@@ -41,9 +41,11 @@ test('kkai app root bypasses login and callback routes and mounts a local runtim
   assert.doesNotMatch(appSource, /if \(!user\)/);
   assert.doesNotMatch(appSource, /window\.location\.pathname === '\/auth\/callback'/);
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
+  assert.match(appSource, /const AdminLayoutSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<AdminLayout \{\.\.\.props\} \/>[\s\S]*?\);/);
+  assert.match(appSource, /const SettingsPageRootSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<SettingsPageRoot \{\.\.\.props\} \/>[\s\S]*?\);/);
   assert.match(
     appSource,
-    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?\? AdminLayoutSuspended[\s\S]*?: rootMode === 'settings'[\s\S]*?\? SettingsPageRootSuspended[\s\S]*?: AppContent\s*\}/
   );
   assert.doesNotMatch(appSource, /if \(createAppRootMode\(\{ pathname: window\.location\.pathname \}\) !== 'workspace'\) \{/);
   assert.match(appSource, /<BillingProvider>\s*<CanvasProvider>/);

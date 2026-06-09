@@ -47,8 +47,8 @@ const hostedApiRequired = [
   "WECHAT_OPEN_REDIRECT_URI",
   "WECHAT_STATE_SIGNING_SECRET",
   "WECHAT_ALLOWED_REDIRECT_ORIGINS",
-  "PAYMENT_SIDECAR_INTERNAL_TOKEN",
-  "PAYMENT_SIDECAR_SETTLEMENT_TOKEN",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
 ];
 
 const hostedApiRecommended = [
@@ -316,11 +316,11 @@ function run() {
     "PROFILE_USER_APIS_ENCRYPTION_SECRET",
     "GOOGLE_OAUTH_CLIENT_SECRET",
     "WECHAT_OPEN_APP_SECRET",
-    "PAYMENT_SIDECAR_INTERNAL_TOKEN",
-    "PAYMENT_SIDECAR_SETTLEMENT_TOKEN",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
   ]);
   misplacedRootServerEnv.forEach((entry) => {
-    warnings.push(`Root env file ${entry.source} contains server-only key ${entry.key}. Move active server secrets into apps/api/.env.local or the VPS runtime env.`);
+    warnings.push(`Root env file ${entry.source} contains server-only key ${entry.key}. Move active server secrets into server/.env.local or the VPS runtime env.`);
   });
 
   printSection("Immediate Blockers");
@@ -360,7 +360,7 @@ function run() {
 
   printSection("Notes");
   console.log("- This script only checks local files and current process env. It does not read remote VPS or Vercel dashboard state.");
-  console.log("- VPS API, payment sidecar, and PostgreSQL secrets must be configured in the VPS runtime environment.");
+  console.log("- VPS API, payment, and PostgreSQL secrets must be configured in the VPS runtime environment.");
   console.log("- If the global Vercel CLI is missing but npm is available, the repo scripts can still run through `npx`.");
   console.log("- Use this check before deploying the frontend or VPS API to avoid copying local-only or legacy managed-database config into hosted environments.");
 }

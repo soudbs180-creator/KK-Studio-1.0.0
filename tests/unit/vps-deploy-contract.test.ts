@@ -17,7 +17,6 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   const webEnv = "scripts/vps/kk-web.env.example";
   const adminWebEnv = "scripts/vps/kk-admin.env.example";
   const apiService = "config/deploy/systemd/kk-api.service";
-  const paymentService = "config/deploy/systemd/kk-payment-sidecar.service";
   const nginxConfig = "config/deploy/nginx/kk-vps-gateway.conf";
   const postgresBootstrap = "scripts/postgres/bootstrap-kk-vps.sql";
 
@@ -28,7 +27,6 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
     webEnv,
     adminWebEnv,
     apiService,
-    paymentService,
     nginxConfig,
     postgresBootstrap,
   ].forEach((relativePath) => {
@@ -45,17 +43,15 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   assert.match(apiEnvSource, /KK_AUTH_REQUIRE_TURNSTILE=/);
   assert.match(apiEnvSource, /KK_SESSION_COOKIE_SECURE=true/);
   assert.match(apiEnvSource, /KK_SESSION_COOKIE_SAME_SITE=none/);
-  assert.match(apiEnvSource, /PAYMENT_SIDECAR_INTERNAL_TOKEN=/);
-  assert.match(apiEnvSource, /PAYMENT_SIDECAR_SETTLEMENT_TOKEN=/);
+  assert.match(apiEnvSource, /STRIPE_SECRET_KEY=/);
+  assert.match(apiEnvSource, /STRIPE_WEBHOOK_SECRET=/);
   assert.match(readSource(webEnv), /VITE_KK_API_BASE_URL=/);
   assert.match(readSource(webEnv), /VITE_KK_ADMIN_URL=/);
   assert.match(readSource(adminWebEnv), /VITE_KK_ADMIN_API_BASE_URL=/);
   assert.match(readSource(apiService), /kk-api\.env/);
-  assert.match(readSource(apiService), /scripts\/run-api-vps\.mjs/);
-  assert.match(readSource(paymentService), /kk-payment-sidecar\.env/);
-  assert.match(readSource(paymentService), /scripts\/run-payment-sidecar-vps\.mjs/);
+  assert.match(readSource(apiService), /server\/index\.js/);
   assert.match(readSource(nginxConfig), /127\.0\.0\.1:3001/);
-  assert.match(readSource(nginxConfig), /127\.0\.0\.1:8080/);
+  assert.doesNotMatch(readSource(nginxConfig), /127\.0\.0\.1:8080/);
 });
 
 test("VPS default web entry serves the main login app while admin stays separate", () => {
@@ -92,7 +88,8 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(nginxSource, /server_name _ 172\.245\.156\.16;/);
   assert.match(nginxSource, /server_name api\.example\.com;/);
   assert.match(nginxSource, /location \/api\/ \{\s*proxy_pass http:\/\/kk_api_upstream\/api\/;/);
-  assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/payment\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/payment\/;/);
+  assert.doesNotMatch(nginxSource, /kk_payment_upstream/);
+  assert.doesNotMatch(nginxSource, /location \/payment\//);
   assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/internal\/ \{\s*return 404;/);
   assert.ok(
     nginxSource.indexOf("server_name _ app.example.com;") < nginxSource.indexOf("server_name api.example.com;"),

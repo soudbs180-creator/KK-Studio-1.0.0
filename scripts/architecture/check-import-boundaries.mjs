@@ -20,29 +20,14 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }
 
-function loadServiceAppImportAllowlist() {
+function assertMigrationAllowlistIsEmpty() {
   const registry = readJson("docs/architecture/MIGRATION_ALLOWLIST_REGISTRY.json");
-  const allowlist = new Map();
-
-  for (const entry of registry.serviceAppImports || []) {
-    const source = toPosix(String(entry.source || ""));
-    const targets = new Set((entry.targets || []).map((target) => toPosix(String(target))));
-    if (!source) {
-      throw new Error("[architecture:check] migration allowlist entry is missing a source path.");
-    }
-    if (targets.size === 0) {
-      throw new Error(`[architecture:check] migration allowlist entry for ${source} must declare at least one target.`);
-    }
-    if (allowlist.has(source)) {
-      throw new Error(`[architecture:check] duplicate service-app migration allowlist entry for ${source}.`);
-    }
-    allowlist.set(source, targets);
+  if ((registry.serviceAppImports || []).length > 0 || (registry.legacyZoneModuleImports || []).length > 0) {
+    throw new Error("[architecture:check] migration allowlists must stay empty after old runtimes are retired.");
   }
-
-  return allowlist;
 }
 
-const serviceAppImportAllowlist = loadServiceAppImportAllowlist();
+assertMigrationAllowlistIsEmpty();
 
 function walkDirectory(relativeDir) {
   const absoluteDir = path.join(root, relativeDir);
@@ -105,19 +90,6 @@ function resolveRepoImport(fromFile, specifier) {
 function classifyFile(relativePath) {
   const normalizedPath = toPosix(relativePath);
 
-  const serviceModuleMatch = normalizedPath.match(
-    /^apps\/(api|payment-sidecar)\/src\/modules\/([^/]+)\/(presentation|application|domain|infrastructure)\//
-  );
-  if (serviceModuleMatch) {
-    return {
-      kind: "service-module",
-      app: serviceModuleMatch[1],
-      moduleName: serviceModuleMatch[2],
-      layer: serviceModuleMatch[3],
-      normalizedPath,
-    };
-  }
-
   const webModuleMatch = normalizedPath.match(/^apps\/web\/src\/modules\/([^/]+)\//);
   if (webModuleMatch) {
     return {
@@ -130,14 +102,6 @@ function classifyFile(relativePath) {
 
   if (normalizedPath.startsWith("apps/web/src/")) {
     return { kind: "web-app", app: "web", normalizedPath };
-  }
-
-  if (normalizedPath.startsWith("apps/api/src/")) {
-    return { kind: "service-app", app: "api", normalizedPath };
-  }
-
-  if (normalizedPath.startsWith("apps/payment-sidecar/src/")) {
-    return { kind: "service-app", app: "payment-sidecar", normalizedPath };
   }
 
   if (normalizedPath.startsWith("packages/contracts/src/")) {
@@ -161,20 +125,6 @@ function classifyFile(relativePath) {
 
 function classifyTarget(relativePath) {
   const normalizedPath = toPosix(relativePath);
-  const serviceModuleMatch = normalizedPath.match(
-    /^apps\/(api|payment-sidecar)\/src\/modules\/([^/]+)(?:\/(presentation|application|domain|infrastructure)(?:\/|$)|\/index\.ts$)/
-  );
-  if (serviceModuleMatch) {
-    return {
-      kind: "service-module-target",
-      app: serviceModuleMatch[1],
-      moduleName: serviceModuleMatch[2],
-      layer: serviceModuleMatch[3] || null,
-      isModuleIndex: normalizedPath.endsWith(`/modules/${serviceModuleMatch[2]}/index.ts`),
-      normalizedPath,
-    };
-  }
-
   const webModuleMatch = normalizedPath.match(/^apps\/web\/src\/modules\/([^/]+)\//);
   if (webModuleMatch) {
     return { kind: "web-module-target", moduleName: webModuleMatch[1], normalizedPath };
@@ -182,14 +132,6 @@ function classifyTarget(relativePath) {
 
   if (normalizedPath.startsWith("apps/web/src/")) {
     return { kind: "web-app-target", normalizedPath };
-  }
-
-  if (normalizedPath.startsWith("apps/api/src/")) {
-    return { kind: "api-app-target", normalizedPath };
-  }
-
-  if (normalizedPath.startsWith("apps/payment-sidecar/src/")) {
-    return { kind: "payment-app-target", normalizedPath };
   }
 
   if (normalizedPath.startsWith("packages/contracts/src/")) {
@@ -228,130 +170,14 @@ function fail(filePath, specifier, reason) {
   failures.push(`${filePath} -> ${specifier}: ${reason}`);
 }
 
-function isAllowlistedServiceAppImport(source, target) {
-  const allowlistedTargets = serviceAppImportAllowlist.get(source.normalizedPath);
-  if (!allowlistedTargets || !allowlistedTargets.has(target.normalizedPath)) {
-    return false;
-  }
-
-  allowlistedDebt.push(`${source.normalizedPath} -> ${target.normalizedPath}`);
-  return true;
-}
-
-function checkServiceModule(source, target, specifier) {
-  if (target.kind === "web-app-target" || target.kind === "web-module-target") {
-    fail(source.normalizedPath, specifier, "service modules must not depend on web implementation files");
-    return;
-  }
-
-  if (target.kind === "legacy-src-target") {
-    if (isAllowlistedServiceAppImport(source, target)) {
-      return;
-    }
-
-    fail(
-      source.normalizedPath,
-      specifier,
-      "service modules must not depend on legacy src/* implementation files; extract a shared runtime surface or use an explicit migration allowlist",
-    );
-    return;
-  }
-
-  if (
-    (target.kind === "api-app-target" && source.app !== "api")
-    || (target.kind === "payment-app-target" && source.app !== "payment-sidecar")
-  ) {
-    fail(source.normalizedPath, specifier, "cross-app service imports are not allowed");
-    return;
-  }
-
-  if (target.kind !== "service-module-target") {
-    return;
-  }
-
-  if (target.moduleName !== source.moduleName) {
-    if (!target.isModuleIndex) {
-      fail(
-        source.normalizedPath,
-        specifier,
-        `cross-module imports must go through the target module index, not ${target.normalizedPath}`
-      );
-    }
-    return;
-  }
-
-  if (!target.layer) {
-    return;
-  }
-
-  if (source.layer === "domain" && target.layer !== "domain") {
-    fail(source.normalizedPath, specifier, "domain layer must stay isolated from application/presentation/infrastructure");
-    return;
-  }
-
-  if (source.layer === "application" && target.layer === "presentation") {
-    fail(source.normalizedPath, specifier, "application layer must not depend on presentation");
-    return;
-  }
-
-  if (source.layer === "presentation" && target.layer === "infrastructure") {
-    fail(source.normalizedPath, specifier, "presentation layer must not depend on infrastructure");
-    return;
-  }
-
-  if (source.layer === "infrastructure" && target.layer === "presentation") {
-    fail(source.normalizedPath, specifier, "infrastructure layer must not depend on presentation");
-  }
-}
-
 function checkWebFile(source, target, specifier) {
-  if (
-    target.kind === "api-app-target" ||
-    target.kind === "payment-app-target" ||
-    target.kind === "service-module-target"
-  ) {
-    fail(source.normalizedPath, specifier, "web code must not import API or payment-sidecar implementation files");
-  }
-}
-
-function checkServiceApp(source, target, specifier) {
-  if (target.kind === "web-app-target" || target.kind === "web-module-target") {
-    fail(source.normalizedPath, specifier, "service app files must not depend on web implementation files");
-    return;
-  }
-
   if (target.kind === "legacy-src-target") {
-    if (isAllowlistedServiceAppImport(source, target)) {
-      return;
-    }
-
-    fail(
-      source.normalizedPath,
-      specifier,
-      "service app files must not depend on legacy src/* implementation files; extract a shared runtime surface or use an explicit migration allowlist",
-    );
-    return;
-  }
-
-  if (
-    target.kind === "api-app-target"
-    || target.kind === "payment-app-target"
-    || target.kind === "service-module-target"
-  ) {
-    const targetApp = target.app || (target.kind === "api-app-target" ? "api" : "payment-sidecar");
-    if (targetApp !== source.app) {
-      if (isAllowlistedServiceAppImport(source, target)) {
-        return;
-      }
-      fail(source.normalizedPath, specifier, "cross-app service implementation imports are not allowed; use packages/shared or contracts");
-    }
+    fail(source.normalizedPath, specifier, "web code must not import retired root src/* implementation files");
   }
 }
 
 function checkContractsPackage(source, target, specifier) {
   if (
-    target.kind === "api-app-target" ||
-    target.kind === "payment-app-target" ||
     target.kind === "web-app-target" ||
     target.kind === "domain-package-target" ||
     target.kind === "shared-package-target" ||
@@ -363,8 +189,6 @@ function checkContractsPackage(source, target, specifier) {
 
 function checkDomainPackage(source, target, specifier) {
   if (
-    target.kind === "api-app-target" ||
-    target.kind === "payment-app-target" ||
     target.kind === "web-app-target" ||
     target.kind === "contracts-package-target" ||
     target.kind === "ui-package-target"
@@ -401,11 +225,6 @@ for (const file of files) {
       continue;
     }
 
-    if (source.kind === "service-module") {
-      checkServiceModule(source, target, specifier);
-      continue;
-    }
-
     if (source.kind === "web-app" || source.kind === "web-module") {
       checkWebFile(source, target, specifier);
       continue;
@@ -421,9 +240,6 @@ for (const file of files) {
       continue;
     }
 
-    if (source.kind === "service-app") {
-      checkServiceApp(source, target, specifier);
-    }
   }
 }
 

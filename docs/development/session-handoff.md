@@ -1,6 +1,6 @@
 # KK Studio Project Handoff (v1.5.6)
 
-Last updated: 2026-06-05
+Last updated: 2026-06-09
 
 ## 1. Project Overview
 
@@ -36,6 +36,65 @@ Do not describe root `src/` as the current live frontend runtime. Do not describ
 - Current partial work: `canvas.arrangeNodes` is registered. With `nodeIds` it applies targeted grid/row/column layout through `updateNodes`; without `nodeIds` it delegates to the existing `CanvasContext.arrangeAllNodes(mode)` path.
 - Current partial work: `KnowledgeStore` now provides a redacted browser projection/cache for `knowledge.searchProject`, `knowledge.recordChange`, `ui.recordLayoutChange`, and `skills.upsertSkill`; it is not authoritative long-term storage.
 - Current partial work: ToolRegistry execution logging now prints redacted `inputSummary` instead of raw tool input, so token-like strings and API-key-like values stay out of console logs.
+
+## 2026-06-09 - Current Mainline Runtime Cleanup
+
+- User request: safely land the current mainline plan, remove retired active runtimes, and unify the project onto `apps/web/`, `server/`, and `packages/*`.
+- Branch state: working branch is `codex/unify-current-mainline`; `main...origin/main` was verified as `0 0` before the cleanup continued.
+- Files touched: retired `apps/api` and `apps/payment-sidecar` tracked runtime files, VPS/systemd/nginx/deploy scripts, portable release scripts, env templates, governance/version scripts, docs/specs, focused tests, `server/index.js`, `server/package-lock.json`, and this handoff.
+- Design decisions:
+  - `server/index.js` remains the backend fact source and now loads `server/.env` plus `server/.env.local` before route modules are imported; existing process env values still win over file values.
+  - Bare `server/index.js` startup now defaults to port `3001`, matching VPS and local bootstrap templates.
+  - `config/release-manifest.json` now names `versionTargets.serverPackage` instead of the retired payment-server wording.
+  - `server/package-lock.json` is refreshed to `1.5.6` and includes the current server dependency closure, including `node-fetch`.
+  - Root `.env.example` stays frontend-public; local backend env is documented through `server/.env.local.example`.
+- Validation passed:
+  - `npm.cmd run governance:version`
+  - `npm.cmd run governance:current`
+  - `npm.cmd run governance:check`
+  - `npm.cmd run architecture:check` (continues to print the known non-blocking UI token warning list)
+  - `npm.cmd run typecheck`
+  - `npm.cmd run spec:check`
+  - `npm.cmd run build`
+  - Focused tests: `local-env-contract`, `local-api-bootstrap-env-hydration`, `vps-deploy-contract`, `vps-deploy-artifacts`, `encoding-check-contract`, `portable-payment-package-contract`, `payment-webhook-raw-body`, and `runtime-governance-upgrade`.
+  - Focused settings/workbench follow-ups: `mobile-settings-taxonomy`, `mobile-settings-browser-verify-script`, `billing-remaining-balance-contract`, `settings-workbench-ui-refit`, `api-settings-workbench-structure`, `capability-route-runtime-preference-contract`, `settings-canonical-entry-regression`, `app-startup-coordinator`, `kkai-app-root`, `prompt-group-browser-verify-script`, `mobile-settings-browser-verify-script`, and `startup-runtime-banner-browser-verify-script`.
+- Full verification:
+  - Passed: `npm.cmd run verify:changes`.
+  - The chain passed architecture, governance, audit, typecheck, spec, build, unit/integration/contract/e2e tests, prompt-group drag smoke, mobile settings smoke, desktop settings smoke, startup runtime banner centering, and encoding/mojibake checks.
+  - Mobile settings smoke used its designed fallback mode because the browser path hit duplicate `Settings Overview` headings while the local API proxy at `127.0.0.1:3001` was not running. The fallback source and HTTP route checks passed.
+  - UI token warnings are still the known non-blocking debt; this pass did not add new hardcoded-token allowances.
+- Risks / next:
+  - `root api/` hosted adapters remain a compatibility surface outside the preferred `server/` runtime boundary; migrate or document them as a deliberate hosted adapter exception in a separate pass.
+  - Env templates are now centered on `server/.env.local` and VPS runtime env, but production secrets, provider route config, and PostgreSQL migration credentials still need operator-side review before release.
+  - Database schema naming is still split across historical docs and runtime tables (`users/plans/orders` versus `profiles/user_credits/payment_orders`); reconcile as a database architecture pass before adding new payment tables.
+  - Payment webhook behavior was not changed beyond server/env wording; the `payment_orders` vs `public.orders` schema drift remains a separate backend reconciliation risk.
+
+## 2026-06-09 - API Route Missing Coverage Fix
+
+- User request: audit current API routes comprehensively and fix the missing routes instead of only reporting them.
+- Files touched in this pass: `server/index.js`, `server/routes/contract-compat.js`, `server/routes/ai-assistant.js`, `server/routes/ocr.js`, `server/routes/user.js`, `server/lib/dispatcher/localUserRouteStore.js`, `server/routes/admin.js`, `server/routes/credit-provider-router.js`, and this handoff.
+- Design decisions:
+  - Added `server/routes/contract-compat.js` as a scoped Express compatibility router for shared/OpenAPI and legacy `packages/api-client` paths that do not yet have dedicated VPS modules.
+  - Mounted the compatibility router from `server/index.js` after existing concrete routers and before telemetry/404, so implemented routes keep precedence.
+  - Fixed AI assistant route double-prefix drift: `/api/api/ai-assistant/*` is gone; `/api/ai-assistant/*` is the active namespace. Added `DELETE /api/ai-assistant/skills/:id`.
+  - Added `/api/v1/ocr` as an alias for the existing OCR proxy.
+  - Added compatibility for `/api/secure-proxy`, `/api/ecommerce-analysis`, `/api/v1/model-proxy/system`, OpenAPI billing/workspace/generation/payment/admin routes, and legacy `/api/billing/plans`, `/api/billing/create-checkout`, `/api/generations`, `PATCH /api/user/me`.
+  - Fixed local user route resolution and missing async `readLocalStorage` / `writeLocalStorage` awaits in the user route store path.
+  - Kept DB writes in existing tables only; no DDL was added. Local/no-DB behavior uses `.kk-local/contract-compat.json`, which is gitignored.
+- Validation passed:
+  - `npm run typecheck:server`
+  - `node --check server/routes/admin.js`
+  - `node --check server/routes/credit-provider-router.js`
+  - `node --check server/routes/contract-compat.js`
+  - Representative Express probe: AI assistant, OCR v1 alias, temp auth, legacy auth, legacy billing, generations, payment order, ecommerce fallback.
+  - OpenAPI route sweep: 36 endpoints checked; endpoint missing / method-not-allowed count was 0. Two 404 responses were resource-not-found for intentionally fake workflow/task/order IDs, not router misses.
+  - Focused tests: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/server-auth-session-routes-contract.test.ts tests/unit/vercel-vps-proxy.test.ts tests/unit/wuyin-user-route-image-mode-contract.test.ts` (9 passed).
+- Not run:
+  - Full `npm run verify:changes`, because the preceding 2026-06-09 handoff already records unrelated current unit-test failures outside this backend route pass.
+- Remaining risks / next:
+  - `/api/ecommerce-analysis` intentionally returns 501 to trigger the existing browser fallback parser unless a server-side ecommerce analyzer is configured later.
+  - `/api/secure-proxy` and `/api/v1/model-proxy/system` now avoid missing-route failures, but successful model execution still depends on valid admin credit models, provider routes, and upstream keys.
+  - Hosted same-origin coverage still depends on `vercel.json` rewrites; the current auth/VPS rewrite contract test passes.
 
 ## 2026-06-05 - User API Key Reveal And Transport Guard
 

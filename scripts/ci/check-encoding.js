@@ -11,7 +11,6 @@ const scanRoots = [
   "docs",
   ".agent",
   "packages",
-  "payment-server",
   "scripts",
   "server",
   "supabase",
@@ -21,7 +20,7 @@ const scanRoots = [
   "README.md",
   "PROJECT_ROOT_GUIDE.md",
   ".env.example",
-  path.join("apps", "api", ".env.local.example"),
+  path.join("server", ".env.local.example"),
 ];
 
 const scanExtensions = new Set([
@@ -45,7 +44,6 @@ const broadMojibakePatternRoots = new Set([
   "api",
   "billing",
   "packages",
-  "payment-server",
   "server",
   "supabase",
 ]);

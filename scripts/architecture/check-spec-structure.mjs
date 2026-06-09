@@ -22,7 +22,7 @@ const requiredPaths = [
 const requiredMarkers = [
   {
     file: "docs/specs/project-spec.md",
-    includes: ["模块化单体", "MVC", "typed client", "payment-sidecar"],
+    includes: ["模块化单体", "MVC", "typed client", "server/"],
   },
   {
     file: "docs/specs/openapi.yaml",

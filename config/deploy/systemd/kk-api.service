@@ -9,7 +9,7 @@ User=kkstudio
 Group=kkstudio
 WorkingDirectory=/opt/kk-studio/current
 EnvironmentFile=/etc/kk-studio/kk-api.env
-ExecStart=/usr/bin/node --env-file=/etc/kk-studio/kk-api.env scripts/run-api-vps.mjs
+ExecStart=/usr/bin/node --env-file=/etc/kk-studio/kk-api.env server/index.js
 Restart=always
 RestartSec=3
 StandardOutput=append:/opt/kk-studio/shared/logs/kk-api.log

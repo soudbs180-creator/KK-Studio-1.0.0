@@ -536,19 +536,19 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       if (mode === 'full' && logsLoadedRef.current) {
-        void refreshBillingRef.current({
+        void refreshBilling({
           includeTransactions: true,
           silent: true,
         });
         return;
       }
 
-      void refreshBillingRef.current({
+      void refreshBilling({
         includeTransactions: false,
         silent: true,
       });
     }, delayMs);
-  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap, refreshBilling]);
 
   useEffect(() => {
     refreshPromiseRef.current = null;
@@ -665,7 +665,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const triggerRefresh = () => {
-      scheduleRealtimeRefresh(0);
+      scheduleRealtimeRefresh(0, logsLoadedRef.current ? 'full' : 'balance');
     };
 
     const handleVisibilityChange = () => {
@@ -886,4 +886,3 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     </BillingContext.Provider>
   );
 };
-

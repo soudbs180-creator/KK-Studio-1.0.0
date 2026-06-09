@@ -29,7 +29,6 @@
         "noEmit": true
     },
     "include": [
-        "src/**/*.d.ts",
         "apps/**/*.ts",
         "apps/**/*.tsx",
         "packages/**/*.ts"
@@ -37,7 +36,6 @@
     "exclude": [
         "dist",
         "node_modules",
-        "apps/api",
         "apps/mobile",
         "apps/web/__create",
         "apps/web/src/__create",

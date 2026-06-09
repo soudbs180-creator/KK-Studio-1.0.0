@@ -1,8 +1,6 @@
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import {
   LEGACY_SETTINGS_ROUTE_REDIRECTS,
-  getSettingsNavItemById,
-  getSettingsNavItemByPath,
   getSettingsNavItems,
   getSettingsNavSections,
   resolveCanonicalSettingsViewId,
@@ -27,7 +25,7 @@ export const renderSettingsRoutes = renderSettingsRouteElements;
 export { LEGACY_SETTINGS_ROUTE_REDIRECTS, resolveCanonicalSettingsViewId };
 
 export const getNavItemByPath = (path: string): SettingsNavItem | undefined =>
-  getSettingsNavItemByPath(path, 'zh-CN');
+  getSettingsNavItems('zh-CN').find((item) => item.path === path);
 
 export const getNavItemById = (id: SettingsViewId): SettingsNavItem | undefined =>
-  getSettingsNavItemById(id, 'zh-CN');
+  getSettingsNavItems('zh-CN').find((item) => item.id === resolveCanonicalSettingsViewId(id));

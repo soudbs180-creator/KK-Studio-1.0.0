@@ -57,7 +57,7 @@ test("prompt-group browser verification script uses browser preflight and fallba
 test("prompt-group browser verification script accepts hook-based drag wiring contracts", () => {
   const source = readSource("scripts/test/verify-prompt-group-drag.mjs");
 
-  assert.match(source, /const dragHookSource = readSource\('src\/app\/usePromptGroupDragHandlers\.ts'\);/);
+  assert.match(source, /const dragHookSource = readSource\('apps\/web\/src\/app\/usePromptGroupDragHandlers\.ts'\);/);
   assert.match(source, /source:\s*dragHookSource,\s*pattern:\s*\/commitPromptGroupDrag[\s\S]*shouldAutoRegroupPromptGroup/);
 });
 

@@ -2,12 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const sourceRoots = ["src", "apps", "packages", "server", "api", "billing", "payment-server", "netlify"];
+const sourceRoots = ["apps", "packages", "server"];
 const includeExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".cjs", ".mjs"]);
 const failures = [];
 
 const storageAllowlist = new Set([
-  "src/services/api/authAccessToken.ts",
+  "apps/web/src/services/api/authAccessToken.ts",
   "packages/api-client/src/client.ts",
   "packages/shared/src/contracts/client/kk-api-client.ts",
 ]);

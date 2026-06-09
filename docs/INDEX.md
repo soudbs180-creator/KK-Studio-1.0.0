@@ -1,6 +1,6 @@
 # KK Studio 文档文件速查索引 (docs/INDEX.md)
 
-以下为当前 **v1.5.5** 架构下，所有有效核心文档的文件路径及其定位的速查表。
+以下为当前 **v1.5.6** 架构下，所有有效核心文档的文件路径及其定位的速查表。
 
 | 核心文件路径 | 职责定位 | 关联的模块修改 |
 |---|---|---|
@@ -37,7 +37,7 @@
 | [development/COMPLETE_DEVELOPMENT_GUIDE.md](development/COMPLETE_DEVELOPMENT_GUIDE.md) | KK Studio 核心系统架构与完整开发指南 | 梳理整体功能、模块分层与 AI 接管逻辑 |
 | [development/multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) | 多供应商架构的详细设计和开发实践说明 | 重构模型路由供应商底层 |
 | **业务计划参考 (Superpowers)** | | |
-| [superpowers/plans/](superpowers/plans/) | 具体业务功能开发计划（如局部重绘、个人版离线代理等） | 恢复或维护特定的超级功能 |
+| [superpowers/plans/](superpowers/plans/) | 历史业务功能开发计划（如局部重绘、个人版离线代理等） | 仅作历史参考；当前实现以 `AGENTS.md` 和源码为准 |
 | **审计与优化报告 (Reports)** | | |
 | [reports/root-notes/PERFORMANCE_OPTIMIZATION.md](reports/root-notes/PERFORMANCE_OPTIMIZATION.md) | 桌面端/画布的性能优化策略 | 画布渲染性能调优 |
 | **归档历史 (Archive)** | | |

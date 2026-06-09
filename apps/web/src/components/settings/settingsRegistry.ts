@@ -169,8 +169,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     titleEn: 'Settings Overview',
     descriptionZh: '先看状态，再进入具体设置页。',
     descriptionEn: 'Review status before opening a detailed settings page.',
-    primaryActionLabelZh: '查看供应商配置',
-    primaryActionLabelEn: 'Open Provider Settings',
+    primaryActionLabelZh: '打开 API 工作台',
+    primaryActionLabelEn: 'Open API Workspace',
     primaryActionTarget: 'api-management',
     statusSummaryLabelZh: '系统状态',
     statusSummaryLabelEn: 'System status',
@@ -288,7 +288,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     labelZh: '供应商配置',
     labelEn: 'Provider Settings',
     descriptionZh: '管理您的本地 API 通道与服务供应商。',
-    descriptionEn: 'Local APIs and provider channels configuration.',
+    descriptionEn: 'Filter API, provider, or platform entries.',
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
@@ -441,6 +441,6 @@ export function getSettingsSearchPlaceholder(
   view: CanonicalSettingsViewId,
   language: AppLanguage = 'zh-CN',
 ): string {
-  const meta = getSettingsViewMeta(view, language);
-  return pickByLanguage(language, `搜索${meta.title}`, `Search ${meta.title}`);
+  void view;
+  return pickByLanguage(language, '筛选设置导航', 'Filter settings navigation');
 }

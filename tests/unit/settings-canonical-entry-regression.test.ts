@@ -14,9 +14,11 @@ test('production settings entry delegates to the localized router-backed workben
   const settingsEntrySource = readSource('apps/web/src/components/settings/SettingsPanel.tsx');
 
   assert.match(appSource, /lazyWithRetry\(\(\) => import\('\.\/app\/SettingsPageRoot'\)\)/);
+  assert.match(appSource, /const AdminLayoutSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<AdminLayout \{\.\.\.props\} \/>[\s\S]*?\);/);
+  assert.match(appSource, /const SettingsPageRootSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<SettingsPageRoot \{\.\.\.props\} \/>[\s\S]*?\);/);
   assert.match(
     appSource,
-    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?\? AdminLayoutSuspended[\s\S]*?: rootMode === 'settings'[\s\S]*?\? SettingsPageRootSuspended[\s\S]*?: AppContent\s*\}/
   );
   assert.match(settingsPageRootSource, /const SettingsPanel = lazyWithRetry\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
   assert.match(settingsPageRootSource, /presentation="page"/);

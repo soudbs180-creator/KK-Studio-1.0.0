@@ -104,10 +104,7 @@ function ensureArtifactsDir() {
 }
 
 function readSource(relativePath) {
-  const sourcePath = relativePath.startsWith('src/')
-    ? path.join('apps/web', relativePath)
-    : relativePath;
-  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
@@ -138,10 +135,10 @@ async function assertHttpHtml(url) {
 }
 
 function verifyPromptGroupSourceContracts() {
-  const appSource = readSource('src/App.tsx');
-  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
-  const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const imageSource = readSource('src/components/image/ImageCard2.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const dragHookSource = readSource('apps/web/src/app/usePromptGroupDragHandlers.ts');
+  const promptSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const imageSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
 
   const checks = [
     { source: appSource, pattern: /usePromptGroupDragHandlers\(/, label: 'App prompt-group drag hook wiring' },

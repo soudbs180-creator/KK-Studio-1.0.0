@@ -688,7 +688,7 @@ if (-not (Test-LocalApiBaseUrl -BaseUrl $frontendApiBaseUrl)) {
                 throw "Local API config preflight failed and local-only fallback is disabled. Latest error output:`n$apiLogSnippet"
             }
 
-            throw "Local API config preflight failed and local-only fallback is disabled. Set VITE_KK_API_BASE_URL to a ready VPS API or fix apps/api/.env.local."
+            throw "Local API config preflight failed and local-only fallback is disabled. Set VITE_KK_API_BASE_URL to a ready VPS API or fix server/.env.local."
         }
 
         $apiScript = $apiLocalScript

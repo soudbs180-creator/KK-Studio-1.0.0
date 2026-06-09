@@ -255,10 +255,7 @@ function ensureArtifactsDir() {
 }
 
 function readSource(relativePath) {
-  const sourcePath = relativePath.startsWith('src/')
-    ? path.join('apps/web', relativePath)
-    : relativePath;
-  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
@@ -404,20 +401,20 @@ async function resolveFallbackRoutes(browserPreflight, targetUrl) {
 }
 
 function verifyMobileSourceContracts() {
-  const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
-  const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-  const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
-  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
+  const mobileHeaderSource = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
+  const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+  const mobileTileSource = readSource('apps/web/src/components/mobile/MobileResultTile.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
 
   const checks = [
     /data-testid="mobile-header-menu-button"/,
     /data-testid="mobile-more-menu-settings"/,
     /data-testid="mobile-more-sheet"/,
     /data-testid=\{`mobile-result-tile-\$\{entry\.id\}`\}/,
-    /settings-dashboard-cockpit__node/,
-    /aria-label=\{pick\([\s\S]*'\+ Add API'[\s\S]*\)\}/,
+    /dashboard-grid-card/,
+    /data-testid="api-official-provider-add"/,
     /testId\?: string;/,
     /data-testid=\{testId\}/,
     /testId="settings-workbench-overview"/,

@@ -9,12 +9,12 @@ $PortableDistDir = Join-Path $AppDir 'dist'
 $WebScript = Join-Path $AppDir 'portable-app-server.cjs'
 $UpdateScript = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
 $UpdateConfig = Join-Path $ReleaseRoot 'support\update-config.json'
-$PaymentDir = Join-Path $AppDir 'server'
-$PaymentScript = Join-Path $PaymentDir 'index.js'
-$PaymentEnv = Join-Path $PaymentDir '.env'
+$ServerDir = Join-Path $AppDir 'server'
+$ServerScript = Join-Path $ServerDir 'index.js'
+$ServerEnv = Join-Path $ServerDir '.env'
 $WebPidFile = Join-Path $RunDir 'web.pid'
 $WebPortFile = Join-Path $RunDir 'web.port'
-$PaymentPidFile = Join-Path $RunDir 'payment.pid'
+$ServerPidFile = Join-Path $RunDir 'server.pid'
 
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -110,7 +110,7 @@ function Get-WorkspacePortableSyncPlan {
         return $null
     }
 
-    $workspaceManifestPath = Join-Path $WorkspaceRoot 'dist\app-version.json'
+    $workspaceManifestPath = Join-Path $WorkspaceRoot 'apps\web\dist\app-version.json'
     $portableManifestPath = Join-Path $PortableDistDir 'app-version.json'
     $workspaceManifest = Get-JsonFile -Path $workspaceManifestPath
     $portableManifest = Get-JsonFile -Path $portableManifestPath
@@ -181,7 +181,7 @@ function Sync-PortableBundleFromWorkspace {
     Write-Host "Detected newer workspace files. Syncing portable bundle before launch..."
     Write-Host "Reasons: $reasonText"
 
-    $workspaceDistDir = Join-Path $workspaceRoot 'dist'
+    $workspaceDistDir = Join-Path $workspaceRoot 'apps\web\dist'
     if (Test-Path -LiteralPath $PortableDistDir) {
         Remove-Item -LiteralPath $PortableDistDir -Recurse -Force
     }
@@ -355,19 +355,19 @@ Start-HiddenNodeProcess `
         HOST = '127.0.0.1'
     } | Out-Null
 
-if ((Test-Path -LiteralPath $PaymentScript) -and (Test-Path -LiteralPath $PaymentDir) -and (Test-Path -LiteralPath $PaymentEnv)) {
+if ((Test-Path -LiteralPath $ServerScript) -and (Test-Path -LiteralPath $ServerDir) -and (Test-Path -LiteralPath $ServerEnv)) {
     Start-HiddenNodeProcess `
-        -ScriptPath $PaymentScript `
-        -WorkingDirectory $PaymentDir `
-        -PidFile $PaymentPidFile `
-        -StdOutLog (Join-Path $LogDir 'payment.out.log') `
-        -StdErrLog (Join-Path $LogDir 'payment.err.log') | Out-Null
-} elseif (Test-Path -LiteralPath $PaymentScript) {
+        -ScriptPath $ServerScript `
+        -WorkingDirectory $ServerDir `
+        -PidFile $ServerPidFile `
+        -StdOutLog (Join-Path $LogDir 'server.out.log') `
+        -StdErrLog (Join-Path $LogDir 'server.err.log') | Out-Null
+} elseif (Test-Path -LiteralPath $ServerScript) {
     $note = @(
-        "Payment sidecar was not started because app\server\.env is missing.",
-        "The main app still works. Payment features stay disabled until that file is provided."
+        "Portable server was not started because app\server\.env is missing.",
+        "The main app still works. Backend features that require local secrets stay disabled until that file is provided."
     ) -join [Environment]::NewLine
-    Set-Content -LiteralPath (Join-Path $LogDir 'payment.note.txt') -Value $note -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $LogDir 'server.note.txt') -Value $note -Encoding utf8
 }
 
 if (-not (Wait-ForUrl -Url "$WebUrl/health")) {

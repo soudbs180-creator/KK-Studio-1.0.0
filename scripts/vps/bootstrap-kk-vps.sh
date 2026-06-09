@@ -133,7 +133,6 @@ Next steps:
 3. Run scripts/vps/deploy-kk-vps.sh from the repo root
 4. Start services:
    systemctl restart kk-api
-   systemctl restart kk-payment-sidecar
    systemctl reload nginx
 EOF
 }

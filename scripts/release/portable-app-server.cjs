@@ -799,7 +799,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname.startsWith('/api/')) {
     sendJson(res, 501, {
-      error: 'This portable build only includes /api/pricing-proxy and /api/nutrient-document locally. Payment can run on :8080 when configured.',
+      error: 'This portable web server only includes /api/pricing-proxy and /api/nutrient-document locally. Configure a remote VITE_KK_API_BASE_URL or app/server/.env for full backend features.',
     });
     return;
   }

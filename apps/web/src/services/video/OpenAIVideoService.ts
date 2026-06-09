@@ -9,7 +9,7 @@ interface OpenAIVideoConfig {
 }
 
 const BROWSER_DIRECT_VIDEO_CALLS_DISABLED_MESSAGE =
-    'Direct OpenAI-compatible video calls are disabled. Use the secure proxy or payment sidecar instead.';
+    'Direct OpenAI-compatible video calls are disabled. Use the secure server proxy instead.';
 
 /**
  * Generate video using OpenAI-compatible endpoint (NewAPI/Apifox format)

@@ -123,10 +123,7 @@ async function installSmokeApiRoutes(page) {
 }
 
 function readSource(relativePath) {
-  const sourcePath = relativePath.startsWith('src/')
-    ? path.join('apps/web', relativePath)
-    : relativePath;
-  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
@@ -288,19 +285,19 @@ async function resolveFallbackRoutes(browserPreflight, targetUrl) {
 }
 
 function verifyDesktopSourceContracts() {
-  const appSource = readSource('src/App.tsx');
-  const appDesktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const appDesktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   const checks = [
     /data-testid="desktop-user-menu-trigger"/,
     /desktop-user-menu-settings/,
     /data-testid="settings-page-root"/,
     /sections=\{sections\}/,
-    /settings-dashboard-cockpit__node/,
+    /dashboard-grid-card/,
     /API setup/,
     /data-testid="api-official-editor-back"/,
     /testId="settings-workbench-stage"/,

@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-// 中文注释：仅保留 payment-server 作为遗留兼容区，下线 api 和 billing 兼容区检查
-const legacyRoots = ["payment-server"];
+// 中文注释：旧运行区已从当前主链路移除，本检查保留空集合以防后续恢复旧桥接扫描。
+const legacyRoots = [];
 const supportedExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".mts", ".cts"]);
 const excludeSegments = new Set(["node_modules", "dist", "release", ".git"]);
 
@@ -114,7 +114,7 @@ function resolveRepoImport(fromFile, specifier) {
 }
 
 function isCanonicalModuleTarget(relativePath) {
-  return /^apps\/(api|web|payment-sidecar)\/src\/modules\//.test(relativePath);
+  return /^apps\/web\/src\/modules\//.test(relativePath);
 }
 
 for (const file of legacyRoots.flatMap((relativeDir) => walk(relativeDir))) {

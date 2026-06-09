@@ -8,6 +8,12 @@ import {
   adminModelService,
   type AdminProvider,
 } from "../../services/model/adminModelService.ts";
+import {
+  ADMIN_MODEL_QUALITY_KEYS,
+  createDefaultAdminQualityPricing,
+  normalizeAdminQualityPricing,
+  type AdminModelQualityPricing,
+} from "../../services/model/adminModelQuality.ts";
 import { safeOpenLink } from "../../utils/browserUtils";
 
 type AdminPresetKind = "official" | "relay";
@@ -212,6 +218,8 @@ type AdminProviderDraft = {
   color: string;
   kind: AdminPresetKind;
   creditCost: string;
+  advancedEnabled: boolean;
+  qualityPricing: AdminModelQualityPricing;
   isEditing?: boolean;
   originalModels?: any[];
   retainApiKeyFingerprints?: string[];
@@ -248,6 +256,8 @@ const createDraftFromPreset = (preset: AdminApiPreset): AdminProviderDraft => ({
   color: preset.color,
   kind: preset.kind,
   creditCost: "1",
+  advancedEnabled: false,
+  qualityPricing: createDefaultAdminQualityPricing(1),
 });
 
 const createEmptyDraft = (): AdminProviderDraft => ({
@@ -262,6 +272,8 @@ const createEmptyDraft = (): AdminProviderDraft => ({
   color: "#3B82F6",
   kind: "relay",
   creditCost: "1",
+  advancedEnabled: false,
+  qualityPricing: createDefaultAdminQualityPricing(1),
 });
 
 const buildModelPayload = (model: {
@@ -278,6 +290,9 @@ const buildModelPayload = (model: {
   colorSecondary?: string | null;
   textColor?: "white" | "black";
   maxCallsLimit?: number | null;
+  advancedEnabled?: boolean;
+  mixWithSameModel?: boolean;
+  qualityPricing?: AdminModelQualityPricing | Record<string, { enabled: boolean; creditCost: number }>;
 }) => ({
   modelId: model.modelId,
   displayName: model.displayName || model.modelId,
@@ -292,6 +307,9 @@ const buildModelPayload = (model: {
   colorSecondary: model.colorSecondary || null,
   textColor: model.textColor === "black" ? "black" : "white",
   maxCallsLimit: model.maxCallsLimit ?? null,
+  advancedEnabled: Boolean(model.advancedEnabled),
+  mixWithSameModel: Boolean(model.mixWithSameModel),
+  qualityPricing: normalizeAdminQualityPricing(model.qualityPricing, normalizeCreditCost(model.creditCost)),
 });
 
 export const ApiConfigPanel: React.FC = () => {
@@ -302,6 +320,8 @@ export const ApiConfigPanel: React.FC = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [providerDraft, setProviderDraft] = useState<AdminProviderDraft | null>(null);
   const [draftCreditCost, setDraftCreditCost] = useState<string>("1");
+  const [draftAdvancedPricingEnabled, setDraftAdvancedPricingEnabled] = useState(false);
+  const [draftQualityPricing, setDraftQualityPricing] = useState<AdminModelQualityPricing>(() => createDefaultAdminQualityPricing(1));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -345,7 +365,10 @@ export const ApiConfigPanel: React.FC = () => {
 
   useEffect(() => {
     if (!selectedModel) return;
-    setDraftCreditCost(String(selectedModel.creditCost || 1));
+    const creditCost = normalizeCreditCost(selectedModel.creditCost || 1);
+    setDraftCreditCost(String(creditCost));
+    setDraftAdvancedPricingEnabled(Boolean(selectedModel.advancedEnabled));
+    setDraftQualityPricing(normalizeAdminQualityPricing(selectedModel.qualityPricing, creditCost));
   }, [selectedModel]);
 
   const filteredPresets = ADMIN_API_PRESETS.filter((preset) => preset.kind === presetTab);
@@ -353,12 +376,16 @@ export const ApiConfigPanel: React.FC = () => {
   const handlePreset = (preset: AdminApiPreset) => {
     setProviderDraft(createDraftFromPreset(preset));
     setDraftCreditCost("1");
+    setDraftAdvancedPricingEnabled(false);
+    setDraftQualityPricing(createDefaultAdminQualityPricing(1));
     setMessage(`${preset.name} 已载入。填写 API Key、模型 ID 和基础积分费用后即可保存。`);
   };
 
   const handleCreateCustomDraft = () => {
     setProviderDraft(createEmptyDraft());
     setDraftCreditCost("1");
+    setDraftAdvancedPricingEnabled(false);
+    setDraftQualityPricing(createDefaultAdminQualityPricing(1));
     setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID、API Key 和基础积分费用后保存。");
   };
 
@@ -383,7 +410,11 @@ export const ApiConfigPanel: React.FC = () => {
       colorSecondary: model.colorSecondary || null,
       textColor: model.textColor || "white",
       maxCallsLimit: model.maxCallsLimit || null,
+      advancedEnabled: Boolean(model.advancedEnabled),
+      mixWithSameModel: Boolean(model.mixWithSameModel),
+      qualityPricing: normalizeAdminQualityPricing(model.qualityPricing, model.creditCost || 1),
     })) : [];
+    const nextQualityPricing = normalizeAdminQualityPricing(detailModel?.qualityPricing || firstModel?.qualityPricing, creditCost);
 
     setProviderDraft({
       providerId: provider.providerId,
@@ -397,16 +428,48 @@ export const ApiConfigPanel: React.FC = () => {
       color: firstModel?.colorStart || detailModel?.color || "#3B82F6",
       kind: provider.providerKind || providerDetail?.providerKind || "relay",
       creditCost: String(creditCost),
+      advancedEnabled: Boolean(detailModel?.advancedEnabled ?? firstModel?.advancedEnabled),
+      qualityPricing: nextQualityPricing,
       isEditing: true,
       originalModels,
       retainApiKeyFingerprints: (providerDetail?.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
     });
     setDraftCreditCost(String(creditCost));
+    setDraftAdvancedPricingEnabled(Boolean(detailModel?.advancedEnabled ?? firstModel?.advancedEnabled));
+    setDraftQualityPricing(nextQualityPricing);
     setMessage(`已载入供应商 ${provider.name} 的配置以供修改。`);
   };
 
   const handleDraftChange = (patch: Partial<AdminProviderDraft>) => {
     setProviderDraft((current) => current ? { ...current, ...patch } : current);
+  };
+
+  const handleAdvancedPricingToggle = (enabled: boolean) => {
+    setDraftAdvancedPricingEnabled(enabled);
+    setProviderDraft((current) => current ? { ...current, advancedEnabled: enabled } : current);
+  };
+
+  const handleQualityPricingChange = (
+    quality: (typeof ADMIN_MODEL_QUALITY_KEYS)[number],
+    patch: Partial<{ enabled: boolean; creditCost: string | number }>,
+  ) => {
+    setDraftQualityPricing((current) => {
+      const defaults = createDefaultAdminQualityPricing(normalizeCreditCost(draftCreditCost));
+      const nextRule = {
+        ...defaults[quality],
+        ...current[quality],
+        ...patch,
+      };
+      const nextPricing = {
+        ...current,
+        [quality]: {
+          enabled: nextRule.enabled !== false,
+          creditCost: normalizeCreditCost(nextRule.creditCost),
+        },
+      };
+      setProviderDraft((draft) => draft ? { ...draft, qualityPricing: nextPricing } : draft);
+      return nextPricing;
+    });
   };
 
   const handleSaveDraftProvider = async () => {
@@ -420,6 +483,7 @@ export const ApiConfigPanel: React.FC = () => {
     }
 
     const creditCost = normalizeCreditCost(providerDraft.creditCost || draftCreditCost);
+    const qualityPricing = normalizeAdminQualityPricing(providerDraft.qualityPricing || draftQualityPricing, creditCost);
     const providerId = providerDraft.isEditing && providerDraft.providerId ? providerDraft.providerId : buildProviderId(providerName, baseUrl);
     const nextModel = buildModelPayload({
       modelId,
@@ -435,6 +499,9 @@ export const ApiConfigPanel: React.FC = () => {
       colorSecondary: null,
       textColor: "white",
       maxCallsLimit: null,
+      advancedEnabled: providerDraft.advancedEnabled,
+      mixWithSameModel: false,
+      qualityPricing,
     });
 
     let finalModels: any[] = [];
@@ -493,21 +560,29 @@ export const ApiConfigPanel: React.FC = () => {
         providerKind: providerDetail.providerKind || "relay",
         apiKeys: [],
         retainApiKeyFingerprints: (providerDetail.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
-        models: providerDetail.models.map((model) => buildModelPayload({
-          modelId: model.modelId,
-          displayName: model.displayName || model.modelId,
-          description: model.description || "",
-          endpointType: model.endpointType || selectedModel.endpoint || "openai_chat_completions",
-          requestProfileId: model.requestProfileId || selectedModel.requestProfileId || "",
-          creditCost: model.modelId === selectedModel.id ? creditCost : model.creditCost || 1,
-          priority: model.priority || 0,
-          weight: model.weight || 1,
-          isActive: model.isActive,
-          color: model.color || selectedModel.colorStart || "#3B82F6",
-          colorSecondary: model.colorSecondary || selectedModel.colorSecondary || null,
-          textColor: model.textColor || "white",
-          maxCallsLimit: model.maxCallsLimit || null,
-        })),
+        models: providerDetail.models.map((model) => {
+          const isTarget = model.modelId === selectedModel.id;
+          const nextPricing = normalizeAdminQualityPricing(draftQualityPricing, creditCost);
+          const qualityPricing = isTarget ? nextPricing : normalizeAdminQualityPricing(model.qualityPricing, model.creditCost || 1);
+          return buildModelPayload({
+            modelId: model.modelId,
+            displayName: model.displayName || model.modelId,
+            description: model.description || "",
+            endpointType: model.endpointType || selectedModel.endpoint || "openai_chat_completions",
+            requestProfileId: model.requestProfileId || selectedModel.requestProfileId || "",
+            creditCost: isTarget ? creditCost : model.creditCost || 1,
+            priority: model.priority || 0,
+            weight: model.weight || 1,
+            isActive: model.isActive,
+            color: model.color || selectedModel.colorStart || "#3B82F6",
+            colorSecondary: model.colorSecondary || selectedModel.colorSecondary || null,
+            textColor: model.textColor || "white",
+            maxCallsLimit: model.maxCallsLimit || null,
+            advancedEnabled: isTarget ? draftAdvancedPricingEnabled : Boolean(model.advancedEnabled),
+            mixWithSameModel: Boolean(model.mixWithSameModel),
+            qualityPricing,
+          });
+        }),
       } as any);
 
       if (!response.success) {
@@ -516,6 +591,8 @@ export const ApiConfigPanel: React.FC = () => {
       }
 
       selectedModel.creditCost = creditCost;
+      selectedModel.advancedEnabled = draftAdvancedPricingEnabled;
+      selectedModel.qualityPricing = normalizeAdminQualityPricing(draftQualityPricing, creditCost);
       setProviders([...providers]);
       setMessage(`${selectedModel.displayName} 的基础积分费用已保存。`);
       await refreshAdminProviders();
@@ -622,6 +699,39 @@ export const ApiConfigPanel: React.FC = () => {
               disabled={!selectedModel || saving}
             />
           </label>
+          <label>
+            <span>图像档位计费</span>
+            <input
+              type="checkbox"
+              checked={draftAdvancedPricingEnabled}
+              onChange={(event) => handleAdvancedPricingToggle(event.target.checked)}
+              disabled={!selectedModel || saving}
+            />
+          </label>
+          <div className="admin-api-nexus__pricing-grid">
+            {ADMIN_MODEL_QUALITY_KEYS.map((quality) => {
+              const rule = draftQualityPricing[quality] || createDefaultAdminQualityPricing(normalizeCreditCost(draftCreditCost))[quality];
+              return (
+                <label key={quality}>
+                  <span>{quality}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={rule.creditCost}
+                    onChange={(event) => handleQualityPricingChange(quality, { creditCost: event.target.value })}
+                    disabled={!selectedModel || saving || !draftAdvancedPricingEnabled}
+                  />
+                  <input
+                    type="checkbox"
+                    checked={rule.enabled}
+                    onChange={(event) => handleQualityPricingChange(quality, { enabled: event.target.checked })}
+                    disabled={!selectedModel || saving || !draftAdvancedPricingEnabled}
+                    aria-label={`${quality} enabled`}
+                  />
+                </label>
+              );
+            })}
+          </div>
           <button type="button" className="admin-api-nexus__save" disabled={!selectedModel || saving} onClick={handleSavePricing}>
             <Save size={15} />
             <span>{saving ? "保存中" : "保存积分费用"}</span>

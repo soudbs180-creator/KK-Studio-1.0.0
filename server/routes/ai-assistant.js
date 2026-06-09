@@ -57,7 +57,7 @@ router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
  * POST /api/ai-assistant/tool-calls
  * 职责：同步持久化工具审计调用日志。
  */
-router.post('/api/ai-assistant/tool-calls', verifyAuth, async (req, res) => {
+router.post('/ai-assistant/tool-calls', verifyAuth, async (req, res) => {
   const { id, runId, toolName, inputSummary, outputSummary, status, error, startedAt, completedAt, idempotencyKey } = req.body;
   if (!id || !runId || !toolName || !inputSummary || !status || !startedAt) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -121,7 +121,7 @@ router.post('/ai-assistant/skills', verifyAuth, async (req, res) => {
  * POST /api/ai-assistant/changes
  * 职责：向数据库权威源同步添加项目变更审计记录（折叠到 knowledge_documents）。
  */
-router.post('/api/ai-assistant/changes', verifyAuth, async (req, res) => {
+router.post('/ai-assistant/changes', verifyAuth, async (req, res) => {
   const { id, title, summary, source, paths = [] } = req.body;
   if (!id || !title || !summary || !source) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -153,7 +153,7 @@ router.post('/api/ai-assistant/changes', verifyAuth, async (req, res) => {
  * GET /api/ai-assistant/knowledge
  * 职责：简单检索后端知识库中的内容，结合前端返回。
  */
-router.get('/api/ai-assistant/knowledge', verifyAuth, async (req, res) => {
+router.get('/ai-assistant/knowledge', verifyAuth, async (req, res) => {
   const { query = '' } = req.query;
   const pool = getPool();
   try {
@@ -170,6 +170,26 @@ router.get('/api/ai-assistant/knowledge', verifyAuth, async (req, res) => {
   } catch (err) {
     console.error('[后端AI助手] 查询知识库失败:', err);
     res.status(500).json({ error: '查询失败', details: err.message });
+  }
+});
+
+/**
+ * DELETE /api/ai-assistant/skills/:id
+ * 职责：删除指定 Skill 记录，保持前端 KnowledgeStore 删除动作不落 404。
+ */
+router.delete('/ai-assistant/skills/:id', verifyAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: '缺少 Skill ID' });
+  }
+
+  const pool = getPool();
+  try {
+    await pool.query('DELETE FROM public.agent_skills WHERE id = $1 OR name = $1', [id]);
+    res.json({ ok: true, deleted: true, id });
+  } catch (err) {
+    console.error('[后端AI助手] 删除 Skill 失败:', err);
+    res.status(500).json({ error: '删除失败', details: err.message });
   }
 });
 

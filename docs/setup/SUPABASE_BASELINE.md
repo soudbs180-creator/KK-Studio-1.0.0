@@ -1,12 +1,14 @@
-# Supabase Baseline
+# Supabase Baseline (Historical)
 
-This repository now treats the current remote Supabase project as the source of truth:
+This document is a historical Supabase-era baseline. The current source of truth is `server/` + VPS PostgreSQL migrations, as defined by `AGENTS.md` and `docs/governance/PROJECT_STATE_AND_VALIDATION.md`.
+
+Historical project reference:
 
 - Project ref: `ovdjhdofjysanamgkfng`
 - Public URL: `https://ovdjhdofjysanamgkfng.supabase.co`
 - Required Edge Function: `secure-model-proxy`
 
-## Canonical runtime objects
+## Historical runtime objects
 
 - `profiles`
   Stores user identity data and `user_apis`.
@@ -34,10 +36,11 @@ This repository now treats the current remote Supabase project as the source of 
 
 ## Audit expectations
 
-`npm run supabase:audit` should confirm:
+`npm run supabase:audit` was a historical Supabase-era check. Current backend and payment validation belongs to `server/`, VPS env, PostgreSQL migrations, and Stripe webhook tests.
+
+Historical Supabase audit expectations were:
 
 - local config points to `ovdjhdofjysanamgkfng`
 - canonical tables and view exist
 - required RPCs exist
 - `secure-model-proxy` is deployed
-- `payment-server` points to the same Supabase project

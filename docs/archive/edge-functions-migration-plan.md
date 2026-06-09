@@ -1,4 +1,4 @@
-# Edge Functions Migration Plan
+# Archived Edge Functions Migration Plan
 
 ## Goal
 

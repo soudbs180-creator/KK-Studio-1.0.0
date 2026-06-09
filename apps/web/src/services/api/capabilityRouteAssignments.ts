@@ -148,18 +148,18 @@ const notifyListeners = () => {
   listeners.forEach((listener) => listener());
 };
 
-// 简体中文注释：新增自定义能力路由开启状态管理（强制返回 true，前台已删除开关但仍通过此接口维护状态一致）
 export const isCustomRoutingEnabled = (): boolean => {
-  // 保持与旧接口逻辑匹配以通过断言，但目前根据版本要求强制返回 true
-  const staleCheck = canUseStorage() && window.localStorage.getItem(CUSTOM_ROUTING_KEY) === 'true';
-  return true;
+  if (!canUseStorage()) {
+    return false;
+  }
+  return window.localStorage.getItem(CUSTOM_ROUTING_KEY) === 'true';
 };
 
 export const setCustomRoutingEnabled = (enabled: boolean): void => {
   if (!canUseStorage()) {
     return;
   }
-  window.localStorage.setItem(CUSTOM_ROUTING_KEY, 'true');
+  window.localStorage.setItem(CUSTOM_ROUTING_KEY, String(enabled));
   notifyListeners();
 };
 
@@ -317,6 +317,10 @@ const ROLE_PRIORITY_ORDER: CapabilityRole[] = [
 
 // 简体中文注释：根据后备和优先级配置解析继承后的分配设置
 export const resolveCapabilityRouteAssignment = (role: CapabilityRole): CapabilityRouteAssignment => {
+  if (!isCustomRoutingEnabled()) {
+    return getSmartAutoAssignment(role);
+  }
+
   const assignments = readAssignments();
   const getRawAssignment = (r: CapabilityRole) => assignments.find((a) => a.role === r);
 

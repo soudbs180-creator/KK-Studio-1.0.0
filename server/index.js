@@ -6,7 +6,28 @@
 
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const dotenv = require('dotenv');
+
+const DEFAULT_PORT = 3001;
+
+function loadServerEnvFiles() {
+  const protectedKeys = new Set(Object.keys(process.env));
+  const serverEnv = ['.env', '.env.local']
+    .map((fileName) => path.resolve(__dirname, fileName))
+    .filter((filePath) => fs.existsSync(filePath))
+    .reduce((values, filePath) => ({
+      ...values,
+      ...dotenv.parse(fs.readFileSync(filePath)),
+    }), {});
+
+  for (const [key, value] of Object.entries(serverEnv)) {
+    if (!protectedKeys.has(key)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadServerEnvFiles();
 
 const express = require('express');
 const cors = require('cors');
@@ -24,6 +45,7 @@ const aiAssistantRouter = require('./routes/ai-assistant');
 const configRouter = require('./routes/config');
 const providerProbeRouter = require('./routes/provider-probe');
 const telemetryRouter = require('./routes/telemetry');
+const contractCompatRouter = require('./routes/contract-compat');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -162,6 +184,7 @@ function createApp() {
   app.use('/api', ocrRouter);
   app.use('/api', aiAssistantRouter);
   app.use('/api', configRouter);
+  app.use(contractCompatRouter);
   app.use('/', telemetryRouter);
 
   app.use((err, _req, res, _next) => {
@@ -205,7 +228,7 @@ function ensureUploadsDirectoryWritable() {
   }
 }
 
-function startServer(port = Number(process.env.PORT || 8080), options = {}) {
+function startServer(port = Number(process.env.PORT || DEFAULT_PORT), options = {}) {
   assertRequiredEnv(options);
   ensureUploadsDirectoryWritable();
   const { startReconciliationDaemon } = require('./lib/dispatcher/reconciliation');
@@ -217,7 +240,7 @@ function startServer(port = Number(process.env.PORT || 8080), options = {}) {
 }
 
 if (require.main === module) {
-  startServer(Number(process.env.PORT || 8080));
+  startServer(Number(process.env.PORT || DEFAULT_PORT));
 }
 
 module.exports = {
@@ -227,5 +250,6 @@ module.exports = {
   createApp,
   getAllowedOrigins,
   isLocalDevelopmentOrigin,
+  loadServerEnvFiles,
   startServer,
 };

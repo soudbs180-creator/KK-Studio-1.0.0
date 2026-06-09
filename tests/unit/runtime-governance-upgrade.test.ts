@@ -26,7 +26,7 @@ test("project docs publish one truth table for current and transitional runtimes
   assert.match(handoffSource, /Mobile workspace: `apps\/mobile\/`/);
 });
 
-test("verification chain includes integration tests and payment-server static checks", () => {
+test("verification chain includes integration tests and current backend static checks", () => {
   const packageJson = JSON.parse(readSource("package.json")) as {
     scripts: Record<string, string>;
   };

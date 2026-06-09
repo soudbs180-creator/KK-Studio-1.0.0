@@ -69,9 +69,18 @@ if (rootPackage.version !== expectedVersion) {
   fail(`${targets.rootPackage} version is ${rootPackage.version}, expected ${expectedVersion}`);
 }
 
-const paymentPackage = JSON.parse(read(targets.paymentServerPackage));
-if (paymentPackage.version !== expectedVersion) {
-  fail(`${targets.paymentServerPackage} version is ${paymentPackage.version}, expected ${expectedVersion}`);
+if (targets.paymentServerPackage) {
+  fail("versionTargets.paymentServerPackage has been retired; use versionTargets.serverPackage for server/package.json");
+}
+
+const serverPackageTarget = targets.serverPackage || targets.paymentServerPackage;
+if (!serverPackageTarget) {
+  fail("versionTargets.serverPackage must point to server/package.json");
+} else {
+  const serverPackage = JSON.parse(read(serverPackageTarget));
+  if (serverPackage.version !== expectedVersion) {
+    fail(`${serverPackageTarget} version is ${serverPackage.version}, expected ${expectedVersion}`);
+  }
 }
 
 for (const target of workspacePackageTargets) {
@@ -139,16 +148,17 @@ for (const { path: target, requiredPatterns } of documentationExpectations) {
       fail(`${target} is missing required version-governance statement ${pattern}`);
     }
   }
-  expectNoRegex(target, /payment-server\/mcpClient\.js/u, `${target} still references deleted payment-server/mcpClient.js`);
+  expectNoRegex(target, /mcpClient\.js/u, `${target} still references a deleted runtime mcpClient.js file`);
 }
 
-const distManifest = readJsonIfExists("dist/app-version.json");
+const distManifestPath = "apps/web/dist/app-version.json";
+const distManifest = readJsonIfExists(distManifestPath);
 if (distManifest) {
   if (distManifest.version !== expectedVersion) {
-    fail(`dist/app-version.json version is ${distManifest.version}, expected ${expectedVersion}`);
+    fail(`${distManifestPath} version is ${distManifest.version}, expected ${expectedVersion}`);
   }
   if (distManifest.releaseDate !== expectedReleaseDate) {
-    fail(`dist/app-version.json releaseDate is ${distManifest.releaseDate}, expected ${expectedReleaseDate}`);
+    fail(`${distManifestPath} releaseDate is ${distManifest.releaseDate}, expected ${expectedReleaseDate}`);
   }
 }
 
@@ -165,7 +175,7 @@ if (portableManifest) {
     }
     : manifest;
   if (distManifest && JSON.stringify(normalizeManifest(portableManifest)) !== JSON.stringify(normalizeManifest(distManifest))) {
-    fail(`${portableManifestPath} does not match dist/app-version.json. Run npm run package:portable.`);
+    fail(`${portableManifestPath} does not match ${distManifestPath}. Run npm run package:portable.`);
   }
 }
 

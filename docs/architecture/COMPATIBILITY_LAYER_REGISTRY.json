@@ -5,7 +5,7 @@
       "path": "apps/web/src/services/billing/costSyncBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Translates legacy frontend billing refresh triggers into the migrated billing/runtime model.",
-      "upstreamCanonicalSource": "apps/api/src/modules/billing",
+      "upstreamCanonicalSource": "server/routes",
       "downstreamDependents": [
         "apps/web/src/services/auth/keyManager.ts"
       ],
@@ -19,7 +19,7 @@
       "path": "apps/web/src/services/llm/syncImageBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Bridges legacy image-generation responses into the synchronized workspace/update pipeline.",
-      "upstreamCanonicalSource": "apps/api/src/modules/generation",
+      "upstreamCanonicalSource": "server/routes",
       "downstreamDependents": [
         "apps/web/src/services/llm/LLMService.ts"
       ],
@@ -33,7 +33,7 @@
       "path": "apps/web/src/services/model/modelPricingOverrideBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Applies pricing overrides while old provider pricing snapshots coexist with migrated model catalog data.",
-      "upstreamCanonicalSource": "apps/api/src/modules/model-catalog",
+      "upstreamCanonicalSource": "server/routes",
       "downstreamDependents": [
         "apps/web/src/services/auth/keyManager.ts"
       ],
@@ -47,7 +47,7 @@
       "path": "apps/web/src/workflow/adapters/workflowToLegacy.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Maps migrated workflow structures back into legacy canvas consumers during transition.",
-      "upstreamCanonicalSource": "apps/api/src/modules/workflow",
+      "upstreamCanonicalSource": "server/routes",
       "downstreamDependents": [
         "apps/web/src/workflow/adapters/canvasToWorkflow.ts"
       ],

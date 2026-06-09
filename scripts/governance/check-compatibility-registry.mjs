@@ -51,7 +51,7 @@ for (const entry of registry.entries) {
   }
 }
 
-const includeRoots = ["src", "apps", "payment-server"];
+const includeRoots = ["apps", "packages", "server"];
 const excludeSegments = new Set(["node_modules", "dist", "release", ".git", "build"]);
 
 function hasCompatibilityMarker(relativePath) {

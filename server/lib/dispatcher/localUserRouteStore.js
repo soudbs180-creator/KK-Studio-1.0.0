@@ -259,6 +259,15 @@ async function resolveLocalUserRoute(userId, routeId) {
   return null;
 }
 
+function resolveRouteFromProfileState(profileState, routeId) {
+  const index = buildProfileRouteIndex(normalizeProfileState(profileState));
+  for (const candidate of buildRouteLookupCandidates(routeId)) {
+    const route = index.routeByAlias.get(candidate);
+    if (route) return route;
+  }
+  return null;
+}
+
 function hasLegacyProfilePayload(data) {
   return Array.isArray(data.slots) || Array.isArray(data.providers) || Array.isArray(data.entries);
 }
@@ -325,6 +334,7 @@ async function writeLocalStorage(data) {
 
 module.exports = {
   resolveLocalUserRoute,
+  resolveRouteFromProfileState,
   readLocalStorage,
   writeLocalStorage,
   normalizeProfileState,

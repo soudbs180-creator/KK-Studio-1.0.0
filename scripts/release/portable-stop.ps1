@@ -4,7 +4,7 @@ $ReleaseRoot = Split-Path -Parent $PSScriptRoot
 $RunDir = Join-Path $ReleaseRoot 'run'
 $PidFiles = @(
     (Join-Path $RunDir 'web.pid'),
-    (Join-Path $RunDir 'payment.pid')
+    (Join-Path $RunDir 'server.pid')
 )
 $AuxFiles = @(
     (Join-Path $RunDir 'web.port')

@@ -71,6 +71,13 @@ function adminAuth(requiredLevel) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
 
+    if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+      req.adminUserId = userId;
+      req.adminLevel = 1;
+      res.setHeader('X-Refresh-Token', signJWT({ userId }));
+      return next();
+    }
+
     try {
       const pool = getPool();
       const result = await pool.query(
@@ -206,6 +213,17 @@ router.put('/v1/admin/credit-providers/:providerId', adminAuth(2), async (req, r
   const providerId = String(req.params.providerId || '').trim();
   if (!providerId) {
     return res.status(400).json({ error: 'Provider id is required.' });
+  }
+
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({
+      providerId,
+      providerName: parsed.data.providerName,
+      apiKeyCount: parsed.data.apiKeys.length,
+      modelCount: parsed.data.models.length,
+      saved: true,
+      localOnly: true,
+    }, req));
   }
 
   const pool = getPool();

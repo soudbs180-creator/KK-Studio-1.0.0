@@ -47,7 +47,8 @@ describe("Wuyin / Suchuang documented API routing", () => {
     assert.match(governanceSource, /expectNoWuyinBrowserDirect/);
     assert.match(governanceSource, /callWuyinClientDirect/);
     assert.match(governanceSource, /checkWuyinClientDirectTaskStatus/);
-    assert.match(governanceSource, /fetch\(targetUrl\)/);
-    assert.match(governanceSource, /fetch\(detailUrl\)/);
+    assert.match(governanceSource, /fetch\\\(targetUrl/);
+    assert.match(governanceSource, /fetch\\\(detailUrl/);
+    assert.match(governanceSource, /Browser-side Wuyin detail polling with a user API key is forbidden/);
   });
 });

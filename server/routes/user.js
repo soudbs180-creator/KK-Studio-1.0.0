@@ -1136,6 +1136,9 @@ function localRecordMatchesRoute(record, routeTarget, rawRouteId) {
 }
 
 async function resolveLocalUserRoute(userId, routeId) {
+  if (userId && typeof userId === 'object') {
+    return localUserRouteStore.resolveRouteFromProfileState(userId, routeId);
+  }
   return localUserRouteStore.resolveLocalUserRoute(userId, routeId);
 }
 
@@ -1933,9 +1936,9 @@ async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
 }
 
 router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
   try {
     const genericResponse = await handleWuyinGenericProxy(req, res, profileState);
@@ -2107,9 +2110,9 @@ router.use([
 
 // 1. 获取 key-manager 状态
 router.get(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
   return res.json({
     success: true,
     data: {
@@ -2123,7 +2126,7 @@ router.get(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], async (
 
 // 2. 覆盖 key-manager 状态
 router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,
@@ -2132,7 +2135,7 @@ router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], async (
     providers: req.body.providers || profileState.providers || []
   };
   writeProfileState(data, req.profileUserId, nextData);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
   return res.json({
     success: true,
     data: {
@@ -2146,9 +2149,9 @@ router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], async (
 
 // 3. 获取 user-apis 列表
 router.get('/v1/profile/user-apis', async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
   return res.json({
     success: true,
     data: {
@@ -2160,9 +2163,9 @@ router.get('/v1/profile/user-apis', async (req, res) => {
 
 // 3.1 显式查看单条已保存密钥。普通列表接口仍不应默认返回所有明文密钥。
 router.post('/v1/profile/user-apis/reveal-secret', async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
   const result = revealProfileApiSecret(profileState, req.body);
   if (!result.ok) {
@@ -2193,9 +2196,9 @@ router.put(['/v1/profile/user-apis', '/v1/profile/user-apis/payload'], async (re
     providers: req.body.providers || [],
     entries: req.body.entries || []
   };
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   writeProfileState(data, req.profileUserId, nextData);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
   return res.json({
     success: true,
     data: nextData,
@@ -2205,14 +2208,14 @@ router.put(['/v1/profile/user-apis', '/v1/profile/user-apis/payload'], async (re
 
 // 5. 新增/覆盖 user-apis entries (replaceUserApiEntries)
 router.post('/v1/profile/user-apis', async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,
     entries: req.body.entries || []
   };
   writeProfileState(data, req.profileUserId, nextData);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
   return res.json({
     success: true,
     data: {

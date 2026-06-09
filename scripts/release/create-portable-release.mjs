@@ -11,10 +11,11 @@ const supportDir = path.join(releaseRoot, 'support');
 const logsDir = path.join(releaseRoot, 'logs');
 const runDir = path.join(releaseRoot, 'run');
 
-const distSourceDir = path.join(rootDir, 'dist');
-const paymentSourceDir = path.join(rootDir, 'server');
-const paymentTargetDir = path.join(appDir, 'server');
-const includePaymentEnv = process.argv.includes('--include-payment-env') || process.env.KK_STUDIO_INCLUDE_PAYMENT_ENV === '1';
+const distSourceDir = path.join(rootDir, 'apps', 'web', 'dist');
+const serverSourceDir = path.join(rootDir, 'server');
+const serverTargetDir = path.join(appDir, 'server');
+const includeServerEnv = process.argv.includes('--include-server-env')
+  || process.env.KK_STUDIO_INCLUDE_SERVER_ENV === '1';
 const releaseScriptSourceDir = path.join(rootDir, 'scripts', 'release');
 const portableAppServerSource = path.join(releaseScriptSourceDir, 'portable-app-server.cjs');
 const portableLaunchSource = path.join(releaseScriptSourceDir, 'portable-launch.ps1');
@@ -22,20 +23,12 @@ const portableStopSource = path.join(releaseScriptSourceDir, 'portable-stop.ps1'
 const updateScriptSource = path.join(releaseScriptSourceDir, 'portable-self-update.ps1');
 const portableRuntimeSourceClosures = [
   {
-    source: path.join(rootDir, 'apps', 'payment-sidecar', 'src'),
-    target: path.join(appDir, 'apps', 'payment-sidecar', 'src'),
+    source: path.join(rootDir, 'server'),
+    target: serverTargetDir,
   },
   {
-    source: path.join(rootDir, 'apps', 'api', 'src', 'lib', 'request-authenticator.ts'),
-    target: path.join(appDir, 'apps', 'api', 'src', 'lib', 'request-authenticator.ts'),
-  },
-  {
-    source: path.join(rootDir, 'apps', 'api', 'src', 'modules', 'auth', 'infrastructure', 'kk-session-token.ts'),
-    target: path.join(appDir, 'apps', 'api', 'src', 'modules', 'auth', 'infrastructure', 'kk-session-token.ts'),
-  },
-  {
-    source: path.join(rootDir, 'packages', 'contracts', 'src'),
-    target: path.join(appDir, 'packages', 'contracts', 'src'),
+    source: path.join(rootDir, 'packages', 'api-client', 'src'),
+    target: path.join(appDir, 'packages', 'api-client', 'src'),
   },
   {
     source: path.join(rootDir, 'packages', 'shared', 'src'),
@@ -135,22 +128,22 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
-async function ensurePaymentDependencies() {
-  const paymentTargetNodeModules = path.join(paymentTargetDir, 'node_modules');
+async function ensureServerDependencies() {
+  const serverTargetNodeModules = path.join(serverTargetDir, 'node_modules');
   const appNodeModules = path.join(appDir, 'node_modules');
-  ensureExists(path.join(paymentTargetDir, 'package-lock.json'), 'server/package-lock.json was not found.');
+  ensureExists(path.join(serverTargetDir, 'package-lock.json'), 'server/package-lock.json was not found.');
 
   const npmArgs = ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'];
   if (process.platform === 'win32') {
     await runCommand('cmd.exe', ['/d', '/s', '/c', `npm.cmd ${npmArgs.join(' ')}`], {
-      cwd: paymentTargetDir,
+      cwd: serverTargetDir,
     });
   } else {
     await runCommand('npm', npmArgs, {
-      cwd: paymentTargetDir,
+      cwd: serverTargetDir,
     });
   }
-  await copyDirectory(paymentTargetNodeModules, appNodeModules);
+  await copyDirectory(serverTargetNodeModules, appNodeModules);
 }
 
 async function getDirectorySize(targetPath) {
@@ -202,9 +195,9 @@ function buildStopBat() {
 }
 
 function buildReadme() {
-  const paymentNote = includePaymentEnv
+  const serverEnvNote = includeServerEnv
     ? 'server/.env was included in this build.'
-    : 'server/.env was intentionally not included. Local payment stays disabled until you add it manually.';
+    : 'server/.env was intentionally not included. Local backend features that require secrets stay disabled until you add it manually.';
 
   return [
     'KK Studio Portable',
@@ -213,7 +206,7 @@ function buildReadme() {
     '- A prebuilt web app in app/dist',
     '- A bundled node.exe runtime',
     '- A local launcher that opens KK Studio at http://127.0.0.1:3000',
-    '- Optional payment sidecar files if they existed at packaging time',
+    '- The current server runtime files under app/server',
     '',
     'How to use',
     '1. Double-click "Start KK Studio.bat".',
@@ -224,13 +217,13 @@ function buildReadme() {
     '- When this bundle is launched from <project-root>/release/KK-Studio-Portable, it automatically syncs the latest workspace dist and portable support scripts before startup.',
     '- This avoids stale release files inside the repo from overriding newer source builds.',
     '',
-    'Payment note',
-    `- ${paymentNote}`,
-    '- If you need local payment, place a valid .env file inside app/server/.',
+    'Server env note',
+    `- ${serverEnvNote}`,
+    '- If you need local backend features that require secrets, place a valid .env file inside app/server/.',
     '',
     'Cloud deployment',
     '- This folder is only for portable local distribution.',
-    '- Keep deploying the main project source with your existing Netlify or Vercel setup.',
+    '- Keep deploying the main project source with your existing VPS and hosted frontend setup.',
     '',
     'Optional self-update setup',
     '- Copy support/update-config.json.example to support/update-config.json.',
@@ -255,7 +248,7 @@ function buildAppPackageJson() {
 }
 
 async function main() {
-  ensureExists(distSourceDir, 'dist/ was not found. Run npm run build first.');
+  ensureExists(distSourceDir, 'apps/web/dist/ was not found. Run npm run build first.');
   await assertPortableRemoteKkApiBaseUrl(distSourceDir);
   ensureExists(process.execPath, `node executable was not found: ${process.execPath}`);
   ensureExists(portableAppServerSource, 'scripts/release/portable-app-server.cjs was not found.');
@@ -293,27 +286,27 @@ async function main() {
     }
   }
 
-  if (fs.existsSync(paymentSourceDir)) {
-    await copyDirectory(paymentSourceDir, paymentTargetDir);
+  if (fs.existsSync(serverSourceDir)) {
+    await copyDirectory(serverSourceDir, serverTargetDir);
 
-    const targetNodeModules = path.join(paymentTargetDir, 'node_modules');
+    const targetNodeModules = path.join(serverTargetDir, 'node_modules');
     if (fs.existsSync(targetNodeModules)) {
       await rm(targetNodeModules, { recursive: true, force: true });
     }
 
-    const targetEnv = path.join(paymentTargetDir, '.env');
+    const targetEnv = path.join(serverTargetDir, '.env');
     if (fs.existsSync(targetEnv)) {
       await rm(targetEnv, { force: true });
     }
 
-    if (includePaymentEnv) {
-      const paymentEnvPath = path.join(paymentSourceDir, '.env');
-      if (fs.existsSync(paymentEnvPath)) {
-        await copyFile(paymentEnvPath, targetEnv);
+    if (includeServerEnv) {
+      const serverEnvPath = path.join(serverSourceDir, '.env');
+      if (fs.existsSync(serverEnvPath)) {
+        await copyFile(serverEnvPath, targetEnv);
       }
     }
 
-    await ensurePaymentDependencies();
+    await ensureServerDependencies();
   }
 
   const releaseSize = await getDirectorySize(releaseRoot);
@@ -321,7 +314,7 @@ async function main() {
     '',
     `Portable package created: ${releaseRoot}`,
     `Portable package size: ${formatSize(releaseSize)}`,
-    `Payment env included: ${includePaymentEnv ? 'yes' : 'no'}`,
+    `Server env included: ${includeServerEnv ? 'yes' : 'no'}`,
   ].join('\n');
 
   process.stdout.write(`${summary}\n`);

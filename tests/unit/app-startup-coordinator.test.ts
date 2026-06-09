@@ -55,9 +55,11 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(appSource, /showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}/);
   assert.match(appSource, /onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}/);
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
+  assert.match(appSource, /const AdminLayoutSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<AdminLayout \{\.\.\.props\} \/>[\s\S]*?\);/);
+  assert.match(appSource, /const SettingsPageRootSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<SettingsPageRoot \{\.\.\.props\} \/>[\s\S]*?\);/);
   assert.match(
     appSource,
-    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?\? AdminLayoutSuspended[\s\S]*?: rootMode === 'settings'[\s\S]*?\? SettingsPageRootSuspended[\s\S]*?: AppContent\s*\}/
   );
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);

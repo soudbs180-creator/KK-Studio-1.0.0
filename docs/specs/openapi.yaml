@@ -2,15 +2,15 @@ openapi: 3.1.0
 info:
   title: KK Studio Unified API
   version: 1.0.0
-  summary: REST + OpenAPI 3.1 contract for the modular monolith API and payment sidecar.
+  summary: REST + OpenAPI 3.1 contract for the server-backed API and payment routes.
   description: |
     This contract freezes the first wave of external and internal-facing APIs used by KK Studio.
-    All routes return a unified JSON envelope and use typed DTOs.
+    All routes return a unified JSON envelope and use typed DTOs through the current server/ backend.
 servers:
   - url: https://api.kkai.plus
     description: Main API / BFF
   - url: https://payment.kkai.plus
-    description: Payment sidecar
+    description: Payment route compatibility host backed by server/
 security:
   - bearerAuth: []
 tags:
@@ -784,7 +784,7 @@ paths:
   /payment/v1/orders:
     post:
       tags: [Payment API]
-      summary: Create a payment order in the payment sidecar
+      summary: Create a payment order through the server payment route
       operationId: createPaymentOrder
       security:
         - bearerAuth: []

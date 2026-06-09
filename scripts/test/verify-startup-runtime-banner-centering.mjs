@@ -22,10 +22,7 @@ function ensureArtifactsDir() {
 }
 
 function readSource(relativePath) {
-  const sourcePath = relativePath.startsWith('src/')
-    ? path.join('apps/web', relativePath)
-    : relativePath;
-  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
@@ -88,9 +85,9 @@ async function resolveFallbackRoutes(browserPreflight, targetUrl) {
 }
 
 function verifyBannerSourceContracts() {
-  const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const appSource = readSource('src/App.tsx');
+  const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   const checks = [
     /data-testid="startup-runtime-banner"/,

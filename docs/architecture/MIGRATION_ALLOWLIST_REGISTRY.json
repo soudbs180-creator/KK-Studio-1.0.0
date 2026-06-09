@@ -1,48 +1,5 @@
 {
-  "serviceAppImports": [
-    {
-      "source": "apps/payment-sidecar/src/server.ts",
-      "targets": [
-        "apps/api/src/lib/request-authenticator.ts"
-      ],
-      "reason": "The payment sidecar still reuses the internal request authenticator until that contract is extracted into a shared runtime surface.",
-      "canonicalSource": "packages/shared/src",
-      "riskLevel": "medium",
-      "regressionTests": [
-        "tests/contract/payment-sidecar.contract.test.ts",
-        "tests/unit/payment-sidecar-service.test.ts"
-      ],
-      "removalCondition": "Delete once internal service-to-service authentication is provided through packages/shared or a dedicated internal contract package."
-    }
-  ],
-  "legacyZoneModuleImports": [
-    {
-      "source": "server/auth_routes.ts",
-      "targets": [
-        "apps/api/src/modules/auth/index.ts"
-      ],
-      "reason": "The legacy server shell still mounts migrated auth routes while the old route bootstrap is being retired.",
-      "canonicalSource": "apps/api/src/modules/auth",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/auth-http-routes.test.ts",
-        "tests/unit/auth-data-routes.test.ts"
-      ],
-      "removalCondition": "Delete once the legacy server bootstrap no longer mounts auth routes directly."
-    },
-    {
-      "source": "server/billing_routes.ts",
-      "targets": [
-        "apps/api/src/modules/billing/index.ts"
-      ],
-      "reason": "The legacy server shell still mounts migrated billing routes while the old billing bootstrap is being retired.",
-      "canonicalSource": "apps/api/src/modules/billing",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-http-routes.test.ts"
-      ],
-      "removalCondition": "Delete once the legacy server bootstrap no longer mounts billing routes directly."
-    }
-  ],
+  "serviceAppImports": [],
+  "legacyZoneModuleImports": [],
   "frontendSupabaseAccess": []
 }

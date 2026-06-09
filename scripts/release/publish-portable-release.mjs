@@ -15,19 +15,19 @@ function readJson(filePath) {
 
 function printUsage() {
   process.stdout.write([
-    "Usage: node scripts/release/publish-portable-release.mjs [--base-url <url>] [--channel <name>] [--allow-payment-env]",
+    "Usage: node scripts/release/publish-portable-release.mjs [--base-url <url>] [--channel <name>] [--allow-server-env]",
     "",
     "Options:",
     "  --base-url <url>        Public URL prefix for portable artifacts.",
     "  --channel <name>        Output channel under release/publish/. Default: stable.",
-    "  --allow-payment-env     Allow publishing a portable bundle that still contains app/server/.env.",
+    "  --allow-server-env      Allow publishing a portable bundle that still contains app/server/.env.",
     "",
   ].join("\n"));
 }
 
 function parseArgs(argv) {
   const options = {
-    allowPaymentEnv: false,
+    allowServerEnv: false,
     baseUrl: "",
     channel: "stable",
     help: false,
@@ -44,8 +44,8 @@ function parseArgs(argv) {
         options.channel = argv[index + 1] || options.channel;
         index += 1;
         break;
-      case "--allow-payment-env":
-        options.allowPaymentEnv = true;
+      case "--allow-server-env":
+        options.allowServerEnv = true;
         break;
       case "--help":
       case "-h":
@@ -127,9 +127,11 @@ async function main() {
   const publishManifestPath = path.join(publishDir, "manifest.json");
   const existingPublishManifest = fs.existsSync(publishManifestPath) ? readJson(publishManifestPath) : null;
 
-  const paymentEnvPath = path.join(portableBundleDir, "app", "server", ".env");
-  if (fs.existsSync(paymentEnvPath) && !options.allowPaymentEnv && process.env.KK_STUDIO_ALLOW_PORTABLE_PAYMENT_ENV !== "1") {
-    throw new Error("Portable bundle still contains app/server/.env. Remove it or pass --allow-payment-env.");
+  const serverEnvPath = path.join(portableBundleDir, "app", "server", ".env");
+  if (fs.existsSync(serverEnvPath)
+    && !options.allowServerEnv
+    && process.env.KK_STUDIO_ALLOW_PORTABLE_SERVER_ENV !== "1") {
+    throw new Error("Portable bundle still contains app/server/.env. Remove it or pass --allow-server-env.");
   }
 
   const baseUrl = normalizeBaseUrl(options.baseUrl || process.env.KK_PORTABLE_PUBLISH_BASE_URL || deriveBaseUrlFromManifest(existingPublishManifest));

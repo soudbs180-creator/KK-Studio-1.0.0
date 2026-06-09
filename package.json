@@ -29,7 +29,7 @@
     "build": "npm run build -w packages/api-client && vite build --configLoader native --config apps/web/vite.config.ts",
     "organize:local": "node scripts/maintenance/organize-local-files.mjs",
     "package:portable": "npm run build && node scripts/release/create-portable-release.mjs",
-    "package:portable:with-payment-env": "npm run build && node scripts/release/create-portable-release.mjs --include-payment-env",
+    "package:portable:with-server-env": "npm run build && node scripts/release/create-portable-release.mjs --include-server-env",
     "publish:portable": "node scripts/release/publish-portable-release.mjs",
     "package:portable:publish": "npm run package:portable && npm run publish:portable",
     "spec:check": "node scripts/architecture/check-spec-structure.mjs && npx swagger-cli validate docs/specs/openapi.yaml",
@@ -86,7 +86,6 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@netlify/functions": "^5.1.5",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^25.5.2",

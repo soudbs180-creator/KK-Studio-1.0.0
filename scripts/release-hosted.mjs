@@ -44,12 +44,12 @@ function printUsage() {
 Options:
   --preview      Deploy Vercel as a preview instead of production.
   --skip-check   Skip the hosted preflight check.
-  --skip-vps     Skip the VPS API/payment-sidecar deploy step.
+  --skip-vps     Skip the VPS backend deploy step.
   --skip-vercel  Skip Vercel deployment.
   --help, -h     Show this help message.
 
 Environment:
-  KK_VPS_DEPLOY_COMMAND          Command that deploys PostgreSQL migrations, apps/api, and apps/payment-sidecar on the production VPS.
+  KK_VPS_DEPLOY_COMMAND          Command that deploys PostgreSQL migrations and the server/ backend on the production VPS.
   KK_VPS_PREVIEW_DEPLOY_COMMAND  Optional command that deploys the preview/staging VPS API. Production VPS deploy is skipped for --preview unless this is set.`);
 }
 
@@ -97,7 +97,7 @@ function main() {
 
   console.log("\n[release:hosted] Workflow finished.");
   console.log("[release:hosted] Reminder: confirm VITE_KK_API_BASE_URL points at the VPS API before validating hosted auth.");
-  console.log("[release:hosted] Reminder: confirm VPS PostgreSQL, payment, Google, and WeChat secrets exist before smoke tests.");
+  console.log("[release:hosted] Reminder: confirm VPS PostgreSQL, Stripe, Google, and WeChat secrets exist before smoke tests.");
 }
 
 try {

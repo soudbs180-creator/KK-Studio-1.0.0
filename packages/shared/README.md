@@ -4,5 +4,5 @@
 
 使用规则：
 
-- 可以被 `apps/api`、`apps/payment-sidecar`、`packages/contracts` 复用
+- 可以被 `server/`、`apps/web/`、`packages/api-client` 复用
 - 不承载具体业务流程

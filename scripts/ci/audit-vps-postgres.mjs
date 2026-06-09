@@ -50,7 +50,7 @@ export const RUNTIME_TABLE_CONTRACT = Object.freeze([
   { name: "credit_exchange_rates", role: "billing", rationale: "Recharge exchange-rate configuration." },
   { name: "credit_transactions", role: "billing", rationale: "Credit ledger for debit, settlement, and refunds." },
   { name: "recharge_submissions", role: "billing", rationale: "Manual recharge order state and admin review queue." },
-  { name: "payment_orders", role: "payment", rationale: "Payment sidecar durable order state." },
+  { name: "payment_orders", role: "payment", rationale: "Server-backed durable payment order state." },
   { name: "payment_callbacks", role: "payment", rationale: "Payment callback audit and settlement dedupe." },
 ]);
 

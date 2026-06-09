@@ -45,8 +45,8 @@ function resolveDatabaseUrl() {
     return explicitUrl;
   }
 
-  const apiEnv = parseEnvFile(resolveEnvFile(path.join("apps", "api", ".env.local")));
-  return String(apiEnv.DATABASE_URL || "").trim();
+  const serverEnv = parseEnvFile(resolveEnvFile(path.join("server", ".env.local")));
+  return String(serverEnv.DATABASE_URL || "").trim();
 }
 
 function resolveAuthIdentityFile() {
@@ -90,7 +90,7 @@ function readPasswordUsers(filePath) {
 async function importUsers() {
   const databaseUrl = resolveDatabaseUrl();
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required. Set it in apps/api/.env.local or process.env.");
+    throw new Error("DATABASE_URL is required. Set it in server/.env.local or process.env.");
   }
 
   const authIdentityFile = resolveAuthIdentityFile();

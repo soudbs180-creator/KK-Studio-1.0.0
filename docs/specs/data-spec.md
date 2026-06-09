@@ -1,23 +1,23 @@
 # KK Studio 数据规格书
 
 文档状态：Draft Frozen v1  
-目标数据库：Supabase PostgreSQL  
+目标数据库：VPS PostgreSQL（`migrations/` 为结构变更事实源）
 数据库命名：`snake_case`  
 API 字段命名：`camelCase`
 
 ## 1. 总体原则
 
-- `auth.users` 继续作为认证主表，业务主数据通过 `profiles` 扩展。
+- `server/` 通过 `profiles`、`password_identities`、`user_sessions` 等表维护当前认证与业务身份。
 - 所有业务主键默认使用 UUID。
 - 所有写操作必须留下审计信息。
 - 所有余额变化必须经 `credit_ledger`。
 - 所有异步任务必须具备状态机。
-- 所有表必须显式定义主键、外键、索引、唯一约束和 RLS。
+- 所有表必须显式定义主键、外键、索引、唯一约束和服务端访问边界。
 - 历史表允许保留，但必须标记兼容策略与退场计划。
 
-## 1.1 运行时基线（2026-03-23）
+## 1.1 运行时基线（2026-06-09）
 
-当前远端 Supabase 仍运行在“兼容运行时”阶段。以下对象是当前真实运行面，审计与迁移必须先保障它们，再逐步收敛到第 3 章目标模型：
+当前主运行时为 `server/` Express / VPS + PostgreSQL。以下对象是当前真实运行面，审计与迁移必须先保障它们，再通过 `migrations/` 逐步收敛到第 3 章目标模型：
 
 - `profiles`
 - `user_credits`
@@ -34,7 +34,7 @@ API 字段命名：`camelCase`
 
 说明：
 
-- `user_credits` / `credit_transactions` 仍是当前主 API 与支付回写的真实写入面，目标态中的 `credit_accounts` / `credit_ledger` 尚未落地替换。
+- `user_credits` / `credit_transactions` 仍是当前 `server/` API 与支付回写的真实写入面，目标态中的 `credit_accounts` / `credit_ledger` 尚未落地替换。
 - `admin_auth` 仍被管理员控制台读取，因此当前不能视为可直接移除的历史垃圾表。
 - `provider_pricing_cache` / `credit_exchange_rates` 仍被现网运营与价格能力使用，目标态会再收敛为更明确的价格快照/计费配置模型。
 - 第 3 章继续定义目标态，未落地对象在迁移完成前属于“规格目标缺口”，不是当前运行态缺陷。
@@ -435,7 +435,7 @@ API 字段命名：`camelCase`
 | `generation_results` | 仅本人 | 否 | 可读写 | 可读写 |
 | `credit_accounts` | 仅本人读取 | 否，走 API | 可读写 | 可读写 |
 | `credit_ledger` | 仅本人只读 | 否 | 可读写 | 可读写 |
-| `payment_orders` | 仅本人只读 | 否，走 Sidecar/API | 可读写 | 可读写 |
+| `payment_orders` | 仅本人只读 | 否，走 server API | 可读写 | 可读写 |
 | `payment_callbacks` | 否 | 否 | 可读 | 可读写 |
 | `refund_records` | 仅本人只读 | 否 | 可读写 | 可读写 |
 | `audit_logs` | 否 | 否 | 可读 | 可读写 |

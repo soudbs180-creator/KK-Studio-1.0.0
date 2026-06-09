@@ -1,4 +1,4 @@
-# AI Assistant Runbooks — KK Studio v1.5.5
+# AI Assistant Runbooks — KK Studio v1.5.6
 
 Last updated: 2026-06-05
 Primary rules: `AGENTS.md`  

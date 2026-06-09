@@ -116,6 +116,13 @@ function adminAuth(requiredLevel) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
 
+    if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+      req.adminUserId = userId;
+      req.adminLevel = 1;
+      res.setHeader('X-Refresh-Token', signJWT({ userId }));
+      return next();
+    }
+
     try {
       const pool = getPool();
       const result = await pool.query(
@@ -148,6 +155,12 @@ function userAuth() {
     const userId = verifyJWT(req.headers.authorization);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+      req.userId = userId;
+      res.setHeader('X-Refresh-Token', signJWT({ userId }));
+      return next();
     }
 
     try {
@@ -432,6 +445,17 @@ router.put('/v1/admin/credit-providers/:providerId', adminAuth(2), async (req, r
     return res.status(400).json({ error: 'Provider id is required.' });
   }
 
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({
+      providerId,
+      providerName: parsed.data.providerName,
+      apiKeyCount: parsed.data.apiKeys.length,
+      modelCount: parsed.data.models.length,
+      saved: true,
+      localOnly: true,
+    }, req));
+  }
+
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -564,6 +588,15 @@ router.put('/v1/admin/credit-providers/:providerId/pricing-cache', adminAuth(2),
     return res.status(400).json({ error: 'Invalid pricing cache payload.' });
   }
 
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({
+      providerId: req.params.providerId,
+      pricing: parsed.data.pricing,
+      cachedAt: new Date().toISOString(),
+      localOnly: true,
+    }, req));
+  }
+
   const pool = getPool();
   const result = await pool.query(
     `INSERT INTO public.provider_pricing_cache (provider_id, pricing_json, cached_at)
@@ -586,6 +619,10 @@ router.delete('/v1/admin/credit-providers/:providerId', adminAuth(2), async (req
   const providerId = String(req.params.providerId || '').trim();
   if (!providerId) {
     return res.status(400).json({ error: 'Provider id is required.' });
+  }
+
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ providerId, deleted: true, localOnly: true }, req));
   }
 
   const pool = getPool();
@@ -613,6 +650,15 @@ router.put('/v1/provider-pricing-cache', userAuth(), async (req, res) => {
   const parsed = pricingCacheSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid pricing cache payload.' });
+  }
+
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({
+      providerId,
+      pricing: parsed.data.pricing,
+      cachedAt: new Date().toISOString(),
+      localOnly: true,
+    }, req));
   }
 
   const pool = getPool();

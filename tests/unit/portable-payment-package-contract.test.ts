@@ -12,31 +12,26 @@ function readJson<T>(relativePath: string): T {
   return JSON.parse(readSource(relativePath)) as T;
 }
 
-test('portable release packages the payment sidecar compatibility runtime closure', () => {
+test('portable release packages the current server runtime closure', () => {
   const releaseSource = readSource('scripts/release/create-portable-release.mjs');
 
   assert.equal(releaseSource.includes("'runtime_payment_bridge.js'"), false);
   assert.equal(releaseSource.includes("'settlement_bridge.js'"), false);
 
-  assert.match(releaseSource, /'apps', 'payment-sidecar', 'src'/);
-  assert.match(releaseSource, /'apps', 'api', 'src', 'lib', 'request-authenticator\.ts'/);
-  assert.match(
-    releaseSource,
-    /'apps', 'api', 'src', 'modules', 'auth', 'infrastructure', 'kk-session-token\.ts'/,
-  );
-  assert.match(releaseSource, /'packages', 'contracts', 'src'/);
+  assert.match(releaseSource, /source: path\.join\(rootDir, 'server'\)/);
+  assert.match(releaseSource, /'packages', 'api-client', 'src'/);
   assert.match(releaseSource, /'packages', 'shared', 'src'/);
 
   assert.match(releaseSource, /function buildAppPackageJson\(\)[\s\S]*type: 'module'/);
   assert.match(releaseSource, /writeFile\(path\.join\(appDir, 'package\.json'\), buildAppPackageJson\(\)/);
 });
 
-test('portable release exposes payment dependencies to both legacy server and copied app sources', () => {
+test('portable release exposes server dependencies to the current server and copied app sources', () => {
   const releaseSource = readSource('scripts/release/create-portable-release.mjs');
-  const paymentPackage = readJson<{
+  const serverPackage = readJson<{
     dependencies?: Record<string, string>;
   }>('server/package.json');
-  const paymentLock = readJson<{
+  const serverLock = readJson<{
     packages?: Record<string, { dependencies?: Record<string, string>; version?: string }>;
   }>('server/package-lock.json');
 
@@ -44,12 +39,12 @@ test('portable release exposes payment dependencies to both legacy server and co
   assert.match(releaseSource, /shell: false/);
   assert.match(releaseSource, /runCommand\('cmd\.exe', \['\/d', '\/s', '\/c', `npm\.cmd \$\{npmArgs\.join\(' '\)\}`]/);
   assert.match(releaseSource, /'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'/);
-  assert.doesNotMatch(releaseSource, /paymentSourceDir, 'node_modules'/);
-  assert.match(releaseSource, /copyDirectory\(paymentTargetNodeModules, appNodeModules\)/);
+  assert.doesNotMatch(releaseSource, /serverSourceDir, 'node_modules'/);
+  assert.match(releaseSource, /copyDirectory\(serverTargetNodeModules, appNodeModules\)/);
 
-  assert.ok(paymentPackage.dependencies?.pg, 'server package.json must include pg');
-  assert.ok(paymentLock.packages?.['']?.dependencies?.pg, 'server lock root must include pg');
-  assert.ok(paymentLock.packages?.['node_modules/pg']?.version, 'server lock must pin pg');
+  assert.ok(serverPackage.dependencies?.pg, 'server package.json must include pg');
+  assert.ok(serverLock.packages?.['']?.dependencies?.pg, 'server lock root must include pg');
+  assert.ok(serverLock.packages?.['node_modules/pg']?.version, 'server lock must pin pg');
 });
 
 test('portable release packaging fails unless the built frontend has a remote KK API base URL', () => {

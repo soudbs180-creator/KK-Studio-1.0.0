@@ -38,10 +38,10 @@ function fixFile(filePath) {
 
 function main() {
   const filesToFix = [
-    'src/components/image/ImageCard2.tsx',
-    'src/App.tsx',
-    'src/types.ts',
-    'src/services/llm/VideoCompatibleAdapter.ts',
+    'apps/web/src/components/image/ImageCard2.tsx',
+    'apps/web/src/App.tsx',
+    'apps/web/src/types.ts',
+    'apps/web/src/services/llm/VideoCompatibleAdapter.ts',
     'api/pricing-proxy.ts',
   ];
 

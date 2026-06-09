@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
+  ArrowRight,
   Coins,
   Cpu,
   Globe,
@@ -32,12 +33,14 @@ import {
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
 import {
+  SettingsActionButton,
   SettingsBadge,
   SettingsCardGridContainer,
   SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
 import {
+  getSettingsPrimaryActionMeta,
   getSettingsStatusSummaryLabel,
   getSettingsViewMeta,
 } from '../settingsRegistry';
@@ -170,7 +173,7 @@ const DashboardPanel: React.FC<{
 
   return (
     <section
-      className={`dashboard-panel ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
+      className={`dashboard-panel dashboard-grid-card ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
       data-clickable={onClick ? 'true' : 'false'}
       data-tone={tone}
       role={onClick ? 'button' : undefined}
@@ -274,6 +277,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
     [registryLanguage],
   );
+  const dashboardPrimaryAction = useMemo(
+    () => getSettingsPrimaryActionMeta('dashboard', registryLanguage),
+    [registryLanguage],
+  );
 
   const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
@@ -281,6 +288,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => selectRemainingBalanceSummary(billingLogs),
     [billingLogs],
   );
+  const dashboardBalanceCards = [
+    {
+      title: pick('余额与充值', 'Balance and recharge'),
+      value: remainingBalanceDisplay,
+    },
+  ];
+  const dashboardBalanceCard = dashboardBalanceCards[0];
 
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
@@ -1373,6 +1387,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           '总览不再只是入口集合，而是把消耗趋势、供应商路由、浏览器助手、存储、日志和账本状态统一成可判断的图形化驾驶舱。',
           'Overview is now a visual command center for spend, provider routing, browser assistant, storage, logs, and ledger health.',
         )}
+        actions={(
+          <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate(dashboardPrimaryAction.target)}>
+            {dashboardPrimaryAction.label}
+          </SettingsActionButton>
+        )}
         metrics={(
           <>
             <MetricTile
@@ -1403,7 +1422,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         )}
       />
 
-      <SettingsCardGridContainer className="dashboard-command-center">
+      <SettingsCardGridContainer className="dashboard-grid-container dashboard-command-center">
         <DashboardPanel
           className="dashboard-card-consumption"
           tone="indigo"
@@ -1633,8 +1652,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           className="dashboard-card-logs"
           tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
           icon={<ScrollText size={18} />}
-          eyebrow={pick('日志信号', 'Log signals')}
-          title={pick('错误、告警与排障优先级', 'Errors, warnings, and triage priority')}
+          eyebrow={pick('日志诊断', 'System Logs')}
+          title={pick('错误排障与告警', 'Triage & Diagnostics')}
           action={(
             <StatusBadge
               status={latestLog ? getLogTone(latestLog.level) : 'online'}
@@ -1671,15 +1690,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <DashboardPanel
           tone="amber"
           icon={<Wallet size={18} />}
-          eyebrow={pick('账本', 'Ledger')}
-          title={pick('余额、充值与交易快照', 'Balance, recharge, and ledger snapshot')}
-          action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('计费', 'Billing')}</SettingsBadge>}
+          eyebrow={pick('计费账本', 'Billing')}
+          title={pick('账户交易记录', 'Transaction History')}
+          action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{dashboardBalanceCard.title}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-module-stack">
             <ModuleMeter
               label={pick('账本同步度', 'Ledger freshness')}
-              value={remainingBalanceDisplay}
+              value={dashboardBalanceCard.value}
               helper={pick('余额、充值和消耗记录保持同屏对账。', 'Balance, recharge, and spend stay reconciled on one screen.')}
               progress={ledgerReadiness}
               tone="amber"

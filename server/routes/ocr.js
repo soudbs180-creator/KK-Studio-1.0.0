@@ -49,7 +49,7 @@ async function getBaiduAccessToken(apiKey, secretKey) {
  * POST /api/ocr
  * 统一 OCR 中转代理路由，接收 Base64 格式的文件并调用百度云 OCR 识别
  */
-router.post('/ocr', async (req, res) => {
+async function handleOcr(req, res) {
   const {
     operation,
     fileBase64,
@@ -128,6 +128,9 @@ router.post('/ocr', async (req, res) => {
     console.error('[ocr-route] 百度 OCR 代理过程出错:', error);
     return res.status(500).send(`后端 OCR 中转异常: ${error.message}`);
   }
-});
+}
+
+router.post('/ocr', handleOcr);
+router.post('/v1/ocr', handleOcr);
 
 module.exports = router;

@@ -7,19 +7,16 @@ APP_ROOT="${KK_APP_ROOT:-/opt/kk-studio}"
 CURRENT_DIR="${KK_CURRENT_DIR:-$APP_ROOT/current}"
 ENV_DIR="${KK_ENV_DIR:-/etc/kk-studio}"
 APP_SITE_ROOT="${KK_APP_SITE_ROOT:-/var/www/kk-app}"
-ADMIN_SITE_ROOT="${KK_ADMIN_SITE_ROOT:-/var/www/kk-admin}"
 WEB_ENV_FILE="${KK_WEB_ENV_FILE:-$ENV_DIR/kk-web.env}"
-ADMIN_ENV_FILE="${KK_ADMIN_ENV_FILE:-$ENV_DIR/kk-admin.env}"
 APPLY_BOOTSTRAP_SQL="${KK_APPLY_BOOTSTRAP_SQL:-false}"
 POSTGRES_DB="${KK_PG_DB:-kkstudio}"
 POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
 BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/postgres/bootstrap-kk-vps.sql}"
-SYSTEMD_SERVICES=("kk-api" "kk-payment-sidecar")
+SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
 RELEASES_DIR="${APP_ROOT}/releases"
 APP_RELEASES_DIR="/var/www/releases/app"
-ADMIN_RELEASES_DIR="/var/www/releases/admin"
 
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
 COMMIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
@@ -27,12 +24,10 @@ RELEASE_NAME="${TIMESTAMP}-${COMMIT_SHA}"
 
 NEW_RELEASE_DIR="${RELEASES_DIR}/release-${RELEASE_NAME}"
 NEW_APP_RELEASE_DIR="${APP_RELEASES_DIR}/kk-app-${RELEASE_NAME}"
-NEW_ADMIN_RELEASE_DIR="${ADMIN_RELEASES_DIR}/kk-admin-${RELEASE_NAME}"
 
 # 备份原先的软链接指向，用以部署失败时回退
 PREV_CURRENT=""
 PREV_APP=""
-PREV_ADMIN=""
 
 require_repo_root() {
   if [[ ! -f package.json || ! -d apps/web ]]; then
@@ -55,11 +50,6 @@ on_error() {
     if [[ -n "${PREV_APP}" ]]; then
       ln -sfn "${PREV_APP}" "${APP_SITE_ROOT}"
       echo "[deploy-kk-vps] Rolled back Web site to: ${PREV_APP}" >&2
-    fi
-    
-    if [[ -n "${PREV_ADMIN}" ]]; then
-      ln -sfn "${PREV_ADMIN}" "${ADMIN_SITE_ROOT}"
-      echo "[deploy-kk-vps] Rolled back Admin site to: ${PREV_ADMIN}" >&2
     fi
     
     echo "[deploy-kk-vps] Re-applying legacy Nginx config..." >&2
@@ -137,13 +127,6 @@ build_static_sites() {
   install -d -m 0755 "${APP_RELEASES_DIR}"
   install -d -m 0755 "${NEW_APP_RELEASE_DIR}"
   rsync -a --delete "${NEW_RELEASE_DIR}/apps/web/dist/" "${NEW_APP_RELEASE_DIR}/"
-
-  echo "[deploy-kk-vps] Building Admin Static Site..."
-  run_npm_script_in_release "npm run admin:build" "${ADMIN_ENV_FILE}"
-  
-  install -d -m 0755 "${ADMIN_RELEASES_DIR}"
-  install -d -m 0755 "${NEW_ADMIN_RELEASE_DIR}"
-  rsync -a --delete "${NEW_RELEASE_DIR}/apps/admin/dist/" "${NEW_ADMIN_RELEASE_DIR}/"
 }
 
 harden_env_permissions() {
@@ -188,19 +171,9 @@ atomic_switch_symlinks() {
     PREV_APP="${APP_RELEASES_DIR}/legacy-folder-backup"
   fi
 
-  # 备份 Admin 指向
-  if [[ -L "${ADMIN_SITE_ROOT}" ]]; then
-    PREV_ADMIN="$(readlink -f "${ADMIN_SITE_ROOT}")"
-  elif [[ -d "${ADMIN_SITE_ROOT}" ]]; then
-    echo "[deploy-kk-vps] Converting folder ${ADMIN_SITE_ROOT} to symlink..."
-    mv "${ADMIN_SITE_ROOT}" "${ADMIN_RELEASES_DIR}/legacy-folder-backup"
-    PREV_ADMIN="${ADMIN_RELEASES_DIR}/legacy-folder-backup"
-  fi
-
   # 执行软链接原子切换
   ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_DIR}"
   ln -sfn "${NEW_APP_RELEASE_DIR}" "${APP_SITE_ROOT}"
-  ln -sfn "${NEW_ADMIN_RELEASE_DIR}" "${ADMIN_SITE_ROOT}"
 }
 
 install_nginx_gateway() {
@@ -303,21 +276,6 @@ cleanup_old_releases() {
       ls -1dt kk-app-* | tail -n +"6" | while read -r old_rel; do
         if [[ -n "${old_rel}" ]]; then
           echo "[deploy-kk-vps] Pruning old Web site release: ${old_rel}"
-          rm -rf "${old_rel}"
-        fi
-      done
-    fi
-  fi
-  
-  # 3. 清理 Admin 静态资源发布的 releases
-  if [[ -d "${ADMIN_RELEASES_DIR}" ]]; then
-    cd "${ADMIN_RELEASES_DIR}"
-    local count
-    count=$(ls -1d kk-admin-* 2>/dev/null | wc -l || echo 0)
-    if [[ "${count}" -gt 5 ]]; then
-      ls -1dt kk-admin-* | tail -n +"6" | while read -r old_rel; do
-        if [[ -n "${old_rel}" ]]; then
-          echo "[deploy-kk-vps] Pruning old Admin site release: ${old_rel}"
           rm -rf "${old_rel}"
         fi
       done

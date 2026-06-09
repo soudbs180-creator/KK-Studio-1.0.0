@@ -8,7 +8,7 @@
 ### 1.1 版本与说明统一
 - [x] 主项目版本统一为 `1.5.4`
 - [x] 画布展示版本继续以 `src/config/appInfo.ts` 集中管理
-- [x] README、开发进度、交接文档、移动端报告同步到 `v1.5.5`
+- [x] README、开发进度、交接文档、移动端报告同步到 `v1.5.6`
 - [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.5.4`
 - [x] 修复 Node/ESM 启动链、用户路由云回退、账单 hydrate 误判与 Canvas 本地持久化问题
 - [x] 构建版本清单补充 `releaseDate / releaseNotes`，便于后续发布与更新校验
