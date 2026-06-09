@@ -199,7 +199,6 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '配置状态',
     statusSummaryLabelEn: 'Configuration status',
   },
-
   'consumption-records': {
     eyebrow: 'Billing',
     titleZh: '计费账本',
@@ -336,6 +335,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
 ];
 
+void Layers3;
+
 function isNavItemEnabled(definition: SettingsNavItemDefinition): boolean {
   if (definition.featureFlag === 'billing') {
     return KKAI_FEATURE_FLAGS.billing;
@@ -434,4 +435,12 @@ export function getSettingsStatusSummaryLabel(view: CanonicalSettingsViewId, lan
 
 export function getSettingsShellCopy(language: AppLanguage = 'zh-CN'): SettingsShellCopy {
   return SHELL_COPY[language];
+}
+
+export function getSettingsSearchPlaceholder(
+  view: CanonicalSettingsViewId,
+  language: AppLanguage = 'zh-CN',
+): string {
+  const meta = getSettingsViewMeta(view, language);
+  return pickByLanguage(language, `搜索${meta.title}`, `Search ${meta.title}`);
 }
