@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const failures = [];
+const SELF_PATH = "scripts/governance/check-current-facts.mjs";
 
 function abs(relativePath) {
   return path.join(root, relativePath);
@@ -165,7 +166,7 @@ const activeFiles = [
   ...collectFiles("apps/web"),
   ...collectFiles("packages"),
   ...collectFiles("server"),
-];
+].filter((file) => file !== SELF_PATH);
 
 expectActiveFilesDoNotReference(
   activeFiles,
