@@ -41,14 +41,14 @@ afterEach(() => {
   restoreTrackedEnv();
 });
 
-test("local API bootstrap hydrates primary env files before local-only startup", async () => {
+test("local API bootstrap hydrates server env files before local-only startup", async () => {
   restoreTrackedEnv();
   trackedEnvKeys.forEach((key) => {
     delete process.env[key];
   });
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kk-local-api-bootstrap-"));
-  fs.mkdirSync(path.join(tempRoot, "apps", "api", "src"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "server"), { recursive: true });
 
   fs.writeFileSync(
     path.join(tempRoot, ".env.local"),
@@ -61,7 +61,7 @@ test("local API bootstrap hydrates primary env files before local-only startup",
   );
 
   fs.writeFileSync(
-    path.join(tempRoot, "apps", "api", ".env.local"),
+    path.join(tempRoot, "server", ".env.local"),
     [
       "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
       "SUPABASE_URL=https://legacy-api-ref.supabase.co",
@@ -71,9 +71,9 @@ test("local API bootstrap hydrates primary env files before local-only startup",
   );
 
   fs.writeFileSync(
-    path.join(tempRoot, "apps", "api", "src", "server.ts"),
+    path.join(tempRoot, "server", "index.js"),
     [
-      "export async function startApiServer(port) {",
+      "exports.startServer = function startServer(port) {",
       "  return {",
       "    port,",
       "    env: {",
@@ -89,7 +89,7 @@ test("local API bootstrap hydrates primary env files before local-only startup",
       "      PORT: process.env.PORT || null,",
       "    },",
       "  };",
-      "}",
+      "};",
       "",
     ].join("\n"),
     "utf8",
