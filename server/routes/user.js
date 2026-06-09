@@ -1026,10 +1026,65 @@ function getLocalRecordIdAliases(record) {
   return Array.from(new Set(aliases));
 }
 
+// 简体中文注释：动态根据记录的内容推导前端的规范化 ID 候选
+function getRecordCanonicalIdCandidate(record) {
+  if (!record) return null;
+  const id = String(record.id || '').trim().toLowerCase();
+  const name = String(record.name || '').trim().toLowerCase();
+  const provider = String(record.provider || '').trim().toLowerCase();
+  const baseUrl = String(record.baseUrl || record.base_url || '').trim().toLowerCase();
+
+  const source = [id, name, provider, baseUrl].join(' ');
+
+  let channel = 'custom';
+  let prefix = '2000';
+
+  // 判断是否是速创
+  const isWuyin = source.includes('wuyin') ||
+                  source.includes('wuyinkeji') ||
+                  source.includes('api.wuyinkeji.com') ||
+                  source.includes('速创') ||
+                  source.includes('五音');
+
+  if (isWuyin) {
+    channel = 'wuyinkeji-google-omni';
+    prefix = '1015';
+  } else if (source.includes('google') || source.includes('gemini')) {
+    channel = 'google';
+    prefix = '1017';
+  } else if (source.includes('openai')) {
+    channel = 'openai';
+    prefix = '1018';
+  } else if (source.includes('anthropic') || source.includes('claude')) {
+    channel = 'anthropic';
+    prefix = '1019';
+  } else if (source.includes('deepseek')) {
+    channel = 'deepseek';
+    prefix = '1007';
+  } else if (source.includes('siliconflow')) {
+    channel = 'siliconflow';
+    prefix = '1009';
+  }
+
+  return `${channel}-${prefix}-1`;
+}
+
 function localRecordMatchesId(record, recordId) {
   const target = normalizeLocalRouteValue(recordId);
   if (!target) return false;
-  return getLocalRecordIdAliases(record).includes(target);
+
+  // 1. 优先匹配已有的 ID 和 legacyIds
+  if (getLocalRecordIdAliases(record).includes(target)) {
+    return true;
+  }
+
+  // 2. 软匹配动态规范化 ID，解决前端在内存中升级了规范 ID，而本地文件尚未保存升级而造成 reveal-secret 匹配失败的 Bug
+  const canonical = getRecordCanonicalIdCandidate(record);
+  if (canonical && canonical === target) {
+    return true;
+  }
+
+  return false;
 }
 
 function revealProfileApiSecret(profileState, input) {

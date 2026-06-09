@@ -58,11 +58,55 @@ function buildRouteLookupCandidates(routeId) {
   ].filter(Boolean)));
 }
 
+// 简体中文注释：动态根据记录的内容推导其对应的规范化 ID 候选别名，保证前端使用规范化 ID 请求路由分发时能正确找到本地路由项
+function getRecordCanonicalIdCandidate(record) {
+  if (!record) return null;
+  const id = safeString(record.id).toLowerCase();
+  const name = safeString(record.name).toLowerCase();
+  const provider = safeString(record.provider).toLowerCase();
+  const baseUrl = safeString(record.baseUrl).toLowerCase();
+
+  const source = [id, name, provider, baseUrl].join(' ');
+
+  let channel = 'custom';
+  let prefix = '2000';
+
+  const isWuyin = source.includes('wuyin') ||
+                  source.includes('wuyinkeji') ||
+                  source.includes('api.wuyinkeji.com') ||
+                  source.includes('速创') ||
+                  source.includes('五音');
+
+  if (isWuyin) {
+    channel = 'wuyinkeji-google-omni';
+    prefix = '1015';
+  } else if (source.includes('google') || source.includes('gemini')) {
+    channel = 'google';
+    prefix = '1017';
+  } else if (source.includes('openai')) {
+    channel = 'openai';
+    prefix = '1018';
+  } else if (source.includes('anthropic') || source.includes('claude')) {
+    channel = 'anthropic';
+    prefix = '1019';
+  } else if (source.includes('deepseek')) {
+    channel = 'deepseek';
+    prefix = '1007';
+  } else if (source.includes('siliconflow')) {
+    channel = 'siliconflow';
+    prefix = '1009';
+  }
+
+  return `${channel}-${prefix}-1`;
+}
+
 function recordAliases(record) {
+  const canonical = getRecordCanonicalIdCandidate(record);
   return [
     safeString(record?.id),
     ...(Array.isArray(record?.legacyIds) ? record.legacyIds : []),
     safeString(record?.name),
+    canonical,
   ].map(normalizeRouteValue).filter(Boolean);
 }
 
