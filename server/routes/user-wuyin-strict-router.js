@@ -27,6 +27,10 @@ const { fetchWithRetries } = require('../lib/fetchClient');
 const router = express.Router();
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
 
+function isObjectRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function buildMeta(req) {
   return {
     requestId: req.headers['x-request-id'] || req.body?.requestId || `req-${Date.now()}`,
@@ -60,9 +64,31 @@ function resolveProfileUserId(req) {
   return null;
 }
 
-function isWuyinRoute(route) {
-  const haystack = `${route?.baseUrl || ''} ${route?.name || ''} ${route?.requestProfileId || ''}`.toLowerCase();
-  return haystack.includes('wuyin') || haystack.includes('wuyinkeji') || haystack.includes('suchuang') || haystack.includes('速创') || haystack.includes('悟因');
+function extractModelId(req) {
+  return String(req.body?.modelId || req.body?.model || '')
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^api\/async\//i, '')
+    .trim();
+}
+
+function isWuyinLikeText(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return raw.includes('wuyin')
+    || raw.includes('wuyinkeji')
+    || raw.includes('suchuang')
+    || raw.includes('速创')
+    || raw.includes('悟因');
+}
+
+function isWuyinRoute(route, context = {}) {
+  const routeText = `${route?.baseUrl || ''} ${route?.name || ''} ${route?.requestProfileId || ''} ${route?.endpointType || ''}`;
+  const modelId = String(context.modelId || '').trim();
+  const routeId = String(context.routeId || '').trim();
+  return Boolean(getWuyinProduct(modelId))
+    || isWuyinLikeText(routeText)
+    || isWuyinLikeText(routeId);
 }
 
 function getRouteApiKey(route) {
@@ -72,15 +98,6 @@ function getRouteApiKey(route) {
 function isWuyinProxyTarget(value) {
   const raw = String(value || '').trim().toLowerCase();
   return raw.includes('wuyinkeji.com') || raw.includes('/api/async/') || raw.includes('/api/chat/index') || raw.includes('/api/sora') || raw.includes('/api/img/') || raw.includes('/api/voice/');
-}
-
-function extractModelId(req) {
-  return String(req.body?.modelId || req.body?.model || '')
-    .split('@')[0]
-    .split('|')[0]
-    .replace(/^models\//i, '')
-    .replace(/^api\/async\//i, '')
-    .trim();
 }
 
 function appendQuery(url, params = {}) {
@@ -162,6 +179,11 @@ function toInputAliases(fieldName) {
     url: ['url', 'imageUrl', 'videoUrl'],
     text: ['text', 'prompt'],
     prompt: ['prompt'],
+    size: ['size', 'imageSize', 'resolution'],
+    imageSize: ['imageSize', 'size'],
+    aspectRatio: ['aspectRatio', 'aspect_ratio'],
+    aspect_ratio: ['aspect_ratio', 'aspectRatio'],
+    duration: ['duration', 'videoDuration'],
   };
   return Array.from(new Set([...aliases, ...(map[fieldName] || [])]));
 }
@@ -213,10 +235,7 @@ function normalizeFieldValue(fieldName, spec, rawValue) {
     return spec.enum.includes(candidate) ? candidate : (spec.default !== undefined ? spec.default : candidate);
   }
 
-  if (spec.type === 'boolean') {
-    return normalizeBooleanLike(rawValue, spec.default);
-  }
-
+  if (spec.type === 'boolean') return normalizeBooleanLike(rawValue, spec.default);
   if (spec.type === 'float') {
     const numberValue = Number(rawValue);
     return Number.isFinite(numberValue) ? numberValue : spec.default;
@@ -224,20 +243,12 @@ function normalizeFieldValue(fieldName, spec, rawValue) {
 
   if (String(spec.type).startsWith('array')) {
     const values = normalizeList(rawValue).slice(0, spec.maxItems || 100);
-    if (spec.publicUrl || spec.publicUrlCsv || spec.allowBase64) {
-      return values.map((value) => validateUrlValue(value, fieldName, spec));
-    }
+    if (spec.publicUrl || spec.publicUrlCsv || spec.allowBase64) return values.map((value) => validateUrlValue(value, fieldName, spec));
     return values;
   }
 
-  if (spec.publicUrl || spec.allowBase64) {
-    return validateUrlValue(rawValue, fieldName, spec);
-  }
-
-  if (spec.publicUrlCsv) {
-    return normalizeList(rawValue).slice(0, spec.maxItems || 100).map((value) => validateUrlValue(value, fieldName, spec)).join(',');
-  }
-
+  if (spec.publicUrl || spec.allowBase64) return validateUrlValue(rawValue, fieldName, spec);
+  if (spec.publicUrlCsv) return normalizeList(rawValue).slice(0, spec.maxItems || 100).map((value) => validateUrlValue(value, fieldName, spec)).join(',');
   return String(rawValue).trim();
 }
 
@@ -246,9 +257,7 @@ function buildDocumentedBody(product, input) {
   for (const [fieldName, spec] of Object.entries(product.requestFields || {})) {
     const raw = readInputValue(input, fieldName);
     const value = normalizeFieldValue(fieldName, spec, raw);
-    if (value !== undefined && value !== null && value !== '') {
-      body[fieldName] = value;
-    }
+    if (value !== undefined && value !== null && value !== '') body[fieldName] = value;
   }
   return body;
 }
@@ -257,13 +266,7 @@ function serializeBody(product, body) {
   const contentType = String(product.contentType || 'application/json').toLowerCase();
   if (contentType.includes('x-www-form-urlencoded')) {
     const params = new URLSearchParams();
-    Object.entries(body).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        params.set(key, JSON.stringify(value));
-      } else {
-        params.set(key, String(value));
-      }
-    });
+    Object.entries(body).forEach(([key, value]) => params.set(key, Array.isArray(value) ? JSON.stringify(value) : String(value)));
     return params.toString();
   }
   return JSON.stringify(body);
@@ -280,7 +283,20 @@ async function fetchWuyinJson(url, apiKey, method, product, body) {
     },
     body: hasBody ? serializeBody(product, body) : undefined,
   });
-  return response.json();
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    const error = new Error(`Wuyin API HTTP ${response.status}: ${text.slice(0, 500)}`);
+    error.statusCode = response.status;
+    throw error;
+  }
+  if (!payload) throw new Error(`Wuyin API 返回非 JSON 内容: ${text.slice(0, 300)}`);
+  return payload;
 }
 
 function mapAsyncStatus(value) {
@@ -303,15 +319,9 @@ function mapStatusByProduct(product, value) {
 
 async function submitStrictTask({ req, mode, modelId, apiKey }) {
   const product = getWuyinProduct(modelId);
-  if (!product) {
-    throw Object.assign(new Error(`Wuyin 模型 ${modelId || '(empty)'} 没有在已核对文档中声明，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_NOT_DOCUMENTED' });
-  }
-  if (product.enabled === false) {
-    throw Object.assign(new Error(`Wuyin 模型 ${modelId} 当前文档标记为不可用或维护中，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_DISABLED_BY_DOC' });
-  }
-  if (product.category !== mode) {
-    throw Object.assign(new Error(`Wuyin 模型 ${modelId} 是 ${product.category}，不能用于 ${mode}。`), { statusCode: 400, code: 'WUYIN_MODEL_TASK_MISMATCH' });
-  }
+  if (!product) throw Object.assign(new Error(`Wuyin 模型 ${modelId || '(empty)'} 没有在已核对文档中声明，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_NOT_DOCUMENTED' });
+  if (product.enabled === false || product.executable === false) throw Object.assign(new Error(`Wuyin 模型 ${modelId} 当前文档标记为不可用或禁用执行，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_DISABLED_BY_DOC' });
+  if (product.category !== mode) throw Object.assign(new Error(`Wuyin 模型 ${modelId} 是 ${product.category}，不能用于 ${mode}。`), { statusCode: 400, code: 'WUYIN_MODEL_TASK_MISMATCH' });
   assertStrictTaskSupported('wuyin-suchuang-form', mode, { modelId });
 
   const body = buildDocumentedBody(product, req.body || {});
@@ -323,12 +333,8 @@ async function submitStrictTask({ req, mode, modelId, apiKey }) {
   const urls = extractUrls(payload);
   const providerTaskId = extractProviderTaskId(payload);
   const isAsync = product.resultEndpoint && product.executionMode !== 'sync';
-  if (!isAsync || urls.length > 0) {
-    return { status: 'success', urls, providerTaskId: providerTaskId || '', product, submitExecTime: Date.now() - startedAt, body, raw: payload };
-  }
-  if (!providerTaskId) {
-    throw new Error('Wuyin API 提交成功但没有返回文档要求的任务 ID。');
-  }
+  if (!isAsync || urls.length > 0) return { status: 'success', urls, providerTaskId: providerTaskId || '', product, submitExecTime: Date.now() - startedAt, body, raw: payload };
+  if (!providerTaskId) throw new Error('Wuyin API 提交成功但没有返回文档要求的任务 ID。');
   return { status: 'pending', urls: [], providerTaskId, product, submitExecTime: Date.now() - startedAt, body, raw: payload };
 }
 
@@ -345,24 +351,18 @@ async function queryStrictTaskStatus({ providerTaskId, apiKey, product }) {
   assertWuyinOk(payload, 'Wuyin 任务状态查询');
   const data = isObjectRecord(payload.data) ? payload.data : payload;
   const status = mapStatusByProduct(product, data.status ?? payload.status);
-  return {
-    status,
-    urls: status === 'success' ? extractUrls(payload) : [],
-    message: status === 'failed' ? readMessage(payload) || 'Wuyin task failed.' : '',
-    raw: payload,
-    detailExecTime: Date.now() - startedAt,
-  };
+  return { status, urls: status === 'success' ? extractUrls(payload) : [], message: status === 'failed' ? readMessage(payload) || 'Wuyin task failed.' : '', raw: payload, detailExecTime: Date.now() - startedAt };
 }
 
 async function handleSubmitMode(req, res, userId, mode) {
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
+  const modelId = extractModelId(req);
   const route = await resolveLocalUserRoute(userId, routeId);
   if (!route) return sendError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
-  if (!isWuyinRoute(route)) return null;
+  if (!isWuyinRoute(route, { modelId, routeId })) return null;
 
   const apiKey = getRouteApiKey(route);
   if (!apiKey) return sendError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
-  const modelId = extractModelId(req);
 
   try {
     const result = await submitStrictTask({ req, mode, modelId, apiKey });
@@ -389,7 +389,7 @@ async function handleSubmitMode(req, res, userId, mode) {
       },
     }, req));
   } catch (err) {
-    return sendError(res, req, err.statusCode || 502, err.code || 'WUYIN_STRICT_UPSTREAM_ERROR', err.message);
+    return sendError(res, req, err.statusCode || 502, err.code || 'WUYIN_STRICT_UPSTREAM_ERROR', err.message, { route: { provider: 'wuyin-suchuang-form', modelId } });
   }
 }
 
@@ -398,16 +398,12 @@ async function handleStatusMode(req, res, userId) {
   const parsed = decodeLocalProxyTaskId(localTaskId);
   if (!parsed.providerTaskId) return sendError(res, req, 400, 'INVALID_REQUEST', 'localTaskId/taskId is required for Wuyin task status.');
   const product = getWuyinProduct(parsed.modelId);
-  if (!product) {
-    return sendError(res, req, 400, 'WUYIN_STATUS_MODEL_REQUIRED', '严格 Wuyin 状态查询要求 taskId 内包含已核对文档模型 ID。旧格式 taskId 不再允许猜测查询。');
-  }
-  if (!product.resultEndpoint) {
-    return sendError(res, req, 400, 'WUYIN_STATUS_NOT_ASYNC', '该 Wuyin 模型按文档不是异步详情查询任务。');
-  }
+  if (!product) return sendError(res, req, 400, 'WUYIN_STATUS_MODEL_REQUIRED', '严格 Wuyin 状态查询要求 taskId 内包含已核对文档模型 ID。旧格式 taskId 不再允许猜测查询。');
+  if (!product.resultEndpoint) return sendError(res, req, 400, 'WUYIN_STATUS_NOT_ASYNC', '该 Wuyin 模型按文档不是异步详情查询任务。');
 
   const route = await resolveLocalUserRoute(userId, parsed.routeId || req.body?.routeId || req.headers['x-key-slot-id']);
   if (!route) return sendError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin API route for this task was not found.');
-  if (!isWuyinRoute(route)) return null;
+  if (!isWuyinRoute(route, { modelId: product.id, routeId: parsed.routeId })) return null;
 
   const apiKey = getRouteApiKey(route);
   if (!apiKey) return sendError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
@@ -448,6 +444,12 @@ router.all('/v1/model-proxy/user', async (req, res, next) => {
   const mode = String(req.body?.mode || '').trim();
   if (!['image', 'video', 'audio', 'utility', 'task_status'].includes(mode)) return next();
 
+  const modelId = extractModelId(req);
+  const isDocumentedWuyinModel = Boolean(getWuyinProduct(modelId));
+  const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
+  const isWuyinHinted = isWuyinLikeText(routeId) || isWuyinLikeText(req.body?.modelId) || isWuyinLikeText(req.body?.model);
+  if (!isDocumentedWuyinModel && !isWuyinHinted) return next();
+
   const authState = resolveProfileUserId(req);
   if (!authState) return sendError(res, req, 401, 'UNAUTHORIZED', 'Authentication is required for Wuyin strict routing.');
   if (authState.refreshToken) res.setHeader('X-Refresh-Token', authState.refreshToken);
@@ -455,7 +457,7 @@ router.all('/v1/model-proxy/user', async (req, res, next) => {
   if (mode === 'task_status') return handleStatusMode(req, res, authState.userId);
   const handled = await handleSubmitMode(req, res, authState.userId, mode);
   if (handled) return handled;
-  return next();
+  return sendError(res, req, 400, 'WUYIN_ROUTE_NOT_RECOGNIZED', '检测到 Wuyin 文档模型，但当前用户路由未能绑定到 Wuyin API。请重新保存该 Wuyin API 地址和 Key。', { route: { modelId, routeId } });
 });
 
 module.exports = router;
