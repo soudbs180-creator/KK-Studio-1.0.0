@@ -3,13 +3,18 @@ import {
   Activity,
   ArrowRight,
   Coins,
+  Cpu,
+  Globe,
   HardDrive,
   KeyRound,
+  Layers,
   LayoutDashboard,
+  Monitor,
   RefreshCw,
   ScrollText,
+  Sparkles,
   Wallet,
-  Globe,
+  Zap,
 } from 'lucide-react';
 
 import { useBilling } from '../../../context/BillingContext';
@@ -33,7 +38,6 @@ import {
   SettingsBadge,
   SettingsCardGridContainer,
   SettingsHero,
-  SettingsSection,
   SettingsViewShell,
 } from '../SettingsScaffold';
 import {
@@ -43,7 +47,6 @@ import {
 } from '../settingsRegistry';
 import { ProgressBar, StatusBadge } from '../ui/index';
 
-
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
 }
@@ -51,6 +54,15 @@ interface DashboardViewProps {
 type DashboardIdleWindow = Window & typeof globalThis & {
   requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
+};
+
+type HealthTone = 'indigo' | 'emerald' | 'amber' | 'rose';
+
+type DashboardBucket = {
+  label: string;
+  amount: number;
+  count: number;
+  percentage: number;
 };
 
 const isSameLocalDay = (value?: string | null) => {
@@ -91,210 +103,106 @@ const buildChartPaths = (points: number[]) => {
   };
 };
 
-const DashboardActivityRow: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  summary: string;
-  meta: string;
-  value?: string;
-  status?: React.ReactNode;
-  onClick?: () => void;
-}> = ({ icon, title, summary, meta, value, status, onClick }) => (
-  <button 
-    type="button" 
-    className="settings-reference-list-item w-full text-left" 
-    onClick={onClick}
-    style={{ minHeight: '60px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}
-  >
-    {/* 使用 items-center 替换原本的 items-start，实现左侧图标、中间内容、右侧控件的整体垂向居中对齐 */}
-    <div className="flex min-w-0 flex-1 items-center gap-3">
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-        style={{
-          border: '1px solid var(--settings-border-subtle)',
-          background: 'var(--settings-surface-overlay)',
-          color: 'var(--text-primary)',
-        }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1 flex flex-col justify-center">
-        <div className="flex items-center gap-2">
-          <div className="settings-reference-list-item__title" style={{ fontSize: '13px', fontWeight: 600 }}>{title}</div>
-          {status}
-        </div>
-        {/* 将 meta 信息与 summary 拼合在同一行，从而完全杜绝第三排描述文案的出现，保证视觉行数严禁多于 2 行 */}
-        <div className="settings-reference-list-item__meta truncate text-[11px]" style={{ marginTop: '2px', opacity: 0.7 }}>
-          {summary}{meta ? ` · ${meta}` : ''}
-        </div>
-      </div>
-    </div>
-    {value ? (
-      <div className="settings-reference-list-item__value shrink-0 flex items-center" style={{ fontSize: '13px', fontWeight: 600 }}>
-        {value}
-      </div>
-    ) : null}
-  </button>
-);
-
-const DashboardRingRow: React.FC<{
+const MetricTile: React.FC<{
   label: string;
-  percent: number;
+  value: React.ReactNode;
   helper: string;
-  color: string;
-  centerLabel: string;
-}> = ({ label, percent, helper, color, centerLabel }) => (
-  <div className="settings-reference-ring-row flex items-center gap-3" style={{ padding: '10px 14px' }}>
-    <div className="settings-reference-ring shrink-0" style={{ ['--value' as string]: String(percent), ['--ring-color' as string]: color }}>
-      <div>
-        <strong>{percent}%</strong>
-        <span>{centerLabel}</span>
-      </div>
-    </div>
-    <div className="min-w-0 flex-1 flex flex-col justify-center">
-      <div className="settings-reference-list-item__title" style={{ fontSize: '13px', fontWeight: 600 }}>{label}</div>
-      <div className="settings-reference-list-item__meta truncate text-[11px]" style={{ marginTop: '2px', opacity: 0.7 }}>{helper}</div>
-    </div>
+  tone?: HealthTone;
+}> = ({ label, value, helper, tone = 'indigo' }) => (
+  <div className="dashboard-metric-tile" data-tone={tone}>
+    <div className="dashboard-metric-tile__label">{label}</div>
+    <div className="dashboard-metric-tile__value">{value}</div>
+    <div className="dashboard-metric-tile__helper">{helper}</div>
   </div>
 );
 
-const MetricTile: React.FC<{ label: string; value: string; helper: string }> = ({ label, value, helper }) => (
-  <div className="settings-reference-mini-metric h-full">
-    <div className="settings-reference-mini-metric__label">{label}</div>
-    <div className="settings-reference-mini-metric__value">{value}</div>
-    <div className="settings-reference-mini-metric__helper">{helper}</div>
-  </div>
-);
-
-const QuickActionCard: React.FC<{
+const DashboardPanel: React.FC<{
   title: string;
-  description: string;
+  eyebrow: string;
   icon: React.ReactNode;
-  onClick: () => void;
-}> = ({ title, description, icon, onClick }) => (
-  <button 
-    type="button" 
-    className="settings-reference-list-item w-full text-left" 
-    onClick={onClick}
-    style={{ minHeight: '56px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}
-  >
-    <div className="flex min-w-0 items-center gap-3 w-full">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-        style={{
-          border: '1px solid var(--settings-border-subtle)',
-          background: 'var(--settings-surface-overlay)',
-          color: 'var(--text-primary)',
-        }}
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+  tone?: HealthTone;
+}> = ({ title, eyebrow, icon, children, action, onClick, className = '', tone = 'indigo' }) => {
+  const content = (
+    <>
+      <div className="dashboard-panel__glow" aria-hidden="true" />
+      <div className="dashboard-panel__header">
+        <div className="dashboard-panel__title-group">
+          <span className="dashboard-panel__icon">{icon}</span>
+          <div className="min-w-0">
+            <div className="dashboard-panel__eyebrow">{eyebrow}</div>
+            <h3 className="dashboard-panel__title">{title}</h3>
+          </div>
+        </div>
+        {action ? <div className="dashboard-panel__action">{action}</div> : null}
+      </div>
+      <div className="dashboard-panel__body">{children}</div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`dashboard-panel dashboard-panel--button ${className}`.trim()}
+        data-tone={tone}
+        onClick={onClick}
       >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1 flex flex-col justify-center">
-        <div className="settings-reference-list-item__title" style={{ fontSize: '13px', fontWeight: 600 }}>{title}</div>
-        <div className="settings-reference-list-item__meta truncate text-[11px]" style={{ marginTop: '2px', opacity: 0.7 }}>{description}</div>
-      </div>
-    </div>
-  </button>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <section className={`dashboard-panel ${className}`.trim()} data-tone={tone}>
+      {content}
+    </section>
+  );
+};
+
+const HealthPill: React.FC<{
+  label: string;
+  value: string;
+  tone: HealthTone;
+}> = ({ label, value, tone }) => (
+  <div className="dashboard-health-pill" data-tone={tone}>
+    <span className="dashboard-health-pill__dot" />
+    <span className="dashboard-health-pill__label">{label}</span>
+    <strong>{value}</strong>
+  </div>
 );
 
-type DashboardSignalNode = {
-  key: string;
+const FlowStep: React.FC<{
+  label: string;
+  helper: string;
+  value: string;
+  icon: React.ReactNode;
+  tone?: HealthTone;
+}> = ({ label, helper, value, icon, tone = 'indigo' }) => (
+  <div className="dashboard-flow-step" data-tone={tone}>
+    <div className="dashboard-flow-step__icon">{icon}</div>
+    <div className="min-w-0">
+      <div className="dashboard-flow-step__label">{label}</div>
+      <div className="dashboard-flow-step__helper">{helper}</div>
+    </div>
+    <strong>{value}</strong>
+  </div>
+);
+
+const TopologyNode: React.FC<{
   label: string;
   value: string;
   helper: string;
-  icon: React.ReactNode;
-  target: string;
-  tone: 'blue' | 'green' | 'amber' | 'rose';
-};
-
-const dashboardPulseColor: Record<'emerald' | 'amber' | 'rose', string> = {
-  emerald: '52 211 153',
-  amber: '245 158 11',
-  rose: '248 113 113',
-};
-
-const DashboardSignalHero: React.FC<{
-  statusLabel: string;
-  statusMeta: string;
-  statusTone: 'emerald' | 'amber' | 'rose';
-  readiness: number;
-  usageBuckets: Array<{ label: string; count: number; percentage: number }>;
-  nodes: DashboardSignalNode[];
-  statusKicker: string;
-  readinessLabel: string;
-  requestLabel: string;
-  navigationLabel: string;
-  onNavigate: (view: string) => void;
-}> = ({
-  statusLabel,
-  statusMeta,
-  statusTone,
-  readiness,
-  usageBuckets,
-  nodes,
-  statusKicker,
-  readinessLabel,
-  requestLabel,
-  navigationLabel,
-  onNavigate,
-}) => (
-  <section className="settings-dashboard-cockpit" data-tone={statusTone}>
-    <div className="settings-dashboard-cockpit__status">
-      <div
-        className="settings-dashboard-cockpit__pulse"
-        style={{ ['--pulse-color' as string]: dashboardPulseColor[statusTone] }}
-        aria-hidden="true"
-      >
-        <span />
-      </div>
-      <div className="min-w-0">
-        <div className="settings-dashboard-cockpit__kicker">{statusKicker}</div>
-        <div className="settings-dashboard-cockpit__title">{statusLabel}</div>
-        <div className="settings-dashboard-cockpit__meta">{statusMeta}</div>
-      </div>
-      <div className="settings-dashboard-cockpit__readiness" aria-label={`${readiness}%`}>
-        <strong>{readiness}%</strong>
-        <span>{readinessLabel}</span>
-      </div>
-    </div>
-
-    <div className="settings-dashboard-live-bars" aria-label={requestLabel}>
-      {usageBuckets.map((bucket, index) => (
-        <div key={bucket.label} className="settings-dashboard-live-bars__item" title={`${bucket.label}: ${bucket.count}`}>
-          <span className="settings-dashboard-live-bars__track">
-            <span
-              className="settings-dashboard-live-bars__bar"
-              style={{
-                ['--bar-height' as string]: `${bucket.percentage}%`,
-                ['--bar-delay' as string]: `${index * 80}ms`,
-              }}
-            />
-          </span>
-          <small>{bucket.label.replace(':00', '')}</small>
-        </div>
-      ))}
-    </div>
-
-    <div className="settings-dashboard-cockpit__flow" aria-label={navigationLabel}>
-      <span className="settings-dashboard-cockpit__flow-line" aria-hidden="true" />
-      {nodes.map((node) => (
-        <button
-          key={node.key}
-          type="button"
-          className="settings-dashboard-cockpit__node"
-          data-tone={node.tone}
-          onClick={() => onNavigate(node.target)}
-        >
-          <span className="settings-dashboard-cockpit__node-icon">{node.icon}</span>
-          <span className="settings-dashboard-cockpit__node-body">
-            <span className="settings-dashboard-cockpit__node-label">{node.label}</span>
-            <strong>{node.value}</strong>
-            <span>{node.helper}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  </section>
+  tone: HealthTone;
+}> = ({ label, value, helper, tone }) => (
+  <div className="dashboard-topology-node" data-tone={tone}>
+    <span>{label}</span>
+    <strong>{value}</strong>
+    <small>{helper}</small>
+  </div>
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
@@ -312,12 +220,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
     [registryLanguage],
   );
+
   const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
     [billingLogs],
   );
+
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
   const [todayTokens, setTodayTokens] = useState(() => getTodayCosts().totalTokens || 0);
@@ -479,24 +389,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     [usageLogs],
   );
 
-  const usageBuckets = useMemo(() => {
+  const usageBuckets = useMemo<DashboardBucket[]>(() => {
     const buckets = Array.from({ length: 6 }, (_, index) => ({
       label: `${String(index * 4).padStart(2, '0')}:00`,
+      amount: 0,
       count: 0,
     }));
 
     todayUsageLogs.forEach((log) => {
       const createdAt = new Date(log.created_at);
       if (Number.isNaN(createdAt.getTime())) return;
+
       const bucketIndex = Math.min(5, Math.floor(createdAt.getHours() / 4));
+      const amount = Math.abs(Number(log.amount) || 0);
+      buckets[bucketIndex]!.amount += amount;
       buckets[bucketIndex]!.count += 1;
     });
 
+    const maxAmount = Math.max(1, ...buckets.map((bucket) => bucket.amount));
     const maxCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
-    return buckets.map((bucket) => ({
-      ...bucket,
-      percentage: bucket.count === 0 ? 8 : Math.max(12, Math.round((bucket.count / maxCount) * 84)),
-    }));
+
+    return buckets.map((bucket) => {
+      const base = bucket.amount > 0
+        ? Math.round((bucket.amount / maxAmount) * 88)
+        : Math.round((bucket.count / maxCount) * 44);
+
+      return {
+        ...bucket,
+        percentage: bucket.amount === 0 && bucket.count === 0 ? 10 : Math.max(16, base),
+      };
+    });
   }, [todayUsageLogs]);
 
   const importantLogs = useMemo(
@@ -517,6 +439,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const hasCriticalLogs = importantLogs.some(
     (item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL,
   );
+  const statsTotal = Number((stats as { total?: number }).total ?? stats.valid);
+  const statsInvalid = Number((stats as { invalid?: number }).invalid ?? 0);
   const hasAvailableRoute = stats.valid > 0 || activeProviderCount > 0;
   const storageModeLabel = getStorageModeLabel(storageMode);
   const channelCount = officialCount + activeProviderCount;
@@ -526,8 +450,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const logHealth = logs.length > 0 ? Math.max(0, 100 - Math.round((importantLogCount / logs.length) * 100)) : 100;
   const storageHealth = storageMode ? 100 : 36;
   const storageProgress = Math.min(100, (storageUsageMb / 1024) * 100);
+  const browserReadiness = Math.min(
+    100,
+    25
+      + (hasAvailableRoute ? 25 : 0)
+      + (storageMode ? 25 : 0)
+      + (importantLogCount === 0 ? 25 : 0),
+  );
+
   const peakUsageBucket = useMemo(
-    () => usageBuckets.slice().sort((left, right) => right.count - left.count)[0] ?? usageBuckets[0],
+    () => usageBuckets.slice().sort((left, right) => right.amount - left.amount || right.count - left.count)[0] ?? usageBuckets[0],
     [usageBuckets],
   );
   const { linePath, areaPath } = useMemo(
@@ -535,439 +467,843 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     [usageBuckets],
   );
 
-  const recentActivity = useMemo(
-    () => [
-      {
-        key: 'usage',
-        icon: <Activity size={18} />,
-        title: pick('最近请求', 'Recent requests'),
-        summary:
-          latestUsage?.model_name
-          || latestUsage?.model_id
-          || latestUsage?.description
-          || pick('今天还没有模型请求。', 'No model request has been recorded today.'),
-        meta: latestUsage
-          ? formatDateTime(latestUsage.created_at)
-          : pick('等待新的调用事件', 'Waiting for a new request event'),
-        value: todayUsageCount > 0 ? pick(`${formatNumber(todayUsageCount)} 次`, `${formatNumber(todayUsageCount)} calls`) : undefined,
-        status: <SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>API</SettingsBadge>,
-        onClick: () => onNavigate('consumption-records'),
-      },
-      {
-        key: 'billing',
-        icon: <Wallet size={18} />,
-        title: pick('余额与充值', 'Balance and recharge'),
-        summary: latestRecharge
-          ? pick(`最近充值：${formatDateTime(latestRecharge.created_at)}`, `Latest recharge: ${formatDateTime(latestRecharge.created_at)}`)
-          : pick(`当前余额 ${remainingBalanceDisplay}`, `Current balance ${remainingBalanceDisplay}`),
-        meta: todayRechargeCount > 0
-          ? pick(`今天新增 ${todayRechargeCount} 条充值`, `${todayRechargeCount} recharges today`)
-          : pick('今天没有充值记录', 'No recharge activity today'),
-        value: remainingBalanceDisplay,
-        status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('账本', 'Billing')}</SettingsBadge>,
-        onClick: () => onNavigate('consumption-records'),
-      },
-      {
-        key: 'logs',
-        icon: <ScrollText size={18} />,
-        title: pick('日志信号', 'Log signals'),
-        summary: latestLog?.message || pick('当前没有需要优先处理的告警。', 'No warning or error logs are blocking the system right now.'),
-        meta: latestLog ? `${formatDateTime(latestLog.timestamp)} · ${latestLog.source}` : pick('日志流稳定', 'Live log stream is stable'),
-        value: importantLogCount > 0 ? pick(`${importantLogCount} 条`, `${importantLogCount} items`) : pick('稳定', 'Stable'),
-        status: (
-          <StatusBadge
-            status={latestLog ? getLogTone(latestLog.level) : 'online'}
-            label={hasCriticalLogs ? pick('优先处理', 'Priority') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('健康', 'Healthy')}
-          />
-        ),
-        onClick: () => onNavigate('system-logs'),
-      },
-      {
-        key: 'channels',
-        icon: <KeyRound size={18} />,
-        title: pick('路由状态', 'Route status'),
-        summary: hasAvailableRoute
-          ? pick(`${channelCount} 条链路可用。`, `${channelCount} active routes are ready.`)
-          : pick('还没有可用链路，建议先配置 API。', 'No ready route was detected. Configure API first.'),
-        meta: providerCount > 0
-          ? pick(`${activeProviderCount}/${providerCount} 个第三方供应商在线`, `${activeProviderCount}/${providerCount} external providers online`)
-          : pick('当前仅依赖官方链路', 'Official routes only'),
-        value: String(channelCount),
-        status: <SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'rose'}>{pick('链路', 'Routes')}</SettingsBadge>,
-        onClick: () => onNavigate('api-management'),
-      },
-    ],
-    [
-      activeProviderCount,
-      channelCount,
-      formatDateTime,
-      formatNumber,
-      hasAvailableRoute,
-      hasCriticalLogs,
-      importantLogCount,
-      latestLog,
-      latestRecharge,
-      latestUsage,
-      onNavigate,
-      pick,
-      providerCount,
-      remainingBalanceDisplay,
-      todayRechargeCount,
-      todayUsageCount,
-    ],
+  const totalCreditSpend = useMemo(
+    () => todayUsageLogs.reduce((sum, log) => sum + Math.abs(Number(log.amount) || 0), 0),
+    [todayUsageLogs],
   );
 
-  const snapshotTiles = useMemo(
-    () => [
-      {
-        label: pick('已接入链路', 'Connected routes'),
-        value: `${formatNumber(channelCount)}`,
-        helper: hasAvailableRoute
-          ? pick(`${officialCount} 个官方 API / ${activeProviderCount} 个在线供应商`, `${officialCount} local APIs / ${activeProviderCount} active providers`)
-          : pick('先添加本地或官方 API', 'Add a local or official API first'),
-      },
-      {
-        label: pick('今日消耗', 'Spend today'),
-        value: formatUsd(todayCostUsd),
-        helper: pick(`余额 ${remainingBalanceDisplay}`, `Balance ${remainingBalanceDisplay}`),
-      },
-      {
-        label: pick('日志状态', 'Log status'),
-        value: importantLogCount > 0 ? pick(`${importantLogCount} 条告警`, `${importantLogCount} alerts`) : pick('稳定', 'Stable'),
-        helper: latestLog ? latestLog.source : pick('当前没有异常日志', 'No recent warning or error'),
-      },
-      {
-        label: pick('存储', 'Storage'),
-        value: storageModeLabel,
-        helper: storageSnapshotPending
-          ? pick('正在整理图片与容量统计…', 'Updating image and storage totals…')
-          : pick(`${formatNumber(storedImages)} 张图片 · ${storageUsageMb.toFixed(0)} MB`, `${formatNumber(storedImages)} images · ${storageUsageMb.toFixed(0)} MB`),
-      },
-    ],
-    [
-      activeProviderCount,
-      channelCount,
-      formatNumber,
-      hasAvailableRoute,
-      importantLogCount,
-      latestLog,
-      officialCount,
-      pick,
-      remainingBalanceDisplay,
-      storageModeLabel,
-      storageSnapshotPending,
-      storageUsageMb,
-      storedImages,
-      todayCostUsd,
-    ],
-  );
+  const systemReadiness = Math.round((
+    (hasAvailableRoute ? 100 : 42)
+    + logHealth
+    + storageHealth
+    + Math.min(100, channelCoverage || (hasAvailableRoute ? 70 : 30))
+  ) / 4);
+
+  const heroStatus = hasCriticalLogs ? 'error' : hasAvailableRoute ? 'online' : 'warning';
+  const heroStatusLabel = hasCriticalLogs
+    ? pick('需排障', 'Needs triage')
+    : hasAvailableRoute
+      ? pick('运行中', 'Operational')
+      : pick('待配置', 'Setup required');
+
+  const latestUsageLabel = latestUsage
+    ? latestUsage.model_name || latestUsage.model_id || latestUsage.description || pick('未知模型', 'Unknown model')
+    : pick('暂无请求', 'No requests yet');
 
   return (
     <SettingsViewShell>
       <style>{`
-        .dashboard-grid-card {
+        .dashboard-command-center {
+          display: grid;
+          gap: 14px;
+          grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
+        .dashboard-panel {
+          --dashboard-tone-rgb: 99 102 241;
           position: relative;
+          min-width: 0;
           overflow: hidden;
-          border-radius: 18px;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
-          background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
-          color: inherit;
-          font: inherit;
+          border-radius: 22px;
+          background:
+            radial-gradient(circle at top right, rgb(var(--dashboard-tone-rgb) / 0.16), transparent 34%),
+            var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
+          box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
+          color: var(--text-primary);
+          padding: 16px;
           text-align: left;
-          padding: 12px 14px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
           backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
           -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
-          transition: all 0.25s ease-in-out;
-          cursor: pointer;
-          box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
         }
-        .dashboard-grid-card:hover {
+
+        .dashboard-panel[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-panel[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-panel[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-panel[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-panel--button {
+          display: block;
+          width: 100%;
+          cursor: pointer;
+          font: inherit;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .dashboard-panel--button:hover {
           transform: translateY(-2px);
-          border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.16));
-          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.84));
+          border-color: rgb(var(--dashboard-tone-rgb) / 0.36);
           box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
         }
-        .dashboard-card-glow {
+
+        .dashboard-panel__glow {
           position: absolute;
-          top: 0;
-          right: 0;
-          width: 100px;
-          height: 100px;
-          border-radius: 50%;
-          filter: blur(45px);
-          opacity: 0.12;
+          inset: -80px -80px auto auto;
+          width: 180px;
+          height: 180px;
+          border-radius: 999px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.18);
+          filter: blur(34px);
           pointer-events: none;
-          transform: translateY(-30px);
-        }
-        /* 手机端 (默认) */
-        .card-overview, .card-billing, .card-logs, .card-storage, .card-api, .card-browser {
-          grid-column: span 1;
         }
 
-        /* 2-column layout for tablet/small desktop (>= 768px) */
-        @media (min-width: 768px) {
-          .card-overview {
-            grid-column: 1 / 3 !important;
-            grid-row: span 2 !important;
+        .dashboard-panel__header {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .dashboard-panel__title-group {
+          display: flex;
+          min-width: 0;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .dashboard-panel__icon {
+          display: inline-flex;
+          width: 34px;
+          height: 34px;
+          flex: 0 0 auto;
+          align-items: center;
+          justify-content: center;
+          border-radius: 13px;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.26);
+          background: rgb(var(--dashboard-tone-rgb) / 0.12);
+          color: rgb(var(--dashboard-tone-rgb));
+        }
+
+        .dashboard-panel__eyebrow {
+          overflow: hidden;
+          color: var(--text-tertiary);
+          font-size: var(--type-micro);
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          line-height: 1.2;
+          text-overflow: ellipsis;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .dashboard-panel__title {
+          margin-top: 4px;
+          overflow-wrap: anywhere;
+          font-size: var(--type-title-3);
+          font-weight: 700;
+          line-height: var(--ui-line-height-tight);
+        }
+
+        .dashboard-panel__action {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-shrink: 0;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .dashboard-panel__body {
+          position: relative;
+          z-index: 1;
+        }
+
+        .dashboard-metric-tile {
+          --dashboard-tone-rgb: 99 102 241;
+          min-width: 0;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
+          border-radius: 16px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.08);
+          padding: 12px;
+        }
+
+        .dashboard-metric-tile[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-metric-tile[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-metric-tile[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-metric-tile[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-metric-tile__label,
+        .dashboard-health-pill__label,
+        .dashboard-flow-step__helper,
+        .dashboard-topology-node small {
+          color: var(--text-tertiary);
+          font-size: var(--type-micro);
+          line-height: 1.35;
+        }
+
+        .dashboard-metric-tile__value {
+          margin-top: 6px;
+          color: var(--text-primary);
+          font-size: clamp(18px, 2vw, 24px);
+          font-weight: 800;
+          line-height: 1;
+          overflow-wrap: anywhere;
+        }
+
+        .dashboard-metric-tile__helper {
+          margin-top: 7px;
+          color: var(--text-secondary);
+          font-size: var(--type-caption);
+          line-height: 1.4;
+          overflow-wrap: anywhere;
+        }
+
+        .dashboard-chart-shell {
+          display: grid;
+          gap: 14px;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .dashboard-chart {
+          min-height: 220px;
+          border: 1px solid var(--settings-border-subtle);
+          border-radius: 18px;
+          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.08), rgb(255 255 255 / 0.02));
+          padding: 14px;
+        }
+
+        .dashboard-chart svg {
+          width: 100%;
+          height: 140px;
+          overflow: visible;
+          color: rgb(var(--settings-accent-rgb));
+        }
+
+        .dashboard-chart__area {
+          fill: currentColor;
+          opacity: 0.14;
+        }
+
+        .dashboard-chart__line {
+          fill: none;
+          stroke: currentColor;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-width: 3;
+          filter: drop-shadow(0 8px 14px rgb(var(--settings-accent-rgb) / 0.28));
+        }
+
+        .dashboard-chart__dot {
+          fill: var(--settings-surface-elevated);
+          stroke: currentColor;
+          stroke-width: 3;
+        }
+
+        .dashboard-chart-bars {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 8px;
+          min-height: 74px;
+          align-items: end;
+          margin-top: 10px;
+        }
+
+        .dashboard-chart-bar {
+          display: flex;
+          min-width: 0;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .dashboard-chart-bar__track {
+          display: flex;
+          width: 100%;
+          height: 52px;
+          align-items: flex-end;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgb(255 255 255 / 0.06);
+          overflow: hidden;
+        }
+
+        .dashboard-chart-bar__fill {
+          width: 100%;
+          min-height: 6px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.92), rgb(var(--settings-accent-rgb) / 0.32));
+          height: var(--bucket-height);
+          transition: height 0.32s ease;
+        }
+
+        .dashboard-chart-bar small {
+          max-width: 100%;
+          overflow: hidden;
+          color: var(--text-tertiary);
+          font-size: 10px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dashboard-health-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .dashboard-health-pill {
+          --dashboard-tone-rgb: 99 102 241;
+          display: flex;
+          min-width: 0;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
+          border-radius: 999px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.08);
+          padding: 9px 11px;
+        }
+
+        .dashboard-health-pill[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-health-pill[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-health-pill[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-health-pill[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-health-pill__dot {
+          width: 8px;
+          height: 8px;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          background: rgb(var(--dashboard-tone-rgb));
+          box-shadow: 0 0 0 4px rgb(var(--dashboard-tone-rgb) / 0.12);
+        }
+
+        .dashboard-health-pill strong {
+          margin-left: auto;
+          color: var(--text-primary);
+          font-size: var(--type-caption);
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .dashboard-topology {
+          display: grid;
+          gap: 12px;
+        }
+
+        .dashboard-topology__rail {
+          position: relative;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .dashboard-topology__rail::before {
+          position: absolute;
+          top: 50%;
+          right: 12%;
+          left: 12%;
+          height: 2px;
+          content: "";
+          background: linear-gradient(90deg, transparent, rgb(var(--settings-accent-rgb) / 0.45), transparent);
+          transform: translateY(-50%);
+        }
+
+        .dashboard-topology-node {
+          --dashboard-tone-rgb: 99 102 241;
+          position: relative;
+          z-index: 1;
+          display: grid;
+          gap: 6px;
+          min-width: 0;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.22);
+          border-radius: 18px;
+          background: color-mix(in srgb, var(--settings-surface-elevated) 78%, rgb(var(--dashboard-tone-rgb)) 8%);
+          padding: 12px;
+          text-align: center;
+        }
+
+        .dashboard-topology-node[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-topology-node[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-topology-node[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-topology-node[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-topology-node span {
+          color: var(--text-secondary);
+          font-size: var(--type-caption);
+          font-weight: 600;
+        }
+
+        .dashboard-topology-node strong {
+          color: rgb(var(--dashboard-tone-rgb));
+          font-size: clamp(20px, 2vw, 28px);
+          font-weight: 800;
+          line-height: 1;
+        }
+
+        .dashboard-flow-map {
+          display: grid;
+          gap: 10px;
+        }
+
+        .dashboard-flow-step {
+          --dashboard-tone-rgb: 99 102 241;
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
+          border-radius: 16px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.07);
+          padding: 10px;
+        }
+
+        .dashboard-flow-step[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-flow-step[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-flow-step[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-flow-step[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-flow-step__icon {
+          display: inline-flex;
+          width: 32px;
+          height: 32px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.14);
+          color: rgb(var(--dashboard-tone-rgb));
+        }
+
+        .dashboard-flow-step__label {
+          overflow: hidden;
+          color: var(--text-primary);
+          font-size: var(--type-body-2);
+          font-weight: 700;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dashboard-flow-step strong {
+          color: rgb(var(--dashboard-tone-rgb));
+          font-size: var(--type-caption);
+          white-space: nowrap;
+        }
+
+        .dashboard-inline-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .dashboard-inline-row {
+          display: flex;
+          min-width: 0;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          border-top: 1px solid var(--settings-border-subtle);
+          padding-top: 10px;
+        }
+
+        .dashboard-inline-row:first-child {
+          border-top: 0;
+          padding-top: 0;
+        }
+
+        .dashboard-inline-row span {
+          min-width: 0;
+          overflow: hidden;
+          color: var(--text-secondary);
+          font-size: var(--type-caption);
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dashboard-inline-row strong {
+          color: var(--text-primary);
+          font-size: var(--type-caption);
+          white-space: nowrap;
+        }
+
+        @media (min-width: 900px) {
+          .dashboard-command-center {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
           }
-          .card-billing {
-            grid-column: 1 !important;
+
+          .dashboard-card-consumption {
+            grid-column: span 2;
+            grid-row: span 2;
           }
-          .card-logs {
-            grid-column: 2 !important;
+
+          .dashboard-card-api {
+            grid-column: span 2;
           }
-          .card-storage {
-            grid-column: 1 / 3 !important;
+
+          .dashboard-card-browser {
+            grid-column: span 2;
           }
-          .card-api {
-            grid-column: 1 / 3 !important;
-          }
-          .card-browser {
-            grid-column: 1 / 3 !important;
+
+          .dashboard-card-storage,
+          .dashboard-card-logs {
+            grid-column: span 1;
           }
         }
 
-        /* 3-column layout for medium desktop (>= 1200px) */
-        @media (min-width: 1200px) {
-          .card-overview {
-            grid-column: 1 / 3 !important;
-            grid-row: 1 / 3 !important;
+        @media (min-width: 1280px) {
+          .dashboard-card-consumption {
+            grid-column: span 2;
+            grid-row: span 2;
           }
-          .card-billing {
-            grid-column: 3 !important;
-            grid-row: 1 !important;
+
+          .dashboard-card-api {
+            grid-column: span 2;
           }
-          .card-logs {
-            grid-column: 3 !important;
-            grid-row: 2 !important;
-          }
-          .card-storage {
-            grid-column: 1 / 4 !important;
-            grid-row: 3 !important;
-          }
-          .card-api {
-            grid-column: 1 / 3 !important;
-            grid-row: 4 !important;
-          }
-          .card-browser {
-            grid-column: 3 !important;
-            grid-row: 4 !important;
+
+          .dashboard-card-browser {
+            grid-column: span 2;
           }
         }
 
-        /* 4-column layout for large desktop (>= 1528px) */
-        @media (min-width: 1528px) {
-          .card-overview {
-            grid-column: 1 / 3 !important;
-            grid-row: 1 / 3 !important;
+        @media (max-width: 640px) {
+          .dashboard-health-grid,
+          .dashboard-topology__rail {
+            grid-template-columns: 1fr;
           }
-          .card-billing {
-            grid-column: 3 !important;
-            grid-row: 1 !important;
-          }
-          .card-logs {
-            grid-column: 4 !important;
-            grid-row: 1 !important;
-          }
-          .card-storage {
-            grid-column: 3 / 5 !important;
-            grid-row: 2 !important;
-          }
-          .card-api {
-            grid-column: 1 / 3 !important;
-            grid-row: 3 !important;
-          }
-          .card-browser {
-            grid-column: 3 / 5 !important;
-            grid-row: 3 !important;
+
+          .dashboard-topology__rail::before {
+            display: none;
           }
         }
       `}</style>
 
-      <SettingsCardGridContainer className="dashboard-grid-container">
-        {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 (4A) */}
-        <div 
-          className="dashboard-grid-card card-overview"
+      <SettingsHero
+        eyebrow={dashboardMeta.eyebrow}
+        title={dashboardMeta.title}
+        icon={LayoutDashboard}
+        tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
+        badge={<StatusBadge status={heroStatus} label={dashboardStatusSummaryLabel} />}
+        description={pick(
+          '把设置总览升级成可读数据的运营驾驶舱：消耗趋势、API 路由、浏览器助手链路、存储和日志健康度都在一个屏幕内判断。',
+          'A data-first settings command center for spend trends, API routing, browser-assistant pipeline, storage, and log health.',
+        )}
+        actions={(
+          <>
+            <SettingsActionButton
+              icon={RefreshCw}
+              loading={refreshing}
+              onClick={() => void refreshDashboard()}
+            >
+              {pick('刷新状态', 'Refresh')}
+            </SettingsActionButton>
+            <SettingsActionButton
+              icon={ArrowRight}
+              tone="primary"
+              onClick={() => onNavigate(dashboardPrimaryAction.target)}
+            >
+              {dashboardPrimaryAction.label}
+            </SettingsActionButton>
+          </>
+        )}
+        metrics={(
+          <>
+            <MetricTile
+              label={pick('系统就绪度', 'System readiness')}
+              value={`${systemReadiness}%`}
+              helper={heroStatusLabel}
+              tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
+            />
+            <MetricTile
+              label={pick('今日消耗', 'Spend today')}
+              value={formatUsd(todayCostUsd)}
+              helper={pick(`${formatCompactNumber(todayTokens)} tokens`, `${formatCompactNumber(todayTokens)} tokens`)}
+              tone="emerald"
+            />
+            <MetricTile
+              label={pick('API 链路', 'API routes')}
+              value={String(channelCount)}
+              helper={pick(`${officialCount} 官方 / ${activeProviderCount} 供应商在线`, `${officialCount} official / ${activeProviderCount} providers online`)}
+              tone={hasAvailableRoute ? 'indigo' : 'amber'}
+            />
+            <MetricTile
+              label={pick('余额', 'Balance')}
+              value={remainingBalanceDisplay}
+              helper={todayRechargeCount > 0 ? pick(`今日充值 ${todayRechargeCount} 条`, `${todayRechargeCount} recharges today`) : pick('余额快照', 'Balance snapshot')}
+              tone="amber"
+            />
+          </>
+        )}
+      />
+
+      <SettingsCardGridContainer className="dashboard-command-center">
+        <DashboardPanel
+          className="dashboard-card-consumption"
+          tone="indigo"
+          icon={<Activity size={18} />}
+          eyebrow={pick('消耗曲线', 'Spend curve')}
+          title={pick('今日调用与积分消耗趋势', 'Today usage and credit spend')}
+          action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
         >
-          <div className="dashboard-card-glow" style={{ background: 'var(--accent-color)' }} />
-          <div className="flex flex-col gap-2 h-full justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <LayoutDashboard size={14} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('总览', 'Overview')}</span>
-              </div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('系统消耗与状态', 'Usage & Status')}</h3>
-              
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('积分余额', 'Credits')}</div>
-                  <div className="text-sm font-bold text-amber-600 dark:text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
-                </div>
-                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('今日消耗', 'Today Cost')}</div>
-                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{formatUsd(todayCostUsd)}</div>
-                </div>
-                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('今日词元', 'Today Tokens')}</div>
-                  <div className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-0.5">{formatCompactNumber(todayTokens)}</div>
-                </div>
-                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('可用链路', 'Routes')}</div>
-                  <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">{channelCount}</div>
-                </div>
+          <div className="dashboard-chart-shell">
+            <div className="grid grid-cols-2 gap-3">
+              <MetricTile
+                label={pick('账单金额', 'Billed amount')}
+                value={formatUsd(todayCostUsd)}
+                helper={pick(`积分消耗 ${formatNumber(totalCreditSpend, 2)}`, `${formatNumber(totalCreditSpend, 2)} credits used`)}
+                tone="emerald"
+              />
+              <MetricTile
+                label={pick('峰值窗口', 'Peak window')}
+                value={peakUsageBucket?.label.replace(':00', '') || '--'}
+                helper={peakUsageBucket ? pick(`${formatNumber(peakUsageBucket.count)} 次请求`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('暂无峰值', 'No peak yet')}
+                tone="indigo"
+              />
+            </div>
+
+            <div className="dashboard-chart" aria-label={pick('今日消耗曲线图', 'Today spend curve chart')}>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img">
+                {areaPath ? <path className="dashboard-chart__area" d={areaPath} /> : null}
+                {linePath ? <path className="dashboard-chart__line" d={linePath} /> : null}
+                {usageBuckets.map((bucket, index) => {
+                  const x = usageBuckets.length > 1 ? (index * 100) / (usageBuckets.length - 1) : 100;
+                  const y = 100 - bucket.percentage;
+                  return (
+                    <circle
+                      key={bucket.label}
+                      className="dashboard-chart__dot"
+                      cx={x}
+                      cy={y}
+                      r="2.6"
+                    />
+                  );
+                })}
+              </svg>
+
+              <div className="dashboard-chart-bars">
+                {usageBuckets.map((bucket) => (
+                  <div key={bucket.label} className="dashboard-chart-bar" title={`${bucket.label} · ${formatNumber(bucket.amount, 2)} credits · ${bucket.count} calls`}>
+                    <span className="dashboard-chart-bar__track">
+                      <span
+                        className="dashboard-chart-bar__fill"
+                        style={{ ['--bucket-height' as string]: `${bucket.percentage}%` }}
+                      />
+                    </span>
+                    <small>{bucket.label.replace(':00', '')}</small>
+                  </div>
+                ))}
               </div>
             </div>
-            
-            <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <span className={`h-1 w-1 rounded-full ${hasAvailableRoute ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="truncate">{hasAvailableRoute ? pick('API 链路正常，状态健康', 'API routes ready') : pick('无可用 API 路由，请在工作台添加', 'API setup required')}</span>
+
+            <div className="dashboard-inline-list">
+              <div className="dashboard-inline-row">
+                <span>{pick('最近请求', 'Latest request')}</span>
+                <strong>{latestUsageLabel}</strong>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`h-1 w-1 rounded-full ${storageMode ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="truncate">{storageMode ? pick(`存储健康 (${storageModeLabel})`, `Storage OK (${storageModeLabel})`) : pick('本地存储待配置', 'Storage setup required')}</span>
+              <div className="dashboard-inline-row">
+                <span>{pick('记录时间', 'Recorded at')}</span>
+                <strong>{latestUsage ? formatDateTime(latestUsage.created_at) : pick('等待新调用', 'Waiting for activity')}</strong>
               </div>
             </div>
           </div>
-        </div>
+        </DashboardPanel>
 
-        {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
-        <div 
-          className="dashboard-grid-card card-billing"
-          onClick={() => onNavigate('consumption-records')}
-        >
-          <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
-          <div className="flex flex-col gap-1.5 justify-between h-full">
-            <div>
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <Coins size={13} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('计费账本', 'Billing')}</span>
-              </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('账户交易记录', 'Transaction History')}</h3>
-            </div>
-            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 truncate">
-              {latestRecharge ? pick(`最近充值：${formatDateTime(latestRecharge.created_at)}`, `Recharged: ${formatDateTime(latestRecharge.created_at)}`) : pick('本周暂无充值记录', 'No recent recharge')}
-            </div>
-          </div>
-        </div>
-
-        {/* 卡片 5: 系统日志 (Logs) - 占 1*1 格 (1A) */}
-        <div 
-          className="dashboard-grid-card card-logs"
-          onClick={() => onNavigate('system-logs')}
-        >
-          <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
-          <div className="flex flex-col gap-1.5 justify-between h-full">
-            <div>
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <ScrollText size={13} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('日志诊断', 'System Logs')}</span>
-              </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
-            </div>
-            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 truncate flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${hasCriticalLogs ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
-              <span className="truncate">{importantLogCount > 0 ? pick(`${importantLogCount} 条运行告警`, `${importantLogCount} alerts`) : pick('系统无异常记录', 'Logs clear')}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2*1 格 (2A) */}
-        <div 
-          className="dashboard-grid-card card-storage"
-          onClick={() => onNavigate('storage-settings')}
-        >
-          <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
-          <div className="flex flex-col gap-2 w-full justify-between h-full">
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-505 dark:text-slate-400" style={{ color: 'var(--text-secondary)' }}>
-                  <HardDrive size={13} />
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('存储容量', 'Storage Settings')}</span>
-                </div>
-                <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/30 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full px-2 py-0.5 font-semibold">
-                  {storageModeLabel}
-                </span>
-              </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
-              
-              <div className="mt-2">
-                <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 mb-1">
-                  <span>{storageSnapshotPending ? pick('更新中...', 'Updating...') : pick(`已存 ${storedImages} 张图`, `${storedImages} images`)}</span>
-                  <span>{storageUsageMb.toFixed(1)} MB / 1 GB</span>
-                </div>
-                <ProgressBar
-                  progress={storageProgress}
-                  tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'indigo'}
-                  showLabel={false}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
-        <button
-          type="button"
-          aria-label={pick('+ 添加 API', '+ Add API')}
-          className="dashboard-grid-card group card-api"
+        <DashboardPanel
+          className="dashboard-card-api"
+          tone={hasAvailableRoute ? 'emerald' : 'amber'}
+          icon={<KeyRound size={18} />}
+          eyebrow={pick('API 路由图', 'API topology')}
+          title={pick('供应商配置与能力路由', 'Provider settings and capability routing')}
+          action={<SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'amber'}>{hasAvailableRoute ? pick('可用', 'Ready') : pick('待配置', 'Setup')}</SettingsBadge>}
           onClick={() => onNavigate('api-management')}
         >
-          <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
-          <div className="flex items-center gap-3 w-full h-full">
-            {/* 左侧：信息区域 */}
-            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <KeyRound size={14} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
-                <span className="text-[9px] bg-blue-500/10 border border-blue-500/30 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                  {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
-                </span>
-              </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
-                {pick('管理本地 API 密钥与第三方中转', 'Manage API keys and external proxies')}
-              </p>
+          <div className="dashboard-topology">
+            <div className="dashboard-topology__rail" aria-label={pick('API 路由信息图', 'API routing infographic')}>
+              <TopologyNode
+                label={pick('官方 API', 'Official API')}
+                value={String(officialCount)}
+                helper={pick('直连密钥', 'Direct keys')}
+                tone={officialCount > 0 ? 'emerald' : 'amber'}
+              />
+              <TopologyNode
+                label={pick('供应商', 'Providers')}
+                value={`${activeProviderCount}/${Math.max(providerCount, 0)}`}
+                helper={pick('在线/总数', 'Online/total')}
+                tone={activeProviderCount > 0 ? 'emerald' : providerCount > 0 ? 'amber' : 'rose'}
+              />
+              <TopologyNode
+                label={pick('覆盖率', 'Coverage')}
+                value={`${channelCoverage}%`}
+                helper={pick('可用链路', 'Ready routes')}
+                tone={channelCoverage >= 70 ? 'emerald' : channelCoverage > 0 ? 'amber' : 'rose'}
+              />
             </div>
-            {/* 右侧：圆形箭头按钮引导 */}
-            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
-              <ArrowRight size={16} />
+
+            <div className="dashboard-health-grid">
+              <HealthPill
+                label={pick('密钥有效', 'Valid keys')}
+                value={`${stats.valid}/${Math.max(statsTotal, stats.valid)}`}
+                tone={stats.valid > 0 ? 'emerald' : 'amber'}
+              />
+              <HealthPill
+                label={pick('异常密钥', 'Invalid keys')}
+                value={String(statsInvalid)}
+                tone={statsInvalid > 0 ? 'rose' : 'emerald'}
+              />
             </div>
           </div>
-        </button>
+        </DashboardPanel>
 
-        {/* 卡片 7: 浏览器助手 (Browser Assistant) - 电脑端占 2*1 格 (2A) */}
-        <div 
-          className="dashboard-grid-card group card-browser"
+        <DashboardPanel
+          className="dashboard-card-browser"
+          tone="indigo"
+          icon={<Globe size={18} />}
+          eyebrow={pick('浏览器助手图', 'Browser assistant map')}
+          title={pick('本地守护、插件与网页自动化链路', 'Daemon, extension, and web automation pipeline')}
+          action={<SettingsBadge tone="indigo">{pick('待检测', 'Doctor')}</SettingsBadge>}
           onClick={() => onNavigate('browser-assistant')}
         >
-          <div className="dashboard-card-glow" style={{ background: '#4f46e5' }} />
-          <div className="flex items-center gap-3 w-full h-full">
-            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <Globe size={13} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('浏览器助手', 'Browser Assistant')}</span>
-                <span className="text-[9px] bg-indigo-500/10 border border-indigo-500/30 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                  {pick('连通就绪', 'Connected')}
-                </span>
+          <div className="dashboard-flow-map" aria-label={pick('浏览器助手流程图', 'Browser assistant flow diagram')}>
+            <FlowStep
+              icon={<Monitor size={16} />}
+              label={pick('本地守护进程', 'Local daemon')}
+              helper={pick('负责 WSS 控制与本地浏览器桥接', 'WSS control and local bridge')}
+              value={pick('检测', 'Check')}
+              tone="indigo"
+            />
+            <FlowStep
+              icon={<Layers size={16} />}
+              label={pick('Chrome 插件', 'Chrome extension')}
+              helper={pick('承接页面读取、截图与上下文采集', 'Page reading, screenshots, context capture')}
+              value={pick('连接', 'Link')}
+              tone="amber"
+            />
+            <FlowStep
+              icon={<Sparkles size={16} />}
+              label={pick('网页抓取/生图素材', 'Extraction and generation assets')}
+              helper={pick('价格、商品图、提示词素材流入工作流', 'Price, images, and prompts enter the workflow')}
+              value={pick('自动化', 'Automate')}
+              tone="emerald"
+            />
+
+            <div className="mt-1">
+              <div className="mb-2 flex items-center justify-between gap-3 text-[var(--text-secondary)]" style={{ fontSize: 'var(--type-caption)' }}>
+                <span>{pick('链路准备度', 'Pipeline readiness')}</span>
+                <strong className="text-[var(--text-primary)]">{browserReadiness}%</strong>
               </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('网页抓取与多端自动化', 'Web Extraction & Multi-device Agent')}</h3>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
-                {pick('控制本地浏览器一键抓取价格与海报生图素材', 'Control local browser to extract price and generation assets')}
-              </p>
-            </div>
-            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 transition-all duration-200 group-hover:bg-indigo-600/40 group-hover:scale-110">
-              <ArrowRight size={16} />
+              <ProgressBar
+                progress={browserReadiness}
+                tone={browserReadiness >= 75 ? 'emerald' : browserReadiness >= 50 ? 'amber' : 'indigo'}
+                showLabel={false}
+              />
             </div>
           </div>
-        </div>
+        </DashboardPanel>
+
+        <DashboardPanel
+          className="dashboard-card-storage"
+          tone={storageMode ? 'emerald' : 'amber'}
+          icon={<HardDrive size={18} />}
+          eyebrow={pick('存储健康', 'Storage health')}
+          title={pick('画布资源与容量', 'Canvas assets and capacity')}
+          action={<SettingsBadge tone={storageMode ? 'emerald' : 'amber'}>{storageModeLabel}</SettingsBadge>}
+          onClick={() => onNavigate('storage-settings')}
+        >
+          <div className="dashboard-inline-list">
+            <div className="dashboard-inline-row">
+              <span>{pick('图片资源', 'Image assets')}</span>
+              <strong>{storageSnapshotPending ? pick('更新中', 'Updating') : formatNumber(storedImages)}</strong>
+            </div>
+            <div className="dashboard-inline-row">
+              <span>{pick('已占用', 'Used storage')}</span>
+              <strong>{storageUsageMb.toFixed(1)} MB</strong>
+            </div>
+            <ProgressBar
+              progress={storageProgress}
+              tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'emerald'}
+              showLabel
+            />
+          </div>
+        </DashboardPanel>
+
+        <DashboardPanel
+          className="dashboard-card-logs"
+          tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
+          icon={<ScrollText size={18} />}
+          eyebrow={pick('日志信号', 'Log signals')}
+          title={pick('错误、告警与排障优先级', 'Errors, warnings, and triage priority')}
+          action={(
+            <StatusBadge
+              status={latestLog ? getLogTone(latestLog.level) : 'online'}
+              label={hasCriticalLogs ? pick('优先处理', 'Priority') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('健康', 'Healthy')}
+            />
+          )}
+          onClick={() => onNavigate('system-logs')}
+        >
+          <div className="dashboard-inline-list">
+            <div className="dashboard-inline-row">
+              <span>{pick('今日告警', 'Alerts today')}</span>
+              <strong>{importantLogCount > 0 ? formatNumber(importantLogCount) : pick('无', 'None')}</strong>
+            </div>
+            <div className="dashboard-inline-row">
+              <span>{pick('最近来源', 'Latest source')}</span>
+              <strong>{latestLog ? latestLog.source : pick('日志流稳定', 'Stable stream')}</strong>
+            </div>
+            <div className="dashboard-inline-row">
+              <span>{pick('最近消息', 'Latest message')}</span>
+              <strong>{latestLog ? latestLog.message : pick('当前没有异常日志', 'No warning or error')}</strong>
+            </div>
+          </div>
+        </DashboardPanel>
+
+        <DashboardPanel
+          tone="amber"
+          icon={<Wallet size={18} />}
+          eyebrow={pick('账本', 'Ledger')}
+          title={pick('余额、充值与交易快照', 'Balance, recharge, and ledger snapshot')}
+          action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('计费', 'Billing')}</SettingsBadge>}
+          onClick={() => onNavigate('consumption-records')}
+        >
+          <div className="dashboard-inline-list">
+            <div className="dashboard-inline-row">
+              <span>{pick('当前余额', 'Current balance')}</span>
+              <strong>{remainingBalanceDisplay}</strong>
+            </div>
+            <div className="dashboard-inline-row">
+              <span>{pick('最近充值', 'Latest recharge')}</span>
+              <strong>{latestRecharge ? formatDateTime(latestRecharge.created_at) : pick('暂无记录', 'No record')}</strong>
+            </div>
+            <div className="dashboard-inline-row">
+              <span>{pick('今日充值', 'Recharge today')}</span>
+              <strong>{todayRechargeCount > 0 ? formatNumber(todayRechargeCount) : pick('无', 'None')}</strong>
+            </div>
+          </div>
+        </DashboardPanel>
+
+        <DashboardPanel
+          tone="indigo"
+          icon={<Cpu size={18} />}
+          eyebrow={pick('能力流', 'Capability flow')}
+          title={pick('模型调用、素材与分发的闭环', 'Closed loop for model calls, assets, and distribution')}
+          action={<Zap size={18} />}
+          onClick={() => onNavigate('ai-management')}
+        >
+          <div className="dashboard-flow-map">
+            <FlowStep
+              icon={<Activity size={16} />}
+              label={pick('模型调用', 'Model calls')}
+              helper={pick('请求记录进入消耗曲线', 'Requests feed the spend curve')}
+              value={formatCompactNumber(todayUsageCount)}
+              tone="indigo"
+            />
+            <FlowStep
+              icon={<Coins size={16} />}
+              label={pick('计费沉淀', 'Billing ledger')}
+              helper={pick('余额、充值、消耗统一落账', 'Balance, recharge, and spend reconcile')}
+              value={formatUsd(todayCostUsd)}
+              tone="amber"
+            />
+            <FlowStep
+              icon={<Globe size={16} />}
+              label={pick('网页助手', 'Browser assistant')}
+              helper={pick('页面素材进入自动化生成流程', 'Page assets enter automated generation')}
+              value={`${browserReadiness}%`}
+              tone="emerald"
+            />
+          </div>
+        </DashboardPanel>
       </SettingsCardGridContainer>
     </SettingsViewShell>
-
   );
 };
 
