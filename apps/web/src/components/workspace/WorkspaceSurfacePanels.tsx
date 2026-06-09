@@ -79,6 +79,7 @@ export function WorkspaceSurfacePanels({
               onGenerate={onGenerate}
               canvasTransform={canvasTransform}
               canvasRef={canvasRef}
+              workspaceSurface={workspaceSurface}
             />
           </Suspense>
         </div>

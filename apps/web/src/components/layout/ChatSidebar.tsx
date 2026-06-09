@@ -80,6 +80,7 @@ interface ChatSidebarProps {
     onGenerate?: any;
     canvasTransform?: { x: number; y: number; scale: number } | null;
     canvasRef?: any;
+    workspaceSurface?: string;
 }
 
 
@@ -579,7 +580,7 @@ interface NormalChatSidebarProps extends ChatSidebarProps {
 }
 
 const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
-    const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel } = props;
+    const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel, workspaceSurface } = props;
     const { user, isTempUser, loading: authLoading } = useAuth();
 
 
@@ -2830,7 +2831,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     return (
         <>
             {/* 侧边栏折叠时吸附在最右侧的展开按钮 */}
-            {!isOpen && !isMobile && (
+            {!isOpen && !isMobile && (!workspaceSurface || workspaceSurface === 'workspace') && (
                 <button
                     onClick={onToggle}
                     className="fixed right-0 top-1/2 -translate-y-1/2 z-[200000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
@@ -2849,7 +2850,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             )}
 
             {/* 2. Chat Card Popover (Morph Transformation) */}
-            {isOpen && (
+            {(isOpen || !isMobile) && (
                 <div
                     onMouseEnter={() => {
                         setIsHovering(true);
@@ -2903,7 +2904,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         boxShadow: 'var(--frost-card-framework-shadow)',
                         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
                         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        transform: 'translateX(0)',
+                        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+                        pointerEvents: isOpen ? 'auto' : 'none',
                         transition: 'transform 0.3s ease-out'
                     }}
                 >
