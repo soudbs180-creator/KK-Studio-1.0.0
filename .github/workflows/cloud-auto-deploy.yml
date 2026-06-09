@@ -114,31 +114,6 @@ jobs:
         if: ${{ env.KK_VPS_DEPLOY_COMMAND == '' }}
         run: echo "KK_VPS_DEPLOY_COMMAND is not configured; skipping VPS API deploy."
 
-  deploy-netlify:
-    runs-on: ubuntu-latest
-    needs: verify
-    env:
-      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-    steps:
-      - name: Download web dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: web-dist-build
-          path: apps/web/dist
-
-      - name: Install Netlify CLI
-        if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
-        run: npm install --global netlify-cli@latest
-
-      - name: Deploy to Netlify
-        if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
-        run: netlify deploy --dir=apps/web/dist --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
-
-      - name: Skip Netlify deploy
-        if: ${{ env.NETLIFY_AUTH_TOKEN == '' || env.NETLIFY_SITE_ID == '' }}
-        run: echo "Netlify secrets are not configured; skipping Netlify deploy."
-
   deploy-vercel:
     runs-on: ubuntu-latest
     needs:
