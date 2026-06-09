@@ -702,15 +702,87 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           pointer-events: none;
           transform: translateY(-30px);
         }
+        /* 手机端 (默认) */
+        .card-overview, .card-billing, .card-logs, .card-storage, .card-api, .card-browser {
+          grid-column: span 1;
+        }
+
+        /* 2-column layout for tablet/small desktop (>= 768px) */
         @media (min-width: 768px) {
-          .dashboard-left-col-span-2 {
+          .card-overview {
             grid-column: 1 / 3 !important;
+            grid-row: span 2 !important;
           }
-          .dashboard-left-col-1 {
+          .card-billing {
             grid-column: 1 !important;
           }
-          .dashboard-left-col-2 {
+          .card-logs {
             grid-column: 2 !important;
+          }
+          .card-storage {
+            grid-column: 1 / 3 !important;
+          }
+          .card-api {
+            grid-column: 1 / 3 !important;
+          }
+          .card-browser {
+            grid-column: 1 / 3 !important;
+          }
+        }
+
+        /* 3-column layout for medium desktop (>= 1200px) */
+        @media (min-width: 1200px) {
+          .card-overview {
+            grid-column: 1 / 3 !important;
+            grid-row: 1 / 3 !important;
+          }
+          .card-billing {
+            grid-column: 3 !important;
+            grid-row: 1 !important;
+          }
+          .card-logs {
+            grid-column: 3 !important;
+            grid-row: 2 !important;
+          }
+          .card-storage {
+            grid-column: 1 / 4 !important;
+            grid-row: 3 !important;
+          }
+          .card-api {
+            grid-column: 1 / 3 !important;
+            grid-row: 4 !important;
+          }
+          .card-browser {
+            grid-column: 3 !important;
+            grid-row: 4 !important;
+          }
+        }
+
+        /* 4-column layout for large desktop (>= 1528px) */
+        @media (min-width: 1528px) {
+          .card-overview {
+            grid-column: 1 / 3 !important;
+            grid-row: 1 / 3 !important;
+          }
+          .card-billing {
+            grid-column: 3 !important;
+            grid-row: 1 !important;
+          }
+          .card-logs {
+            grid-column: 4 !important;
+            grid-row: 1 !important;
+          }
+          .card-storage {
+            grid-column: 3 / 5 !important;
+            grid-row: 2 !important;
+          }
+          .card-api {
+            grid-column: 1 / 3 !important;
+            grid-row: 3 !important;
+          }
+          .card-browser {
+            grid-column: 3 / 5 !important;
+            grid-row: 3 !important;
           }
         }
       `}</style>
@@ -718,7 +790,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       <SettingsCardGridContainer className="dashboard-grid-container">
         {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 (4A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row dashboard-left-col-span-2"
+          className="dashboard-grid-card card-overview"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: 'var(--accent-color)' }} />
@@ -765,7 +837,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
         <div 
-          className="dashboard-grid-card dashboard-left-col-1"
+          className="dashboard-grid-card card-billing"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
@@ -785,7 +857,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 5: 系统日志 (Logs) - 占 1*1 格 (1A) */}
         <div 
-          className="dashboard-grid-card dashboard-left-col-2"
+          className="dashboard-grid-card card-logs"
           onClick={() => onNavigate('system-logs')}
         >
           <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
@@ -806,7 +878,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col dashboard-left-col-span-2"
+          className="dashboard-grid-card card-storage"
           onClick={() => onNavigate('storage-settings')}
         >
           <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
@@ -842,7 +914,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <button
           type="button"
           aria-label={pick('+ 添加 API', '+ Add API')}
-          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
+          className="dashboard-grid-card group card-api"
           onClick={() => onNavigate('api-management')}
         >
           <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
@@ -870,7 +942,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 7: 浏览器助手 (Browser Assistant) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
+          className="dashboard-grid-card group card-browser"
           onClick={() => onNavigate('browser-assistant')}
         >
           <div className="dashboard-card-glow" style={{ background: '#4f46e5' }} />

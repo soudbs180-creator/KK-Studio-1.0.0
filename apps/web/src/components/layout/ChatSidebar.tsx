@@ -1219,12 +1219,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     lastPreferredModelIdRef.current = preferredModelId;
                     const match = models.find(m => m.id === preferredModelId);
                     if (match) {
-                        setSelectedModel(prev => {
-                            if (prev?.id === match.id && prev?.name === match.name && prev?.description === match.description) {
-                                return prev;
-                            }
-                            return match;
-                        });
+                        // 简体中文：如果当前选择的模型与最新首选模型不同，则切换默认模型
+                        if (!(selectedModel?.id === match.id && selectedModel?.name === match.name && selectedModel?.description === match.description)) {
+                            setSelectedModel(match);
+                        }
                         return;
                     }
                 }
@@ -1232,20 +1230,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                 const exists = models.find(m => m.id === selectedModel.id);
                 const staleDisabledCapabilityModel = isCapabilityRouteAssignmentModelDisabled('assistant', selectedModel.id);
                 if (!exists || staleDisabledCapabilityModel) {
-                    setSelectedModel(prev => {
-                        if (prev?.id === assistantPreferredModel.id && prev?.name === assistantPreferredModel.name && prev?.description === assistantPreferredModel.description) {
-                            return prev;
-                        }
-                        return assistantPreferredModel;
-                    });
+                    // 简体中文：如果模型不存在或被禁用，则切换至推荐的 assistantPreferredModel
+                    if (!(selectedModel?.id === assistantPreferredModel.id && selectedModel?.name === assistantPreferredModel.name && selectedModel?.description === assistantPreferredModel.description)) {
+                        setSelectedModel(assistantPreferredModel);
+                    }
                 } else {
                     if (exists.name !== selectedModel.name || exists.description !== selectedModel.description) {
-                        setSelectedModel(prev => {
-                            if (prev?.id === exists.id && prev?.name === exists.name && prev?.description === exists.description) {
-                                return prev;
-                            }
-                            return exists;
-                        });
+                        // 简体中文：如果模型的名称或描述有更新，重新同步更新模型
+                        if (!(selectedModel?.id === exists.id && selectedModel?.name === exists.name && selectedModel?.description === exists.description)) {
+                            setSelectedModel(exists);
+                        }
                     }
                 }
             }
