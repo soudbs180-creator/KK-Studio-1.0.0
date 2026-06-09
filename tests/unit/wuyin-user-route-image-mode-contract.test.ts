@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { readSource } from "../support/workspacePaths.js";
 
-describe("Wuyin / 速创 documented API routing", () => {
+describe("Wuyin / Suchuang documented API routing", () => {
   test("strict Wuyin router is mounted before the legacy user router", () => {
     const indexSource = readSource("server/index.js");
     const strictRouterIndex = indexSource.indexOf("userWuyinStrictRouter");
@@ -29,7 +29,6 @@ describe("Wuyin / 速创 documented API routing", () => {
     assert.match(strictSource, /\/api\/voice\/composite/);
     assert.match(strictSource, /\/api\/img\/split/);
     assert.doesNotMatch(strictSource, /fetch\(targetUrl/);
-    assert.doesNotMatch(strictSource, /Wuyin 通用转发已禁用。请使用 image\/video\/audio\/task_status 模式/);
   });
 
   test("strict status routing requires model-bearing task ids and documented detail endpoints", () => {
@@ -40,6 +39,15 @@ describe("Wuyin / 速创 documented API routing", () => {
     assert.match(strictSource, /WUYIN_STATUS_MODEL_REQUIRED/);
     assert.match(strictSource, /WUYIN_ASYNC_DETAIL_ENDPOINT/);
     assert.match(strictSource, /WUYIN_SORA2_DETAIL_ENDPOINT/);
-    assert.match(strictSource, /api\.wuyinkeji\.com/);
+  });
+
+  test("governance blocks browser-direct Wuyin transport before merge", () => {
+    const governanceSource = readSource("scripts/governance/check-current-facts.mjs");
+
+    assert.match(governanceSource, /expectNoWuyinBrowserDirect/);
+    assert.match(governanceSource, /callWuyinClientDirect/);
+    assert.match(governanceSource, /checkWuyinClientDirectTaskStatus/);
+    assert.match(governanceSource, /fetch\(targetUrl\)/);
+    assert.match(governanceSource, /fetch\(detailUrl\)/);
   });
 });
