@@ -118,8 +118,7 @@ const buildSmoothCurvePath = (points: ChartPoint[]) => {
     const previous = points[index - 1]!;
     const current = points[index]!;
     const controlX = Number(((previous.x + current.x) / 2).toFixed(2));
-    const controlY = previous.y;
-    path += ` C ${controlX} ${controlY}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
+    path += ` C ${controlX} ${previous.y}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
   }
 
   return path;
@@ -161,8 +160,24 @@ const DashboardPanel: React.FC<{
   className?: string;
   tone?: HealthTone;
 }> = ({ title, eyebrow, icon, children, action, onClick, className = '', tone = 'indigo' }) => {
-  const content = (
-    <>
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
+  return (
+    <section
+      className={`dashboard-panel ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
+      data-clickable={onClick ? 'true' : 'false'}
+      data-tone={tone}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="dashboard-panel__glow" aria-hidden="true" />
       <div className="dashboard-panel__header">
         <div className="dashboard-panel__title-group">
@@ -175,25 +190,6 @@ const DashboardPanel: React.FC<{
         {action ? <div className="dashboard-panel__action">{action}</div> : null}
       </div>
       <div className="dashboard-panel__body">{children}</div>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        className={`dashboard-panel dashboard-panel--button ${className}`.trim()}
-        data-tone={tone}
-        onClick={onClick}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <section className={`dashboard-panel ${className}`.trim()} data-tone={tone}>
-      {content}
     </section>
   );
 };
@@ -239,6 +235,33 @@ const TopologyNode: React.FC<{
     <small>{helper}</small>
   </div>
 );
+
+const ModuleMeter: React.FC<{
+  label: string;
+  value: string;
+  helper: string;
+  progress: number;
+  tone?: HealthTone;
+}> = ({ label, value, helper, progress, tone = 'indigo' }) => {
+  const normalizedProgress = clampPercentage(progress);
+
+  return (
+    <div className="dashboard-module-meter" data-tone={tone}>
+      <div
+        className="dashboard-module-meter__ring"
+        style={{ '--meter-progress': `${normalizedProgress}%` } as React.CSSProperties}
+      >
+        <span>{Math.round(normalizedProgress)}%</span>
+      </div>
+      <div className="dashboard-module-meter__content">
+        <div className="dashboard-module-meter__label">{label}</div>
+        <strong>{value}</strong>
+        <p>{helper}</p>
+        <ProgressBar progress={normalizedProgress} tone={tone} showLabel={false} />
+      </div>
+    </div>
+  );
+};
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
@@ -489,9 +512,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     ? Math.round((channelCount / Math.max(officialCount + providerCount, 1)) * 100)
     : 0;
   const logHealth = logs.length > 0 ? Math.max(0, 100 - Math.round((importantLogCount / logs.length) * 100)) : 100;
-  const storageHealth = storageMode ? 100 : 36;
   const storageProgress = Math.min(100, (storageUsageMb / 1024) * 100);
+  const storageReadiness = storageMode ? Math.max(70, Math.round(100 - storageProgress * 0.25)) : 36;
+  const ledgerReadiness = Math.min(100, 55 + (!billingLoading ? 15 : 0) + (latestRecharge ? 15 : 0) + (todayUsageCount > 0 ? 15 : 0));
   const hasUsageSignal = totalCreditSpend > 0 || todayUsageCount > 0 || todayCostUsd > 0 || todayTokens > 0;
+  const routeReadiness = Math.min(
+    100,
+    (stats.valid > 0 ? 40 : 0)
+      + (activeProviderCount > 0 ? 35 : 0)
+      + (statsInvalid === 0 ? 25 : 10),
+  );
   const browserReadiness = Math.min(
     100,
     25
@@ -516,7 +546,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const systemReadiness = Math.round((
     (hasAvailableRoute ? 100 : 42)
     + logHealth
-    + storageHealth
+    + storageReadiness
     + Math.min(100, channelCoverage || (hasAvailableRoute ? 70 : 30))
   ) / 4);
 
@@ -543,11 +573,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-panel {
           --dashboard-tone-rgb: 99 102 241;
           position: relative;
+          display: flex;
           min-width: 0;
+          min-height: 100%;
+          flex-direction: column;
           overflow: hidden;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           border-radius: 22px;
           background:
+            linear-gradient(145deg, rgb(255 255 255 / 0.045), transparent 38%),
             radial-gradient(circle at top right, rgb(var(--dashboard-tone-rgb) / 0.16), transparent 34%),
             var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
           box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
@@ -563,18 +597,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-panel[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
         .dashboard-panel[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
 
-        .dashboard-panel--button {
-          display: block;
-          width: 100%;
+        .dashboard-panel--interactive {
           cursor: pointer;
-          font: inherit;
-          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+          outline: none;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
         }
 
-        .dashboard-panel--button:hover {
+        .dashboard-panel--interactive:hover,
+        .dashboard-panel--interactive:focus-visible {
           transform: translateY(-2px);
           border-color: rgb(var(--dashboard-tone-rgb) / 0.36);
           box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
+        }
+
+        .dashboard-panel--interactive:active {
+          transform: translateY(0) scale(0.995);
         }
 
         .dashboard-panel__glow {
@@ -650,6 +687,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-panel__body {
           position: relative;
           z-index: 1;
+          display: flex;
+          min-height: 0;
+          flex: 1;
+          flex-direction: column;
         }
 
         .dashboard-metric-tile {
@@ -669,7 +710,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-metric-tile__label,
         .dashboard-health-pill__label,
         .dashboard-flow-step__helper,
-        .dashboard-topology-node small {
+        .dashboard-topology-node small,
+        .dashboard-module-meter__label {
           color: var(--text-tertiary);
           font-size: var(--type-micro);
           line-height: 1.35;
@@ -689,6 +731,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           color: var(--text-secondary);
           font-size: var(--type-caption);
           line-height: 1.4;
+          overflow-wrap: anywhere;
+        }
+
+        .dashboard-module-meter {
+          --dashboard-tone-rgb: 99 102 241;
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          align-items: center;
+          gap: 12px;
+          border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
+          border-radius: 18px;
+          background: rgb(var(--dashboard-tone-rgb) / 0.08);
+          padding: 12px;
+        }
+
+        .dashboard-module-meter[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
+        .dashboard-module-meter[data-tone="amber"] { --dashboard-tone-rgb: 245 158 11; }
+        .dashboard-module-meter[data-tone="rose"] { --dashboard-tone-rgb: 244 63 94; }
+        .dashboard-module-meter[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
+
+        .dashboard-module-meter__ring {
+          display: grid;
+          width: 62px;
+          height: 62px;
+          place-items: center;
+          border-radius: 999px;
+          background:
+            radial-gradient(circle, var(--settings-surface-elevated) 0 56%, transparent 57%),
+            conic-gradient(rgb(var(--dashboard-tone-rgb)) var(--meter-progress), rgb(255 255 255 / 0.10) 0);
+          box-shadow: inset 0 0 0 1px rgb(var(--dashboard-tone-rgb) / 0.16);
+        }
+
+        .dashboard-module-meter__ring span {
+          color: var(--text-primary);
+          font-size: var(--type-caption);
+          font-weight: 800;
+        }
+
+        .dashboard-module-meter__content {
+          display: grid;
+          min-width: 0;
+          gap: 5px;
+        }
+
+        .dashboard-module-meter__content strong {
+          overflow: hidden;
+          color: var(--text-primary);
+          font-size: var(--type-body-2);
+          font-weight: 800;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .dashboard-module-meter__content p {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: var(--type-caption);
+          line-height: 1.45;
           overflow-wrap: anywhere;
         }
 
@@ -924,7 +1024,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           min-width: 0;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.22);
           border-radius: 18px;
-          background: color-mix(in srgb, var(--settings-surface-elevated) 78%, rgb(var(--dashboard-tone-rgb)) 8%);
+          background:
+            linear-gradient(180deg, rgb(var(--dashboard-tone-rgb) / 0.10), rgb(255 255 255 / 0.02)),
+            var(--settings-surface-elevated);
           padding: 12px;
           text-align: center;
         }
@@ -948,12 +1050,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-flow-map {
+          position: relative;
           display: grid;
           gap: 10px;
         }
 
+        .dashboard-flow-map::before {
+          position: absolute;
+          top: 28px;
+          bottom: 56px;
+          left: 26px;
+          width: 2px;
+          border-radius: 999px;
+          content: "";
+          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.45), rgb(255 255 255 / 0.04));
+        }
+
         .dashboard-flow-step {
           --dashboard-tone-rgb: 99 102 241;
+          position: relative;
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
           align-items: center;
@@ -1033,6 +1148,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           white-space: nowrap;
         }
 
+        .dashboard-module-stack {
+          display: grid;
+          gap: 12px;
+        }
+
         @media (min-width: 900px) {
           .dashboard-command-center {
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1091,6 +1211,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             padding: 12px;
           }
 
+          .dashboard-panel--interactive:hover,
+          .dashboard-panel--interactive:focus-visible {
+            transform: none;
+          }
+
           .dashboard-panel__header {
             align-items: center;
             gap: 8px;
@@ -1121,6 +1246,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           .dashboard-health-grid,
           .dashboard-topology__rail {
             grid-template-columns: 1fr;
+          }
+
+          .dashboard-module-meter {
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 10px;
+            border-radius: 16px;
+            padding: 10px;
+          }
+
+          .dashboard-module-meter__ring {
+            width: 54px;
+            height: 54px;
           }
 
           .dashboard-metric-tile {
@@ -1170,6 +1307,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             display: none;
           }
 
+          .dashboard-flow-map::before {
+            top: 24px;
+            bottom: 60px;
+            left: 24px;
+          }
+
           .dashboard-flow-step {
             grid-template-columns: auto minmax(0, 1fr);
             align-items: flex-start;
@@ -1188,12 +1331,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             gap: 4px;
           }
 
-          .dashboard-inline-row strong {
+          .dashboard-inline-row span,
+          .dashboard-inline-row strong,
+          .dashboard-flow-step__label {
             max-width: 100%;
           }
         }
 
-        @media (max-width: 380px) {
+        @media (max-width: 420px) {
           .settings-hero-flat-header .settings-reference-grid-4 {
             grid-template-columns: 1fr !important;
           }
@@ -1205,6 +1350,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           .dashboard-chart-bar small[data-major="false"] {
             visibility: hidden;
           }
+
+          .dashboard-module-meter {
+            align-items: flex-start;
+            grid-template-columns: 1fr;
+          }
+
+          .dashboard-module-meter__ring {
+            width: 50px;
+            height: 50px;
+          }
         }
       `}</style>
 
@@ -1215,8 +1370,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
         badge={<StatusBadge status={heroStatus} label={dashboardStatusSummaryLabel} />}
         description={pick(
-          '把设置总览升级成可读数据的运营驾驶舱：消耗趋势、API 路由、浏览器助手链路、存储和日志健康度都在一个屏幕内判断。',
-          'A data-first settings command center for spend trends, API routing, browser-assistant pipeline, storage, and log health.',
+          '总览不再只是入口集合，而是把消耗趋势、供应商路由、浏览器助手、存储、日志和账本状态统一成可判断的图形化驾驶舱。',
+          'Overview is now a visual command center for spend, provider routing, browser assistant, storage, logs, and ledger health.',
         )}
         metrics={(
           <>
@@ -1268,7 +1423,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               />
               <MetricTile
                 label={pick('峰值时段', 'Peak period')}
-                value={peakUsageBucket?.label.replace(':00', '') || '--'}
+                value={peakUsageBucket && hasUsageSignal ? peakUsageBucket.label.replace(':00', '') : '--'}
                 helper={peakUsageBucket && hasUsageSignal ? pick(`${formatNumber(peakUsageBucket.count)} 次请求`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('暂无峰值', 'No peak yet')}
                 tone="indigo"
               />
@@ -1317,9 +1472,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                       <span
                         className="dashboard-chart-bar__fill"
                         style={{
-                          ['--bucket-height' as string]: `${hasUsageSignal ? bucket.barPercentage : 4}%`,
-                          ['--bucket-opacity' as string]: bucket.amount > 0 || bucket.count > 0 ? '1' : '0.26',
-                        }}
+                          '--bucket-height': `${hasUsageSignal ? bucket.barPercentage : 4}%`,
+                          '--bucket-opacity': bucket.amount > 0 || bucket.count > 0 ? '1' : '0.26',
+                        } as React.CSSProperties}
                       />
                     </span>
                     <small data-major={bucket.isMajorTick ? 'true' : 'false'}>{bucket.label.replace(':00', '')}</small>
@@ -1350,39 +1505,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           action={<SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'amber'}>{hasAvailableRoute ? pick('可用', 'Ready') : pick('待配置', 'Setup')}</SettingsBadge>}
           onClick={() => onNavigate('api-management')}
         >
-          <div className="dashboard-topology">
-            <div className="dashboard-topology__rail" aria-label={pick('API 路由信息图', 'API routing infographic')}>
-              <TopologyNode
-                label={pick('官方 API', 'Official API')}
-                value={String(officialCount)}
-                helper={pick('直连密钥', 'Direct keys')}
-                tone={officialCount > 0 ? 'emerald' : 'amber'}
-              />
-              <TopologyNode
-                label={pick('供应商', 'Providers')}
-                value={`${activeProviderCount}/${Math.max(providerCount, 0)}`}
-                helper={pick('在线/总数', 'Online/total')}
-                tone={activeProviderCount > 0 ? 'emerald' : providerCount > 0 ? 'amber' : 'rose'}
-              />
-              <TopologyNode
-                label={pick('覆盖率', 'Coverage')}
-                value={`${channelCoverage}%`}
-                helper={pick('可用链路', 'Ready routes')}
-                tone={channelCoverage >= 70 ? 'emerald' : channelCoverage > 0 ? 'amber' : 'rose'}
-              />
-            </div>
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('路由准备度', 'Route readiness')}
+              value={hasAvailableRoute ? pick('可分发请求', 'Routing enabled') : pick('需要配置通道', 'Needs channels')}
+              helper={pick('官方密钥、供应商在线状态与异常密钥共同决定路由质量。', 'Route quality combines official keys, provider status, and invalid keys.')}
+              progress={routeReadiness}
+              tone={hasAvailableRoute ? 'emerald' : 'amber'}
+            />
+            <div className="dashboard-topology">
+              <div className="dashboard-topology__rail" aria-label={pick('API 路由信息图', 'API routing infographic')}>
+                <TopologyNode
+                  label={pick('官方 API', 'Official API')}
+                  value={String(officialCount)}
+                  helper={pick('直连密钥', 'Direct keys')}
+                  tone={officialCount > 0 ? 'emerald' : 'amber'}
+                />
+                <TopologyNode
+                  label={pick('供应商', 'Providers')}
+                  value={`${activeProviderCount}/${Math.max(providerCount, 0)}`}
+                  helper={pick('在线/总数', 'Online/total')}
+                  tone={activeProviderCount > 0 ? 'emerald' : providerCount > 0 ? 'amber' : 'rose'}
+                />
+                <TopologyNode
+                  label={pick('覆盖率', 'Coverage')}
+                  value={`${channelCoverage}%`}
+                  helper={pick('可用链路', 'Ready routes')}
+                  tone={channelCoverage >= 70 ? 'emerald' : channelCoverage > 0 ? 'amber' : 'rose'}
+                />
+              </div>
 
-            <div className="dashboard-health-grid">
-              <HealthPill
-                label={pick('密钥有效', 'Valid keys')}
-                value={`${stats.valid}/${Math.max(statsTotal, stats.valid)}`}
-                tone={stats.valid > 0 ? 'emerald' : 'amber'}
-              />
-              <HealthPill
-                label={pick('异常密钥', 'Invalid keys')}
-                value={String(statsInvalid)}
-                tone={statsInvalid > 0 ? 'rose' : 'emerald'}
-              />
+              <div className="dashboard-health-grid">
+                <HealthPill
+                  label={pick('密钥有效', 'Valid keys')}
+                  value={`${stats.valid}/${Math.max(statsTotal, stats.valid)}`}
+                  tone={stats.valid > 0 ? 'emerald' : 'amber'}
+                />
+                <HealthPill
+                  label={pick('异常密钥', 'Invalid keys')}
+                  value={String(statsInvalid)}
+                  tone={statsInvalid > 0 ? 'rose' : 'emerald'}
+                />
+              </div>
             </div>
           </div>
         </DashboardPanel>
@@ -1393,41 +1557,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           icon={<Globe size={18} />}
           eyebrow={pick('浏览器助手图', 'Browser assistant map')}
           title={pick('本地守护、插件与网页自动化链路', 'Daemon, extension, and web automation pipeline')}
-          action={<SettingsBadge tone="indigo">{pick('待检测', 'Doctor')}</SettingsBadge>}
+          action={<SettingsBadge tone={browserReadiness >= 75 ? 'emerald' : 'indigo'}>{`${browserReadiness}%`}</SettingsBadge>}
           onClick={() => onNavigate('browser-assistant')}
         >
-          <div className="dashboard-flow-map" aria-label={pick('浏览器助手流程图', 'Browser assistant flow diagram')}>
-            <FlowStep
-              icon={<Monitor size={16} />}
-              label={pick('本地守护进程', 'Local daemon')}
-              helper={pick('负责 WSS 控制与本地浏览器桥接', 'WSS control and local bridge')}
-              value={pick('检测', 'Check')}
-              tone="indigo"
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('链路准备度', 'Pipeline readiness')}
+              value={browserReadiness >= 75 ? pick('可以进入联调', 'Ready for checks') : pick('需要补齐环境', 'Needs setup')}
+              helper={pick('由 API 路由、存储模式和告警日志共同估算。', 'Estimated from API routing, storage mode, and warning logs.')}
+              progress={browserReadiness}
+              tone={browserReadiness >= 75 ? 'emerald' : browserReadiness >= 50 ? 'amber' : 'indigo'}
             />
-            <FlowStep
-              icon={<Layers size={16} />}
-              label={pick('Chrome 插件', 'Chrome extension')}
-              helper={pick('承接页面读取、截图与上下文采集', 'Page reading, screenshots, context capture')}
-              value={pick('连接', 'Link')}
-              tone="amber"
-            />
-            <FlowStep
-              icon={<Sparkles size={16} />}
-              label={pick('网页抓取/生图素材', 'Extraction and generation assets')}
-              helper={pick('价格、商品图、提示词素材流入工作流', 'Price, images, and prompts enter the workflow')}
-              value={pick('自动化', 'Automate')}
-              tone="emerald"
-            />
-
-            <div className="mt-1">
-              <div className="mb-2 flex items-center justify-between gap-3 text-[var(--text-secondary)]" style={{ fontSize: 'var(--type-caption)' }}>
-                <span>{pick('链路准备度', 'Pipeline readiness')}</span>
-                <strong className="text-[var(--text-primary)]">{browserReadiness}%</strong>
-              </div>
-              <ProgressBar
-                progress={browserReadiness}
-                tone={browserReadiness >= 75 ? 'emerald' : browserReadiness >= 50 ? 'amber' : 'indigo'}
-                showLabel={false}
+            <div className="dashboard-flow-map" aria-label={pick('浏览器助手流程图', 'Browser assistant flow diagram')}>
+              <FlowStep
+                icon={<Monitor size={16} />}
+                label={pick('本地守护进程', 'Local daemon')}
+                helper={pick('负责 WSS 控制与本地浏览器桥接', 'WSS control and local bridge')}
+                value={pick('检测', 'Check')}
+                tone="indigo"
+              />
+              <FlowStep
+                icon={<Layers size={16} />}
+                label={pick('Chrome 插件', 'Chrome extension')}
+                helper={pick('承接页面读取、截图与上下文采集', 'Page reading, screenshots, context capture')}
+                value={pick('连接', 'Link')}
+                tone="amber"
+              />
+              <FlowStep
+                icon={<Sparkles size={16} />}
+                label={pick('网页抓取/生图素材', 'Extraction and generation assets')}
+                helper={pick('价格、商品图、提示词素材流入工作流', 'Price, images, and prompts enter the workflow')}
+                value={pick('自动化', 'Automate')}
+                tone="emerald"
               />
             </div>
           </div>
@@ -1442,20 +1603,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           action={<SettingsBadge tone={storageMode ? 'emerald' : 'amber'}>{storageModeLabel}</SettingsBadge>}
           onClick={() => onNavigate('storage-settings')}
         >
-          <div className="dashboard-inline-list">
-            <div className="dashboard-inline-row">
-              <span>{pick('图片资源', 'Image assets')}</span>
-              <strong>{storageSnapshotPending ? pick('更新中', 'Updating') : formatNumber(storedImages)}</strong>
-            </div>
-            <div className="dashboard-inline-row">
-              <span>{pick('已占用', 'Used storage')}</span>
-              <strong>{storageUsageMb.toFixed(1)} MB</strong>
-            </div>
-            <ProgressBar
-              progress={storageProgress}
-              tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'emerald'}
-              showLabel
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('存储准备度', 'Storage readiness')}
+              value={storageModeLabel}
+              helper={storageMode ? pick('资源可被画布与生成流程复用。', 'Assets can be reused by canvas and generation flows.') : pick('需要先选择存储模式。', 'Choose a storage mode first.')}
+              progress={storageReadiness}
+              tone={storageMode ? 'emerald' : 'amber'}
             />
+            <div className="dashboard-inline-list">
+              <div className="dashboard-inline-row">
+                <span>{pick('图片资源', 'Image assets')}</span>
+                <strong>{storageSnapshotPending ? pick('更新中', 'Updating') : formatNumber(storedImages)}</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('已占用', 'Used storage')}</span>
+                <strong>{storageUsageMb.toFixed(1)} MB</strong>
+              </div>
+              <ProgressBar
+                progress={storageProgress}
+                tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'emerald'}
+                showLabel
+              />
+            </div>
           </div>
         </DashboardPanel>
 
@@ -1473,18 +1643,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           )}
           onClick={() => onNavigate('system-logs')}
         >
-          <div className="dashboard-inline-list">
-            <div className="dashboard-inline-row">
-              <span>{pick('今日告警', 'Alerts today')}</span>
-              <strong>{importantLogCount > 0 ? formatNumber(importantLogCount) : pick('无', 'None')}</strong>
-            </div>
-            <div className="dashboard-inline-row">
-              <span>{pick('最近来源', 'Latest source')}</span>
-              <strong>{latestLog ? latestLog.source : pick('日志流稳定', 'Stable stream')}</strong>
-            </div>
-            <div className="dashboard-inline-row">
-              <span>{pick('最近消息', 'Latest message')}</span>
-              <strong>{latestLog ? latestLog.message : pick('当前没有异常日志', 'No warning or error')}</strong>
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('日志健康度', 'Log health')}
+              value={hasCriticalLogs ? pick('存在错误', 'Errors found') : importantLogCount > 0 ? pick('存在告警', 'Warnings found') : pick('日志稳定', 'Stable logs')}
+              helper={pick('告警和错误越少，健康度越高。', 'Fewer warnings and errors increase health.')}
+              progress={logHealth}
+              tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
+            />
+            <div className="dashboard-inline-list">
+              <div className="dashboard-inline-row">
+                <span>{pick('今日告警', 'Alerts today')}</span>
+                <strong>{importantLogCount > 0 ? formatNumber(importantLogCount) : pick('无', 'None')}</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('最近来源', 'Latest source')}</span>
+                <strong>{latestLog ? latestLog.source : pick('日志流稳定', 'Stable stream')}</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('最近消息', 'Latest message')}</span>
+                <strong>{latestLog ? latestLog.message : pick('当前没有异常日志', 'No warning or error')}</strong>
+              </div>
             </div>
           </div>
         </DashboardPanel>
@@ -1497,18 +1676,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('计费', 'Billing')}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
         >
-          <div className="dashboard-inline-list">
-            <div className="dashboard-inline-row">
-              <span>{pick('当前余额', 'Current balance')}</span>
-              <strong>{remainingBalanceDisplay}</strong>
-            </div>
-            <div className="dashboard-inline-row">
-              <span>{pick('最近充值', 'Latest recharge')}</span>
-              <strong>{latestRecharge ? formatDateTime(latestRecharge.created_at) : pick('暂无记录', 'No record')}</strong>
-            </div>
-            <div className="dashboard-inline-row">
-              <span>{pick('今日充值', 'Recharge today')}</span>
-              <strong>{todayRechargeCount > 0 ? formatNumber(todayRechargeCount) : pick('无', 'None')}</strong>
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('账本同步度', 'Ledger freshness')}
+              value={remainingBalanceDisplay}
+              helper={pick('余额、充值和消耗记录保持同屏对账。', 'Balance, recharge, and spend stay reconciled on one screen.')}
+              progress={ledgerReadiness}
+              tone="amber"
+            />
+            <div className="dashboard-inline-list">
+              <div className="dashboard-inline-row">
+                <span>{pick('最近充值', 'Latest recharge')}</span>
+                <strong>{latestRecharge ? formatDateTime(latestRecharge.created_at) : pick('暂无记录', 'No record')}</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('今日充值', 'Recharge today')}</span>
+                <strong>{todayRechargeCount > 0 ? formatNumber(todayRechargeCount) : pick('无', 'None')}</strong>
+              </div>
             </div>
           </div>
         </DashboardPanel>
@@ -1518,31 +1702,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           icon={<Cpu size={18} />}
           eyebrow={pick('能力流', 'Capability flow')}
           title={pick('模型调用、素材与分发的闭环', 'Closed loop for model calls, assets, and distribution')}
-          action={<Zap size={18} />}
+          action={<SettingsBadge tone="indigo">{pick('闭环', 'Loop')}</SettingsBadge>}
           onClick={() => onNavigate('ai-management')}
         >
-          <div className="dashboard-flow-map">
-            <FlowStep
-              icon={<Activity size={16} />}
-              label={pick('模型调用', 'Model calls')}
-              helper={pick('请求记录进入消耗曲线', 'Requests feed the spend curve')}
-              value={formatCompactNumber(todayUsageCount)}
+          <div className="dashboard-module-stack">
+            <ModuleMeter
+              label={pick('能力闭环', 'Capability loop')}
+              value={hasUsageSignal ? pick('已有调用信号', 'Activity detected') : pick('等待首次调用', 'Waiting for calls')}
+              helper={pick('模型调用、计费沉淀和网页素材进入同一工作流。', 'Model calls, billing, and page assets flow together.')}
+              progress={Math.min(100, Math.round((browserReadiness + routeReadiness + (hasUsageSignal ? 100 : 42)) / 3))}
               tone="indigo"
             />
-            <FlowStep
-              icon={<Coins size={16} />}
-              label={pick('计费沉淀', 'Billing ledger')}
-              helper={pick('余额、充值、消耗统一落账', 'Balance, recharge, and spend reconcile')}
-              value={formatUsd(todayCostUsd)}
-              tone="amber"
-            />
-            <FlowStep
-              icon={<Globe size={16} />}
-              label={pick('网页助手', 'Browser assistant')}
-              helper={pick('页面素材进入自动化生成流程', 'Page assets enter automated generation')}
-              value={`${browserReadiness}%`}
-              tone="emerald"
-            />
+            <div className="dashboard-flow-map">
+              <FlowStep
+                icon={<Activity size={16} />}
+                label={pick('模型调用', 'Model calls')}
+                helper={pick('请求记录进入消耗曲线', 'Requests feed the spend curve')}
+                value={formatCompactNumber(todayUsageCount)}
+                tone="indigo"
+              />
+              <FlowStep
+                icon={<Coins size={16} />}
+                label={pick('计费沉淀', 'Billing ledger')}
+                helper={pick('余额、充值、消耗统一落账', 'Balance, recharge, and spend reconcile')}
+                value={formatUsd(todayCostUsd)}
+                tone="amber"
+              />
+              <FlowStep
+                icon={<Globe size={16} />}
+                label={pick('网页助手', 'Browser assistant')}
+                helper={pick('页面素材进入自动化生成流程', 'Page assets enter automated generation')}
+                value={`${browserReadiness}%`}
+                tone="emerald"
+              />
+            </div>
           </div>
         </DashboardPanel>
       </SettingsCardGridContainer>
