@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Wand2,
   Sliders,
@@ -13,10 +13,6 @@ import {
   ChevronUp,
   X,
   Sparkles,
-  Wifi,
-  WifiOff,
-  RefreshCw,
-  CheckCircle2,
 } from 'lucide-react';
 import type { CapabilityRole, CapabilityRouteAssignment } from '../../../types';
 import {
@@ -24,10 +20,7 @@ import {
   subscribeCapabilityRouteAssignments,
   upsertCapabilityRouteAssignment,
 } from '../../../services/api/capabilityRouteAssignments';
-import keyManager, {
-  type KeySlot,
-  type ThirdPartyProvider,
-} from '../../../services/auth/keyManager';
+import keyManager, { type KeySlot, type ThirdPartyProvider } from '../../../services/auth/keyManager';
 import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
 import { knowledgeStore, type AgentSkillRecord } from '../../../features/ai-assistant-runtime/knowledge/KnowledgeStore';
@@ -43,7 +36,6 @@ import {
 } from '../SettingsScaffold';
 import { SettingToggle, SettingSelect, SettingInput } from '../ui/index';
 
-// 本地高级能力参数缓存 Key
 const PRESETS_STORAGE_KEY = 'kk_capability_presets_v1';
 
 interface CapabilityPresetDetail {
@@ -82,65 +74,17 @@ const SYSTEM_TOOLS_LIST = [
   { value: 'generation.createBatchJob', label: 'generation.createBatchJob (发起并发批量绘图调度任务)' },
 ];
 
-// 简单轻量的防抖钩子，避免外部重型依赖
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => {
-      clearTimeout(handler);
-    };
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
   }, [value, delay]);
 
   return debouncedValue;
 }
 
-// ----------------------------------------------------
-// 1. 网络联通性测速工具 (Ping Channel)
-// ----------------------------------------------------
-interface PingResult {
-  success: boolean;
-  latency?: number;
-  error?: string;
-}
-
-async function pingChannelBaseUrl(baseUrl: string): Promise<PingResult> {
-  const start = Date.now();
-  const targetUrl = baseUrl || 'https://api.openai.com';
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    // 用 no-cors 模式发出轻量请求，避开 CORS 拦截但可以感知与服务器的 TCP 握手握通
-    await fetch(targetUrl, {
-      method: 'GET',
-      mode: 'no-cors',
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    return {
-      success: true,
-      latency: Date.now() - start,
-    };
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      return { success: false, error: '超时 / Timeout' };
-    }
-    // 很多情况下即使报错（比如没有参数或者404），但既然抓到了异常且非超时，说明物理网络已经连通
-    return {
-      success: true,
-      latency: Date.now() - start,
-    };
-  }
-}
-
-// ----------------------------------------------------
-// 2. 子组件：能力预设卡片 (CapabilityCard)
-// ----------------------------------------------------
 interface CapabilityCardProps {
   role: CapabilityRole;
   assignment: CapabilityRouteAssignment;
@@ -166,75 +110,31 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
   onSavePreset,
   pick,
 }) => {
-  // 本地临时编辑状态，避免键入时高频引起父组件重绘
   const [localPrompt, setLocalPrompt] = useState(preset.systemPrompt);
   const [localTemp, setLocalTemp] = useState(preset.temperature);
   const [localMaxTokens, setLocalMaxTokens] = useState(preset.maxTokens);
 
-  // 测速状态
-  const [pinging, setPinging] = useState(false);
-  const [pingResult, setPingResult] = useState<PingResult | null>(null);
-
-  // 侦听 preset 属性在外部改变（比如切换 role 或重置）时同步本地状态
   useEffect(() => {
     setLocalPrompt(preset.systemPrompt);
     setLocalTemp(preset.temperature);
     setLocalMaxTokens(preset.maxTokens);
-    setPingResult(null);
   }, [preset]);
 
-  // 对系统人设输入使用防抖同步，避免频繁存盘与重新绘制
   const debouncedPrompt = useDebounce(localPrompt, 800);
   useEffect(() => {
     if (debouncedPrompt !== preset.systemPrompt) {
-      onSavePreset(role, {
-        systemPrompt: debouncedPrompt,
-        temperature: localTemp,
-        maxTokens: localMaxTokens,
-      });
+      onSavePreset(role, { systemPrompt: debouncedPrompt, temperature: localTemp, maxTokens: localMaxTokens });
     }
-  }, [debouncedPrompt]);
+  }, [debouncedPrompt, localMaxTokens, localTemp, onSavePreset, preset.systemPrompt, role]);
 
-  // 当数值型滑块停止拖拽/改变时触发同步
   const handleTempChange = (val: number) => {
     setLocalTemp(val);
-    onSavePreset(role, {
-      systemPrompt: localPrompt,
-      temperature: val,
-      maxTokens: localMaxTokens,
-    });
+    onSavePreset(role, { systemPrompt: localPrompt, temperature: val, maxTokens: localMaxTokens });
   };
 
   const handleMaxTokensChange = (val: number) => {
     setLocalMaxTokens(val);
-    onSavePreset(role, {
-      systemPrompt: localPrompt,
-      temperature: localTemp,
-      maxTokens: val,
-    });
-  };
-
-  // 执行测速
-  const handlePing = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (pinging) return;
-    setPinging(true);
-    
-    // 找出当前渠道的 BaseUrl
-    const channelId = assignment.primaryRouteId || '';
-    const allChannels = keyManager.getChannelConfigs({ includeDisabled: true, includeProviders: true });
-    const targetChannel = allChannels.find((c) => c.id === channelId);
-    
-    let targetUrl = 'https://api.openai.com';
-    if (targetChannel && targetChannel.baseUrl) {
-      targetUrl = targetChannel.baseUrl;
-    } else if (channelId.startsWith('official:google')) {
-      targetUrl = 'https://generativelanguage.googleapis.com';
-    }
-
-    const res = await pingChannelBaseUrl(targetUrl);
-    setPingResult(res);
-    setPinging(false);
+    onSavePreset(role, { systemPrompt: localPrompt, temperature: localTemp, maxTokens: val });
   };
 
   const getRoleDisplayName = (r: string) => {
@@ -247,7 +147,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
   const getRoleDescription = (r: string) => {
     if (r === 'assistant') return pick('处理画布的对话助理、脑暴大纲及交互控制的核心大脑通道。', 'Core channel for text conversation, brainstorming, and canvas controls.');
     if (r === 'image_generation') return pick('文生图与图生图的扩写、美化和模型指派接口。', 'Preferred route for expansion, optimization and model routing of image generation.');
-    if (r === 'video_generation') return pick('电影视频分镜生成、动态控制及镜头控制能力的路由信道。', 'Routing endpoint for Veo and other dynamic video generation models.');
+    if (r === 'video_generation') return pick('电影视频分镜生成、动态控制及镜头控制能力的路由信道。', 'Routing endpoint for dynamic video generation models.');
     return '';
   };
 
@@ -270,16 +170,11 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
         background: isExpanded ? 'var(--settings-surface-elevated)' : 'var(--settings-section-bg)',
       }}
     >
-      {/* 卡片头部 */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex gap-4 items-center">
           <div
             className="p-3.5 rounded-2xl flex items-center justify-center border"
-            style={{
-              background: 'var(--bg-secondary)',
-              borderColor: 'var(--border-light)',
-              color: 'var(--settings-state-info-text)',
-            }}
+            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-light)', color: 'var(--settings-state-info-text)' }}
           >
             <Icon size={22} />
           </div>
@@ -304,52 +199,22 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
             checked={assignment.enabled}
             onChange={(checked) => onUpdateCapability(role, { enabled: checked })}
           />
-          <SettingsActionButton
-            size="sm"
-            onClick={onToggleExpand}
-            icon={isExpanded ? ChevronUp : ChevronDown}
-          >
-            {isExpanded ? pick('折叠预设', 'Collapse') : pick('参数预设', 'Setup presets')}
+          <SettingsActionButton size="sm" onClick={onToggleExpand} icon={isExpanded ? ChevronUp : ChevronDown}>
+            {isExpanded ? pick('折叠设置', 'Collapse') : pick('能力设置', 'Capability settings')}
           </SettingsActionButton>
         </div>
       </div>
 
-      {/* 主路由绑定配置 */}
       {assignment.enabled && (
-        <div
-          className="grid gap-4 md:grid-cols-2 p-4 rounded-2xl border transition-all duration-300 relative"
-          style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}
-        >
-          <div className="space-y-2">
-            <SettingSelect
-              label={pick('主通道 (Primary Route)', 'Primary Route')}
-              value={assignment.primaryRouteId || ''}
-              options={capabilityRouteOptions}
-              onChange={(val) => onUpdateCapability(role, { primaryRouteId: val, primaryModelId: '' })}
-            />
-            {/* 信道网络测速组件 */}
-            {assignment.primaryRouteId && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <button
-                  type="button"
-                  onClick={handlePing}
-                  disabled={pinging}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-[10.5px] rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:bg-[var(--toolbar-hover)] text-[var(--text-secondary)] transition-all cursor-pointer disabled:opacity-60"
-                >
-                  <Wifi size={11} className={pinging ? 'animate-bounce' : ''} />
-                  {pinging ? pick('正在测速...', 'Testing...') : pick('信道测速', 'Ping Route')}
-                </button>
-                {pingResult && (
-                  <span className={`text-[10px] font-mono font-bold flex items-center gap-1 ${pingResult.success ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${pingResult.success ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                    {pingResult.success ? `${pingResult.latency}ms` : pingResult.error}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="grid gap-4 md:grid-cols-2 p-4 rounded-2xl border transition-all duration-300" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
           <SettingSelect
-            label={pick('首选模型 (Primary Model)', 'Primary Model')}
+            label={pick('主通道', 'Primary Route')}
+            value={assignment.primaryRouteId || ''}
+            options={capabilityRouteOptions}
+            onChange={(val) => onUpdateCapability(role, { primaryRouteId: val, primaryModelId: '' })}
+          />
+          <SettingSelect
+            label={pick('首选模型', 'Primary Model')}
             value={assignment.primaryModelId || ''}
             options={[{ value: '', label: pick('自动选择', 'Auto detect') }, ...primaryModels]}
             onChange={(val) => onUpdateCapability(role, { primaryModelId: val })}
@@ -358,19 +223,15 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
         </div>
       )}
 
-      {/* 高级模型参数折叠栏 */}
       {isExpanded && (
         <div className="mt-4 pt-4 border-t space-y-5 animate-in slide-in-from-top-2 duration-200" style={{ borderColor: 'var(--border-light)' }}>
           <h4 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
             <Sparkles size={14} className="text-amber-500" />
-            {pick('模型参数预设方案 (LJQuan/OpenTu 预设风格)', 'Capability parameters preset scheme')}
+            {pick('能力参数预设', 'Capability parameter presets')}
           </h4>
 
-          {/* 系统提示词 */}
           <div className="space-y-1.5">
-            <label className={SETTINGS_LABEL_CLASSNAME}>
-              {pick('System Prompt (系统人设引导指令)', 'System Prompt')}
-            </label>
+            <label className={SETTINGS_LABEL_CLASSNAME}>{pick('System Prompt（系统人设引导指令）', 'System Prompt')}</label>
             <textarea
               rows={3}
               className={SETTINGS_INPUT_CLASSNAME}
@@ -382,15 +243,10 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* 温度调节 */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className={SETTINGS_LABEL_CLASSNAME}>
-                  {pick('Temperature (采样温度 / 创造力)', 'Temperature')}
-                </label>
-                <span className="text-[12px] font-mono text-[var(--text-secondary)] font-bold">
-                  {localTemp.toFixed(1)}
-                </span>
+                <label className={SETTINGS_LABEL_CLASSNAME}>{pick('Temperature（采样温度）', 'Temperature')}</label>
+                <span className="text-[12px] font-mono text-[var(--text-secondary)] font-bold">{localTemp.toFixed(1)}</span>
               </div>
               <div className="flex items-center gap-4">
                 <input
@@ -403,45 +259,29 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
                   className="flex-1 accent-[var(--clay-ink)] h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
                 />
                 <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleTempChange(0.2)}
-                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
-                  >
+                  <button type="button" onClick={() => handleTempChange(0.2)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
                     {pick('精准', 'Precise')}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTempChange(0.7)}
-                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
-                  >
+                  <button type="button" onClick={() => handleTempChange(0.7)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
                     {pick('平衡', 'Balanced')}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTempChange(1.3)}
-                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
-                  >
+                  <button type="button" onClick={() => handleTempChange(1.3)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
                     {pick('创造', 'Creative')}
                   </button>
                 </div>
               </div>
-              <p className="text-[10px] text-[var(--text-tertiary)]">
-                {pick('较低值将倾向于更确定和聚焦的输出；较高值则促进创意与发散灵感。', 'Lower values tend to be more deterministic; higher values promote creativity.')}
-              </p>
             </div>
 
-            {/* 备用通道和最大 tokens */}
             <div className="space-y-4">
               <div className="grid gap-3 grid-cols-2">
                 <SettingSelect
-                  label={pick('后备通道 (Backup Route)', 'Backup Route')}
+                  label={pick('后备通道', 'Backup Route')}
                   value={assignment.fallbackRouteId || ''}
                   options={capabilityRouteOptions}
                   onChange={(val) => onUpdateCapability(role, { fallbackRouteId: val, fallbackModelId: '' })}
                 />
                 <SettingSelect
-                  label={pick('后备模型 (Backup Model)', 'Backup Model')}
+                  label={pick('后备模型', 'Backup Model')}
                   value={assignment.fallbackModelId || ''}
                   options={[{ value: '', label: pick('自动选择', 'Auto detect') }, ...fallbackModels]}
                   onChange={(val) => onUpdateCapability(role, { fallbackModelId: val })}
@@ -449,10 +289,10 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
                 />
               </div>
               <SettingInput
-                label={pick('单次最大词元数 (Max Output Tokens)', 'Max Tokens')}
+                label={pick('单次最大词元数', 'Max Tokens')}
                 value={localMaxTokens.toString()}
                 type="number"
-                onChange={(val) => handleMaxTokensChange(parseInt(val) || 2048)}
+                onChange={(val) => handleMaxTokensChange(parseInt(val, 10) || 2048)}
                 placeholder="2048"
               />
             </div>
@@ -465,9 +305,6 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
 
 CapabilityCard.displayName = 'CapabilityCard';
 
-// ----------------------------------------------------
-// 3. 子组件：自定义技能卡片 (SkillCard)
-// ----------------------------------------------------
 interface SkillCardProps {
   skill: AgentSkillRecord;
   onEdit: () => void;
@@ -475,67 +312,50 @@ interface SkillCardProps {
   pick: <T>(zh: T, en: T) => T;
 }
 
-const SkillCard: React.FC<SkillCardProps> = React.memo(({ skill, onEdit, onDelete, pick }) => {
-  return (
-    <div
-      className="rounded-[24px] border p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
-      style={SETTINGS_PANEL_STYLE}
-    >
-      {/* 高级卡片呼吸光 */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-xl pointer-events-none" />
-
-      <div className="space-y-3 relative z-10">
-        <div className="flex justify-between items-start">
-          <div>
-            <h4 className="text-[15px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-              <Wand2 size={13} className="text-blue-500" />
-              {skill.name}
-            </h4>
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-[10px] font-mono font-bold mt-1.5 border border-blue-500/20">
-              {pick('命令行触发语：', 'Trigger: ')}/{skill.trigger}
-            </div>
-          </div>
-          <SettingsBadge tone="slate">Skill</SettingsBadge>
-        </div>
-
-        <p className="text-[12px] text-[var(--text-secondary)] line-clamp-2 min-h-[36px]">
-          {skill.steps?.[0] || pick('暂无技能描述。', 'No description.')}
-        </p>
-
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-            {pick('已授权调用的工具列表:', 'Authorized tools:')}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {skill.tools.map((t) => (
-              <span
-                key={t}
-                className="text-[9.5px] px-2 py-0.5 rounded-md font-mono bg-slate-100 dark:bg-slate-800 text-[var(--text-secondary)] border border-slate-200/50"
-              >
-                {t}
-              </span>
-            ))}
+const SkillCard: React.FC<SkillCardProps> = React.memo(({ skill, onEdit, onDelete, pick }) => (
+  <div className="rounded-[24px] border p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden" style={SETTINGS_PANEL_STYLE}>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-xl pointer-events-none" />
+    <div className="space-y-3 relative z-10">
+      <div className="flex justify-between items-start">
+        <div>
+          <h4 className="text-[15px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+            <Wand2 size={13} className="text-blue-500" />
+            {skill.name}
+          </h4>
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-[10px] font-mono font-bold mt-1.5 border border-blue-500/20">
+            {pick('命令行触发语：', 'Trigger: ')}/{skill.trigger}
           </div>
         </div>
+        <SettingsBadge tone="slate">Skill</SettingsBadge>
       </div>
 
-      <div className="flex gap-2 justify-end pt-4 mt-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
-        <SettingsActionButton size="sm" icon={Edit} onClick={onEdit}>
-          {pick('编辑', 'Edit')}
-        </SettingsActionButton>
-        <SettingsActionButton size="sm" tone="danger" icon={Trash2} onClick={onDelete}>
-          {pick('删除', 'Delete')}
-        </SettingsActionButton>
+      <p className="text-[12px] text-[var(--text-secondary)] line-clamp-2 min-h-[36px]">
+        {skill.steps?.[0] || pick('暂无技能描述。', 'No description.')}
+      </p>
+
+      <div className="space-y-1.5">
+        <div className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+          {pick('已授权调用的工具列表:', 'Authorized tools:')}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {skill.tools.map((tool) => (
+            <span key={tool} className="text-[9.5px] px-2 py-0.5 rounded-md font-mono bg-slate-100 dark:bg-slate-800 text-[var(--text-secondary)] border border-slate-200/50">
+              {tool}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
-  );
-});
+
+    <div className="flex gap-2 justify-end pt-4 mt-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
+      <SettingsActionButton size="sm" icon={Edit} onClick={onEdit}>{pick('编辑', 'Edit')}</SettingsActionButton>
+      <SettingsActionButton size="sm" tone="danger" icon={Trash2} onClick={onDelete}>{pick('删除', 'Delete')}</SettingsActionButton>
+    </div>
+  </div>
+));
 
 SkillCard.displayName = 'SkillCard';
 
-// ----------------------------------------------------
-// 4. 子组件：Skill 编辑模态框 (SkillModal)
-// ----------------------------------------------------
 interface SkillModalProps {
   editingSkill: AgentSkillRecord | null;
   onClose: () => void;
@@ -544,7 +364,6 @@ interface SkillModalProps {
 }
 
 const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClose, onSave, pick }) => {
-  // Modal 内部本地状态，彻底防止弹窗输入时导致外部大卡片列表进行昂贵重绘
   const [name, setName] = useState(editingSkill ? editingSkill.name : '');
   const [trigger, setTrigger] = useState(editingSkill ? editingSkill.trigger : '');
   const [desc, setDesc] = useState(editingSkill ? editingSkill.steps?.[0] || '' : '');
@@ -560,114 +379,58 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
   };
 
   const handleToolToggle = (toolValue: string) => {
-    if (tools.includes(toolValue)) {
-      setTools(tools.filter((t) => t !== toolValue));
-    } else {
-      setTools([...tools, toolValue]);
-    }
+    setTools((current) => current.includes(toolValue) ? current.filter((tool) => tool !== toolValue) : [...current, toolValue]);
   };
 
   return (
     <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div
-        className="w-full max-w-lg rounded-[24px] border p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
-        style={SETTINGS_ELEVATED_STYLE}
-      >
-        {/* Header */}
+      <div className="w-full max-w-lg rounded-[24px] border p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" style={SETTINGS_ELEVATED_STYLE}>
         <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-light)' }}>
           <div>
             <h3 className="text-[18px] font-bold text-[var(--text-primary)]">
-              {editingSkill ? pick('编辑自定义技能', 'Edit Custom Skill') : pick('新建自定义技能', 'Create Custom Skill')}
+              {editingSkill ? pick('编辑 Skill 配置', 'Edit Skill') : pick('新建 Skill 配置', 'Create Skill')}
             </h3>
             <p className="text-[12px] text-[var(--text-tertiary)] mt-1">
-              {pick('声明 Skill 的命令参数与工具列表。我们将在 AI 助手中动态读取它。', 'Define custom triggers, descriptions, and grant tools permissions.')}
+              {pick('配置触发语、描述、授权工具和执行提示词。', 'Define trigger, description, allowed tools, and instructions.')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 hover:bg-[var(--toolbar-hover)] rounded-full transition-colors cursor-pointer border-none bg-transparent"
-          >
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-[var(--toolbar-hover)] rounded-full transition-colors cursor-pointer border-none bg-transparent">
             <X size={18} className="text-[var(--text-secondary)]" />
           </button>
         </div>
 
-        {/* Form Body */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           <div className="grid gap-3 grid-cols-2">
-            <SettingInput
-              label={pick('技能名称 (Name)', 'Skill Name')}
-              value={name}
-              onChange={setName}
-              placeholder={pick('例如：批量头像生成', 'e.g., AvatarGenerator')}
-            />
-            <SettingInput
-              label={pick('命令行触发语 (Trigger)', 'Trigger word')}
-              value={trigger}
-              onChange={(val) => setTrigger(val.replace(/^\/+/, ''))}
-              placeholder={pick('例如：avatar', 'e.g., avatar')}
-            />
+            <SettingInput label={pick('技能名称', 'Skill Name')} value={name} onChange={setName} placeholder={pick('例如：批量头像生成', 'e.g., AvatarGenerator')} />
+            <SettingInput label={pick('触发语', 'Trigger word')} value={trigger} onChange={(val) => setTrigger(val.replace(/^\/+/, ''))} placeholder={pick('例如：avatar', 'e.g., avatar')} />
           </div>
 
-          <SettingInput
-            label={pick('技能描述 (Description)', 'Description')}
-            value={desc}
-            onChange={setDesc}
-            placeholder={pick('说明该技能的任务说明与流程...', 'Describe what this skill does...')}
-          />
+          <SettingInput label={pick('技能描述', 'Description')} value={desc} onChange={setDesc} placeholder={pick('说明该技能的任务说明与流程...', 'Describe what this skill does...')} />
 
-          {/* 工具授权勾选框 */}
           <div className="space-y-2">
-            <label className={SETTINGS_LABEL_CLASSNAME}>
-              {pick('授权调用的底层能力工具链 (声明式权限边界)', 'Authorized SDK Tools')}
-            </label>
-            <div
-              className="rounded-2xl border p-3.5 space-y-2.5 max-h-[160px] overflow-y-auto"
-              style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
-            >
-              {SYSTEM_TOOLS_LIST.map((tool) => {
-                const checked = tools.includes(tool.value);
-                return (
-                  <label key={tool.value} className="flex items-start gap-2.5 text-xs text-[var(--text-primary)] cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => handleToolToggle(tool.value)}
-                      className="mt-0.5 accent-[var(--clay-ink)] cursor-pointer"
-                    />
-                    <span>{tool.label}</span>
-                  </label>
-                );
-              })}
+            <label className={SETTINGS_LABEL_CLASSNAME}>{pick('授权工具', 'Authorized tools')}</label>
+            <div className="rounded-2xl border p-3.5 space-y-2.5 max-h-[160px] overflow-y-auto" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}>
+              {SYSTEM_TOOLS_LIST.map((tool) => (
+                <label key={tool.value} className="flex items-start gap-2.5 text-xs text-[var(--text-primary)] cursor-pointer select-none">
+                  <input type="checkbox" checked={tools.includes(tool.value)} onChange={() => handleToolToggle(tool.value)} className="mt-0.5 accent-[var(--clay-ink)] cursor-pointer" />
+                  <span>{tool.label}</span>
+                </label>
+              ))}
             </div>
             <p className="text-[10px] text-[var(--text-tertiary)]">
-              {pick('声明式安全性原则：AI 助手在执行此技能时，只允许调用这里授权的 API，杜绝越权执行破坏性操作。', 'Declarative security: The assistant is only allowed to call checked tools during execution.')}
+              {pick('AI 助手执行此 Skill 时，只允许调用这里授权的工具。', 'The assistant may only call the tools authorized here when this Skill runs.')}
             </p>
           </div>
 
-          {/* 引导 Prompt */}
           <div className="space-y-1.5">
-            <label className={SETTINGS_LABEL_CLASSNAME}>
-              {pick('引导提示词 (Prompt Instructions)', 'Instructions Prompt')}
-            </label>
-            <textarea
-              rows={4}
-              className={SETTINGS_INPUT_CLASSNAME}
-              placeholder={pick('指导 AI 触发此技能时应遵循的具体流程细节、推理假设、或输出约束格式（如输出 JSON 等）...', 'Instruct the AI how to behave when this skill is active...')}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
+            <label className={SETTINGS_LABEL_CLASSNAME}>{pick('执行提示词', 'Instructions Prompt')}</label>
+            <textarea rows={4} className={SETTINGS_INPUT_CLASSNAME} placeholder={pick('指导 AI 触发此技能时应遵循的流程、约束或输出格式...', 'Instruct the AI how to behave when this skill is active...')} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           </div>
         </div>
 
-        {/* Footer Buttons */}
         <div className="flex justify-end gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-          <SettingsActionButton onClick={onClose}>
-            {pick('取消', 'Cancel')}
-          </SettingsActionButton>
-          <SettingsActionButton tone="primary" onClick={handleSave}>
-            {pick('保存技能', 'Save Skill')}
-          </SettingsActionButton>
+          <SettingsActionButton onClick={onClose}>{pick('取消', 'Cancel')}</SettingsActionButton>
+          <SettingsActionButton tone="primary" onClick={handleSave}>{pick('保存 Skill', 'Save Skill')}</SettingsActionButton>
         </div>
       </div>
     </div>
@@ -676,15 +439,9 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
 
 SkillModal.displayName = 'SkillModal';
 
-// ----------------------------------------------------
-// 5. 主视图组件 (AiManagementView)
-// ----------------------------------------------------
 const AiManagementView: React.FC = () => {
   const { pick } = useLocale();
-
   const [activeTab, setActiveTab] = useState<'capability' | 'skills'>('capability');
-
-  // --- 能力预设状态 ---
   const [capabilityAssignments, setCapabilityAssignments] = useState(() => getCapabilityRouteAssignments());
   const [slots, setSlots] = useState<KeySlot[]>(() => keyManager.getSlots());
   const [providers, setProviders] = useState<ThirdPartyProvider[]>(() => keyManager.getProviders());
@@ -692,33 +449,20 @@ const AiManagementView: React.FC = () => {
     if (typeof window === 'undefined') return defaultPresets;
     try {
       const raw = window.localStorage.getItem(PRESETS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return { ...defaultPresets, ...parsed };
-      }
+      if (raw) return { ...defaultPresets, ...JSON.parse(raw) };
     } catch {
-      // 忽略
+      // ignore local preset parse errors
     }
     return defaultPresets;
   });
-
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
-
-  // --- Skill 状态 ---
   const [skills, setSkills] = useState<AgentSkillRecord[]>(() => knowledgeStore.listSkills());
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [editingSkill, setEditingSkill] = useState<AgentSkillRecord | null>(null);
 
-  // 云同步挂起状态
-  const [isOnline, setIsOnline] = useState(true);
-  const [pendingSyncCount, setPendingSyncCount] = useState(0);
-
-  // 侦听订阅
   useEffect(() => {
     setCapabilityAssignments(getCapabilityRouteAssignments());
-    return subscribeCapabilityRouteAssignments(() => {
-      setCapabilityAssignments(getCapabilityRouteAssignments());
-    });
+    return subscribeCapabilityRouteAssignments(() => setCapabilityAssignments(getCapabilityRouteAssignments()));
   }, []);
 
   const refreshKeys = useCallback(() => {
@@ -731,52 +475,18 @@ const AiManagementView: React.FC = () => {
     return keyManager.subscribe(refreshKeys);
   }, [refreshKeys]);
 
-  // 定期检测离线队列与网络情况，让用户产生“环境韧性”和掌控度
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const checkSyncStatus = () => {
-      setIsOnline(navigator.onLine);
-      const queue = knowledgeStore.getPendingTasks();
-      setPendingSyncCount(queue.length);
-    };
-
-    checkSyncStatus();
-    const interval = setInterval(checkSyncStatus, 2500);
-
-    const handleOnline = () => {
-      setIsOnline(true);
-      checkSyncStatus();
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      checkSyncStatus();
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // 更新并保存预设到 localStorage
   const handleSavePreset = useCallback((role: string, updated: CapabilityPresetDetail) => {
     setLocalPresets((prev) => {
       const next = { ...prev, [role]: updated };
       try {
         window.localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
       } catch {
-        // 忽略
+        // ignore storage failure
       }
       return next;
     });
   }, []);
 
-  // 整合信道选项
   const allChannelConfigs = useMemo(
     () => keyManager.getChannelConfigs({ includeDisabled: true, includeProviders: true }),
     [slots, providers]
@@ -785,36 +495,26 @@ const AiManagementView: React.FC = () => {
   const capabilityRouteOptions = useMemo(
     () => [
       { value: '', label: pick('自动选择', 'Automatic') },
-      ...allChannelConfigs.map((channel) => {
-        const prefix = channel.id.startsWith('official:')
-          ? channel.name === 'OpenAI' ? 'OpenAI 官方' : '谷歌 官方'
-          : `${channel.name} (${channel.baseUrl})`;
-        return {
-          value: channel.id,
-          label: prefix,
-        };
-      }),
+      ...allChannelConfigs.map((channel) => ({
+        value: channel.id,
+        label: channel.id.startsWith('official:') ? `${channel.name} 官方` : `${channel.name} (${channel.baseUrl})`,
+      })),
     ],
     [allChannelConfigs, pick]
   );
 
-  const getRouteModelOptions = useCallback(
-    (channelId: string) => {
-      const channel = allChannelConfigs.find((c) => c.id === channelId);
-      if (!channel) return [];
-      return (channel.supportedModels || []).map((m) => ({ value: m, label: m }));
-    },
-    [allChannelConfigs]
-  );
+  const getRouteModelOptions = useCallback((channelId: string) => {
+    const channel = allChannelConfigs.find((item) => item.id === channelId);
+    if (!channel) return [];
+    return (channel.supportedModels || []).map((model) => ({ value: model, label: model }));
+  }, [allChannelConfigs]);
 
-  // 修改信道路由绑定
   const updateCapability = useCallback((role: CapabilityRole, patch: Partial<Omit<CapabilityRouteAssignment, 'role' | 'updatedAt'>>) => {
     upsertCapabilityRouteAssignment(role, patch);
     setCapabilityAssignments(getCapabilityRouteAssignments());
-    notify.success(pick('修改成功', 'Updated'), pick('核心能力通道分配已更新。', 'AI capability routing updated.'));
+    notify.success(pick('修改成功', 'Updated'), pick('AI 能力设置已更新。', 'AI capability settings updated.'));
   }, [pick]);
 
-  // --- Skill 管理动作 ---
   const handleOpenAddSkill = () => {
     setEditingSkill(null);
     setShowSkillModal(true);
@@ -836,97 +536,56 @@ const AiManagementView: React.FC = () => {
       });
       setSkills(knowledgeStore.listSkills());
       setShowSkillModal(false);
-      notify.success(pick('保存成功', 'Saved'), pick('Skill 自定义技能已成功保存。', 'Skill saved successfully.'));
+      notify.success(pick('保存成功', 'Saved'), pick('Skill 配置已保存。', 'Skill saved successfully.'));
     } catch (err: any) {
       notify.error(pick('保存失败', 'Error'), err.message || String(err));
     }
   };
 
   const handleDeleteSkill = (id: string) => {
-    if (!window.confirm(pick('确定要删除该自定义技能吗？', 'Are you sure you want to delete this custom skill?'))) {
-      return;
-    }
+    if (!window.confirm(pick('确定要删除该 Skill 吗？', 'Are you sure you want to delete this Skill?'))) return;
     try {
       knowledgeStore.deleteSkill(id);
       setSkills(knowledgeStore.listSkills());
-      notify.success(pick('删除成功', 'Deleted'), pick('Skill 技能已成功移除。', 'Skill deleted successfully.'));
+      notify.success(pick('删除成功', 'Deleted'), pick('Skill 已移除。', 'Skill deleted successfully.'));
     } catch (err: any) {
       notify.error(pick('删除失败', 'Error'), err.message || String(err));
     }
   };
 
-  // 我们只显式允许配置这三个核心现阶段能力角色
   const targetRoles: CapabilityRole[] = ['assistant', 'image_generation', 'video_generation'];
 
   return (
     <SettingsViewShell>
       <SettingsHero
-        eyebrow={pick('AI Engine Settings', 'AI Engine Settings')}
+        eyebrow={pick('AI Settings', 'AI Settings')}
         title={pick('AI 管理', 'AI Management')}
-        description={pick(
-          '在此对本地 AI 核心能力对应的后端信道、预设提示词及模型温度参数进行设置，并可自定义扩展 Skill 自定义指令。',
-          'Configure core LLM routes, presets parameters, and build custom Skills for your AI assistant.'
-        )}
+        description={pick('这里只管理 AI 能力设置和 Skill 配置。供应商、Key、预设 API 与价格费用在供应商配置页面维护。', 'Manage only AI capabilities and Skills here. Providers, keys, API presets, and pricing are handled in provider settings.')}
         icon={Wand2}
         tone="indigo"
       />
 
-      {/* 极具现代感的顶部云端同步状态条 */}
-      <div className="flex items-center justify-between mb-5 px-5 py-3 rounded-2xl border" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
-        <div className="flex items-center gap-2">
-          {isOnline ? (
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          ) : (
-            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-          )}
-          <span className="text-xs text-[var(--text-secondary)]">
-            {isOnline ? pick('网络状态：已连接', 'Network Status: Connected') : pick('网络状态：离线模式', 'Network Status: Offline')}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {pendingSyncCount > 0 ? (
-            <div className="flex items-center gap-1.5 text-xs text-amber-500">
-              <RefreshCw size={12} className="animate-spin" />
-              <span>{pick(`等待同步到服务器 (${pendingSyncCount} 项)...`, `Pending sync (${pendingSyncCount} items)...`)}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-500">
-              <CheckCircle2 size={13} />
-              <span>{pick('配置已在服务器同步', 'All changes synced')}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 精致的 Glassmorphism Tab 切换胶囊 */}
       <div className="flex border-b mb-6 pb-2" style={{ borderColor: 'var(--border-light)' }}>
         <div className="flex gap-1.5 p-1 rounded-2xl bg-[var(--bg-secondary)] border" style={{ borderColor: 'var(--border-light)' }}>
           <button
             type="button"
             onClick={() => setActiveTab('capability')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-none text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'capability'
-                ? 'bg-[var(--clay-ink)] text-white shadow-md'
-                : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              activeTab === 'capability' ? 'bg-[var(--clay-ink)] text-white shadow-md' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Sliders size={14} />
-            {pick('能力配置', 'Capability Presets')}
+            {pick('能力设置', 'Capabilities')}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('skills')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-none text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'skills'
-                ? 'bg-[var(--clay-ink)] text-white shadow-md'
-                : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              activeTab === 'skills' ? 'bg-[var(--clay-ink)] text-white shadow-md' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Bot size={14} />
-            {pick('Skill 配置', 'Custom Skills')}
+            {pick('Skill 配置', 'Skills')}
           </button>
         </div>
       </div>
@@ -934,7 +593,7 @@ const AiManagementView: React.FC = () => {
       {activeTab === 'capability' ? (
         <div className="space-y-4">
           {targetRoles.map((role) => {
-            const assignment = capabilityAssignments.find((a) => a.role === role) || {
+            const assignment = capabilityAssignments.find((item) => item.role === role) || {
               role,
               enabled: true,
               primaryRouteId: '',
@@ -943,7 +602,6 @@ const AiManagementView: React.FC = () => {
               fallbackModelId: '',
               updatedAt: Date.now(),
             };
-
             const isExpanded = expandedRole === role;
             const preset = localPresets[role] || defaultPresets[role];
 
@@ -968,50 +626,34 @@ const AiManagementView: React.FC = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-[16px] font-bold text-[var(--text-primary)]">
-                {pick('自定义技能库', 'Custom Skills Library')}
-              </h3>
+              <h3 className="text-[16px] font-bold text-[var(--text-primary)]">{pick('Skill 配置', 'Skill Configuration')}</h3>
               <p className="text-[12px] text-[var(--text-secondary)] mt-1">
-                {pick('在此声明 AI 助手的 Skill 自定义指令，使其可以理解特定命令行触发语，并赋权调用底层的画布和生图工具。', 'Define custom triggers and declare tools permission boundary for the AI assistant.')}
+                {pick('配置 AI 助手的触发语、执行提示词和授权工具边界。', 'Configure triggers, instructions, and tool permission boundaries for the AI assistant.')}
               </p>
             </div>
-            <SettingsActionButton tone="primary" icon={Plus} onClick={handleOpenAddSkill}>
-              {pick('新建自定义技能', 'Create Custom Skill')}
-            </SettingsActionButton>
+            <SettingsActionButton tone="primary" icon={Plus} onClick={handleOpenAddSkill}>{pick('新建 Skill', 'Create Skill')}</SettingsActionButton>
           </div>
 
           {skills.length === 0 ? (
             <div className="rounded-[24px] border border-dashed p-12 text-center text-[var(--text-tertiary)]" style={SETTINGS_PANEL_STYLE}>
               <Bot size={44} className="mx-auto mb-3 opacity-40 text-slate-400" />
-              <div className="text-sm font-semibold">{pick('暂无自定义技能', 'No custom skills')}</div>
+              <div className="text-sm font-semibold">{pick('暂无 Skill 配置', 'No Skills')}</div>
               <p className="text-xs mt-1 text-[var(--text-tertiary)]">
-                {pick('点击右上角创建一个自定义技能，为 AI 助手赋予特定任务的工具操控和流程能力。', 'Click the button to create a custom skill for the assistant.')}
+                {pick('点击右上角创建一个 Skill。', 'Click the button to create a Skill.')}
               </p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {skills.map((skill) => (
-                <SkillCard
-                  key={skill.id}
-                  skill={skill}
-                  onEdit={() => handleOpenEditSkill(skill)}
-                  onDelete={() => handleDeleteSkill(skill.id)}
-                  pick={pick}
-                />
+                <SkillCard key={skill.id} skill={skill} onEdit={() => handleOpenEditSkill(skill)} onDelete={() => handleDeleteSkill(skill.id)} pick={pick} />
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* --- Skill 编写/编辑模态框 --- */}
       {showSkillModal && (
-        <SkillModal
-          editingSkill={editingSkill}
-          onClose={() => setShowSkillModal(false)}
-          onSave={handleSaveSkill}
-          pick={pick}
-        />
+        <SkillModal editingSkill={editingSkill} onClose={() => setShowSkillModal(false)} onSave={handleSaveSkill} pick={pick} />
       )}
     </SettingsViewShell>
   );
