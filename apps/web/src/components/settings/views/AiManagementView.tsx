@@ -317,7 +317,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
       {/* 主路由绑定配置 */}
       {assignment.enabled && (
         <div
-          className="grid gap-4 md:grid-cols-2 p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden"
+          className="grid gap-4 md:grid-cols-2 p-4 rounded-2xl border transition-all duration-300 relative"
           style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}
         >
           <div className="space-y-2">

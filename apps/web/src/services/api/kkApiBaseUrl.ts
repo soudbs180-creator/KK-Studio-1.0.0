@@ -59,6 +59,17 @@ function isHostedRuntimeOrigin(runtimeOrigin?: string): boolean {
   );
 }
 
+// 简体中文注释：判断是否为 create.xyz 或 createanything.com 等沙箱/托管预览环境的域名
+function isSandboxOrigin(origin?: string): boolean {
+  const hostname = resolveOriginHostname(origin) || "";
+  return hostname.endsWith("create.xyz")
+    || hostname.endsWith("createanything.com")
+    || hostname === "create.xyz"
+    || hostname === "createanything.com"
+    || hostname.endsWith("anything.com")
+    || hostname === "anything.com";
+}
+
 function normalizeConfiguredApiBaseUrl(configuredBaseUrl: string): string {
   try {
     const url = new URL(configuredBaseUrl);
@@ -262,8 +273,15 @@ export async function startOptimalApiBaseUrlRace(): Promise<string | null> {
       });
       clearTimeout(timeoutId);
       
+      // 简体中文注释：强校验健康检查响应，必须为 200 OK 且响应体为包含 ok: true 或 success: true 的 JSON 格式
       if (response.ok) {
-        return { url: baseUrl, latency: performance.now() - startTime };
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const json = await response.json().catch(() => null);
+          if (json && (json.ok === true || json.success === true)) {
+            return { url: baseUrl, latency: performance.now() - startTime };
+          }
+        }
       }
       return { url: baseUrl, latency: 9999 };
     } catch {
@@ -278,7 +296,11 @@ export async function startOptimalApiBaseUrlRace(): Promise<string | null> {
     ]);
 
     const optimal = results.reduce((prev, curr) => (curr.latency < prev.latency ? curr : prev));
-    const optimalUrl = optimal.latency < 9999 ? optimal.url : runtimeOrigin;
+    
+    // 简体中文注释：若均探测失败，且运行环境属于沙箱预览环境，则优先回退到配置好的本地 API 地址以防止访问沙箱网关报错
+    const optimalUrl = optimal.latency < 9999
+      ? optimal.url
+      : (isSandboxOrigin(runtimeOrigin) ? (configuredBaseUrl || runtimeOrigin) : runtimeOrigin);
 
     window.localStorage.setItem(OPTIMAL_URL_KEY, optimalUrl);
     window.localStorage.setItem(NETWORK_FINGERPRINT_KEY, currentFingerprint);
@@ -288,8 +310,9 @@ export async function startOptimalApiBaseUrlRace(): Promise<string | null> {
     console.log(`[Smart Routing] 智能网络延迟测试完毕。中转延迟: ${results[0].latency.toFixed(1)}ms | 直连延迟: ${results[1].latency.toFixed(1)}ms。最低延迟选择: ${optimalUrl}`);
     return optimalUrl;
   } catch (e) {
-    memoryOptimalApiBaseUrl = runtimeOrigin;
-    return runtimeOrigin;
+    const fallbackUrl = isSandboxOrigin(runtimeOrigin) ? (configuredBaseUrl || runtimeOrigin) : runtimeOrigin;
+    memoryOptimalApiBaseUrl = fallbackUrl;
+    return fallbackUrl;
   }
 }
 
