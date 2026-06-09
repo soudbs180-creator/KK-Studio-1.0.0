@@ -1,4 +1,4 @@
-// 职责：管理员维护供应商、模型和积分参数，入口形态与用户 API 设置保持一致。
+// 职责：管理员维护供应商、预设 API、Key 和基础模型积分；高级能力开关迁移到 AI 管理页面。
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Edit, ExternalLink, Globe, Plus, RefreshCw, Save, Shield } from "lucide-react";
@@ -29,21 +29,186 @@ type AdminApiPreset = {
   modelId: string;
   kind: AdminPresetKind;
   endpointType: string;
+  requestProfileId: string;
   color: string;
   website: string;
+  note?: string;
 };
 
 const ADMIN_API_PRESETS: AdminApiPreset[] = [
-  { name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", modelId: "gemini-2.5-flash-image", kind: "official", endpointType: "openai", color: "#4285f4", website: "https://gemini.google.com" },
-  { name: "OpenAI", baseUrl: "https://api.openai.com/v1", modelId: "gpt-4o", kind: "official", endpointType: "openai", color: "#10a37f", website: "https://openai.com" },
-  { name: "Anthropic Claude", baseUrl: "https://api.anthropic.com", modelId: "claude-3-5-sonnet-latest", kind: "official", endpointType: "claude", color: "#d97706", website: "https://www.anthropic.com" },
-  { name: "DeepSeek", baseUrl: "https://api.deepseek.com", modelId: "deepseek-chat", kind: "official", endpointType: "openai", color: "#2563eb", website: "https://www.deepseek.com" },
-  { name: "Qwen", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", modelId: "qwen-plus", kind: "official", endpointType: "openai", color: "#7c3aed", website: "https://chat.qwen.ai" },
-  { name: "Kimi", baseUrl: "https://api.moonshot.cn/v1", modelId: "moonshot-v1-128k", kind: "official", endpointType: "openai", color: "#111827", website: "https://www.kimi.com" },
-  { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", modelId: "openai/gpt-4o", kind: "relay", endpointType: "openai", color: "#7c3aed", website: "https://openrouter.ai" },
-  { name: "WorldRouter", baseUrl: "https://inference-api.worldrouter.ai/v1", modelId: "openai/gpt-4o", kind: "relay", endpointType: "openai", color: "#0891b2", website: "https://www.worldrouter.ai" },
-  { name: "SiliconFlow", baseUrl: "https://api.siliconflow.cn/v1", modelId: "Qwen/Qwen3-235B-A22B-Instruct-2507", kind: "relay", endpointType: "openai", color: "#ff5a00", website: "https://siliconflow.cn" },
-  { name: "B.ai", baseUrl: "https://api.theb.ai/v1", modelId: "gpt-4o", kind: "relay", endpointType: "openai", color: "#0f172a", website: "https://b.ai" },
+  {
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    modelId: "gpt-4o",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "openai-official",
+    color: "#10a37f",
+    website: "https://openai.com",
+  },
+  {
+    name: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    modelId: "gemini-2.5-flash",
+    kind: "official",
+    endpointType: "google_gemini_generate_content",
+    requestProfileId: "google-gemini-official",
+    color: "#4285f4",
+    website: "https://gemini.google.com",
+  },
+  {
+    name: "Anthropic Claude",
+    baseUrl: "https://api.anthropic.com/v1",
+    modelId: "claude-3-5-sonnet-latest",
+    kind: "official",
+    endpointType: "anthropic_messages",
+    requestProfileId: "anthropic-official",
+    color: "#d97706",
+    website: "https://www.anthropic.com",
+  },
+  {
+    name: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    modelId: "deepseek-chat",
+    kind: "official",
+    endpointType: "deepseek_chat_completions",
+    requestProfileId: "deepseek-official",
+    color: "#2563eb",
+    website: "https://www.deepseek.com",
+  },
+  {
+    name: "阿里 DashScope / Qwen",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    modelId: "qwen-plus",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "dashscope-openai-compatible",
+    color: "#7c3aed",
+    website: "https://help.aliyun.com/zh/model-studio/",
+  },
+  {
+    name: "火山 Ark",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    modelId: "doubao-seed-1-6",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "volcengine-ark-openai-compatible",
+    color: "#ef4444",
+    website: "https://www.volcengine.com/product/ark",
+  },
+  {
+    name: "Moonshot / Kimi",
+    baseUrl: "https://api.moonshot.cn/v1",
+    modelId: "moonshot-v1-128k",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "moonshot-openai-compatible",
+    color: "#111827",
+    website: "https://www.moonshot.cn",
+  },
+  {
+    name: "智谱 GLM",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    modelId: "glm-4-plus",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "zhipu-openai-compatible",
+    color: "#0ea5e9",
+    website: "https://open.bigmodel.cn",
+  },
+  {
+    name: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    modelId: "mistral-large-latest",
+    kind: "official",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "mistral-openai-compatible",
+    color: "#f97316",
+    website: "https://mistral.ai",
+  },
+  {
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    modelId: "openai/gpt-4o",
+    kind: "relay",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "openrouter-openai-compatible",
+    color: "#7c3aed",
+    website: "https://openrouter.ai",
+  },
+  {
+    name: "SiliconFlow",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    modelId: "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    kind: "relay",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "siliconflow-openai-compatible",
+    color: "#ff5a00",
+    website: "https://siliconflow.cn",
+  },
+  {
+    name: "GPT-Best",
+    baseUrl: "https://api.gpt-best.com/v1",
+    modelId: "gpt-4o",
+    kind: "relay",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "gpt-best-openai-compatible",
+    color: "#16a34a",
+    website: "https://gpt-best.apifox.cn/llms.txt",
+  },
+  {
+    name: "APIMart",
+    baseUrl: "https://api.apimart.ai/v1",
+    modelId: "gpt-5-mini",
+    kind: "relay",
+    endpointType: "apimart_chat_completions",
+    requestProfileId: "apimart-openai-compatible",
+    color: "#9333ea",
+    website: "https://docs.apimart.ai/cn",
+    note: "APIMart 返回 { code, data } 包装结构，必须使用专用 adapter。",
+  },
+  {
+    name: "12AI",
+    baseUrl: "https://cdn.12ai.org",
+    modelId: "gpt-5.1",
+    kind: "relay",
+    endpointType: "twelveai_multi_protocol",
+    requestProfileId: "12ai-documented-multi-protocol",
+    color: "#06b6d4",
+    website: "https://doc.12ai.org/docs/api",
+    note: "12AI 独立多协议预设，按模型自动走 OpenAI Chat / Claude Messages / Gemini Generate Content。",
+  },
+  {
+    name: "Wuyin / 速创",
+    baseUrl: "https://api.wuyinkeji.com",
+    modelId: "image_nanoBanana2",
+    kind: "relay",
+    endpointType: "wuyin_documented_task",
+    requestProfileId: "wuyin-suchuang-form",
+    color: "#f59e0b",
+    website: "https://api.wuyinkeji.com/type/all",
+    note: "Wuyin 必须按每个模型文档执行；图片/视频/音频/工具由后端 strict router 接管。",
+  },
+  {
+    name: "One API / New API",
+    baseUrl: "https://your-new-api.example.com/v1",
+    modelId: "gpt-4o-mini",
+    kind: "relay",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "one-api-new-api-compatible",
+    color: "#64748b",
+    website: "https://github.com/Calcium-Ion/new-api",
+  },
+  {
+    name: "自定义 OpenAI 兼容",
+    baseUrl: "https://example.com/v1",
+    modelId: "gpt-4o-mini",
+    kind: "relay",
+    endpointType: "openai_chat_completions",
+    requestProfileId: "generic-openai-compatible",
+    color: "#0f172a",
+    website: "https://platform.openai.com/docs/api-reference/chat",
+  },
 ];
 
 type AdminProviderDraft = {
@@ -53,6 +218,7 @@ type AdminProviderDraft = {
   modelId: string;
   displayName: string;
   endpointType: string;
+  requestProfileId: string;
   apiKey: string;
   color: string;
   kind: AdminPresetKind;
@@ -100,6 +266,7 @@ const createDraftFromPreset = (preset: AdminApiPreset): AdminProviderDraft => ({
   modelId: preset.modelId,
   displayName: preset.modelId,
   endpointType: preset.endpointType,
+  requestProfileId: preset.requestProfileId,
   apiKey: "",
   color: preset.color,
   kind: preset.kind,
@@ -111,7 +278,8 @@ const createEmptyDraft = (): AdminProviderDraft => ({
   baseUrl: "",
   modelId: "",
   displayName: "",
-  endpointType: "openai",
+  endpointType: "openai_chat_completions",
+  requestProfileId: "generic-openai-compatible",
   apiKey: "",
   color: "#3B82F6",
   kind: "relay",
@@ -124,7 +292,7 @@ const buildSavePayload = (
 ): SaveAdminCreditProviderRequestDto => ({
   providerName: provider.providerName,
   baseUrl: provider.baseUrl,
-  providerKind: provider.providerKind || 'relay',
+  providerKind: provider.providerKind || "relay",
   apiKeys: [],
   retainApiKeyFingerprints: (provider.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
   models: provider.models.map((model) => {
@@ -135,9 +303,10 @@ const buildSavePayload = (
       modelId: model.modelId,
       displayName: model.displayName || model.modelId,
       description: model.description || "",
-      endpointType: model.endpointType || selectedModel.endpoint || "openai",
+      endpointType: model.endpointType || selectedModel.endpoint || "openai_chat_completions",
+      requestProfileId: model.requestProfileId || selectedModel.requestProfileId || "",
       creditCost: isTarget ? nextPricing["1K"].creditCost : Math.max(1, Number(model.creditCost || 1)),
-      advancedEnabled: isTarget ? true : Boolean(model.advancedEnabled),
+      advancedEnabled: Boolean(model.advancedEnabled),
       mixWithSameModel: Boolean(model.mixWithSameModel),
       qualityPricing,
       priority: Number(model.priority || 0),
@@ -213,13 +382,13 @@ export const ApiConfigPanel: React.FC = () => {
   const handlePreset = (preset: AdminApiPreset) => {
     setProviderDraft(createDraftFromPreset(preset));
     setDraftPricing(toDraftPricing(undefined, 1));
-    setMessage(`${preset.name} 已载入为管理员供应商草稿。补充 API Key 和积分档位后即可保存。`);
+    setMessage(`${preset.name} 已载入。填写 API Key 和模型积分费用后即可保存。`);
   };
 
   const handleCreateCustomDraft = () => {
     setProviderDraft(createEmptyDraft());
     setDraftPricing(toDraftPricing(undefined, 1));
-    setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID 和积分档位后保存。");
+    setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID、API Key 和积分费用后保存。");
   };
 
   const handleEditProvider = (provider: AdminProvider) => {
@@ -227,16 +396,19 @@ export const ApiConfigPanel: React.FC = () => {
     const baseUrl = providerDetail?.baseUrl || "";
     const providerKind = provider.providerKind || providerDetail?.providerKind || "relay";
 
-    const modelId = provider.models[0]?.id || "";
-    const displayName = provider.models[0]?.displayName || "";
-    const endpointType = provider.models[0]?.endpoint || "openai";
-    const color = provider.models[0]?.colorStart || "#3B82F6";
+    const firstModel = provider.models[0];
+    const modelId = firstModel?.id || "";
+    const displayName = firstModel?.displayName || "";
+    const endpointType = firstModel?.endpoint || "openai_chat_completions";
+    const requestProfileId = firstModel?.requestProfileId || providerDetail?.models[0]?.requestProfileId || "";
+    const color = firstModel?.colorStart || "#3B82F6";
 
     const modelsForDraft = providerDetail ? providerDetail.models.map(m => ({
       modelId: m.modelId,
       displayName: m.displayName || m.modelId,
       description: m.description || "",
-      endpointType: m.endpointType || "openai",
+      endpointType: m.endpointType || "openai_chat_completions",
+      requestProfileId: m.requestProfileId || "",
       creditCost: m.creditCost,
       advancedEnabled: m.advancedEnabled,
       mixWithSameModel: m.mixWithSameModel,
@@ -253,24 +425,33 @@ export const ApiConfigPanel: React.FC = () => {
     setProviderDraft({
       providerId: provider.providerId,
       providerName: provider.name,
-      baseUrl: baseUrl,
-      modelId: modelId,
-      displayName: displayName,
-      endpointType: endpointType,
+      baseUrl,
+      modelId,
+      displayName,
+      endpointType,
+      requestProfileId,
       apiKey: "",
-      color: color,
+      color,
       kind: providerKind,
-    isEditing: true,
+      isEditing: true,
       originalModels: modelsForDraft,
       retainApiKeyFingerprints: (providerDetail?.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
     });
-
+    setDraftPricing(toDraftPricing(firstModel?.qualityPricing, firstModel?.creditCost || 1));
     setMessage(`已载入供应商 ${provider.name} 的配置以供修改。`);
   };
 
   const handleDraftChange = (patch: Partial<AdminProviderDraft>) => {
     setProviderDraft((current) => current ? { ...current, ...patch } : current);
   };
+
+  const buildDraftPricing = (): AdminModelQualityPricing => ADMIN_MODEL_QUALITY_KEYS.reduce((pricing, key) => {
+    pricing[key] = {
+      enabled: true,
+      creditCost: normalizeCreditCost(draftPricing[key]),
+    };
+    return pricing;
+  }, {} as AdminModelQualityPricing);
 
   const handleSaveDraftProvider = async () => {
     if (!providerDraft) return;
@@ -282,73 +463,43 @@ export const ApiConfigPanel: React.FC = () => {
       return;
     }
 
-    const nextPricing = ADMIN_MODEL_QUALITY_KEYS.reduce((pricing, key) => {
-      pricing[key] = {
-        enabled: true,
-        creditCost: normalizeCreditCost(draftPricing[key]),
-      };
-      return pricing;
-    }, {} as AdminModelQualityPricing);
-
+    const nextPricing = buildDraftPricing();
     const providerId = providerDraft.isEditing && providerDraft.providerId
       ? providerDraft.providerId
       : buildProviderId(providerName, baseUrl);
+
+    const nextModel = {
+      modelId,
+      displayName: providerDraft.displayName.trim() || modelId,
+      description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
+      endpointType: providerDraft.endpointType.trim() || "openai_chat_completions",
+      requestProfileId: providerDraft.requestProfileId.trim(),
+      creditCost: nextPricing["1K"].creditCost,
+      advancedEnabled: false,
+      mixWithSameModel: false,
+      qualityPricing: nextPricing,
+      priority: 0,
+      weight: 1,
+      isActive: true,
+      color: providerDraft.color || "#3B82F6",
+      colorSecondary: null,
+      textColor: "white" as const,
+      maxCallsLimit: null,
+    };
 
     let finalModels: any[] = [];
     if (providerDraft.isEditing && providerDraft.originalModels && providerDraft.originalModels.length > 0) {
       finalModels = providerDraft.originalModels.map((m, index) => {
         if (index === 0 || m.modelId === providerDraft.modelId) {
-          return {
-            ...m,
-            modelId: providerDraft.modelId.trim(),
-            displayName: providerDraft.displayName.trim() || providerDraft.modelId.trim(),
-            endpointType: providerDraft.endpointType.trim() || "openai",
-            color: providerDraft.color || "#3B82F6",
-            creditCost: nextPricing["1K"].creditCost,
-            qualityPricing: nextPricing,
-          };
+          return { ...m, ...nextModel };
         }
         return m;
       });
-
-      const hasModel = finalModels.some(m => m.modelId === providerDraft.modelId.trim());
-      if (!hasModel) {
-        finalModels[0] = {
-          modelId: providerDraft.modelId.trim(),
-          displayName: providerDraft.displayName.trim() || providerDraft.modelId.trim(),
-          description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
-          endpointType: providerDraft.endpointType.trim() || "openai",
-          creditCost: nextPricing["1K"].creditCost,
-          advancedEnabled: true,
-          mixWithSameModel: false,
-          qualityPricing: nextPricing,
-          priority: 0,
-          weight: 0,
-          isActive: true,
-          color: providerDraft.color || "#3B82F6",
-          colorSecondary: null,
-          textColor: "white",
-          maxCallsLimit: null,
-        };
+      if (!finalModels.some(m => m.modelId === modelId)) {
+        finalModels.unshift(nextModel);
       }
     } else {
-      finalModels = [{
-        modelId,
-        displayName: providerDraft.displayName.trim() || modelId,
-        description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
-        endpointType: providerDraft.endpointType.trim() || "openai",
-        creditCost: nextPricing["1K"].creditCost,
-        advancedEnabled: true,
-        mixWithSameModel: false,
-        qualityPricing: nextPricing,
-        priority: 0,
-        weight: 0,
-        isActive: true,
-        color: providerDraft.color || "#3B82F6",
-        colorSecondary: null,
-        textColor: "white",
-        maxCallsLimit: null,
-      }];
+      finalModels = [nextModel];
     }
 
     setSaving(true);
@@ -363,7 +514,7 @@ export const ApiConfigPanel: React.FC = () => {
       });
 
       if (!response.success) {
-        setMessage(response.error?.message || "保存供应商草稿失败，请稍后重试。");
+        setMessage(response.error?.message || "保存供应商失败，请稍后重试。");
         return;
       }
 
@@ -373,7 +524,7 @@ export const ApiConfigPanel: React.FC = () => {
       await adminModelService.forceLoadAdminModels();
       await adminModelService.broadcastCatalogUpdate("admin-provider-saved");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存供应商草稿失败，请稍后重试。");
+      setMessage(error instanceof Error ? error.message : "保存供应商失败，请稍后重试。");
     } finally {
       setSaving(false);
     }
@@ -394,13 +545,7 @@ export const ApiConfigPanel: React.FC = () => {
       return;
     }
 
-    const nextPricing = ADMIN_MODEL_QUALITY_KEYS.reduce((pricing, key) => {
-      pricing[key] = {
-        enabled: true,
-        creditCost: normalizeCreditCost(draftPricing[key]),
-      };
-      return pricing;
-    }, {} as AdminModelQualityPricing);
+    const nextPricing = buildDraftPricing();
 
     setSaving(true);
     try {
@@ -414,11 +559,10 @@ export const ApiConfigPanel: React.FC = () => {
         return;
       }
 
-      selectedModel.advancedEnabled = true;
       selectedModel.qualityPricing = nextPricing;
       selectedModel.creditCost = nextPricing["1K"].creditCost;
       setProviders([...providers]);
-      setMessage(`${selectedModel.displayName} 的积分参数已保存到管理员模型配置。`);
+      setMessage(`${selectedModel.displayName} 的积分费用已保存到供应商配置。`);
       await refreshAdminProviders();
       await adminModelService.broadcastCatalogUpdate("admin-pricing-saved");
     } catch (error) {
@@ -433,8 +577,8 @@ export const ApiConfigPanel: React.FC = () => {
       <section className="admin-api-nexus__main">
         <div className="admin-api-nexus__header">
           <div>
-            <h2>API 供应商与模型积分</h2>
-            <p>官方和中转站入口与用户侧保持一致；管理员在这里维护模型对应的积分参数。</p>
+            <h2>API 供应商配置</h2>
+            <p>这里只添加供应商、选择预设 API、填写地址 / Key，并维护基础模型积分费用；高级能力到 AI 管理页面配置。</p>
           </div>
           <button type="button" onClick={() => void adminModelService.forceLoadAdminModels()}>
             <RefreshCw size={15} />
@@ -465,6 +609,8 @@ export const ApiConfigPanel: React.FC = () => {
                     e.stopPropagation();
                     handleEditProvider(provider);
                   }}
+                  className="admin-api-nexus__provider-card-edit"
+                  title="修改供应商配置"
                   style={{
                     position: "absolute",
                     top: "12px",
@@ -479,8 +625,6 @@ export const ApiConfigPanel: React.FC = () => {
                     justifyContent: "center",
                     borderRadius: "4px",
                   }}
-                  className="admin-api-nexus__provider-card-edit"
-                  title="修改供应商配置"
                 >
                   <Edit size={14} />
                 </button>
@@ -500,7 +644,7 @@ export const ApiConfigPanel: React.FC = () => {
               className={`admin-api-nexus__model-card ${selectedModel === model ? "is-active" : ""}`}
               onClick={() => setSelectedModelId(model.recordId || model.id)}
             >
-              <span>{model.endpoint || "openai"}</span>
+              <span>{model.endpoint || "openai_chat_completions"}</span>
               <strong>{model.displayName}</strong>
               <small>{model.id}</small>
               <em>{formatPricingSummary(model.qualityPricing, model.creditCost)}</em>
@@ -510,8 +654,8 @@ export const ApiConfigPanel: React.FC = () => {
 
         <div className="admin-api-nexus__pricing">
           <div>
-            <h3>积分档位</h3>
-            <p>{selectedModel ? `${selectedProvider?.name || selectedModel.providerName} · ${selectedModel.id}` : "选择一个模型后调整不同参数档位的积分。"}</p>
+            <h3>模型积分费用</h3>
+            <p>{selectedModel ? `${selectedProvider?.name || selectedModel.providerName} · ${selectedModel.id}` : "选择一个模型后调整供应商基础积分费用。"}</p>
           </div>
           <div className="admin-api-nexus__pricing-grid">
             {ADMIN_MODEL_QUALITY_KEYS.map((key) => (
@@ -529,7 +673,7 @@ export const ApiConfigPanel: React.FC = () => {
           </div>
           <button type="button" className="admin-api-nexus__save" disabled={!selectedModel || saving} onClick={handleSavePricing}>
             <Save size={15} />
-            <span>{saving ? "保存中" : "保存积分参数"}</span>
+            <span>{saving ? "保存中" : "保存积分费用"}</span>
           </button>
         </div>
       </section>
@@ -555,6 +699,7 @@ export const ApiConfigPanel: React.FC = () => {
               <div>
                 <strong>{preset.name}</strong>
                 <small>{parseHost(preset.baseUrl)} · {preset.modelId}</small>
+                {preset.note ? <small>{preset.note}</small> : null}
               </div>
               <a
                 href={preset.website}
@@ -562,6 +707,10 @@ export const ApiConfigPanel: React.FC = () => {
                 rel="noopener noreferrer"
                 className="admin-api-nexus__preset-row-link"
                 style={{ color: "inherit", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  safeOpenLink(preset.website);
+                }}
               >
                 <ExternalLink size={16} />
               </a>
@@ -571,15 +720,15 @@ export const ApiConfigPanel: React.FC = () => {
             <Box size={18} />
             <div>
               <strong>自定义供应商</strong>
-              <small>填写 Base URL、模型 ID 和积分参数</small>
+              <small>默认按 OpenAI 兼容协议；填写 Base URL、模型 ID、Key 和积分费用</small>
             </div>
           </button>
         </div>
-         {providerDraft ? (
+        {providerDraft ? (
           <div className="admin-api-nexus__draft" data-testid="admin-api-provider-draft">
             <div>
               <strong>{providerDraft.isEditing ? "修改供应商配置" : "供应商草稿"}</strong>
-              <small>{providerDraft.isEditing ? "正在编辑已有的供应商通道" : `${providerDraft.kind === "relay" ? "中转站" : "官方"} · 保存后进入模型积分池`}</small>
+              <small>{providerDraft.isEditing ? "正在编辑已有供应商通道" : `${providerDraft.kind === "relay" ? "中转站" : "官方"} · 保存后进入模型积分池`}</small>
             </div>
             <label>
               <span>名称</span>
@@ -588,9 +737,7 @@ export const ApiConfigPanel: React.FC = () => {
                 onChange={(event) => {
                   const updatedName = event.target.value;
                   const patch: Partial<AdminProviderDraft> = { providerName: updatedName };
-                  if (!providerDraft.isEditing) {
-                    patch.providerId = buildProviderId(updatedName, providerDraft.baseUrl);
-                  }
+                  if (!providerDraft.isEditing) patch.providerId = buildProviderId(updatedName, providerDraft.baseUrl);
                   handleDraftChange(patch);
                 }}
               />
@@ -602,9 +749,7 @@ export const ApiConfigPanel: React.FC = () => {
                 onChange={(event) => {
                   const updatedUrl = event.target.value;
                   const patch: Partial<AdminProviderDraft> = { baseUrl: updatedUrl };
-                  if (!providerDraft.isEditing) {
-                    patch.providerId = buildProviderId(providerDraft.providerName, updatedUrl);
-                  }
+                  if (!providerDraft.isEditing) patch.providerId = buildProviderId(providerDraft.providerName, updatedUrl);
                   handleDraftChange(patch);
                 }}
               />
@@ -617,9 +762,24 @@ export const ApiConfigPanel: React.FC = () => {
               <span>API Key</span>
               <input type="password" value={providerDraft.apiKey} onChange={(event) => handleDraftChange({ apiKey: event.target.value })} placeholder="可稍后补充" />
             </label>
+            <div className="admin-api-nexus__pricing-grid">
+              {ADMIN_MODEL_QUALITY_KEYS.map((key) => (
+                <label key={key}>
+                  <span>{key} 积分</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={draftPricing[key]}
+                    onChange={(event) => setDraftPricing((current) => ({ ...current, [key]: event.target.value }))}
+                    disabled={saving}
+                  />
+                </label>
+              ))}
+            </div>
+            <small>协议预设：{providerDraft.requestProfileId || "generic-openai-compatible"} · {providerDraft.endpointType}</small>
             <button type="button" className="admin-api-nexus__save" disabled={saving} onClick={handleSaveDraftProvider}>
               <Save size={15} />
-              <span>{saving ? "保存中" : (providerDraft.isEditing ? "保存修改" : "保存草稿")}</span>
+              <span>{saving ? "保存中" : (providerDraft.isEditing ? "保存修改" : "保存供应商")}</span>
             </button>
           </div>
         ) : null}
