@@ -103,7 +103,7 @@ const SHELL_COPY = {
     emptySearchLabel: '没有匹配的导航入口。',
     mobileHomeKicker: '移动设置',
     mobileHomeTitle: '四个核心入口',
-    mobileHomeDescription: '保留总览、API、计费和错误四个入口。',
+    mobileHomeDescription: '保留总览、供应商、计费和错误四个入口。',
     mobileUsageLabel: '计费',
     mobileErrorsLabel: '错误',
     mobileErrorsDescription: '错误、告警与排障信号。',
@@ -117,7 +117,7 @@ const SHELL_COPY = {
     emptySearchLabel: 'No navigation entries matched.',
     mobileHomeKicker: 'Mobile Settings',
     mobileHomeTitle: 'Four core entries',
-    mobileHomeDescription: 'Keep Overview, API, Billing, and Errors on the phone home.',
+    mobileHomeDescription: 'Keep Overview, Providers, Billing, and Errors on the phone home.',
     mobileUsageLabel: 'Billing',
     mobileErrorsLabel: 'Errors',
     mobileErrorsDescription: 'Errors, warnings, and triage signals.',
@@ -169,8 +169,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     titleEn: 'Settings Overview',
     descriptionZh: '先看状态，再进入具体设置页。',
     descriptionEn: 'Review status before opening a detailed settings page.',
-    primaryActionLabelZh: '打开 API 工作台',
-    primaryActionLabelEn: 'Open API Workspace',
+    primaryActionLabelZh: '查看供应商配置',
+    primaryActionLabelEn: 'Open Provider Settings',
     primaryActionTarget: 'api-management',
     statusSummaryLabelZh: '系统状态',
     statusSummaryLabelEn: 'System status',
@@ -206,8 +206,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     titleEn: 'Billing',
     descriptionZh: '查看充值、消耗和账本。',
     descriptionEn: 'Review recharges, spend, and ledger activity.',
-    primaryActionLabelZh: '查看 API 工作台',
-    primaryActionLabelEn: 'Open API Workspace',
+    primaryActionLabelZh: '查看供应商配置',
+    primaryActionLabelEn: 'Open Provider Settings',
     primaryActionTarget: 'api-management',
     statusSummaryLabelZh: '账本状态',
     statusSummaryLabelEn: 'Ledger status',
@@ -230,8 +230,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     titleEn: 'Logs',
     descriptionZh: '查看错误、告警和诊断信号。',
     descriptionEn: 'Inspect errors, warnings, and diagnostic signals.',
-    primaryActionLabelZh: '返回 API 工作台',
-    primaryActionLabelEn: 'Back to API Workspace',
+    primaryActionLabelZh: '返回供应商配置',
+    primaryActionLabelEn: 'Back to Provider Settings',
     primaryActionTarget: 'api-management',
     statusSummaryLabelZh: '日志状态',
     statusSummaryLabelEn: 'Log status',
@@ -420,10 +420,7 @@ export function getSettingsViewMeta(
   };
 }
 
-export function getSettingsPrimaryActionMeta(
-  view: CanonicalSettingsViewId,
-  language: AppLanguage = 'zh-CN',
-) {
+export function getSettingsPrimaryActionMeta(view: CanonicalSettingsViewId, language: AppLanguage = 'zh-CN') {
   const meta = getSettingsViewMeta(view, language);
   return {
     label: meta.primaryActionLabel,
@@ -431,68 +428,10 @@ export function getSettingsPrimaryActionMeta(
   };
 }
 
-export function getSettingsStatusSummaryLabel(
-  view: CanonicalSettingsViewId,
-  language: AppLanguage = 'zh-CN',
-) {
+export function getSettingsStatusSummaryLabel(view: CanonicalSettingsViewId, language: AppLanguage = 'zh-CN') {
   return getSettingsViewMeta(view, language).statusSummaryLabel;
 }
 
-export function getSettingsShellCopy(
-  language: AppLanguage = 'zh-CN',
-): SettingsShellCopy {
-  return language === 'zh-CN' ? SHELL_COPY['zh-CN'] : SHELL_COPY['en-US'];
-}
-
-export function getSettingsSearchPlaceholder(
-  view: CanonicalSettingsViewId,
-  language: AppLanguage,
-): string {
-  if (view === 'api-management') {
-    return pickByLanguage(language, '筛选 API、供应商或平台入口', 'Filter API, provider, or platform entries');
-  }
-  if (view === 'consumption-records') {
-    return pickByLanguage(language, '筛选计费入口', 'Filter billing entries');
-  }
-  if (view === 'storage-settings') {
-    return pickByLanguage(language, '筛选存储与清理入口', 'Filter storage and cleanup entries');
-  }
-  if (view === 'system-logs') {
-    return pickByLanguage(language, '筛选日志入口或级别', 'Filter log entries or levels');
-  }
-
-  return pickByLanguage(language, '筛选设置导航', 'Filter settings navigation');
-}
-
-export function getSettingsNavItemByPath(
-  path: string,
-  language: AppLanguage = 'zh-CN',
-): SettingsNavItem | undefined {
-  const topLevelPath = path.replace(/^\/settings\/?/, '').split('/')[0] || '';
-  const navItems = getSettingsNavItems(language);
-
-  if (!topLevelPath) {
-    return navItems.find((item) => item.id === 'dashboard');
-  }
-
-  if (topLevelPath === 'api-management') {
-    return navItems.find((item) => item.id === 'api-management');
-  }
-
-  if (topLevelPath === 'ai-management') {
-    return navItems.find((item) => item.id === 'ai-management');
-  }
-
-  if (topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
-    return navItems.find((item) => item.id === LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
-  }
-
-  return navItems.find((item) => item.path === topLevelPath);
-}
-
-export function getSettingsNavItemById(
-  id: SettingsViewId,
-  language: AppLanguage = 'zh-CN',
-): SettingsNavItem | undefined {
-  return getSettingsNavItems(language).find((item) => item.id === resolveCanonicalSettingsViewId(id));
+export function getSettingsShellCopy(language: AppLanguage = 'zh-CN'): SettingsShellCopy {
+  return SHELL_COPY[language];
 }
