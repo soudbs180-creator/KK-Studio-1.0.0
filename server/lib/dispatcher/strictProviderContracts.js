@@ -91,7 +91,7 @@ const TWELVE_AI_CONTRACT = {
         async_image: {
           endpoint: '/v1/task/submit',
           requestShape: '{ model, input: { prompt, images?, aspect_ratio?, image_size?, n? }, callback_url? }',
-          responseShape: '{ success, task_id, status }',
+          responseShape: '{ id, status, outputs, error }',
         },
       },
     },
@@ -102,9 +102,9 @@ const TWELVE_AI_CONTRACT = {
       contentType: 'application/json',
       protocols: {
         async_video: {
-          endpoint: '/v1/task/submit',
-          requestShape: '{ model, input: { prompt, aspect_ratio?, duration?, image_url?, image_tail_url? }, callback_url? }',
-          responseShape: '{ success, task_id, status }',
+          endpoint: '/v1/videos',
+          requestShape: '{ model, prompt, size?/seconds? | duration?/aspect_ratio?/images? | resolution?/ratio? }',
+          responseShape: '{ id, status, output?, video_url?, data? }',
         },
       },
     },

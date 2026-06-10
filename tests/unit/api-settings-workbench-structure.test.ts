@@ -20,7 +20,7 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
   assert.match(viewSource, /navigate\(buildProviderEditorPath\(null\)\)/);
   assert.match(viewSource, /Provider prefilled/);
   assert.doesNotMatch(viewSource, /saveProvider\(\)[\s\S]{0,180}Provider prefilled/);
-  assert.match(viewSource, /const toProviderFormFromPreset = \(preset: ProviderPreset\): ProviderForm => \(\{[\s\S]*apiKey: '',[\s\S]*apiKeyPreview: '',/);
+  assert.match(viewSource, /toProviderFormFromPreset,\s*[\s\S]*from '\.\/apiProviderPresets';/);
   assert.match(viewSource, /const toProviderFormFromSupplier = \(supplier: Supplier\): ProviderForm => \(\{[\s\S]*apiKey: '',[\s\S]*apiKeyPreview: '',/);
   assert.match(viewSource, /const nextDraft = toProviderFormFromPreset\(preset\);[\s\S]*setEditingProviderId\(null\);[\s\S]*navigate\(buildProviderEditorPath\(null\),/);
   assert.doesNotMatch(viewSource, /const existingProvider = thirdPartyProviders\.find\([\s\S]{0,160}p\.name === preset\.name/);
@@ -164,4 +164,69 @@ test('ApiSettingsView keeps diagnostics and section actions owned by shared modu
   assert.doesNotMatch(viewSource, /data-testid="api-workbench-diagnostics-toggle"/);
   assert.doesNotMatch(viewSource, /className="hidden"[^\n]*beginCreateOfficial/);
   assert.doesNotMatch(viewSource, /className="hidden"[^\n]*beginCreateProvider/);
+});
+
+test('ApiSettingsView delegates readonly snapshot persistence to a focused module', () => {
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const snapshotSource = readSource('apps/web/src/components/settings/apiUserApiViewSnapshot.ts');
+
+  assert.match(viewSource, /from '\.\/apiUserApiViewSnapshot';/);
+  assert.doesNotMatch(viewSource, /USER_API_VIEW_SNAPSHOT_PREFIX/);
+  assert.doesNotMatch(viewSource, /function readUserApiViewSnapshot/);
+  assert.doesNotMatch(viewSource, /function writeUserApiViewSnapshot/);
+  assert.doesNotMatch(viewSource, /function clearUserApiViewSnapshot/);
+
+  assert.match(snapshotSource, /export interface UserApiViewSnapshot/);
+  assert.match(snapshotSource, /export function readUserApiViewSnapshot/);
+  assert.match(snapshotSource, /export function writeUserApiViewSnapshot/);
+  assert.match(snapshotSource, /export function clearUserApiViewSnapshot/);
+});
+
+test('ApiSettingsView delegates provider presets to a focused module', () => {
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+
+  assert.match(
+    viewSource,
+    /import \{[\s\S]*PROVIDER_PRESETS,[\s\S]*findProviderPresetForDraft,[\s\S]*getProviderPresetLinks,[\s\S]*toProviderFormFromPreset,[\s\S]*\} from '\.\/apiProviderPresets';/,
+  );
+  assert.doesNotMatch(viewSource, /interface ProviderPreset/);
+  assert.doesNotMatch(viewSource, /const PROVIDER_PRESETS/);
+});
+
+test('ApiSettingsView delegates pure formatting helpers to a focused module', () => {
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const formatterSource = readSource('apps/web/src/components/settings/apiSettingsFormatters.ts');
+  const formatterImport = viewSource.match(/import \{([\s\S]*?)\} from '\.\/apiSettingsFormatters';/);
+  const formatterHelpers = [
+    'formatUsd',
+    'formatTokens',
+    'formatDateTime',
+    'formatLatency',
+    'extractDomain',
+    'maskSecretDisplay',
+    'getModeLabel',
+    'getModeOption',
+    'parseModeOption',
+    'getProtocolLabel',
+    'getOfficialProviderLabel',
+  ];
+
+  assert.ok(formatterImport, 'Expected ApiSettingsView.tsx to import formatters from ./apiSettingsFormatters.');
+  for (const helperName of formatterHelpers) {
+    assert.match(formatterImport[1], new RegExp(`\\b${helperName}\\b`));
+    assert.match(formatterSource, new RegExp(`export const ${helperName}\\b`));
+    assert.doesNotMatch(viewSource, new RegExp(`const\\s+${helperName}\\s*=`));
+    assert.doesNotMatch(viewSource, new RegExp(`function\\s+${helperName}\\b`));
+  }
+
+  assert.doesNotMatch(formatterSource, /^import\b/m);
+  assert.match(formatterSource, /export type ApiProtocolFormat = 'auto' \| 'openai' \| 'gemini' \| 'claude';/);
+  assert.match(formatterSource, /export type CostMode = 'unlimited' \| 'amount' \| 'tokens';/);
+  assert.match(formatterSource, /export type OfficialProvider = 'Google' \| 'OpenAI';/);
+  assert.match(formatterSource, /export const UI_BUDGET_OPTIONS = \['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL\] as const;/);
+  assert.doesNotMatch(formatterSource, /from 'react';/);
+  assert.doesNotMatch(formatterSource, /from '\.\/ui/);
+  assert.doesNotMatch(formatterSource, /from '\.\/SettingsScaffold/);
+  assert.doesNotMatch(formatterSource, /from '\.\.\/\.\.\/services\//);
+  assert.doesNotMatch(formatterSource, /from '\.\.\/\.\.\/context\//);
 });

@@ -309,8 +309,7 @@ import { traceLocalPerformance } from './services/system/localPerformanceTrace';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
 import { lazyWithRetry, lazyNamedWithRetry } from './utils/lazyWithRetry';
-const SettingsPageRoot = lazyWithRetry(() => import('./app/SettingsPageRoot'));
-const AdminLayout = lazyNamedWithRetry(() => import('./pages/admin/AdminLayout.tsx'), 'AdminLayout');
+import AppRootContentSwitch from './app/AppRootContentSwitch';
 import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,
@@ -342,7 +341,7 @@ const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
   projectManagerOffset: 0,
 };
 
-const AppContent: React.FC<AppContentProps> = () => {
+export const AppContent: React.FC<AppContentProps> = () => {
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     user,
@@ -5948,18 +5947,6 @@ const AppKkUIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
-const AdminLayoutSuspended: React.FC<any> = (props) => (
-  <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
-    <AdminLayout {...props} />
-  </React.Suspense>
-);
-
-const SettingsPageRootSuspended: React.FC<any> = (props) => (
-  <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
-    <SettingsPageRoot {...props} />
-  </React.Suspense>
-);
-
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
   const rootMode = createAppRootMode({ pathname: window.location.pathname });
@@ -5995,13 +5982,7 @@ const App: React.FC = () => {
                 showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
                 onExitCostEstimation={() => setShowCostEstimation(false)}
                 showStartupBanner={rootMode === 'workspace'}
-                AppContentComponent={
-                  rootMode === 'admin'
-                    ? AdminLayoutSuspended
-                    : rootMode === 'settings'
-                      ? SettingsPageRootSuspended
-                      : AppContent
-                }
+                AppContentComponent={AppRootContentSwitch}
               />
             </CanvasProvider>
           </BillingProvider>

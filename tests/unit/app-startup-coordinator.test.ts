@@ -55,12 +55,14 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(appSource, /showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}/);
   assert.match(appSource, /onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}/);
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
-  assert.match(appSource, /const AdminLayoutSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<AdminLayout \{\.\.\.props\} \/>[\s\S]*?\);/);
-  assert.match(appSource, /const SettingsPageRootSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<SettingsPageRoot \{\.\.\.props\} \/>[\s\S]*?\);/);
-  assert.match(
-    appSource,
-    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?\? AdminLayoutSuspended[\s\S]*?: rootMode === 'settings'[\s\S]*?\? SettingsPageRootSuspended[\s\S]*?: AppContent\s*\}/
-  );
+  const switchSource = readSource('apps/web/src/app/AppRootContentSwitch.tsx');
+  assert.match(appSource, /import AppRootContentSwitch from '\.\/app\/AppRootContentSwitch';/);
+  assert.match(appSource, /AppContentComponent=\{AppRootContentSwitch\}/);
+  assert.match(switchSource, /const AdminLayoutSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<AdminLayout \{\.\.\.props\} \/>[\s\S]*?\);/);
+  assert.match(switchSource, /const SettingsPageRootSuspended: React\.FC<any> = \(props\) => \([\s\S]*?<SettingsPageRoot \{\.\.\.props\} \/>[\s\S]*?\);/);
+  assert.match(switchSource, /if \(rootMode === 'admin'\) \{\s*return <AdminLayoutSuspended \/>;\s*\}/);
+  assert.match(switchSource, /if \(rootMode === 'settings'\) \{\s*return <SettingsPageRootSuspended \/>;\s*\}/);
+  assert.match(switchSource, /return <AppContent \/>;/);
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);
   assert.doesNotMatch(appSource, /import \{ AppStartupScreen \} from '\.\/components\/common\/AppStartupScreen';/);

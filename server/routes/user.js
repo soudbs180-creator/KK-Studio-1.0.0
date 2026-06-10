@@ -1637,6 +1637,118 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
 }
 
 // 简体中文注释：处理 12AI 自有 Key 的图片生成，支持同步 Gemini Native 和异步生图任务
+function extractTwelveAIUrls(payload) {
+  const urls = [];
+  const seen = new Set();
+  const add = (value) => {
+    const url = String(value || '').trim();
+    if (!url || seen.has(url)) return;
+    if (/^(https?:|data:)/i.test(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
+  };
+  const visit = (value) => {
+    if (!value) return;
+    if (typeof value === 'string') {
+      add(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === 'object') {
+      [
+        'outputs',
+        'output',
+        'result',
+        'results',
+        'url',
+        'urls',
+        'video_url',
+        'image_url',
+        'remote_url',
+        'data',
+      ].forEach((key) => visit(value[key]));
+    }
+  };
+  if (payload && typeof payload === 'object' && payload.outputs) {
+    visit(payload.outputs);
+  }
+  visit(payload);
+  return urls;
+}
+
+function collectTwelveAIImageUrls(body) {
+  const values = [
+    body && body.imageUrl,
+    body && body.image_url,
+    body && body.url,
+    body && body.images,
+    body && body.imageUrls,
+    body && body.image_urls,
+    body && body.referenceImages,
+  ];
+  const urls = [];
+  const seen = new Set();
+  const add = (value) => {
+    const url = String(value || '').trim();
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    urls.push(url);
+  };
+  values.forEach((value) => {
+    if (Array.isArray(value)) {
+      value.forEach(add);
+    } else if (typeof value === 'string' && value.includes(',')) {
+      value.split(',').forEach(add);
+    } else {
+      add(value);
+    }
+  });
+  return urls;
+}
+
+function buildTwelveAIVideoPayload(body, modelId, prompt, aspectRatio, duration, size) {
+  const seconds = Number(duration) || 8;
+  const images = collectTwelveAIImageUrls(body);
+
+  if (/seedance/i.test(modelId)) {
+    const payload = {
+      model: modelId,
+      prompt,
+      duration: seconds,
+      resolution: String(body && (body.resolution || body.quality) || '720p'),
+      ratio: aspectRatio || '16:9',
+    };
+    if (images.length > 0) payload.image_url = images[0];
+    if (images.length > 1) payload.image_urls = images;
+    if (body && body.mode) payload.mode = body.mode;
+    if (body && body.webhook_url) payload.webhook_url = body.webhook_url;
+    if (body && body.auto_review !== undefined) payload.auto_review = body.auto_review;
+    return payload;
+  }
+
+  if (/veo|omni/i.test(modelId)) {
+    const payload = {
+      model: modelId,
+      prompt,
+      duration: seconds,
+      aspect_ratio: aspectRatio || '16:9',
+    };
+    if (images.length > 0) payload.images = images;
+    return payload;
+  }
+
+  return {
+    model: modelId,
+    prompt,
+    size,
+    seconds,
+  };
+}
+
 async function handleTwelveAIImageMode(req, res, route, profileState) {
   const apiKey = getLocalRouteApiKeyForTransport(route);
   if (!apiKey) {
@@ -1755,9 +1867,9 @@ async function handleTwelveAIImageMode(req, res, route, profileState) {
       }
 
       const resJson = await upstream.json();
-      const providerTaskId = resJson.task_id;
+      const providerTaskId = resJson.id || resJson.task_id || resJson.taskId || (resJson.data && resJson.data.id);
       if (!providerTaskId) {
-        throw new Error(`12AI Async Image API did not return task_id: ${JSON.stringify(resJson)}`);
+        throw new Error(`12AI Async Image API did not return id/task_id: ${JSON.stringify(resJson)}`);
       }
 
       const localTaskId = encodeLocalProxyTaskId(route.id, providerTaskId, modelId);
@@ -1803,12 +1915,7 @@ async function handleTwelveAIVideoMode(req, res, route, profileState) {
 
   try {
     const url = `${baseUrl.replace(/\/+$/, '')}/v1/videos`;
-    const payload = {
-      model: modelId,
-      prompt: prompt,
-      size: size,
-      seconds: duration
-    };
+    const payload = buildTwelveAIVideoPayload(req.body || {}, modelId, prompt, aspectRatio, duration, size);
 
     const upstream = await fetch(url, {
       method: 'POST',
@@ -1861,7 +1968,7 @@ async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
 
   const providerTaskId = parsed.providerTaskId;
   const modelId = parsed.modelId || '';
-  const isVideo = /video|sora|veo|omni|vidu/i.test(modelId);
+  const isVideo = /video|sora|veo|omni|vidu|seedance/i.test(modelId);
 
   const baseUrl = route.baseUrl || 'https://cdn.12ai.org';
 
@@ -1892,26 +1999,21 @@ async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
     let errorMessage = '';
 
     const upstreamStatus = String(resJson.status || '').toLowerCase();
+    urls = extractTwelveAIUrls(resJson);
 
     if (isVideo) {
-      if (upstreamStatus === 'completed') {
+      if (upstreamStatus === 'completed' || upstreamStatus === 'success') {
         normalizedStatus = 'success';
-        if (resJson.output) {
-          urls = [resJson.output];
-        }
-      } else if (upstreamStatus === 'failed') {
+      } else if (upstreamStatus === 'failed' || upstreamStatus === 'cancelled' || upstreamStatus === 'canceled' || upstreamStatus === 'error') {
         normalizedStatus = 'failed';
         errorMessage = resJson.error?.message || '12AI video generation failed.';
       } else {
         normalizedStatus = 'pending';
       }
     } else {
-      if (upstreamStatus === 'success') {
+      if (upstreamStatus === 'completed' || upstreamStatus === 'partial_completed' || upstreamStatus === 'success') {
         normalizedStatus = 'success';
-        if (resJson.result && Array.isArray(resJson.result.urls)) {
-          urls = resJson.result.urls;
-        }
-      } else if (upstreamStatus === 'failed') {
+      } else if (upstreamStatus === 'failed' || upstreamStatus === 'cancelled' || upstreamStatus === 'canceled' || upstreamStatus === 'error') {
         normalizedStatus = 'failed';
         errorMessage = resJson.error?.message || '12AI image generation failed.';
       } else {

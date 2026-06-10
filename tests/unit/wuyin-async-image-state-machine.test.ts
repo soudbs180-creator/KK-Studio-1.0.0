@@ -272,10 +272,10 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
 
       assert.equal(result.providerTaskId, "task-1");
       assert.equal(calls.length, 1);
-      assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/image_nanoBanana2");
+      assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/image_nanoBanana2?key=test-key");
       assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "test-key");
       assert.match(String(calls[0].init.body), /"prompt":"test prompt"/);
-      assert.doesNotMatch(calls[0].url, /[?&]key=/);
+      assert.match(calls[0].url, /[?&]key=test-key/);
     } finally {
       globalThis.fetch = originalFetch;
     }

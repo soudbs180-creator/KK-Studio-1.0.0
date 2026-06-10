@@ -61,7 +61,6 @@ import {
   buildCanonicalApiRecordId,
   isWuyinApiRecord,
 } from '../../services/auth/keyManagerCanonicalIds';
-import { WUYIN_PRESET_LOGO_URL } from '../../services/auth/keyManagerProviderPresets';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
 import { buildWuyinOneKeyProvider, WUYIN_DEFAULT_CATALOG } from '../../services/llm/wuyinCatalog';
@@ -108,6 +107,20 @@ import {
   type ApiManagementTab,
 } from './apiManagementRouteState';
 import {
+  clearUserApiViewSnapshot,
+  readUserApiViewSnapshot,
+  toReadonlyOfficialSlot,
+  toReadonlyProvider,
+  writeUserApiViewSnapshot,
+} from './apiUserApiViewSnapshot';
+import {
+  PROVIDER_PRESETS,
+  findProviderPresetForDraft,
+  getProviderPresetLinks,
+  toProviderFormFromPreset,
+  type ProviderPreset,
+} from './apiProviderPresets';
+import {
   ApiWorkbenchCapabilitySection,
   ApiWorkbenchCurrentViewSection,
   ApiWorkbenchDiagnosticsSection,
@@ -123,13 +136,23 @@ import {
   resolveApiWorkbenchDiagnosticsAvailability,
   resolveApiWorkbenchStageMeta,
 } from './apiWorkbenchState';
-type CostMode = 'unlimited' | 'amount' | 'tokens';
-type OfficialProvider = 'Google' | 'OpenAI';
+import {
+  UI_BUDGET_OPTIONS,
+  extractDomain,
+  formatDateTime,
+  formatLatency,
+  formatTokens,
+  formatUsd,
+  getModeLabel,
+  getModeOption,
+  getOfficialProviderLabel,
+  getProtocolLabel,
+  maskSecretDisplay,
+  parseModeOption,
+  type CostMode,
+  type OfficialProvider,
+} from './apiSettingsFormatters';
 type TabType = ApiManagementTab;
-const UI_TOKEN_UNIT_LABEL = '词元';
-const UI_TOKEN_LIMIT_LABEL = '词元上限';
-const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
-const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;
 const suspiciousLocaleCharSet = new Set('\u9359\u95c2\u59ab\u7487\u6dc7\u93c2\u8930\u7f02\u95b9\u93c6\u95b2\u68f0\u6e1a\u6d98\u7c32\u9350\u5a34\u7039\u95ab\u7ed7\u9422\u6d63');
 
 type OfficialForm = {
@@ -191,8 +214,6 @@ const providerDefaults: ProviderForm = {
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com';
-const USER_API_VIEW_SNAPSHOT_PREFIX = 'kk_user_api_view_snapshot:';
-const USER_API_VIEW_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
 const CAPABILITY_ROLE_META: Array<{
   role: CapabilityRole;
@@ -250,51 +271,6 @@ const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
 const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
 
-interface ProviderPreset {
-  name: string;
-  url: string;
-  baseUrl: string;
-  format: ApiProtocolFormat;
-  color: string;
-  modelId?: string;
-  logoName?: string;
-  kind?: 'official' | 'relay';
-  keyLinks?: Array<{
-    labelZh: string;
-    labelEn: string;
-    url: string;
-  }>;
-}
-
-const PROVIDER_PRESETS: ProviderPreset[] = [
-  { name: 'Xiaomi 小米', url: 'https://platform.xiaomimimo.com/', baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1', format: 'openai', color: '#ff6900', modelId: 'mimo-v2.5-pro', logoName: 'xiaomi mimo', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://platform.xiaomimimo.com/' }] },
-  { name: 'OpenAI', url: 'https://openai.com', baseUrl: 'https://api.openai.com/v1', format: 'openai', color: '#10a37f', modelId: 'gpt-4o', logoName: 'openai', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://platform.openai.com/api-keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://platform.openai.com/docs/api-reference' }] },
-  { name: 'Google Gemini', url: 'https://gemini.google.com', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', format: 'gemini', color: '#4285f4', modelId: 'gemini-2.5-flash', logoName: 'gemini', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://aistudio.google.com/app/apikey' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://ai.google.dev/gemini-api/docs' }] },
-  { name: 'Volcengine 火山引擎', url: 'https://www.volcengine.com/', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', format: 'openai', color: '#2563eb', modelId: 'doubao-seed-1-6', logoName: 'volcengine', kind: 'official' },
-  { name: 'DeepSeek', url: 'https://www.deepseek.com', baseUrl: 'https://api.deepseek.com', format: 'openai', color: '#2563eb', modelId: 'deepseek-chat', logoName: 'deepseek', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://platform.deepseek.com/api_keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api-docs.deepseek.com/' }] },
-  { name: 'ERNIE 文心', url: 'https://yiyan.baidu.com', baseUrl: 'https://qianfan.baidubce.com/v2', format: 'openai', color: '#1677ff', modelId: 'ernie-4.5-turbo', logoName: 'ernie baidu', kind: 'official' },
-  { name: 'Qwen 通义千问', url: 'https://chat.qwen.ai', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', format: 'openai', color: '#6d5dfc', modelId: 'qwen-plus', logoName: 'qwen', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://bailian.console.aliyun.com/' }] },
-  { name: 'Kimi 月之暗面', url: 'https://www.kimi.com', baseUrl: 'https://api.moonshot.cn/v1', format: 'openai', color: '#7c3aed', modelId: 'moonshot-v1-32k', logoName: 'kimi moonshot', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://platform.moonshot.cn/console/api-keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://platform.moonshot.cn/docs' }] },
-  { name: 'Anthropic', url: 'https://www.anthropic.com', baseUrl: 'https://api.anthropic.com', format: 'claude', color: '#d97757', modelId: 'claude-sonnet-4-5', logoName: 'anthropic claude', kind: 'official', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://console.anthropic.com/settings/keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://docs.anthropic.com/' }] },
-  { name: 'GLM 智谱', url: 'https://www.zhipuai.cn', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', format: 'openai', color: '#5b5cf6', modelId: 'glm-4.5', logoName: 'glm zhipu', kind: 'official' },
-  { name: 'xAI Grok', url: 'https://x.ai', baseUrl: 'https://api.x.ai/v1', format: 'openai', color: '#8b949e', modelId: 'grok-4', logoName: 'xai grok', kind: 'official' },
-  { name: 'Hunyuan 混元', url: 'https://hunyuan.tencent.com', baseUrl: 'https://api.hunyuan.cloud.tencent.com/v1', format: 'openai', color: '#0ea5e9', modelId: 'hunyuan-turbos-latest', logoName: 'hunyuan tencent', kind: 'official' },
-  { name: 'Meta AI', url: 'https://ai.meta.com', baseUrl: '', format: 'openai', color: '#0866ff', modelId: 'llama-3.3-70b-instruct', logoName: 'meta llama', kind: 'official' },
-  { name: 'Perplexity', url: 'https://www.perplexity.ai', baseUrl: 'https://api.perplexity.ai', format: 'openai', color: '#20b8cd', modelId: 'sonar-pro', logoName: 'perplexity', kind: 'official' },
-  { name: 'MiniMax EN', url: 'https://www.minimax.io', baseUrl: 'https://api.minimax.io/v1', format: 'openai', color: '#e11d48', modelId: 'MiniMax-M2.7', logoName: 'minimax', kind: 'official' },
-  { name: 'MiniMax CN', url: 'https://www.minimaxi.com', baseUrl: 'https://api.minimaxi.com/v1', format: 'openai', color: '#e11d48', modelId: 'MiniMax-M2.7', logoName: 'minimax', kind: 'official' },
-  { name: 'Stepfun 阶跃星辰', url: 'https://www.stepfun.com', baseUrl: 'https://api.stepfun.com/v1', format: 'openai', color: '#4f46e5', modelId: 'step-2-mini', logoName: 'stepfun', kind: 'official' },
-  { name: 'Mistral AI', url: 'https://mistral.ai', baseUrl: 'https://api.mistral.ai/v1', format: 'openai', color: '#f59e0b', modelId: 'mistral-large-latest', logoName: 'mistral', kind: 'official' },
-  { name: 'Cohere', url: 'https://cohere.com', baseUrl: 'https://api.cohere.ai/compatibility/v1', format: 'openai', color: '#22c55e', modelId: 'command-a-03-2025', logoName: 'cohere', kind: 'official' },
-  { name: 'Groq', url: 'https://groq.com', baseUrl: 'https://api.groq.com/openai/v1', format: 'openai', color: '#f97316', modelId: 'llama-3.3-70b-versatile', logoName: 'groq', kind: 'official' },
-  { name: 'Together AI', url: 'https://www.together.ai', baseUrl: 'https://api.together.xyz/v1', format: 'openai', color: '#3b82f6', modelId: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', logoName: 'together', kind: 'official' },
-  { name: 'NVIDIA', url: 'https://build.nvidia.com/models', baseUrl: 'https://integrate.api.nvidia.com/v1', format: 'openai', color: '#76b900', modelId: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', logoName: 'nvidia nemotron', kind: 'official' },
-  { name: 'OpenRouter', url: 'https://openrouter.ai', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#9ca3af', modelId: 'openai/gpt-4o', logoName: 'openrouter', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://openrouter.ai/settings/keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://openrouter.ai/docs' }] },
-  { name: 'WorldRouter', url: 'https://www.worldrouter.ai', baseUrl: 'https://inference-api.worldrouter.ai/v1', format: 'openai', color: '#38bdf8', modelId: '', logoName: 'worldrouter', kind: 'relay' },
-  { name: '速创 API', url: 'https://api.wuyinkeji.com/type/all', baseUrl: 'https://api.wuyinkeji.com', format: 'openai', color: '#0891b2', modelId: 'video_google_omni', logoName: WUYIN_PRESET_LOGO_URL, kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://api.wuyinkeji.com/user/register?cps=KCyv1E6I' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api.wuyinkeji.com/doc/72' }] },
-  { name: 'B.ai', url: 'https://b.ai', baseUrl: 'https://api.theb.ai/v1', format: 'openai', color: '#a855f7', modelId: '', logoName: 'b.ai', kind: 'relay' },
-];
-
 const buildOfficialEditorPath = (officialId?: string | null) =>
   officialId
     ? `/settings/api-management/official/${encodeURIComponent(officialId)}`
@@ -328,23 +304,6 @@ const parseProviderModelsText = (value: string): string[] => {
 };
 
 const formatProviderModelsText = (models: string[] = []) => models.join('\n');
-
-const findProviderPresetForDraft = (name: string, baseUrl: string): ProviderPreset | null => {
-  const normalizedName = normalizeProviderConnectionValue(name);
-  const normalizedBaseUrl = normalizeProviderConnectionValue(baseUrl);
-  return PROVIDER_PRESETS.find((preset) => (
-    normalizeProviderConnectionValue(preset.name) === normalizedName
-    || (normalizedBaseUrl && normalizeProviderConnectionValue(preset.baseUrl) === normalizedBaseUrl)
-  )) || null;
-};
-
-const getProviderPresetLinks = (preset: ProviderPreset | null) => {
-  if (!preset) return [];
-  const links = preset.keyLinks && preset.keyLinks.length > 0
-    ? preset.keyLinks
-    : [{ labelZh: '打开官网', labelEn: 'Open website', url: preset.url }];
-  return links.filter((link) => Boolean(String(link.url || '').trim()));
-};
 
 const decodeRouteParam = (value?: string) => {
   if (!value) return '';
@@ -513,210 +472,6 @@ function normalizeOptionalTimestamp(value: unknown): number | null {
   return normalizeTimestamp(value, Date.now());
 }
 
-function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
-  const raw = isRecord(rawValue) ? rawValue : null;
-  if (!raw) return null;
-
-  const id = normalizeString(raw.id);
-  if (!id) return null;
-
-  const now = Date.now();
-  const createdAt = normalizeTimestamp(raw.createdAt ?? raw.created_at, now);
-  const provider = normalizeOfficialProvider(raw.provider);
-  const defaultBaseUrl =
-    provider === 'Google'
-      ? DEFAULT_GOOGLE_BASE_URL
-      : provider === 'OpenAI'
-        ? DEFAULT_OPENAI_BASE_URL
-        : undefined;
-  const baseUrl = normalizeString(raw.baseUrl ?? raw.base_url) || defaultBaseUrl;
-
-  return {
-    id,
-    legacyIds: normalizeStringArray(raw.legacyIds),
-    key: hasStoredSecret(raw.key) ? maskSecret(raw.key) : '',
-
-    name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
-    provider,
-    type: provider === 'Google' || provider === 'OpenAI' ? 'official' : (baseUrl ? 'proxy' : 'third-party'),
-    format: normalizeProtocolFormat(raw.format, provider === 'Google' ? 'gemini' : 'openai'),
-    baseUrl,
-    supportedModels: normalizeStringArray(raw.supportedModels ?? raw.supported_models),
-    disabled:
-      typeof raw.disabled === 'boolean'
-        ? raw.disabled
-        : typeof raw.is_active === 'boolean'
-          ? !raw.is_active
-          : false,
-    status:
-      raw.status === 'valid' || raw.status === 'invalid' || raw.status === 'rate_limited'
-        ? raw.status
-        : 'unknown',
-    failCount: normalizeNumber(raw.failCount ?? raw.fail_count),
-    successCount: normalizeNumber(raw.successCount ?? raw.success_count),
-    lastUsed: normalizeOptionalTimestamp(raw.lastUsed ?? raw.last_used),
-    lastError: normalizeString(raw.lastError ?? raw.last_error) || null,
-    createdAt,
-    updatedAt: normalizeTimestamp(raw.updatedAt ?? raw.updated_at, createdAt),
-    avgResponseTime: normalizeNumber(raw.avgResponseTime ?? raw.avg_response_time, 0) || undefined,
-    lastResponseTime: normalizeNumber(raw.lastResponseTime ?? raw.last_response_time, 0) || undefined,
-    usedTokens: normalizeNumber(raw.usedTokens ?? raw.used_tokens),
-    totalCost: normalizeNumber(raw.totalCost ?? raw.total_cost),
-    budgetLimit: Number.isFinite(Number(raw.budgetLimit)) ? Number(raw.budgetLimit) : -1,
-    tokenLimit: Number.isFinite(Number(raw.tokenLimit)) ? Number(raw.tokenLimit) : -1,
-  };
-}
-
-function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
-  const raw = isRecord(rawValue) ? rawValue : null;
-  if (!raw) return null;
-
-  const id = normalizeString(raw.id);
-  if (!id) return null;
-
-  const now = Date.now();
-  const createdAt = normalizeTimestamp(raw.createdAt ?? raw.created_at, now);
-  const usageRaw = isRecord(raw.usage) ? raw.usage : {};
-  const providerName = normalizeString(raw.name) || 'Provider';
-  const providerBaseUrl = normalizeString(raw.baseUrl ?? raw.base_url);
-  const providerFormat = normalizeProtocolFormat(raw.format);
-  const rawProviderModels = normalizeStringArray(raw.models ?? raw.supportedModels ?? raw.supported_models);
-
-  return {
-    id,
-    legacyIds: normalizeStringArray(raw.legacyIds),
-    name: providerName,
-    baseUrl: providerBaseUrl,
-    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret(raw.apiKey ?? raw.key) : '',
-
-    models: resolveEffectiveProviderModels({
-      provider: providerName,
-      baseUrl: providerBaseUrl,
-      format: providerFormat,
-      models: rawProviderModels,
-    }),
-    format: providerFormat,
-    icon: normalizeString(raw.icon) || undefined,
-    group: normalizeString(raw.group) || undefined,
-    providerColor: normalizeString(raw.providerColor ?? raw.color) || DEFAULT_PROVIDER_COLOR,
-    isActive:
-      typeof raw.isActive === 'boolean'
-        ? raw.isActive
-        : typeof raw.is_active === 'boolean'
-          ? raw.is_active
-          : true,
-    budgetLimit: Number.isFinite(Number(raw.budgetLimit)) ? Number(raw.budgetLimit) : undefined,
-    tokenLimit: Number.isFinite(Number(raw.tokenLimit)) ? Number(raw.tokenLimit) : undefined,
-    customCostMode:
-      raw.customCostMode === 'unlimited' || raw.customCostMode === 'amount' || raw.customCostMode === 'tokens'
-        ? raw.customCostMode
-        : 'unlimited',
-    customCostValue: Number.isFinite(Number(raw.customCostValue)) ? Number(raw.customCostValue) : undefined,
-    usage: {
-      totalTokens: normalizeNumber(usageRaw.totalTokens ?? raw.usedTokens ?? raw.used_tokens),
-      totalCost: normalizeNumber(usageRaw.totalCost ?? raw.totalCost ?? raw.total_cost),
-      dailyTokens: normalizeNumber(usageRaw.dailyTokens),
-      dailyCost: normalizeNumber(usageRaw.dailyCost),
-      lastReset: normalizeTimestamp(usageRaw.lastReset, createdAt),
-    },
-    status: raw.status === 'active' || raw.status === 'error' || raw.status === 'checking' ? raw.status : 'checking',
-    lastError: normalizeString(raw.lastError ?? raw.last_error) || undefined,
-    lastChecked: normalizeOptionalTimestamp(raw.lastChecked ?? raw.last_checked) ?? undefined,
-    createdAt,
-    updatedAt: normalizeTimestamp(raw.updatedAt ?? raw.updated_at, createdAt),
-    activitySummary: isRecord(raw.activitySummary)
-      ? {
-          lastLatencyMs: normalizeNumber(raw.activitySummary.lastLatencyMs, 0) || null,
-          lastTokens: normalizeNumber(raw.activitySummary.lastTokens, 0) || null,
-          lastAmount: normalizeNumber(raw.activitySummary.lastAmount, 0) || null,
-          updatedAt: normalizeOptionalTimestamp(raw.activitySummary.updatedAt) ?? undefined,
-        }
-      : undefined,
-  };
-}
-
-interface UserApiViewSnapshot {
-  officialSlots: unknown[];
-  providers: unknown[];
-  updatedAt: number;
-}
-
-function getUserApiViewSnapshotKey(userId: string): string {
-  return `${USER_API_VIEW_SNAPSHOT_PREFIX}${userId}`;
-}
-
-function readUserApiViewSnapshot(userId: string | null | undefined): UserApiViewSnapshot | null {
-  const normalizedUserId = normalizeString(userId);
-  if (typeof window === 'undefined' || !normalizedUserId) {
-    return null;
-  }
-
-  try {
-    const raw =
-      window.localStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId))
-      || window.sessionStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId));
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<UserApiViewSnapshot> | null;
-    if (!parsed || typeof parsed !== 'object') {
-      return null;
-    }
-
-    const updatedAt = normalizeTimestamp(parsed.updatedAt, 0);
-    if (!updatedAt || Date.now() - updatedAt > USER_API_VIEW_SNAPSHOT_TTL_MS) {
-      window.localStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
-      window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
-      return null;
-    }
-
-    return {
-      officialSlots: Array.isArray(parsed.officialSlots) ? parsed.officialSlots : [],
-      providers: Array.isArray(parsed.providers) ? parsed.providers : [],
-      updatedAt,
-    };
-  } catch (error) {
-    console.warn('[ApiSettingsView] Failed to restore cached user API snapshot:', error);
-    return null;
-  }
-}
-
-function writeUserApiViewSnapshot(
-  userId: string | null | undefined,
-  officialSlots: KeySlot[],
-  providers: ThirdPartyProvider[],
-): void {
-  const normalizedUserId = normalizeString(userId);
-  if (typeof window === 'undefined' || !normalizedUserId) {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(getUserApiViewSnapshotKey(normalizedUserId), JSON.stringify({
-      officialSlots: officialSlots
-        .map((slot) => toReadonlyOfficialSlot(slot))
-        .filter((slot): slot is KeySlot => Boolean(slot)),
-      providers: providers
-        .map((provider) => toReadonlyProvider(provider))
-        .filter((provider): provider is ThirdPartyProvider => Boolean(provider)),
-      updatedAt: Date.now(),
-    } satisfies UserApiViewSnapshot));
-  } catch (error) {
-    console.warn('[ApiSettingsView] Failed to persist cached user API snapshot:', error);
-  }
-}
-
-function clearUserApiViewSnapshot(userId: string | null | undefined): void {
-  const normalizedUserId = normalizeString(userId);
-  if (typeof window === 'undefined' || !normalizedUserId) {
-    return;
-  }
-
-  window.localStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
-  window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
-}
-
 function isUserApiPersistenceDegradedFromHealth(health: KkApiServerHealth | null): boolean {
   return Boolean(
     health
@@ -726,53 +481,6 @@ function isUserApiPersistenceDegradedFromHealth(health: KkApiServerHealth | null
     ),
   );
 }
-
-const formatUsd = (value: number) =>
-  new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency: 'USD',
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-
-const compactNumber = (value: number) =>
-  new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-
-const formatTokens = (value: number) => `${compactNumber(value)} ${UI_TOKEN_UNIT_LABEL}`;
-
-const formatDateTime = (value?: number | string | null) => {
-  if (!value) return '暂无记录';
-  const target = new Date(value);
-  if (Number.isNaN(target.getTime())) return '暂无记录';
-  return target.toLocaleString('zh-CN', {
-    hour12: false,
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const formatLatency = (value?: number | null) => {
-  if (typeof value !== 'number' || value <= 0) return '暂无';
-  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}s`;
-  return `${Math.round(value)}ms`;
-};
-
-const extractDomain = (url: string) => {
-  if (!url.trim()) return '未填写基础地址';
-  return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-};
-
-const maskSecretDisplay = (value: string) => {
-  if (!value.trim()) return '尚未填写';
-  if (value.startsWith('__kk_redacted__:') || value === 'sk-readonly-0000') {
-    return '••••••••••••';
-  }
-  if (value.length <= 10) return '已填写';
-  return `${value.slice(0, 6)}••••${value.slice(-4)}`;
-};
 
 const positive = (value: string) => {
   const parsed = Number(value);
@@ -787,34 +495,6 @@ const getMode = (budget?: number, tokenLimit?: number, fallback: CostMode = 'unl
   if (typeof budget === 'number' && budget > -1) return 'amount';
   return fallback;
 };
-
-const getModeLabel = (mode: CostMode) => {
-  if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return UI_TOKEN_LIMIT_LABEL;
-  return '不限额';
-};
-
-const getModeOption = (mode: CostMode) => {
-  if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return UI_TOKEN_LIMIT_LABEL;
-  return '不限额';
-};
-
-const parseModeOption = (value: string): CostMode => {
-  if (value === '金额预算') return 'amount';
-  if (value === UI_TOKEN_LIMIT_LABEL || value === UI_LEGACY_TOKEN_LIMIT_LABEL) return 'tokens';
-  return 'unlimited';
-};
-
-const getProtocolLabel = (format: ApiProtocolFormat) => {
-  if (format === 'openai') return 'OpenAI 协议';
-  if (format === 'gemini') return 'Gemini 协议';
-  if (format === 'claude') return 'Claude 协议';
-  return '自动识别';
-};
-
-const getOfficialProviderLabel = (provider: OfficialProvider) =>
-  provider === 'Google' ? '谷歌官方接口' : 'OpenAI 官方接口';
 
 const getOfficialStatus = (slot: KeySlot) => {
   if (slot.disabled) return { badge: 'neutral' as const, status: 'paused' as const, label: '已暂停' };
@@ -927,17 +607,6 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
         : provider.customCostValue && provider.customCostValue > 0
           ? String(provider.customCostValue)
           : '',
-});
-
-const toProviderFormFromPreset = (preset: ProviderPreset): ProviderForm => ({
-  ...providerDefaults,
-  name: preset.name,
-  baseUrl: preset.baseUrl,
-  apiKey: '',
-  apiKeyPreview: '',
-  modelsText: '',
-  format: preset.format,
-  color: preset.color,
 });
 
 const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({

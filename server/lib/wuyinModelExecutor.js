@@ -561,6 +561,24 @@ function serializeBody(body, contentType) {
 /**
  * 提交 API 模型任务
  */
+function appendWuyinKeyQuery(url, apiKey) {
+  const parsed = new URL(url);
+  if (apiKey) {
+    parsed.searchParams.set('key', apiKey);
+  }
+  return parsed.toString();
+}
+
+function wuyinSubmitNeedsKeyQuery(catalogItem, targetUrl) {
+  const auth = String(catalogItem && (catalogItem.auth || catalogItem.submitAuth) || '');
+  const endpoint = String((catalogItem && (catalogItem.endpointUrl || catalogItem.endpointPath || catalogItem.endpoint)) || targetUrl || '');
+  return auth.includes('key query')
+    || auth.includes('?key')
+    || /\/api\/async\//i.test(endpoint)
+    || /\/api\/sora2/i.test(endpoint)
+    || /\/api\/img\//i.test(endpoint);
+}
+
 async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
   apiKey = normalizeUserApiSecretForTransport(apiKey);
   if (!apiKey) {
@@ -584,6 +602,10 @@ async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
     }
   }
   
+  if (wuyinSubmitNeedsKeyQuery(catalogItem, targetUrl)) {
+    targetUrl = appendWuyinKeyQuery(targetUrl, apiKey);
+  }
+
   const contentType = catalogItem.contentType || catalogItem.submitContentType || 'application/json';
   const headers = {
     Authorization: apiKey,

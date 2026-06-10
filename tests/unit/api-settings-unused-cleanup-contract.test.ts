@@ -12,8 +12,9 @@ test('ApiSettingsView does not retain compiler-proven unused bindings', () => {
   const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.doesNotMatch(source, /isKkApiUserDataPersistedInCloudFromHealth/);
-  assert.match(source, /const UI_TOKEN_UNIT_LABEL = '词元';/);
-  assert.match(source, /const UI_BUDGET_OPTIONS = \['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL\] as const;/);
+  const formattersSource = readSource('apps/web/src/components/settings/apiSettingsFormatters.ts');
+  assert.match(formattersSource, /export const UI_TOKEN_UNIT_LABEL = '词元';/);
+  assert.match(formattersSource, /export const UI_BUDGET_OPTIONS = \['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL\] as const;/);
   assert.doesNotMatch(source, /const TOKEN_UNIT_LABEL =/);
   assert.doesNotMatch(source, /const LEGACY_TOKEN_LIMIT_LABEL =/);
   assert.doesNotMatch(source, /const BUDGET_OPTIONS =/);

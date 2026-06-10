@@ -787,3 +787,64 @@ npm run check:encoding
   - `workspace-layout` increased to about 229.82 KB / 62.41 KB gzip in this build because existing canvas/workspace code remains tightly coupled.
   - `index.css` remains about 592 KB / 87 KB gzip.
   - Main `index-*.js` remains about 473 KB / 135 KB gzip.
+
+## 2026-06-10 - 12AI and Wuyin Provider API Contract Repair
+
+- **User request**: audit the 12AI preset against `https://doc.12ai.org/docs/api` and the Wuyin/Suchuang preset against `https://api.wuyinkeji.com/type/all`, then resolve missing or mismatched API contract behavior.
+- **Scope**:
+  - Server-side user API route adaptation for 12AI image/video async tasks.
+  - Server-side Wuyin documented async submit executor.
+  - Strict provider contract metadata and targeted unit tests.
+- **Files touched**:
+  - `server/routes/user.js`
+  - `server/lib/wuyinModelExecutor.js`
+  - `server/lib/dispatcher/strictProviderContracts.js`
+  - `tests/unit/twelveai-user-route-proxy-contract.test.ts`
+  - `tests/unit/wuyin-async-image-state-machine.test.ts`
+  - this handoff
+- **Design decisions**:
+  - 12AI async image submit now accepts the documented `id` response field while retaining `task_id`/`taskId` fallbacks for old relay responses.
+  - 12AI async status polling now treats `completed`, `partial_completed`, and legacy `success` as successful image states, and extracts URLs from `outputs`, `output`, `video_url`, nested `data`, and legacy `result.urls`.
+  - 12AI video task detection now includes `seedance`; video submit uses `/v1/videos` with Sora-style, Seedance-style, and Veo/Omni-style payload shapes instead of forcing every video model into `size/seconds`.
+  - Wuyin async submits now add the documented `?key=<token>` query parameter while preserving the raw `Authorization` header. Detail polling already used both.
+  - The strict 12AI contract metadata now records `/v1/videos` for video and `{ id, status, outputs }` for async image response shape.
+- **Validation**:
+  - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/twelveai-user-route-proxy-contract.test.ts tests/unit/wuyin-async-image-state-machine.test.ts` (18 tests).
+  - Passed: `npm run typecheck:server`.
+  - Passed: `npm run typecheck:tests`.
+  - Passed: `npm run check:encoding`.
+  - Passed: `git diff --check -- server/routes/user.js server/lib/wuyinModelExecutor.js server/lib/dispatcher/strictProviderContracts.js tests/unit/twelveai-user-route-proxy-contract.test.ts tests/unit/wuyin-async-image-state-machine.test.ts`.
+- **Not run**:
+  - Full `npm run verify:changes` was not run because this was a scoped provider-route repair and the targeted server/test/encoding checks passed.
+- **Risks / next**:
+  - Wuyin official catalog remains a dynamic site; this repair used the concrete product docs linked from the catalog (`doc/65`, `doc/54`, `doc/55`, `doc/47`, `doc/60`, `doc/36`, `doc/72`) rather than a live authenticated upstream call.
+  - 12AI and Wuyin upstreams were not called with real user keys, by design.
+
+## 2026-06-10 - 稳定性重构 Phase 1 完整闭环
+
+- **重构范围**：完成了 API Workbench 稳定性抽取（Snapshot、Provider Preset 与 Formatting 边界），并修复了相关单元测试断言。
+- **修改文件**：
+  - `tests/unit/frontend-key-boundary-hardening.test.ts` (修正 `WUYIN_PRESET_LOGO_URL` 宏提取后的断言)
+  - `tests/unit/api-settings-unused-cleanup-contract.test.ts` (修正 `UI_TOKEN_UNIT_LABEL` 和 `UI_BUDGET_OPTIONS` 提取后的断言)
+  - `docs/development/session-handoff.md` (追加记录)
+- **设计决策**：
+  - 保持 Task 1-3 提取逻辑的完整性。更新了对 `WUYIN_PRESET_LOGO_URL`、`UI_TOKEN_UNIT_LABEL` 和 `UI_BUDGET_OPTIONS` 的匹配断言，将检测目标从 `ApiSettingsView.tsx` 改为新生成的 `apiProviderPresets.ts` 和 `apiSettingsFormatters.ts`。
+- **验证通过**：
+  - 项目完整构建及全量测试脚本验证通过：`npm run verify:changes`。
+
+## 2026-06-10 - 稳定性重构 Phase 2 完整闭环
+
+- **重构范围**：完成了 App Root 及设置/管理后台外壳路由的解耦抽取（Task 5），消除了 `App.tsx` 中的硬编码路由渲染切换。
+- **修改文件**：
+  - `apps/web/src/app/AppRootContentSwitch.tsx` (新建，承载 `AdminLayoutSuspended` 和 `SettingsPageRootSuspended` 以及 `AppRootContentSwitch` 路由切换逻辑)
+  - `apps/web/src/App.tsx` (导出 `AppContent` 组件，移除路由和 lazy 引入，并将 `AppContentComponent` 赋值为 `AppRootContentSwitch`)
+  - `tests/unit/kkai-app-root.test.ts` (修正路由切换与 Suspended 组件位置相关的测试断言)
+  - `tests/unit/app-startup-coordinator.test.ts` (同步修正路由断言)
+  - `tests/unit/settings-canonical-entry-regression.test.ts` (同步修正路由及 SettingsPageRoot 懒加载匹配断言)
+- **设计决策**：
+  - 将 `App.tsx` 中与特定路由（如 `/settings`、`/admin`）强绑定的条件渲染解耦至新组件 `AppRootContentSwitch.tsx` 中，实现了更细粒度的分发与加载，并在 App 入口处只关注全局 Provider 与 Shell 骨架的渲染。
+- **验证通过**：
+  - 自动化单元测试 `kkai-app-root`、`app-startup-coordinator` 和 `settings-canonical-entry-regression` 通过。
+  - 全量构建与端到端回归脚本验证全部通过：`npm run verify:changes`。
+
+
