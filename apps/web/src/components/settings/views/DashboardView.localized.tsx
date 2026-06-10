@@ -202,9 +202,9 @@ const HealthPill: React.FC<{
   value: string;
   tone: HealthTone;
 }> = ({ label, value, tone }) => (
-  <div className="dashboard-health-pill" data-tone={tone}>
+  <div className="dashboard-health-pill" data-tone={tone} title={`${label}: ${value}`}>
     <span className="dashboard-health-pill__dot" />
-    <span className="dashboard-health-pill__label">{label}</span>
+    <span className="dashboard-health-pill__label" title={label}>{label}</span>
     <strong>{value}</strong>
   </div>
 );
@@ -232,10 +232,10 @@ const TopologyNode: React.FC<{
   helper: string;
   tone: HealthTone;
 }> = ({ label, value, helper, tone }) => (
-  <div className="dashboard-topology-node" data-tone={tone}>
-    <span>{label}</span>
+  <div className="dashboard-topology-node" data-tone={tone} title={`${label} · ${helper} · ${value}`}>
+    <span title={label}>{label}</span>
     <strong>{value}</strong>
-    <small>{helper}</small>
+    <small title={helper}>{helper}</small>
   </div>
 );
 
@@ -977,11 +977,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           display: flex;
           min-width: 0;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
           border-radius: 999px;
           background: rgb(var(--dashboard-tone-rgb) / 0.08);
-          padding: 9px 11px;
+          padding: 6px 10px;
         }
 
         .dashboard-health-pill[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
@@ -998,6 +998,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           box-shadow: 0 0 0 4px rgb(var(--dashboard-tone-rgb) / 0.12);
         }
 
+        .dashboard-health-pill__label {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
         .dashboard-health-pill strong {
           margin-left: auto;
           color: var(--text-primary);
@@ -1008,7 +1015,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-topology {
           display: grid;
-          gap: 12px;
+          gap: 8px;
         }
 
         .dashboard-topology__rail {
@@ -1034,14 +1041,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           position: relative;
           z-index: 1;
           display: grid;
-          gap: 6px;
+          gap: 4px;
           min-width: 0;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.22);
           border-radius: 18px;
           background:
             linear-gradient(180deg, rgb(var(--dashboard-tone-rgb) / 0.10), rgb(255 255 255 / 0.02)),
             var(--settings-surface-elevated);
-          padding: 12px;
+          padding: 8px 4px;
           text-align: center;
         }
 
@@ -1054,13 +1061,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           color: var(--text-secondary);
           font-size: var(--type-caption);
           font-weight: 600;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
         }
 
         .dashboard-topology-node strong {
           color: rgb(var(--dashboard-tone-rgb));
-          font-size: clamp(20px, 2vw, 28px);
+          font-size: clamp(16px, 2vw, 24px);
           font-weight: 800;
           line-height: 1;
+        }
+
+        .dashboard-topology-node small {
+          color: var(--text-tertiary);
+          font-size: var(--type-micro);
+          line-height: 1.35;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
         }
 
         .dashboard-flow-map {

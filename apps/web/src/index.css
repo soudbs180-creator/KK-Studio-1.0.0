@@ -16946,12 +16946,20 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 
 /* 2. 顶部渐变状态栏与内容区绝对定位融合 */
-.settings-panel .settings-shell-main__topbar,
-.settings-panel .settings-shell-mobile__topbar {
+.settings-panel .settings-shell-main__topbar {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
+  z-index: 50 !important;
+  border-bottom: none !important;
+}
+
+.settings-panel .settings-shell-mobile__topbar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 16px !important;
+  right: 16px !important;
   z-index: 50 !important;
   border-bottom: none !important;
 }
@@ -17014,7 +17022,7 @@ body.light-mode .settings-panel .mobile-header-action-btn:active {
 /* 5. 顶栏返回按钮显隐过渡定位容器 */
 .settings-panel .settings-shell-mobile__back-btn-container {
   position: absolute !important;
-  left: 16px !important;
+  left: 0px !important;
   top: calc(50% + env(safe-area-inset-top, 0px) / 2) !important;
   transform: translateY(-50%) !important;
   display: flex !important;

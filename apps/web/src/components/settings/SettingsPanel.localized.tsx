@@ -440,7 +440,7 @@ const SettingsMobileShell: React.FC<{
         </div>
 
         {/* 右侧始终保留 X 关闭按钮，提供无边框大触控热区 */}
-        <div style={{ position: 'absolute', right: '16px', top: 'calc(50% + env(safe-area-inset-top, 0px) / 2)', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', right: '0px', top: 'calc(50% + env(safe-area-inset-top, 0px) / 2)', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
           <button
             type="button"
             onClick={onClose}

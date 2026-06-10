@@ -111,3 +111,67 @@ export const toProviderFormFromPreset = (preset: ProviderPreset): ProviderPreset
   format: preset.format,
   color: preset.color,
 });
+
+export const detectProviderPresetByBaseUrl = (baseUrl: string): ProviderPreset | null => {
+  const urlStr = String(baseUrl || '').trim();
+  if (!urlStr) return null;
+
+  const normalizedInput = urlStr.toLowerCase().replace(/\/+$/, '');
+
+  // 1. 精确匹配（去尾斜杠）
+  let match = PROVIDER_PRESETS.find(
+    (preset) => preset.baseUrl && preset.baseUrl.toLowerCase().replace(/\/+$/, '') === normalizedInput
+  );
+  if (match) return match;
+
+  // 2. 域名提取与匹配
+  const extractDomain = (url: string): string => {
+    try {
+      let temp = url.toLowerCase().trim();
+      if (!/^https?:\/\//i.test(temp)) {
+        temp = `https://${temp}`;
+      }
+      const parsed = new URL(temp);
+      return parsed.hostname.replace('www.', '');
+    } catch {
+      return '';
+    }
+  };
+
+  const inputDomain = extractDomain(urlStr);
+  if (inputDomain) {
+    // 首先看是否有域名完全相等的
+    for (const preset of PROVIDER_PRESETS) {
+      if (preset.baseUrl) {
+        const presetDomain = extractDomain(preset.baseUrl);
+        if (presetDomain && presetDomain === inputDomain) {
+          return preset;
+        }
+      }
+    }
+    // 其次看是否包含关系
+    for (const preset of PROVIDER_PRESETS) {
+      if (preset.baseUrl) {
+        const presetDomain = extractDomain(preset.baseUrl);
+        if (presetDomain && (inputDomain.includes(presetDomain) || presetDomain.includes(inputDomain))) {
+          return preset;
+        }
+      }
+      if (preset.url) {
+        const presetDomain = extractDomain(preset.url);
+        if (presetDomain && (inputDomain.includes(presetDomain) || presetDomain.includes(inputDomain))) {
+          return preset;
+        }
+      }
+    }
+  }
+
+  // 3. 子串模糊匹配
+  match = PROVIDER_PRESETS.find((preset) => {
+    if (!preset.baseUrl) return false;
+    const cleanPresetUrl = preset.baseUrl.toLowerCase().replace(/\/+$/, '');
+    return normalizedInput.includes(cleanPresetUrl) || cleanPresetUrl.includes(normalizedInput);
+  });
+
+  return match || null;
+};
