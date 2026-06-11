@@ -525,7 +525,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const channelCoverage = officialCount + providerCount > 0
     ? Math.round((channelCount / Math.max(officialCount + providerCount, 1)) * 100)
     : 0;
-  const logHealth = logs.length > 0 ? Math.max(0, 100 - Math.round((importantLogCount / logs.length) * 100)) : 100;
+  const logHealth = useMemo(() => {
+    if (hasCriticalLogs) {
+      // 存在严重错误时，健康度直接受限在 50% 以下，匹配红色（rose）状态色
+      const base = 48 - Math.min(20, importantLogCount * 4);
+      return Math.max(12, base);
+    }
+    if (importantLogCount > 0) {
+      // 仅存在警告时，健康度限制在 85% 以下，匹配黄色（amber）状态色
+      const base = 84 - Math.min(30, importantLogCount * 3);
+      return Math.max(52, base);
+    }
+    return 100;
+  }, [hasCriticalLogs, importantLogCount]);
   const storageProgress = Math.min(100, (storageUsageMb / 1024) * 100);
   const storageReadiness = storageMode ? Math.max(70, Math.round(100 - storageProgress * 0.25)) : 36;
   const ledgerReadiness = Math.min(100, 55 + (!billingLoading ? 15 : 0) + (latestRecharge ? 15 : 0) + (todayUsageCount > 0 ? 15 : 0));
@@ -594,6 +606,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           overflow: hidden;
           scrollbar-width: none;
           -ms-overflow-style: none;
+          outline: none;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           border-radius: 22px;
           background:
@@ -606,6 +619,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           text-align: left;
           backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
           -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
+        }
+
+        .dashboard-panel:focus {
+          outline: none;
         }
 
         .dashboard-panel::-webkit-scrollbar {
@@ -624,9 +641,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-panel--interactive:hover,
+        .dashboard-panel--interactive:focus,
         .dashboard-panel--interactive:focus-visible {
+          outline: none;
           transform: translateY(-2px);
-          border-color: rgb(var(--dashboard-tone-rgb) / 0.36);
+          border-color: rgb(var(--dashboard-tone-rgb) / 0.45);
           box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
         }
 
@@ -832,14 +851,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-chart {
           position: relative;
-          min-height: 254px;
+          min-height: 146px;
           overflow: hidden;
           border: 1px solid var(--settings-border-subtle);
           border-radius: 18px;
-          background:
-            linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.10), rgb(255 255 255 / 0.015)),
-            repeating-linear-gradient(0deg, transparent 0 33px, rgb(255 255 255 / 0.055) 34px 35px);
-          padding: 14px;
+          background: rgba(255, 255, 255, 0.012);
+          padding: 10px 12px;
+          transition: background 0.25s ease;
+        }
+
+        .dashboard-chart:hover {
+          background: rgba(255, 255, 255, 0.025);
         }
 
         .dashboard-chart__header {
@@ -847,7 +869,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           align-items: flex-start;
           justify-content: space-between;
           gap: 10px;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .dashboard-chart__title {
@@ -876,7 +898,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-chart svg {
           display: block;
           width: 100%;
-          height: 158px;
+          height: 76px;
           color: rgb(var(--settings-accent-rgb));
         }
 
@@ -912,28 +934,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-chart__empty {
           position: absolute;
-          inset: 74px 18px auto;
+          inset: 0;
           display: flex;
+          align-items: center;
           justify-content: center;
           pointer-events: none;
         }
 
         .dashboard-chart__empty span {
-          border: 1px solid var(--settings-border-subtle);
+          border: 1px solid rgb(var(--settings-accent-rgb) / 0.15);
           border-radius: 999px;
-          background: var(--settings-surface-overlay);
-          color: var(--text-tertiary);
-          font-size: var(--type-caption);
-          padding: 6px 10px;
+          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.85));
+          color: var(--text-secondary);
+          font-size: var(--type-micro);
+          padding: 4px 10px;
+          backdrop-filter: blur(8px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .dashboard-chart-bars {
           display: grid;
           grid-template-columns: repeat(12, minmax(0, 1fr));
-          gap: 5px;
-          min-height: 70px;
+          gap: 4px;
+          min-height: 36px;
           align-items: end;
-          margin-top: 10px;
+          margin-top: 4px;
         }
 
         .dashboard-chart-bar {
@@ -941,23 +966,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           min-width: 0;
           flex-direction: column;
           align-items: center;
-          gap: 6px;
+          gap: 2px;
         }
 
         .dashboard-chart-bar__track {
           display: flex;
           width: 100%;
-          height: 50px;
+          height: 22px;
           align-items: flex-end;
           justify-content: center;
           border-radius: 999px;
-          background: rgb(255 255 255 / 0.06);
+          background: rgb(255 255 255 / 0.05);
           overflow: hidden;
         }
 
         .dashboard-chart-bar__fill {
           width: 100%;
-          min-height: 4px;
+          min-height: 3px;
           border-radius: 999px;
           background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.88), rgb(var(--settings-accent-rgb) / 0.28));
           height: var(--bucket-height);
@@ -969,13 +994,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           max-width: 100%;
           overflow: hidden;
           color: var(--text-tertiary);
-          font-size: 9px;
+          font-size: 8px;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
         .dashboard-chart-bar small[data-major="false"] {
           opacity: 0.34;
+        }
+
+        .dashboard-inline-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px 16px;
+          border-top: 1px solid var(--settings-border-subtle);
+          padding-top: 10px;
         }
 
         .dashboard-health-grid {
@@ -1153,6 +1186,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           white-space: nowrap;
         }
 
+        .dashboard-flow-step__helper {
+          color: var(--text-tertiary);
+          font-size: var(--type-micro);
+          line-height: 1.35;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
+        }
+
         .dashboard-flow-step strong {
           color: rgb(var(--dashboard-tone-rgb));
           font-size: var(--type-caption);
@@ -1213,11 +1256,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           }
 
           .dashboard-card-api {
-            grid-column: span 2;
+            grid-row: span 2;
           }
 
           .dashboard-card-browser {
-            grid-column: span 2;
+            grid-row: span 2;
           }
 
           .dashboard-card-storage,
@@ -1233,11 +1276,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           }
 
           .dashboard-card-api {
-            grid-column: span 2;
+            grid-row: span 2;
           }
 
           .dashboard-card-browser {
-            grid-column: span 2;
+            grid-row: span 2;
           }
         }
 
@@ -1319,37 +1362,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           }
 
           .dashboard-chart {
-            min-height: 232px;
-            border-radius: 16px;
-            padding: 10px;
+            min-height: 122px;
+            border-radius: 14px;
+            padding: 8px;
           }
 
           .dashboard-chart__header {
             align-items: flex-start;
             flex-direction: column;
-            gap: 4px;
+            gap: 2px;
           }
 
           .dashboard-chart svg {
-            height: 146px;
+            height: 54px;
           }
 
           .dashboard-chart__empty {
-            inset: 68px 10px auto;
+            inset: 0;
           }
 
           .dashboard-chart-bars {
-            gap: 3px;
-            min-height: 58px;
-            margin-top: 8px;
+            gap: 2px;
+            min-height: 28px;
+            margin-top: 4px;
           }
 
           .dashboard-chart-bar__track {
-            height: 42px;
+            height: 16px;
           }
 
           .dashboard-chart-bar small {
-            font-size: 8px;
+            font-size: 7px;
           }
 
           .dashboard-topology__rail::before {
@@ -1372,6 +1415,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           .dashboard-flow-step strong {
             grid-column: 2;
             justify-self: start;
+          }
+
+          .dashboard-inline-grid {
+            grid-template-columns: 1fr;
+            gap: 6px;
           }
 
           .dashboard-inline-row {
@@ -1468,21 +1516,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-chart-shell">
-            <div className="dashboard-chart-summary">
-              <MetricTile
-                label={pick('账单金额', 'Billed amount')}
-                value={formatUsd(todayCostUsd)}
-                helper={pick(`积分消耗 ${formatNumber(totalCreditSpend, 2)}`, `${formatNumber(totalCreditSpend, 2)} credits used`)}
-                tone="emerald"
-              />
-              <MetricTile
-                label={pick('峰值时段', 'Peak period')}
-                value={peakUsageBucket && hasUsageSignal ? peakUsageBucket.label.replace(':00', '') : '--'}
-                helper={peakUsageBucket && hasUsageSignal ? pick(`${formatNumber(peakUsageBucket.count)} 次请求`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('暂无峰值', 'No peak yet')}
-                tone="indigo"
-              />
-            </div>
-
             <div className="dashboard-chart" aria-label={pick('今日累计消耗曲线图', 'Today cumulative spend curve chart')}>
               <div className="dashboard-chart__header">
                 <span className="dashboard-chart__title">{pick('累计曲线 / 分段柱状', 'Cumulative curve / interval bars')}</span>
@@ -1537,21 +1570,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="dashboard-inline-list">
+            <div className="dashboard-inline-grid">
               <div className="dashboard-inline-row">
-                <span>{pick('最近请求', 'Latest request')}</span>
-                <strong>{latestUsageLabel}</strong>
+                <span>{pick('账单金额', 'Billed')}</span>
+                <strong>
+                  {formatUsd(todayCostUsd)}
+                  <small className="ml-1 text-[var(--text-tertiary)] font-normal">
+                    ({pick(`消耗 ${formatNumber(totalCreditSpend, 1)}`, `${formatNumber(totalCreditSpend, 1)} credits`)})
+                  </small>
+                </strong>
               </div>
               <div className="dashboard-inline-row">
-                <span>{pick('记录时间', 'Recorded at')}</span>
-                <strong>{latestUsage ? formatDateTime(latestUsage.created_at) : pick('等待新调用', 'Waiting for activity')}</strong>
+                <span>{pick('峰值时段', 'Peak')}</span>
+                <strong>
+                  {peakUsageBucket && hasUsageSignal ? peakUsageBucket.label.replace(':00', '') : '--'}
+                  <small className="ml-1 text-[var(--text-tertiary)] font-normal">
+                    ({peakUsageBucket && hasUsageSignal ? pick(`${formatNumber(peakUsageBucket.count)}次`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('无', 'None')})
+                  </small>
+                </strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('最近请求', 'Latest')}</span>
+                <strong title={latestUsageLabel}>{latestUsageLabel}</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('记录时间', 'Time')}</span>
+                <strong>{latestUsage ? formatDateTime(latestUsage.created_at) : pick('等待中', 'Waiting')}</strong>
               </div>
             </div>
           </div>
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-api a-card-span-2-col"
+          className="dashboard-card-api a-card-span-2-row"
           tone={hasAvailableRoute ? 'emerald' : 'amber'}
           icon={<KeyRound size={18} />}
           eyebrow={pick('API 路由图', 'API topology')}
@@ -1606,7 +1657,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-browser a-card-span-2-col"
+          className="dashboard-card-browser a-card-span-2-row"
           tone="indigo"
           icon={<Globe size={18} />}
           eyebrow={pick('浏览器助手图', 'Browser assistant map')}
@@ -1658,13 +1709,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           onClick={() => onNavigate('storage-settings')}
         >
           <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('存储准备度', 'Storage readiness')}
-              value={storageModeLabel}
-              helper={storageMode ? pick('资源可被画布与生成流程复用。', 'Assets can be reused by canvas and generation flows.') : pick('需要先选择存储模式。', 'Choose a storage mode first.')}
-              progress={storageReadiness}
-              tone={storageMode ? 'emerald' : 'amber'}
-            />
             <div className="dashboard-inline-list">
               <div className="dashboard-inline-row">
                 <span>{pick('图片资源', 'Image assets')}</span>
@@ -1692,31 +1736,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           action={(
             <StatusBadge
               status={latestLog ? getLogTone(latestLog.level) : 'online'}
-              label={hasCriticalLogs ? pick('优先处理', 'Priority') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('健康', 'Healthy')}
+              label={hasCriticalLogs ? pick('存在错误', 'Errors') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('日志稳定', 'Healthy')}
             />
           )}
           onClick={() => onNavigate('system-logs')}
         >
           <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('日志健康度', 'Log health')}
-              value={hasCriticalLogs ? pick('存在错误', 'Errors found') : importantLogCount > 0 ? pick('存在告警', 'Warnings found') : pick('日志稳定', 'Stable logs')}
-              helper={pick('告警和错误越少，健康度越高。', 'Fewer warnings and errors increase health.')}
-              progress={logHealth}
-              tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
-            />
             <div className="dashboard-inline-list">
               <div className="dashboard-inline-row">
                 <span>{pick('今日告警', 'Alerts today')}</span>
                 <strong>{importantLogCount > 0 ? formatNumber(importantLogCount) : pick('无', 'None')}</strong>
               </div>
               <div className="dashboard-inline-row">
-                <span>{pick('最近来源', 'Latest source')}</span>
-                <strong>{latestLog ? latestLog.source : pick('日志流稳定', 'Stable stream')}</strong>
-              </div>
-              <div className="dashboard-inline-row">
                 <span>{pick('最近消息', 'Latest message')}</span>
-                <strong>{latestLog ? latestLog.message : pick('当前没有异常日志', 'No warning or error')}</strong>
+                <strong title={latestLog ? latestLog.message : undefined}>
+                  {latestLog ? latestLog.message : pick('当前运行稳定', 'Running stable')}
+                </strong>
               </div>
             </div>
           </div>
@@ -1731,13 +1766,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('账本同步度', 'Ledger freshness')}
-              value={dashboardBalanceCard.value}
-              helper={pick('余额、充值和消耗记录保持同屏对账。', 'Balance, recharge, and spend stay reconciled on one screen.')}
-              progress={ledgerReadiness}
-              tone="amber"
-            />
             <div className="dashboard-inline-list">
               <div className="dashboard-inline-row">
                 <span>{pick('最近充值', 'Latest recharge')}</span>
@@ -1755,40 +1783,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           tone="indigo"
           icon={<Cpu size={18} />}
           eyebrow={pick('能力流', 'Capability flow')}
-          title={pick('模型调用、素材与分发的闭环', 'Closed loop for model calls, assets, and distribution')}
+          title={pick('模型调用与素材闭环', 'Model calls and assets loop')}
           action={<SettingsBadge tone="indigo">{pick('闭环', 'Loop')}</SettingsBadge>}
           onClick={() => onNavigate('ai-management')}
         >
           <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('能力闭环', 'Capability loop')}
-              value={hasUsageSignal ? pick('已有调用信号', 'Activity detected') : pick('等待首次调用', 'Waiting for calls')}
-              helper={pick('模型调用、计费沉淀和网页素材进入同一工作流。', 'Model calls, billing, and page assets flow together.')}
-              progress={Math.min(100, Math.round((browserReadiness + routeReadiness + (hasUsageSignal ? 100 : 42)) / 3))}
-              tone="indigo"
-            />
-            <div className="dashboard-flow-map">
-              <FlowStep
-                icon={<Activity size={16} />}
-                label={pick('模型调用', 'Model calls')}
-                helper={pick('请求记录进入消耗曲线', 'Requests feed the spend curve')}
-                value={formatCompactNumber(todayUsageCount)}
-                tone="indigo"
-              />
-              <FlowStep
-                icon={<Coins size={16} />}
-                label={pick('计费沉淀', 'Billing ledger')}
-                helper={pick('余额、充值、消耗统一落账', 'Balance, recharge, and spend reconcile')}
-                value={formatUsd(todayCostUsd)}
-                tone="amber"
-              />
-              <FlowStep
-                icon={<Globe size={16} />}
-                label={pick('网页助手', 'Browser assistant')}
-                helper={pick('页面素材进入自动化生成流程', 'Page assets enter automated generation')}
-                value={`${browserReadiness}%`}
-                tone="emerald"
-              />
+            <div className="dashboard-inline-list">
+              <div className="dashboard-inline-row">
+                <span>{pick('今日调用', 'Today calls')}</span>
+                <strong>{formatNumber(todayUsageCount)} 次</strong>
+              </div>
+              <div className="dashboard-inline-row">
+                <span>{pick('消费总计', 'Total spend')}</span>
+                <strong>{formatUsd(todayCostUsd)}</strong>
+              </div>
             </div>
           </div>
         </DashboardPanel>
