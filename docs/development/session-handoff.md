@@ -32,3 +32,6 @@
 - `config/release-manifest.json` 为主版本源。
 - `apps/web/src/config/appInfo.ts` 运行时只读导出。
 - `release/publish/stable/manifest.json` 为 portable stable 发布清单。
+
+- Primary Web runtime: `apps/web/`
+- Mobile workspace: `apps/mobile/`

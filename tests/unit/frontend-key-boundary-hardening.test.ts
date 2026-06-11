@@ -193,7 +193,8 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /<SettingInput[\s\S]*?value=\{getOfficialDisplayName\(officialForm\.provider\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{officialForm\.provider\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{officialForm\.key\}[\s\S]*?onReveal=\{isReadonlySecretPlaceholder\(officialForm\.key\) \? revealOfficialSecret : undefined\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
-  assert.match(source, /<SettingInput[\s\S]*?value=\{providerForm\.name\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
+  // [FIX] providerForm.name is removed in simplify config refactor
+  // assert.match(source, /<SettingInput[\s\S]*?value=\{providerForm\.name\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{providerForm\.baseUrl\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{providerForm\.apiKey\}[\s\S]*?onReveal=\{isReadonlySecretPlaceholder\(providerForm\.apiKey\) \? revealProviderSecret : undefined\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{providerForm\.format\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
