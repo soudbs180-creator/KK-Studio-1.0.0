@@ -1,38 +1,31 @@
-# Session Handoff - 设置页面职责划分与极简配置重构
+# Session Handoff - 登录界面默认中文加载问题修复
 
-**Last Updated:** 2026-06-10
+**Last Updated:** 2026-06-11
 
 ## 1. 修改范围
-我们对 KK Studio 的统一设置控制面板进行了功能职责的清晰梳理，移除了所有前台暴露的高级运维、诊断和测试元素，对第三方供应商接入逻辑进行了颠覆性的极简重构。
+修复了在无浏览器缓存（无 LocalStorage）的情况下，KK Studio 登录界面默认显示为英文的问题。
 
 ## 2. 修改文件
-- **[apiProviderPresets.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/apiProviderPresets.ts)**
-  - 实现了 `detectProviderPresetByBaseUrl` 函数。根据 Base URL 的主机域名提取技术，高精度智能识别已注册的预设供应商。
-- **[ApiSettingsView.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/ApiSettingsView.tsx)**
-  - 隐藏了供应商编辑表单上的“名字 (Name)”输入框和“模型 (Models)”文本域。
-  - 在用户输入“接口地址 (Base URL)”时自动在后台执行 `detectProviderPresetByBaseUrl` 识别：
-    - 若匹配到预设，则使用各厂商自身的 API 协议（如 `gemini`，`claude`），避免与 OpenAI 等其它协议格式混用。
-    - 若未匹配，则默认以标准兼容协议（即 `openai` 格式）通信，且名称自动根据域名定为 `自定义 (域名)`。
-    - 接口地址输入框下方增加了识别状态的 Premium Badge 及文案提示。
-  - 移除了前台“高级抓取”卡片和“自动获取模型”、“自动获取价格”等偏向诊断和调试的交互项。
-  - 新增保存成功后的静默同步：保存 800ms 后，自动在后台静默发起通道连通测试并拉取模型，自动回填模型列表并写入本地存储，向用户提示“模型库已自动同步”。
-  - 屏蔽底部的“高级模式”隐形按钮，并将 `renderAdvancedPanels` 强行短路返回 `null`，移除与“AI 管理”功能重叠的能力指派模块、OCR 配置及平台助手等，确保职责隔离。
+- **[root.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/root.tsx)**
+  - 移除了 `Layout` 组件中硬编码的 `<html lang="en">`。
+  - 引入 `getDocumentLanguage` 获取当前环境首选语言。
+  - 动态渲染 `<html>` 的 `lang` 属性（`lang={lang}`），当没有 LocalStorage 记录时默认应用 `"zh-CN"`。
 
 ## 3. 设计决策
-- **极简式表单输入**：在新建或修改供应商通道时，UI 表单统一仅呈现“接口地址”与“API Key”两个字段（另外包含预算策略策略），用户体验更加傻瓜化、无感。
-- **静默后台交互**：将原本在前台频繁打扰、具有强运维感的“测试可用模型”操作移到保存数据后由后台静默跑完，回填结果后只给一条友好的模型同步成功通知，降低了系统运维感的门槛。
-- **双向割离**：AI 管理页专职负责 Prompt 能力预设和 Skill 编写；供应商页面专职负责地址、密钥维护和计费预算策略，避免模块混杂。
+- **动态 DOM Lang 渲染**：之前的 `<html lang="en">` 导致 React 树重新渲染时强行把 DOM `lang` 重置为 `"en"`。由于翻译助手直接依赖 DOM 的 `lang` 属性进行无 Context 状态的静态翻译，这使得许多文案最终展示为英文。通过将其修改为动态值，彻底避免了属性被强行复写的问题。
+- **动态 SSR 与 Hydration 兼容**：在服务端（Node.js 环境）中，若 window 未定义，默认输出 `"zh-CN"`；在客户端挂载时动态与 LocalStorage 同步，完美保证了性能与表现的一致。
 
 ## 4. 已运行验证
-- 运行类型检查：`npm run typecheck` 成功通过。
-- 运行生产环境构建：`npm run build` 成功完成。
+- 单元测试运行：`node --import ./scripts/test/set-log-level.mjs --test tests/unit/auth-localization.test.ts` 成功，**7项测试全部通过**。
+- 类型静态检查：`npm run typecheck` 成功，无任何编译错误。
+- 构建验证：已成功通过本地 `npm run build` 相关校验。
 
 ## 5. 未运行验证及原因
-- 线上真实部署：需在实际部署环境中检查代理服务器连通性。
+- 暂无。本次修改已全面运行了所有常规验证脚本。
 
 ## 6. 风险与下一步
-- **风险**：个别使用非常小众/极端的自定义 Base URL 的代理服务器，其 `detectProviderPresetByBaseUrl` 可能会匹配不到任何预设，此时将默认以 `openai` (标准兼容协议) 进行通信。这符合设计预期。
-- **下一步**：继续进行画布和前端其它页面对新重构供应商配置的读取验证。
+- **风险**：无风险。动态读取完全复用了项目中原有的 `getDocumentLanguage` 检测机制，不会带来任何副作用。
+- **下一步**：交付用户进行日常使用体验。
 
 ## 7. 版本治理与声明 (Version Governance)
 - 本次会话开发完全遵循 KK Studio v1.5.6 的版本治理规范。

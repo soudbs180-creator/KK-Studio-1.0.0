@@ -592,6 +592,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           min-height: 100%;
           flex-direction: column;
           overflow: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           border-radius: 22px;
           background:
@@ -604,6 +606,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           text-align: left;
           backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
           -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
+        }
+
+        .dashboard-panel::-webkit-scrollbar {
+          display: none;
         }
 
         .dashboard-panel[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
@@ -705,6 +711,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           min-height: 0;
           flex: 1;
           flex-direction: column;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .dashboard-panel__body::-webkit-scrollbar {
+          display: none;
         }
 
         .dashboard-metric-tile {
@@ -753,11 +765,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr);
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
           border-radius: 18px;
           background: rgb(var(--dashboard-tone-rgb) / 0.08);
-          padding: 12px;
+          padding: 10px 12px;
         }
 
         .dashboard-module-meter[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
@@ -1089,7 +1101,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-flow-map {
           position: relative;
           display: grid;
-          gap: 10px;
+          gap: 6px;
         }
 
         .dashboard-flow-map::before {
@@ -1109,11 +1121,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
           border-radius: 16px;
           background: rgb(var(--dashboard-tone-rgb) / 0.07);
-          padding: 10px;
+          padding: 8px 10px;
         }
 
         .dashboard-flow-step[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
@@ -1187,7 +1199,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-module-stack {
           display: grid;
-          gap: 12px;
+          gap: 8px;
         }
 
         @media (min-width: 900px) {
@@ -1447,7 +1459,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
       <SettingsCardGridContainer className="dashboard-grid-container dashboard-command-center">
         <DashboardPanel
-          className="dashboard-card-consumption"
+          className="dashboard-card-consumption a-card-span-2-col a-card-span-2-row"
           tone="indigo"
           icon={<Activity size={18} />}
           eyebrow={pick('消耗曲线', 'Spend curve')}
@@ -1539,7 +1551,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-api"
+          className="dashboard-card-api a-card-span-2-col"
           tone={hasAvailableRoute ? 'emerald' : 'amber'}
           icon={<KeyRound size={18} />}
           eyebrow={pick('API 路由图', 'API topology')}
@@ -1594,7 +1606,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-browser"
+          className="dashboard-card-browser a-card-span-2-col"
           tone="indigo"
           icon={<Globe size={18} />}
           eyebrow={pick('浏览器助手图', 'Browser assistant map')}

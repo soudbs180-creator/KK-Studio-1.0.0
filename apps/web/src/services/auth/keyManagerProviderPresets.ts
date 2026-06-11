@@ -173,6 +173,13 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         format: 'openai',
         icon: '\u{1F3AF}'
     },
+    'apimart': {
+        name: 'APIMart',
+        baseUrl: 'https://api.apimart.ai/v1',
+        models: ['gpt-5-mini', 'gpt-4o', 'claude-3-5-sonnet'],
+        format: 'openai',
+        icon: '\u{1F52E}'
+    },
     'custom': {
         name: '\u81EA\u5B9A\u4E49\u4F9B\u5E94\u5546',
         baseUrl: '',

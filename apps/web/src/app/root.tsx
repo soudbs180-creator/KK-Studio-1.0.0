@@ -23,6 +23,7 @@ import {
 import './global.css';
 
 import { LoadFonts } from 'virtual:load-fonts.jsx';
+import { getDocumentLanguage } from '../utils/localeText';
 import fetch from '@/__create/fetch';
 import { SessionProvider } from '@auth/create/react';
 import { toPng } from 'html-to-image';
@@ -432,8 +433,11 @@ export function Layout({ children }: { children: ReactNode }) {
       );
     }
   }, [pathname]);
+
+  const lang = typeof window !== 'undefined' ? getDocumentLanguage() : 'zh-CN';
+
   return (
-    <html lang="en">
+    <html lang={lang}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

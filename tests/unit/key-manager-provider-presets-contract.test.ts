@@ -56,6 +56,7 @@ test('provider presets preserve documented built-in routes and defaults', async 
     'wuyinkeji-nanobanana2',
     'wuyinkeji-google-omni',
     'gpt-best',
+    'apimart',
     'custom',
   ]);
   assert.equal(PROVIDER_PRESETS.openclaw.defaultApiKey, 'sk-openclaw-zero-token');
