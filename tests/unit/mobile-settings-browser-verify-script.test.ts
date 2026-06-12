@@ -99,7 +99,13 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /SETTINGS_API_PATH\}\/official\/new/);
   assert.match(scriptSource, /settings-workbench-stage/);
   assert.match(scriptSource, /settings-workbench-diagnostics/);
+  assert.match(scriptSource, /testId="settings-workbench-overview"/);
+  assert.match(scriptSource, /testId="settings-workbench-capability"\|Capability roles/);
   assert.match(scriptSource, /api-workbench-diagnostics-toggle/);
+  assert.match(scriptSource, /Provider settings and capability routing\|dashboardPrimaryAction/);
+  assert.doesNotMatch(scriptSource, /\/API setup\//);
+  assert.doesNotMatch(scriptSource, /\/Usage & Status\//);
+  assert.doesNotMatch(scriptSource, /\/API & Capability Routing\//);
   assert.match(scriptSource, /Hide more advanced items/);
   assert.match(scriptSource, /name: 'Hide more advanced items', exact: true/);
   assert.match(scriptSource, /api-official-editor-back/);

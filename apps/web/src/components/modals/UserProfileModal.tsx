@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { KkModal } from '@kk/ui/web';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
@@ -1513,23 +1514,17 @@ const ModalWrapper: React.FC<ModalWrapperProps> = ({
   if (isMobile) {
     return (
       <div 
-        className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="kk-canvas-modal-backdrop fixed inset-0 flex items-center justify-center p-4 animate-in fade-in duration-200"
+        style={{ zIndex: KK_LAYER.modalBackdrop }}
         onClick={onClose}
         onTouchStart={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
       >
         <div 
-          className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] flex flex-col rounded-2xl border overflow-hidden text-white animate-in fade-in zoom-in-95 duration-200"
+          className="kk-canvas-modal-panel w-full max-w-[480px] max-h-[calc(100dvh-32px)] flex flex-col rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           onTouchEnd={(e) => e.stopPropagation()}
-          style={{
-            borderColor: 'var(--frost-card-main-border)',
-            background: 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, #0f1115)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: 'var(--frost-card-framework-shadow)',
-          }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 shrink-0">

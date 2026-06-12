@@ -178,9 +178,9 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                         {onDisconnect && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDisconnect(); }}
-                                className="ml-auto w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
+                                className="kk-canvas-pending-disconnect-button"
                             >
-                                <span className="text-red-400 text-[10px]">×</span>
+                                <span className="kk-canvas-pending-disconnect-icon">×</span>
                             </button>
                         )}
                     </div>
@@ -283,19 +283,18 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                         <React.Fragment key={i}>
                             {/* 连接线 */}
                             <svg
-                                className="pointer-events-none"
+                                className="kk-canvas-pending-connector pointer-events-none"
                                 style={{
                                     position: 'absolute',
                                     left: '50%',
                                     top: 0,
                                     overflow: 'visible',
-                                    zIndex: 5
                                 }}
                             >
                                 <path
                                     d={`M0,0 L${offsetX},${offsetY}`}
                                     fill="none"
-                                    stroke="rgba(255,255,255,0.25)"
+                                    stroke="var(--kk-canvas-pending-connector-stroke)"
                                     strokeWidth="1.5"
                                     strokeDasharray="6 4"
                                 />
@@ -303,96 +302,29 @@ const PendingNode: React.FC<PendingNodeProps> = ({
 
                             {/* Secondary placeholder card with frosted motion */}
                             <div
+                                className="kk-canvas-pending-placeholder-card"
                                 style={{
-                                    position: 'absolute',
                                     width: cardWidth,
                                     height: cardHeight,
                                     left: `calc(50% + ${offsetX}px)`,
                                     top: offsetY,
                                     transform: 'translateX(-50%)',
-                                    borderRadius: '16px',
-                                    overflow: 'hidden',
-                                    boxShadow: 'var(--frost-card-main-shadow)',
-                                    border: '1px solid var(--frost-card-main-border)',
-                                    background: 'var(--frost-card-main-bg)',
-                                    WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
-                                    backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    zIndex: 10
                                 }}
                             >
                                 {/* 45度倾斜扫光动画 + 磨砂效果 */}
-                                <div
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        background: 'linear-gradient(45deg, transparent 0%, transparent 35%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.12) 55%, transparent 65%, transparent 100%)',
-                                        backgroundSize: '300% 300%',
-                                        animation: 'shimmer-move 2.5s ease-in-out infinite',
-                                        pointerEvents: 'none',
-                                        backdropFilter: 'blur(1px)'
-                                    }}
-                                />
+                                <div className="kk-canvas-pending-shimmer" />
 
                                 {/* 流体光晕动画底座 */}
-                                <div style={{ position: 'absolute', left: '50%', top: '50%', pointerEvents: 'none', zIndex: 1 }}>
+                                <div className="kk-canvas-pending-ambient">
                                     {/* 外层流体 */}
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            width: '140px',
-                                            height: '140px',
-                                            marginLeft: '-70px',
-                                            marginTop: '-70px',
-                                            background: 'linear-gradient(45deg, rgb(255 77 139 / 0.14) 0%, rgb(255 176 132 / 0.14) 100%)',
-                                            animation: 'fluid-shape 8s ease-in-out infinite, spin-slow 15s linear infinite',
-                                            filter: 'blur(8px)',
-                                            mixBlendMode: 'screen'
-                                        }}
-                                    />
+                                    <div className="kk-canvas-pending-glow kk-canvas-pending-glow--outer" />
                                     {/* Inner accent glow */}
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            width: '100px',
-                                            height: '100px',
-                                            marginLeft: '-50px',
-                                            marginTop: '-50px',
-                                            background: 'linear-gradient(135deg, rgb(255 176 132 / 0.16) 0%, rgb(255 107 90 / 0.16) 100%)',
-                                            animation: 'fluid-shape 6s ease-in-out infinite reverse, spin-slow 10s linear infinite reverse',
-                                            filter: 'blur(4px)',
-                                            mixBlendMode: 'screen'
-                                        }}
-                                    />
+                                    <div className="kk-canvas-pending-glow kk-canvas-pending-glow--inner" />
                                 </div>
 
                                 {/* 内容 */}
-                                <div style={{
-                                    position: 'relative',
-                                    zIndex: 10,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                }}>
-                                    <div style={{
-                                        width: 52,
-                                        height: 52,
-                                        borderRadius: '50%',
-                                        background: 'var(--frost-card-sub-bg)',
-                                        border: '1px solid var(--frost-card-sub-border)',
-                                        boxShadow: 'var(--frost-card-sub-shadow)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        animation: 'float-up-down 4s ease-in-out infinite'
-                                    }}>
+                                <div className="kk-canvas-pending-content">
+                                    <div className="kk-canvas-pending-spinner-shell">
                                         <Loader2 size={24} style={{ color: 'var(--accent-coral)' }} className="animate-spin" />
                                     </div>
                                     <span style={{

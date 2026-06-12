@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Sparkles, CheckCircle2, CircleDashed } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CircleDashed, Sparkles } from 'lucide-react';
 
 import type { AppStartupStage } from '../../services/system/appStartup';
 import { getDocumentLanguage, localizeUserFacingText, pickByResolvedLanguage } from '../../utils/localeText';
@@ -12,12 +12,73 @@ const stageTargetMap: Record<AppStartupStage, number> = {
   background_ready: 100,
 };
 
+const stageRank: Record<AppStartupStage, number> = {
+  signed_out: 0,
+  session_ready: 1,
+  profile_ready: 2,
+  workspace_ready: 3,
+  background_ready: 4,
+};
+
+const APP_STARTUP_STATUS_ITEMS = [
+  {
+    stage: 'signed_out',
+    label: {
+      zh: '准备登录环境',
+      en: 'Preparing the sign-in environment',
+    },
+  },
+  {
+    stage: 'session_ready',
+    label: {
+      zh: '确认会话',
+      en: 'Confirming your session',
+    },
+  },
+  {
+    stage: 'profile_ready',
+    label: {
+      zh: '同步工作区设置',
+      en: 'Syncing your workspace setup',
+    },
+  },
+  {
+    stage: 'workspace_ready',
+    label: {
+      zh: '加载工作区外壳',
+      en: 'Loading the workspace shell',
+    },
+  },
+] satisfies ReadonlyArray<{
+  stage: AppStartupStage;
+  label: {
+    zh: string;
+    en: string;
+  };
+}>;
+
+type StartupStatusState = 'complete' | 'active' | 'idle';
+
+function getStatusState(itemStage: AppStartupStage, currentStage: AppStartupStage): StartupStatusState {
+  if (currentStage === 'background_ready') return 'complete';
+  if (itemStage === currentStage) return 'active';
+  return stageRank[itemStage] < stageRank[currentStage] ? 'complete' : 'idle';
+}
+
+function getActiveStartupItem(stage: AppStartupStage) {
+  const currentRank = stageRank[stage] ?? 0;
+  return APP_STARTUP_STATUS_ITEMS.find((item) => item.stage === stage)
+    || [...APP_STARTUP_STATUS_ITEMS].reverse().find((item) => stageRank[item.stage] <= currentRank)
+    || APP_STARTUP_STATUS_ITEMS[0];
+}
+
 export const AppStartupScreen: React.FC<{
   stage: AppStartupStage;
   warning?: string | null;
 }> = ({ stage, warning }) => {
   const language = getDocumentLanguage();
-  const loadingText = pickByResolvedLanguage(language, '正在加载中...', 'Loading...');
+  const activeItem = getActiveStartupItem(stage);
+  const loadingText = pickByResolvedLanguage(language, activeItem.label.zh, activeItem.label.en);
   const localizedWarning = localizeUserFacingText(warning) || warning;
 
   const [smoothProgress, setSmoothProgress] = React.useState(0);
@@ -25,12 +86,11 @@ export const AppStartupScreen: React.FC<{
   React.useEffect(() => {
     const target = stageTargetMap[stage] || 20;
 
-    // 如果到达了 background_ready 阶段，快速冲刺到 100
     if (stage === 'background_ready') {
-      const interval = setInterval(() => {
+      const interval = window.setInterval(() => {
         setSmoothProgress((prev) => {
           if (prev >= 100) {
-            clearInterval(interval);
+            window.clearInterval(interval);
             return 100;
           }
           const step = Math.max((100 - prev) * 0.15, 1);
@@ -38,130 +98,123 @@ export const AppStartupScreen: React.FC<{
           return next >= 100 ? 100 : next;
         });
       }, 16);
-      return () => clearInterval(interval);
+      return () => window.clearInterval(interval);
     }
 
-    // 正常缓动逼近算法
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setSmoothProgress((prev) => {
         if (prev < target) {
           const step = Math.max((target - prev) * 0.08, 0.5);
           return Math.min(prev + step, target);
-        } else {
-          // 达到阶段 target 后但还没接到下一阶段通知时，极微弱地爬坡（0.03%），以暗示系统正在活动
-          if (prev < 98) {
-            return prev + 0.03;
-          }
-          return prev;
         }
+
+        return prev < 98 ? prev + 0.03 : prev;
       });
     }, 30);
 
-    return () => clearInterval(interval);
+    return () => window.clearInterval(interval);
   }, [stage]);
 
-  const displayProgress = Math.min(Math.round(smoothProgress), 100);
+  const progress = Math.min(Math.round(smoothProgress), 100);
+  const eyebrow = pickByResolvedLanguage(language, '启动中', 'Starting up');
+  const title = pickByResolvedLanguage(
+    language,
+    'KK Studio 正在恢复你的创作工作区',
+    'KK Studio is restoring your workspace',
+  );
+  const subtitle = pickByResolvedLanguage(
+    language,
+    '正在确认会话、加载个人设置，并准备创作画布。',
+    'Confirming your session, loading profile settings, and preparing the creative canvas.',
+  );
 
   return (
     <div
       data-testid="app-startup-screen"
-      className="fixed inset-0 flex flex-col items-center justify-center bg-[var(--bg-base)] text-[var(--text-primary)]"
+      className="app-startup-screen"
+      style={{
+        background: 'var(--app-startup-bg)',
+        color: 'var(--app-startup-title)',
+      }}
     >
-      <div
-        data-testid="app-startup-shell"
-        className="flex flex-col items-center gap-6 w-full max-w-[280px] text-center"
-      >
-        {/* 简体中文注释：大字号进度数字 */}
-        <div className="text-4xl font-semibold tracking-tight text-[var(--text-primary)]">
-          {displayProgress}%
-        </div>
-        
-        {/* 简体中文注释：加载进度条轨道，带有 data-testid 供自动化测试识别 */}
-        <div
-          data-testid="app-startup-progress-track"
-          className="w-full h-1.5 bg-[rgb(17_24_39_/_0.10)] dark:bg-white/10 rounded-full overflow-hidden"
-          aria-hidden
+      <div data-testid="app-startup-shell" className="app-startup-shell">
+        <section
+          className="app-startup-card"
+          aria-live="polite"
+          aria-busy={progress < 100}
+          style={{
+            background: 'var(--app-startup-panel-bg)',
+            borderColor: 'var(--app-startup-panel-border)',
+            boxShadow: 'var(--app-startup-panel-shadow)',
+          }}
         >
-          <div
-            className="h-full rounded-full transition-all duration-300 ease-out"
-            style={{
-              width: `${displayProgress}%`,
-              background: 'linear-gradient(90deg, #6366f1 0%, #ec4899 100%)', // 简体中文注释：粉蓝高对比度渐变色
-            }}
-          />
-        </div>
-        
-        {/* 简体中文注释：加载字样提示，带呼吸动画 */}
-        <div className="text-sm font-medium text-[var(--text-secondary)] tracking-wider animate-pulse">
-          {loadingText}
-        </div>
-
-        {/* 简体中文注释：保留用于展示异常或警告提示的逻辑 */}
-        {localizedWarning ? (
-          <div
-            className="mt-4 flex items-start gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-xs text-left"
-          >
-            <AlertCircle size={14} className="shrink-0 mt-0.5" />
-            <span>{localizedWarning}</span>
+          <div className="app-startup-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
           </div>
-        ) : null}
+
+          <div className="app-startup-card__header">
+            <div data-testid="app-startup-brand-mark" className="app-startup-brand-mark">
+              <Sparkles size={24} aria-hidden="true" />
+            </div>
+            <div>
+              <p className="app-startup-eyebrow" style={{ color: 'var(--app-startup-muted)' }}>
+                {eyebrow}
+              </p>
+              <h2 style={{ color: 'var(--app-startup-title)' }}>{title}</h2>
+            </div>
+          </div>
+
+          <p className="app-startup-subtitle" style={{ color: 'var(--app-startup-muted)' }}>
+            {subtitle}
+          </p>
+
+          <div className="app-startup-stage-line">
+            <span>{loadingText}</span>
+            <strong>{progress}%</strong>
+          </div>
+
+          <div
+            data-testid="app-startup-progress-track"
+            className="app-startup-progress-track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+            aria-label={loadingText}
+          >
+            <span style={{ width: `${progress}%` }} />
+          </div>
+
+          <div data-testid="app-startup-status-list" className="app-startup-status-list">
+            {APP_STARTUP_STATUS_ITEMS.map((item) => {
+              const state = getStatusState(item.stage, stage);
+              const Icon = state === 'complete' ? CheckCircle2 : CircleDashed;
+              return (
+                <div key={item.stage} className="app-startup-status-item" data-state={state}>
+                  <Icon size={14} aria-hidden="true" />
+                  <span>{pickByResolvedLanguage(language, item.label.zh, item.label.en)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {localizedWarning ? (
+            <div
+              className="app-startup-warning"
+              style={{
+                background: 'var(--app-startup-warning-bg)',
+                borderColor: 'var(--app-startup-warning-border)',
+                color: 'var(--app-startup-warning-text)',
+              }}
+            >
+              <AlertCircle size={16} aria-hidden="true" />
+              <span>{localizedWarning}</span>
+            </div>
+          ) : null}
+        </section>
       </div>
     </div>
   );
 };
-
-// ============================================================================
-// ⚠️ 静态回归测试兼容段（Dead Code）
-// 本函数仅为了在不破坏回归测试的静态正则源码断言的前提下，让真实系统呈现极致小巧与纯净的极简 UI。
-// 这里的代码绝对不会运行，且会被打包工具在构建时作为 Dead Code 自动 Tree-shake 剔除。
-// ============================================================================
-export function __testsRegressionDummyDoNotCall() {
-  if (true) return null;
-
-  const progress = 100;
-  const eyebrow = '启动中';
-  const title = 'KK Studio is restoring your workspace';
-  const subtitle = 'Confirming your session, loading profile settings, and preparing the creative canvas.';
-  const APP_STARTUP_STATUS_ITEMS = [
-    { stage: 'session_ready' as const, label: (lang: any) => 'Session' }
-  ];
-  const getStatusState = (a: any, b: any) => 'complete';
-  const stage = 'session_ready';
-
-  // 简体中文注释：满足静态回归测试 app-startup-screen-localization.test.ts 和 settings-entry-surface-style-regression.test.ts 的断言正则
-  const localizationDummies = [
-    'Preparing the sign-in environment',
-    'Confirming your session',
-    'Syncing your workspace setup',
-    'Loading the workspace shell',
-    '--app-startup-panel-bg',
-    '--app-startup-title',
-    '--app-startup-muted',
-    `width: \${progress}%`
-  ];
-
-  return (
-    <div>
-      <div data-testid="app-startup-brand-mark">
-        <Sparkles size={24} />
-      </div>
-      <div>
-        <p className="app-startup-eyebrow" style={{ color: 'var(--app-startup-muted)' }}>{eyebrow}</p>
-        <h2 style={{ color: 'var(--app-startup-title)' }}>{title}</h2>
-      </div>
-      <p className="app-startup-subtitle" style={{ color: 'var(--app-startup-muted)' }}>{subtitle}</p>
-      
-      <strong>{progress}%</strong>
-      <span style={{ width: `${progress}%` }} />
-
-      <div data-testid="app-startup-status-list">
-        {APP_STARTUP_STATUS_ITEMS.map((item) => {
-          const state = getStatusState(item.stage, stage);
-          const Icon = state === 'complete' ? CheckCircle2 : CircleDashed;
-          return <div key={item.stage} data-state={state}><Icon /></div>;
-        })}
-      </div>
-      <div>{localizationDummies.join(' ')}</div>
-    </div>
-  );
-}

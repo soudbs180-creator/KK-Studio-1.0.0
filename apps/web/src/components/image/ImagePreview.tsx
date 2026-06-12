@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
+import { KK_LAYER } from '@kk/ui';
 
 interface ImagePreviewProps {
   imageUrl: string;
@@ -84,11 +85,14 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ imageUrl, originRect, onClo
   const currentOpacity = isClosing ? 0 : 1;
 
   return ReactDOM.createPortal(
-    <>
-      <div className="fixed inset-0 z-[9998]" onClick={handleClose} />
+    <div
+      className="kk-image-preview-root fixed inset-0"
+      style={{ zIndex: KK_LAYER.fullscreen }}
+    >
+      <div className="kk-image-preview-backdrop absolute inset-0" onClick={handleClose} />
 
       <div
-        className="fixed z-[9999]"
+        className="fixed"
         style={{
           left: currentLeft,
           top: currentTop,
@@ -105,18 +109,15 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ imageUrl, originRect, onClo
         <img
           src={imageUrl}
           alt="放大查看"
-          className="w-full h-full object-contain rounded-xl shadow-2xl"
+          className="kk-image-preview-frame w-full h-full object-contain rounded-xl"
           style={{
-            border: '3px solid rgba(99, 102, 241, 0.6)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
             pointerEvents: 'auto',
             cursor: 'pointer',
-            background: 'rgba(6, 10, 20, 0.88)',
           }}
           onClick={handleClose}
         />
       </div>
-    </>,
+    </div>,
     document.body
   );
 };

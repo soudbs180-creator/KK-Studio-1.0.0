@@ -264,6 +264,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 // Lucide icons replaced with SVGs
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { AppearanceMotionProvider } from './context/AppearanceMotionContext';
 import { KkUIProvider } from '@kk/ui/web';
 import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
@@ -5974,20 +5975,22 @@ const App: React.FC = () => {
 
   return (
     <ThemeProvider>
-      <AppKkUIProvider>
-        <AppStartupProvider>
-          <BillingProvider>
-            <CanvasProvider>
-              <AuthenticatedAppShell
-                showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
-                onExitCostEstimation={() => setShowCostEstimation(false)}
-                showStartupBanner={rootMode === 'workspace'}
-                AppContentComponent={AppRootContentSwitch}
-              />
-            </CanvasProvider>
-          </BillingProvider>
-        </AppStartupProvider>
-      </AppKkUIProvider>
+      <AppearanceMotionProvider>
+        <AppKkUIProvider>
+          <AppStartupProvider>
+            <BillingProvider>
+              <CanvasProvider>
+                <AuthenticatedAppShell
+                  showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
+                  onExitCostEstimation={() => setShowCostEstimation(false)}
+                  showStartupBanner={rootMode === 'workspace'}
+                  AppContentComponent={AppRootContentSwitch}
+                />
+              </CanvasProvider>
+            </BillingProvider>
+          </AppStartupProvider>
+        </AppKkUIProvider>
+      </AppearanceMotionProvider>
     </ThemeProvider>
   );
 };

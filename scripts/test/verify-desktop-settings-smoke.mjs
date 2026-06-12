@@ -298,13 +298,13 @@ function verifyDesktopSourceContracts() {
     /data-testid="settings-page-root"/,
     /sections=\{sections\}/,
     /dashboard-grid-card/,
-    /API setup/,
+    /Provider settings and capability routing|dashboardPrimaryAction/,
     /data-testid="api-official-editor-back"/,
     /testId="settings-workbench-stage"/,
     /testId="settings-workbench-diagnostics"/,
     /testId="settings-workbench-platform"/,
-    /Usage & Status/,
-    /API & Capability Routing/,
+    /testId="settings-workbench-overview"/,
+    /testId="settings-workbench-capability"|Capability roles/,
     /testId="settings-workbench-route-pool"/,
   ];
 

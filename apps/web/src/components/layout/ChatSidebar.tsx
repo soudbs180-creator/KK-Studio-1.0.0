@@ -1,6 +1,7 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Ghost } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -2853,14 +2854,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             {!isOpen && !isMobile && (!workspaceSurface || workspaceSurface === 'workspace') && (
                 <button
                     onClick={onToggle}
-                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[200000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                    className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                     style={{
-                        background: 'var(--frost-card-framework-bg)',
-                        borderColor: 'var(--frost-card-framework-border)',
+                        zIndex: KK_LAYER.drawer,
                         borderWidth: '1px 0 1px 1px',
                         borderStyle: 'solid',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                     }}
                     title="展开 AI 助手"
                 >
@@ -2900,11 +2898,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         }
                     }}
                     onWheel={registerActivity}
-                    className={`fixed z-[200000] flex flex-col ${isMobile
+                    className={`fixed kk-workspace-sidebar kk-workspace-chrome-surface flex flex-col ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'
                         : 'top-0 right-0 bottom-0 border-l border-[var(--border-light)]'
                         }`}
                     style={isMobile ? {
+                        zIndex: KK_LAYER.drawer,
                         top: 0,
                         bottom: 0,
                         left: 0,
@@ -2916,30 +2915,23 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
                         transition: 'none'
                     } : {
+                        zIndex: KK_LAYER.drawer,
                         // Full height sidebar on the right
                         width: `${sidebarWidth}px`,
-                        background: 'var(--frost-card-framework-bg)',
-                        borderColor: 'var(--frost-card-framework-border)',
-                        boxShadow: 'var(--frost-card-framework-shadow)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
                         transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
                         pointerEvents: isOpen ? 'auto' : 'none',
-                        transition: 'transform 0.3s ease-out'
+                        transition: 'transform var(--kk-motion-panel) var(--kk-motion-ease-standard)'
                     }}
                 >
                     {/* 侧边栏展开时吸附在最左侧外边缘的收缩按钮 */}
                     {!isMobile && (
                         <button
                             onClick={onToggle}
-                            className="absolute -left-6 top-1/2 -translate-y-1/2 z-[200000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                            className="kk-workspace-edge-toggle absolute -left-6 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                             style={{
-                                background: 'var(--frost-card-framework-bg)',
-                                borderColor: 'var(--frost-card-framework-border)',
+                                zIndex: KK_LAYER.drawer + 1,
                                 borderWidth: '1px 0 1px 1px',
                                 borderStyle: 'solid',
-                                backdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
-                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                             }}
                             title="折叠 AI 助手（收起）"
                         >
@@ -2976,7 +2968,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             {isMobile ? (
                                 <button
                                     onClick={onClose || onToggle}
-                                    className="p-2 -ml-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:bg-[var(--toolbar-hover)] rounded-full transition-colors flex items-center justify-center shrink-0"
+                                    className="kk-workspace-icon-control -ml-2 rounded-full flex items-center justify-center shrink-0"
                                     title="返回"
                                 >
                                     <ChevronLeft size={22} />
@@ -3002,28 +2994,28 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             <div className="flex items-center gap-1 shrink-0">
                                 <button
                                     onClick={handleClearCurrentSession}
-                                    className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
+                                    className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="清除当前对话（清空）"
                                 >
                                     <Broom size={18} />
                                 </button>
                                 <button
                                     onClick={handleNewTempSession}
-                                    className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
+                                    className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="开启临时对话（不保存，关闭或切换后清理）"
                                 >
                                     <Ghost size={18} />
                                 </button>
                                 <button
                                     onClick={handleNewSession}
-                                    className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
+                                    className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="新建对话（保留历史）"
                                 >
                                     <Plus size={18} />
                                 </button>
                                 <button
                                     onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-                                    className={`p-1.5 flex items-center justify-center rounded-md transition-colors ${showHistoryPanel ? 'text-[var(--primary)] bg-[var(--primary-light)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]'}`}
+                                    className={`kk-workspace-icon-control flex items-center justify-center rounded-md ${showHistoryPanel ? 'text-[var(--primary)] bg-[var(--primary-light)]' : ''}`}
                                     title="历史记录与分支"
                                 >
                                     <Layout size={18} />
@@ -3716,14 +3708,15 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         {aiTakeoverMode && showTakeoverMenu && (
                                             <div
                                                 id="btn-takeover-menu-container"
-                                                className="absolute bottom-full left-0 mb-2 z-[1000] w-40 rounded-xl border border-zinc-800 bg-[#0d0e14]/95 backdrop-blur-md p-1 shadow-[0_4px_20px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                                className="kk-chat-sidebar-floating-menu absolute bottom-full left-0 mb-2 w-40 rounded-xl p-1 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                                style={{ zIndex: KK_LAYER.dropdown }}
                                             >
                                                 <button
                                                     onClick={() => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverImgInputRef.current?.click();
                                                     }}
-                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                    className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
                                                     <Picture size={13} className="text-[var(--clay-brand-lavender)]" />
                                                     <span>上传图片</span>
@@ -3733,9 +3726,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverDirInputRef.current?.click();
                                                     }}
-                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                    className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
-                                                    <FolderOpen size={13} className="text-pink-400" />
+                                                    <FolderOpen size={13} className="text-[var(--clay-brand-pink)]" />
                                                     <span>导入文件夹</span>
                                                 </button>
                                                 <button
@@ -3743,20 +3736,20 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverFileInputRef.current?.click();
                                                     }}
-                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                    className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
-                                                    <FileText size={13} className="text-rose-400" />
+                                                    <FileText size={13} className="text-[var(--clay-brand-coral)]" />
                                                     <span>连接文件</span>
                                                 </button>
-                                                <div className="h-px bg-zinc-800/40 my-1" />
+                                                <div className="kk-chat-sidebar-menu-divider h-px my-1" />
                                                 <button
                                                     onClick={() => {
                                                         setShowTakeoverMenu(false);
                                                         setShowResourcePanel(prev => !prev);
                                                     }}
-                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                    className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
-                                                    <Eye size={13} className="text-zinc-400" />
+                                                    <Eye size={13} className="text-[var(--text-tertiary)]" />
                                                     <span>资源 ({takeoverImages.length + takeoverFiles.length})</span>
                                                 </button>
                                             </div>
@@ -3841,15 +3834,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             )}
             {sessionContextMenu && ReactDOM.createPortal(
                 <div
-                    className="fixed z-[10020] w-40 rounded-lg border py-1"
+                    className="kk-chat-sidebar-floating-menu fixed w-40 rounded-lg py-1"
                     style={{
                         top: sessionContextMenu.y,
                         left: sessionContextMenu.x,
-                        background: 'var(--frost-card-framework-bg)',
-                        borderColor: 'var(--frost-card-framework-border)',
-                        boxShadow: 'var(--frost-card-framework-shadow)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        zIndex: KK_LAYER.dropdown,
                     }}
                 >
                     <button
@@ -3858,7 +3847,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             handleRenameSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
+                        className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         重命名
                     </button>
@@ -3867,7 +3856,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             e.stopPropagation();
                             handleDuplicateSession(sessionContextMenu.sessionId);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
+                        className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         复制分支
                     </button>
@@ -3877,7 +3866,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             handleToggleArchiveSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
+                        className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         归档/取消归档
                     </button>
@@ -3887,7 +3876,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             handleDeleteSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-red-500/20"
+                        className="kk-chat-sidebar-menu-item kk-chat-sidebar-menu-item--danger w-full text-left px-3 py-2 text-sm"
                     >
                         删除会话
                     </button>
@@ -3895,16 +3884,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                 document.body
             )}
             {importPreview && ReactDOM.createPortal(
-                <div className="fixed inset-0 z-[10030] bg-black/50 flex items-center justify-center p-4">
+                <div className="kk-chat-sidebar-modal-backdrop fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: KK_LAYER.modalBackdrop }}>
                     <div
-                        className="w-full max-w-md rounded-xl border p-4"
-                        style={{
-                            background: 'var(--frost-card-framework-bg)',
-                            borderColor: 'var(--frost-card-framework-border)',
-                            boxShadow: 'var(--frost-card-framework-shadow)',
-                            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        }}
+                        className="kk-chat-sidebar-modal-panel w-full max-w-md rounded-xl border p-4"
                     >
                         <div className="text-sm font-medium text-[var(--text-primary)] mb-2">导入预览</div>
                         <div className="text-xs text-[var(--text-secondary)] space-y-1 mb-4">
@@ -3929,9 +3911,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 </button>
                                 <button
                                     onClick={() => setImportPreviewOnlyExcluded(prev => !prev)}
-                                    className={`flex-1 sm:flex-none h-8 px-2 rounded-lg border text-[11px] whitespace-nowrap transition-colors ${importPreviewOnlyExcluded
-                                        ? 'border-red-400/40 bg-red-500/15 text-red-200'
-                                        : 'border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'
+                                    className={`kk-chat-sidebar-filter-toggle flex-1 sm:flex-none h-8 px-2 rounded-lg border text-[11px] whitespace-nowrap ${importPreviewOnlyExcluded
+                                        ? 'kk-chat-sidebar-filter-toggle--active'
+                                        : ''
                                         }`}
                                 >
                                     {importPreviewOnlyExcluded ? '显示全部' : '只看已勾选'}

@@ -1,4 +1,5 @@
 import React, { type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
+import { TOKENS } from '@kk/ui/core';
 
 type Tone = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose' | 'slate' | 'neutral';
 type IconLike = React.ComponentType<{ size?: number; className?: string }>;
@@ -156,8 +157,101 @@ export const SETTINGS_LABEL_CLASSNAME =
 export const SETTINGS_CONTROL_MOTION_CLASSNAME =
   'settings-control-motion transition-[background-color,border-color,box-shadow,color,transform] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] hover:-translate-y-px active:translate-y-0';
 
-export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="settings-view-shell settings-reference-stack space-y-6 pb-4">{children}</div>
+export const SETTINGS_UI_SYSTEM = TOKENS.uiSystem;
+
+export const SETTINGS_PAGE_CONTAINER_CLASSNAME = 'settings-system-page';
+export const SETTINGS_GLASS_SURFACE_CLASSNAME = 'settings-system-glass';
+export const SETTINGS_RESPONSIVE_GRID_CLASSNAME = 'settings-system-grid';
+export const SETTINGS_FIELD_GROUP_CLASSNAME = 'settings-system-field-group';
+export const SETTINGS_MODAL_BACKDROP_CLASSNAME = 'settings-system-modal-backdrop';
+export const SETTINGS_MODAL_PANEL_CLASSNAME = 'settings-system-modal-panel';
+
+type SettingsViewShellProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export const SettingsViewShell: React.FC<SettingsViewShellProps> = ({ children, className = '' }) => (
+  <div className={`${SETTINGS_PAGE_CONTAINER_CLASSNAME} settings-view-shell settings-reference-stack space-y-6 pb-4 ${className}`.trim()}>{children}</div>
+);
+
+type SettingsSystemCardProps = {
+  title?: string;
+  description?: ReactNode;
+  icon?: IconLike;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  tone?: Tone;
+};
+
+export const SettingsSystemCard: React.FC<SettingsSystemCardProps> = ({
+  title,
+  description,
+  icon: Icon,
+  action,
+  children,
+  className = '',
+  tone = 'neutral',
+}) => {
+  const toneStyle = toneStyles[tone];
+
+  return (
+    <section className={`settings-system-card ${SETTINGS_GLASS_SURFACE_CLASSNAME} ${className}`.trim()}>
+      {title || description || Icon || action ? (
+        <div className="settings-system-card__header">
+          <div className="settings-system-card__title-row">
+            {Icon ? (
+              <span className="settings-system-card__icon" style={toneStyle.iconStyle} aria-hidden="true">
+                <Icon size={16} />
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              {title ? <h3 className="settings-system-card__title">{title}</h3> : null}
+              {description ? <p className="settings-system-card__description">{description}</p> : null}
+            </div>
+          </div>
+          {action ? <div className="settings-system-card__action">{action}</div> : null}
+        </div>
+      ) : null}
+      <div className={SETTINGS_FIELD_GROUP_CLASSNAME}>{children}</div>
+    </section>
+  );
+};
+
+type SettingsSystemFieldProps = {
+  label: string;
+  description?: ReactNode;
+  value?: ReactNode;
+  children: ReactNode;
+  htmlFor?: string;
+  className?: string;
+};
+
+export const SettingsSystemField: React.FC<SettingsSystemFieldProps> = ({
+  label,
+  description,
+  value,
+  children,
+  htmlFor,
+  className = '',
+}) => (
+  <div className={`settings-system-field ${className}`.trim()}>
+    <div className="settings-system-field__copy">
+      <div className="settings-system-field__label-row">
+        {htmlFor ? (
+          <label className="settings-system-field__label" htmlFor={htmlFor}>
+            {label}
+          </label>
+        ) : (
+          <span className="settings-system-field__label">{label}</span>
+        )}
+        {value ? <span className="settings-system-field__value">{value}</span> : null}
+      </div>
+      {description ? <p className="settings-system-field__description">{description}</p> : null}
+    </div>
+    <div className="settings-system-field__control">{children}</div>
+  </div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({
@@ -221,7 +315,7 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
                 {eyebrow}
               </div>
             ) : null}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="settings-hero-card__title-line mt-2 flex flex-wrap items-center gap-2">
               <h2
                 className="min-w-0 break-words"
                 style={{
@@ -234,23 +328,23 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
               </h2>
               {badge}
             </div>
-            {description ? (
-              <p
-                className="mt-3 max-w-3xl break-words"
-                style={{
-                  color: 'var(--text-secondary)',
-                  overflowWrap: 'anywhere',
-                  fontSize: 'var(--type-body-2)',
-                  lineHeight: 'var(--ui-line-height-relaxed)',
-                }}
-              >
-                {description}
-              </p>
-            ) : null}
           </div>
         </div>
         {actions ? <div className="settings-hero-card__actions settings-reference-actions">{actions}</div> : null}
       </div>
+      {description ? (
+        <p
+          className="settings-hero-card__description mt-3 max-w-3xl break-words"
+          style={{
+            color: 'var(--text-secondary)',
+            overflowWrap: 'anywhere',
+            fontSize: 'var(--type-body-2)',
+            lineHeight: 'var(--ui-line-height-relaxed)',
+          }}
+        >
+          {description}
+        </p>
+      ) : null}
       {metrics ? <div className="settings-reference-grid-4">{metrics}</div> : null}
     </section>
   );

@@ -17043,3 +17043,20 @@ body.light-mode .settings-panel .mobile-header-action-btn:active {
 }
 
 /* ===== settings.css 专属 Connected Provider Card 样式已迁移 ===== */
+
+/* ===== 专项治理：防遮挡与溢出通用样式 ===== */
+.kk-min-w-0 {
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.kk-break-anywhere {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}

@@ -126,6 +126,7 @@ test('canvas card shadows follow Clay flat-card depth instead of cinematic shado
 
 test('search palette uses Clay tokens without heavy shadows or inline focus mutation', () => {
   const source = readSource('apps/web/src/components/layout/SearchPalette.tsx');
+  const cssSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   assert.doesNotMatch(source, /shadow-2xl|shadow-xl|shadow-lg/);
   assert.doesNotMatch(source, /bg-indigo|text-indigo|border-indigo/);
@@ -133,11 +134,13 @@ test('search palette uses Clay tokens without heavy shadows or inline focus muta
   assert.doesNotMatch(source, /ios-mobile-sheet/);
   assert.doesNotMatch(source, /parentElement!\.style\.boxShadow|style\.boxShadow/);
   assert.doesNotMatch(source, /animate-bounce-in/);
-  assert.match(source, /var\(--search-palette-overlay-bg\)/);
-  assert.match(source, /var\(--frost-card-framework-shadow\)/);
+  assert.match(source, /kk-search-palette-backdrop/);
+  assert.match(source, /kk-search-palette-panel/);
   assert.match(source, /var\(--search-palette-selected-bg\)/);
   assert.match(source, /var\(--search-palette-focus-ring\)/);
   assert.match(source, /var\(--clay-brand-pink\)|var\(--accent-color\)/);
+  assert.match(cssSource, /--kk-search-palette-backdrop-bg:\s*var\(--search-palette-overlay-bg\);/);
+  assert.match(cssSource, /--kk-search-palette-panel-shadow:\s*var\(--frost-card-framework-shadow\);/);
 });
 
 test('tutorial overlay uses Clay spotlight and flat action treatment', () => {

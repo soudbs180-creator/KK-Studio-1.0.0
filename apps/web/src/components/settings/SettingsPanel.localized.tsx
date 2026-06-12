@@ -436,7 +436,7 @@ const SettingsMobileShell: React.FC<{
         {/* 左对齐与居中平滑切换的标题 */}
         <div className={titleClass}>
           <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
-          <h2 className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</h2>
+          <div className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</div>
         </div>
 
         {/* 右侧始终保留 X 关闭按钮，提供无边框大触控热区 */}

@@ -10,6 +10,7 @@ import {
   Type,
   X,
 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import type { GeneratedImage, PptEditableLayer, PptEditablePage, PromptNode } from '../../types';
 import {
   buildPptEditablePages,
@@ -35,7 +36,7 @@ const layerIcon = (layer: PptEditableLayer) => {
   return <Type size={14} />;
 };
 
-const hexToRgba = (value?: string, opacity = 1) => {
+const hexToRgbAlpha = (value?: string, opacity = 1) => {
   if (!value) return undefined;
 
   const raw = value.trim().replace(/^#/, '');
@@ -52,7 +53,7 @@ const hexToRgba = (value?: string, opacity = 1) => {
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   const alpha = Math.max(0, Math.min(1, opacity));
 
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  return `rgb(${red} ${green} ${blue} / ${alpha})`;
 };
 
 const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
@@ -174,13 +175,13 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
           left: `${(layer.x / 1920) * 100}%`,
           top: `${(layer.y / 1080) * 100}%`,
           width: `${(layer.width / 1920) * 100}%`,
-          color: layer.color || '#ffffff',
+          color: layer.color || 'var(--kk-ppt-layer-default-text)',
           fontSize: compact
             ? `${Math.max(8, Math.round(layer.fontSize / 4))}px`
             : `${Math.max(14, Math.round((layer.fontSize / 1080) * 720)) / 10}vw`,
           fontWeight: layer.fontWeight || 500,
           textAlign: layer.align || 'left',
-          backgroundColor: hexToRgba(layer.backgroundColor, layer.backgroundOpacity ?? 1),
+          backgroundColor: hexToRgbAlpha(layer.backgroundColor, layer.backgroundOpacity ?? 1),
           opacity: layer.opacity ?? 1,
           lineHeight: compact ? 1.2 : 1.35,
           minHeight: compact ? undefined : `${(layer.height / 1080) * 100}%`,
@@ -219,27 +220,30 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm"
+      className="kk-image-modal-backdrop kk-ppt-deck-editor fixed inset-0"
       onClick={onClose}
-      style={isMobile ? {
-        paddingTop: 'max(8px, env(safe-area-inset-top, 0px))',
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
-        paddingLeft: '8px',
-        paddingRight: '8px',
-      } : undefined}
+      style={{
+        zIndex: KK_LAYER.fullscreen,
+        ...(isMobile ? {
+          paddingTop: 'max(8px, env(safe-area-inset-top, 0px))',
+          paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
+          paddingLeft: '8px',
+          paddingRight: '8px',
+        } : {}),
+      }}
     >
       <div
-        className={`overflow-hidden border border-white/10 bg-[#0f172a] text-white shadow-2xl ${isMobile ? 'h-full rounded-[24px]' : 'absolute inset-[4%] rounded-3xl'}`}
+        className={`kk-image-modal-panel overflow-hidden border ${isMobile ? 'h-full rounded-[24px]' : 'absolute inset-[4%] rounded-3xl'}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`flex items-center justify-between border-b border-white/10 ${isMobile ? 'px-4 py-3' : 'px-6 py-4'}`}>
+        <div className={`kk-ppt-deck-header flex items-center justify-between border-b ${isMobile ? 'px-4 py-3' : 'px-6 py-4'}`}>
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-sky-500/15 p-2 text-sky-300">
+            <div className="kk-ppt-layer-icon rounded-2xl p-2">
               <Layers3 size={18} />
             </div>
             <div>
               <div className="text-sm font-semibold">{pick('可编辑 PPT 页面包', 'Editable PPT Deck')}</div>
-              <div className="text-xs text-white/60">
+              <div className="kk-ppt-muted text-xs">
                 {pick('导出分层 PPTX 之前，可以先在这里调整文字图层。', 'Edit text layers before exporting a layered PPTX package.')}
               </div>
             </div>
@@ -248,13 +252,13 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={handleSave}
-              className="rounded-full bg-sky-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-400"
+              className="kk-image-modal-primary rounded-full px-4 py-2 text-sm font-medium"
             >
               {pick('保存页面包', 'Save deck')}
             </button>
             <button
               onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+              className="kk-image-modal-icon-button inline-flex items-center justify-center rounded-full"
               title={pick('关闭', 'Close')}
             >
               <X size={18} />
@@ -263,8 +267,8 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
         </div>
 
         <div className={`grid min-h-0 ${isMobile ? 'h-[calc(100%-65px)] grid-cols-1' : 'h-[calc(100%-73px)] grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
-          <aside className="overflow-y-auto border-b border-white/10 bg-white/[0.03] p-4 xl:border-b-0 xl:border-r">
-            <div className="mb-3 text-xs uppercase tracking-[0.16em] text-white/45">
+          <aside className="kk-ppt-editor-panel overflow-y-auto border-b p-4 xl:border-b-0 xl:border-r">
+            <div className="kk-image-modal-label mb-3 text-xs uppercase tracking-[0.16em]">
               {pick('页面列表', 'Slides')}
             </div>
             <div className="space-y-3">
@@ -278,22 +282,19 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                   <button
                     key={page.id}
                     onClick={() => setActiveIndex(index)}
-                    className={`w-full rounded-2xl border p-2 text-left transition-all ${
-                      isActive
-                        ? 'border-sky-400/70 bg-sky-500/10 shadow-lg shadow-sky-500/10'
-                        : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
-                    }`}
+                    className="kk-ppt-slide-nav w-full rounded-2xl p-2 text-left"
+                    data-active={isActive}
                   >
-                    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-950">
-                      <div className="relative aspect-video w-full bg-slate-900">
+                    <div className="kk-ppt-preview-frame relative overflow-hidden rounded-xl">
+                      <div className="relative aspect-video w-full">
                         {image ? renderLayeredPreview(page, true) : null}
                       </div>
-                      <div className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[10px] font-medium">
+                      <div className="kk-ppt-page-badge absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-medium">
                         {index + 1}/{slideCount}
                       </div>
                     </div>
                     <div className="mt-2 text-sm font-medium">{title}</div>
-                    <div className="mt-1 line-clamp-2 text-xs text-white/55">{subtitle || pick('暂未填写副标题', 'No subtitle yet')}</div>
+                    <div className="kk-ppt-muted mt-1 line-clamp-2 text-xs">{subtitle || pick('暂未填写副标题', 'No subtitle yet')}</div>
                   </button>
                 );
               })}
@@ -306,18 +307,18 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                 <>
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('预览', 'Preview')}</div>
+                      <div className="kk-image-modal-label text-xs uppercase tracking-[0.16em]">{pick('预览', 'Preview')}</div>
                       <div className="mt-1 text-lg font-semibold">
                         {titleLayer?.text.trim() || activePage.name || pick(`第 ${activeIndex + 1} 页`, `Slide ${activeIndex + 1}`)}
                       </div>
                     </div>
-                    <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/60">
+                    <div className="kk-image-info-panel rounded-full border px-3 py-1 text-xs">
                       {pick('1920 x 1080 分层画面', '1920 x 1080 layered scene')}
                     </div>
                   </div>
 
-                  <div className="mx-auto max-w-[920px] rounded-[28px] border border-white/10 bg-[#020617] p-4 shadow-2xl">
-                    <div className="relative aspect-video overflow-hidden rounded-[22px] border border-white/10 bg-slate-950">
+                  <div className="kk-ppt-preview-frame mx-auto max-w-[920px] rounded-[28px] p-4">
+                    <div className="kk-ppt-stack-page relative aspect-video overflow-hidden rounded-[22px] border">
                       {renderLayeredPreview(activePage)}
                     </div>
                   </div>
@@ -325,36 +326,36 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
               ) : null}
             </div>
 
-            <div className="overflow-y-auto border-t border-white/10 bg-white/[0.03] p-5 2xl:border-l 2xl:border-t-0">
+            <div className="kk-ppt-editor-panel overflow-y-auto border-t p-5 2xl:border-l 2xl:border-t-0">
               {activePage ? (
                 <>
                   <div className="mb-5">
-                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('文字图层', 'Text layers')}</div>
+                    <div className="kk-image-modal-label text-xs uppercase tracking-[0.16em]">{pick('文字图层', 'Text layers')}</div>
                     <div className="mt-3 space-y-4">
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">{pick('标题', 'Title')}</div>
+                        <div className="kk-ppt-muted mb-1 text-xs">{pick('标题', 'Title')}</div>
                         <textarea
                           value={titleLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'title', event.target.value))}
-                          className="min-h-[88px] w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-400/60"
+                          className="kk-image-modal-field min-h-[88px] w-full rounded-2xl px-3 py-2 text-sm outline-none transition-colors"
                         />
                       </label>
 
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">{pick('副标题', 'Subtitle')}</div>
+                        <div className="kk-ppt-muted mb-1 text-xs">{pick('副标题', 'Subtitle')}</div>
                         <textarea
                           value={subtitleLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'subtitle', event.target.value))}
-                          className="min-h-[88px] w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-400/60"
+                          className="kk-image-modal-field min-h-[88px] w-full rounded-2xl px-3 py-2 text-sm outline-none transition-colors"
                         />
                       </label>
 
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">{pick('正文', 'Body')}</div>
+                        <div className="kk-ppt-muted mb-1 text-xs">{pick('正文', 'Body')}</div>
                         <textarea
                           value={bodyLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'body', event.target.value))}
-                          className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-400/60"
+                          className="kk-image-modal-field min-h-[140px] w-full rounded-2xl px-3 py-2 text-sm outline-none transition-colors"
                           placeholder={pick('可选正文，支持段落或项目符号式内容。', 'Optional body copy or bullet-style text.')}
                         />
                       </label>
@@ -362,29 +363,29 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                   </div>
 
                   <div className="mb-4 flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('图层顺序', 'Layer order')}</div>
-                    <div className="text-[11px] text-white/45">{pick('越靠上的图层，在 PPTX 中越晚导出。', 'Top layers export later in PPTX.')}</div>
+                    <div className="kk-image-modal-label text-xs uppercase tracking-[0.16em]">{pick('图层顺序', 'Layer order')}</div>
+                    <div className="kk-ppt-muted text-[11px]">{pick('越靠上的图层，在 PPTX 中越晚导出。', 'Top layers export later in PPTX.')}</div>
                   </div>
 
                   <div className="space-y-2">
                     {sortPptLayers(activePage.layers).map((layer, index, sorted) => (
                       <div
                         key={layer.id}
-                        className="rounded-2xl border border-white/10 bg-slate-950/65 px-3 py-2"
+                        className="kk-ppt-layer-card rounded-2xl px-3 py-2"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="rounded-lg bg-white/10 p-1.5 text-white/70">
+                          <div className="kk-ppt-layer-icon rounded-lg p-1.5">
                             {layerIcon(layer)}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{layer.name}</div>
-                            <div className="text-[11px] text-white/45">
+                            <div className="kk-ppt-muted text-[11px]">
                               {layer.type} / {layer.role} / z {layer.zIndex}
                             </div>
                           </div>
                           <button
                             onClick={() => updateLayerVisibility(activeIndex, layer.id, !layer.visible)}
-                            className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14"
+                            className="kk-image-modal-icon-button rounded-full disabled:cursor-not-allowed disabled:opacity-30"
                             title={layer.visible ? pick('隐藏图层', 'Hide layer') : pick('显示图层', 'Show layer')}
                           >
                             {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -392,7 +393,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                           <button
                             onClick={() => moveLayer(activeIndex, layer.id, -1)}
                             disabled={index === 0}
-                            className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-30"
+                            className="kk-image-modal-icon-button rounded-full disabled:cursor-not-allowed disabled:opacity-30"
                             title={pick('下移一层', 'Move down')}
                           >
                             <ChevronDown size={14} />
@@ -400,7 +401,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                           <button
                             onClick={() => moveLayer(activeIndex, layer.id, 1)}
                             disabled={index === sorted.length - 1}
-                            className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-30"
+                            className="kk-image-modal-icon-button rounded-full disabled:cursor-not-allowed disabled:opacity-30"
                             title={pick('上移一层', 'Move up')}
                           >
                             <ChevronUp size={14} />

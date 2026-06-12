@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, QrCode, X } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import { parseWechatAuthorizationUrl } from '../../services/auth/wechatAuthUtils.ts';
 import { getDocumentLanguage, localizeUserFacingText, type ResolvedLanguage } from '../../utils/localeText';
@@ -266,28 +267,29 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[10030] flex items-center justify-center bg-black/65 px-4 py-6 backdrop-blur-sm"
+      className="kk-overlay-backdrop fixed inset-0 flex items-center justify-center px-4 py-6"
       onClick={onClose}
+      style={{ zIndex: KK_LAYER.modalBackdrop }}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#081629] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45)]"
+        className="kk-auth-modal-panel w-full max-w-md overflow-hidden rounded-[28px] border"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div className="kk-auth-modal-header flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-emerald-300">
+            <div className="kk-auth-modal-badge flex items-center gap-2">
               <QrCode size={18} />
               <span className="text-sm font-medium">{copy.badge}</span>
             </div>
-            <h3 className="mt-2 text-lg font-semibold text-white">{title}</h3>
-            <p className="mt-1 text-sm text-slate-300">{description}</p>
-            {expiryText && <p className="mt-2 text-xs text-slate-400">{copy.expiresAt(expiryText)}</p>}
+            <h3 className="kk-auth-modal-title mt-2 text-lg font-semibold">{title}</h3>
+            <p className="kk-auth-modal-description mt-1 text-sm">{description}</p>
+            {expiryText && <p className="kk-auth-modal-muted mt-2 text-xs">{copy.expiresAt(expiryText)}</p>}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-slate-300 transition hover:border-white/20 hover:text-white"
+            className="kk-auth-modal-close inline-flex items-center justify-center rounded-full"
             aria-label={copy.closeAria}
           >
             <X size={18} />
@@ -296,63 +298,63 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
         <div className="px-5 py-5">
           {loading && (
-            <div className="flex h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-slate-300">
+            <div className="kk-auth-modal-state kk-auth-modal-state--loading flex h-[360px] flex-col items-center justify-center rounded-2xl">
               <Loader2 size={24} className="animate-spin" />
               <p className="mt-3 text-sm">{copy.loading}</p>
             </div>
           )}
 
           {!loading && error && (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-200">
+            <div className="kk-auth-modal-state kk-auth-modal-state--danger rounded-2xl px-4 py-4 text-sm">
               {error}
             </div>
           )}
 
           {emptyState && (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
+            <div className="kk-auth-modal-state kk-auth-modal-state--warning rounded-2xl px-4 py-4 text-sm">
               {copy.emptyState}
             </div>
           )}
 
           {!loading && !error && authorizationUrl && (
             <>
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white">
+              <div className="kk-auth-modal-widget-shell overflow-hidden rounded-2xl border">
                 {showFallbackIframe ? (
                   <iframe
                     src={authorizationUrl}
                     title={title}
-                    className="h-[360px] w-full bg-white"
+                    className="kk-auth-modal-widget-frame h-[360px] w-full"
                     allow="local-network-access"
                     referrerPolicy="strict-origin-when-cross-origin"
                   />
                 ) : (
-                  <div className="relative min-h-[360px] bg-white">
+                  <div className="kk-auth-modal-widget-frame relative min-h-[360px]">
                     {widgetState === 'loading' && (
-                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 text-slate-500">
+                      <div className="kk-auth-modal-widget-loading absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
                         <Loader2 size={24} className="animate-spin" />
                         <p className="text-sm">{copy.loadingWidget}</p>
                       </div>
                     )}
                     <div
                       id={widgetMountId}
-                      className="flex min-h-[360px] w-full items-center justify-center bg-white"
+                      className="kk-auth-modal-widget-frame flex min-h-[360px] w-full items-center justify-center"
                     />
                   </div>
                 )}
               </div>
 
               {widgetHint && (
-                <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+                <div className="kk-auth-modal-state kk-auth-modal-state--warning mt-3 rounded-2xl px-4 py-3 text-xs">
                   {widgetHint}
                 </div>
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-slate-400">{copy.fallbackHelp}</p>
+                <p className="kk-auth-modal-muted text-xs">{copy.fallbackHelp}</p>
                 <button
                   type="button"
                   onClick={onOpenInNewPage}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/15"
+                  className="kk-auth-modal-external-action inline-flex items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium"
                 >
                   <ExternalLink size={16} />
                   {copy.openInNewPage}

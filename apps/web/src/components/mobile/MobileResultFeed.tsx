@@ -438,7 +438,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     const handleTouchEnd = () => {
       active = false;
       // 触手松开，以更具动量弹性质感的缓动曲线物理回弹复位
-      content.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
+      content.style.transition = 'transform var(--kk-motion-panel) var(--kk-motion-ease-standard)';
       content.style.transform = 'translateY(0px)';
     };
 
@@ -473,16 +473,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   }, [surface]);
 
   return (
-    <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
+    <section className="kk-result-surface relative flex h-full min-h-0 flex-col overflow-hidden">
       {/* 简体中文：极致高颜值的移动端顶部搜索和历史控制栏，带半透明磨砂质感 and 返回面包屑 */}
       {isHistoryView && (
         <div 
-          className="shrink-0 px-3.5 pb-2.5 flex flex-col gap-2.5 border-b"
+          className="kk-result-history-header shrink-0 px-3.5 pb-2.5 flex flex-col gap-2.5 border-b"
           style={{
-            background: 'linear-gradient(to bottom, rgba(20, 20, 22, 0.95) 0%, rgba(20, 20, 22, 0.85) 100%)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderColor: 'rgba(255, 255, 255, 0.08)',
             paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
           }}
         >
@@ -491,7 +487,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             <button
               type="button"
               onClick={onCloseHistory}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-all active:scale-[0.97] active:bg-[var(--mobile-clay-active-bg)]"
+              className="kk-result-control inline-flex items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-[var(--text-secondary)] active:scale-[0.97]"
             >
               <ArrowLeft size={13} className="text-[var(--text-tertiary)]" />
               <span>{pick('返回工作区', 'Back to Workspace')}</span>
@@ -500,12 +496,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               <button
                 type="button"
                 onClick={() => setIsMultiSelectMode(prev => !prev)}
-                className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-[0.97]"
-                style={{
-                  background: isMultiSelectMode ? 'var(--mobile-clay-active-bg)' : 'rgba(255, 255, 255, 0.05)',
-                  borderColor: isMultiSelectMode ? 'var(--mobile-clay-active-border)' : 'rgba(255, 255, 255, 0.08)',
-                  color: isMultiSelectMode ? '#fff' : 'var(--text-secondary)',
-                }}
+                className={`kk-result-control inline-flex items-center rounded-full px-3 text-xs font-semibold active:scale-[0.97] ${isMultiSelectMode ? 'border-[var(--mobile-clay-active-border)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
+                aria-pressed={isMultiSelectMode}
               >
                 {isMultiSelectMode ? pick('取消多选', 'Cancel') : pick('多选', 'Select')}
               </button>
@@ -514,10 +506,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
           {/* 极其精致的磨砂毛玻璃搜索框 */}
           <div 
-            className="relative flex items-center rounded-xl border border-[var(--mobile-clay-border)] transition-all duration-300 focus-within:border-[var(--mobile-clay-active-border)] focus-within:bg-[var(--mobile-clay-active-bg)] bg-[var(--mobile-clay-surface-bg)]/80 px-3.5 py-2.5"
-            style={{
-              borderColor: 'rgba(255, 255, 255, 0.08)',
-            }}
+            className="kk-result-control relative flex items-center rounded-xl px-3.5 py-0 focus-within:border-[var(--mobile-clay-active-border)] focus-within:bg-[var(--mobile-clay-active-bg)]"
           >
             <Search size={16} className="text-[var(--text-tertiary)] mr-2 shrink-0" />
             <input
@@ -534,7 +523,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="p-1 hover:bg-[var(--mobile-clay-active-bg)] rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                className="kk-result-icon-control -mr-2 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
               >
                 <X size={14} />
               </button>
@@ -624,7 +613,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
       {/* 底部悬浮操作与模式切换控制区，多选模式下切换为批量操作栏 */}
       <div 
-        className={`absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-4 select-none pointer-events-none transition-all duration-300 transform ${
+        className={`kk-result-bottom-bar absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pt-4 select-none pointer-events-none transition-[opacity,transform] transform ${
           isInputActive 
             ? 'opacity-0 pointer-events-none translate-y-6' 
             : 'opacity-100'
@@ -633,7 +622,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         <div 
           className="absolute inset-0 -z-10"
           style={{
-            background: 'linear-gradient(to top, rgba(10, 10, 12, 1) 0%, rgba(10, 10, 12, 0.98) 18%, rgba(10, 10, 12, 0.92) 36%, rgba(10, 10, 12, 0.76) 54%, rgba(10, 10, 12, 0.48) 70%, rgba(10, 10, 12, 0.24) 84%, rgba(10, 10, 12, 0.08) 93%, rgba(10, 10, 12, 0) 100%)'
+            background: 'var(--kk-result-bottom-scrim-bg)'
           }}
         />
 
@@ -667,7 +656,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   e.stopPropagation();
                   handleBatchCopyPrompts();
                 }}
-                className="flex touch-manipulation items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                className="kk-result-control flex touch-manipulation items-center gap-1 rounded-full px-3 text-xs font-semibold active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
                 title={pick('复制选中提示词', 'Copy selected prompts')}
               >
                 <Copy size={13} />
@@ -685,7 +674,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                     e.stopPropagation();
                     handleBatchDownload();
                   }}
-                  className="flex touch-manipulation items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  className="kk-result-control flex touch-manipulation items-center gap-1 rounded-full px-3 text-xs font-semibold active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
                   title={pick('下载选中图片', 'Download selected images')}
                 >
                   <Download size={13} />
@@ -704,7 +693,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                     e.stopPropagation();
                     handleBatchDelete();
                   }}
-                  className="flex touch-manipulation items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  className="kk-result-control kk-result-danger-control flex touch-manipulation items-center gap-1 rounded-full px-3 text-xs font-semibold active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
                   title={pick('删除选中图片', 'Delete selected images')}
                 >
                   <Trash2 size={13} />
@@ -733,11 +722,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             </div>
             {/* 简体中文：打包模式切换与回底按钮的一体化磨砂圆角容器，通过 pointer-events-auto 和事件冒泡拦截，彻底杜绝穿模点击 */}
             <div 
-              className="flex shrink-0 touch-manipulation items-center gap-1.5 pointer-events-auto rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/45 p-1 text-[11px] font-medium shadow-lg"
+              className="kk-result-panel flex shrink-0 touch-manipulation items-center gap-1.5 pointer-events-auto rounded-full border p-1 text-[11px] font-medium"
               style={{
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
+                boxShadow: 'var(--kk-result-panel-shadow)',
               }}
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
@@ -746,7 +733,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchEnd={stopMobileResultControlEvent}
             >
               {/* 模式切换胶囊 */}
-              <div className="flex rounded-full bg-black/10 dark:bg-white/5 p-0.5 text-[11px] font-medium text-[var(--text-primary)]">
+              <div className="flex rounded-full bg-[var(--kk-result-control-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)]">
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -756,7 +743,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                       e.preventDefault();
                       onViewModeChange(mode);
                     }}
-                    className={`rounded-full px-3 py-1 transition-all duration-150 ${
+                    className={`min-h-9 rounded-full px-3 py-1 transition-all ${
                       viewMode === mode 
                         ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-white font-bold shadow-sm' 
                         : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
@@ -776,7 +763,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 dark:bg-white/5 text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] transition-all duration-150"
+                className="kk-result-icon-control flex rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)]"
               >
                 <ArrowDown size={14} />
               </button>

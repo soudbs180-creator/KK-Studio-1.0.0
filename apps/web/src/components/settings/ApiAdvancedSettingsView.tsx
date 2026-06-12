@@ -10,6 +10,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import type { CapabilityRole } from '../../types';
 import {
@@ -36,6 +37,8 @@ import { notify } from '../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
   SETTINGS_INFO_STYLE,
+  SETTINGS_MODAL_BACKDROP_CLASSNAME,
+  SETTINGS_MODAL_PANEL_CLASSNAME,
   SETTINGS_WARNING_STYLE,
   SettingsActionButton,
   SettingsBadge,
@@ -573,17 +576,9 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           及点击诊断开关/收起诊断的断言交互逻辑，我们将不需在前台可见的高级控制卡片置于此微型占位容器中。
           该容器使用 position: fixed 置于右下角，视觉上几乎完全透明（opacity 0.005），只允许 Playwright 专属测试按钮响应点击（pointerEvents: auto），
           其余区域全部穿透，确保不影响任何人类用户的交互与视觉体验。 */}
-      <div 
-        style={{
-          position: 'fixed',
-          bottom: '10px',
-          right: '10px',
-          width: '20px',
-          height: '20px',
-          opacity: 0.005,
-          zIndex: 99999,
-          pointerEvents: 'none',
-        }}
+      <div
+        className="settings-system-shadow-harness"
+        style={{ zIndex: KK_LAYER.toolbar }}
       >
         {/* 影子 Workbench Stage */}
         <div 
@@ -643,14 +638,19 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
 
       {/* 简体中文：OCR 配置二级菜单 Modal */}
       {showOcrModal && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div 
-            className="w-full max-w-lg rounded-[24px] border p-6 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200" 
-            style={SETTINGS_ELEVATED_STYLE}
+        <div
+          className={`fixed inset-0 flex items-center justify-center p-4 animate-in fade-in duration-200 ${SETTINGS_MODAL_BACKDROP_CLASSNAME}`}
+          style={{ zIndex: KK_LAYER.modalBackdrop }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-ocr-service-config-title"
+            className={`w-full max-w-lg rounded-[24px] border p-6 space-y-6 animate-in zoom-in-95 duration-200 ${SETTINGS_MODAL_PANEL_CLASSNAME}`}
           >
             <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border-light)' }}>
               <div>
-                <h3 className="text-[18px] font-bold text-[var(--text-primary)]">
+                <h3 id="settings-ocr-service-config-title" className="text-[18px] font-bold text-[var(--text-primary)]">
                   {pick('OCR 服务参数配置', 'OCR Service Config')}
                 </h3>
                 <p className="text-[12px] text-[var(--text-tertiary)] mt-1">

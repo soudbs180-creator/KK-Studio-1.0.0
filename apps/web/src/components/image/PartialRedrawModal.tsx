@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImagePlus, RefreshCw, X } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import type {
   AspectRatio,
@@ -285,26 +286,29 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="relative flex h-[min(92vh,860px)] w-[min(94vw,1360px)] overflow-hidden rounded-3xl border border-white/10 bg-[var(--bg-secondary)] shadow-2xl">
+    <div
+      className="kk-image-modal-backdrop fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: KK_LAYER.fullscreen }}
+    >
+      <div className="kk-image-modal-panel relative flex h-[min(92vh,860px)] w-[min(94vw,1360px)] overflow-hidden rounded-3xl border">
         <button
           type="button"
           onClick={onCancel}
-          className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/45 p-2 text-white/80 transition-colors hover:text-white"
+          className="kk-image-modal-icon-button absolute right-4 top-4 z-20 rounded-full"
           title={UI_TEXT.close}
         >
           <X size={18} />
         </button>
 
-        <div className="flex min-w-0 flex-1 flex-col bg-black/35 p-5">
-          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-col p-5">
+          <div className="kk-image-modal-toolbar mb-4 flex items-center gap-3 rounded-2xl border px-4 py-3">
             <div className="min-w-[180px]">
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.2em] text-white/45">{UI_TEXT.model}</div>
+              <div className="kk-image-modal-label mb-1 text-[11px] font-medium uppercase tracking-[0.2em]">{UI_TEXT.model}</div>
               <select
                 value={selectedModel}
                 onChange={(event) => setSelectedModel(event.target.value)}
                 disabled={!hasSupportedModels}
-                className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"
+                className="kk-image-modal-field w-full rounded-xl px-3 py-2 text-sm outline-none"
               >
                 {availableModels.map((model) => (
                   <option key={model.id} value={model.id}>
@@ -315,12 +319,12 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
             </div>
 
             <div className="min-w-[120px]">
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.2em] text-white/45">{UI_TEXT.ratio}</div>
+              <div className="kk-image-modal-label mb-1 text-[11px] font-medium uppercase tracking-[0.2em]">{UI_TEXT.ratio}</div>
               <select
                 value={selectedRatio}
                 onChange={(event) => setSelectedRatio(event.target.value as AspectRatio)}
                 disabled={!hasSupportedModels}
-                className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white outline-none"
+                className="kk-image-modal-field w-full rounded-xl px-3 py-2 text-sm outline-none"
               >
                 {availableRatios.map((ratio) => (
                   <option key={ratio} value={ratio}>
@@ -336,7 +340,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
                 setSelectionRect(null);
                 dragStartRef.current = null;
               }}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 transition-colors hover:text-white"
+              className="kk-image-modal-control mt-5 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm"
             >
               <RefreshCw size={14} />
               {UI_TEXT.resetSelection}
@@ -345,13 +349,13 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
             <button
               type="button"
               onClick={() => setShowGenerationFrame((previousValue) => !previousValue)}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 transition-colors hover:text-white"
+              className="kk-image-modal-control mt-5 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm"
             >
               {showGenerationFrame ? UI_TEXT.hideGenerationRegion : UI_TEXT.showGenerationRegion}
             </button>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/10 bg-black/30">
+          <div className="kk-image-modal-stage relative min-h-0 flex-1 overflow-hidden rounded-3xl border">
             <div
               ref={stageRef}
               className="relative flex h-full w-full items-center justify-center p-5"
@@ -387,13 +391,13 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
               >
                 {showGenerationFrame && generationRect && (
                   <div
-                    className="absolute rounded-[20px] border border-dashed border-sky-300/90 bg-sky-400/10"
+                    className="kk-image-generation-frame absolute rounded-[20px]"
                     style={renderFrameStyle(generationRect)}
                   />
                 )}
                 {selectionRect && (
                   <div
-                    className="absolute rounded-[16px] border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]"
+                    className="kk-image-selection-frame absolute rounded-[16px]"
                     style={renderFrameStyle(selectionRect)}
                   />
                 )}
@@ -402,33 +406,33 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
           </div>
         </div>
 
-        <div className="flex w-[360px] shrink-0 flex-col gap-4 border-l border-white/10 bg-[var(--bg-tertiary)] p-6">
+        <div className="kk-image-modal-sidebar flex w-[360px] shrink-0 flex-col gap-4 border-l p-6">
           <div>
-            <div className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-white/45">{UI_TEXT.prompt}</div>
+            <div className="kk-image-modal-label mb-2 text-xs font-medium uppercase tracking-[0.2em]">{UI_TEXT.prompt}</div>
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               rows={6}
               disabled={!hasSupportedModels}
               placeholder={UI_TEXT.promptPlaceholder}
-              className="w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none placeholder:text-white/25"
+              className="kk-image-modal-field w-full resize-none rounded-2xl px-3 py-3 text-sm outline-none"
             />
           </div>
 
           {!hasSupportedModels && (
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <div className="kk-image-warning-panel rounded-2xl border p-4 text-sm">
               {UI_TEXT.noSupportedModels}
             </div>
           )}
 
           <div>
-            <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.2em] text-white/45">
+            <div className="kk-image-modal-label mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.2em]">
               <span>{UI_TEXT.references}</span>
               <span>{referenceImages.length}/{availableReferenceSlots}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {referenceImages.map((referenceImage) => (
-                <div key={referenceImage.id} className="relative h-16 w-16 overflow-hidden rounded-xl border border-white/10">
+                <div key={referenceImage.id} className="kk-image-reference-tile relative h-16 w-16 overflow-hidden rounded-xl border">
                   <img
                     src={referenceImage.url || referenceImage.data}
                     alt={UI_TEXT.referenceAlt}
@@ -439,7 +443,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
                     onClick={() => {
                       setReferenceImages((previousValue) => previousValue.filter((item) => item.id !== referenceImage.id));
                     }}
-                    className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white/80"
+                    className="kk-image-modal-icon-button absolute right-1 top-1 rounded-full"
                     title={UI_TEXT.removeReference}
                   >
                     <X size={12} />
@@ -451,7 +455,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/70 transition-colors hover:text-white"
+                  className="kk-image-reference-upload inline-flex h-16 w-16 items-center justify-center rounded-xl transition-colors"
                   title={UI_TEXT.uploadReference}
                 >
                   <ImagePlus size={18} />
@@ -471,7 +475,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
             />
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+          <div className="kk-image-info-panel rounded-2xl border p-4 text-sm">
             <div>{UI_TEXT.sourceSize}: {sourceDimensions.width} x {sourceDimensions.height}</div>
             <div className="mt-2">
               {UI_TEXT.selectionRegion}: {selectionRect
@@ -489,7 +493,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 rounded-2xl border border-white/10 px-4 py-3 text-sm text-white/75 transition-colors hover:text-white"
+              className="kk-image-modal-control flex-1 rounded-2xl px-4 py-3 text-sm"
             >
               {UI_TEXT.cancel}
             </button>
@@ -497,7 +501,7 @@ export const PartialRedrawModal: React.FC<PartialRedrawModalProps> = ({
               type="button"
               disabled={!canSubmit}
               onClick={handleSubmit}
-              className="flex-1 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-900/40 disabled:text-white/40"
+              className="kk-image-modal-primary flex-1 rounded-2xl px-4 py-3 text-sm font-medium"
             >
               {UI_TEXT.submit}
             </button>

@@ -14,6 +14,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import type { CapabilityRole, CapabilityRouteAssignment } from '../../../types';
 import {
   getCapabilityRouteAssignments,
@@ -25,10 +26,11 @@ import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
 import { knowledgeStore, type AgentSkillRecord } from '../../../features/ai-assistant-runtime/knowledge/KnowledgeStore';
 import {
-  SETTINGS_ELEVATED_STYLE,
   SETTINGS_PANEL_STYLE,
   SETTINGS_INPUT_CLASSNAME,
   SETTINGS_LABEL_CLASSNAME,
+  SETTINGS_MODAL_BACKDROP_CLASSNAME,
+  SETTINGS_MODAL_PANEL_CLASSNAME,
   SettingsActionButton,
   SettingsBadge,
   SettingsHero,
@@ -383,11 +385,19 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-[24px] border p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" style={SETTINGS_ELEVATED_STYLE}>
+    <div
+      className={`fixed inset-0 flex items-center justify-center p-4 animate-in fade-in duration-200 ${SETTINGS_MODAL_BACKDROP_CLASSNAME}`}
+      style={{ zIndex: KK_LAYER.modalBackdrop }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-ai-skill-modal-title"
+        className={`w-full max-w-lg rounded-[24px] border p-6 space-y-5 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${SETTINGS_MODAL_PANEL_CLASSNAME}`}
+      >
         <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-light)' }}>
           <div>
-            <h3 className="text-[18px] font-bold text-[var(--text-primary)]">
+            <h3 id="settings-ai-skill-modal-title" className="text-[18px] font-bold text-[var(--text-primary)]">
               {editingSkill ? pick('编辑 Skill 配置', 'Edit Skill') : pick('新建 Skill 配置', 'Create Skill')}
             </h3>
             <p className="text-[12px] text-[var(--text-tertiary)] mt-1">

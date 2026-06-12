@@ -132,8 +132,8 @@ test('CanvasGroupComponent exposes hide and compact expand controls for collapse
   assert.match(source, /const isCollapsed = Boolean\(group\.collapsed\);/);
   assert.match(source, /const isHidden = Boolean\(group\.hidden\);/);
   assert.match(source, /const groupBorderColor = group\.color \|\| '#ffffff';/);
-  assert.match(source, /const groupGlowShadow = \[/);
-  assert.match(source, /boxShadow: groupGlowShadow/);
+  assert.match(source, /boxShadow: \[[\s\S]*'var\(--frost-card-framework-shadow\)'[\s\S]*groupBorderColor/);
+  assert.match(source, /borderColor: highlighted[\s\S]*'var\(--frost-card-framework-border\)'/);
   assert.match(source, /const hiddenLabelFontSize = Math\.max/);
   assert.match(source, /title=\{hiddenDisplayLabel\}/);
   assert.match(source, /const handleToggleCollapsed = useCallback\(/);

@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { type PromptNode, type CanvasGroup} from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { generateTagColor } from '../../utils/colorUtils';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
@@ -183,24 +184,19 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     return (
         <div
             data-search-surface={isMobile ? 'mobile' : 'desktop'}
-            className={`fixed inset-0 z-[100] flex justify-center animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}
-            style={{ background: 'var(--search-palette-overlay-bg)' }}
+            className={`kk-search-palette-backdrop animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}
+            style={{ zIndex: KK_LAYER.modal }}
         >
             {/* Click outside to close */}
-            <div className="absolute inset-0" onClick={onClose} />
+            <div className="kk-search-palette-scrim absolute inset-0" onClick={onClose} />
 
             <div
                 data-search-panel={isMobile ? 'mobile-bottom-sheet' : 'desktop-command-surface'}
-                className={`relative w-full overflow-hidden border animate-slideDown flex flex-col ${isMobile ? 'clay-mobile-search-sheet mobile-sheet-viewport' : 'max-w-2xl max-h-[60vh]'}`}
+                className={`kk-search-palette-panel relative w-full overflow-hidden animate-slideDown flex flex-col ${isMobile ? 'clay-mobile-search-sheet mobile-sheet-viewport' : 'max-w-2xl max-h-[60vh]'}`}
                 style={{
-                    background: 'var(--frost-card-framework-bg)',
-                    borderColor: 'var(--frost-card-framework-border)',
-                    boxShadow: 'var(--frost-card-framework-shadow)',
                     borderRadius: isMobile ? 'var(--search-palette-mobile-radius)' : 'var(--search-palette-desktop-radius)',
                     borderBottom: isMobile ? 'none' : undefined,
-                    outlineColor: 'var(--clay-brand-pink)',
-                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
+                    outlineColor: 'var(--clay-brand-pink)'
                 }}
             >
                 {/* Search Header */}

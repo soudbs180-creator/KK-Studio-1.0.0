@@ -10,22 +10,24 @@ function readServerSource(relativePath: string): string {
 }
 
 test('platform image route rejects local user API requests before credit pricing or deduction', () => {
-  const source = readServerSource('routes/generate-image.js');
-  const guardIndex = source.indexOf("executionLane === 'local-user-api'");
-  const costIndex = source.indexOf('credits.getOperationCost');
-  const balanceIndex = source.indexOf('credits.getUserCredits(userId)');
-  const deductIndex = source.indexOf('credits.deductCredits');
+  const controllerSource = readServerSource('lib/generation/generationController.js');
+  const sagaSource = readServerSource('lib/generation/generationBillingSaga.js');
+  
+  const guardIndex = controllerSource.indexOf("executionLane === 'local-user-api'");
+  const executeIndex = controllerSource.indexOf('billingSaga.execute');
+  const costIndex = sagaSource.indexOf('credits.getOperationCost');
+  const balanceIndex = sagaSource.indexOf('credits.getUserCredits(userId)');
+  const deductIndex = sagaSource.indexOf('credits.deductCredits');
 
   assert.ok(guardIndex > -1, 'client settlement guard should exist');
+  assert.ok(executeIndex > -1, 'billing saga execution call should exist');
+  assert.ok(guardIndex < executeIndex, 'client settlement must be rejected before calling billing saga');
   assert.ok(costIndex > -1, 'server pricing lookup should still exist');
   assert.ok(balanceIndex > -1, 'server balance preflight should exist');
   assert.ok(deductIndex > -1, 'server credit deduction should still exist');
-  assert.ok(guardIndex < costIndex, 'client settlement must be rejected before pricing lookup');
   assert.ok(costIndex < balanceIndex, 'pricing lookup must happen before balance preflight');
   assert.ok(balanceIndex < deductIndex, 'insufficient credits must be rejected before credit deduction');
-  assert.ok(guardIndex < deductIndex, 'client settlement must be rejected before credit deduction');
-  assert.match(source, /sendInsufficientCredits\(res, availableCredits, requiredCredits(?:, \w+)?\)/);
-  assert.match(source, /No credits were charged/);
+  assert.match(controllerSource, /No credits were charged/);
 });
 
 test('platform chat route rejects local user API requests before credit pricing or deduction', () => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { type Canvas} from '../../types';
 import { X, FolderOutput, Check, Plus } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface MigrateModalProps {
@@ -36,12 +37,12 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
 
     return (
         <div
-            className={`fixed inset-0 z-[10001] flex justify-center bg-black/60 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
+            className={`kk-canvas-modal-backdrop fixed inset-0 flex justify-center animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
+            style={{ zIndex: KK_LAYER.modalBackdrop }}
             onClick={onClose}
         >
             <div
-                className={`shadow-2xl w-full overflow-hidden animate-scaleIn flex flex-col safe-inset-bottom ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[24px] rounded-b-none' : 'md:max-w-md md:rounded-xl max-h-[80vh]'}`}
-                style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-light)', borderWidth: '1px' }}
+                className={`kk-canvas-modal-panel w-full overflow-hidden animate-scaleIn flex flex-col safe-inset-bottom ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[24px] rounded-b-none' : 'md:max-w-md md:rounded-xl max-h-[80vh]'}`}
                 onClick={e => e.stopPropagation()}
             >
                 {/* 🚀 移动端拖动手柄 */}

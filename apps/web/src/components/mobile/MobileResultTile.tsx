@@ -112,7 +112,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   return (
     // 简体中文：当处于多选状态且选中时，突出呈现选中边框和投影效果
     <article
-      className="relative min-w-0 rounded-[20px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-300 p-2 flex flex-col gap-2 active:scale-[0.985]"
+      className="kk-result-tile relative min-w-0 border p-2 flex flex-col gap-2 active:scale-[0.985]"
       style={{
         borderColor: isSelected 
           ? 'var(--mobile-clay-active-border)' 
@@ -120,9 +120,9 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             ? 'var(--mobile-clay-active-border)' 
             : 'var(--mobile-clay-border)',
         boxShadow: isSelected 
-          ? '0 8px 24px rgba(251, 113, 133, 0.16)'
+          ? 'var(--kk-result-selected-shadow)'
           : (isActive || isSource) 
-            ? '0 8px 24px rgba(251, 113, 133, 0.12)' 
+            ? 'var(--kk-result-selected-shadow)' 
             : 'none',
         // 开启 GPU 硬件加速，防止在 iOS 等移动端浏览器下溢出圆角裁剪失效导致漏直角
         transform: 'translateZ(0)',
@@ -150,7 +150,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         {/* 核心展示区 */}
         <div
           // 简体中文：遵循经典设计准则，内层圆角根据外层 20px 圆角和 8px（p-2）padding 自动收缩，采用黄金法则 Ri = Ro - padding = 12px（rounded-[12px]），确保同心连续，避免内外冲突。
-          className="relative min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] rounded-[12px]"
+          className="kk-result-media relative min-h-0 w-full overflow-hidden"
           style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
         >
           {entry.isGenerating ? (
@@ -199,7 +199,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
                 alt={promptSummary}
                 onLoad={() => setIsImageLoaded(true)}
                 onError={() => setImgLoadError(true)}
-                className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${
+                className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] group-active:scale-[0.985] group-hover:scale-[1.01] ${
                   isImageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />
@@ -260,7 +260,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               <div
                 className={`flex items-center justify-center rounded-full border transition-all duration-200 ${
                   isSelected
-                    ? 'bg-[#fb7185] border-[#fb7185] text-white shadow-md scale-105'
+                    ? 'bg-[var(--accent-coral)] border-[var(--accent-coral)] text-white shadow-md scale-105'
                     : 'border-white/50 bg-black/45 text-transparent active:scale-95'
                 }`}
                 style={{

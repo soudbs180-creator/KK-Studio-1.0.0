@@ -225,14 +225,9 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   return (
     <div
-      className="canvas-nav-panel flex flex-col gap-2 rounded-2xl border p-2 select-none transition-all duration-300"
+      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-2 rounded-2xl border p-2 select-none"
       style={{
         width: '218px',
-        background: 'var(--frost-card-framework-bg)',
-        border: '1px solid var(--frost-card-framework-border)',
-        boxShadow: 'var(--frost-card-framework-shadow)',
-        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
-        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
       }}
     >
       {/* 简体中文：小地图 SVG 画面层 — 仅在未折叠状态下才向下展开渲染，不占头部空间 */}
@@ -243,16 +238,12 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             width={miniWidth}
             height={miniHeight}
             onMouseDown={handleMouseDown}
-            className="cursor-crosshair overflow-hidden"
-            style={{
-              background: 'rgba(0, 0, 0, 0.12)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-            }}
+            className="kk-workspace-canvas-minimap cursor-crosshair overflow-hidden"
           >
             {/* 背景网格装饰，提供空间感 */}
             <defs>
               <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.02)" strokeWidth="1" />
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--kk-workspace-minimap-grid-stroke)" strokeWidth="1" />
               </pattern>
             </defs>
             <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
@@ -275,8 +266,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
                   width={Math.max(2, rw)}
                   height={Math.max(2, rh)}
                   rx={Math.max(1, scaleMini * 24)} // 等比例圆角
-                  fill={isImage ? 'rgba(129, 140, 248, 0.35)' : 'rgba(244, 63, 94, 0.35)'}
-                  stroke={isImage ? 'rgba(129, 140, 248, 0.5)' : 'rgba(244, 63, 94, 0.5)'}
+                  fill={isImage ? 'var(--kk-workspace-minimap-image-bg)' : 'var(--kk-workspace-minimap-node-bg)'}
+                  stroke={isImage ? 'var(--kk-workspace-minimap-image-stroke)' : 'var(--kk-workspace-minimap-node-stroke)'}
                   strokeWidth="0.5"
                 />
               );
@@ -289,7 +280,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               width={Math.max(6, miniViewportW)}
               height={Math.max(6, miniViewportH)}
               rx="2"
-              fill="rgba(255, 82, 64, 0.08)"
+              fill="var(--kk-workspace-minimap-viewport-bg)"
               stroke="var(--accent-coral)"
               strokeWidth="1.2"
               style={{
@@ -306,7 +297,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 折叠切换按钮 */}
         <button
           onClick={toggleCollapsed}
-          className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] active:scale-90 transition-all outline-none cursor-pointer"
+          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
           title={isCollapsed ? "展开小地图" : "收起小地图"}
         >
           {isCollapsed ? (
@@ -319,7 +310,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 缩小按钮 */}
         <button
           onClick={handleZoomOut}
-          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] active:scale-90 transition-all outline-none cursor-pointer"
+          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
           title="缩小"
         >
           <Minus size={13} />
@@ -344,7 +335,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 放大按钮 */}
         <button
           onClick={handleZoomIn}
-          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] active:scale-90 transition-all outline-none cursor-pointer"
+          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
           title="放大"
         >
           <Plus size={13} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -125,11 +126,11 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
 
   return (
     <div
-      className={`storage-selection-modal fixed inset-0 z-[3000] flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
-      style={{ background: 'var(--storage-selection-overlay-bg)', backdropFilter: 'blur(14px)' }}
+      className={`kk-canvas-modal-backdrop fixed inset-0 flex justify-center storage-selection-modal ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
+      style={{ zIndex: KK_LAYER.modalBackdrop }}
     >
       <div
-        className={`w-full border ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none' : 'max-w-[640px] rounded-3xl p-6'}`}
+        className={`kk-canvas-modal-panel w-full ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none' : 'max-w-[640px] rounded-3xl p-6'}`}
         style={{
           background: 'var(--storage-selection-card-bg)',
           borderColor: 'var(--storage-selection-border)',

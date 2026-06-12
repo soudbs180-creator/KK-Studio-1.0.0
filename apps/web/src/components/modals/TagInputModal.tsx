@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tag, X, Plus, Check } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { generateTagColor } from '../../utils/colorUtils';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
@@ -119,19 +120,12 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
 
     return (
         <div
-            className={`fixed inset-0 z-[10001] flex justify-center backdrop-blur-sm ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            className={`kk-canvas-modal-backdrop fixed inset-0 flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
+            style={{ zIndex: KK_LAYER.modalBackdrop }}
             onClick={onClose}
         >
             <div
-                className={`tag-input-modal w-full overflow-hidden animate-modal-in flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-md rounded-xl max-h-[85vh]'}`}
-                style={{
-                    background: 'var(--frost-card-framework-bg)',
-                    border: '1px solid var(--frost-card-framework-border)',
-                    boxShadow: 'var(--frost-card-framework-shadow)',
-                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
-                }}
+                className={`kk-canvas-modal-panel tag-input-modal w-full overflow-hidden animate-modal-in flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-md rounded-xl max-h-[85vh]'}`}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}

@@ -16,6 +16,8 @@ export type OpenAICompatibleImageDispatchKind =
     | 'gemini-chat-strict-fail-closed'
     | 'provider-chat'
     | 'comfly-openai-strict'
+    | 'wuyin_async_task'
+    | 'acedata-image'
     | 'default-openai-strict-fail-closed';
 
 export interface OpenAICompatibleImageDispatchPlan {
@@ -42,6 +44,14 @@ function endpointHintsInclude(endpointTypes: string[] | undefined, patterns: Reg
 export function resolveOpenAICompatibleImageDispatch(
     input: OpenAICompatibleImageDispatchInput,
 ): OpenAICompatibleImageDispatchPlan {
+    if (input.runtime.strategyId === 'wuyinkeji') {
+        return { kind: 'wuyin_async_task' };
+    }
+
+    if (input.runtime.strategyId === 'acedata') {
+        return { kind: 'acedata-image' };
+    }
+
     if (input.imageSurface === 'async-image') {
         return { kind: 'async-image' };
     }
@@ -53,7 +63,7 @@ export function resolveOpenAICompatibleImageDispatch(
         return { kind: 'chat' };
     }
 
-    if (input.imageSurface === 'gemini-native-image') {
+    if (input.imageSurface === 'gemini-native-image' && input.runtime.strategyId !== '12ai') {
         return { kind: 'gemini-native' };
     }
 

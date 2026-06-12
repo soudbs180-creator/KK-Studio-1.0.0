@@ -81,6 +81,7 @@ test('Clay CSS exposes shared frosted tokens and neutral black-gray dark surface
 
 test('Core UI surfaces consume the shared frosted material tokens', () => {
   const cssSource = readSource('apps/web/src/index.css');
+  const tokenSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
   const searchPaletteSource = readSource('apps/web/src/components/layout/SearchPalette.tsx');
   const sidebarSource = readSource('apps/web/src/components/layout/Sidebar.tsx');
   const composerSource = readSource('apps/web/src/app/AppPromptComposer.tsx');
@@ -101,9 +102,11 @@ test('Core UI surfaces consume the shared frosted material tokens', () => {
   assert.match(cssSource, /--settings-nav-glass-bg:\s*var\(--frost-card-framework-bg\);/);
   assert.doesNotMatch(cssSource, /--settings-nav-glass-bg:\s*var\(--clay-brand-teal\);/);
 
-  assert.match(searchPaletteSource, /var\(--frost-card-framework-bg\)/);
-  assert.match(searchPaletteSource, /var\(--frost-card-framework-border\)/);
-  assert.match(searchPaletteSource, /var\(--frost-card-framework-shadow\)/);
+  assert.match(searchPaletteSource, /className=\{`kk-search-palette-panel/);
+  assert.match(tokenSource, /--kk-search-palette-panel-bg:\s*var\(--frost-card-framework-bg\);/);
+  assert.match(tokenSource, /--kk-search-palette-panel-border:\s*var\(--frost-card-framework-border\);/);
+  assert.match(tokenSource, /--kk-search-palette-panel-shadow:\s*var\(--frost-card-framework-shadow\);/);
+  assert.match(tokenSource, /\.kk-search-palette-panel\s*\{[\s\S]*background:\s*var\(--kk-search-palette-panel-bg\);/);
   assert.match(searchPaletteSource, /var\(--frost-input-bg\)/);
   assert.match(searchPaletteSource, /var\(--frost-card-sub-bg\)/);
   assert.match(searchPaletteSource, /var\(--frost-card-sub-border\)/);
@@ -207,6 +210,7 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   const userProfileSource = readSource('apps/web/src/components/modals/UserProfileModal.tsx');
   const rechargeModalSource = readSource('apps/web/src/components/modals/RechargeModal.tsx');
   const cssSource = readSource('apps/web/src/index.css');
+  const tokenSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   for (const source of [
     desktopChromeSource,
@@ -254,7 +258,9 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
 
   const tagInputSource = readSource('apps/web/src/components/modals/TagInputModal.tsx');
   assert.match(tagInputSource, /tag-input-modal/);
-  assert.match(tagInputSource, /var\(--frost-card-framework-bg\)/);
+  assert.match(tagInputSource, /className=\{`kk-canvas-modal-panel tag-input-modal/);
+  assert.match(tokenSource, /--kk-canvas-modal-panel-bg:\s*var\(--frost-card-framework-bg\);/);
+  assert.match(tokenSource, /\.kk-canvas-modal-panel\s*\{[\s\S]*background:\s*var\(--kk-canvas-modal-panel-bg\);/);
   assert.match(tagInputSource, /var\(--frost-card-sub-bg\)/);
   assert.match(tagInputSource, /var\(--frost-input-bg\)/);
   assert.doesNotMatch(tagInputSource, /var\(--accent-blue\)|var\(--glow-blue\)|rgba\(37, 99, 235|shadow-2xl|boxShadow: 'var\(--shadow-xl\)'|backgroundColor: 'var\(--bg-input\)'|backgroundColor: 'var\(--bg-secondary\)'/);

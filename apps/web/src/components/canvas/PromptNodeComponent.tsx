@@ -2350,14 +2350,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <React.Fragment key={i}>
                                             {/* 能量流动线 */}
                                             <svg
-                                                className="pointer-events-none"
-                                                style={{
-                                                    position: 'absolute',
-                                                    left: '50%',
-                                                    top: 0,
-                                                    overflow: 'visible',
-                                                    zIndex: 1
-                                                }}
+                                                className="kk-canvas-prompt-node-energy-trail pointer-events-none"
                                             >
                                                 <defs>
                                                     {/* 发光滤镜 - Scoped ID */}
@@ -2371,16 +2364,16 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                                     {/* 能量流动渐变 - Scoped ID */}
                                                     <linearGradient id={`energy-gradient-${node.id}-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                        <stop offset="0%" stopColor="#ff4d8b" stopOpacity="0">
+                                                        <stop offset="0%" stopColor="var(--kk-canvas-prompt-node-energy-stop-start)" stopOpacity="0">
                                                             <animate attributeName="offset" values="0;0.3;0" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="30%" stopColor="#ff6b5a" stopOpacity="1">
+                                                        <stop offset="30%" stopColor="var(--kk-canvas-prompt-node-energy-stop-mid)" stopOpacity="1">
                                                             <animate attributeName="offset" values="0.3;0.7;0.3" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="60%" stopColor="#ffb084" stopOpacity="0.8">
+                                                        <stop offset="60%" stopColor="var(--kk-canvas-prompt-node-energy-stop-warm)" stopOpacity="0.8">
                                                             <animate attributeName="offset" values="0.6;1;0.6" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="100%" stopColor="#b8a4ed" stopOpacity="0" />
+                                                        <stop offset="100%" stopColor="var(--kk-canvas-prompt-node-energy-stop-end)" stopOpacity="0" />
                                                     </linearGradient>
                                                 </defs>
 
@@ -2388,7 +2381,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 <path
                                                     d={`M0,0 C0,${offsetY * 0.5} ${offsetX},${offsetY * 0.5} ${offsetX},${offsetY}`}
                                                     fill="none"
-                                                    stroke="#ff6b5a"
+                                                    stroke="var(--kk-canvas-prompt-node-energy-trail-stroke)"
                                                     strokeWidth="8"
                                                     opacity="0.1"
                                                     filter={`url(#energy-trail-${node.id}-${i})`}
@@ -2398,7 +2391,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 <path
                                                     d={`M0,0 C0,${offsetY * 0.5} ${offsetX},${offsetY * 0.5} ${offsetX},${offsetY}`}
                                                     fill="none"
-                                                    stroke="#ff4d8b"
+                                                    stroke="var(--kk-canvas-prompt-node-energy-base-stroke)"
                                                     strokeWidth="2"
                                                     opacity="0.3"
                                                 >
@@ -2416,7 +2409,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 />
 
                                                 {/* 能量粒子1 - 快速 */}
-                                                <circle r="4" fill="#ff4d8b" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
+                                                <circle r="4" fill="var(--kk-canvas-prompt-node-energy-stop-start)" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="1.5s"
                                                         repeatCount="indefinite"
@@ -2427,7 +2420,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 </circle>
 
                                                 {/* 能量粒子2 - 中速 */}
-                                                <circle r="3" fill="#ff6b5a" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
+                                                <circle r="3" fill="var(--kk-canvas-prompt-node-energy-stop-mid)" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="1.8s"
                                                         repeatCount="indefinite"
@@ -2438,7 +2431,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 </circle>
 
                                                 {/* 能量粒子3 - 慢速 */}
-                                                <circle r="2.5" fill="#b8a4ed" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
+                                                <circle r="2.5" fill="var(--kk-canvas-prompt-node-energy-stop-end)" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="2s"
                                                         repeatCount="indefinite"
@@ -2467,23 +2460,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             >
                                                 {/* 生成中扫光层（严格限定在图片区域，不覆盖底栏 bottom-8） */}
                                                 <div
-                                                    className="absolute left-0 right-0 top-0 bottom-8 pointer-events-none z-[6] overflow-hidden"
-                                                    style={{ borderTopLeftRadius: 'inherit', borderTopRightRadius: 'inherit' }}
+                                                    className="kk-canvas-prompt-node-generating-image-overlay"
                                                 >
-                                                    <div
-                                                        className="absolute inset-0 opacity-80"
-                                                        style={{
-                                                            background: 'linear-gradient(135deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.01) 100%)'
-                                                        }}
-                                                    />
-                                                    <div
-                                                        className="absolute top-[-20%] bottom-[-20%] w-[150%] animate-prompt-shimmer-sweep"
-                                                        style={{
-                                                            background: 'linear-gradient(105deg, transparent 15%, rgba(255,255,255,0.1) 35%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.1) 65%, transparent 85%)',
-                                                            filter: 'blur(4px)',
-                                                            transformOrigin: 'center'
-                                                        }}
-                                                    />
+                                                    <div className="kk-canvas-prompt-node-generating-sheen" />
+                                                    <div className="kk-canvas-prompt-node-generating-sweep" />
                                                 </div>
 
                                                 <div className="absolute inset-0 bottom-8 flex flex-col items-center justify-center z-10">
@@ -2563,16 +2543,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             </div>
 
             {/* [NEW] 局部专属占位扫光动画 */}
-            <style>{`
-                @keyframes prompt-shimmer-sweep {
-                    0% { transform: translateX(-150%) skewX(-15deg); }
-                    100% { transform: translateX(200%) skewX(-15deg); }
-                }
-                .animate-prompt-shimmer-sweep {
-                    animation: prompt-shimmer-sweep 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-                }
-            `}</style>
-
             {/* [NEW] 参考图放大浮层 */}
             {previewImage && (
                 <ImagePreview

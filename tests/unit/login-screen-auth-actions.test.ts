@@ -55,6 +55,14 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
 test('LoginScreen styles keep temporary and admin entry points compact and grouped', () => {
   const source = readSource(LOGIN_SCREEN_CSS_PATH);
 
+  assert.match(source, /--auth-system-bg:\s*var\(--app-startup-bg\);/);
+  assert.match(source, /--auth-system-panel-bg:\s*var\(--app-startup-panel-bg\);/);
+  assert.match(source, /--auth-system-title:\s*var\(--app-startup-title\);/);
+  assert.match(source, /--auth-system-motion:\s*calc\(var\(--kk-motion-standard\)\s*\*\s*var\(--kk-ui-motion-scale\)\);/);
+  assert.match(source, /@media \(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(source, /body\.auth-screen-active\.auth-screen-active--dark[\s\S]*background:\s*var\(--auth-system-bg\) !important;/);
+  assert.doesNotMatch(source, /background:\s*#07111f !important;/);
+  assert.doesNotMatch(source, /background:\s*#eef4ff !important;/);
   assert.match(source, /\.auth-aux-actions \{/);
   assert.match(source, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
   assert.match(source, /\.auth-btn-compact \{/);

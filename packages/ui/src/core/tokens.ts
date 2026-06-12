@@ -1,4 +1,55 @@
-// 中文注释：平台无关的设计令牌，用于在不同端统一主题色与配色逻辑
+// 中文注释：平台无关的设计令牌，用于在不同端统一主题色、布局、动态与配色逻辑
+export const UI_SYSTEM_TOKENS = {
+  breakpoints: {
+    phoneSmall: 375,
+    phoneStandard: 430,
+    tablet: 768,
+    desktop: 1024,
+    desktopWide: 1280,
+    desktopLarge: 1440,
+  },
+  spacing: {
+    1: "var(--kk-space-1)",
+    2: "var(--kk-space-2)",
+    3: "var(--kk-space-3)",
+    4: "var(--kk-space-4)",
+    5: "var(--kk-space-5)",
+    6: "var(--kk-space-6)",
+    8: "var(--kk-space-8)",
+    10: "var(--kk-space-10)",
+    12: "var(--kk-space-12)",
+  },
+  layout: {
+    mobilePageMargin: "16px",
+    tabletPageMargin: "24px",
+    desktopPageMargin: "32px",
+    contentMaxWidth: "1200px",
+    contentWideMaxWidth: "1440px",
+    touchTargetMin: "44px",
+    desktopControlHeight: "40px",
+    mobileControlHeight: "48px",
+  },
+  typography: {
+    bodyMobile: "16px",
+    bodyDesktop: "14px",
+    caption: "12px",
+    lineHeightBody: "1.5",
+    lineHeightTight: "1.2",
+  },
+  motion: {
+    durationFast: "var(--kk-motion-fast)",
+    durationStandard: "var(--kk-motion-standard)",
+    durationPanel: "var(--kk-motion-panel)",
+    easeStandard: "var(--kk-motion-ease-standard)",
+  },
+  glass: {
+    surface: "var(--kk-glass-surface-bg)",
+    border: "var(--kk-glass-surface-border)",
+    blur: "var(--kk-ui-glass-blur)",
+    opacity: "var(--kk-ui-glass-opacity)",
+  },
+} as const;
+
 export const TOKENS = {
   colors: {
     background: "var(--kk-color-bg-canvas)",
@@ -24,7 +75,8 @@ export const TOKENS = {
   },
   typography: {
     fontFamily: "Inter, sans-serif",
-  }
+  },
+  uiSystem: UI_SYSTEM_TOKENS,
 };
 
 export type ThemeTokens = typeof TOKENS;

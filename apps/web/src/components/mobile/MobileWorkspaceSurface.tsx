@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -214,8 +215,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
       {showMoreSheet ? (
         <div
           data-testid="mobile-more-sheet"
-          className="fixed inset-0 z-[985] flex flex-col justify-end"
-          style={{ background: 'var(--mobile-clay-overlay-bg)' }}
+          data-kk-mobile-overlay-layer="true"
+          className="fixed inset-0 flex flex-col justify-end"
+          style={{ background: 'var(--mobile-clay-overlay-bg)', zIndex: KK_LAYER.modal }}
         >
           <button
             type="button"

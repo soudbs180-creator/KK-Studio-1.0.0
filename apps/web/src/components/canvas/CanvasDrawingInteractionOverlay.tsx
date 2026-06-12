@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { type CanvasDrawing } from '../../types/index.ts';
 import { type InfiniteCanvasHandle } from './InfiniteCanvas';
 import { notify } from '../../services/system/notificationService';
@@ -583,13 +584,13 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
 
     return (
         <div
-            className="absolute z-[25] cursor-crosshair pointer-events-auto"
+            className="kk-canvas-drawing-overlay absolute"
             style={{
                 width: '200000px',
                 height: '200000px',
                 left: '-100000px',
                 top: '-100000px',
-                background: 'transparent',
+                zIndex: KK_LAYER.nodeSelected,
             }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -637,10 +638,10 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
                 {/* 框选蓝框预览 */}
                 <rect
                     ref={previewSelectRef}
-                    stroke="#6366f1"
+                    stroke="var(--kk-canvas-drawing-selection-stroke)"
                     strokeWidth={1.5}
                     strokeDasharray="4 4"
-                    fill="rgba(99, 102, 241, 0.12)"
+                    fill="var(--kk-canvas-drawing-selection-fill)"
                     rx={2}
                     ry={2}
                     style={{ display: 'none' }}
@@ -649,11 +650,12 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
 
             {textInputPos && (
                 <div
-                    className="absolute z-[100]"
+                    className="kk-canvas-drawing-text-input-anchor"
                     style={{
                         left: textInputPos.x + 100000,
                         top: textInputPos.y + 100000,
                         transformOrigin: 'top left',
+                        zIndex: KK_LAYER.floating,
                     }}
                 >
                     <input
@@ -668,17 +670,10 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
                                 submitText();
                             }
                         }}
+                        className="kk-canvas-drawing-text-input"
                         style={{
-                            background: 'var(--frost-card-main-bg, rgba(255, 255, 255, 0.85))',
-                            border: '1px solid var(--accent-coral, #ef4444)',
-                            borderRadius: '4px',
                             color: activeColor,
                             fontSize: `${activeWidth * 5 + 12}px`,
-                            fontWeight: '500',
-                            fontFamily: 'Inter, system-ui, sans-serif',
-                            padding: '4px 8px',
-                            outline: 'none',
-                            boxShadow: '0 0 10px rgba(0,0,0,0.15)',
                         }}
                         placeholder="打字，回车确认"
                     />

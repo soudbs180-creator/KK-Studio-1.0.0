@@ -1,11 +1,28 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { LayoutDashboard, LogOut, Sparkles, User, Zap, Shield } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { navigateAppRoot } from './navigation/appRootNavigation';
+
+const chromeSurfaceStyle: React.CSSProperties = {
+  background: 'var(--kk-workspace-chrome-bg, var(--frost-card-framework-bg))',
+  borderColor: 'var(--kk-workspace-chrome-border, var(--frost-card-main-border))',
+  boxShadow: 'var(--kk-workspace-chrome-shadow, var(--frost-card-main-shadow))',
+  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.22)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.22)',
+};
+
+const desktopUserMenuSurfaceStyle: React.CSSProperties = {
+  ...chromeSurfaceStyle,
+  background: 'color-mix(in srgb, var(--frost-card-framework-bg-solid, var(--frost-card-framework-bg)) 86%, transparent 14%)',
+  borderColor: 'var(--kk-workspace-chrome-border, var(--frost-card-framework-border))',
+  boxShadow: 'var(--kk-workspace-chrome-shadow, var(--frost-card-framework-shadow))',
+  zIndex: KK_LAYER.modal,
+};
 
 interface AppDesktopChromeProps {
   isMobile: boolean;
@@ -46,16 +63,7 @@ const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
     id={id}
     onClick={onClick}
     data-testid={testId}
-    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
-    style={{ color: 'var(--text-secondary)' }}
-    onMouseEnter={(event) => {
-      event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
-      event.currentTarget.style.color = 'var(--text-primary)';
-    }}
-    onMouseLeave={(event) => {
-      event.currentTarget.style.backgroundColor = 'transparent';
-      event.currentTarget.style.color = 'var(--text-secondary)';
-    }}
+    className="kk-workspace-control kk-workspace-menu-action flex w-full items-center gap-3 rounded-lg px-3 text-left text-sm"
   >
     <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: accentColor }}>
       {icon}
@@ -88,14 +96,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
   return (
     <div
-      className="w-full flex items-center gap-3 rounded-2xl border p-2.5 transition-all duration-300 select-none relative"
-      style={{
-        background: 'var(--frost-card-framework-bg)',
-        borderColor: 'var(--frost-card-framework-border)',
-        boxShadow: 'var(--frost-card-framework-shadow)',
-        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-      }}
+      className="kk-workspace-chrome-surface w-full flex items-center gap-3 rounded-2xl border p-2.5 select-none relative"
+      style={chromeSurfaceStyle}
     >
       {/* 简体中文：头像按钮区域 (高度与右侧资产齐平) */}
       <div className="relative flex-shrink-0">
@@ -105,12 +107,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             event.stopPropagation();
             setShowUserMenu((prev) => !prev);
           }}
-          className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
-          style={{
-            background: 'var(--frost-card-sub-bg)',
-            borderColor: 'var(--frost-card-sub-border)',
-            boxShadow: 'var(--frost-card-sub-shadow)',
-          }}
+          className="kk-workspace-avatar-button relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
         >
           {avatarUrl ? (
             <img src={avatarUrl} className="h-full w-full object-cover" />
@@ -123,8 +120,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
         {/* 简体中文：服务/API 状态指示灯 */}
         <div
-          className={`absolute -right-0.5 -top-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 shadow-lg ${apiStatus === 'success' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-zinc-500'}`}
-          style={{ borderColor: 'var(--bg-canvas)' }}
+          className="kk-workspace-status-dot absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 shadow-lg"
+          data-status={apiStatus}
         />
       </div>
 
@@ -143,13 +140,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           <button
             id="btn-desktop-recharge"
             onClick={onRecharge}
-            className="inline-flex items-center justify-center rounded-xl px-4 py-1.5 text-xs font-black leading-none text-white transition-all active:scale-95 hover:brightness-110"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-coral) 0%, #ff5240 100%)',
-              boxShadow: '0 4px 12px rgba(255, 107, 90, 0.35)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              height: '32px',
-            }}
+            className="kk-workspace-primary-action inline-flex items-center justify-center rounded-xl px-4 text-xs font-black leading-none active:scale-95"
           >
             充值
           </button>
@@ -160,19 +151,12 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
       {showUserMenu ? (
         createPortal(
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+            <div className="fixed inset-0" style={{ zIndex: KK_LAYER.modalBackdrop }} onClick={() => setShowUserMenu(false)} />
             <div
               id="desktop-user-menu-panel"
               onClick={(e) => e.stopPropagation()}
-              className="fixed left-4 top-[88px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
-              style={{
-                // 简体中文：使用 80% 的实色基底色与透明混合，配合强模糊，实现顶级高级磨砂玻璃（Mica/Glassmorphism）效果，彻底解决后方文字和图片透出的干扰问题
-                background: 'color-mix(in srgb, var(--frost-card-framework-bg-solid) 80%, transparent 20%)',
-                borderColor: 'var(--frost-card-framework-border)',
-                boxShadow: 'var(--frost-card-framework-shadow), 0 10px 30px rgba(0, 0, 0, 0.25)',
-                backdropFilter: 'blur(24px) saturate(190%)',
-                WebkitBackdropFilter: 'blur(24px) saturate(190%)',
-              }}
+              className="kk-workspace-menu-surface fixed left-4 top-[88px] w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
+              style={desktopUserMenuSurfaceStyle}
             >
               <div className="space-y-1">
                 <DesktopMenuActionButton
@@ -215,9 +199,9 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                     void onSignOut();
                     setShowUserMenu(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10 outline-none"
+                  className="kk-workspace-danger-action flex w-full items-center gap-3 rounded-lg px-3 text-left text-sm outline-none"
                 >
-                  <div className="rounded-lg bg-red-500/10 p-1.5">
+                  <div className="kk-workspace-danger-icon rounded-lg p-1.5">
                     <LogOut size={14} />
                   </div>
                   退出登录

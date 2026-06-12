@@ -3,6 +3,19 @@ import type {
     ResolvedProviderRuntime,
 } from './providerStrategy.ts';
 import type { ResolvedChatSurface, ResolvedImageSurface } from './providerSurfaceTypes.ts';
+import type { GenerationProviderId, GenerationSurface } from '@kk/shared';
+
+export interface ProviderRoutingDecision {
+    requestId: string;
+    providerId: GenerationProviderId;
+    strategyId: string;
+    modelId: string;
+    surface: GenerationSurface;
+    dispatchKind: string;
+    reason: string;
+    endpointTypes?: string[];
+    confidence: 'explicit' | 'inferred' | 'fallback';
+}
 
 export type ProviderRouteFamily =
     | 'official-native'
@@ -184,6 +197,15 @@ export function resolveProviderImageRoute(input: ProviderImageRouteInput): Provi
             input,
             'gemini-native-image',
             'endpoint-hints-only-expose-gemini-native-image',
+            endpointHints,
+        );
+    }
+
+    if (((input.runtime.resolvedFormat === 'gemini' && isGeminiImage) || forceGeminiNativeOn12AI) && !input.preferAsync) {
+        return buildImageDecision(
+            input,
+            'gemini-native-image',
+            'native-gemini-image-protocol',
             endpointHints,
         );
     }

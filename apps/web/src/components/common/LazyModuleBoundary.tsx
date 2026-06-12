@@ -1,4 +1,13 @@
 import React, { Component, type ReactNode } from 'react';
+import { KK_LAYER } from '@kk/ui';
+
+const lazyBoundaryPanelStyle: React.CSSProperties = {
+  background: 'var(--kk-lazy-boundary-panel-bg, var(--frost-card-framework-bg))',
+  borderColor: 'var(--frost-card-main-border)',
+  boxShadow: 'var(--frost-card-main-shadow)',
+  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+};
 
 type LazyModuleBoundaryProps = {
   children: ReactNode;
@@ -45,23 +54,18 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
 
     const isOverlay = this.props.variant !== 'inline';
     const wrapperClassName = isOverlay
-      ? 'absolute inset-0 z-[130] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm'
+      ? 'kk-lazy-boundary-overlay absolute inset-0 flex items-center justify-center p-4'
       : 'flex min-h-[280px] items-center justify-center';
     const panelClassName = isOverlay
-      ? 'w-full max-w-xl rounded-3xl border p-6'
-      : 'w-full rounded-3xl border p-5';
+      ? 'kk-lazy-boundary-panel w-full max-w-xl rounded-3xl border p-6'
+      : 'kk-lazy-boundary-panel w-full rounded-3xl border p-5';
 
     return (
-      <div className={wrapperClassName}>
+      <div className={wrapperClassName} style={isOverlay ? { zIndex: KK_LAYER.toolbar } : undefined}>
         <div
           className={panelClassName}
-          style={{
-            background: 'var(--frost-card-framework-bg)',
-            borderColor: isOverlay ? 'var(--frost-card-framework-border)' : 'var(--state-danger-border)',
-            boxShadow: 'var(--frost-card-framework-shadow)',
-            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-          }}
+          data-variant={isOverlay ? 'overlay' : 'inline'}
+          style={lazyBoundaryPanelStyle}
         >
           <div className="text-sm font-medium text-[var(--text-secondary)]">模块加载失败</div>
           <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
@@ -70,7 +74,7 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
           <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
             这通常发生在本地开发服务器重启、端口断开，或热更新过程中模块文件暂时不可用时。主界面数据不会丢失。
           </p>
-          <pre className="mt-4 max-h-40 overflow-auto rounded-2xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] p-3 text-xs leading-6 text-[var(--text-secondary)]">
+          <pre className="kk-lazy-boundary-pre mt-4 max-h-40 overflow-auto rounded-2xl border p-3 text-xs leading-6 text-[var(--text-secondary)]">
             {this.state.error.message}
           </pre>
           <div className="mt-5 flex flex-wrap gap-3">

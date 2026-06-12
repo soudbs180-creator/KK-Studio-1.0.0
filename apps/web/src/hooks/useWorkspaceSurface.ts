@@ -11,7 +11,10 @@ export type SettingsSurfaceView =
   | 'consumption-records'
   | 'storage-settings'
   | 'system-logs'
-  | 'user-profile';
+  | 'user-profile'
+  | 'appearance-motion'
+  | 'browser-assistant'
+  | 'ai-management';
 
 interface UseWorkspaceSurfaceOptions {
   showSettingsPanel: boolean;

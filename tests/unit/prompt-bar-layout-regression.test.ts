@@ -1,12 +1,6 @@
 import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
-
-const ROOT_DIR = process.cwd();
-
-
 
 test('prompt bar keeps footer wrapping while allowing full desktop control labels', () => {
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
@@ -137,8 +131,10 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
   assert.doesNotMatch(promptBarSource, /className="absolute left-0 bottom-full mb-3 z-50 animate-fadeIn origin-bottom"/);
   assert.match(
     promptBarSource,
-    /className="fixed z-\[10000\] animate-fadeIn origin-bottom"/,
+    /className="kk-prompt-bar-deep-popover-host animate-fadeIn origin-bottom"/,
   );
+  assert.match(promptBarSource, /zIndex:\s*KK_LAYER\.dropdown/);
+  assert.doesNotMatch(promptBarSource, /className="fixed z-\[10000\] animate-fadeIn origin-bottom"/);
 });
 
 test('prompt bar normal action buttons share a flat shadow while the send button keeps model-color emphasis without heavy shadows', () => {
@@ -163,6 +159,7 @@ test('prompt bar normal action buttons share a flat shadow while the send button
 
 test('prompt bar model library and footer controls use frosted flat defaults with hover-only gradients and bright enabled toggles', () => {
   const cssSource = readSource('apps/web/src/index.css');
+  const uiTokenSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const imageOptionsSource = readSource('apps/web/src/components/image/ImageOptionsPanel.tsx');
   const footerFrostRule = cssSource.match(/\.prompt-bar-footer-frost::before\s*\{[\s\S]*?\}/)?.[0] || '';
@@ -182,7 +179,9 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   assert.match(promptBarSource, /const modelLibrarySurfaceStyle: React\.CSSProperties = \{/);
   assert.match(promptBarSource, /const modelLibrarySearchSurfaceStyle: React\.CSSProperties = \{/);
   assert.match(promptBarSource, /background:\s*'var\(--frost-card-framework-bg\)'/);
-  assert.match(promptBarSource, /WebkitBackdropFilter:\s*'blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.18\)'/);
+  assert.match(promptBarSource, /className="kk-prompt-bar-deep-count-sheet"/);
+  assert.match(uiTokenSource, /\.kk-prompt-bar-deep-count-sheet\s*\{[\s\S]*backdrop-filter: blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.18\);/);
+  assert.match(uiTokenSource, /\.kk-prompt-bar-deep-count-sheet\s*\{[\s\S]*-webkit-backdrop-filter: blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.18\);/);
   assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySearchSurfaceStyle, width: 'min\(22rem, calc\(100vw - 24px\)\)' \}\}/);
   assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySurfaceStyle, borderRadius: '1rem' \}\}/);
   assert.doesNotMatch(promptBarSource, /background:\s*'color-mix\(in srgb, var\(--bg-overlay\) 96%, transparent\)'/);

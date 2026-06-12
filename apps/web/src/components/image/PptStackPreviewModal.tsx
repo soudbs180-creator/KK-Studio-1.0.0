@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
-import { type GeneratedImage} from '../../types';
+import { KK_LAYER } from '@kk/ui';
+import { type GeneratedImage } from '../../types';
 
 interface PptStackPreviewModalProps {
   images: GeneratedImage[];
@@ -32,21 +33,22 @@ const PptStackPreviewModal: React.FC<PptStackPreviewModalProps> = ({
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-[100000] bg-black/90 backdrop-blur-sm"
+      className="kk-image-modal-backdrop kk-ppt-stack-preview fixed inset-0"
+      style={{ zIndex: KK_LAYER.fullscreen }}
       onClick={onClose}
     >
       <div
-        className="absolute inset-0 flex flex-col"
+        className="kk-image-modal-panel kk-ppt-stack-shell absolute inset-0 flex flex-col"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 text-white">
+        <div className="kk-ppt-stack-header flex items-center justify-between border-b px-6 py-4">
           <div>
             <div className="text-sm font-semibold">PPT 整屏预览</div>
-            <div className="text-xs text-white/60">已拼接显示 {images.length} 页副卡</div>
+            <div className="kk-ppt-muted text-xs">已拼接显示 {images.length} 页副卡</div>
           </div>
           <button
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            className="kk-image-modal-icon-button inline-flex items-center justify-center rounded-full"
             title="关闭"
           >
             <X size={18} />
@@ -54,14 +56,15 @@ const PptStackPreviewModal: React.FC<PptStackPreviewModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="mx-auto w-full max-w-[1100px] rounded-2xl bg-[#111827] border border-white/10 overflow-hidden shadow-2xl">
+          <div className="kk-image-modal-panel mx-auto w-full max-w-[1100px] overflow-hidden rounded-2xl border">
             {images.map((image, index) => (
               <div
                 id={`ppt-stack-page-${index}`}
                 key={image.id}
-                className={`relative border-b border-white/10 last:border-b-0 ${index === initialIndex ? 'ring-2 ring-sky-400/60 ring-inset' : ''}`}
+                className="kk-ppt-stack-page relative border-b last:border-b-0"
+                data-active={index === initialIndex}
               >
-                <div className="absolute left-4 top-4 z-10 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                <div className="kk-ppt-page-badge absolute left-4 top-4 z-10 rounded-full px-3 py-1 text-xs font-medium">
                   {image.alias || `第 ${index + 1} 页`}
                 </div>
                 <img

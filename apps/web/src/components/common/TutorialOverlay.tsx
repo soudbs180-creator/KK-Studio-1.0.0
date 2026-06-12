@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface TutorialStep {
@@ -357,7 +358,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     }, [rect, isMobile]);
 
     return createPortal(
-        <div className="fixed inset-0 z-[99999] overflow-hidden">
+        <div className="kk-tutorial-overlay-root fixed inset-0 overflow-hidden" style={{ zIndex: KK_LAYER.fullscreen }}>
             {spotlightBounds ? (
                 <>
                     <div

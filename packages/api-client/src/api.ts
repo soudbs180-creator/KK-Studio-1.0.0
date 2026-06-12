@@ -2,6 +2,86 @@
 // 职责：定义与导出全部类型化的 API 请求函数，供桌面端前端、移动端以及 hooks 调用
 
 import { apiClient } from './client.js';
+export type GenerationProviderId =
+  | 'google'
+  | 'gpt-best'
+  | '12ai'
+  | 'suxi'
+  | 'wuyinkeji'
+  | 'newapi'
+  | 'acedata'
+  | 'custom';
+
+export type GenerationSurface =
+  | 'chat-image'
+  | 'provider-images'
+  | 'gemini-native-image'
+  | 'async-image';
+
+export type StandardGenerationStatus =
+  | 'pending'
+  | 'processing'
+  | 'success'
+  | 'failed';
+
+export type StandardGenerationErrorCode =
+  | 'AUTH_ERROR'
+  | 'RATE_LIMIT'
+  | 'INVALID_INPUT'
+  | 'MODEL_UNAVAILABLE'
+  | 'PROVIDER_ROUTE_MISMATCH'
+  | 'PROVIDER_RESPONSE_INVALID'
+  | 'EMPTY_RESULT'
+  | 'TIMEOUT'
+  | 'BILLING_PRECHARGE_FAILED'
+  | 'BILLING_REFUND_FAILED'
+  | 'UNKNOWN_PROVIDER_ERROR';
+
+export interface StandardImageGenerationInput {
+  requestId: string;
+  providerId: GenerationProviderId;
+  modelId: string;
+  prompt: string;
+  negativePrompt?: string;
+  aspectRatio?: string;
+  size?: string;
+  imageCount?: number;
+  referenceImages?: Array<string | { data: string; mimeType: string }>;
+  executionLane: 'local-user-api' | 'cloud-credit-model';
+}
+
+export interface StandardGenerationError {
+  code: StandardGenerationErrorCode;
+  message: string;
+  retryable: boolean;
+  providerId: GenerationProviderId;
+  surface?: GenerationSurface;
+  status?: number;
+  raw?: unknown;
+}
+
+export interface StandardImageGenerationResult {
+  requestId: string;
+  providerId: GenerationProviderId;
+  surface: GenerationSurface;
+  modelId: string;
+  status: StandardGenerationStatus;
+  urls: string[];
+  taskId?: string;
+  providerTaskId?: string;
+  usage?: {
+    totalTokens?: number;
+    cost?: number;
+  };
+  billing?: {
+    deducted?: boolean;
+    ledgerId?: string;
+    balanceAfter?: number;
+    refundApplied?: boolean;
+  };
+  error?: StandardGenerationError;
+  raw?: unknown;
+}
 
 // 定义相关的载荷与响应类型定义
 export interface LoginPayload {
@@ -120,13 +200,39 @@ export async function refresh(): Promise<AuthResponse> {
 }
 
 /**
- * 4. 调用 Gemini 进行图像生成 / 编辑
+ * 兼容过渡：将旧版图像响应转化为标准响应
  */
-export async function generateImage(payload: GenerateImagePayload): Promise<GenerateImageResponse> {
+export function normalizeLegacyGenerateImageResponse(
+  legacy: GenerateImageResponse,
+  requestId: string,
+  modelId: string,
+  providerId: string
+): StandardImageGenerationResult {
+  return {
+    requestId,
+    providerId: providerId as any,
+    surface: 'provider-images',
+    modelId,
+    status: 'success',
+    urls: [legacy.image],
+    raw: legacy,
+  };
+}
+
+/**
+ * 4. 调用 Gemini 进行图像生成 / 编辑
+ * @deprecated Use createImageGeneration() instead.
+ */
+export async function generateImage(payload: GenerateImagePayload): Promise<StandardImageGenerationResult> {
   const isEdit = !!payload.referenceImageBase64;
   const path = isEdit ? '/generate/edit' : '/generate/image';
   const { data } = await apiClient.post<GenerateImageResponse>(path, payload);
-  return data;
+  return normalizeLegacyGenerateImageResponse(
+    data,
+    `legacy-${Date.now()}`,
+    isEdit ? 'gemini-2.5-flash-image-edit' : 'gemini-2.5-flash-image',
+    'google'
+  );
 }
 
 /**
@@ -223,5 +329,15 @@ export async function adminUpdateApiConfig(operationKey: string, cost: number, t
  */
 export async function adminSetAdminLevel(userId: string, adminLevel: number, token?: string): Promise<any> {
   const { data } = await apiClient.patch(`/admin/users/${userId}/admin-level`, { admin_level: adminLevel });
+  return data;
+}
+
+/**
+ * 17. 标准图像生成统一入口
+ */
+export async function createImageGeneration(
+  payload: StandardImageGenerationInput
+): Promise<StandardImageGenerationResult> {
+  const { data } = await apiClient.post<StandardImageGenerationResult>('/generate-image', payload);
   return data;
 }

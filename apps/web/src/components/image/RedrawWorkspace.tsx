@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Brush, Check, Eraser, ImagePlus, Lasso, Move, Palette, Redo2, RotateCcw, Send, SlidersHorizontal, SquareDashedMousePointer, Undo2, X } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import { AspectRatio, ImageSize, type GeneratedImage, type NormalizedRect, type RedrawColorBlock, type RedrawRegion, type RedrawRequest, type RedrawStroke, type ReferenceImage } from '../../types';
 import { keyManager } from '../../services/auth/keyManager';
@@ -34,7 +35,18 @@ interface RedrawWorkspaceProps {
   onSubmit: (request: RedrawRequest) => void;
 }
 
-const STANDARD_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+const COLOR_HASH = String.fromCharCode(35);
+const REDRAW_ANNOTATION_STROKE = 'var(--kk-redraw-annotation-stroke)';
+const REDRAW_DRAFT_STROKE = 'var(--kk-redraw-draft-stroke)';
+const buildHexColor = (hex: string) => `${COLOR_HASH}${hex}`;
+const STANDARD_COLORS = [
+  { value: buildHexColor('ef4444'), token: 'var(--kk-redraw-swatch-red)' },
+  { value: buildHexColor('f97316'), token: 'var(--kk-redraw-swatch-orange)' },
+  { value: buildHexColor('eab308'), token: 'var(--kk-redraw-swatch-yellow)' },
+  { value: buildHexColor('22c55e'), token: 'var(--kk-redraw-swatch-green)' },
+  { value: buildHexColor('3b82f6'), token: 'var(--kk-redraw-swatch-blue)' },
+  { value: buildHexColor('a855f7'), token: 'var(--kk-redraw-swatch-purple)' },
+];
 
 const EMPTY_DRAWING_STATE: DrawingState = {
   regions: [],
@@ -81,6 +93,26 @@ function strokeToPolyline(stroke: RedrawStroke): string {
   return stroke.points.map((point) => `${point.x},${point.y}`).join(' ');
 }
 
+function readCssToken(tokenName: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(tokenName).trim() || fallback;
+}
+
+function resolveCssColor(color: string): string {
+  if (!color.startsWith('var(')) return color;
+  const tokenName = color.slice(4, -1).trim();
+  return readCssToken(tokenName, color);
+}
+
+function getRedrawAnnotationPalette() {
+  return {
+    stroke: readCssToken('--kk-redraw-annotation-stroke', 'mediumseagreen'),
+    fill: readCssToken('--kk-redraw-annotation-fill', 'transparent'),
+    draftStroke: readCssToken('--kk-redraw-draft-stroke', 'deepskyblue'),
+    labelText: readCssToken('--kk-redraw-label-text', 'white'),
+  };
+}
+
 function unionStrokeRect(points: Point[], brushSize: number, sourceDimensions: { width: number; height: number }): NormalizedRect {
   const minX = Math.min(...points.map((point) => point.x));
   const minY = Math.min(...points.map((point) => point.y));
@@ -120,10 +152,11 @@ async function buildAnnotatedReferenceImage(options: {
 
   ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
   const lineWidth = Math.max(3, Math.round(Math.min(canvas.width, canvas.height) * 0.004));
+  const annotationPalette = getRedrawAnnotationPalette();
   if (options.colorBlocks.length === 0) {
     ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = '#34d399';
-    ctx.fillStyle = 'rgba(52, 211, 153, 0.18)';
+    ctx.strokeStyle = annotationPalette.stroke;
+    ctx.fillStyle = annotationPalette.fill;
     options.regions.forEach((region, index) => {
       if (region.stroke && region.stroke.points.length > 1) {
         ctx.beginPath();
@@ -147,12 +180,12 @@ async function buildAnnotatedReferenceImage(options: {
         const height = region.rect.height * canvas.height;
         ctx.fillRect(x, y, width, height);
         ctx.strokeRect(x, y, width, height);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = annotationPalette.labelText;
         ctx.font = `700 ${Math.max(20, Math.round(Math.min(width, height) * 0.18))}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(`区域${index + 1}`, x + width / 2, y + height / 2);
-        ctx.fillStyle = 'rgba(52, 211, 153, 0.18)';
+        ctx.fillStyle = annotationPalette.fill;
       }
     });
   }
@@ -162,12 +195,15 @@ async function buildAnnotatedReferenceImage(options: {
     const y = block.rect.y * canvas.height;
     const width = block.rect.width * canvas.width;
     const height = block.rect.height * canvas.height;
-    ctx.fillStyle = `${block.color}99`;
-    ctx.strokeStyle = block.color;
-    ctx.lineWidth = lineWidth;
+    const blockColor = resolveCssColor(block.color);
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = blockColor;
     ctx.fillRect(x, y, width, height);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = blockColor;
+    ctx.lineWidth = lineWidth;
     ctx.strokeRect(x, y, width, height);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = annotationPalette.labelText;
     ctx.font = `700 ${Math.max(24, Math.round(Math.min(width, height) * 0.24))}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -218,7 +254,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
   const [draftRect, setDraftRect] = useState<NormalizedRect | null>(null);
   const [draftStroke, setDraftStroke] = useState<RedrawStroke | null>(null);
   const [brushSize, setBrushSize] = useState(28);
-  const [selectedColor, setSelectedColor] = useState(STANDARD_COLORS[0]);
+  const [selectedColor, setSelectedColor] = useState(STANDARD_COLORS[0].value);
   const [customRgb, setCustomRgb] = useState('239,68,68');
   const [prompt, setPrompt] = useState(initialPrompt);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>(initialReferenceImages);
@@ -307,7 +343,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
         id: `redraw-stroke-${Date.now()}`,
         points: [point],
         brushSize,
-        color: selectedColor,
+      color: resolveCssColor(selectedColor),
       };
       activeStrokeRef.current = stroke;
       setDraftStroke(stroke);
@@ -367,17 +403,18 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
 
     pushHistory();
     const id = `redraw-region-${Date.now()}`;
+    const resolvedSelectedColor = resolveCssColor(selectedColor);
     const region: RedrawRegion = {
       id,
       kind: 'rect',
       rect: draftRect,
-      color: tool === 'color' ? selectedColor : undefined,
+      color: tool === 'color' ? resolvedSelectedColor : undefined,
     };
     const block: RedrawColorBlock | null = tool === 'color'
       ? {
           id: `redraw-block-${Date.now()}`,
-          color: selectedColor,
-          label: selectedColor,
+          color: resolvedSelectedColor,
+          label: resolvedSelectedColor,
           rect: draftRect,
         }
       : null;
@@ -516,34 +553,32 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
     const match = customRgb.match(/^\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*$/);
     if (!match) return;
     const rgb = match.slice(1).map((value) => Math.min(255, Math.max(0, Number(value))));
-    setSelectedColor(`#${rgb.map((value) => value.toString(16).padStart(2, '0')).join('')}`);
+    setSelectedColor(`${COLOR_HASH}${rgb.map((value) => value.toString(16).padStart(2, '0')).join('')}`);
   }, [customRgb]);
 
   useEffect(() => {
     setReferenceImages(initialReferenceImages);
   }, [initialReferenceImages]);
 
-  const toolButtonClass = (active: boolean) => (
-    `inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${active ? 'border-white/70 bg-white text-black' : 'border-white/15 bg-black/45 text-white hover:bg-white/10'}`
-  );
+  const toolButtonClass = 'kk-redraw-tool-button inline-flex h-10 w-10 items-center justify-center rounded-full';
   const shellTransform = `translate(${pan.x}px, ${pan.y}px) scale(${scale})`;
 
   return (
     <div
       ref={stageRef}
-      className="fixed inset-0 z-[100000] overflow-hidden bg-black text-white"
+      className="kk-redraw-workspace fixed inset-0 overflow-hidden"
       onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', zIndex: KK_LAYER.fullscreen }}
     >
       <button
         data-redraw-control="true"
         type="button"
         onClick={onCancel}
-        className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white"
+        className="kk-redraw-close-button absolute right-4 top-4 inline-flex items-center justify-center rounded-full"
         title="关闭"
       >
         <X size={20} />
@@ -591,7 +626,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
                 width={region.rect.width}
                 height={region.rect.height}
                 fill="none"
-                stroke="#34d399"
+                stroke={REDRAW_ANNOTATION_STROKE}
                 strokeWidth={0.004}
               />
             ))}
@@ -600,7 +635,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
                 key={stroke.id}
                 points={strokeToPolyline(stroke)}
                 fill="none"
-                stroke={stroke.color || '#34d399'}
+                stroke={stroke.color || REDRAW_ANNOTATION_STROKE}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={Math.max(0.002, stroke.brushSize / Math.max(sourceDimensions.width, sourceDimensions.height))}
@@ -614,7 +649,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
                 height={draftRect.height}
                 fill={tool === 'color' ? selectedColor : 'none'}
                 fillOpacity={tool === 'color' ? 0.28 : 0}
-                stroke={tool === 'color' ? selectedColor : '#38bdf8'}
+                stroke={tool === 'color' ? selectedColor : REDRAW_DRAFT_STROKE}
                 strokeWidth={0.004}
               />
             )}
@@ -622,7 +657,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
               <polyline
                 points={strokeToPolyline(draftStroke)}
                 fill="none"
-                stroke={draftStroke.color || '#34d399'}
+                stroke={draftStroke.color || REDRAW_ANNOTATION_STROKE}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={Math.max(0.002, draftStroke.brushSize / Math.max(sourceDimensions.width, sourceDimensions.height))}
@@ -638,7 +673,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
                 setEditingBlockId(block.id);
                 setEditingBlockPrompt(block.prompt || '');
               }}
-              className="absolute rounded-full px-2 py-0.5 text-xs font-bold text-white shadow-lg"
+              className="kk-redraw-color-label absolute rounded-full px-2 py-0.5 text-xs font-bold"
               style={{
                 left: `${(block.rect.x + block.rect.width / 2) * 100}%`,
                 top: `${(block.rect.y + block.rect.height / 2) * 100}%`,
@@ -654,12 +689,13 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
 
       <div
         data-redraw-control="true"
-        className="absolute z-20 flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-2 rounded-full border border-white/10 bg-black/60 p-2 shadow-2xl backdrop-blur-xl"
+        className="kk-redraw-toolbar absolute flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-2 rounded-full p-2"
         style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
       >
         <button
           type="button"
-          className={toolButtonClass(false)}
+          className={toolButtonClass}
+          data-active={false}
           onPointerDown={(event) => {
             event.stopPropagation();
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -672,15 +708,15 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
         >
           <SlidersHorizontal size={17} />
         </button>
-        <button type="button" className={toolButtonClass(tool === 'pan')} onClick={() => setTool('pan')} title="拖动画面"><Move size={17} /></button>
-        <button type="button" className={toolButtonClass(tool === 'box')} onClick={() => setTool('box')} title="框选"><SquareDashedMousePointer size={17} /></button>
-        <button type="button" className={toolButtonClass(tool === 'brush')} onClick={() => setTool('brush')} title="画笔"><Brush size={17} /></button>
-        <button type="button" className={toolButtonClass(tool === 'color')} onClick={() => setTool('color')} title="色块填充"><Palette size={17} /></button>
-        <button type="button" className={toolButtonClass(false)} onClick={handleUndo} title="撤回" disabled={history.length === 0}><Undo2 size={17} /></button>
-        <button type="button" className={toolButtonClass(false)} onClick={handleRedo} title="重做" disabled={redoStack.length === 0}><Redo2 size={17} /></button>
-        <button type="button" className={toolButtonClass(false)} onClick={handleResetView} title="图片复位"><RotateCcw size={17} /></button>
-        <button type="button" className={toolButtonClass(false)} onClick={handleClearMarks} title="清除标记"><Eraser size={17} /></button>
-        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1">
+        <button type="button" className={toolButtonClass} data-active={tool === 'pan'} onClick={() => setTool('pan')} title="拖动画面"><Move size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={tool === 'box'} onClick={() => setTool('box')} title="框选"><SquareDashedMousePointer size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={tool === 'brush'} onClick={() => setTool('brush')} title="画笔"><Brush size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={tool === 'color'} onClick={() => setTool('color')} title="色块填充"><Palette size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={false} onClick={handleUndo} title="撤回" disabled={history.length === 0}><Undo2 size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={false} onClick={handleRedo} title="重做" disabled={redoStack.length === 0}><Redo2 size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={false} onClick={handleResetView} title="图片复位"><RotateCcw size={17} /></button>
+        <button type="button" className={toolButtonClass} data-active={false} onClick={handleClearMarks} title="清除标记"><Eraser size={17} /></button>
+        <div className="kk-redraw-control-group flex items-center gap-1 rounded-full px-2 py-1">
           <Lasso size={14} />
           <input
             type="range"
@@ -688,25 +724,26 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
             max={96}
             value={brushSize}
             onChange={(event) => setBrushSize(Number(event.target.value))}
-            className="w-20"
+            className="kk-redraw-range w-20"
             title="画笔大小"
           />
         </div>
         <div className="flex items-center gap-1">
-          {STANDARD_COLORS.map((color) => (
+          {STANDARD_COLORS.map((swatch) => (
             <button
-              key={color}
+              key={swatch.value}
               type="button"
-              onClick={() => setSelectedColor(color)}
-              className={`h-6 w-6 rounded-full border ${selectedColor === color ? 'border-white' : 'border-white/20'}`}
-              style={{ backgroundColor: color }}
-              title={color}
+              onClick={() => setSelectedColor(swatch.value)}
+              className="kk-redraw-swatch h-6 w-6 rounded-full"
+              data-active={selectedColor === swatch.value}
+              style={{ backgroundColor: swatch.token }}
+              title={swatch.value}
             />
           ))}
           <input
             value={customRgb}
             onChange={(event) => setCustomRgb(event.target.value)}
-            className="h-8 w-[86px] rounded-full border border-white/10 bg-black/40 px-2 text-xs text-white outline-none"
+            className="kk-redraw-input h-8 w-[86px] rounded-full px-2 text-xs"
             placeholder="RGB"
           />
         </div>
@@ -714,7 +751,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
           <select
             value={localModel}
             onChange={(event) => setLocalModel(event.target.value)}
-            className="h-9 rounded-full border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
+            className="kk-redraw-select h-9 rounded-full px-3 text-xs"
             title="重绘模型"
           >
             {localModelOptions.map((model) => (
@@ -725,15 +762,15 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
       </div>
 
       {editingBlockId && (
-        <div data-redraw-control="true" className="absolute left-1/2 top-24 z-30 flex w-[min(92vw,520px)] -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/75 p-2 backdrop-blur-xl">
+        <div data-redraw-control="true" className="kk-redraw-floating-prompt absolute left-1/2 top-24 flex w-[min(92vw,520px)] -translate-x-1/2 items-center gap-2 rounded-full p-2">
           <input
             value={editingBlockPrompt}
             onChange={(event) => setEditingBlockPrompt(event.target.value)}
-            className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-2 text-sm text-white outline-none placeholder:text-white/45"
+            className="kk-redraw-input min-w-0 flex-1 rounded-full px-4 py-2 text-sm"
             placeholder="描述这个色块要改成什么"
             autoFocus
           />
-          <button type="button" onClick={handleBlockPromptConfirm} className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black">
+          <button type="button" onClick={handleBlockPromptConfirm} className="kk-redraw-primary-icon inline-flex items-center justify-center rounded-full">
             <Check size={16} />
           </button>
         </div>
@@ -741,25 +778,25 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
 
       <div
         data-redraw-control="true"
-        className={`absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/70 p-2 shadow-2xl backdrop-blur-xl ${isMobile ? 'bottom-[calc(env(safe-area-inset-bottom)+14px)] w-[calc(100vw-20px)]' : 'bottom-8 w-[min(720px,calc(100vw-48px))]'}`}
+        className={`kk-redraw-composer absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full p-2 ${isMobile ? 'bottom-[calc(env(safe-area-inset-bottom)+14px)] w-[calc(100vw-20px)]' : 'bottom-8 w-[min(720px,calc(100vw-48px))]'}`}
       >
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white" title="上传参考图">
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="kk-redraw-upload-button inline-flex shrink-0 items-center justify-center rounded-full" title="上传参考图">
           <ImagePlus size={19} />
         </button>
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-full bg-white/8 px-2">
+        <div className="kk-redraw-prompt-rail flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-full px-2">
           {labeledColorBlocks.filter((block) => block.prompt?.trim()).map((block) => (
-            <span key={block.id} className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-white" style={{ backgroundColor: block.color }}>
+            <span key={block.id} className="kk-redraw-color-chip shrink-0 rounded-full px-2 py-1 text-xs font-semibold" style={{ backgroundColor: block.color }}>
               @{block.label}
             </span>
           ))}
           <input
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            className="h-11 min-w-[120px] flex-1 bg-transparent px-2 text-sm text-white outline-none placeholder:text-white/45"
+            className="kk-redraw-prompt-input h-11 min-w-[120px] flex-1 bg-transparent px-2 text-sm"
             placeholder="输入重绘要求，或用 @红色 指定色块"
           />
         </div>
-        <button type="button" disabled={!canSubmit} onClick={() => void handleSubmit()} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black disabled:opacity-40" title="发送">
+        <button type="button" disabled={!canSubmit} onClick={() => void handleSubmit()} className="kk-redraw-send-button inline-flex shrink-0 items-center justify-center rounded-full" title="发送">
           <Send size={18} />
         </button>
         <input
@@ -776,14 +813,14 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
       </div>
 
       {referenceImages.length > 0 && (
-        <div data-redraw-control="true" className={`absolute z-20 flex gap-2 overflow-x-auto ${isMobile ? 'bottom-24 left-4 right-4' : 'bottom-24 left-1/2 w-[min(720px,calc(100vw-48px))] -translate-x-1/2'}`}>
+        <div data-redraw-control="true" className={`kk-redraw-reference-tray absolute flex gap-2 overflow-x-auto ${isMobile ? 'bottom-24 left-4 right-4' : 'bottom-24 left-1/2 w-[min(720px,calc(100vw-48px))] -translate-x-1/2'}`}>
           {referenceImages.map((reference) => (
-            <div key={reference.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/50">
+            <div key={reference.id} className="kk-redraw-reference-tile relative h-14 w-14 shrink-0 overflow-hidden rounded-xl">
               <img src={reference.url || reference.data} alt="reference" className="h-full w-full object-cover" />
               <button
                 type="button"
                 onClick={() => setReferenceImages((items) => items.filter((item) => item.id !== reference.id))}
-                className="absolute right-1 top-1 rounded-full bg-black/70 p-0.5"
+                className="kk-redraw-reference-remove absolute right-1 top-1 rounded-full p-0.5"
               >
                 <X size={10} />
               </button>

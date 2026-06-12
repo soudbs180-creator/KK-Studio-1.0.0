@@ -5,6 +5,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Layers3,
+  Palette,
   ScrollText,
   Globe,
   Wand2,
@@ -20,6 +21,7 @@ export type CanonicalSettingsViewId =
   | 'storage-settings'
   | 'system-logs'
   | 'user-profile'
+  | 'appearance-motion'
   | 'browser-assistant'
   | 'ai-management';
 
@@ -134,6 +136,7 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'storage-settings': 'storage-settings',
   'system-logs': 'system-logs',
   'user-profile': 'user-profile',
+  'appearance-motion': 'appearance-motion',
   'browser-assistant': 'browser-assistant',
   'ai-management': 'ai-management',
 };
@@ -247,6 +250,18 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '账户状态',
     statusSummaryLabelEn: 'Account status',
   },
+  'appearance-motion': {
+    eyebrow: 'Appearance',
+    titleZh: '外观与动态',
+    titleEn: 'Appearance & Motion',
+    descriptionZh: '统一调节毛玻璃透明度、模糊强度和动态强度。',
+    descriptionEn: 'Tune glass transparency, blur, and motion intensity from one system surface.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Settings Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '界面系统',
+    statusSummaryLabelEn: 'UI system',
+  },
   'browser-assistant': {
     eyebrow: 'Browser Assistant',
     titleZh: '浏览器助手与多端控制',
@@ -314,6 +329,16 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     path: SETTINGS_PATHS['storage-settings'],
   },
   {
+    id: 'appearance-motion',
+    labelZh: '外观与动态',
+    labelEn: 'Appearance & Motion',
+    descriptionZh: '透明、模糊、动态。',
+    descriptionEn: 'Glass, blur, motion.',
+    icon: Palette,
+    section: 'system',
+    path: SETTINGS_PATHS['appearance-motion'],
+  },
+  {
     id: 'system-logs',
     labelZh: '日志',
     labelEn: 'Logs',
@@ -371,6 +396,7 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
   if (!currentPath) return 'dashboard';
   if (currentPath.startsWith('api-management')) return 'api-management';
   if (currentPath.startsWith('ai-management')) return 'ai-management';
+  if (currentPath.startsWith('appearance-motion')) return 'appearance-motion';
   if (currentPath.startsWith('user-profile')) return 'user-profile';
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);

@@ -146,7 +146,7 @@ const LoginScreen: React.FC = () => {
     const body = document.body;
     const root = document.documentElement;
     const authThemeClass = `auth-screen-active--${resolvedTheme}`;
-    const backgroundColor = resolvedTheme === 'dark' ? '#07111f' : '#eef4ff';
+    const backgroundColor = resolvedTheme === 'dark' ? 'var(--clay-dark-canvas)' : 'var(--clay-canvas)';
     const previousBodyBackground = body.style.background;
     const previousRootBackground = root.style.background;
     const previousColorScheme = root.style.colorScheme;
@@ -430,7 +430,7 @@ const LoginScreen: React.FC = () => {
         ) : null}
       </div>
       <div className="auth-background" aria-hidden><div className="auth-gradient auth-gradient-a" /><div className="auth-gradient auth-gradient-b" /><div className="auth-grid" /><div className="auth-star-layer">{stars.map((star) => <span key={star.id} className="auth-star-point" style={{ '--star-top': star.top, '--star-left': star.left, '--star-delay': star.delay, '--star-duration': star.duration, '--star-size': star.size, '--star-opacity': star.opacity } as React.CSSProperties} />)}</div></div>
-      <section className="auth-side-visual" aria-hidden><div className="auth-brand"><div className="auth-brand-icon"><Sparkles size={30} /></div><h1>{t('KK 创作平台', 'KK Creative Platform')}</h1><p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p></div><p className="auth-side-note">{hostedRuntime ? t('当前版本使用 VPS 登录与 PostgreSQL 会话持久化。', 'This build now uses VPS-backed sign-in and PostgreSQL session persistence.') : t('本地运行时优先保留工作区状态，后端认证接口就绪后再同步账号。', 'The local runtime keeps your workspace state first. Account sync will be added once the backend auth routes are ready.')}</p></section>
+      <section className="auth-side-visual" aria-hidden><div className="auth-brand"><div className="auth-brand-icon"><Sparkles size={30} /></div><h1>{t('KK Studio', 'KK Studio')}</h1><p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p></div><p className="auth-side-note">{hostedRuntime ? t('当前版本使用 VPS 登录与 PostgreSQL 会话持久化。', 'This build now uses VPS-backed sign-in and PostgreSQL session persistence.') : t('本地运行时优先保留工作区状态，后端认证接口就绪后再同步账号。', 'The local runtime keeps your workspace state first. Account sync will be added once the backend auth routes are ready.')}</p></section>
 
       <section className="auth-side-form">
         <div className="auth-panel">
@@ -488,7 +488,7 @@ const LoginScreen: React.FC = () => {
             )}
 
             <div className="auth-footer-actions">
-              {view === 'login' && <><button type="button" className="auth-text-btn" onClick={() => setView('register')}>{t('没有账号？立即注册', "Don't have an account? Sign up")}</button><button type="button" className="auth-btn-forgot" onClick={() => setView('forgot-password')}>{t('忘记密码？', 'Forgot your password?')}</button></>}
+              {view === 'login' && <><button type="button" className="auth-text-btn auth-signup-link" onClick={() => setView('register')}><span className="auth-signup-link__prefix">{t('没有账号？', "Don't have an account?")}</span><span className="auth-signup-link__action">{t('立即注册', 'Sign up')}</span></button><button type="button" className="auth-btn-forgot" onClick={() => setView('forgot-password')}>{t('忘记密码？', 'Forgot your password?')}</button></>}
               {view === 'register' && <button type="button" className="auth-text-btn" onClick={() => setView('login')}>{t('已有账号？返回登录', 'Already have an account? Sign in')}</button>}
               {view === 'forgot-password' && <button type="button" className="auth-text-btn" onClick={() => setView('login')}>{t('想起来了？返回登录', 'Remembered it? Back to sign in')}</button>}
             </div>

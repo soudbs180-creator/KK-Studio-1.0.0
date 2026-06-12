@@ -52,8 +52,8 @@ test("12AI image routing requires an explicit async preference instead of blanke
 test("GPT Best defaults to the doc-safe native images payload instead of the local extended payload", () => {
   const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
   const helperSource = readSource("apps/web/src/services/llm/openAICompatibleImageDispatch.ts");
-  const gptBestDispatchStart = adapterSource.indexOf("dispatchPlan.kind === 'gpt-best-native'");
-  const gptBestDispatchEnd = adapterSource.indexOf("dispatchPlan.kind === '12ai-openai-strict'");
+  const gptBestDispatchStart = adapterSource.indexOf("decision.dispatchKind === 'gpt-best-native'");
+  const gptBestDispatchEnd = adapterSource.indexOf("decision.dispatchKind === '12ai-openai-strict'");
   const gptBestDispatchBlock = adapterSource.slice(gptBestDispatchStart, gptBestDispatchEnd);
 
   assert.ok(gptBestDispatchStart > -1 && gptBestDispatchEnd > gptBestDispatchStart);
@@ -67,7 +67,7 @@ test("GPT Best defaults to the doc-safe native images payload instead of the loc
   );
   assert.match(
     adapterSource,
-    /dispatchPlan\.kind === 'gpt-best-native'/,
+    /decision\.dispatchKind === 'gpt-best-native'/,
   );
   assert.match(
     gptBestDispatchBlock,

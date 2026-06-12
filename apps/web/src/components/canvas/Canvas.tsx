@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 
 interface InfiniteCanvasProps {
@@ -304,34 +305,37 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ children, onTransformCh
             </div>
 
             {/* Canvas Controls - Bottom Left (Desktop) / Top Left (Mobile) */}
-            <div id="canvas-toolbar" className="absolute md:bottom-4 md:left-4 top-4 left-4 z-[1001]">
-                <div className="toolbar !grid grid-cols-2 !gap-2 md:!flex md:!flex-col md:!gap-1">
-                    {/* 1. Locate (Home) - Clean Target */}
-                    <button className="toolbar-btn group" onClick={locateAllCards} title="定位 (Home)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 dark:text-zinc-400 group-hover:text-gray-800 dark:group-hover:text-white transition-colors">
-                            <circle cx="12" cy="12" r="10" />
-                            <circle cx="12" cy="12" r="3" />
-                        </svg>
-                    </button>
-                    {/* 4. Dots - Clean Dot Pattern */}
-                    <button
-                        className={`toolbar-btn group ${showGrid ? 'active' : ''}`}
-                        onClick={toggleGrid}
-                        title="点阵 (Dots)"
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={showGrid ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-zinc-400 group-hover:text-gray-800 dark:group-hover:text-white transition-colors"}>
-                            <circle cx="6" cy="6" r="2" />
-                            <circle cx="12" cy="6" r="2" />
-                            <circle cx="18" cy="6" r="2" />
-                            <circle cx="6" cy="12" r="2" />
-                            <circle cx="12" cy="12" r="2" />
-                            <circle cx="18" cy="12" r="2" />
-                            <circle cx="6" cy="18" r="2" />
-                            <circle cx="12" cy="18" r="2" />
-                            <circle cx="18" cy="18" r="2" />
-                        </svg>
-                    </button>
-                </div>
+            <div
+                id="canvas-toolbar"
+                className="kk-canvas-toolbar absolute md:bottom-4 md:left-4 top-4 left-4 !grid grid-cols-2 !gap-2 md:!flex md:!flex-col md:!gap-1"
+                style={{ zIndex: KK_LAYER.toolbar }}
+            >
+                {/* 1. Locate (Home) - Clean Target */}
+                <button className="kk-canvas-toolbar-button group" onClick={locateAllCards} title="定位 (Home)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="kk-canvas-toolbar-icon transition-colors">
+                        <circle cx="12" cy="12" r="10" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </button>
+                {/* 4. Dots - Clean Dot Pattern */}
+                <button
+                    className="kk-canvas-toolbar-button group"
+                    data-active={showGrid}
+                    onClick={toggleGrid}
+                    title="点阵 (Dots)"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="kk-canvas-toolbar-icon transition-colors">
+                        <circle cx="6" cy="6" r="2" />
+                        <circle cx="12" cy="6" r="2" />
+                        <circle cx="18" cy="6" r="2" />
+                        <circle cx="6" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="18" cy="12" r="2" />
+                        <circle cx="6" cy="18" r="2" />
+                        <circle cx="12" cy="18" r="2" />
+                        <circle cx="18" cy="18" r="2" />
+                    </svg>
+                </button>
             </div>
 
             {/* Zoom Slider & Version - Bottom Left */}

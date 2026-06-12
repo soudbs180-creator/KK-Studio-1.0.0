@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2, Heart } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { useNavigate, useInRouterContext } from 'react-router-dom';
 import { resolveRedrawRouteAndModel } from '../../services/api/capabilityRouteAssignments';
 
@@ -19,6 +20,8 @@ import { pickByDocumentLanguage } from '../../utils/localeText';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { useFavoritesStore } from '../../features/favorites';
+
+type LightboxCssProperties = React.CSSProperties & Record<`--${string}`, string | number>;
 
 const RedrawWorkspace = React.lazy(() =>
     import('./RedrawWorkspace').then((module) => ({ default: module.RedrawWorkspace })),
@@ -867,27 +870,32 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return 1;
     };
 
-    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 h-10 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
-    const iconActionButtonClass = 'shrink-0 inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-3 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
+    const actionButtonClass = 'kk-result-control shrink-0 flex items-center gap-2 rounded-lg px-4 text-sm font-medium active:scale-[0.98]';
+    const downloadButtonClass = 'kk-result-control kk-result-primary-action shrink-0 flex items-center gap-2 rounded-lg px-4 text-sm font-semibold active:scale-[0.98]';
+    const zoomButtonClass = 'kk-result-icon-control flex items-center justify-center rounded-md text-[var(--kk-result-control-muted-text)] hover:text-[var(--kk-result-control-text)]';
+    const zoomGroupClass = 'kk-result-zoom-group flex shrink-0 items-center rounded-lg p-1 gap-0.5';
+    const downloadMenuClass = 'kk-result-menu absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl p-1.5';
+    const downloadMenuItemClass = 'kk-result-menu-item flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--kk-result-control-text)]';
 
     return ReactDOM.createPortal(
         <div
             ref={containerRef}
-            className="fixed inset-0 z-[99999] flex flex-col animate-fadeIn select-none overflow-hidden"
+            className="kk-result-surface kk-lightbox-backdrop fixed inset-0 flex flex-col animate-fadeIn select-none overflow-hidden"
             onClick={handleBackgroundClick}
             style={{
-                backgroundColor: `rgba(0, 0, 0, ${getOpacity()})`,
-                transition: (isPanning || zoomRef.current !== 1 || Math.abs(pan.y) > 0) ? 'none' : 'background-color 0.15s ease-out',
+                zIndex: KK_LAYER.fullscreen,
+                '--kk-lightbox-backdrop-opacity': getOpacity(),
+                transition: (isPanning || zoomRef.current !== 1 || Math.abs(pan.y) > 0) ? 'none' : 'background-color var(--kk-motion-standard) var(--kk-motion-ease-standard)',
                 ...(isMobile ? {
                     paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
                     paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
                 } : {})
-            }}
+            } as LightboxCssProperties}
         >
             {/* Top bar: close button */}
             <button
                 onClick={onClose}
-                className="absolute z-50 rounded-full bg-white/10 p-2 text-white transition-opacity hover:opacity-80 lightbox-exclude"
+                className="kk-result-icon-control absolute z-50 rounded-full p-2 text-white hover:opacity-90 lightbox-exclude"
                 style={isMobile
                     ? { top: 'max(12px, env(safe-area-inset-top, 0px))', right: 12 }
                     : { top: 16, right: 16 }}
@@ -904,7 +912,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         onClick={handlePrev}
                         title="上一张"
                     >
-                        <div className="p-3 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="kk-result-icon-control rounded-full p-3 text-white opacity-0 group-hover:opacity-100">
                             <ChevronLeft size={32} />
                         </div>
                     </div>
@@ -914,7 +922,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         onClick={handleNext}
                         title="下一张"
                     >
-                        <div className="p-3 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="kk-result-icon-control rounded-full p-3 text-white opacity-0 group-hover:opacity-100">
                             <ChevronRight size={32} />
                         </div>
                     </div>
@@ -1004,7 +1012,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           }}
                           style={{
                               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * getScale()})`,
-                              transition: isPanning ? 'none' : 'transform 0.15s ease-out',
+                              transition: isPanning ? 'none' : 'transform var(--kk-motion-standard) var(--kk-motion-ease-standard)',
                               cursor: isPanning ? 'grabbing' : 'grab'
                           }}
                       />
@@ -1029,7 +1037,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
               {!isMobile && images.length > 1 && (
                   <div
-                      className="w-full shrink-0 border-t border-[var(--border-light)] bg-black/45 px-8 py-3 text-white backdrop-blur-xl"
+                      className="kk-result-panel w-full shrink-0 border-t px-8 py-3 text-[var(--kk-result-control-text)]"
                       onClick={(event) => event.stopPropagation()}
                   >
                       <div className="mb-2 flex items-center justify-between text-xs text-white/55">
@@ -1050,15 +1058,15 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           setZoom(1);
                                           setPan({ x: 0, y: 0 });
                                       }}
-                                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border transition ${isCurrent ? 'border-white ring-2 ring-white/25' : 'border-white/15 opacity-75 hover:opacity-100'}`}
+                                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border transition-opacity ${isCurrent ? 'border-[var(--kk-result-control-primary-text)] ring-2 ring-white/25' : 'border-[var(--kk-result-panel-border)] opacity-75 hover:opacity-100'}`}
                                       title={item.prompt || `结果 ${index + 1}`}
                                   >
                                       {thumbSrc ? (
                                           <img src={thumbSrc} alt={item.prompt || `结果 ${index + 1}`} className="h-full w-full object-cover" />
                                       ) : (
-                                          <span className="flex h-full w-full items-center justify-center bg-white/10 text-[10px]">无预览</span>
+                                          <span className="flex h-full w-full items-center justify-center bg-[var(--kk-result-control-bg)] text-[10px]">无预览</span>
                                       )}
-                                      <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                      <span className="absolute bottom-1 left-1 rounded bg-[var(--kk-result-control-overlay-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                                           {isRedrawItem ? '重绘' : index + 1}
                                       </span>
                                   </button>
@@ -1070,12 +1078,12 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
   
               {/* 简体中文注释：底部信息与操作区和缩略图分层，避免遮挡主图和重绘入口。 */}
               <div
-                  className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl lightbox-exclude ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
+                  className={`kk-result-panel w-full shrink-0 border-t text-[var(--text-primary)] lightbox-exclude ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
                   onClick={e => e.stopPropagation()}
               >
                   <div className="flex min-w-0 flex-col text-left justify-center">
                       <div
-                          className="text-left text-sm font-medium line-clamp-2 cursor-pointer hover:text-indigo-300 transition-colors"
+                          className="text-left text-sm font-medium line-clamp-2 cursor-pointer hover:text-[var(--accent-coral)] transition-colors"
                           title="点击复制提示词"
                           onClick={async (e) => {
                               e.stopPropagation();
@@ -1091,7 +1099,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           {image.prompt}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs text-[var(--text-tertiary)] sm:gap-3">
-                          <span className="bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-medium)]">
+                          <span className="bg-[var(--kk-result-control-bg)] px-2 py-0.5 rounded border border-[var(--kk-result-control-border)]">
                               {currentIndex + 1} / {images.length}
                           </span>
                           <span>{image.model.split('/').pop()}</span>
@@ -1107,30 +1115,30 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           {/* 第一排：高频缩放控制条与高频下载按钮 */}
                           <div className="flex w-full items-center justify-between gap-2">
                               {/* Action controls */}
-                              <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
-                                  <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
+                              <div className={zoomGroupClass}>
+                                  <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className={zoomButtonClass} title="缩小"><ZoomOut size={16} /></button>
                                   <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
-                                  <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
-                                  <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
+                                  <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className={zoomButtonClass} title="放大"><ZoomIn size={16} /></button>
+                                  <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className={`${zoomButtonClass} ml-1 border-l border-[var(--kk-result-control-border)]`} title="重置"><RotateCcw size={16} /></button>
                               </div>
 
                               <div className="relative" ref={downloadMenuRef}>
                                   <button
                                       onClick={handleDownload}
-                                      className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500 text-white"
+                                      className={downloadButtonClass}
                                       title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
                                   >
                                       <Download size={16} />
                                       下载
                                   </button>
                                   {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
-                                      <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                                      <div className={downloadMenuClass}>
                                           <button
                                               onClick={(e) => {
                                                   setShowDownloadMenu(false);
                                                   void handleSingleDownload(e);
                                               }}
-                                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                              className={downloadMenuItemClass}
                                           >
                                               <span>下载单图</span>
                                           </button>
@@ -1140,7 +1148,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                                   setShowDownloadMenu(false);
                                                   onDownloadPptComposite(image.id);
                                               }}
-                                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                              className={downloadMenuItemClass}
                                           >
                                               <span>下载整屏</span>
                                           </button>
@@ -1167,7 +1175,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           onUseAsSource(image);
                                           onClose();
                                       }}
-                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title="将此图设为参考图继续创作"
                                   >
                                       <Sparkles size={16} />
@@ -1181,7 +1189,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           e.stopPropagation();
                                           setRedrawWorkspaceMode('fresh');
                                       }}
-                                      className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title="重绘"
                                   >
                                       <Pen size={16} />
@@ -1195,7 +1203,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           e.stopPropagation();
                                           setRedrawWorkspaceMode('regenerate');
                                       }}
-                                      className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title="复用原图、原提示词和原标记重新生成"
                                   >
                                       <Sparkles size={16} />
@@ -1209,7 +1217,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           e.stopPropagation();
                                           onEditPptDeck(image);
                                       }}
-                                      className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
                                   >
                                       <Pen size={16} />
@@ -1223,7 +1231,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           e.stopPropagation();
                                           onEditText(image);
                                       }}
-                                      className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title="编辑当前页文字"
                                   >
                                       <Pen size={16} />
@@ -1234,7 +1242,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                               {!isVideo && !isAudio && (
                                   <button
                                       onClick={handleCopyOriginal}
-                                      className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)] flex-1 justify-center`}
                                       title="复制原图"
                                   >
                                       <Copy size={16} />
@@ -1253,7 +1261,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           }
                                           setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
                                       }}
-                                      className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80 flex-1 justify-center`}
+                                      className={`${actionButtonClass} kk-result-danger-control flex-1 justify-center`}
                                       title="删除当前结果"
                                   >
                                       <Trash2 size={16} />
@@ -1265,11 +1273,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                   ) : (
                       <div className="mt-3 flex w-full items-center gap-2 self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3">
                           {/* Action controls */}
-                          <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
-                              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
+                          <div className={zoomGroupClass}>
+                              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className={zoomButtonClass} title="缩小"><ZoomOut size={16} /></button>
                               <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
-                              <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
-                              <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
+                              <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className={zoomButtonClass} title="放大"><ZoomIn size={16} /></button>
+                              <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className={`${zoomButtonClass} ml-1 border-l border-[var(--kk-result-control-border)]`} title="重置"><RotateCcw size={16} /></button>
                           </div>
    
                           <button
@@ -1290,7 +1298,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       onUseAsSource(image);
                                       onClose(); // 将此图片设为参考图后，立即关闭大图灯箱
                                   }}
-                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80`}
+                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]`}
                                   title="将此图设为参考图继续创作"
                               >
                                   <Sparkles size={16} />
@@ -1316,7 +1324,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           }
                                           setRedrawWorkspaceMode('fresh');
                                       }}
-                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-purple-500 hover:bg-purple-600/80' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
+                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
                                       title="重绘"
                                   >
                                       <Pen size={16} />
@@ -1342,7 +1350,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                           }
                                           setRedrawWorkspaceMode('regenerate');
                                       }}
-                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-amber-400 hover:bg-amber-500/80' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
+                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
                                       title="复用原图、原提示词和原标记重新生成"
                                   >
                                       <Sparkles size={16} />
@@ -1356,7 +1364,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       e.stopPropagation();
                                       onEditPptDeck(image);
                                   }}
-                                  className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
+                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]`}
                                   title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
                               >
                                   <Pen size={16} />
@@ -1370,7 +1378,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       e.stopPropagation();
                                       onEditText(image);
                                   }}
-                                  className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
+                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]`}
                                   title="编辑当前页文字"
                               >
                                   <Pen size={16} />
@@ -1381,7 +1389,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           {!isVideo && !isAudio && (
                               <button
                                   onClick={handleCopyOriginal}
-                                  className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
+                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]`}
                                   title="复制原图"
                               >
                                   <Copy size={16} />
@@ -1399,7 +1407,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       }
                                       setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
                                   }}
-                                  className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80`}
+                                  className={`${actionButtonClass} kk-result-danger-control`}
                                   title="删除当前结果"
                               >
                                   <Trash2 size={16} />
@@ -1410,20 +1418,20 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           <div className="relative" ref={downloadMenuRef}>
                               <button
                                   onClick={handleDownload}
-                                  className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500"
+                                  className={downloadButtonClass}
                                   title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
                               >
                                   <Download size={16} />
                                   下载
                               </button>
                               {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
-                                  <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                                  <div className={downloadMenuClass}>
                                       <button
                                           onClick={(e) => {
                                               setShowDownloadMenu(false);
                                               void handleSingleDownload(e);
                                           }}
-                                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                          className={downloadMenuItemClass}
                                       >
                                           <span>下载单图</span>
                                       </button>
@@ -1433,7 +1441,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                               setShowDownloadMenu(false);
                                               onDownloadPptComposite(image.id);
                                           }}
-                                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                          className={downloadMenuItemClass}
                                       >
                                           <span>下载整屏</span>
                                       </button>

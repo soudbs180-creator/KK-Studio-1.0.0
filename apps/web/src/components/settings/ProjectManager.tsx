@@ -19,6 +19,7 @@ import {
     Eye,
     Save,
 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { useCanvas } from '../../context/CanvasContext';
 import { createZipArchive, saveBlobAs } from '../../utils/archiveRuntime';
 
@@ -52,6 +53,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { notify } from '../../services/system/notificationService';
 import type { WorkflowUtilityNodeKind } from '../../workflow/schema';
 import type { WorkflowTemplateDefinition, WorkflowTemplateId } from '../../workflow/templates/workflowTemplates';
+import {
+    SETTINGS_MODAL_BACKDROP_CLASSNAME,
+    SETTINGS_MODAL_PANEL_CLASSNAME,
+} from './SettingsScaffold';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -813,12 +818,15 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const deleteConfirmModal = showDeleteConfirm
         ? ReactDOM.createPortal(
             <div
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md"
+                className={`fixed inset-0 flex items-center justify-center ${SETTINGS_MODAL_BACKDROP_CLASSNAME}`}
+                style={{ zIndex: KK_LAYER.modalBackdrop }}
                 onClick={() => setShowDeleteConfirm(null)}
             >
                 <div
-                    className="mx-4 w-[90%] max-w-sm rounded-2xl border p-6"
-                    style={frostedProjectManagerShellStyle}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="project-manager-delete-title"
+                    className={`mx-4 w-[90%] max-w-sm rounded-2xl border p-6 ${SETTINGS_MODAL_PANEL_CLASSNAME}`}
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="mb-5 flex items-center gap-4">
@@ -830,7 +838,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             </svg>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">确认删除项目？</h3>
+                            <h3 id="project-manager-delete-title" className="text-lg font-bold text-gray-900 dark:text-white">确认删除项目？</h3>
                             <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">本地文件不会被删除，只会从工作区移除。</p>
                         </div>
                     </div>
@@ -869,17 +877,20 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const mergeModal = showMergeModal
         ? ReactDOM.createPortal(
             <div
-                className="fixed inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-md"
+                className={`fixed inset-0 flex items-center justify-center ${SETTINGS_MODAL_BACKDROP_CLASSNAME}`}
+                style={{ zIndex: KK_LAYER.modalBackdrop }}
                 onClick={() => !mergingCanvasId && setShowMergeModal(false)}
             >
                 <div
-                    className="mx-4 w-[92%] max-w-lg rounded-2xl border p-5"
-                    style={frostedProjectManagerShellStyle}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="project-manager-merge-title"
+                    className={`mx-4 w-[92%] max-w-lg rounded-2xl border p-5 ${SETTINGS_MODAL_PANEL_CLASSNAME}`}
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">合并项目到当前画布</h3>
+                            <h3 id="project-manager-merge-title" className="text-lg font-semibold text-gray-900 dark:text-white">合并项目到当前画布</h3>
                             <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
                                 选择一个项目合并进“{activeProjectName}”，合并完成后原项目会自动删除。
                             </p>

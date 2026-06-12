@@ -12,6 +12,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import type { GeneratedImage, MobileResultEntry, RedrawRequest } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -302,7 +303,9 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
     <>
     <section
       data-testid="mobile-result-detail-screen"
-      className="fixed inset-0 z-[990] flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)]"
+      data-kk-mobile-overlay-layer="true"
+      className="fixed inset-0 flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)]"
+      style={{ zIndex: KK_LAYER.modal }}
     >
       <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+10px)]">
         <div className="min-w-0 flex-1">

@@ -9,6 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@kk/shared": "*",
     "axios": "^1.7.9",
     "@tanstack/react-query": "^5.66.0",
     "react": "^19.2.5"

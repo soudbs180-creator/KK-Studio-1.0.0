@@ -43,6 +43,7 @@ import {
 } from './openAICompatibleErrors';
 import { buildNewApiGoogleExtraBody, mergeExtraBody } from './openAICompatibleGoogleExtraBody';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
+import type { ProviderRoutingDecision } from '../api/providerRequestRegistry';
 import { extractImageUrlsFromPayload, extractOpenAICompatibleChatImageUrls } from './openAICompatibleImagePayload';
 import {
     buildOpenAICompatibleImageContentParts,
@@ -1756,16 +1757,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         // 🚀 [Protocol Routing]
         // 12AI + Gemini 图片模型：强制走 Gemini Native（严格对齐 12AI 文档），
-        // 忽略 compatibilityMode='chat'，避免命中 Chat-to-Image 信道导致 503。
         const channelRuntime = this.resolveChannelRuntime(baseUrl, keySlot, options.modelId);
-        if (channelRuntime.strategyId === 'wuyinkeji') {
-            console.log(`[OpenAICompatibleAdapter] 使用 Wuyin async image API -> ${keySlot.name}`);
-            return this.generateImageWuyinAsync(options, keySlot);
-        }
-        if (channelRuntime.strategyId === 'acedata') {
-            console.log(`[OpenAICompatibleAdapter] 使用 AceData image API -> ${keySlot.name}`);
-            return this.generateImageAceData(options, keySlot);
-        }
         const prefer12AIAsync = shouldUse12AIAsyncImageRoute(options);
         const modelMetadata = getModelMetadata(options.modelId);
         const imageSurface = resolveImageSurface({
@@ -1791,26 +1783,50 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             useChatEndpoint: Boolean(options.providerConfig?.openai?.useChatEndpoint),
         });
 
-        if (dispatchPlan.kind === 'async-image') {
+        const decision: ProviderRoutingDecision = {
+            requestId: options.requestId || `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            providerId: (channelRuntime.strategyId === 'wuyinkeji' ? 'wuyinkeji' : (channelRuntime.strategyId || 'custom')) as any,
+            strategyId: channelRuntime.strategyId || 'custom',
+            modelId: options.modelId,
+            surface: imageSurface as any,
+            dispatchKind: dispatchPlan.kind,
+            reason: `Image generation triggered with surface ${imageSurface} and dispatch kind ${dispatchPlan.kind}`,
+            endpointTypes: modelMetadata?.endpointTypes,
+            confidence: keySlot.compatibilityMode ? 'explicit' : 'inferred'
+        };
+
+        console.log(`[ProviderRoutingDecision] Front-end route execution details:`, decision);
+
+        if (decision.dispatchKind === 'wuyin_async_task') {
+            console.log(`[OpenAICompatibleAdapter] 使用 Wuyin async image API -> ${keySlot.name}`);
+            return this.generateImageWuyinAsync(options, keySlot);
+        }
+
+        if (decision.dispatchKind === 'acedata-image') {
+            console.log(`[OpenAICompatibleAdapter] 使用 AceData image API -> ${keySlot.name}`);
+            return this.generateImageAceData(options, keySlot);
+        }
+
+        if (decision.dispatchKind === 'async-image') {
             console.log(`[OpenAICompatibleAdapter] 使用 12AI async image API -> ${keySlot.name}`);
             return this.generateImage12AIAsync(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'chat-strict' || dispatchPlan.kind === 'chat') {
+        if (decision.dispatchKind === 'chat-strict' || decision.dispatchKind === 'chat') {
             console.log(`[OpenAICompatibleAdapter] 使用 Chat API (显式 compatibilityMode='chat') -> ${keySlot.name}`);
-            if (dispatchPlan.kind === 'chat-strict') {
+            if (decision.dispatchKind === 'chat-strict') {
                 return this.generateImageViaChatStrict(options, keySlot);
             }
             return this.generateImageViaChat(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'gemini-native') {
+        if (decision.dispatchKind === 'gemini-native') {
             console.log(`[OpenAICompatibleAdapter] 使用原生 Gemini 图片协议 -> ${keySlot.name}`);
             return this.generateImageGeminiNative(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'antigravity-chat' || dispatchPlan.kind === 'antigravity-extended-with-native-fallback') {
-            if (dispatchPlan.kind === 'antigravity-chat') {
+        if (decision.dispatchKind === 'antigravity-chat' || decision.dispatchKind === 'antigravity-extended-with-native-fallback') {
+            if (decision.dispatchKind === 'antigravity-chat') {
                 console.log(`[OpenAICompatibleAdapter] 使用 Chat API (Antigravity + Gemini模型) -> ${keySlot.name}`);
                 return this.generateImageViaChat(options, keySlot);
             }
@@ -1826,32 +1842,32 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
         }
 
-        if (dispatchPlan.kind === 'openai-strict') {
+        if (decision.dispatchKind === 'openai-strict') {
             console.log(`[OpenAICompatibleAdapter] 使用 OpenAI_Strict API -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'siliconflow') {
+        if (decision.dispatchKind === 'siliconflow') {
             console.log(`[OpenAICompatibleAdapter] 使用 SiliconFlow API -> ${keySlot.name}`);
             return this.generateImageStandard_SiliconFlow(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'gpt-best-native') {
+        if (decision.dispatchKind === 'gpt-best-native') {
             console.log(`[OpenAICompatibleAdapter] 使用 GPT Best 文档安全 Images API -> ${keySlot.name}`);
             return this.generateImageStandard_GPT_Best_Native(options, keySlot);
         }
 
-        if (dispatchPlan.kind === '12ai-openai-strict') {
+        if (decision.dispatchKind === '12ai-openai-strict') {
             console.log(`[OpenAICompatibleAdapter] 使用 OpenAI_Strict API (12AI) -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'suxi-openai-strict') {
+        if (decision.dispatchKind === 'suxi-openai-strict') {
             console.log(`[OpenAICompatibleAdapter] suxi 网关默认走 OpenAI Images API -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'gemini-chat-strict-fail-closed') {
+        if (decision.dispatchKind === 'gemini-chat-strict-fail-closed') {
             console.log(`[OpenAICompatibleAdapter] Gemini模型优先尝试 Chat API (严格 new-api 兼容层) -> ${keySlot.name}`);
             try {
                 return await this.generateImageViaChatStrict(options, keySlot);
@@ -1864,11 +1880,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
         }
 
-        if (dispatchPlan.kind === 'provider-chat') {
+        if (decision.dispatchKind === 'provider-chat') {
             return this.generateImageViaChat(options, keySlot);
         }
 
-        if (dispatchPlan.kind === 'comfly-openai-strict') {
+        if (decision.dispatchKind === 'comfly-openai-strict') {
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 

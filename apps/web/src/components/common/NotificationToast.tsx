@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check, ChevronRight, Sparkles, ArrowUp } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import { notificationService, type Notification, type NotificationType } from '../../services/system/notificationService';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { useLocale } from '../../context/LocaleContext';
+
+type ToastCssProperties = React.CSSProperties & Record<`--${string}`, string | number>;
+
+const getToastDataType = (type: NotificationType): string => String(type);
 
 const NotificationToast: React.FC = () => {
     const { pick } = useLocale();
@@ -200,105 +205,21 @@ const NotificationToast: React.FC = () => {
     };
 
     const getIcon = (type: NotificationType) => {
-        const iconStyle = { color: getIconColor(type) };
         switch (type) {
-            case 'success': return <CheckCircle size={18} style={iconStyle} />;
-            case 'error': return <AlertCircle size={18} style={iconStyle} />;
-            case 'warning': return <AlertTriangle size={18} style={iconStyle} />;
-            case 'update' as any: return <Sparkles size={18} className="animate-pulse" style={iconStyle} />;
+            case 'success': return <CheckCircle size={18} />;
+            case 'error': return <AlertCircle size={18} />;
+            case 'warning': return <AlertTriangle size={18} />;
+            case 'update' as any: return <Sparkles size={18} className="animate-pulse" />;
             case 'info':
             case 'alipay':
             case 'wechat':
             case 'paypal':
             default:
-                return <Info size={18} style={iconStyle} />;
-        }
-    };
-
-    const getIconColor = (type: NotificationType): string => {
-        switch (type) {
-            case 'success': return '#10b981'; // 纯净翠绿
-            case 'error': return '#ef4444'; // 纯净熔岩红
-            case 'warning': return '#f59e0b'; // 纯净琥珀黄
-            case 'info': return '#ec4899'; // 霓虹绯粉
-            case 'alipay': return '#3b82f6'; // 支付宝深蓝
-            case 'wechat': return '#14b8a6'; // 微信青绿
-            case 'paypal': return '#0ea5e9'; // 贝宝亮天蓝
-            case 'update' as any: return '#c084fc'; // 升级幻彩紫
-            default: return '#ec4899'; // 默认兜底
+                return <Info size={18} />;
         }
     };
 
     // 简体中文：生成高阶质感与高区分度色彩的毛玻璃卡片样式，包含精致的微光渐变边框和高对比度文本
-    const getPremiumStyles = (type: NotificationType) => {
-        const baseStyle = {
-            backdropFilter: 'blur(20px) saturate(140%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-            transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, margin 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)',
-        };
-
-        switch (type) {
-            case 'success':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(16, 185, 129, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(10, 28, 20, 0.75) 0%, rgba(6, 18, 13, 0.85) 100%)',
-                    color: '#a7f3d0'
-                };
-            case 'error':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(239, 68, 68, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(30, 12, 12, 0.75) 0%, rgba(18, 8, 8, 0.85) 100%)',
-                    color: '#fecaca'
-                };
-            case 'warning':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(245, 158, 11, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(28, 20, 10, 0.75) 0%, rgba(18, 12, 6, 0.85) 100%)',
-                    color: '#fef3c7'
-                };
-            case 'alipay':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(59, 130, 246, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(12, 20, 36, 0.75) 0%, rgba(8, 12, 22, 0.85) 100%)',
-                    color: '#bfdbfe'
-                };
-            case 'wechat':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(20, 184, 166, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(10, 28, 24, 0.75) 0%, rgba(6, 18, 15, 0.85) 100%)',
-                    color: '#ccfbf1'
-                };
-            case 'paypal':
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(14, 165, 233, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(10, 24, 36, 0.75) 0%, rgba(6, 15, 22, 0.85) 100%)',
-                    color: '#e0f2fe'
-                };
-            case 'update' as any:
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(168, 85, 247, 0.3)',
-                    background: 'linear-gradient(135deg, rgba(22, 16, 32, 0.75) 0%, rgba(14, 10, 20, 0.85) 100%)',
-                    color: '#e9d5ff'
-                };
-            case 'info':
-            default:
-                return {
-                    ...baseStyle,
-                    borderColor: 'rgba(236, 72, 153, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(26, 12, 20, 0.75) 0%, rgba(16, 8, 12, 0.85) 100%)',
-                    color: '#fbcfe8'
-                };
-        }
-    };
-
     // 优先显示错误和警告，再按时间正序
     const sortedNotifications = [...notifications].sort((a, b) => {
         const score = (t: string) => (t === 'error' ? 3 : t === 'warning' ? 2 : 1);
@@ -374,19 +295,16 @@ const NotificationToast: React.FC = () => {
             }
         }
 
-        const premiumStyles = getPremiumStyles(latestNotification?.type || 'info');
-        const mStyle: React.CSSProperties = latestNotification ? {
-            ...premiumStyles,
+        const mStyle: ToastCssProperties = latestNotification ? {
+            '--kk-layer-current': KK_LAYER.toast,
             position: 'fixed',
             top: '48px', // 位置往下移动一些 (top-12)
             left: '50%',
-            zIndex: 99999,
             transform: transformStyle,
             opacity: opacityStyle,
             transition: transitionStyle,
             display: 'flex',
             alignItems: 'center',
-            boxShadow: `0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 10px 0 ${getIconColor(latestNotification.type)}10`,
             overflow: 'hidden',
             cursor: 'grab',
             touchAction: 'none', // 禁用浏览器默认滑动行为
@@ -416,7 +334,8 @@ const NotificationToast: React.FC = () => {
                             }
                         }}
                         style={mStyle}
-                        className="active:scale-98"
+                        className="kk-toast-layer kk-toast-card kk-toast-mobile-bar active:scale-98"
+                        data-type={getToastDataType(latestNotification.type)}
                     >
                         {isMobileBarExpanded ? (
                             <div className="flex items-center justify-between w-full gap-3 min-w-0 transition-opacity duration-300" style={{ opacity: isMobileBarExpanded ? 1 : 0 }}>
@@ -424,21 +343,20 @@ const NotificationToast: React.FC = () => {
                                     <div className="shrink-0 relative">
                                         {getIcon(latestNotification.type)}
                                         <span 
-                                            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-ping"
-                                            style={{ backgroundColor: getIconColor(latestNotification.type) }}
+                                            className="kk-toast-notification-dot absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-ping"
                                         />
                                     </div>
                                     <div className="min-w-0 flex-1 flex items-baseline">
-                                        <span className="text-xs font-bold leading-none truncate text-white max-w-[80px]">
+                                        <span className="kk-toast-title text-xs font-bold leading-none truncate max-w-[80px]">
                                             {latestNotification.title}
                                         </span>
-                                        <span className="text-[10px] font-medium opacity-80 pl-1.5 truncate text-white/80 flex-1">
+                                        <span className="kk-toast-message text-[10px] font-medium pl-1.5 truncate flex-1">
                                             {latestNotification.message}
                                         </span>
                                     </div>
                                 </div>
                                 <div className="shrink-0 flex items-center justify-center opacity-70">
-                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/90 flex items-center gap-0.5 font-bold">
+                                    <span className="kk-toast-action-badge text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5 font-bold">
                                         {latestNotification.id === 'system-update-card' ? pick('应用', 'Apply') : pick('查看', 'View')}
                                         <ChevronRight size={10} />
                                     </span>
@@ -455,25 +373,19 @@ const NotificationToast: React.FC = () => {
                 {/* 手机端二级页面 Drawer */}
                 {isMobileDrawerOpen && (
                     <div 
-                        className="fixed inset-0 z-[100000] flex flex-col justify-end bg-black/60 backdrop-blur-sm transition-all duration-300"
+                        className="kk-toast-layer kk-overlay-backdrop fixed inset-0 flex flex-col justify-end transition-all duration-300"
+                        style={{ '--kk-layer-current': KK_LAYER.toast } as ToastCssProperties}
                         onClick={() => setIsMobileDrawerOpen(false)}
                     >
                         <div 
-                            className="w-full max-h-[82vh] rounded-t-[24px] border-t p-5 flex flex-col"
-                            style={{
-                                background: 'linear-gradient(180deg, rgba(20, 20, 25, 0.85) 0%, rgba(12, 12, 16, 0.92) 100%)',
-                                borderColor: 'rgba(255, 255, 255, 0.12)',
-                                backdropFilter: 'blur(30px)',
-                                WebkitBackdropFilter: 'blur(30px)',
-                                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)'
-                            }}
+                            className="kk-toast-drawer-panel w-full max-h-[82vh] rounded-t-[24px] border-t p-5 flex flex-col"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* 顶部拖拽把手及标题 */}
-                            <div className="flex flex-col items-center gap-1.5 pb-4 border-b border-white/10">
-                                <div className="w-12 h-1 rounded-full bg-white/20" />
+                            <div className="kk-toast-drawer-header flex flex-col items-center gap-1.5 pb-4 border-b">
+                                <div className="w-12 h-1 rounded-full kk-toast-action-badge" />
                                 <div className="w-full flex items-center justify-between mt-3">
-                                    <span className="text-base font-bold text-white/90">
+                                    <span className="kk-toast-title text-base font-bold">
                                         {pick('通知中心', 'Notifications')}
                                     </span>
                                     <div className="flex items-center gap-2">
@@ -483,14 +395,14 @@ const NotificationToast: React.FC = () => {
                                                     notificationService.dismissAll();
                                                     setIsMobileDrawerOpen(false);
                                                 }}
-                                                className="text-xs px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/25 text-white/80 active:scale-95 transition-all"
+                                                className="kk-toast-action-badge text-xs px-2.5 py-1 rounded-full active:scale-95 transition-all"
                                             >
                                                 {pick('清空', 'Clear All')}
                                             </button>
                                         )}
                                         <button 
                                             onClick={() => setIsMobileDrawerOpen(false)}
-                                            className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 active:scale-95 transition-all"
+                                            className="kk-toast-icon-button rounded-full active:scale-95"
                                         >
                                             <X size={16} />
                                         </button>
@@ -502,34 +414,29 @@ const NotificationToast: React.FC = () => {
                             <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-3 max-h-[55vh]">
                                 {finalNotifications.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-12 opacity-40">
-                                        <span className="text-xs text-white/70">{pick('暂无通知', 'No Notifications')}</span>
+                                        <span className="kk-toast-muted text-xs">{pick('暂无通知', 'No Notifications')}</span>
                                     </div>
                                 ) : (
                                     finalNotifications.slice(0, 5).map((notification) => {
-                                        const styles = getPremiumStyles(notification.type);
                                         const isUpdateCard = notification.id === 'system-update-card';
                                         return (
                                             <div 
                                                 key={notification.id}
                                                 onClick={() => handleCardClick(notification)}
-                                                className={`rounded-xl border p-4 flex gap-3 shadow-md ${isUpdateCard ? 'cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all' : ''}`}
-                                                style={{
-                                                    background: styles.background,
-                                                    borderColor: styles.borderColor,
-                                                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)'
-                                                }}
+                                                className={`kk-toast-card rounded-xl p-4 flex gap-3 ${isUpdateCard ? 'cursor-pointer hover:brightness-110 active:scale-[0.98]' : ''}`}
+                                                data-type={getToastDataType(notification.type)}
                                             >
-                                                <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                                                <div className="kk-toast-icon-shell shrink-0 flex h-8 w-8 items-center justify-center rounded-full">
                                                     {getIcon(notification.type)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                                                    <div className="kk-toast-title text-sm font-bold flex items-center gap-1.5">
                                                         {notification.title}
-                                                        {isUpdateCard && <ArrowUp size={12} className="animate-bounce" style={{ color: '#c084fc' }} />}
+                                                        {isUpdateCard && <ArrowUp size={12} className="kk-toast-accent-icon animate-bounce" />}
                                                     </div>
-                                                    <div className="text-xs text-white/80 mt-1 leading-relaxed break-words">{notification.message}</div>
+                                                    <div className="kk-toast-message text-xs mt-1 leading-relaxed break-words">{notification.message}</div>
                                                     {notification.details && (
-                                                        <div className="mt-2 rounded p-2 text-[10px] font-mono bg-black/40 border border-white/5 text-white/50 max-h-20 overflow-y-auto">
+                                                        <div className="kk-toast-details mt-2 rounded p-2 text-[10px] font-mono max-h-20 overflow-y-auto">
                                                             {notification.details}
                                                         </div>
                                                     )}
@@ -541,12 +448,12 @@ const NotificationToast: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 notificationService.dismiss(notification.id);
                                                             }}
-                                                            className="p-1 rounded-full hover:bg-white/10 text-white/40 active:scale-95 transition-all"
+                                                            className="kk-toast-icon-button rounded-full active:scale-95"
                                                         >
                                                             <X size={14} />
                                                         </button>
                                                     ) : (
-                                                        <span className="text-[10px] bg-purple-500/20 text-purple-200 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                                                        <span className="kk-toast-update-badge text-[10px] px-2 py-0.5 rounded-full font-bold">
                                                             {pick('应用', 'Apply')}
                                                         </span>
                                                     )}
@@ -556,9 +463,9 @@ const NotificationToast: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 handleCopyDetails(notification);
                                                             }}
-                                                            className="p-1 rounded-full hover:bg-white/10 text-white/40 active:scale-95 transition-all"
+                                                            className="kk-toast-icon-button rounded-full active:scale-95"
                                                         >
-                                                            {copiedId === notification.id ? <Check size={14} style={{ color: '#34d399' }} /> : <Copy size={14} />}
+                                                            {copiedId === notification.id ? <Check size={14} className="kk-toast-accent-icon" /> : <Copy size={14} />}
                                                         </button>
                                                     )}
                                                 </div>
@@ -584,19 +491,21 @@ const NotificationToast: React.FC = () => {
     return (
         <>
             {finalNotifications.length > 0 && (
-                <div className="fixed z-[99999] flex flex-col pointer-events-none bottom-24 right-6 w-full max-w-[380px] top-auto left-auto">
+                <div
+                    className="kk-toast-layer fixed flex flex-col pointer-events-none bottom-24 right-6 w-full max-w-[380px] top-auto left-auto"
+                    style={{ '--kk-layer-current': KK_LAYER.toast } as ToastCssProperties}
+                >
                     <div 
                         className="flex flex-col pointer-events-auto" 
                         onMouseEnter={() => setIsExpanded(true)} 
                         onMouseLeave={() => setIsExpanded(false)}
                     >
                         {desktopDisplayNotifications.map((notification, index) => {
-                            const styles = getPremiumStyles(notification.type);
                             const isUpdateCard = notification.id === 'system-update-card';
                             
                             // 简体中文：根据折叠/展开状态计算 3D 向上叠放与缩放样式
-                            let cardStyle: React.CSSProperties = { 
-                                ...styles,
+                            let cardStyle: ToastCssProperties = {
+                                '--kk-toast-card-stack-index': 0,
                                 borderRadius: '16px',
                                 borderWidth: '1px',
                             };
@@ -604,21 +513,21 @@ const NotificationToast: React.FC = () => {
                             if (!isExpanded) {
                                 if (index === 0) {
                                     cardStyle.transform = 'translateY(0px) scale(1)';
-                                    cardStyle.zIndex = 30;
+                                    cardStyle['--kk-toast-card-stack-index'] = 30;
                                     cardStyle.opacity = 1;
                                 } else if (index === 1) {
                                     cardStyle.transform = 'translateY(-8px) scale(0.96)';
-                                    cardStyle.zIndex = 20;
+                                    cardStyle['--kk-toast-card-stack-index'] = 20;
                                     cardStyle.opacity = 0.85;
                                     cardStyle.marginTop = '-72px'; // 向上偏移覆盖上一张，实现折叠堆叠
                                 } else if (index === 2) {
                                     cardStyle.transform = 'translateY(-16px) scale(0.92)';
-                                    cardStyle.zIndex = 10;
+                                    cardStyle['--kk-toast-card-stack-index'] = 10;
                                     cardStyle.opacity = 0.55;
                                     cardStyle.marginTop = '-72px';
                                 } else {
                                     cardStyle.transform = 'translateY(-24px) scale(0.88)';
-                                    cardStyle.zIndex = 0;
+                                    cardStyle['--kk-toast-card-stack-index'] = 0;
                                     cardStyle.opacity = 0;
                                     cardStyle.pointerEvents = 'none';
                                     cardStyle.marginTop = '-72px';
@@ -627,7 +536,7 @@ const NotificationToast: React.FC = () => {
                                 // 展开状态：自然纵向排列
                                 cardStyle.transform = 'translateY(0px) scale(1)';
                                 cardStyle.opacity = 1;
-                                cardStyle.zIndex = 30 - index;
+                                cardStyle['--kk-toast-card-stack-index'] = 30 - index;
                                 cardStyle.marginTop = '12px'; // 正常的通知间距
                             }
 
@@ -636,22 +545,23 @@ const NotificationToast: React.FC = () => {
                                     key={notification.id}
                                     style={cardStyle}
                                     onClick={() => handleCardClick(notification)}
-                                    className={`overflow-hidden cursor-pointer hover:!scale-[1.02] shadow-2xl ${isUpdateCard ? 'hover:brightness-110 active:scale-[0.98]' : ''}`}
+                                    className="kk-toast-card overflow-hidden cursor-pointer hover:!scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+                                    data-type={getToastDataType(notification.type)}
                                 >
                                     <div className="flex items-start gap-3.5 p-4">
-                                        <div className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                                        <div className="kk-toast-icon-shell shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full">
                                             {getIcon(notification.type)}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-bold leading-snug tracking-wide text-white flex items-center gap-1.5">
+                                            <div className="kk-toast-title text-sm font-bold leading-snug tracking-wide flex items-center gap-1.5">
                                                 {notification.title}
-                                                {isUpdateCard && <ArrowUp size={12} className="animate-bounce" style={{ color: '#c084fc' }} />}
+                                                {isUpdateCard && <ArrowUp size={12} className="kk-toast-accent-icon animate-bounce" />}
                                             </div>
-                                            <div className="mt-1 text-xs font-medium leading-relaxed break-words text-white/80">
+                                            <div className="kk-toast-message mt-1 text-xs font-medium leading-relaxed break-words">
                                                 {notification.message}
                                             </div>
                                             {notification.details && (
-                                                <div className="mt-2.5 overflow-hidden rounded-lg border p-2 text-[10px] font-mono line-clamp-3 bg-black/40 border-white/5 text-white/50">
+                                                <div className="kk-toast-details mt-2.5 overflow-hidden rounded-lg border p-2 text-[10px] font-mono line-clamp-3">
                                                     {notification.details}
                                                 </div>
                                             )}
@@ -664,12 +574,12 @@ const NotificationToast: React.FC = () => {
                                                         e.stopPropagation();
                                                         notificationService.dismiss(notification.id);
                                                     }}
-                                                    className="p-1.5 rounded-full hover:bg-white/10 text-white/40 active:scale-95 transition-all"
+                                                    className="kk-toast-icon-button rounded-full active:scale-95"
                                                 >
                                                     <X size={13} />
                                                 </button>
                                             ) : (
-                                                <span className="text-[10px] bg-purple-500/20 text-purple-200 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                                                <span className="kk-toast-update-badge text-[10px] px-2 py-0.5 rounded-full font-bold">
                                                     {pick('应用', 'Apply')}
                                                 </span>
                                             )}
@@ -679,10 +589,10 @@ const NotificationToast: React.FC = () => {
                                                         e.stopPropagation();
                                                         handleCopyDetails(notification);
                                                     }}
-                                                    className="p-1.5 rounded-full hover:bg-white/10 text-white/40 active:scale-95 transition-all"
+                                                    className="kk-toast-icon-button rounded-full active:scale-95"
                                                     title={pick('复制详细信息', 'Copy details')}
                                                 >
-                                                    {copiedId === notification.id ? <Check size={13} style={{ color: '#34d399' }} /> : <Copy size={13} />}
+                                                    {copiedId === notification.id ? <Check size={13} className="kk-toast-accent-icon" /> : <Copy size={13} />}
                                                 </button>
                                             )}
                                         </div>

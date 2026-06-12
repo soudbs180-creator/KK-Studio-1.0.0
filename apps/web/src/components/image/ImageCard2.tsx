@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { type GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music, Heart } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
+import { LayerPortal } from '../layout/LayerPortal';
 import { getCardDimensions, FOOTER_HEIGHT } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -22,7 +24,6 @@ import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { safeOpenLink } from '../../utils/browserUtils';
-import { useTheme } from '../../context/ThemeContext';
 import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 
@@ -142,7 +143,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false // 🚀 [New] 垂直聊天流标识
 }) => {
-    const { isDarkMode } = useTheme();
     const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
         : detailLevel === 'compact'
@@ -229,7 +229,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, [showDownloadMenu]);
 
-    // 🚀 [丝滑优化] 统一飞入动画：从输入框中心飞向画布目标位置
+    // 🚀 [丝滑优化] 统一飞入动画：直接复位样式，忽略不可达动画
     useLayoutEffect(() => {
         hasAnimatedRef.current = image.id;
         const directRenderEl = containerRef.current;
@@ -239,94 +239,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             directRenderEl.style.zIndex = '';
             directRenderEl.style.transform = '';
         }
-        return;
-
-        if (hasAnimatedRef.current === image.id || isChatMode) return;
-
-        const now = Date.now();
-        const isFresh = image.timestamp && (now - image.timestamp < 1500);
-
-        if (isFresh && canvasTransform && containerRef.current) {
-            hasAnimatedRef.current = image.id;
-            const el = containerRef.current;
-
-            // 🚀 立即隐藏元素，防止 GSAP 加载期间闪烁到目标位置
-            const restoreVisibility = () => {
-                if (!el || !el.isConnected) return;
-                el.style.opacity = '1';
-                el.style.willChange = '';
-                el.style.zIndex = '';
-            };
-
-            import('gsap').then(({ default: gsap }) => {
-                if (!el || !el.isConnected) return;
-
-                // 1. 计算起始世界坐标（输入框中线发牌，且整体在输入框上方）
-                const launchPoint = getPromptBarLaunchPoint(18, 'bottom');
-                const startScreenX = launchPoint.x;
-                const startScreenY = launchPoint.y;
-                const offsetX = (startScreenX - canvasTransform!.x) / canvasTransform!.scale - position.x;
-                const offsetY = (startScreenY - canvasTransform!.y) / canvasTransform!.scale - position.y;
-                const timelineConfig = getLaunchTimelineByOffset(offsetX, offsetY, canvasTransform!.scale || 1);
-
-                // 2. 单一 fromTo 动画 —— 消除双重动画抖动
-                const timeline = gsap.timeline({
-                    defaults: { force3D: true, overwrite: 'auto' },
-                    onStart: () => {
-                        el.style.zIndex = String((stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex)) + 1);
-                    },
-                    onComplete: () => {
-                        el.style.willChange = '';
-                        el.style.zIndex = '';
-                    },
-                    onInterrupt: () => {
-                        el.style.willChange = '';
-                        el.style.zIndex = '';
-                    },
-                });
-
-                timeline
-                    .set(el, {
-                        x: timelineConfig.startX,
-                        y: timelineConfig.startY,
-                        scale: timelineConfig.startScale,
-                        opacity: 0,
-                        transformOrigin: '50% 100%',
-                    })
-                    .to(el, {
-                        opacity: 1,
-                        duration: timelineConfig.fadeInDuration,
-                        ease: 'sine.out',
-                    })
-                    .to(el, {
-                        x: timelineConfig.midX,
-                        y: timelineConfig.midY,
-                        scale: timelineConfig.midScale,
-                        duration: timelineConfig.travelDuration,
-                        ease: 'power2.out',
-                    }, '<')
-                    .to(el, {
-                        x: timelineConfig.nearX,
-                        y: timelineConfig.nearY,
-                        scale: timelineConfig.nearScale,
-                        duration: timelineConfig.nearDuration,
-                        ease: 'sine.out',
-                    })
-                    .to(el, {
-                        x: 0,
-                        y: 0,
-                        scale: 1,
-                        opacity: 1,
-                        duration: timelineConfig.settleDuration + 0.06,
-                        ease: 'expo.out',
-                        clearProps: 'transform,opacity,will-change',
-                    });
-            }).catch((error) => {
-                console.warn('[ImageCard2] Failed to load GSAP, restored visibility.', error);
-                restoreVisibility();
-            });
-        }
-    }, [image.id, image.timestamp, canvasTransform, image.zIndex, isActive, isNew, isSelected, groupLayerZIndex, stackZIndexOverride]);
+    }, [image.id]);
 
     // 🚀 [New] Entry Animation Cleanup: remove 'isNew' status after animation ends
     useEffect(() => {
@@ -1365,9 +1278,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const showSelectionBorder = showSelectedAccent || showHighlightedAccent;
     const selectedBorderColor = 'color-mix(in srgb, var(--accent-coral) 72%, var(--frost-card-main-border))';
     const highlightedBorderColor = 'color-mix(in srgb, var(--accent-coral) 46%, var(--frost-card-main-border))';
-    const activeBorderColor = 'rgba(245, 158, 11, 0.72)';
+    const activeBorderColor = 'var(--kk-image-card-active-border)';
     const cardBorderColor = image.error && !image.isGenerating
-        ? 'rgba(244, 63, 94, 0.45)' // 简体中文注释：使用带半透明质感的高级玫瑰珊瑚红代替刺眼的强亮红，更显细腻与高雅
+        ? 'var(--kk-image-card-error-border)' // 简体中文注释：使用系统错误边框 token，避免卡片状态色继续分叉
         : showSelectedAccent
             ? selectedBorderColor
             : showHighlightedAccent
@@ -1390,7 +1303,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             : showSelectionBorder
                 ? `0 0 0 ${selectionRingWidth}px color-mix(in srgb, var(--accent-coral) 18%, transparent)`
                 : showActiveAccent
-                    ? `0 0 0 ${activeRingWidth}px rgba(245, 158, 11, 0.26)`
+                    ? `0 0 0 ${activeRingWidth}px var(--kk-image-card-active-ring)`
                     : '';
     const cardSurfaceShadow = accentRingShadow
         ? `${accentRingShadow}, ${baseCardShadow}`
@@ -1424,12 +1337,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 className="gpu-accelerated transition-opacity duration-300"
             >
                 <div
-                    className="w-full h-full rounded-2xl border animate-pulse"
-                    style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderColor: 'rgba(255, 255, 255, 0.08)',
-                        backdropFilter: 'blur(8px)',
-                    }}
+                    className="kk-image-card-skeleton w-full h-full rounded-2xl border animate-pulse"
                 />
             </div>
         );
@@ -1442,7 +1350,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             ? truncateByChars(shellTitle, 22)
             : truncateByChars(image.prompt || shellTitle, 42);
         const shellBadgeClass = image.error && !image.isGenerating
-            ? 'text-red-400 bg-red-500/10 border-red-500/20'
+            ? 'kk-image-card-pill-error'
             : image.isGenerating
                 ? 'text-[var(--accent-coral)] bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)]'
                 : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
@@ -1646,7 +1554,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         e.stopPropagation();
                                         onPreviewPptStack(image.id);
                                     }}
-                                    className="absolute left-2 top-2 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[var(--accent-coral)] transition-colors"
+                                    className="kk-image-card-ppt-badge absolute left-2 top-2 rounded-full px-2.5 py-1 text-[10px] font-medium"
                                     title="整屏查看"
                                 >
                                     整屏
@@ -1704,9 +1612,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     }}
                                                 />
                                                 {/* Play/Pause Overlay with smooth transitions */}
-                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/video:opacity-100 transition-opacity duration-300 bg-black/0 hover:bg-black/20">
+                                                <div className="kk-image-card-video-overlay absolute inset-0 flex items-center justify-center opacity-0 group-hover/video:opacity-100">
                                                     <button
-                                                        className="w-12 h-12 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white transition-all duration-300 transform hover:scale-110 active:scale-95 border border-white/20"
+                                                        className="kk-image-card-video-button w-12 h-12 flex items-center justify-center rounded-full backdrop-blur-sm transform hover:scale-110 active:scale-95"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (videoRef.current) {
@@ -1811,26 +1719,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     image.originalUrl?.startsWith('blob:')
                                                 ));
 
-                                            const placeholderBg = 'rgba(10, 10, 10, 0.95)';
-                                            const placeholderGlow = isMediaExpired
-                                                ? 'inset 0 0 16px rgba(245, 158, 11, 0.15)'
-                                                : 'inset 0 0 16px rgba(239, 68, 68, 0.15)';
-                                            const placeholderBorder = isMediaExpired
-                                                ? '1px solid rgba(245, 158, 11, 0.12)'
-                                                : '1px solid rgba(239, 68, 68, 0.12)';
-                                            const placeholderTextColor = isMediaExpired
-                                                ? 'rgb(245, 158, 11)'
-                                                : 'rgb(244, 63, 94)';
-
                                             return (
                                                 <div 
-                                                    className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center rounded-lg"
-                                                    style={{
-                                                        background: placeholderBg,
-                                                        boxShadow: placeholderGlow,
-                                                        border: placeholderBorder,
-                                                        color: placeholderTextColor
-                                                    }}
+                                                    className={joinClasses(
+                                                        'kk-image-card-state absolute inset-0 flex flex-col items-center justify-center p-4 text-center rounded-lg',
+                                                        isMediaExpired ? 'kk-image-card-state--expired' : 'kk-image-card-state--error'
+                                                    )}
                                                 >
                                                     {/* 🚀 加载/恢复状态 - 居中显示 */}
                                                     {(isLoading || (!imgError && !displaySrc)) ? (
@@ -1869,22 +1763,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 ? '已取消'
                                                 : '生成失败');
                                     
-                                    const placeholderTextColor = isExpired ? 'rgb(245, 158, 11)' : 'rgb(244, 63, 94)';
-                                    const placeholderBorder = isExpired ? '1px solid rgba(245, 158, 11, 0.12)' : '1px solid rgba(239, 68, 68, 0.12)';
-                                    const placeholderGlow = isExpired ? 'inset 0 0 16px rgba(245, 158, 11, 0.15)' : 'inset 0 0 16px rgba(239, 68, 68, 0.15)';
-
                                     return (
                                         <div
-                                            className="absolute inset-0 z-40 rounded-lg flex items-center justify-center p-4 text-center"
-                                            style={{
-                                                background: 'rgba(10, 10, 10, 0.95)',
-                                                border: placeholderBorder,
-                                                boxShadow: placeholderGlow,
-                                            }}
+                                            className={joinClasses(
+                                                'kk-image-card-state absolute inset-0 rounded-lg flex items-center justify-center p-4 text-center',
+                                                isExpired ? 'kk-image-card-state--expired' : 'kk-image-card-state--error'
+                                            )}
                                         >
                                             <span 
                                                 className="text-xs font-semibold tracking-wide"
-                                                style={{ color: placeholderTextColor }}
                                             >
                                                 {errorText}
                                             </span>
@@ -1894,12 +1781,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                 {image.isGenerating && (
                                     <div
-                                        className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center"
-                                        style={{
-                                            background: 'rgba(10, 10, 10, 0.92)',
-                                            border: '1px solid rgba(255, 77, 139, 0.15)',
-                                            boxShadow: 'inset 0 0 16px rgba(255, 77, 139, 0.08)',
-                                        }}
+                                        className="kk-image-card-state kk-image-card-state--generating absolute inset-0 rounded-lg flex flex-col items-center justify-center p-4 text-center"
                                     >
                                         <Loader2 className="animate-spin text-[var(--accent-coral)] mb-2" size={20} />
                                         <span 
@@ -1912,22 +1794,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                 {((isLoading || !isMediaLoaded) && !imgError) && !image.error && !image.isGenerating && !isCanvasTransforming && (
                                     <div
-                                        className={`absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border ${
-                                            isDarkMode ? 'border-white/5 animate-shimmer-inward' : 'border-black/5 animate-shimmer-inward'
-                                        }`}
+                                        className="kk-image-card-state kk-image-card-state--loading absolute inset-0 rounded-lg flex flex-col items-center justify-center animate-shimmer-inward"
                                         style={{
                                             willChange: 'opacity',
-                                            background: isDarkMode ? 'rgba(10, 10, 10, 0.95)' : 'rgba(250, 250, 250, 0.95)',
-                                            boxShadow: isDarkMode 
-                                                ? 'inset 0 0 16px rgba(255, 255, 255, 0.12)' 
-                                                : 'inset 0 0 16px rgba(0, 0, 0, 0.06)'
                                         }}
                                     >
                                         <span 
                                             className="text-xs font-semibold tracking-wide"
-                                            style={{
-                                                color: isDarkMode ? 'rgba(255, 255, 255, 0.85)' : 'rgba(17, 17, 17, 0.85)'
-                                            }}
                                         >
                                             正在加载...
                                         </span>
@@ -2003,7 +1876,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 {!image.orphaned && image.isGenerating && (
                                     <div className={joinClasses('flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')} style={secondaryTextRenderStyle}>
                                         <div className={joinClasses(`flex items-center gap-1 rounded-lg border min-w-0 ${isCreditModel ? getModelThemeBgColor(image.model || '') : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`, generatingBadgeMaxWidthClass, capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
-                                            <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'text-white drop-shadow-sm' : modelBadge.colorClass}`)} title={modelText || 'AI'}>
+                                            <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'kk-image-card-credit-text' : modelBadge.colorClass}`)} title={modelText || 'AI'}>
                                                 {truncateByChars(modelText || 'AI', 15)}
                                             </span>
                                             {!isCreditModel && providerText && (
@@ -2033,8 +1906,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                                 title="点击结束生成"
                                             >
-                                                <div className={joinClasses('flex items-center px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-sm transform translate-y-[1px]', isCompactFooter ? 'gap-1' : 'gap-1.5')}>
-                                                    <svg className={joinClasses('animate-spin border-r-transparent border-red-500 rounded-full border-2', isTightFooter ? 'w-2.5 h-2.5' : 'w-3 h-3')} viewBox="0 0 24 24" />
+                                                <div className={joinClasses('kk-image-card-stop-generate flex items-center px-3 py-1 rounded-full active:scale-95 shadow-sm transform translate-y-[1px]', isCompactFooter ? 'gap-1' : 'gap-1.5')}>
+                                                    <svg className={joinClasses('animate-spin border-r-transparent rounded-full border-2', isTightFooter ? 'w-2.5 h-2.5' : 'w-3 h-3')} viewBox="0 0 24 24" />
                                                     <span className={joinClasses('font-bold', isTightFooter ? 'text-[9px]' : 'text-[10px]')}>结束生成</span>
                                                 </div>
                                             </button>
@@ -2104,31 +1977,42 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-coral)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
                                                         <Download size={actionIconSize} />
                                                     </button>
-                                                    {showDownloadMenu && isPptSubCard && (
-                                                        <div className="absolute right-0 top-full z-30 mt-1 w-28 rounded-lg border border-[var(--frost-card-framework-border)] bg-[var(--frost-card-framework-bg)] p-1">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    setShowDownloadMenu(false);
-                                                                    void handleSingleDownload(e);
-                                                                }}
-                                                                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                                                            >
-                                                                <span>下载单图</span>
-                                                            </button>
-                                                            {onDownloadPptComposite && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setShowDownloadMenu(false);
-                                                                        onDownloadPptComposite(image.id);
-                                                                    }}
-                                                                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                                    {showDownloadMenu && isPptSubCard && (() => {
+                                                        const btnEl = downloadMenuRef.current?.querySelector('button');
+                                                        const rect = btnEl?.getBoundingClientRect();
+                                                        const top = rect ? rect.bottom + window.scrollY + 4 : 0;
+                                                        const left = rect ? rect.left + window.scrollX - 80 : 0;
+                                                        return (
+                                                            <LayerPortal zIndex={KK_LAYER.dropdown}>
+                                                                <div
+                                                                    style={{ position: 'absolute', top, left }}
+                                                                    className="kk-image-card-download-menu w-28 rounded-lg p-1"
                                                                 >
-                                                                    <span>下载整屏</span>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            setShowDownloadMenu(false);
+                                                                            void handleSingleDownload(e);
+                                                                        }}
+                                                                        className="kk-image-card-download-item flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px]"
+                                                                    >
+                                                                        <span>下载单图</span>
+                                                                    </button>
+                                                                    {onDownloadPptComposite && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setShowDownloadMenu(false);
+                                                                                onDownloadPptComposite(image.id);
+                                                                            }}
+                                                                            className="kk-image-card-download-item flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px]"
+                                                                        >
+                                                                            <span>下载整屏</span>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </LayerPortal>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <button onClick={(e) => { e.stopPropagation(); onDelete(image.id); }} className={joinClasses('hover:text-[var(--accent-red)] transition-colors', iconButtonPaddingClass)} title="删除">
                                                     <Trash2 size={actionIconSize} />

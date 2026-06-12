@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { type CanvasGroup} from '../../types';
 import { Type, GripHorizontal, Trash2, Eye, EyeOff, Archive, Maximize2, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -63,11 +64,6 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
-    const groupGlowShadow = [
-        'var(--frost-card-framework-shadow)',
-        `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 34%, transparent)`,
-        `inset 0 0 22px color-mix(in srgb, ${groupBorderColor} 18%, transparent)`,
-    ].join(', ');
     const groupSurfaceStyle: React.CSSProperties = {
         background: highlighted
             ? 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, var(--state-info-bg) 12%)'
@@ -78,8 +74,12 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                 : 'var(--frost-card-framework-bg)',
         borderColor: highlighted
             ? 'var(--state-info-border)'
-            : 'color-mix(in srgb, #ffffff 26%, transparent)',
-        boxShadow: groupGlowShadow,
+            : 'var(--frost-card-framework-border)',
+        boxShadow: [
+            'var(--frost-card-framework-shadow)',
+            `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 34%, transparent)`,
+            `inset 0 0 22px color-mix(in srgb, ${groupBorderColor} 18%, transparent)`,
+        ].join(', '),
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
@@ -103,7 +103,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     };
     const groupCollapsedCardStyle: React.CSSProperties = {
         ...groupHeaderSurfaceStyle,
-        borderColor: highlighted ? 'var(--state-info-border)' : 'color-mix(in srgb, #ffffff 26%, transparent)',
+        borderColor: highlighted ? 'var(--state-info-border)' : 'var(--frost-card-framework-border)',
         boxShadow: [
             'var(--frost-card-sub-shadow)',
             `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 34%, transparent)`,
@@ -443,15 +443,11 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             {contextMenu && createPortal(
                 <div
                     ref={menuRef}
-                    className="fixed z-[9999] rounded-lg border p-1 min-w-[140px] animate-fadeIn"
+                    className="kk-canvas-context-menu fixed animate-fadeIn"
                     style={{
                         left: (menuPosition?.x ?? contextMenu.x + 6),
                         top: (menuPosition?.y ?? contextMenu.y + 6),
-                        background: 'var(--frost-card-framework-bg)',
-                        borderColor: 'var(--frost-card-framework-border)',
-                        boxShadow: 'var(--frost-card-framework-shadow)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                        zIndex: KK_LAYER.dropdown,
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -460,28 +456,30 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             setContextMenu(null);
                             setIsEditing(true);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)] rounded transition-colors text-left"
+                        className="kk-canvas-context-menu-item"
                     >
                         <Type size={14} />
                         重命名
                     </button>
-                    <div className="px-3 py-2">
-                        <div className="mb-2 text-xs font-medium text-[var(--text-tertiary)]">内发光颜色</div>
+                    <div className="kk-canvas-context-menu-section">
+                        <div className="kk-canvas-context-menu-label">内发光颜色</div>
                         <div className="flex flex-wrap items-center gap-1.5">
                             {GROUP_BORDER_COLOR_SWATCHES.map((color) => {
                                 const selected = color.toLowerCase() === groupBorderColor.toLowerCase();
+                                const swatchStyle = {
+                                    '--kk-canvas-context-menu-swatch-color': color,
+                                    '--kk-canvas-context-menu-swatch-check-color': color === '#111827'
+                                        ? 'var(--kk-canvas-context-menu-swatch-check-on-dark)'
+                                        : 'var(--kk-canvas-context-menu-swatch-check-on-light)',
+                                } as React.CSSProperties;
                                 return (
                                     <button
                                         key={color}
                                         type="button"
                                         onClick={() => handleUpdateColor(color)}
-                                        className="flex h-6 w-6 items-center justify-center rounded-full border transition-transform hover:scale-105"
-                                        style={{
-                                            background: color,
-                                            borderColor: selected ? 'var(--text-primary)' : 'color-mix(in srgb, #ffffff 45%, transparent)',
-                                            boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${color} 40%, transparent)` : 'none',
-                                            color: color === '#111827' ? '#ffffff' : '#111827',
-                                        }}
+                                        className="kk-canvas-context-menu-swatch"
+                                        data-selected={selected}
+                                        style={swatchStyle}
                                         title={color}
                                         aria-label={color}
                                     >
@@ -494,19 +492,19 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                                 value={normalizeHexColor(groupBorderColor)}
                                 onChange={(e) => handleUpdateColor(e.currentTarget.value)}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="h-6 w-6 cursor-pointer rounded-full border border-[var(--frost-card-sub-border)] bg-transparent p-0"
+                                className="kk-canvas-context-menu-color-input"
                                 title="自定义内发光颜色"
                                 aria-label="自定义内发光颜色"
                             />
                         </div>
                     </div>
-                    <div className="h-[1px] bg-[var(--border-light)] my-1" />
+                    <div className="kk-canvas-context-menu-divider" />
                     <button
                         onClick={() => {
                             setContextMenu(null);
                             onUngroup(group.id);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-[rgba(255,107,90,0.10)] hover:text-red-400 rounded transition-colors text-left"
+                        className="kk-canvas-context-menu-item kk-canvas-context-menu-item--danger"
                     >
                         <Trash2 size={14} />
                         取消分组

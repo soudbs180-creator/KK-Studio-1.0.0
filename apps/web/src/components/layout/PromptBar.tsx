@@ -1,5 +1,6 @@
 import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
+import { KK_LAYER } from '@kk/ui';
 import { type GenerationConfig, AspectRatio, ImageSize, GenerationMode, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
 import { type ActiveModel} from '../../services/model/modelRegistry';
 import { keyManager } from '../../services/auth/keyManager'; // Added getter
@@ -79,6 +80,8 @@ const PROMPT_TEXTAREA_MAX_ROWS = 6;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 const MODEL_MENU_SKELETON_COUNT = 3;
+const PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR = '[data-prompt-bar-mobile-model-layer="true"]';
+const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '[data-kk-mobile-overlay-layer="true"], [data-prompt-bar-mobile-model-layer="true"]';
 
 type LlmServiceModule = typeof import('../../services/llm/LLMService');
 
@@ -446,14 +449,15 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 {isLongPressing && (
                     <div 
                         ref={bubbleRef}
-                        className={"absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl backdrop-blur-xl bg-black/85 dark:bg-black/90 border border-white/20 text-white " + ("shadow-2x" + "l") + " z-[1200]"}
+                        className="kk-prompt-bar-count-bubble absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl"
+                        style={{ zIndex: KK_LAYER.dropdown }}
                     >
                         {[1, 2, 3, 4].map((num) => {
                             const isSelected = parallelCount === num;
                             return (
                                 <div 
                                     key={num}
-                                    className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-150 ${isSelected ? 'bg-gradient-to-r from-[var(--accent-coral)] to-[var(--accent-pink)] text-white scale-125 shadow-md shadow-pink-500/20' : 'text-white/60 scale-100'}`}
+                                    className={`kk-prompt-bar-count-option w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold ${isSelected ? 'kk-prompt-bar-count-option--active' : 'scale-100'}`}
                                 
                                 >
                                     {num}
@@ -461,7 +465,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                             );
                         })}
                         {/* 小气泡箭头 */}
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black/85 dark:bg-black/90 border-r border-b border-white/20 rotate-45" />
+                        <div className="kk-prompt-bar-overlay-arrow absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 border-r border-b rotate-45" />
                     </div>
                 )}
 
@@ -635,9 +639,9 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                     {/* 悬停提示 - 精确居中于整个按钮 */}
                     <div className="absolute -top-10 left-0 right-0 flex justify-center pointer-events-none">
-                        <div className="px-3 py-1.5 bg-black/85 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap scale-95 group-hover:scale-100">
+                        <div className="kk-prompt-bar-tooltip px-3 py-1.5 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap scale-95 group-hover:scale-100">
                             消耗 {creditCost} 积分生成
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black/85 rotate-45" />
+                            <div className="kk-prompt-bar-tooltip-arrow absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45" />
                         </div>
                     </div>
                 </button>
@@ -1312,15 +1316,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
             // 2. 若点击在移动端模型选择弹窗（Bottom Sheet）或其遮罩层中，放行
             const target = e.target as HTMLElement;
-            if (target.closest('[class*="z-[1049]"]') || target.closest('[class*="z-[1050]"]')) {
+            if (target.closest(PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR) || target.closest(PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR)) {
                 return;
             }
 
             // 3. 若点击在裁剪、大图预览、电商续作历史等悬浮面板里，放行
-            if (target.closest('[class*="z-[990]"]') || target.closest('[class*="z-[985]"]')) {
-                return;
-            }
-
             // 4. 收起面板，且使输入框失去焦点（防键盘弹起）
             setIsExpanded(false);
             textareaRef.current?.blur();
@@ -3506,7 +3506,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             margin: 0,
             borderRadius: '22px',
             border: '1px solid var(--frost-card-framework-border)',
-            zIndex: 960,
+            zIndex: KK_LAYER.promptComposer,
             padding: 0,
             WebkitBackdropFilter: 'blur(26px) saturate(170%)',
             backdropFilter: 'blur(26px) saturate(170%)',
@@ -4068,7 +4068,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
             <>
                 <div
                     id="prompt-bar-container"
-                    className="fixed bottom-[10px] left-1/2 -translate-x-1/2 w-[80px] h-[12px] bg-neutral-400/30 hover:bg-neutral-400/50 dark:bg-neutral-500/30 dark:hover:bg-neutral-500/50 rounded-full transition-all duration-300 z-[800] cursor-pointer"
+                    className="kk-prompt-bar-mobile-collapse-handle"
+                    style={{ zIndex: KK_LAYER.promptComposer }}
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsExpanded(true);
@@ -4103,7 +4104,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         return (
             <div
                 id="prompt-bar-container"
-                className={`input-bar ios-mobile-prompt ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full z-[800]`}
+                className={`input-bar ios-mobile-prompt ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full`}
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{
@@ -5766,44 +5767,28 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                      <>
                                       {/* 🚀 移动端模型库 Bottom Sheet 蒙层 */}
                                       <div
-                                          className="fixed inset-0 z-[1049] bg-black/40"
-                                          style={{ backdropFilter: 'blur(2px)' }}
+                                          data-prompt-bar-mobile-model-layer="true"
+                                          className="kk-prompt-bar-mobile-model-backdrop"
+                                          style={{ zIndex: KK_LAYER.modalBackdrop }}
                                           onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
                                           onTouchStart={(e) => e.stopPropagation()}
                                       />
                                       {/* 🚀 移动端模型库 Bottom Sheet 半屏弹窗 */}
                                       <div
-                                          className="fixed left-0 right-0 bottom-0 z-[1050] flex flex-col items-center"
-                                          style={{
-                                              animation: 'model-sheet-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) forwards',
-                                              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-                                          }}
+                                          data-prompt-bar-mobile-model-layer="true"
+                                          className="kk-prompt-bar-mobile-model-sheet-host"
+                                          style={{ zIndex: KK_LAYER.modal }}
                                           onTouchStart={(e) => e.stopPropagation()}
                                           onTouchMove={(e) => e.stopPropagation()}
                                           onTouchEnd={(e) => e.stopPropagation()}
                                       >
-                                          <style>{`
-                                              @keyframes model-sheet-slide-up {
-                                                  from { transform: translateY(100%); opacity: 0.6; }
-                                                  to   { transform: translateY(0);    opacity: 1; }
-                                              }
-                                          `}</style>
                                           <div
                                               ref={modelDropdownRef}
-                                              className="w-full max-w-[480px] rounded-t-2xl overflow-hidden"
-                                              style={{
-                                                  background: 'var(--frost-card-framework-bg)',
-                                                  borderTop: '1px solid var(--frost-card-framework-border)',
-                                                  borderLeft: '1px solid var(--frost-card-framework-border)',
-                                                  borderRight: '1px solid var(--frost-card-framework-border)',
-                                                  boxShadow: '0 -8px 32px rgba(0,0,0,0.25)',
-                                                  backdropFilter: 'blur(24px) saturate(1.2)',
-                                                  WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
-                                              }}
+                                              className="kk-prompt-bar-mobile-model-sheet"
                                           >
                                               {/* 拖拽手柄条 */}
                                               <div className="flex justify-center pt-3 pb-2">
-                                                  <div className="w-10 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                                                  <div className="kk-prompt-bar-mobile-model-sheet-handle" />
                                               </div>
 
                                               {/* 🔍 搜索输入框 */}
@@ -5980,13 +5965,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <div
                                         ref={modelDropdownRef}
                                         onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
-                                        className="fixed z-[10000] animate-fadeIn origin-bottom"
+                                        className="kk-prompt-bar-deep-popover-host animate-fadeIn origin-bottom"
                                         style={(() => {
                                             // 基于锚点元素动态计算 Portal 的 fixed 定位坐标
                                             const anchorEl = modelMenuAnchorRef.current;
                                             if (!anchorEl) return { top: 0, left: 0 };
                                             const rect = anchorEl.getBoundingClientRect();
                                             return {
+                                                zIndex: KK_LAYER.dropdown,
                                                 left: rect.left + rect.width / 2,
                                                 top: rect.top - 12, // mb-3 ≈ 12px 间距
                                                 transform: 'translateX(-50%) translateY(-100%)',
@@ -6182,13 +6168,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {contextMenu && ReactDOM.createPortal(
                                             <div
                                                 onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
-                                                className="fixed z-[10010] w-32 rounded-[14px] border py-1 backdrop-blur-md"
+                                                className="kk-prompt-bar-deep-context-menu"
                                                 style={{
+                                                    zIndex: KK_LAYER.dropdown,
                                                     top: contextMenu.y,
                                                     left: contextMenu.x,
-                                                    background: 'var(--prompt-bar-shell-bg)',
-                                                    borderColor: 'var(--prompt-bar-shell-border)',
-                                                    boxShadow: 'var(--frost-card-sub-shadow)',
                                                 }}
                                             >
                                                 {!isMobile && (
@@ -6228,20 +6212,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {modelSettingsModal && ReactDOM.createPortal(
                                             <div
                                                 onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
-                                                className="fixed inset-0 z-[10020] flex items-center justify-center p-4"
-                                                style={{
-                                                    background: 'color-mix(in srgb, var(--bg-base) 52%, transparent)',
-                                                    backdropFilter: 'blur(12px)',
-                                                }}
+                                                className="kk-prompt-bar-deep-modal-backdrop"
+                                                style={{ zIndex: KK_LAYER.modal }}
                                                 onClick={() => setModelSettingsModal(null)}
                                             >
                                                 <div
-                                                    className="w-full max-w-md rounded-[20px] border p-5 space-y-4"
-                                                    style={{
-                                                        background: 'var(--frost-card-framework-bg)',
-                                                        borderColor: 'var(--prompt-bar-shell-border)',
-                                                        boxShadow: 'var(--frost-card-framework-shadow)',
-                                                    }}
+                                                    className="kk-prompt-bar-deep-modal-panel"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <div className="flex justify-between items-center">
@@ -6389,18 +6365,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 {/* 移动端并发数 Action Sheet 浮层 */}
                 {isMobile && activeMenu === 'count' && ReactDOM.createPortal(
                     <div 
-                        className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/45 backdrop-blur-[2px] transition-opacity duration-300"
+                        className="kk-prompt-bar-deep-count-sheet-backdrop"
+                        style={{ zIndex: KK_LAYER.modal }}
                         onClick={() => setActiveMenu(null)}
                     >
                         <div 
-                            className="w-full rounded-t-3xl border-t p-5 pb-9 space-y-5 transition-transform duration-300"
-                            style={{ 
-                                background: 'var(--frost-card-framework-bg)', 
-                                borderColor: 'var(--frost-card-framework-border)',
-                                boxShadow: '0 -8px 32px rgba(0,0,0,0.18)',
-                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
-                                backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
-                            }}
+                            className="kk-prompt-bar-deep-count-sheet"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex items-center justify-between">
