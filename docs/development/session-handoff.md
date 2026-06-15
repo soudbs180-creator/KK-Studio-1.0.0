@@ -3,6 +3,49 @@
 **Last Updated:** 2026-06-15
 **Version:** KK Studio v1.5.6
 
+## 2026-06-15 - Dependency Security and Integrity Audit
+
+### Scope
+- Fixed the root/web development dependency audit failure caused by stale Vite/esbuild/vite-node resolution across root workspaces and the standalone `apps/web` CI install path.
+- Aligned root, `apps/web`, and `packages/api-client` Vite constraints to the patched Vite 8 line.
+- Added root and web package overrides so React Router dev tooling and Vitest resolve to patched Vite/vite-node/esbuild versions.
+- Fixed type errors surfaced by the stricter verification pass: API client hooks now use type-only imports, and the obsolete Vitest `esbuild.jsx` option was removed for Vite 8.
+
+### Files Touched
+- `package.json`
+- `package-lock.json`
+- `apps/web/package.json`
+- `apps/web/package-lock.json`
+- `apps/web/vitest.config.ts`
+- `packages/api-client/package.json`
+- `packages/api-client/src/hooks.ts`
+- `docs/development/session-handoff.md`
+
+### Current Design Decisions
+- The npm root workspace lockfile and the standalone `apps/web/package-lock.json` both need to stay aligned because CI runs both `npm ci` and `npm ci --prefix apps/web --legacy-peer-deps`.
+- React Router has no published patched `@react-router/dev` release beyond 7.17.0 at this time, so the project pins a verified override to `vite-node@6.0.0` and Vite 8 instead of leaving the dev audit red.
+- `apps/mobile` remains a separate Expo/RN dependency surface. Its audit findings are not mixed into the web/server fix because npm dry-run shows no safe automatic patch path and many fixes require Expo 56 / third-party major migrations.
+
+### Verification Run
+- `npm audit --audit-level=moderate --json`: 0 vulnerabilities.
+- `npm audit --omit=dev --audit-level=moderate --json`: 0 vulnerabilities.
+- `npm audit --prefix apps/web --audit-level=moderate --json`: 0 vulnerabilities.
+- `npm audit --prefix server --audit-level=moderate --json`: 0 vulnerabilities.
+- `npm ci --prefix apps/web --legacy-peer-deps --ignore-scripts`: passed with 0 vulnerabilities.
+- `npm run typecheck -w web`: passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+- `npm run verify:changes`: passed, including architecture, governance, dependency audit, typecheck, OpenAPI spec check, build, unit/integration/contract/e2e tests, smoke checks, and encoding checks.
+
+### Not Run / Deferred
+- `npm audit --prefix apps/mobile --omit=dev --audit-level=moderate --json` was run and still reports mobile-only findings: 42 total vulnerabilities, including one critical `shell-quote` chain and several Expo/RN ecosystem high findings.
+- `npm audit fix --prefix apps/mobile --omit=dev --package-lock-only --dry-run --json` made 0 proposed changes. Mobile remediation is deferred because the available fixes require Expo 56 or third-party package major migrations that need a dedicated mobile compatibility pass.
+
+### Risks / Next
+- Root `npm ls vite esbuild vite-node @react-router/dev` reports the intentional `vite-node@6.0.0` override as outside `@react-router/dev`'s declared `^3.2.2` range, while `react-router typegen`, root typecheck, build, and full `verify:changes` pass. Revisit this once React Router publishes a patched dev dependency chain.
+- Continue a dedicated `apps/mobile` security pass: evaluate Expo 56 migration, `@anythingai/app` update path, `expo-three` compatibility, and targeted overrides for fixable transitive packages.
+- Existing non-blocking UI token warnings remain in `architecture:check`; this pass did not change UI token debt.
+
 ## 2026-06-15 - UI System Alignment Push Cleanup
 
 ### Push Cleanup Scope

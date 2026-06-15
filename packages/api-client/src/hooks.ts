@@ -10,6 +10,8 @@ import {
   updateUserMe,
   chat,
   getGenerations,
+} from './api.js';
+import type {
   GenerateImagePayload,
   UpdateUserPayload,
   ChatPayload,

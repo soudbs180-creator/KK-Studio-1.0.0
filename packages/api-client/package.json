@@ -10,14 +10,14 @@
   },
   "dependencies": {
     "@kk/shared": "*",
-    "axios": "^1.7.9",
     "@tanstack/react-query": "^5.66.0",
+    "axios": "^1.7.9",
     "react": "^19.2.5"
   },
   "devDependencies": {
-    "typescript": "~6.0.2",
-    "@types/react": "^19.2.14",
     "@types/node": "^20.0.0",
-    "vite": "^6.0.0"
+    "@types/react": "^19.2.14",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.16"
   }
 }

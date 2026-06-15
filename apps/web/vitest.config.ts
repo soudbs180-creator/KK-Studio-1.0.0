@@ -19,8 +19,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  esbuild: {
-    jsx: 'automatic',
-  },
   cacheDir: './.vitest',
 });

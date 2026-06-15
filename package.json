@@ -101,7 +101,8 @@
     "tailwindcss": "^4.2.2",
     "typescript": "~6.0.2",
     "vanilla-colorful": "^0.7.2",
-    "vite": "^8.0.8",
+    "vite": "^8.0.16",
+    "vite-node": "6.0.0",
     "zod": "^3.24.1"
   },
   "overrides": {
@@ -127,6 +128,16 @@
     "@xmldom/xmldom": "^0.8.15",
     "postcss": "^8.5.13",
     "semver": "^7.6.0",
-    "send": "^0.19.0"
+    "send": "^0.19.0",
+    "esbuild": "0.28.1",
+    "vite": "$vite",
+    "vite-node": "$vite-node",
+    "@react-router/dev": {
+      "vite": "$vite",
+      "vite-node": "$vite-node"
+    },
+    "vitest": {
+      "vite": "$vite"
+    }
   }
 }
