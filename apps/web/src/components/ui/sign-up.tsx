@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useInView, type Transition, type Variants } from "framer-motion";
 import confetti from "canvas-confetti";
+import { KK_LAYER } from '@kk/ui';
 import type {
   CreateTypes as ConfettiInstance,
   GlobalOptions as ConfettiGlobalOptions,
@@ -396,7 +397,7 @@ export const AuthComponent = ({
     const fire = confettiRef.current?.fire;
     if (!fire) return;
 
-    const defaults = { startVelocity: 28, spread: 360, ticks: 64, zIndex: 100 };
+    const defaults = { startVelocity: 28, spread: 360, ticks: 64, zIndex: KK_LAYER.modalBackdrop };
     const particleCount = 48;
 
     fire({ ...defaults, particleCount, origin: { x: 0, y: 1 }, angle: 60 });
@@ -708,7 +709,8 @@ export const AuthComponent = ({
         <Confetti
           ref={confettiRef}
           manualstart
-          className="pointer-events-none fixed left-0 top-0 z-[999] h-full w-full"
+          className="pointer-events-none fixed left-0 top-0 h-full w-full"
+          style={{ zIndex: KK_LAYER.modalBackdrop }}
         />
         <Modal />
 

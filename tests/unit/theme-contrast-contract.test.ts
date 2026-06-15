@@ -112,13 +112,26 @@ function extractCssVariables(block: string): Record<string, string> {
   return variables;
 }
 
+function extractCanonicalRootVariables(source: string): Record<string, string> {
+  const rootBlocks = [...source.matchAll(/(?:^|\n):root\s*\{([\s\S]*?)\}/g)].map((match) => match[1]);
+  let clayRoot: string | undefined;
+  for (let index = rootBlocks.length - 1; index >= 0; index -= 1) {
+    if (rootBlocks[index].includes('--clay-canvas')) {
+      clayRoot = rootBlocks[index];
+      break;
+    }
+  }
+  assert.ok(clayRoot, 'Missing canonical Clay root variables');
+  return extractCssVariables(clayRoot);
+}
+
 function extractThemeVariables(
   source: string,
   selector: string,
   occurrence: 'first' | 'last' = 'last',
 ): Record<string, string> {
   return {
-    ...extractCssVariables(extractCssBlock(source, ':root', 'last')),
+    ...extractCanonicalRootVariables(source),
     ...extractCssVariables(extractCssBlock(source, selector, occurrence)),
   };
 }
@@ -235,7 +248,7 @@ test('light Clay emphasis text remains readable on tinted frosted states', () =>
 
 test('Clay theme tokens expose distinct readable light and dark surfaces', () => {
   const cssSource = readSource('apps/web/src/index.css');
-  const root = extractCssVariables(extractCssBlock(cssSource, ':root', 'last'));
+  const root = extractCanonicalRootVariables(cssSource);
   const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
   const dark = extractThemeVariables(cssSource, 'body.dark-mode');
   const settingsLight = extractThemeVariables(cssSource, '.settings-panel');

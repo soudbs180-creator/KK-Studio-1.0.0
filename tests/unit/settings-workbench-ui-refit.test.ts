@@ -91,7 +91,7 @@ test('destructive settings maintenance actions require confirmation before mutat
   assert.match(storageSource, /Apply the \$\{days\}-day retention policy\?/);
   assert.match(storageSource, /Merge "\$\{sourceCanvas\.name\}" into "\$\{activeCanvas\.name\}"\?/);
   assert.match(logsSource, /window\.confirm\(/);
-  assert.match(logsSource, /Clear today’s log cache\?/);
+  assert.match(logsSource, /Clear today's log cache\?/);
 });
 
 test('platform entry is clearly disabled until the real flow is wired in', () => {

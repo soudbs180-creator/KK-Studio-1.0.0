@@ -10,12 +10,16 @@ const ROOT_DIR = process.cwd();
 
 test('shared settings ui primitives use a calmer desktop density scale', () => {
   const source = readSource('apps/web/src/components/settings/ui/index.tsx');
+  const cssSource = readSource('apps/web/src/styles/settings.css');
 
   assert.match(source, /borderRadius: 'var\(--radius-control-md\)'/);
   assert.match(source, /fontSize: 'var\(--type-body-2\)'/);
   assert.match(source, /fontSize: 'var\(--type-caption\)'/);
   assert.match(source, /minHeight: 'var\(--ui-control-height-default\)'/);
-  assert.match(source, /minHeight: 'var\(--ui-control-height-compact\)'/);
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-icon-button \{[\s\S]*min-height:\s*var\(--ui-control-height-compact\);/,
+  );
   assert.doesNotMatch(source, /rounded-\[22px\]/);
   assert.doesNotMatch(source, /rounded-\[20px\]/);
 });

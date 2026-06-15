@@ -4,7 +4,11 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 import {
+  SETTINGS_CONTROL_MENU_CLASSNAME,
+  SETTINGS_CONTROL_MENU_OPTION_CLASSNAME,
+  SETTINGS_CONTROL_MENU_TRIGGER_CLASSNAME,
   SETTINGS_CONTROL_MOTION_CLASSNAME,
   SETTINGS_INPUT_CLASSNAME,
   SETTINGS_LABEL_CLASSNAME,
@@ -402,8 +406,10 @@ export const SettingSelect: React.FC<{
       <button
         type="button"
         disabled={disabled}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         onClick={() => setIsOpen(!isOpen)}
-        className={`${SETTINGS_INPUT_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60 min-w-0`.trim()}
+        className={`${SETTINGS_INPUT_CLASSNAME} ${SETTINGS_CONTROL_MENU_TRIGGER_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60 min-w-0`.trim()}
         style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
         <span className="truncate">{selectedOption?.label || value}</span>
@@ -419,27 +425,22 @@ export const SettingSelect: React.FC<{
 
       {isOpen && (
         <div
-          className="absolute z-[100] mt-1 w-full rounded-[var(--radius-control-md)] border overflow-hidden shadow-lg backdrop-blur-md animate-fadeIn"
-          style={{
-            borderColor: 'var(--settings-border-subtle)',
-            background: 'var(--settings-surface-elevated)',
-            maxHeight: '200px',
-            overflowY: 'auto',
-          }}
+          role="listbox"
+          className={`absolute mt-2 w-full overflow-hidden animate-fadeIn ${SETTINGS_CONTROL_MENU_CLASSNAME}`}
+          style={{ zIndex: KK_LAYER.dropdown }}
         >
           {options.map((option) => (
             <button
               key={option.value}
               type="button"
+              role="option"
+              aria-selected={option.value === value}
+              data-state={option.value === value ? 'selected' : 'idle'}
               onClick={() => {
                 onChange(option.value);
                 setIsOpen(false);
               }}
-              className="w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--bg-hover)] transition-colors duration-150 border-none bg-transparent"
-              style={{
-                color: option.value === value ? 'var(--accent-blue)' : 'var(--text-primary)',
-                fontWeight: option.value === value ? 600 : 400,
-              }}
+              className={`w-full px-4 py-2.5 text-left text-sm border-none bg-transparent ${SETTINGS_CONTROL_MENU_OPTION_CLASSNAME}`}
             >
               {option.label}
             </button>
@@ -644,77 +645,39 @@ export const IconButton: React.FC<{
   onClick?: () => void;
   title?: string;
   variant?: 'default' | 'active' | 'danger';
-}> = ({ icon, onClick, title, variant = 'default' }) => {
-  const variantStyles = {
-    default: {},
-    active: {
-      backgroundColor: 'color-mix(in srgb, var(--bg-hover) 92%, transparent)',
-      color: 'var(--text-primary)',
-    },
-    danger: {
-      backgroundColor: 'color-mix(in srgb, var(--error) 10%, transparent)',
-      color: 'var(--error)',
-    },
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`flex h-10 w-10 items-center justify-center border text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
-      style={{
-        background: 'var(--settings-surface-overlay)',
-        borderColor: 'var(--settings-border-subtle)',
-        borderRadius: 'var(--radius-control-md)',
-        minHeight: 'var(--ui-control-height-compact)',
-        ...variantStyles[variant],
-      }}
-    >
-      {icon}
-    </button>
-  );
-};
+}> = ({ icon, onClick, title, variant = 'default' }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    data-variant={variant}
+    className={`settings-icon-button ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
+  >
+    {icon}
+  </button>
+);
 
 // ProgressBar 进度条组件
 export const ProgressBar: React.FC<{
   progress: number;
   tone?: 'indigo' | 'emerald' | 'amber' | 'rose';
   showLabel?: boolean;
-}> = ({ progress, tone = 'indigo', showLabel = true }) => {
-  const toneColors = {
-    indigo: 'var(--settings-state-info-text)',
-    emerald: 'var(--settings-state-success-text)',
-    amber: 'var(--settings-state-warning-text)',
-    rose: 'var(--settings-state-danger-text)',
-  };
-
-  return (
-    <div>
+}> = ({ progress, tone = 'indigo', showLabel = true }) => (
+  <div className="settings-progress" data-tone={tone}>
+    <div className="settings-progress__track">
       <div
-        className="h-2 w-full overflow-hidden rounded-full"
-        style={{ background: 'rgb(255 255 255 / 0.08)' }}
-      >
-        <div 
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${Math.max(0, Math.min(100, progress))}%`,
-            background: toneColors[tone],
-            boxShadow: 'none',
-          }}
-        />
-      </div>
-      {showLabel && (
-        <div
-          className="mt-1 text-right text-[var(--text-tertiary)]"
-          style={{ fontSize: 'var(--type-caption)' }}
-        >
-          {Math.round(progress)}%
-        </div>
-      )}
+        className="settings-progress__bar"
+        data-tone={tone}
+        style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+      />
     </div>
-  );
-};
+    {showLabel && (
+      <div className="settings-progress__label">
+        {Math.round(progress)}%
+      </div>
+    )}
+  </div>
+);
 
 // StatusBadge 状态徽章
 export const StatusBadge: React.FC<{
@@ -722,31 +685,23 @@ export const StatusBadge: React.FC<{
   label?: string;
 }> = ({ status, label }) => {
   const statusConfig = {
-    online: { color: '#10b981', label: '在线' },
-    offline: { color: '#64748b', label: '离线' },
-    warning: { color: '#f59e0b', label: '警告' },
-    error: { color: '#ef4444', label: '异常' },
-    paused: { color: '#64748b', label: '已暂停' },
-    unverified: { color: '#3b82f6', label: '已保存' },
+    online: { label: '在线' },
+    offline: { label: '离线' },
+    warning: { label: '警告' },
+    error: { label: '异常' },
+    paused: { label: '已暂停' },
+    unverified: { label: '已保存' },
   };
 
   const config = statusConfig[status];
 
   return (
     <div
-      className="inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 uppercase tracking-[0.12em]"
-      style={{
-        borderColor: `${config.color}33`,
-        backgroundColor: `${config.color}14`,
-        color: config.color,
-        fontSize: 'var(--type-micro)',
-      }}
+      className="settings-status-badge"
+      data-status={status}
     >
-      <span 
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: config.color }}
-      />
-      <span className="min-w-0 truncate">
+      <span className="settings-status-badge__dot" />
+      <span className="settings-status-badge__label">
         {label || config.label}
       </span>
     </div>

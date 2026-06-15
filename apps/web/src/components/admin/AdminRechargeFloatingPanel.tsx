@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import type { AdminRechargeSubmissionDto } from '../../../../../packages/shared/src/index.ts';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
@@ -159,20 +160,23 @@ const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({
   return (
     <div
       data-testid="admin-recharge-floating-panel"
-      className="fixed left-1/2 z-[210] w-[min(92vw,760px)] select-none rounded-2xl border border-amber-300/30 bg-slate-950/90 text-slate-100 shadow-2xl backdrop-blur"
-      style={{ transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)` }}
+      className="admin-recharge-floating-panel fixed left-1/2 w-[min(92vw,760px)] select-none rounded-2xl"
+      style={{
+        zIndex: KK_LAYER.floatingPanel,
+        transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)`,
+      }}
     >
       <div
-        className="flex cursor-move items-center justify-between gap-3 px-4 py-3"
+        className="admin-recharge-floating-panel__header flex cursor-move items-center justify-between gap-3 px-4 py-3"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
         <div className="min-w-0">
-          <div className="text-sm font-semibold">
+          <div className="admin-recharge-floating-panel__title text-sm font-semibold">
             {latest.paymentMarkedAt ? '用户已支付，请优先处理' : '用户正在支付，请处理'}
           </div>
-          <div className="truncate text-xs text-slate-400">
+          <div className="admin-recharge-floating-panel__meta truncate text-xs">
             {latest.userId} · {formatAmount(latest.payableAmount ?? latest.amount, latest.currencyCode)} · {latest.creditAmount} 积分
           </div>
         </div>
@@ -180,7 +184,7 @@ const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({
           <button
             type="button"
             onClick={() => openAdminRechargePage(latest.submissionId)}
-            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+            className="admin-recharge-floating-panel__primary-action inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold"
           >
             进入处理
             <ExternalLink size={13} />
@@ -188,7 +192,7 @@ const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({
           <button
             type="button"
             onClick={() => setCollapsed((current) => !current)}
-            className="rounded-lg border border-white/10 p-2 text-slate-300 hover:bg-white/10"
+            className="admin-recharge-floating-panel__icon-action rounded-lg p-2"
             aria-label={collapsed ? '展开充值处理列表' : '缩小充值处理列表'}
           >
             {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -197,42 +201,39 @@ const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({
       </div>
 
       {collapsed ? null : (
-        <div className="max-h-[420px] space-y-2 overflow-y-auto border-t border-white/10 p-3">
+        <div className="admin-recharge-floating-panel__list max-h-[420px] space-y-2 overflow-y-auto p-3">
           {payingItems.map((item) => {
             const marked = Boolean(item.paymentMarkedAt);
             return (
               <div
                 key={item.submissionId}
-                className="grid gap-3 rounded-xl border p-3 text-xs md:grid-cols-[minmax(0,1.4fr)_90px_90px_70px_180px]"
-                style={{
-                  borderColor: marked ? 'rgba(251,191,36,0.55)' : 'rgba(148,163,184,0.18)',
-                  background: marked ? 'rgba(245,158,11,0.16)' : 'rgba(15,23,42,0.78)',
-                }}
+                data-state={marked ? 'marked' : 'idle'}
+                className="admin-recharge-floating-panel__row grid gap-3 rounded-xl border p-3 text-xs md:grid-cols-[minmax(0,1.4fr)_90px_90px_70px_180px]"
               >
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{item.userId}</div>
-                  <div className="truncate text-slate-400">{item.submissionId}</div>
+                  <div className="admin-recharge-floating-panel__muted truncate">{item.submissionId}</div>
                 </div>
                 <div>
-                  <div className="text-slate-400">渠道</div>
+                  <div className="admin-recharge-floating-panel__muted">渠道</div>
                   <div>{item.manualProvider === 'wechat' ? '微信' : '支付宝'}</div>
                 </div>
                 <div>
-                  <div className="text-slate-400">实付</div>
+                  <div className="admin-recharge-floating-panel__muted">实付</div>
                   <div>{formatAmount(item.payableAmount ?? item.amount, item.currencyCode)}</div>
                 </div>
                 <div>
-                  <div className="text-slate-400">积分</div>
+                  <div className="admin-recharge-floating-panel__muted">积分</div>
                   <div>{item.creditAmount}</div>
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                  <span className={marked ? 'text-amber-200' : 'text-slate-400'}>
+                  <span className="admin-recharge-floating-panel__status" data-state={marked ? 'marked' : 'idle'}>
                     {formatRemaining(item)}
                   </span>
                   <button
                     type="button"
                     onClick={() => openAdminRechargePage(item.submissionId)}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                    className="admin-recharge-floating-panel__primary-action rounded-lg px-3 py-2 text-xs font-semibold"
                   >
                     进入处理
                   </button>
@@ -240,7 +241,7 @@ const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({
                     type="button"
                     onClick={() => void handleDirectCredit(item.submissionId)}
                     disabled={processingId === item.submissionId}
-                    className="rounded-md border border-emerald-400/40 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="admin-recharge-floating-panel__credit-action rounded-md px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {processingId === item.submissionId ? <Loader2 size={12} className="animate-spin" /> : '直接处理'}
                   </button>

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { Images, MessageSquare, Sparkles, User } from 'lucide-react';
 import { GenerationMode, type MobilePrimaryTab } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -57,8 +58,8 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 z-[940] transition-transform duration-300 ease-out md:hidden ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'}`}
-      style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }}
+      className={`fixed bottom-0 left-0 right-0 transition-transform duration-300 ease-out md:hidden ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'}`}
+      style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))', zIndex: KK_LAYER.mobileChrome }}
       onTouchStart={onInteract}
       onClick={onInteract}
     >
@@ -74,12 +75,12 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => onSelectTab(tab.key)}
                 className={`ios-mobile-tab-button flex min-h-[54px] flex-col items-center justify-center gap-1 px-2 py-2 ${isActive ? 'is-active' : ''}`}
-                style={{ color: isActive ? '#ffffff' : 'var(--text-tertiary)' }}
+                style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)' }}
               >
                 {tab.icon}
                 <span className="ios-mobile-tab-label">{tab.label}</span>
                 {tab.caption ? (
-                  <span className={`ios-mobile-tab-caption text-[10px] leading-none ${isActive ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                  <span className={`ios-mobile-tab-caption text-[10px] leading-none ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
                     {tab.caption}
                   </span>
                 ) : null}

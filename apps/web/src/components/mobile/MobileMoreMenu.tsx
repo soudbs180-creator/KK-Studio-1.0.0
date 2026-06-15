@@ -1,4 +1,5 @@
 import React from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { Settings, User, X } from 'lucide-react';
 
 interface MobileMoreMenuProps {
@@ -17,26 +18,22 @@ const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[1001] flex flex-col justify-end">
+        <div
+            className="fixed inset-0 flex flex-col justify-end"
+            data-kk-mobile-overlay-layer="true"
+            style={{ zIndex: KK_LAYER.modalBackdrop }}
+        >
             {/* Backdrop */}
             <div
-                className="absolute inset-0 animate-in fade-in duration-200"
-                style={{ background: 'var(--mobile-clay-overlay-bg)' }}
+                className="kk-mobile-more-menu-backdrop absolute inset-0 animate-in fade-in duration-200"
                 onClick={onClose}
             />
 
             {/* Menu Sheet */}
-            <div
-                className="relative rounded-t-3xl border-t p-4 pb-safe animate-in slide-in-from-bottom duration-300"
-                style={{
-                    background: 'var(--mobile-clay-shell-bg)',
-                    borderColor: 'var(--mobile-clay-border)',
-                    boxShadow: 'var(--mobile-clay-shadow)'
-                }}
-            >
-                <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
-                    <span className="text-white font-bold text-lg">更多功能</span>
-                    <button onClick={onClose} className="min-w-[44px] min-h-[44px] p-2 flex items-center justify-center text-zinc-400 active:text-white active:scale-95 bg-white/5 rounded-lg transition-all">
+            <div className="kk-mobile-more-menu-sheet relative rounded-t-3xl border-t p-4 pb-safe animate-in slide-in-from-bottom duration-300">
+                <div className="kk-mobile-more-menu-header flex items-center justify-between mb-4 pb-3">
+                    <span className="kk-mobile-more-menu-title text-lg">更多功能</span>
+                    <button onClick={onClose} className="kk-mobile-more-menu-close min-w-[44px] min-h-[44px] p-2 flex items-center justify-center rounded-lg transition-all">
                         <X size={22} strokeWidth={2} />
                     </button>
                 </div>
@@ -48,12 +45,12 @@ const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                             onOpenSettings();
                             onClose();
                         }}
-                        className="flex flex-col items-center gap-2 min-w-[44px] min-h-[72px] p-2 rounded-xl active:scale-95 transition-all group"
+                        className="kk-mobile-more-menu-action flex flex-col items-center gap-2 min-w-[44px] min-h-[72px] p-2 rounded-xl transition-all group"
                     >
-                        <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-active:bg-white/10 transition-colors">
-                            <Settings size={24} strokeWidth={2} className="text-white" />
+                        <div className="kk-mobile-more-menu-icon w-14 h-14 rounded-2xl flex items-center justify-center transition-colors">
+                            <Settings size={24} strokeWidth={2} />
                         </div>
-                        <span className="text-[11px] text-zinc-400 leading-none">设置</span>
+                        <span className="kk-mobile-more-menu-label text-[11px] leading-none">设置</span>
                     </button>
 
                     {/* Profile */}
@@ -62,12 +59,12 @@ const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                             onOpenProfile();
                             onClose();
                         }}
-                        className="flex flex-col items-center gap-2 min-w-[44px] min-h-[72px] p-2 rounded-xl active:scale-95 transition-all group"
+                        className="kk-mobile-more-menu-action flex flex-col items-center gap-2 min-w-[44px] min-h-[72px] p-2 rounded-xl transition-all group"
                     >
-                        <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-active:bg-white/10 transition-colors">
-                            <User size={24} strokeWidth={2} className="text-white" />
+                        <div className="kk-mobile-more-menu-icon w-14 h-14 rounded-2xl flex items-center justify-center transition-colors">
+                            <User size={24} strokeWidth={2} />
                         </div>
-                        <span className="text-[11px] text-zinc-400 leading-none">我的</span>
+                        <span className="kk-mobile-more-menu-label text-[11px] leading-none">我的</span>
                     </button>
                 </div>
             </div>

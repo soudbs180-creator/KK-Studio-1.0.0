@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { Check, Layers, Plus, Search, Wand2 } from 'lucide-react';
 import { useCanvas } from '../../context/CanvasContext';
 
@@ -146,7 +147,9 @@ const MobileWorkspaceQuickBar: React.FC<MobileWorkspaceQuickBarProps> = ({
         <button
           type="button"
           aria-label="\u5173\u95ed\u9879\u76ee\u5217\u8868"
-          className="fixed inset-0 z-[964] cursor-default bg-transparent md:hidden"
+          data-kk-mobile-chrome-overlay="true"
+          className="fixed inset-0 cursor-default bg-transparent md:hidden"
+          style={{ zIndex: KK_LAYER.mobileChromeOverlay }}
           onClick={() => setShowProjects(false)}
         />
       ) : null}

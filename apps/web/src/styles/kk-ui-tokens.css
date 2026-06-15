@@ -44,6 +44,8 @@
   --mobile-header-scrim-bg: linear-gradient(to bottom, #ffffff 0%, rgb(255 255 255 / 0.96) 18%, rgb(255 255 255 / 0.88) 36%, rgb(255 255 255 / 0.68) 54%, rgb(255 255 255 / 0.42) 72%, rgb(255 255 255 / 0.16) 88%, rgb(255 255 255 / 0) 100%);
   --kk-z-canvas: 1;
   --kk-z-chrome: 100;
+  --kk-z-mobile-chrome: 940;
+  --kk-z-mobile-chrome-overlay: 964;
   --kk-z-dropdown: 1000;
   --kk-z-modal: 3000;
   --kk-z-toast: 5000;

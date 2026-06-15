@@ -165,6 +165,9 @@ export const SETTINGS_RESPONSIVE_GRID_CLASSNAME = 'settings-system-grid';
 export const SETTINGS_FIELD_GROUP_CLASSNAME = 'settings-system-field-group';
 export const SETTINGS_MODAL_BACKDROP_CLASSNAME = 'settings-system-modal-backdrop';
 export const SETTINGS_MODAL_PANEL_CLASSNAME = 'settings-system-modal-panel';
+export const SETTINGS_CONTROL_MENU_TRIGGER_CLASSNAME = 'settings-system-control-menu-trigger';
+export const SETTINGS_CONTROL_MENU_CLASSNAME = 'settings-system-control-menu';
+export const SETTINGS_CONTROL_MENU_OPTION_CLASSNAME = 'settings-system-control-menu-option';
 
 type SettingsViewShellProps = {
   children: ReactNode;

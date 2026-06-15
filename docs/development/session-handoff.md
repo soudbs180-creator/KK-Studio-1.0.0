@@ -1,7 +1,380 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-12
+**Last Updated:** 2026-06-15
 **Version:** KK Studio v1.5.6
+
+## 2026-06-15 - UI System Alignment Push Cleanup
+
+### Push Cleanup Scope
+- Restored the desktop settings sidebar search contract while keeping the new system-aligned sidebar visual treatment.
+- Adjusted the theme contrast contract helper so it reads the canonical Clay `:root` token block instead of a later unrelated `:root` block.
+- Kept the broader UI-system migration grouped on branch `codex/ui-system-alignment-20260615` for review and push, without routing changes back to legacy entry points.
+
+### Push Cleanup Files Touched
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `tests/unit/theme-contrast-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Push Cleanup Verification Run
+- Targeted regression suite: `settings-desktop-workbench-regression.test.ts`, `settings-shell-scroll-regression.test.ts`, and `theme-contrast-contract.test.ts`: 13 tests passed.
+- `npm.cmd run verify:changes`: passed, including architecture, governance, dependency audit, typecheck, spec check, build, unit/integration/contract/e2e tests, prompt drag smoke, mobile settings smoke, desktop settings smoke, startup banner smoke, and encoding checks.
+
+### Push Cleanup Risks And Next Steps
+- Smoke scripts reported fallback mode for two settings smoke probes, but the fallback contract checks completed successfully and `verify:changes` exited cleanly.
+- Historical non-blocking UI token warnings still exist outside this UI-system pass; future UI cleanup should continue moving older canvas/admin/ecommerce surfaces onto shared tokens.
+
+## 2026-06-15 - System Logs Settings System Alignment Pass
+
+### System Logs Change Scope
+- Rebuilt the System Logs settings page on top of the shared settings scaffold: `SettingsViewShell`, `SettingsHero`, `SettingsMetricCard`, `SettingsSection`, `SettingsBadge`, and `SettingsCardGridContainer`.
+- Removed the previous utility-styled dashboard cards and the fake `__legacy_testing_support_mark` scaffold marker so the real page now satisfies the system contract.
+- Added `settings-log-*` primitives for metric grids, filter toolbar, log actions, console switches, alert cards, stream cards, and per-level stream entries.
+- Fixed desktop alignment so the System Logs page uses a 4-column settings grid, metrics span the full row, filter/switch sections sit in two balanced columns, and alert/stream sections span full width.
+- Fixed the filter toolbar to use a stable two-row layout inside a 2-column settings card, avoiding select/button overlap while keeping mobile single-column.
+
+### System Logs Files Changed
+- `apps/web/src/components/settings/views/SystemLogsView.localized.tsx`
+- `apps/web/src/styles/settings.css`
+- `tests/unit/system-logs-settings-ui-system-contract.test.ts`
+- `tests/unit/settings-workbench-ui-refit.test.ts`
+- `docs/development/session-handoff.md`
+
+### System Logs Current Design Decisions
+- Future System Logs additions should use the `settings-log-*` primitives and semantic `data-tone`, `data-variant`, `data-state`, and `data-level` attributes instead of component-local color, border, or spacing utilities.
+- The System Logs page intentionally overrides the legacy fixed-width A-card grid inside `.settings-system-logs-view`; new settings pages with composed sections should prefer page-scoped grid contracts over inheriting global `270px` card rules blindly.
+- Filter controls and actions stay in separate toolbar rows on desktop and mobile to prevent regressions when labels, locales, or source names become longer.
+- Destructive maintenance behavior remains guarded by confirmation, and local log filtering/export behavior is unchanged.
+
+### System Logs Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/system-logs-settings-ui-system-contract.test.ts`: red first, then 2 tests passed.
+- Related settings contract suite: `tests/unit/system-logs-settings-ui-system-contract.test.ts tests/unit/settings-workbench-ui-refit.test.ts tests/unit/settings-shared-ui-primitives-contract.test.ts tests/unit/settings-ui-system-contract.test.ts tests/unit/settings-ui-density-regression.test.ts tests/unit/settings-desktop-workbench-regression.test.ts tests/unit/system-logs-unused-cleanup-contract.test.ts`: 30 tests passed.
+- `npm.cmd run architecture:check`: passed. It still prints non-blocking historical raw color warnings in older UI surfaces; no settings-system or z-index failures.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and tests typecheck passed for 433 test files.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `git diff --check`: passed with CRLF normalization warnings only.
+- In-app Browser visual smoke with a local temp user and seeded system logs:
+  - Desktop `1440x900` `/settings/system-logs`: final grid computed as `244px 244px 244px 244px`, metric grid computed as 4 columns, no horizontal overflow, and toolbar controls/actions no longer overlap.
+  - Mobile `390x844` `/settings/system-logs`: final grid computed as one column, no horizontal overflow.
+  - Latest screenshots: `.tmp/system-logs-toolbar-fresh.png`, `.tmp/system-logs-mobile-stable.png`.
+
+### System Logs Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization remains in staged passes; this pass covered the requested related contracts, architecture, governance, typecheck, build, encoding, diff check, and visual browser smoke.
+
+### System Logs Risks And Next Steps
+- `architecture:check` continues to report historical raw color literals outside this pass. The next UI passes should keep migrating PromptBar overlays, Canvas chrome, Admin floating panels, and ecommerce panels into shared token/layer primitives.
+- The dev restart helper timed out twice during visual QA; Vite was manually verified through the actual port listener and browser loading. This did not affect the production build or tests.
+
+## 2026-06-15 - Browser Assistant Settings Full-System Alignment Pass
+
+### 修改范围
+- 继续收口设置页 `BrowserAssistantView` 下半部分 UI，将 AI 接管指令区、命令解析报告、演示沙盒、网页直通生成、模型路由策略、Session 选择、自动化流水线、终端日志和结果卡片统一迁移到 `settings-browser-*` 设计系统 primitive。
+- 修复桌面设置侧栏中工作区总览和存储统计的中文乱码，避免设置页整体观感被侧栏状态文案破坏。
+- 保持主画布页结构不做大改，本轮只针对设置页浏览器助手与设置侧栏做系统化 UI 对齐。
+
+### 修改文件
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `apps/web/src/styles/settings.css`
+- `tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`
+- `tests/unit/settings-sidebar-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### 当前设计决策
+- Browser Assistant 后续新增模块优先复用 `settings-browser-section-card`、`settings-browser-command-grid`、`settings-browser-field`、`settings-browser-tabbar`、`settings-browser-result-card`、`settings-browser-pipeline-*`、`settings-browser-terminal` 和 `settings-browser-notice`，不要再在组件内直接堆 Tailwind 颜色、边框和背景工具类。
+- 可变状态统一通过 `data-status`、`data-state`、`data-tone`、`data-active` 驱动 CSS，业务组件只传语义状态，不再直接决定视觉 token。
+- 移动端规则以不横向溢出为底线：命令行、策略卡、结果卡、流水线布局和终端日志在窄屏下全部按单列流式排列。
+- 设置侧栏状态文案必须保持可读中文；新增中文文案时需要经过 `check:encoding` 和单元契约保护。
+
+### 已运行验证
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: 新增用例先红后绿，最终通过。
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/settings-shared-ui-primitives-contract.test.ts tests/unit/settings-sidebar-ui-system-contract.test.ts tests/unit/settings-ui-system-contract.test.ts tests/unit/settings-ui-density-regression.test.ts tests/unit/mobile-settings-browser-verify-script.test.ts tests/unit/api-settings-workbench-structure.test.ts`: 39 tests passed。
+- `npm.cmd run typecheck`: passed。
+- `npm.cmd run architecture:check`: passed，仍输出历史 raw color / z-index 非阻断 warning，主要来自 canvas、admin、ecommerce 等旧区域。
+- `npm.cmd run governance:check`: passed。
+- `npm.cmd run build`: passed。
+- `npm.cmd run check:encoding`: passed。
+- `git diff --check`: passed，仅有 Windows CRLF normalization warning。
+- Chrome/Playwright visual smoke:
+  - Desktop `1440x920` `/settings/browser-assistant`: 侧栏中文可读，`scrollWidth=1440`，无横向溢出，`settings-browser-playground` 位于视口内。
+  - Mobile `390x844` pipeline tab: `scrollWidth=390`，terminal 宽度 `326px`，无横向溢出。
+  - 截图保存在 `.tmp/browser-assistant-desktop-final-after-restart.png` 与 `.tmp/browser-assistant-mobile-pipeline-final.png`。
+- `npm.cmd run dev:status`: Vite `3000` 与 API `3001` 均 healthy。
+
+### 未运行验证及原因
+- 未运行完整 `npm run verify:changes`：当前全局 UI 系统优化目标仍在分阶段推进，本轮已经覆盖相关单测、类型、架构、治理、构建、编码检查和运行态视觉 smoke；完整发布级验证保留到全局 UI 收口或发布前执行。
+
+### 风险与下一步
+- `architecture:check` 仍提示历史区域存在 raw color / raw z-index warning；本轮没有回滚或重排这些并行改动。
+- 下一轮建议继续收口 `PromptBar` 深层模型菜单/弹窗、Canvas 交互浮层、Admin 浮层和 ecommerce panels，保证设置页之外的高频 UI 也沿用同一 token/layer/primitive 体系。
+
+## 2026-06-15 - Browser Assistant Settings System Deep Pass
+
+### Browser Assistant Deep Pass Change Scope
+- Reworked the Browser Assistant settings mid-page from scattered utility styling into reusable `settings-browser-*` primitives.
+- Migrated Session pool rows, social channel rows, plugin install guide tiles, Daemon setup steps, desktop IDE adapter form, and the Advanced Fusion Center feature cards.
+- Added system primitives for rows, chips, subtle actions, toggles, guide tiles, step lists, code snippets, compact fields, status dots, feature cards, insight cards, and swatches.
+- Added a Browser Assistant scoped adaptive grid override so legacy fixed-width A-card spans no longer push two-column cards beyond the settings shell on desktop or force overlap.
+- Preserved existing Browser Assistant behavior: session checks/toggles, social channel checks/toggles, plugin download notification, IDE launch test, local LLM test, clipboard simulation, screen inspect flow, and WASM/WebGPU switches.
+
+### Browser Assistant Deep Pass Files Changed
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/styles/settings.css`
+- `tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Deep Pass Current Design Decisions
+- Browser Assistant settings cards should expose structure through stable classes and `data-status`, `data-state`, `data-tone`, or `data-platform` attributes instead of local color utilities.
+- New Browser Assistant row-like content should reuse `settings-browser-row`, `settings-browser-row-list`, `settings-browser-inline-status`, `settings-browser-subtle-action`, and `settings-browser-toggle`.
+- New guide or feature cards should reuse `settings-browser-section-card`, `settings-browser-tile`, `settings-browser-feature-card`, `settings-browser-meta-row`, and shared form primitives before adding new CSS.
+- Browser Assistant must not inherit the global fixed `270px` A-card width contract directly; its grid uses `minmax(0, 1fr)` columns and releases per-card `min-width`/`max-width` locally to stay inside the settings shell.
+- Motion remains restrained: hover lift and status pulse use existing motion tokens and reduced-motion governance; no component-local animation timing was added.
+
+### Browser Assistant Deep Pass Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: red first, then 4 tests passed.
+- Related settings contract suite covering Browser Assistant, shared primitives, sidebar, UI system, density, mobile settings smoke source, and API workbench structure: 36 tests passed.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and 432 test files typechecked.
+- `npm.cmd run architecture:check`: passed. Non-blocking historical raw color warnings remain in ecommerce/canvas/admin surfaces.
+- `npm.cmd run governance:check`: passed before this handoff entry was appended; rerun after handoff update is required.
+- `npm.cmd run build`: passed and emitted `BrowserAssistantView-3AsfPBMq.js`.
+- Chrome visual smoke after local temp-user entry:
+  - Desktop `1440x920` `/settings/browser-assistant`: `hasSettings=true`, grid `244px 244px 244px 244px`, `sectionCards=6`, `featureCards=4`, `maxCardRight=1375`, `cardsOverViewport=0`, no horizontal overflow.
+  - Mobile `390x844` `/settings/browser-assistant`: grid `358px`, `sectionCards=6`, `featureCards=4`, `rowCount=5`, `maxSectionCardRight=371`, no horizontal overflow.
+
+### Browser Assistant Deep Pass Not Run
+- Full `npm run verify:changes` not run because the larger UI modernization goal remains in progress and this pass is scoped to Browser Assistant settings surfaces.
+
+### Browser Assistant Deep Pass Risks And Next Steps
+- `BrowserAssistantView.tsx` still has legacy utility styling in the lower Phase 5 AI Takeover and ecommerce automation playground sections. Those should be the next settings-page slices to migrate to the same primitives.
+- Project-level raw color warnings are still historical and non-blocking; future passes should continue with PromptBar overlays, Canvas interaction chrome, Admin floating panels, and ecommerce panels.
+- Current worktree contains pre-existing modified and untracked files from earlier UI passes. This pass did not revert or reorder unrelated changes.
+
+## 2026-06-15 - Settings Shared Primitives And Browser Assistant First Screen Pass
+
+### Settings Shared Primitive Change Scope
+- Migrated shared settings `IconButton`, `ProgressBar`, and `StatusBadge` away from local inline paint logic into CSS-owned primitives.
+- Added `settings-icon-button`, `settings-progress`, and `settings-status-badge` classes with `data-variant`, `data-tone`, and `data-status` state contracts.
+- Reworked the Browser Assistant settings first screen status cards and connectivity doctor card to use `settings-browser-*` primitives instead of private slate/white/red/blue utility styling.
+- Preserved Browser Assistant connection checks, daemon/extension status logic, local latency display, and connectivity test behavior.
+
+### Settings Shared Primitive Files Changed
+- `apps/web/src/components/settings/ui/index.tsx`
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/styles/settings.css`
+- `tests/unit/settings-shared-ui-primitives-contract.test.ts`
+- `tests/unit/settings-ui-density-regression.test.ts`
+- `docs/development/session-handoff.md`
+
+### Settings Shared Primitive Current Design Decisions
+- Shared settings controls should expose state through `data-*` attributes and stable classes. Components should not reintroduce local hex/rgb colors, inline status color math, or bespoke icon-button paint logic.
+- Browser Assistant first-screen status cards now use `settings-browser-status-card` with `data-status`; future cards in that view should continue moving toward `settings-browser-*` row/action/note primitives.
+- This pass keeps large Browser Assistant business logic intact and only consolidates the visible first-screen UI surface.
+
+### Settings Shared Primitive Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-shared-ui-primitives-contract.test.ts`: red first, then 2 tests passed.
+- Settings related contract suite covering shared primitives, sidebar, UI system, density, mobile settings smoke source, and API workbench structure: 32 tests passed.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and 431 test files typechecked.
+- `npm.cmd run architecture:check`: passed. The z-index check still reports no hardcoded z-indexes; the non-blocking raw color warning list remains historical and now reports 373 additional offenders.
+- `npm.cmd run governance:check`: passed after making duplicate handoff headings unique.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed.
+- Build artifact check found `settings-icon-button`, `settings-progress__bar`, `settings-status-badge`, `settings-browser-status-card`, and `settings-browser-action` in generated assets.
+- `npm.cmd run dev:status`: Vite `3000` and API `3001` healthy.
+- Runtime HTTP smoke on `http://localhost:3000/`: returned `status=200`, `length=5005`, and `root=true`.
+- `git diff --check`: passed with CRLF replacement warnings only.
+
+### Settings Shared Primitive Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization goal is still in scoped system passes; this pass covered focused contracts plus typecheck, architecture, governance, build, encoding, runtime smoke, and artifact checks.
+- Browser screenshot QA was not repeated in this pass because previous in-app Browser screenshot capture timed out; runtime was checked through project dev status and HTTP smoke.
+
+### Settings Shared Primitive Risks And Next Steps
+- `BrowserAssistantView` still contains many deeper local slate/white/black utility surfaces below the first screen. Continue migrating session rows, social channel rows, plugin management, macro pipeline, and console panels to `settings-browser-*` primitives.
+- `architecture:check` still reports non-blocking raw color warnings in ecommerce desktop panels, ModelLogo, canvas drawing/group components, and other legacy surfaces.
+- `apps/web/src/components/settings/ui/index.tsx` still has older inline paint in segmented controls, inputs, and toggles. These should be converted in smaller guarded passes so the shared settings component layer becomes fully token driven.
+
+## 2026-06-14 - Settings Sidebar Alignment And Overlay Layer Pass
+
+### Change Scope
+- Reworked the desktop settings sidebar from per-item inline visual themes into a shared card primitive driven by `data-state` and `data-accent`.
+- Centralized active rails, active chevrons, billing/status marks, icon containers, hover states, shadows, and reduced-motion behavior in `settings.css` so future settings sections inherit the same UI rules.
+- Finished a remaining floating-layer pass by moving admin recharge floating panels, PromptBar send-button internals, desktop composer mobile sheet, and sign-up/confetti overlays onto `KK_LAYER` and CSS-owned primitives.
+- Preserved existing settings navigation behavior, billing count display, provider status display, PromptBar behavior, mobile composer behavior, and sign-up behavior.
+
+### Files Changed
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `apps/web/src/styles/settings.css`
+- `apps/web/src/components/admin/AdminRechargeFloatingPanel.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx`
+- `apps/web/src/components/ui/sign-up.tsx`
+- `apps/web/src/index.css`
+- `packages/ui/src/core/layers.ts`
+- `tests/unit/settings-sidebar-ui-system-contract.test.ts`
+- `tests/unit/remaining-overlay-layer-ui-system-contract.test.ts`
+
+### Settings Sidebar And Overlay Current Design Decisions
+- New desktop settings navigation items should reuse `.settings-sidebar-card` and set `data-accent`; components should not reintroduce inline card colors, bespoke active rails, or one-off chevron animations.
+- Settings sidebar status and balance details should use `.settings-sidebar-card__balance`, `.settings-sidebar-card__status-dot`, and `.settings-sidebar-card__status-text` instead of local Tailwind color bundles.
+- Floating surfaces should use `KK_LAYER` values and local CSS primitives. New raw `z-[...]` or inline `zIndex` values are treated as regressions.
+- This pass intentionally keeps the main canvas structure stable while tightening settings and overlay rules, matching the request to avoid destabilizing the primary canvas page.
+
+### Settings Sidebar And Overlay Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/remaining-overlay-layer-ui-system-contract.test.ts`: 2 tests passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-sidebar-ui-system-contract.test.ts`: 2 tests passed.
+- Related UI contract suite covering settings, overlays, mobile chrome, mobile ecommerce, PromptBar, billing, and login: 52 tests passed.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed after fixing suspicious mojibake in `SettingsDesktopSidebar.tsx`.
+- `npm.cmd run architecture:check`: passed. The raw z-index check now reports no hardcoded z-indexes.
+- `npm.cmd run build`: passed.
+- Short-lived runtime HTTP smoke on `http://127.0.0.1:5199/`: returned `status=200`, `length=4989`, and `root=true`.
+- `npm.cmd run dev:start` was then run outside the sandbox after approval; `npm.cmd run dev:status` reported Vite `3000` and API `3001` healthy, and `http://localhost:3000/` returned `status=200`, `length=4989`, and `root=true`.
+- In-app Browser DOM verification loaded `http://localhost:3000/`, progressed from startup to the login screen, and reported `overflowX=false` at `1280x720`.
+- `git diff --check`: passed with CRLF replacement warnings only.
+
+### Settings Sidebar And Overlay Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization goal is still in scoped system passes; this round covered related contracts, typecheck, governance, architecture, encoding, build, diff check, and Vite HTTP smoke.
+- Browser screenshot QA was attempted with the in-app Browser, but screenshot capture timed out in the Browser backend. The default login entry was still verified by DOM signals; settings runtime navigation behind local auth was not completed because the local temporary-login click also timed out in the Browser backend.
+
+### Settings Sidebar And Overlay Risks And Next Steps
+- `architecture:check` still prints historical non-blocking raw color warnings in older canvas/auth/ModelLogo and related legacy surfaces. This pass cleared the remaining hardcoded z-index warnings but did not finish every raw color migration.
+- The login/auth CSS still has older visual-system compatibility layers and should be trimmed in a dedicated pass.
+- Settings BrowserAssistantView, model center surfaces, and other settings subviews should continue moving toward the same sidebar/card/form primitives so new pages inherit one system instead of adding local themes.
+
+## 2026-06-13 - Mobile Ecommerce Panel Primitive Pass
+
+### Mobile Ecommerce Panel Change Scope
+- Migrated the most visible internal controls in `MobileEcommercePanel` to reusable mobile ecommerce primitives: upload cards, upload dropzones, delete/remove actions, generation preview shell, download action, inspiration trigger/grid/chips, config section, segmented controls, ratio cards, selects, batch stepper, sticky bottom bar, prompt textarea, and submit button.
+- Replaced local white-alpha glass, private black blur download overlay, rose/amber gradient ratio cards, and private gradient submit button styling with `mobile-clay`, `frost-card`, and Clay brand token driven CSS.
+- Preserved ecommerce upload, reference upload, ratio switching, advanced parameter selection, batch count changes, prompt editing, task queue execution, image generation, and download behavior.
+
+### Mobile Ecommerce Panel Files Changed
+- `apps/web/src/components/mobile/MobileEcommercePanel.tsx`
+- `apps/web/src/index.css`
+- `tests/unit/mobile-ecommerce-panel-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Mobile Ecommerce Panel Current Design Decisions
+- Mobile ecommerce internals should use class primitives with `data-state` for active/busy/ready states instead of conditional Tailwind color bundles.
+- The panel now uses CSS-owned primitives such as `mobile-ecommerce-upload-card`, `mobile-ecommerce-ratio-option`, `mobile-ecommerce-field-select`, `mobile-ecommerce-bottom-bar`, and `mobile-ecommerce-submit`.
+- The submit button still uses a restrained Clay brand gradient, but it is centralized under `.mobile-ecommerce-submit[data-state="ready"]`; component code should not reintroduce private `from-[#FF5E62]` or `to-[#FF9966]` utilities.
+- This pass focuses on mobile ecommerce controls. Desktop ecommerce workbench/import/review panels still need their own UI tokenization pass.
+
+### Mobile Ecommerce Panel Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-ecommerce-panel-ui-system-contract.test.ts`: red first for missing primitives and legacy local styling, then 3 tests passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-ecommerce-panel-ui-system-contract.test.ts tests/unit/mobile-chrome-layer-ui-system-contract.test.ts tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/mobile-workspace-surface-contract.test.ts tests/unit/clay-frosted-surface-contract.test.ts tests/unit/ecommerce-mode-source-contract.test.ts tests/unit/ecommerce-mode-source-guard.test.ts tests/unit/partial-redraw-pipeline-contract.test.ts tests/unit/vite-manual-chunk-boundary-contract.test.ts`: 36 tests passed.
+- `rg -n "bg-black/60|backdrop-blur-md|border-white/10|hover:text-white|text-rose-300|border-white/20|border-white/5|bg-white/\[0\.01\]|hover:border-white/10|hover:bg-white/\[0\.02\]|bg-gradient-to-tr from-rose-500/10 to-amber-500/5|shadow-rose-500/2|bg-gradient-to-tr from-\[#FF5E62\] to-\[#FF9966\]|bg-white/10 text-white/50|hover:shadow-lg|hover:shadow-rose-500/10" apps/web/src/components/mobile/MobileEcommercePanel.tsx`: no matches.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and 428 test files typechecked.
+- `npm.cmd run architecture:check`: passed. Existing warning groups remain in admin recharge, canvas color constants, PromptBar internals, sign-up/confetti, and other legacy surfaces; ecommerce warning count was reduced by this pass.
+- `npm.cmd run build`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed.
+- Build artifact check: `rg -n "mobile-ecommerce-upload-card|mobile-ecommerce-ratio-option|mobile-ecommerce-submit|mobile-ecommerce-bottom-bar" apps/web/dist/assets -g "index-*.css" -g "index-*.js"` found the new primitives in generated assets.
+- Runtime HTTP smoke: short-lived Vite process on `http://127.0.0.1:5199/` returned `status=200`, `length=4989`, and `root=true`, then the process tree was stopped.
+- `npm.cmd run dev:status`: confirmed no residual Vite/API processes after smoke runs.
+
+### Mobile Ecommerce Panel Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization goal is still progressing through scoped system passes.
+- Screenshot visual QA was not completed because the Browser navigation/screenshot tool was not exposed in this session.
+
+### Mobile Ecommerce Panel Risks And Next Steps
+- Desktop ecommerce panels and admin recharge still contain raw color/layer styling and should be moved to the same tokenized primitive approach.
+- `MobileEcommercePanel` still contains some decorative status/loading micro-styles and local product copy structure; these are lower risk than the primary controls now covered by contract tests.
+
+## 2026-06-13 - Mobile Chrome Layer System Pass
+
+### Mobile Chrome Layer Change Scope
+- Added semantic mobile chrome layers to `KK_LAYER` and CSS z-index tokens for bottom navigation and project dropdown overlays.
+- Migrated `MobileTabBar`, `MobileWorkspaceQuickBar`, `MobileMoreMenu`, and the `MobileEcommercePanel` root away from private raw z-index utilities and root hardcoded dark backgrounds.
+- Added reusable mobile menu and ecommerce root primitives in `apps/web/src/index.css` covering backdrop, sheet, action tile, icon, label, active states, bottom tab active states, and reduced-motion behavior.
+- Preserved the main canvas interaction model, ecommerce generation flow, project switching behavior, settings/profile entry actions, and mobile result/feed behavior.
+
+### Mobile Chrome Layer Files Changed
+- `packages/ui/src/core/layers.ts`
+- `apps/web/src/styles/kk-ui-tokens.css`
+- `apps/web/src/index.css`
+- `apps/web/src/components/mobile/MobileTabBar.tsx`
+- `apps/web/src/components/mobile/MobileWorkspaceQuickBar.tsx`
+- `apps/web/src/components/mobile/MobileMoreMenu.tsx`
+- `apps/web/src/components/mobile/MobileEcommercePanel.tsx`
+- `tests/unit/mobile-chrome-layer-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Mobile Chrome Layer Current Design Decisions
+- Mobile app chrome should use named layer tokens: `KK_LAYER.mobileChrome`, `KK_LAYER.mobileChromeOverlay`, `KK_LAYER.modalBackdrop`, and `KK_LAYER.modal`; mobile components should not reintroduce `z-[940]`, `z-[964]`, `z-[995]`, or `z-[1001]`.
+- CSS-owned mobile primitives should carry the visual system. Components should attach stable classes such as `kk-mobile-more-menu-sheet`, `kk-mobile-more-menu-action`, and `mobile-ecommerce-panel-root` instead of inline background, border, and shadow recipes.
+- Mobile chrome surfaces continue to inherit the existing `mobile-clay` and `frost-card` token system so light/dark mode, border rhythm, active state, and reduced-motion rules stay consistent.
+- This pass intentionally only changes the `MobileEcommercePanel` root layer/surface. Internal ecommerce controls still contain legacy local button and tag styling and should be handled by a dedicated ecommerce panel UI pass.
+
+### Mobile Chrome Layer Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-chrome-layer-ui-system-contract.test.ts`: red first for missing layer/CSS/component contracts, then 3 tests passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-chrome-layer-ui-system-contract.test.ts tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/mobile-workspace-surface-contract.test.ts tests/unit/clay-frosted-surface-contract.test.ts tests/unit/ecommerce-mode-source-contract.test.ts tests/unit/ecommerce-mode-source-guard.test.ts tests/unit/partial-redraw-pipeline-contract.test.ts`: 30 tests passed.
+- `rg -n "z-\[1001\]|z-\[964\]|z-\[940\]|z-\[995\]|bg-\[#0A0A0C\]" apps/web/src/components/mobile/MobileMoreMenu.tsx apps/web/src/components/mobile/MobileTabBar.tsx apps/web/src/components/mobile/MobileWorkspaceQuickBar.tsx apps/web/src/components/mobile/MobileEcommercePanel.tsx`: no matches.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and 427 test files typechecked.
+- `npm.cmd run architecture:check`: passed. Existing hardcoded color/raw z-index warning groups remain in admin recharge, PromptBar internals, sign-up/confetti, and other legacy surfaces, but the mobile chrome warnings addressed by this pass are no longer listed.
+- `npm.cmd run build`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `git diff --check -- packages/ui/src/core/layers.ts apps/web/src/styles/kk-ui-tokens.css apps/web/src/index.css apps/web/src/components/mobile/MobileMoreMenu.tsx apps/web/src/components/mobile/MobileTabBar.tsx apps/web/src/components/mobile/MobileWorkspaceQuickBar.tsx apps/web/src/components/mobile/MobileEcommercePanel.tsx tests/unit/mobile-chrome-layer-ui-system-contract.test.ts`: passed with CRLF/LF normalization warnings only.
+- Build artifact check: `rg -n "kk-mobile-more-menu|mobile-ecommerce-panel-root|kk-z-mobile-chrome" apps/web/dist/assets -g "index-*.css" -g "index-*.js"` found the new mobile chrome primitives in generated assets.
+- Runtime HTTP smoke: short-lived Vite process on `http://127.0.0.1:5199/` returned `status=200`, `length=4989`, and `root=true`, then the process tree was stopped.
+- `npm.cmd run dev:status`: confirmed no residual Vite/API processes after smoke runs.
+
+### Mobile Chrome Layer Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization goal is still progressing through scoped system passes.
+- In-app Browser screenshot QA was not completed because the Browser navigation/screenshot tool was not exposed in this session; Product Design local context also has no saved screenshot/Figma reference. Runtime smoke and build artifact checks were used instead.
+
+### Mobile Chrome Layer Risks And Next Steps
+- `MobileEcommercePanel` still contains internal legacy local visual utilities such as local overlays, rose/amber gradients, and white-alpha button treatments. A follow-up ecommerce panel system pass should convert its upload cards, inspiration chips, option selectors, and sticky composer actions to reusable primitives.
+- Architecture warnings still identify unrelated legacy raw z-index and color literals in admin recharge, PromptBar internals, sign-up/confetti, and ecommerce desktop/import panels.
+- A later visual QA pass should open mobile viewport states with real screenshots once the Browser tool or Playwright-backed smoke environment is available.
+
+## 2026-06-13 - Settings Visual Alignment Layer Pass
+
+### Settings Visual Alignment Change Scope
+- Added a visible settings UI system layer covering the settings shell, desktop/mobile topbars, sidebar, page background, hero header, cards, inputs, dropdowns, floating menus, hover states, and reduced-motion behavior.
+- Migrated shared `SettingSelect` dropdowns from private layer/shadow/blur utilities to the settings control-menu primitive with `KK_LAYER.dropdown`, `listbox`/`option` semantics, selected state attributes, and shared visual styling.
+- Preserved settings routing, business logic, provider/API flows, account behavior, billing behavior, and the main canvas interaction model. This pass focuses on visible alignment and system reuse.
+
+### Settings Visual Alignment Files Changed
+- `apps/web/src/components/settings/SettingsScaffold.tsx`
+- `apps/web/src/components/settings/ui/index.tsx`
+- `apps/web/src/styles/settings.css`
+- `tests/unit/settings-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Settings Visual Alignment Current Design Decisions
+- Settings UI should inherit one visible system layer instead of accumulating page-by-page overrides: shell, sidebar, hero, cards, controls, dropdowns, and modal panels now share the same visual variables.
+- Settings content cards keep an 18-24px radius rhythm, subtle glass material, bounded shadows, and unified hover motion; reduced-motion mode removes transitions and transforms.
+- Sidebar navigation spacing is owned by grid `gap` in the final settings layer; legacy Tailwind `space-y-*` margins are reset to avoid doubled vertical rhythm.
+- Shared settings dropdowns must use `SETTINGS_CONTROL_MENU_*` classes and `KK_LAYER.dropdown`; individual views should not reintroduce raw `z-[100]`, private `shadow-lg`, or private `backdrop-blur-md`.
+- The main canvas page remains intentionally untouched in this pass because the user called out settings and non-canvas surfaces as the priority.
+
+### Settings Visual Alignment Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-ui-system-contract.test.ts`: red first for missing visual alignment/control-menu contracts, then 7 tests passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-ui-system-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/settings-entry-surface-style-regression.test.ts tests/unit/clay-frosted-surface-contract.test.ts tests/unit/mobile-settings-browser-verify-script.test.ts tests/unit/overlay-layer-ui-system-contract.test.ts`: 33 tests passed.
+- `rg -n "z-\[100\]|shadow-lg|backdrop-blur-md" apps/web/src/components/settings/ui/index.tsx`: no matches.
+- `npm.cmd run typecheck`: passed; server syntax check passed for 47 files and 426 test files typechecked.
+- `npm.cmd run architecture:check`: passed. Existing hardcoded color and raw z-index warning lists remain outside this pass.
+- `npm.cmd run build`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `git diff --check -- apps/web/src/components/settings/SettingsScaffold.tsx apps/web/src/components/settings/ui/index.tsx apps/web/src/styles/settings.css tests/unit/settings-ui-system-contract.test.ts docs/development/session-handoff.md`: passed with CRLF/LF normalization warnings only.
+- Build artifact check found `settings-visual-shell-bg`, `settings-visual-sidebar-card-bg`, `settings-system-control-menu`, and the visual alignment layer inside `apps/web/dist/assets/SettingsPanel-*.css`.
+- Runtime HTTP smoke: short-lived Vite job on `http://127.0.0.1:5198/settings` returned `status=200`, `length=4989`, and `root=True`, then was stopped.
+- `npm.cmd run verify:mobile-settings-smoke`: exited 0 in fallback mode; direct settings routes returned 200, Playwright preflight passed, but the local backend/API proxy was not running.
+- `npm.cmd run verify:desktop-settings-smoke`: exited 0 in fallback mode; direct settings routes returned 200, Playwright preflight passed, but the local backend/API proxy was not running.
+- `npm.cmd run dev:status`: confirmed no residual Vite/API processes after smoke runs.
+
+### Settings Visual Alignment Not Run
+- Full `npm run verify:changes` was not run because the broader UI optimization goal is still progressing through scoped system passes.
+- Full screenshot comparison QA was not completed: the Browser connector did not expose a direct navigation/screenshot tool in this session, and the Playwright smoke scripts fell back because the local backend/API proxy was not started.
+
+### Settings Visual Alignment Risks And Next Steps
+- Broader non-settings surfaces still need visible system passes: mobile chrome, admin recharge, PromptBar internals, ecommerce panels, and sign-up/confetti still appear in raw layer or token warning groups.
+- Settings shell now has a stronger visible system layer, but screenshot review with a live backend should still be done before considering the full UI optimization goal complete.
+- Some legacy styling still lives in `apps/web/src/index.css`; the final `settings.css` layer overrides it safely for settings, but future cleanup should gradually retire duplicated settings rules.
 
 ## 2026-06-12 - AI Management Skill Modal Layer Pass
 
@@ -215,13 +588,13 @@
 - `tests/unit/clay-global-ui-refit-contract.test.ts`
 - `docs/development/session-handoff.md`
 
-### Current Design Decisions
+### Search Palette Current Design Decisions
 - SearchPalette now consumes `KK_LAYER.modal`, matching the top-level overlay policy instead of carrying a private Tailwind z-index.
 - `kk-search-palette-backdrop`, `kk-search-palette-scrim`, and `kk-search-palette-panel` are the reusable system primitives for future command/search overlays.
 - Existing legacy Clay tokens are preserved as the visual source of truth via aliases such as `--kk-search-palette-backdrop-bg: var(--search-palette-overlay-bg)` and `--kk-search-palette-panel-shadow: var(--frost-card-framework-shadow)`.
 - Mobile and desktop variants remain explicit through `data-search-surface` and `data-search-panel`; CSS data selectors own the shell radius and bottom-sheet edge treatment.
 
-### Verification Run
+### Search Palette Verification Run
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/search-palette-ui-system-contract.test.ts`: red first, then 2 tests passed.
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/search-palette-ui-system-contract.test.ts tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/responsive-surface.test.ts tests/unit/overlay-layer-ui-system-contract.test.ts`: 24 tests passed.
 - `rg -n "z-\[100\]|fixed inset-0 z-\[100\]|search-palette-overlay-bg|frost-card-framework-shadow|frost-card-framework-blur" apps/web/src/components/layout/SearchPalette.tsx`: no matches.
@@ -233,11 +606,11 @@
 - `npm.cmd run check:encoding`: passed.
 - Runtime QA: `npm.cmd run dev:start` reported ready, but the managed Vite/API processes exited in this local environment before HTTP smoke. In-app Browser still returned `net::ERR_BLOCKED_BY_CLIENT` for `http://localhost:3000/`. A short-lived Vite job on `http://127.0.0.1:5191/` returned `status=200`, `length=4989`, and `root=True`, then was stopped. `npm.cmd run dev:status` confirmed no residual Vite/API processes.
 
-### Not Run
+### Search Palette Not Run
 - Full `npm run verify:changes` was not run because the overall UI optimization goal is still being advanced in scoped passes; keep it for the final release-grade convergence run.
 - Browser screenshot QA is still blocked by the in-app Browser localhost policy returning `net::ERR_BLOCKED_BY_CLIENT`; HTTP smoke and build/test verification were used as fallback.
 
-### Risks And Next Steps
+### Search Palette Risks And Next Steps
 - Global raw z-index warnings remain in `AdminRechargeFloatingPanel`, mobile ecommerce/menu/tab/quick surfaces, several modals, `ProjectManager`, and sign-up confetti. Continue moving them to `KK_LAYER` by risk priority.
 - Raw color warnings remain broad and historical. Separate UI chrome tokens from user/content color values before bulk cleanup.
 - SearchPalette now has system primitives, so future command/search surfaces should reuse these classes instead of adding new private glass/z-index styling.
@@ -1062,4 +1435,3 @@
 
 Primary Web runtime: `apps/web/`
 Mobile workspace: `apps/mobile/`
-

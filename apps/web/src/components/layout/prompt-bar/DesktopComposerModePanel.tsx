@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { KK_LAYER } from '@kk/ui';
 import { AspectRatio, type GenerationConfig, GenerationMode } from '../../../types';
 
 interface DesktopComposerModePanelProps {
@@ -164,7 +165,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
         {showOptionsPanel && isMobile ? (
           <div
-            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
+            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'kk-desktop-composer-mobile-sheet fixed left-3 right-3 ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
             style={
               isEmbeddedMobileDrawer
                 ? {
@@ -172,6 +173,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
                     overscrollBehavior: 'contain',
                   }
                 : {
+                    zIndex: KK_LAYER.modalBackdrop,
                     bottom: mobileFloatingSheetBottom,
                     maxHeight: mobileFloatingSheetMaxHeight,
                     overscrollBehavior: 'contain',

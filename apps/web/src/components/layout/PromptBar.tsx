@@ -689,7 +689,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                         />
                     </>
                 )}
-                <div className="relative z-[1] flex min-w-0 items-center gap-2 px-3">
+                <div className="kk-prompt-send-button-content relative flex min-w-0 items-center gap-2 px-3">
                     {isCreditModel && creditCost > 0 ? (
                         <div className="flex items-center gap-1.5">
                             <Sparkles size={14} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black' : 'text-white'} />
@@ -706,7 +706,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                 {/* 发送箭头 🚀 箭头朝右 + 动画 */}
                 <div className={`
-                    relative z-[1] flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-all duration-200
+                    kk-prompt-send-button-icon relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-all duration-200
                     ${isDisabled
                         ? 'bg-black/10 dark:bg-white/[0.04] text-[var(--text-tertiary)] opacity-55'
                         : isInsufficient

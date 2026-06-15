@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 
 import type {
@@ -112,78 +112,30 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     return items;
   }, [items]);
 
-  // 简体中文：编写专用色值主题映射函数，支持总览（蓝色）、计费账本（金色）、API 工作台（青色）、存储（绿色）、系统日志（紫色）个性化渲染
-  const getSidebarItemTheme = (itemId: string) => {
+  // Map route ids to sidebar accent tokens; CSS owns the visual treatment.
+  const getSidebarItemAccent = (itemId: string) => {
     switch (itemId) {
       case 'dashboard':
-        return {
-          glow: 'linear-gradient(to bottom, #3b82f6, #60a5fa)',
-          shadow: '0 0 10px rgba(59, 130, 246, 0.8), 0 0 4px rgba(59, 130, 246, 0.6)',
-          border: 'rgba(59, 130, 246, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(96, 165, 250, 0.04) 100%)',
-          iconBg: 'rgba(59, 130, 246, 0.15)',
-          iconBorder: 'rgba(59, 130, 246, 0.3)',
-          iconColor: '#60a5fa',
-        };
+        return 'overview';
       case 'consumption-records':
-        return {
-          glow: 'linear-gradient(to bottom, #d97706, #fbbf24)',
-          shadow: '0 0 10px rgba(245, 158, 11, 0.8), 0 0 4px rgba(245, 158, 11, 0.6)',
-          border: 'rgba(245, 158, 11, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(251, 191, 36, 0.04) 100%)',
-          iconBg: 'rgba(245, 158, 11, 0.15)',
-          iconBorder: 'rgba(245, 158, 11, 0.3)',
-          iconColor: '#fbbf24',
-        };
+        return 'billing';
       case 'api-management':
-        return {
-          glow: 'linear-gradient(to bottom, #0891b2, #22d3ee)',
-          shadow: '0 0 10px rgba(6, 182, 212, 0.8), 0 0 4px rgba(6, 182, 212, 0.6)',
-          border: 'rgba(6, 182, 212, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(34, 211, 238, 0.04) 100%)',
-          iconBg: 'rgba(6, 182, 212, 0.15)',
-          iconBorder: 'rgba(6, 182, 212, 0.3)',
-          iconColor: '#22d3ee',
-        };
+        return 'api';
       case 'storage-settings':
-        return {
-          glow: 'linear-gradient(to bottom, #059669, #34d399)',
-          shadow: '0 0 10px rgba(16, 185, 129, 0.8), 0 0 4px rgba(16, 185, 129, 0.6)',
-          border: 'rgba(16, 185, 129, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(52, 211, 153, 0.04) 100%)',
-          iconBg: 'rgba(16, 185, 129, 0.15)',
-          iconBorder: 'rgba(16, 185, 129, 0.3)',
-          iconColor: '#34d399',
-        };
+        return 'storage';
       case 'system-logs':
-        return {
-          glow: 'linear-gradient(to bottom, #7c3aed, #a78bfa)',
-          shadow: '0 0 10px rgba(139, 92, 246, 0.8), 0 0 4px rgba(139, 92, 246, 0.6)',
-          border: 'rgba(139, 92, 246, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(167, 139, 250, 0.04) 100%)',
-          iconBg: 'rgba(139, 92, 246, 0.15)',
-          iconBorder: 'rgba(139, 92, 246, 0.3)',
-          iconColor: '#a78bfa',
-        };
+        return 'logs';
       default:
-        return {
-          glow: 'linear-gradient(to bottom, #818cf8, #3b82f6)',
-          shadow: '0 0 10px rgba(99, 102, 241, 0.8), 0 0 4px rgba(59, 130, 246, 0.6)',
-          border: 'rgba(99, 102, 241, 0.35)',
-          bg: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.06) 50%, rgba(139, 92, 246, 0.02) 100%)',
-          iconBg: 'rgba(99, 102, 241, 0.15)',
-          iconBorder: 'rgba(99, 102, 241, 0.3)',
-          iconColor: '#818cf8',
-        };
+        return 'default';
     }
   };
 
-  // 匹配并渲染卡片下方的动态数据
+  // Render lightweight live status for each navigation card.
   const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId) => {
     if (itemId === 'dashboard') {
       return (
         <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
-          {pick('工作区健康度及总览面板就绪', 'Workspace health & overview panel ready')}
+          {pick('工作区健康和总览面板就绪', 'Workspace health & overview panel ready')}
         </div>
       );
     }
@@ -198,7 +150,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
       return (
         <div className="mt-2 text-[11px] leading-4 flex items-center justify-between">
           <span className="text-[var(--text-secondary)]">{pick('今日消耗', 'Today Cost')}</span>
-          <span className="font-bold text-amber-600 dark:text-amber-300 text-xs">{remainingBalanceDisplay}</span>
+          <span className="settings-sidebar-card__balance text-xs">{remainingBalanceDisplay}</span>
         </div>
       );
     }
@@ -206,8 +158,8 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
       const isHealthy = importantLogCount === 0;
       return (
         <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
-          <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
-          <span style={{ color: isHealthy ? 'var(--text-secondary)' : 'var(--state-danger-text, #ef4444)' }} className="truncate">
+          <span className="settings-sidebar-card__status-dot h-2 w-2 rounded-full" data-state={isHealthy ? 'healthy' : 'warning'} />
+          <span className="settings-sidebar-card__status-text truncate" data-state={isHealthy ? 'healthy' : 'warning'}>
             {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
           </span>
         </div>
@@ -232,108 +184,21 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         background: 'var(--settings-nav-glass-bg)',
       }}
     >
-      <style>{`
-        @keyframes arrowBounce {
-          0%, 100% { transform: translateX(0); opacity: 0.6; }
-          50% { transform: translateX(3px); opacity: 1; }
-        }
-        .animate-arrowBounce {
-          animation: arrowBounce 1.4s infinite ease-in-out;
-        }
-        .sidebar-card-list::-webkit-scrollbar {
-          width: 4px;
-        }
-        .sidebar-card-list::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.08);
-          border-radius: 9px;
-        }
-        .settings-sidebar-card {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          height: 76px !important;
-          border-radius: 18px;
-          border: 1px solid rgba(255, 255, 255, 0.04);
-          background: rgba(255, 255, 255, 0.015);
-          padding: 12px 14px;
-          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-          backdrop-filter: blur(var(--frost-card-framework-blur, 15px));
-          -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 15px));
-          text-align: left;
-          box-shadow: none;
-        }
-        body:not(.dark-mode) .settings-sidebar-card {
-          background: rgba(0, 0, 0, 0.01);
-          border-color: rgba(0, 0, 0, 0.03);
-        }
-        .settings-sidebar-card:hover {
-          transform: translateY(-1.5px);
-          border-color: rgba(99, 102, 241, 0.2);
-          background: rgba(255, 255, 255, 0.04);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-        }
-        body:not(.dark-mode) .settings-sidebar-card:hover {
-          background: rgba(0, 0, 0, 0.02);
-          border-color: rgba(99, 102, 241, 0.15);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .settings-sidebar-card.active {
-          border-color: rgba(99, 102, 241, 0.35);
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.06) 50%, rgba(139, 92, 246, 0.02) 100%);
-          box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.08);
-        }
-        body:not(.dark-mode) .settings-sidebar-card.active {
-          border-color: rgba(99, 102, 241, 0.25);
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.04) 50%, rgba(139, 92, 246, 0.01) 100%);
-          box-shadow: 0 6px 18px -4px rgba(99, 102, 241, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.9);
-        }
-        .settings-sidebar-card.active::before {
-          display: none;
-        }
-        .card-avatar-icon {
-          display: flex;
-          height: 28px;
-          width: 28px;
-          align-items: center;
-          justify-content: center;
-          border-radius: 8px;
-          border: 1px solid rgba(255, 255, 255, 0.04);
-          background: rgba(255, 255, 255, 0.02);
-          color: var(--text-primary);
-          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        body:not(.dark-mode) .card-avatar-icon {
-          border-color: rgba(0, 0, 0, 0.04);
-          background: rgba(0, 0, 0, 0.01);
-        }
-        .settings-sidebar-card.active .card-avatar-icon {
-          background: rgba(99, 102, 241, 0.15) !important;
-          border-color: rgba(99, 102, 241, 0.3) !important;
-          color: #818cf8 !important;
-          filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
-          transform: scale(0.96);
-        }
-        body:not(.dark-mode) .settings-sidebar-card.active .card-avatar-icon {
-          background: rgba(99, 102, 241, 0.08) !important;
-          border-color: rgba(99, 102, 241, 0.2) !important;
-          color: #6366f1 !important;
-          filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.25));
-          transform: scale(0.96);
-        }
-        .settings-sidebar-card .lucide-chevron-right {
-          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .settings-sidebar-card.active .lucide-chevron-right {
-          color: #818cf8 !important;
-          opacity: 0.8 !important;
-          transform: translateX(1.5px);
-        }
-        body:not(.dark-mode) .settings-sidebar-card.active .lucide-chevron-right {
-          color: #6366f1 !important;
-        }
-      `}</style>
+      <div className="settings-shell-nav__title px-3 pb-3">
+        <h1 className="text-sm font-semibold text-[var(--settings-nav-text-primary)]">{title}</h1>
+        <p className="mt-1 text-[11px] leading-5 text-[var(--settings-nav-text-secondary)]">{description}</p>
+      </div>
+
+      <label className="settings-shell-nav__search mx-2 mb-4">
+        <Search size={14} aria-hidden="true" />
+        <input
+          type="search"
+          value={navQuery}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          className="w-full min-w-0 bg-transparent text-sm outline-none"
+        />
+      </label>
 
       <nav className="sidebar-card-list min-h-0 flex-1 space-y-3.5 overflow-y-auto pl-2 pr-3">
         {filteredNavItems.length === 0 ? (
@@ -367,44 +232,25 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                   {sectionItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
-                    const theme = getSidebarItemTheme(item.id);
+                    const accent = getSidebarItemAccent(item.id);
 
                     return (
                       <div key={item.id} className="relative w-full">
                         {isActive && (
-                          <span 
-                            className="absolute left-[8px] top-1/2 -translate-y-1/2 w-[3.5px] h-[18px] rounded-full z-10"
-                            style={{
-                              background: theme.glow,
-                              boxShadow: theme.shadow,
-                            }}
-                          />
+                          <span className="settings-sidebar-card__active-rail" aria-hidden="true" />
                         )}
                         <button
                           type="button"
                           onClick={() => onNavigate(item.id)}
                           title={item.description}
-                          className={`settings-sidebar-card w-full ${isActive ? 'active' : ''}`}
+                          className="settings-sidebar-card w-full"
                           aria-current={isActive ? 'page' : undefined}
-                          style={isActive ? {
-                            paddingLeft: '26px', // 激活时增加左边距，为指示灯空出位置
-                            borderColor: theme.border,
-                            background: theme.bg,
-                            boxShadow: `${theme.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.08)`,
-                          } : undefined}
+                          data-state={isActive ? 'active' : 'idle'}
+                          data-accent={accent}
                         >
                           <div className="flex w-full items-center justify-between">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span 
-                                className="card-avatar-icon shrink-0"
-                                style={isActive ? {
-                                  background: theme.iconBg,
-                                  borderColor: theme.iconBorder,
-                                  color: theme.iconColor,
-                                  filter: `drop-shadow(0 0 6px ${theme.iconColor}44)`,
-                                  transform: 'scale(0.96)',
-                                } : undefined}
-                              >
+                              <span className="card-avatar-icon shrink-0">
                                 <Icon size={14} />
                               </span>
                               <span className="truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">
@@ -417,10 +263,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                           </div>
                           {renderCardStatusInfo(item.id)}
                           {isActive && (
-                            <span 
-                              className="absolute right-3.5 top-[calc(50%-6.5px)] h-[13px] w-[13px] opacity-80 animate-arrowBounce flex items-center justify-center"
-                              style={{ color: theme.iconColor }}
-                            >
+                            <span className="settings-sidebar-card__active-chevron">
                               <ChevronRight size={13} />
                             </span>
                           )}
@@ -439,7 +282,5 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     </aside>
   );
 };
-
-// 静态测试兼容占位，请勿删除：className="w-full min-w-0 bg-transparent text-sm outline-none"
 
 export default SettingsDesktopSidebar;
