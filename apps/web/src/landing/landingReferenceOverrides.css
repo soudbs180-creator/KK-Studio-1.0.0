@@ -1,6 +1,6 @@
 /* 简体中文：参考 New Genre 风格的高端最终一致性覆盖层 */
 
-/* 1. 根滚动环境修复：强制解除所有可能导致锁定滚动的父级高度和 Overflow 限制 */
+/* 1. 根滚动环境修复与自适应字号等比缩放：强制解除所有可能导致锁定滚动的父级高度和 Overflow 限制 */
 html.auth-screen-active,
 body.auth-screen-active,
 html.auth-screen-active body,
@@ -10,6 +10,26 @@ body.auth-screen-active #root {
   overflow-y: auto !important;
   overflow-x: clip !important;
   background: transparent !important; /* 解除根底色绑定，露出天空长渐变 */
+}
+
+/* 1.1 100% 还原原站的根字号等比自适应收缩，防止大标题在中低分辨率下对导航和内容进行挤压遮挡 */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  html.auth-screen-active,
+  html.auth-screen-active body {
+    font-size: 87.5% !important; /* 约 14px */
+  }
+}
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  html.auth-screen-active,
+  html.auth-screen-active body {
+    font-size: 75% !important; /* 约 12px */
+  }
+}
+@media (max-width: 767.98px) {
+  html.auth-screen-active,
+  html.auth-screen-active body {
+    font-size: 62.5% !important; /* 约 10px */
+  }
 }
 
 /* 2. 黎明天空长渐变背景及全局文本基色 */
@@ -23,16 +43,15 @@ body.auth-screen-active #root {
   overflow-y: visible !important;
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* 从深夜黑红过渡到深海蓝、晨曦蓝、曙光金黄，最后到晨雾白 */
+  /* 100% 还原原站 7色阶天空黎明长渐变背景，高度延展 240vh 表现极佳的柔和度 */
   background: linear-gradient(180deg, 
-    #180602 0%,      /* 极深暗红黑（Hero 顶部） */
-    #0c1428 14%,     /* 深邃夜空蓝 */
-    #20385d 28%,     /* 晨曦微光蓝 */
-    #49719d 44%,     /* 晨空蔚蓝 */
-    #87a7cc 58%,     /* 天空淡蓝 */
-    #f6dbb5 74%,     /* 曙光金黄 */
-    #faf1e9 88%,     /* 朝雾乳白 */
-    #f7f3f0 100%     /* 底部亮灰白 */
+    #280e01 0%,       /* 黎明前夕黑咖啡红 */
+    #182644 15.2608%, /* 深邃夜空蓝 */
+    #5a769f 30.284%,  /* 晨曦微光蓝 */
+    #87a1c4 43.3787%, /* 晨空淡蓝灰色 */
+    #c1d3e6 58.8313%, /* 天空亮灰蓝色 */
+    #fef9e1 79.7139%, /* 朝阳淡金黄 */
+    #f7f3f0 100%      /* 晨雾亮灰白 */
   ) !important;
   color: #111827 !important;
   isolation: isolate;
@@ -187,7 +206,7 @@ body.auth-screen-active #root {
 .kk-landing-root .kk-hero__title {
   color: #ffffff !important;
   text-shadow: 0 4px 32px rgba(0, 0, 0, 0.25) !important;
-  font-size: clamp(32px, 5.4vw, 68px) !important;
+  font-size: clamp(2.5rem, 5.2vw, 4.5rem) !important;
   line-height: 1.15 !important;
   letter-spacing: -0.04em !important;
 }
@@ -284,11 +303,11 @@ body.auth-screen-active #root {
   padding: 0 48px;
 }
 
-.kk-work-header h2 {
+.kk-landing-root .kk-work-header h2 {
   color: #0f1d3a !important; /* 优雅的深蓝墨色 */
-  font-size: clamp(38px, 6.2vw, 92px);
-  line-height: 0.98;
-  letter-spacing: -0.07em;
+  font-size: clamp(1.8rem, 4.5vw, 3.2rem) !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.06em !important;
 }
 
 .kk-work-header .kk-section-kicker {
@@ -300,7 +319,7 @@ body.auth-screen-active #root {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  cursor: grab;
+  cursor: grab !important;
   scrollbar-width: none; /* Firefox */
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
@@ -312,7 +331,7 @@ body.auth-screen-active #root {
 }
 
 .kk-work-scroll-container.is-dragging {
-  cursor: grabbing;
+  cursor: grabbing !important;
   user-select: none;
   scroll-snap-type: none;
 }
@@ -539,7 +558,7 @@ body.auth-screen-active #root {
 
 .kk-landing-root #process h2 {
   color: #0f1d3a !important;
-  font-size: clamp(28px, 4.8vw, 54px) !important;
+  font-size: clamp(1.8rem, 4vw, 3.2rem) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.05em !important;
 }
@@ -564,7 +583,7 @@ body.auth-screen-active #root {
 
 .kk-landing-root .kk-services-section__header h2 {
   color: #0f1d3a !important;
-  font-size: clamp(28px, 4.8vw, 54px) !important;
+  font-size: clamp(1.8rem, 4vw, 3.2rem) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.05em !important;
 }
@@ -589,7 +608,7 @@ body.auth-screen-active #root {
 
 .kk-landing-root .kk-service-row p {
   color: #0f1d3a !important;
-  font-size: clamp(16px, 2.2vw, 28px) !important;
+  font-size: clamp(1rem, 2.2vw, 1.8rem) !important;
   line-height: 1.25 !important;
   letter-spacing: -0.02em !important;
   font-weight: 580 !important;
@@ -606,7 +625,7 @@ body.auth-screen-active #root {
 
 .kk-landing-root .kk-thoughts__header h2 {
   color: #0f1d3a !important;
-  font-size: clamp(28px, 4.8vw, 54px) !important;
+  font-size: clamp(1.8rem, 4vw, 3.2rem) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.05em !important;
 }
