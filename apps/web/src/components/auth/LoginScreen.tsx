@@ -288,35 +288,8 @@ const LoginScreen: React.FC = () => {
         break;
       }
     }
-    setError(isNetworkError(lastError) ? (hostedRuntime ? t(`连续 ${MAX_RETRY} 次请求失败，请检查 VPS 登录服务是否可达后重试。`, `Network request failed after ${MAX_RETRY} attempts. Check whether the VPS sign-in service is reachable and try again.`) : t(`连续 ${MAX_RETRY} 次请求失败，可先使用临时账号进入本地工作区。`, `Network request failed after ${MAX_RETRY} attempts. You can continue with a temporary account for local-only access.`)) : resolveAuthErrorMessage(lastError, view));
-    if (turnstileAvailable) resetTurnstile();
+    setError(isNetworkError(lastError) ? (hostedRuntime ? t(`连续 ${MAX_RETRY} 次请求失败，请检查 VPS 登录服务是否可达后重试。`, `Network request failed after ${MAX_RETRY} attempts. Check whether the VPS sign-in service is reachable and try again.`) : t(`连续 ${MAX_RETRY} 次请求失败，可先使用临时账号进入本地工作区。`, `Network request failed after ${MAX_RETRY} attempts. You can use temporary access for the local workspace.`)) : resolveAuthErrorMessage(lastError, view));
     setLoading(false);
-  };
-
-  const handleWechatLogin = async () => {
-    if (loading || tempLoading || wechatLoading || googleLoading) return;
-    if (turnstileAvailable && !turnstileToken) {
-      setCaptchaRequiredByBackend(true);
-      setError(turnstileError || t('请先完成人机验证后再使用微信扫码登录。', 'Complete CAPTCHA verification before signing in with WeChat QR.'));
-      return;
-    }
-    setWechatModalOpen(true);
-    setWechatLoading(true);
-    setWechatError(null);
-    setWechatAuthorizationUrl(null);
-    setWechatExpiresAt(null);
-    try {
-      const { startWechatLogin } = await import('../../services/auth/wechatAuth.ts');
-      const authData = await startWechatLogin();
-      setWechatAuthorizationUrl(authData.authorizationUrl);
-      setWechatExpiresAt(authData.expiresAt);
-    } catch (authError) {
-      const nextError = resolveAuthErrorMessage(authError, 'login');
-      setWechatError(nextError);
-      setError(nextError);
-    } finally {
-      setWechatLoading(false);
-    }
   };
 
   const handleGoogleLogin = async () => {
@@ -369,7 +342,7 @@ const LoginScreen: React.FC = () => {
 
 
   return (
-    <div className={`auth-page auth-page--${resolvedTheme}`}>
+    <div className={`auth-page auth-page--landing auth-page--${resolvedTheme}`}>
       {wechatModalOpen && (
         <Suspense fallback={null}>
           <WechatQrModal
@@ -460,54 +433,38 @@ const LoginScreen: React.FC = () => {
                     <Mail size={18} />
                     <input
                       type="email"
+                      autoComplete="email"
                       value={email}
                       onChange={handleEmailChange}
-                      onBlur={() => setFieldTouched((current) => ({ ...current, email: true }))}
-                      placeholder={t('请输入邮箱地址', 'Enter your email')}
-                      required
-                      autoComplete="email"
+                      onBlur={() => setFieldTouched((prev) => ({ ...prev, email: true }))}
+                      placeholder={t('you@example.com', 'you@example.com')}
                     />
                   </div>
-                  <div className="auth-field-help">
-                    {showFieldError('email') ? (
-                      <span className="auth-field-error">{fieldErrors.email}</span>
-                    ) : (
-                      <span>　</span>
-                    )}
-                  </div>
+                  <small className={`auth-field-help ${showFieldError('email') ? 'auth-field-error' : ''}`}>
+                    {showFieldError('email') ? fieldErrors.email : ' '}
+                  </small>
                 </label>
 
                 {view !== 'forgot-password' && (
                   <label className="auth-field">
-                    <span>{t('登录密码', 'Password')}</span>
+                    <span>{t('密码', 'Password')}</span>
                     <div className={`auth-input-wrap ${showFieldError('password') ? 'auth-input-error' : ''}`}>
                       <Lock size={18} />
                       <input
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete={view === 'register' ? 'new-password' : 'current-password'}
                         value={password}
                         onChange={handlePasswordChange}
-                        onBlur={() => setFieldTouched((current) => ({ ...current, password: true }))}
-                        placeholder={t('请输入登录密码', 'Enter your password')}
-                        required
-                        minLength={8}
-                        autoComplete={view === 'register' ? 'new-password' : 'current-password'}
+                        onBlur={() => setFieldTouched((prev) => ({ ...prev, password: true }))}
+                        placeholder={t('至少 8 位字符', 'At least 8 characters')}
                       />
-                      <button
-                        type="button"
-                        className="auth-eye-btn"
-                        onClick={() => setShowPassword((current) => !current)}
-                        aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      <button type="button" className="auth-eye-btn" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}>
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </button>
                     </div>
-                    <div className="auth-field-help">
-                      {showFieldError('password') ? (
-                        <span className="auth-field-error">{fieldErrors.password}</span>
-                      ) : (
-                        <span>　</span>
-                      )}
-                    </div>
+                    <small className={`auth-field-help ${showFieldError('password') ? 'auth-field-error' : ''}`}>
+                      {showFieldError('password') ? fieldErrors.password : ' '}
+                    </small>
                   </label>
                 )}
 
@@ -517,179 +474,100 @@ const LoginScreen: React.FC = () => {
                     <div className={`auth-input-wrap ${showFieldError('confirmPassword') ? 'auth-input-error' : ''}`}>
                       <Lock size={18} />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={handleConfirmPasswordChange}
-                        onBlur={() => setFieldTouched((current) => ({ ...current, confirmPassword: true }))}
-                        placeholder={t('请再次输入密码', 'Enter your password again')}
-                        required
-                        minLength={8}
-                        autoComplete="new-password"
+                        onBlur={() => setFieldTouched((prev) => ({ ...prev, confirmPassword: true }))}
+                        placeholder={t('再次输入密码', 'Enter password again')}
                       />
                     </div>
-                    <div className="auth-field-help">
-                      {showFieldError('confirmPassword') ? (
-                        <span className="auth-field-error">{fieldErrors.confirmPassword}</span>
-                      ) : (
-                        <span>　</span>
-                      )}
-                    </div>
+                    <small className={`auth-field-help ${showFieldError('confirmPassword') ? 'auth-field-error' : ''}`}>
+                      {showFieldError('confirmPassword') ? fieldErrors.confirmPassword : ' '}
+                    </small>
                   </label>
                 )}
 
+                {view === 'login' && (
+                  <div className="auth-field-row auth-options-row">
+                    <label className="auth-remember">
+                      <input type="checkbox" defaultChecked />
+                      <span>{t('保持登录', 'Keep me signed in')}</span>
+                    </label>
+                    <button type="button" className="auth-text-btn" onClick={() => setView('forgot-password')}>
+                      {t('忘记密码？', 'Forgot password?')}
+                    </button>
+                  </div>
+                )}
+
                 {showTurnstileBlock && (
-                  <div className="auth-turnstile-block">
-                    <div className="auth-turnstile-head">
-                      <span>{t('安全验证', 'Security check')}</span>
-                      <span className={`auth-turnstile-badge ${turnstileStatusClass}`}>{turnstileStatusLabel}</span>
-                    </div>
-                    {turnstileAvailable ? (
-                      <>
-                        <TurnstileWidget
-                          onVerify={handleTurnstileVerify}
-                          onError={handleTurnstileError}
-                          onExpire={handleTurnstileExpire}
-                          onStatusChange={handleTurnstileStatusChange}
-                          appearance="always"
-                          action={view === 'forgot-password' ? 'reset-password' : view}
-                          language={language}
-                          className="auth-turnstile-shell"
-                        />
-                        <div className="auth-turnstile-help">{turnstileHint}</div>
-                      </>
-                    ) : (
-                      <div className="auth-turnstile-inline-error" role="alert">
-                        {turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : getTurnstileDisabledMessage(language)}
+                  <div className={`auth-turnstile-card ${turnstileStatusClass}`}>
+                    <div className="auth-turnstile-header">
+                      <div>
+                        <span>{t('Cloudflare 安全验证', 'Cloudflare verification')}</span>
+                        <p>{turnstileHint}</p>
                       </div>
+                      <small>{turnstileStatusLabel}</small>
+                    </div>
+                    {turnstileAvailable && (
+                      <TurnstileWidget
+                        language={language}
+                        onVerify={handleTurnstileVerify}
+                        onError={handleTurnstileError}
+                        onExpire={handleTurnstileExpire}
+                        onStatusChange={handleTurnstileStatusChange}
+                      />
                     )}
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  className="auth-btn auth-btn-main"
-                  disabled={loading || tempLoading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={16} className="auth-spin" />
-                      {t('处理中...', 'Processing...')}
-                    </>
-                  ) : (
-                    <>
-                      {view === 'login'
-                        ? t('登录', 'Sign in')
-                        : view === 'register'
-                        ? t('注册', 'Sign up')
-                        : t('发送占位提示', 'Send placeholder notice')}
-                      <ArrowRight size={16} />
-                    </>
-                  )}
+                <button className="auth-btn auth-btn-main" disabled={loading || tempLoading || googleLoading || wechatLoading || (turnstileAvailable && !turnstileToken)} type="submit">
+                  {loading ? <Loader2 size={17} className="animate-spin" /> : null}
+                  {view === 'login'
+                    ? t('登录并进入工作区', 'Sign in and enter workspace')
+                    : view === 'register'
+                    ? t('创建账号', 'Create account')
+                    : t('发送重置链接', 'Send reset link')}
+                  {!loading && <ArrowRight size={16} />}
                 </button>
 
                 {view === 'login' && (
                   <>
-                    <div className="auth-divider">
-                      <span>{t('或使用以下方式进入', 'Or continue with')}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn auth-btn-ghost"
-                      onClick={handleWechatLogin}
-                      disabled={loading || tempLoading || wechatLoading || googleLoading}
-                    >
-                      <QrCode size={18} />
-                      {t('使用微信扫码登录', 'Continue with WeChat QR')}
+                    <div className="auth-divider"><span>{t('或使用', 'Or continue with')}</span></div>
+                    <button type="button" className="auth-btn auth-btn-google" onClick={handleGoogleLogin} disabled={loading || tempLoading || googleLoading || wechatLoading}>
+                      {googleLoading ? <Loader2 size={17} className="animate-spin" /> : null}
+                      <span>{t('使用 Google 登录', 'Continue with Google')}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="auth-btn auth-btn-google"
-                      onClick={() => void handleGoogleLogin()}
-                      disabled={loading || tempLoading || googleLoading || wechatLoading}
-                    >
-                      {googleLoading ? (
-                        <>
-                          <Loader2 size={16} className="auth-spin" />
-                          {t('跳转中...', 'Redirecting...')}
-                        </>
-                      ) : (
-                        <>{t('使用 Google 登录', 'Continue with Google')}</>
-                      )}
+                    <button type="button" className="auth-btn auth-btn-ghost" onClick={handleTempUserEntry} disabled={loading || tempLoading || googleLoading || wechatLoading}>
+                      {tempLoading ? <Loader2 size={17} className="animate-spin" /> : null}
+                      <span>{t('临时进入本地工作区', 'Temporary local access')}</span>
                     </button>
-                    <div className="auth-aux-actions">
-                      <button
-                        type="button"
-                        className="auth-btn auth-btn-ghost auth-btn-compact"
-                        onClick={() => void handleTempUserEntry()}
-                        disabled={loading || tempLoading || googleLoading || wechatLoading}
-                      >
-                        {tempLoading ? (
-                          <>
-                            <Loader2 size={15} className="auth-spin" />
-                            {t('正在准备', 'Preparing')}
-                          </>
-                        ) : (
-                          t('临时用户（仅本地）', 'Temporary local access')
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        className="auth-btn auth-btn-ghost auth-btn-compact"
-                        onClick={handleAdminEntry}
-                        disabled={loading || tempLoading || googleLoading || wechatLoading}
-                      >
-                        {t('管理员登录', 'Admin sign-in')}
-                      </button>
-                    </div>
                   </>
                 )}
-
-                <div className="auth-footer-actions">
-                  {view === 'login' && (
-                    <>
-                      <button
-                        type="button"
-                        className="auth-text-btn auth-signup-link"
-                        onClick={() => setView('register')}
-                      >
-                        <span className="auth-signup-link__prefix">{t('没有账号？', "Don't have an account?")}</span>
-                        <span className="auth-signup-link__action">{t('立即注册', 'Sign up')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="auth-btn-forgot"
-                        onClick={() => setView('forgot-password')}
-                      >
-                        {t('忘记密码？', 'Forgot your password?')}
-                      </button>
-                    </>
-                  )}
-                  {view === 'register' && (
-                    <button
-                      type="button"
-                      className="auth-text-btn"
-                      onClick={() => setView('login')}
-                    >
-                      {t('已有账号？返回登录', 'Already have an account? Sign in')}
-                    </button>
-                  )}
-                  {view === 'forgot-password' && (
-                    <button
-                      type="button"
-                      className="auth-text-btn"
-                      onClick={() => setView('login')}
-                    >
-                      {t('想起来了？返回登录', 'Remembered it? Back to sign in')}
-                    </button>
-                  )}
-                </div>
               </form>
-            </div>
-            <div
-              className="auth-version-badge"
-              aria-label={t(`应用版本 ${APP_DISPLAY_VERSION}`, `App version ${APP_DISPLAY_VERSION}`)}
-            >
-              {APP_DISPLAY_VERSION}
+
+              <footer className="auth-footer-actions">
+                {view === 'login' ? (
+                  <button type="button" className="auth-text-btn" onClick={() => setView('register')}>
+                    {t('还没有账号？创建一个', 'No account yet? Create one')}
+                  </button>
+                ) : view === 'register' ? (
+                  <button type="button" className="auth-text-btn" onClick={() => setView('login')}>
+                    {t('已有账号？返回登录', 'Already have an account? Sign in')}
+                  </button>
+                ) : null}
+                <div className="auth-aux-actions">
+                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={handleAdminEntry}>
+                    <Sparkles size={15} />
+                    <span>{t('管理员入口', 'Admin entry')}</span>
+                  </button>
+                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={() => setWechatModalOpen(true)}>
+                    <QrCode size={15} />
+                    <span>{t('微信登录', 'WeChat login')}</span>
+                  </button>
+                </div>
+              </footer>
+              <div className="auth-version">{APP_DISPLAY_VERSION}</div>
             </div>
           </div>
         </div>
