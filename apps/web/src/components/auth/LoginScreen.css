@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
 .auth-screen-active.auth-screen-active--dark,
 body.auth-screen-active.auth-screen-active--dark,
 html.auth-screen-active.auth-screen-active--dark,
@@ -2117,3 +2119,368 @@ body.auth-screen-active.auth-screen-active--light #root {
     animation: none !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   New Genre Premium Aesthetic Overrides (100% 还原白底极简卡片视觉)
+   ========================================================================== */
+/* 将整个 Modal 部分锁定为 Outfit 字体 */
+.auth-modal-overlay,
+.auth-modal-content,
+.auth-panel,
+.auth-header,
+.auth-form,
+.auth-btn,
+.auth-input-wrap input {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* 遮罩层：白朦胧高斯模糊面罩 */
+.auth-modal-overlay {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(32px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+  transition: all 0.3s ease;
+}
+
+/* 登录面板：奢华白卡片 */
+.auth-modal-content .auth-panel {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 20px !important;
+  padding: 40px !important;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.01),
+    0 4px 12px rgba(0, 0, 0, 0.02),
+    0 16px 36px rgba(0, 0, 0, 0.04),
+    0 40px 80px rgba(0, 0, 0, 0.06) !important;
+  color: #111111 !important;
+  max-width: 440px !important;
+  overflow: hidden;
+}
+
+/* 关闭按钮：极简黑色微圆形 */
+.auth-modal-close {
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  top: 24px !important;
+  right: 24px !important;
+}
+.auth-modal-close:hover {
+  background: #f4f4f5 !important;
+  color: #000000 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  transform: scale(1.05) rotate(90deg) !important;
+}
+
+/* 返回登录按钮 */
+.auth-link-back {
+  color: #666666 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-bottom: 24px !important;
+  transition: color 0.2s ease !important;
+}
+.auth-link-back:hover {
+  color: #000000 !important;
+}
+
+/* 头部排版 */
+.auth-header {
+  margin-bottom: 32px !important;
+  text-align: left !important;
+}
+.auth-header h2 {
+  font-size: 28px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  color: #111111 !important;
+  margin-bottom: 8px !important;
+}
+.auth-header p {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  color: #666666 !important;
+  font-weight: 400 !important;
+}
+
+/* 表单字段样式 */
+.auth-field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-bottom: 16px !important;
+}
+.auth-field > span {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #888888 !important;
+}
+
+/* 输入框包装器：极致极简 */
+.auth-input-wrap {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: none !important;
+}
+.auth-input-wrap svg {
+  color: #a1a1aa !important; /* 淡化默认图标 */
+}
+.auth-input-wrap:focus-within {
+  background: #ffffff !important;
+  border-color: #000000 !important;
+  box-shadow: 0 0 0 1px #000000 !important;
+}
+.auth-input-wrap input {
+  color: #111111 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  background: transparent !important;
+}
+.auth-input-wrap input::placeholder {
+  color: #a1a1aa !important;
+}
+
+/* 错误输入框 */
+.auth-input-wrap.auth-input-error {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.02) !important;
+}
+.auth-input-wrap.auth-input-error:focus-within {
+  box-shadow: 0 0 0 1px #ef4444 !important;
+}
+
+/* 字段错误文本提示 */
+.auth-field-help.auth-field-error {
+  color: #ef4444 !important;
+  font-size: 12px !important;
+  margin-top: 4px !important;
+}
+
+/* 选项行（保持登录/忘记密码） */
+.auth-options-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 24px !important;
+  font-size: 13px !important;
+}
+.auth-remember {
+  color: #666666 !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+}
+.auth-remember input[type="checkbox"] {
+  accent-color: #000000 !important;
+}
+
+/* 文本类按钮（忘记密码/创建账号） */
+.auth-text-btn {
+  color: #111111 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  transition: opacity 0.2s ease !important;
+  cursor: pointer !important;
+  border: none !important;
+  background: none !important;
+  padding: 0 !important;
+}
+.auth-text-btn:hover {
+  opacity: 0.7 !important;
+  text-decoration: underline !important;
+}
+
+/* 核心主按钮：纯黑奢华胶囊按钮 */
+.auth-btn-main {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border-radius: 99px !important;
+  height: 48px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  width: 100% !important;
+}
+.auth-btn-main:hover:not(:disabled) {
+  background: #1a1a1a !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+}
+.auth-btn-main:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+.auth-btn-main:disabled {
+  background: #a1a1aa !important;
+  color: #e4e4e7 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+/* 分割线 */
+.auth-divider {
+  margin: 24px 0 !important;
+  text-align: center !important;
+  position: relative !important;
+}
+.auth-divider::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 1px !important;
+  background: rgba(0, 0, 0, 0.08) !important;
+  z-index: 1 !important;
+}
+.auth-divider span {
+  background: #ffffff !important;
+  padding: 0 16px !important;
+  color: #888888 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* 第三方登录按钮（Google） */
+.auth-btn-google {
+  background: #ffffff !important;
+  color: #111111 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 99px !important;
+  height: 48px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  margin-bottom: 12px !important;
+}
+.auth-btn-google:hover:not(:disabled) {
+  background: #f4f4f5 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 微信/临时入口等 Ghost 按钮 */
+.auth-btn-ghost {
+  background: transparent !important;
+  color: #666666 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 99px !important;
+  height: 48px !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+}
+.auth-btn-ghost:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #111111 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 紧凑辅助按钮（微信登录/管理员入口） */
+.auth-aux-actions {
+  display: flex !important;
+  gap: 12px !important;
+  margin-top: 16px !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+.auth-aux-actions .auth-btn-compact {
+  flex: 1 !important;
+  height: 38px !important;
+  font-size: 12px !important;
+}
+
+/* 反馈提示面板 */
+.auth-feedback {
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  margin-bottom: 20px !important;
+}
+.auth-feedback-error {
+  background: rgba(239, 68, 68, 0.05) !important;
+  border: 1px solid rgba(239, 68, 68, 0.1) !important;
+  color: #b91c1c !important;
+}
+.auth-feedback-success {
+  background: rgba(34, 197, 94, 0.05) !important;
+  border: 1px solid rgba(34, 197, 94, 0.1) !important;
+  color: #15803d !important;
+}
+
+/* 页脚样式 */
+.auth-footer-actions {
+  margin-top: 32px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+.auth-version {
+  margin-top: 24px !important;
+  font-size: 11px !important;
+  color: #aaaaaa !important;
+  font-family: monospace !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+
+/* 安全验证 Cloudflare 卡片微调 */
+.auth-turnstile-card {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin: 16px 0 !important;
+}
+.auth-turnstile-header span {
+  color: #111111 !important;
+  font-weight: 600 !important;
+}
+.auth-turnstile-header p {
+  color: #666666 !important;
+}
+.auth-turnstile-card.is-ready {
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  background: rgba(34, 197, 94, 0.02) !important;
+}
+

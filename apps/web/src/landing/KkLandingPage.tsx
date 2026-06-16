@@ -1,6 +1,6 @@
 // 简体中文：KK Studio 高端编辑排版营销落地页主框架组件
 import React from 'react';
-import { ArrowDownRight, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { LandingChrome } from './LandingChrome';
 import { CanvasPreviewMock } from './CanvasPreviewMock';
 import { FeatureNarrative } from './FeatureNarrative';
@@ -70,7 +70,6 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
                   en: 'From prompts, references and model outputs to commerce assets, PPT, video and agent queues. KK Studio turns scattered AI generations into a manageable, reusable and auditable visual production system.'
                 })}
               </p>
-
             </aside>
           </div>
 
@@ -159,3 +158,5 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
 };
 
 export default KkLandingPage;
+
+

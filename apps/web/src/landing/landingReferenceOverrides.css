@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
 /* 简体中文：参考 New Genre 风格的高端最终一致性覆盖层 */
 
 /* 1. 根滚动环境修复与自适应字号等比缩放：强制解除所有可能导致锁定滚动的父级高度和 Overflow 限制 */
@@ -32,7 +34,7 @@ body.auth-screen-active #root {
   }
 }
 
-/* 2. 黎明天空长渐变背景及全局文本基色 */
+/* 2. 纯白高保真极简纸张背景 */
 .auth-page--landing {
   position: relative !important;
   inset: auto !important;
@@ -43,17 +45,8 @@ body.auth-screen-active #root {
   overflow-y: visible !important;
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* 100% 还原原站 7色阶天空黎明长渐变背景，高度延展 240vh 表现极佳的柔和度 */
-  background: linear-gradient(180deg, 
-    #280e01 0%,       /* 黎明前夕黑咖啡红 */
-    #182644 15.2608%, /* 深邃夜空蓝 */
-    #5a769f 30.284%,  /* 晨曦微光蓝 */
-    #87a1c4 43.3787%, /* 晨空淡蓝灰色 */
-    #c1d3e6 58.8313%, /* 天空亮灰蓝色 */
-    #fef9e1 79.7139%, /* 朝阳淡金黄 */
-    #f7f3f0 100%      /* 晨雾亮灰白 */
-  ) !important;
-  color: #111827 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
   isolation: isolate;
   touch-action: pan-y;
 }
@@ -65,40 +58,7 @@ body.auth-screen-active #root {
   content: none !important;
 }
 
-/* 3. 登录弹窗 (Modal Overlay & Content) 深度视觉美化 */
-.auth-page.auth-page--landing .auth-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(12, 20, 40, 0.46) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.auth-page.auth-page--landing .auth-modal-content {
-  position: relative;
-  width: min(100%, 500px);
-  max-height: calc(100dvh - 40px);
-  overflow: auto;
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.72) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  box-shadow: 0 24px 70px rgba(12, 20, 40, 0.16) !important;
-  backdrop-filter: blur(24px) saturate(1.25) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.25) !important;
-}
-
-.auth-page.auth-page--landing .auth-modal-content .auth-panel {
-  background: transparent !important;
-  border: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-  padding: 32px 28px !important;
-}
+/* 3. 登录弹窗 (Modal Overlay & Content) 由全局 LoginScreen.css 强接管，此处让位以防样式冲突 */
 
 .auth-page--landing .auth-modal-close {
   position: absolute;
@@ -132,15 +92,16 @@ body.auth-screen-active #root {
 
 /* 顶部导航条 */
 .kk-landing-chrome__inner {
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .kk-landing-chrome.is-scrolled .kk-landing-chrome__inner {
-  background: rgba(12, 20, 40, 0.46) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(20px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.2) !important;
-  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(24px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.5) !important;
+  color: #000000 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02) !important;
 }
 
 .kk-landing-logo__mark {
@@ -173,17 +134,17 @@ body.auth-screen-active #root {
 
 .kk-landing-navlinks a,
 .kk-landing-link-button {
-  color: rgba(255, 255, 255, 0.72) !important;
+  color: rgba(0, 0, 0, 0.6) !important;
 }
 
 .kk-landing-navlinks a:hover,
 .kk-landing-link-button:hover {
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .kk-landing-start-button {
-  background: #ffffff !important;
-  color: #0c1428 !important;
+  background: #000000 !important;
+  color: #ffffff !important;
   font-weight: 700;
 }
 
@@ -199,16 +160,18 @@ body.auth-screen-active #root {
 }
 
 .kk-hero__meta {
-  color: rgba(255, 255, 255, 0.48) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(0, 0, 0, 0.48) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .kk-landing-root .kk-hero__title {
-  color: #ffffff !important;
-  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.25) !important;
-  font-size: clamp(2.5rem, 5.2vw, 4.5rem) !important;
-  line-height: 1.15 !important;
-  letter-spacing: -0.04em !important;
+  font-family: 'Outfit', sans-serif !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  font-size: clamp(54px, 9vw, 110px) !important;
+  line-height: 0.9 !important;
+  letter-spacing: -0.05em !important;
+  font-weight: 600 !important;
 }
 
 .kk-hero__badges span {
@@ -218,76 +181,77 @@ body.auth-screen-active #root {
 }
 
 .kk-hero__aside {
-  border-top-color: rgba(255, 255, 255, 0.16) !important;
+  border-top-color: rgba(0, 0, 0, 0.1) !important;
 }
 
 .kk-hero__aside p {
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: rgba(0, 0, 0, 0.76) !important;
 }
 
 .kk-editorial-button--dark {
-  background: #ffffff !important;
-  color: #0c1428 !important;
+  background: #000000 !important;
+  color: #ffffff !important;
 }
 
 .kk-editorial-button--ghost {
-  border-color: rgba(255, 255, 255, 0.22) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #000000 !important;
 }
 
 /* Hero Preview 画布模拟块美化 */
 .kk-canvas-preview {
-  background: linear-gradient(135deg, rgba(20, 32, 58, 0.72) 0%, rgba(12, 18, 33, 0.82) 100%) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fcfcfc 100%) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.05) !important;
 }
 
 .kk-canvas-preview__topbar {
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: rgba(0, 0, 0, 0.3) !important;
 }
 
 .kk-canvas-node {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  color: #ffffff !important;
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  color: #111111 !important;
 }
 
 .kk-canvas-node p {
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(0, 0, 0, 0.5) !important;
 }
 
 .kk-canvas-node--agent {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  color: #111111 !important;
 }
 
 /* 核心场景 Marquee 条 */
 .kk-trust-strip {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(0, 0, 0, 0.01) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
 }
 
 .kk-trust-strip__heading span {
-  color: rgba(255, 255, 255, 0.48) !important;
+  color: rgba(0, 0, 0, 0.48) !important;
 }
 
 .kk-trust-strip__heading p {
-  color: #ffffff !important;
+  color: #000000 !important;
+  font-family: 'Outfit', sans-serif !important;
 }
 
 .kk-usecase-pill {
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  background: #ffffff !important;
+  color: rgba(0, 0, 0, 0.72) !important;
 }
 
 /* 5. 核心系统能力水平滑动卡片区 (FeatureNarrative) */
 .kk-work-section {
-  background: transparent !important; /* 透出后面的长天空渐变 */
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 0;
+  background: rgba(0, 0, 0, 0.01) !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   padding: 100px 0;
 }
 
@@ -367,26 +331,29 @@ body.auth-screen-active #root {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background: rgba(255, 255, 255, 0.38) !important;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
-  border-radius: 32px !important;
-  padding: 22px !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 16px 48px rgba(12, 20, 40, 0.03) !important;
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), border-color 320ms ease, box-shadow 320ms ease !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-radius: 24px !important;
+  padding: 24px !important;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.01),
+    0 4px 10px rgba(0, 0, 0, 0.015),
+    0 12px 28px rgba(0, 0, 0, 0.02) !important;
+  transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1), border-color 400ms ease, box-shadow 400ms ease !important;
   scroll-snap-align: center;
 }
 
 .kk-work-card::before {
-  display: none !important; /* 彻底移除简陋的 CSS 伪元素背景块 */
+  display: none !important;
 }
 
 .kk-work-card:hover {
-  transform: translateY(-8px) !important;
-  border-color: rgba(255, 255, 255, 0.72) !important;
-  box-shadow: 0 24px 60px rgba(12, 20, 40, 0.08) !important;
-  background: rgba(255, 255, 255, 0.48) !important;
+  transform: translateY(-6px) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.01),
+    0 8px 20px rgba(0, 0, 0, 0.03),
+    0 24px 50px rgba(0, 0, 0, 0.05) !important;
 }
 
 @media (max-width: 768px) {
@@ -401,10 +368,10 @@ body.auth-screen-active #root {
   position: relative;
   width: 100%;
   height: 240px;
-  border-radius: 22px;
+  border-radius: 16px;
   overflow: hidden;
   background: #0d1627;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .kk-work-card__art {
@@ -506,13 +473,15 @@ body.auth-screen-active #root {
 
 .kk-work-card__eyebrow {
   font-weight: 700;
+  color: rgba(0, 0, 0, 0.48) !important;
 }
 
 .kk-work-card__title {
   margin: 0;
-  color: #0f1d3a !important;
+  font-family: 'Outfit', sans-serif !important;
+  color: #000000 !important;
   font-size: 24px !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   line-height: 1.15 !important;
   letter-spacing: -0.04em !important;
   max-width: none !important;
@@ -520,8 +489,8 @@ body.auth-screen-active #root {
 
 .kk-work-card__desc {
   margin: 0 !important;
-  color: rgba(15, 29, 58, 0.76) !important;
-  font-size: 13.5px !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+  font-size: 14px !important;
   line-height: 1.6 !important;
   font-weight: 400 !important;
 }
@@ -557,14 +526,16 @@ body.auth-screen-active #root {
 }
 
 .kk-landing-root #process h2 {
-  color: #0f1d3a !important;
+  font-family: 'Outfit', sans-serif !important;
+  color: #000000 !important;
   font-size: clamp(1.8rem, 4vw, 3.2rem) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.05em !important;
+  font-weight: 600 !important;
 }
 
 #process p {
-  color: rgba(15, 29, 58, 0.8) !important;
+  color: rgba(0, 0, 0, 0.6) !important;
 }
 
 .process-step-item.is-active {
