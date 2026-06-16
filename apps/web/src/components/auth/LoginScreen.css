@@ -2106,3 +2106,13 @@ body.auth-screen-active.auth-screen-active--light #root {
     margin-bottom: 24px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Reduced motion support for LoginScreen animation fallbacks */
+  .auth-btn,
+  .auth-input-wrap,
+  .auth-page {
+    transition: none !important;
+    animation: none !important;
+  }
+}

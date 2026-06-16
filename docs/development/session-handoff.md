@@ -1,7 +1,50 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-16
+**Last Updated:** 2026-06-16 (Premium Landing Pass)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-16 - Premium Landing Page and Empty Canvas Welcome State
+
+### Premium Landing Scope
+- 基于现有 Vite + React 19 + TypeScript + Tailwind 架构，全新改造了 KK Studio 的营销落地页 / 未登录首页，代替了原先简陋的 SaaS 蓝紫霓虹科技风格。
+- 引入了暖奶油背景 `#fffaf0` + 近黑墨 `#0a0a0a` + 珊瑚粉与淡桃色的低对比优雅渐变，融入了噪点颗粒感（noise overlay）美学。
+- 实现极简磨砂毛玻璃顶栏导航组件 `LandingChrome.tsx`，支持桌面和移动端安全折叠菜单。
+- 实现非对称的作品集式特色卡片网格 `FeatureNarrative.tsx`，展示无限画布、多模型路由、电商流、智能体等产品叙事。
+- 实现交互式步骤时间线组件 `ProcessTimeline.tsx`，在滚动进入视口时动态激活高亮状态。
+- 实现纯前端高还原度的工作台预览组件 `CanvasPreviewMock.tsx`，通过 SVG 虚线动效展示节点的流向，无任何额外性能负担。
+- 新增针对已登录用户的“空画布欢迎态”组件 `EmptyCanvasWelcome.tsx`。当判定画布完全无节点时呈极简卡片排版提示，包含快速上手指示，并可一键载入已注册的 workflow 预设模板（如 Ecommerce Workflow 等）。
+- 重构了 `LoginScreen.tsx`。移除了旧的 slider 首屏，使用全新的 `<KkLandingPage />` 代替。登录、注册及微信/Google第三方认证表单整体被封装在了点击按钮才弹出的 Frosted Modal 磨砂浮层内，做到对原有鉴权逻辑零改动、零破坏。
+- 修改 `App.tsx`，定义了 `isCanvasEmpty` 状态变量，在画布为空且非移动端时自动渲染 `<EmptyCanvasWelcome />`。
+
+### Premium Landing Files Touched
+- `apps/web/src/landing/landingContent.ts` [NEW]
+- `apps/web/src/landing/landingStyles.css` [NEW]
+- `apps/web/src/landing/LandingChrome.tsx` [NEW]
+- `apps/web/src/landing/CanvasPreviewMock.tsx` [NEW]
+- `apps/web/src/landing/FeatureNarrative.tsx` [NEW]
+- `apps/web/src/landing/ProcessTimeline.tsx` [NEW]
+- `apps/web/src/landing/LandingCTA.tsx` [NEW]
+- `apps/web/src/landing/KkLandingPage.tsx` [NEW]
+- `apps/web/src/landing/EmptyCanvasWelcome.tsx` [NEW]
+- `apps/web/src/components/auth/LoginScreen.tsx` [MODIFY]
+- `apps/web/src/App.tsx` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### Premium Landing Design Decisions
+- 视觉风格紧密靠拢高端设计工作室美学，采用超大 Display 标题（72px-112px，行高 0.98），拒绝普通 SaaS 模板堆砌。
+- 保证无任何破坏性集成。通过把登录、注册、微信扫码和 Google 登录表单用高定磨砂毛玻璃 Modal 弹窗打包，在不改动已有 VPS 前后端认证和状态管理的条件下实现完美蜕变。
+- 空画布欢迎态通过 pointer-events-none 穿透底层 InfiniteCanvas，仅卡片本身 pointer-events-auto 可交互，避免遮挡画布本身的双击创建卡片与拖拽上传行为。
+- 使用 `@import "tailwindcss/index.css"` 的 Inline Type 导入规范处理接口，确保 rolldown/vite 构建打包零错误。
+
+### Premium Landing Verification Run
+- `npm run typecheck`: Passed successfully.
+- `npm run build`: Passed successfully. Web client compiled successfully with Vite 8.
+
+### Premium Landing Not Run / Deferred
+- 暂未在 Expo 移动端 App 的原生 WebView 中全面联调落地页的渲染性能（移动端已做好了全幅极简卡片和 reduced motion 退避保护）。
+
+### Premium Landing Risks / Next
+- 无新引入风险。下一步可以对已登录的 Onboarding TutorialOverlay 引导提示做进一步的视觉排版统一。
 
 ## 2026-06-16 - Code Review Issue Fixes
 

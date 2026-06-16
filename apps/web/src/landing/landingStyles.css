@@ -1,0 +1,171 @@
+/* 简体中文：Landing 专属高端极简编辑排版美学样式 */
+
+.kk-landing-root {
+  font-family: var(--font-sans);
+  background-color: #fffaf0; /* warm clay / cream canvas */
+  color: #0a0a0a; /* near-black ink */
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 噪点覆盖层，营造 premium 颗粒质感 */
+.kk-landing-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.035;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* 渐变背景光圈 */
+.kk-landing-gradients {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 900px;
+  z-index: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(255, 107, 90, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 15%, rgba(255, 176, 132, 0.07) 0%, transparent 35%),
+    radial-gradient(circle at 50% 50%, rgba(255, 250, 240, 0.95) 0%, #fffaf0 100%);
+}
+
+/* 暗色编辑设计区块 */
+.kk-landing-dark-section {
+  background-color: #0b0b0c; /* dark clay / near-black */
+  color: rgba(255, 255, 255, 0.96);
+  position: relative;
+  z-index: 10;
+}
+
+/* 超大编辑排版标题 */
+.kk-landing-display-title {
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: #0a0a0a;
+}
+
+.kk-landing-dark-section .kk-landing-display-title {
+  color: #ffffff;
+}
+
+/* 滚动平滑高亮 */
+.process-step-item {
+  transition: opacity 300ms var(--kk-motion-ease-standard), transform 300ms var(--kk-motion-ease-standard);
+  opacity: 0.35;
+}
+
+.process-step-item.is-active {
+  opacity: 1;
+  transform: translateX(8px);
+}
+
+/* 模拟连接线上的粒子流动感 */
+@keyframes connectorFlow {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.mock-flow-line {
+  stroke-dasharray: 6, 6;
+  animation: connectorFlow 1200ms linear infinite;
+}
+
+/* Marquee 跑马灯 */
+.marquee-container {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+.marquee-content {
+  display: flex;
+  gap: 1.5rem;
+  flex-shrink: 0;
+  animation: scrollMarquee 40s linear infinite;
+}
+
+@keyframes scrollMarquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Clay Button 规范提升 */
+.clay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 160ms var(--kk-motion-ease-standard);
+  cursor: pointer;
+}
+
+.clay-btn-primary {
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+.clay-btn-primary:hover {
+  background-color: #1a1a1a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(10, 10, 10, 0.08);
+}
+
+.clay-btn-secondary {
+  background-color: transparent;
+  border: 1px solid #e5e5e5;
+  color: #3a3a3a;
+}
+
+.clay-btn-secondary:hover {
+  background-color: rgba(10, 10, 10, 0.03);
+  border-color: #adadad;
+  transform: translateY(-1px);
+}
+
+/* 针对 prefers-reduced-motion 的样式退避 */
+@media (prefers-reduced-motion: reduce) {
+  .mock-flow-line {
+    animation: none !important;
+  }
+  
+  .marquee-content {
+    animation: none !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: auto;
+  }
+  
+  .process-step-item {
+    opacity: 0.9 !important;
+    transform: none !important;
+  }
+  
+  .clay-btn:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  
+  .floating-card-mock {
+    animation: none !important;
+  }
+}

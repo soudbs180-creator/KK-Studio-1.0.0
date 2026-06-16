@@ -31,6 +31,7 @@ import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import './LoginScreen.css';
+import KkLandingPage from '../../landing/KkLandingPage';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
 type FieldName = 'email' | 'password' | 'confirmPassword';
@@ -43,7 +44,7 @@ type IdleSchedulerWindow = Window & typeof globalThis & {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const AnimatedShaderBackground = lazyWithRetry(() => import('../ui/animated-shader-background'));
+
 const WechatQrModal = lazyWithRetry(() => import('./WechatQrModal'));
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,36 +64,7 @@ function toAuthError(code: string | undefined, message: string): Error {
   return new Error(normalizedCode ? `${normalizedCode}: ${message}` : message);
 }
 
-const FEATURES = [
-  {
-    id: 1,
-    num: '01',
-    title: '智能无限画布 / Infinite Creative Canvas',
-    desc: '突破画幅边界，在自由的可视化空间中进行创作。支持 AI 辅助版面重排与节点自动连接，让你的创意工作流如水般自然流淌。',
-    visualType: 'canvas',
-  },
-  {
-    id: 2,
-    num: '02',
-    title: '智能体自主接管 / Autonomous Copilot',
-    desc: '引入先进的智能接管协议。它不仅是问答助手，更能深度理解上下文，自主规划多步任务，帮你自动进行复杂的开发与设计改造。',
-    visualType: 'copilot',
-  },
-  {
-    id: 3,
-    num: '03',
-    title: '多模型与预设服务 / Global Model Aggregator',
-    desc: '聚合 OpenAI, Claude, DeepSeek 等全球顶尖模型。一键无缝热切，统一接口契约。无论是在本地运行时还是云端，均能快速连接。',
-    visualType: 'models',
-  },
-  {
-    id: 4,
-    num: '04',
-    title: '本地优先与多端协同 / Local-First, Cloud-Synced',
-    desc: '默认采用本地优先架构，体验极致响应速度。支持无缝与云端（PostgreSQL / VPS）安全同步会话，多端保持，保障数据永不丢失。',
-    visualType: 'sync',
-  }
-];
+
 
 function validateFields(
   view: AuthView,
@@ -160,16 +132,11 @@ const LoginScreen: React.FC = () => {
   const [wechatError, setWechatError] = useState<string | null>(null);
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
-  const [showShaderBackground, setShowShaderBackground] = useState(false);
+
   const [turnstileWidgetStatus, setTurnstileWidgetStatus] = useState<TurnstileStatus>('idle');
   const t = useCallback(<T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en), [language]);
 
-  // Modal & Slider states
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [slideProgress, setSlideProgress] = useState(0);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const localErrors = useMemo(() => validateFields(view, email, password, confirmPassword, language), [view, email, password, confirmPassword, language]);
 
@@ -185,7 +152,7 @@ const LoginScreen: React.FC = () => {
     const body = document.body;
     const root = document.documentElement;
     const authThemeClass = `auth-screen-active--${resolvedTheme}`;
-    const backgroundColor = resolvedTheme === 'dark' ? 'var(--clay-dark-canvas)' : 'var(--clay-canvas)';
+    const backgroundColor = 'var(--clay-dark-canvas)';
     const previousBodyBackground = body.style.background;
     const previousRootBackground = root.style.background;
     const previousColorScheme = root.style.colorScheme;
@@ -210,26 +177,7 @@ const LoginScreen: React.FC = () => {
     void ensureTurnstileScript(language).catch(() => {});
   }, [language, turnstileAvailable]);
 
-  useEffect(() => {
-    const idleWindow = window as IdleSchedulerWindow;
-    let revealHandle: number | null = null;
-    let fallbackHandle: number | null = null;
-    const reveal = () => startTransition(() => setShowShaderBackground(true));
 
-    if (turnstileAvailable && window.turnstile?.render) {
-      revealHandle = typeof idleWindow.requestIdleCallback === 'function' ? idleWindow.requestIdleCallback(reveal, { timeout: 600 }) : window.setTimeout(reveal, 180);
-    } else {
-      fallbackHandle = window.setTimeout(reveal, 600);
-    }
-
-    return () => {
-      if (revealHandle !== null) {
-        if (typeof idleWindow.cancelIdleCallback === 'function' && typeof idleWindow.requestIdleCallback === 'function') idleWindow.cancelIdleCallback(revealHandle);
-        else window.clearTimeout(revealHandle);
-      }
-      if (fallbackHandle !== null) window.clearTimeout(fallbackHandle);
-    };
-  }, [turnstileAvailable]);
 
   // 控制外层页面滚动：弹窗打开时禁用滚动
   useEffect(() => {
@@ -261,30 +209,7 @@ const LoginScreen: React.FC = () => {
     if (turnstileAvailable) resetTurnstile();
   }, [resetTurnstile, turnstileAvailable, view]);
 
-  // Slide autoplay effect
-  useEffect(() => {
-    if (isLoginModalOpen) return;
-    const SLIDE_DURATION = 6000;
-    const interval = 60;
-    const increment = (interval / SLIDE_DURATION) * 100;
-    const timer = setInterval(() => {
-      setSlideProgress((prev) => {
-        if (prev >= 100) {
-          setActiveSlide((current) => (current + 1) % FEATURES.length);
-          return 0;
-        }
-        return prev + increment;
-      });
-    }, interval);
-    return () => clearInterval(timer);
-  }, [isLoginModalOpen]);
 
-  const handleNextSlide = () => { setActiveSlide((current) => (current + 1) % FEATURES.length); setSlideProgress(0); };
-  const handlePrevSlide = () => { setActiveSlide((current) => (current - 1 + FEATURES.length) % FEATURES.length); setSlideProgress(0); };
-  const handleIndicatorClick = (idx: number) => { setActiveSlide(idx); setSlideProgress(0); };
-  const handleTouchStart = (e: React.TouchEvent) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
-  const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
-  const handleTouchEnd = () => { if (!touchStart || !touchEnd) return; const distance = touchStart - touchEnd; if (distance > 50) handleNextSlide(); else if (distance < -50) handlePrevSlide(); };
 
   const handleTurnstileVerify = useCallback((token: string) => { setCaptchaRequiredByBackend(false); handleVerify(token); }, [handleVerify]);
   const handleTurnstileError = useCallback((nextError: string) => { handleError(nextError); if (captchaRequiredByBackend) setError(nextError); }, [captchaRequiredByBackend, handleError]);
@@ -314,7 +239,7 @@ const LoginScreen: React.FC = () => {
     if (view === 'register') {
       const response = await kkWebApiClient.register({ email: emailValue, password, turnstileToken: captchaToken || '' });
       if (!response.success) throw toAuthError(response.error.code, response.error.message || 'Registration failed.');
-      setMessage(t('注册成功，正在跳转登录...', 'Registration succeeded, redirecting to login...'));
+      setMessage(t('注册请求已提交，后端认证接口就绪后可继续完成验证。', 'Registration succeeded, redirecting to login...'));
       window.setTimeout(() => setView('login'), 1500);
       return;
     }
@@ -441,20 +366,7 @@ const LoginScreen: React.FC = () => {
   const turnstileStatusLabel = turnstileToken ? t('已就绪', 'Ready') : turnstileWidgetFailed ? t('验证异常', 'Error') : turnstileAwaitingVerification ? t('待验证', 'Verify') : turnstileAvailable ? t('加载中', 'Loading') : turnstileMissingSiteKey ? t('未配置', 'Not configured') : t('已关闭', 'Disabled');
   const turnstileHint = turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : turnstileDisabledByRuntime ? getTurnstileDisabledMessage(language) : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : turnstileAwaitingVerification ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
 
-  const scrollToSlider = () => {
-    const sliderEl = document.querySelector('.intro-slider-section');
-    sliderEl?.scrollIntoView({ behavior: 'smooth' });
-  };
 
-  const renderFeatureVisual = (type: string) => {
-    switch (type) {
-      case 'canvas': return <div className="visual-canvas-mock"><div className="canvas-grid-bg" /><div className="canvas-card canvas-card-1"><span className="card-dot red" /><div className="card-line" style={{ width: '60%' }} /></div><div className="canvas-card canvas-card-2"><span className="card-dot blue" /><div className="card-line" style={{ width: '70%' }} /></div><div className="canvas-card canvas-card-3"><span className="card-dot green" /><div className="card-line" style={{ width: '50%' }} /></div><svg className="canvas-connection-svg" width="100%" height="100%"><path d="M 50,60 Q 150,110 250,80" className="animated-path path-1" /><path d="M 250,80 Q 200,200 130,220" className="animated-path path-2" /></svg><div className="canvas-cursor-mock" /></div>;
-      case 'copilot': return <div className="visual-copilot-mock"><div className="copilot-core"><div className="core-glow" /><div className="core-circle-1" /><div className="core-circle-2" /><Sparkles size={28} className="core-icon" /></div><div className="copilot-orbit orbit-1"><div className="orbit-particle p1" /></div><div className="copilot-orbit orbit-2"><div className="orbit-particle p2" /></div><div className="copilot-code-tag tag-1"><code>console.log("Autonomous...")</code></div><div className="copilot-code-tag tag-2"><code>agent.execute(plan)</code></div></div>;
-      case 'models': return <div className="visual-models-mock"><div className="model-card model-card-openai"><div className="model-header-badge openai">GPT-4o</div><div className="model-body-lines"><span className="line" /><span className="line short" /></div></div><div className="model-card model-card-claude"><div className="model-header-badge claude">Claude 3.5</div><div className="model-body-lines"><span className="line" /><span className="line short" /></div></div><div className="model-card model-card-deepseek"><div className="model-header-badge deepseek">DeepSeek R1</div><div className="model-body-lines"><span className="line" /><span className="line short" /></div></div></div>;
-      case 'sync': return <div className="visual-sync-mock"><div className="sync-node local-node"><span className="node-icon">💻</span><span className="node-label">Local</span></div><div className="sync-channel"><div className="channel-line" /><div className="sync-particle to-cloud" /><div className="sync-particle to-local" /></div><div className="sync-node cloud-node"><span className="node-icon">☁️</span><span className="node-label">VPS Sync</span></div></div>;
-      default: return null;
-    }
-  };
 
   return (
     <div className={`auth-page auth-page--${resolvedTheme}`}>
@@ -475,226 +387,16 @@ const LoginScreen: React.FC = () => {
         </Suspense>
       )}
 
-      {/* 动态 Shader 背景 */}
-      <div className="auth-shader-background" aria-hidden>
-        {showShaderBackground ? (
-          <Suspense fallback={null}>
-            <AnimatedShaderBackground className="auth-shader-canvas" />
-          </Suspense>
-        ) : null}
-      </div>
+      {/* 高级极简产品营销落地页 */}
+      <KkLandingPage
+        onLoginClick={() => {
+          setIsLoginModalOpen(true);
+          setView('login');
+        }}
+        isLoggedIn={false}
+        onEnterWorkspace={() => {}}
+      />
 
-      {/* 高级深色渐变与网格背景 */}
-      <div className="auth-background" aria-hidden>
-        <div className="auth-gradient auth-gradient-a" />
-        <div className="auth-gradient auth-gradient-b" />
-        <div className="auth-grid" />
-      </div>
-
-      {/* 介绍页垂直可滚动大容器 */}
-      <div className="intro-scroll-container">
-        {/* Header 导航 */}
-        <header className="intro-header">
-          <div className="intro-logo">
-            <Sparkles size={22} className="intro-logo-icon" />
-            <span className="intro-logo-text">{t('KK Studio', 'KK Studio')}</span>
-          </div>
-          <div className="intro-nav-actions">
-            <button
-              type="button"
-              className="intro-login-btn"
-              onClick={() => {
-                setIsLoginModalOpen(true);
-                setView('login');
-              }}
-            >
-              {t('登录', 'Sign In')}
-            </button>
-          </div>
-        </header>
-
-        {/* Section 1: Hero Section */}
-        <section className="intro-hero">
-          <h1 className="intro-hero-title">
-            {t('下一代智能创作工作台', 'Next-Generation')}
-            <br />
-            <span className="hero-gradient-text">{t('激发你的无限创意', 'AI Creative Workspace')}</span>
-          </h1>
-          <p className="intro-hero-subtitle">
-            {t('KK Studio 融合了无限画布、自主智能体接管与全球模型聚合，旨在加速您的创意与开发构想。', 'KK Studio blends infinite canvas, autonomous agents, and model aggregator to accelerate your ideas.')}
-          </p>
-          <div className="intro-hero-actions">
-            <button
-              type="button"
-              className="intro-hero-btn"
-              onClick={() => {
-                setIsLoginModalOpen(true);
-                setView('login');
-              }}
-            >
-              {t('立即开启智能创作', 'Start Designing')}
-              <ArrowRight size={16} />
-            </button>
-          </div>
-          {/* 下滑指引 */}
-          <button
-            type="button"
-            className="intro-hero-scroll-down"
-            onClick={scrollToSlider}
-            aria-label="Scroll down"
-          >
-            <span className="scroll-down-text">{t('探索功能特性', 'Explore Features')}</span>
-            <ChevronDown size={18} className="scroll-down-arrow" />
-          </button>
-        </section>
-
-        {/* Section 2: Features Slider (水平轮播展示) */}
-        <section className="intro-slider-section">
-          <div className="slider-container">
-            {/* 左右导航 */}
-            <button
-              type="button"
-              className="slider-nav-btn slider-nav-prev"
-              onClick={handlePrevSlide}
-              aria-label="Previous slide"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              type="button"
-              className="slider-nav-btn slider-nav-next"
-              onClick={handleNextSlide}
-              aria-label="Next slide"
-            >
-              <ChevronRight size={20} />
-            </button>
-
-            {/* 轮播轨道 */}
-            <div
-              className="slider-track"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            >
-              {FEATURES.map((feat, idx) => {
-                const isActive = idx === activeSlide;
-                const isPrev = idx === (activeSlide - 1 + FEATURES.length) % FEATURES.length;
-                const isNext = idx === (activeSlide + 1) % FEATURES.length;
-                let slideClass = 'slider-slide';
-                if (isActive) slideClass += ' active';
-                else if (isPrev) slideClass += ' prev';
-                else if (isNext) slideClass += ' next';
-
-                return (
-                  <div key={feat.id} className={slideClass}>
-                    <div className="slide-content">
-                      <div className="slide-text-col">
-                        <span className="slide-num">{feat.num}</span>
-                        <h2 className="slide-title">{feat.title}</h2>
-                        <p className="slide-desc">{feat.desc}</p>
-                        <button
-                          type="button"
-                          className="slide-cta-btn"
-                          onClick={() => {
-                            setIsLoginModalOpen(true);
-                            setView('login');
-                          }}
-                        >
-                          {t('体验此功能', 'Try it now')}
-                        </button>
-                      </div>
-                      <div className="slide-visual-col">
-                        <div className="visual-wrapper">
-                          {renderFeatureVisual(feat.visualType)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 进度条指示器 */}
-            <div className="slider-indicators">
-              {FEATURES.map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={`slider-indicator-dot ${idx === activeSlide ? 'active' : ''}`}
-                  onClick={() => handleIndicatorClick(idx)}
-                >
-                  <span
-                    className="slider-indicator-progress"
-                    style={{
-                      width: idx === activeSlide ? `${slideProgress}%` : '0%',
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: Capability Grid (交互式能力网格卡片) */}
-        <section className="intro-grid-section">
-          <div className="grid-header">
-            <span className="grid-badge">{t('技术规格 / SPECS', 'SPECIFICATIONS')}</span>
-            <h2 className="grid-title">{t('卓越的技术底层架构', 'Built for Performance')}</h2>
-          </div>
-          <div className="capability-grid">
-            {/* 卡片 1: Lightning Local Runtime */}
-            <div className="cap-card cap-card-runtime">
-              <div className="cap-visual">
-                <div className="cpu-graphic">
-                  <div className="cpu-inner" />
-                  <div className="cpu-core-glow" />
-                </div>
-              </div>
-              <h3 className="cap-title">{t('极速本地运行时', 'Lightning Local Runtime')}</h3>
-              <p className="cap-desc">{t('默认运行在本地隔离的极低延迟沙箱环境。支持离线可用、本地大模型直连及秒级代码热加载，免受网络波动干扰。', 'Runs locally in an isolated low-latency sandbox. Features offline support and hot-reload in seconds.')}</p>
-            </div>
-
-            {/* 卡片 2: Secure DB Sync */}
-            <div className="cap-card cap-card-sync">
-              <div className="cap-visual">
-                <div className="db-graphic">
-                  <div className="db-cylinder row-1" />
-                  <div className="db-cylinder row-2" />
-                  <div className="db-cylinder row-3" />
-                  <div className="db-lock">🔒</div>
-                </div>
-              </div>
-              <h3 className="cap-title">{t('数据库状态持久化', 'Session Persistence')}</h3>
-              <p className="cap-desc">{t('配备本地 SQLite 与 PostgreSQL 混合持久化引擎。自动在 VPS 或本地保持应用状态，即便重新打开浏览器，您的工作进度也能无缝恢复。', 'Equipped with hybrid persistent engines. Syncs state automatically to VPS to ensure your work is never lost.')}</p>
-            </div>
-
-            {/* 卡片 3: Global API Router */}
-            <div className="cap-card cap-card-bridge">
-              <div className="cap-visual">
-                <div className="bridge-graphic">
-                  <div className="node center-node" />
-                  <div className="node orbit-node n1" />
-                  <div className="node orbit-node n2" />
-                  <div className="node orbit-node n3" />
-                  <div className="bridge-glow" />
-                </div>
-              </div>
-              <h3 className="cap-title">{t('云端 API 网络网桥', 'Global Model Router')}</h3>
-              <p className="cap-desc">{t('完美映射全球主流 AI 模型供应商，提供统一、标准化的 API 服务中继与路由协议。支持按需热切与动态凭证代理，连通无阻。', 'Integrates global top-tier model providers into a standardized API router with dynamic credential proxying.')}</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 4: Footer */}
-        <footer className="intro-footer">
-          <div className="footer-left">
-            <span>&copy; {new Date().getFullYear()} KK Studio. All rights reserved.</span>
-          </div>
-          <div className="footer-right">
-            <span className="footer-version">{APP_DISPLAY_VERSION}</span>
-          </div>
-        </footer>
-      </div>
 
       {/* 登录弹窗 Modal */}
       {isLoginModalOpen && (

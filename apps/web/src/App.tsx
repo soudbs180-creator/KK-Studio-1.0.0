@@ -311,6 +311,7 @@ import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
 import { lazyWithRetry, lazyNamedWithRetry } from './utils/lazyWithRetry';
 import AppRootContentSwitch from './app/AppRootContentSwitch';
+import EmptyCanvasWelcome from './landing/EmptyCanvasWelcome';
 import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,
@@ -5081,6 +5082,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
     );
   }
 
+  const isCanvasEmpty = !activeCanvas || (
+    (activeCanvas.promptNodes?.length || 0) === 0 &&
+    (activeCanvas.imageNodes?.length || 0) === 0 &&
+    (activeCanvas.workflow?.nodes?.length || 0) === 0
+  );
+
   const projectManagerNode = !isMobile ? (
     <ProjectManager
       onSearch={() => {
@@ -5222,6 +5229,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
         showConnections={true}
         mode={backgroundMode}
       />
+      {/* 简体中文：空画布欢迎态，仅在桌面端且画布节点完全为空时渲染 */}
+      {isCanvasEmpty && !isMobile && !isLoading && (
+        <EmptyCanvasWelcome
+          onApplyWorkflowTemplate={(templateId) => {
+            void handleApplyWorkflowTemplate(templateId);
+          }}
+          onOpenSettings={() => openSettingsPanel('api-management')}
+        />
+      )}
       {/* 简体中文：画板模式顶部控制栏，使用磨砂质感毛玻璃高定设计 */}
       {canvasMode === 'board' && !isMobile && (
         <div 
