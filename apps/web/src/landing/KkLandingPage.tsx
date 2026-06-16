@@ -10,6 +10,7 @@ import { heroBadges, serviceItems, thoughtItems, trustHeadline, useCaseTags } fr
 import { useLocale } from '../context/LocaleContext';
 import { pickByResolvedLanguage } from '../utils/localeText';
 import './landingStyles.css';
+import './landingReferenceOverrides.css';
 
 interface KkLandingPageProps {
   onLoginClick: () => void;
