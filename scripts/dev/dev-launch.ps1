@@ -168,7 +168,7 @@ function Stop-ProcessTree {
         return
     }
 
-    & taskkill /PID $ProcessId /T /F | Out-Null
+    & taskkill /PID $ProcessId /T /F 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
         return
     }
@@ -275,15 +275,51 @@ function Get-ListeningProcessIdByPort {
 function Get-KnownDevProcessIds {
     param([int]$Port)
 
-    return @(Get-Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.ProcessName -in @('node', 'npm', 'cmd', 'powershell') } |
-        ForEach-Object {
-            $resolvedProcessId = 0
-            if ([int]::TryParse([string]$_.Id, [ref]$resolvedProcessId) -and (Is-KnownDevProcess -ProcessId $resolvedProcessId -Port $Port)) {
-                $resolvedProcessId
+    $ownerPids = @(Get-ListeningConnectionRecords | Where-Object { $_.LocalPort -eq $Port } |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+
+    $resolvedOwnerPids = @()
+    foreach ($ownerPid in $ownerPids) {
+        $resolvedOwnerPid = 0
+        if ([int]::TryParse([string]$ownerPid, [ref]$resolvedOwnerPid)) {
+            $resolvedOwnerPids += $resolvedOwnerPid
+        }
+    }
+
+    $processRecords = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('node.exe', 'npm.cmd', 'npm.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe') })
+
+    $candidateIds = @()
+    foreach ($processRecord in $processRecords) {
+        $resolvedProcessId = 0
+        if (-not [int]::TryParse([string]$processRecord.ProcessId, [ref]$resolvedProcessId)) {
+            continue
+        }
+
+        $commandLine = [string]$processRecord.CommandLine
+        $isPortOwner = $resolvedProcessId -in $resolvedOwnerPids
+
+        if ($Port -eq 3000) {
+            if (
+                $isPortOwner `
+                -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' `
+                -or $commandLine -match 'scripts[\\/]+dev[\\/]+run-vite-dev\.ps1'
+            ) {
+                $candidateIds += $resolvedProcessId
             }
-        } |
-        Select-Object -Unique)
+        } elseif ($Port -eq 3001) {
+            if (
+                $isPortOwner `
+                -or $commandLine -match 'scripts[\\/]+dev[\\/]+run-api-runner\.ps1' `
+                -or $commandLine -match 'scripts[\\/]+dev[\\/]+run-api-(?:dev|local)\.mjs' `
+                -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
+            ) {
+                $candidateIds += $resolvedProcessId
+            }
+        }
+    }
+
+    return @($candidateIds | Select-Object -Unique)
 }
 
 function Is-KnownDevProcess {
@@ -700,6 +736,8 @@ if (-not (Test-LocalApiBaseUrl -BaseUrl $frontendApiBaseUrl)) {
 if ($Restart) {
     Stop-TrackedProcess -PidFile $vitePidFile
     Stop-TrackedProcess -PidFile $apiPidFile
+    Clear-KnownDevPortConflicts -Port 3000
+    Clear-KnownDevPortConflicts -Port 3001
 }
 
 if ($apiEnabled) {
@@ -760,8 +798,11 @@ if ($apiEnabled) {
         }
     }
 
-    # Keep the API pid file pinned to the currently active API process.
-    $apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $apiPid
+    # Keep the API pid file pinned to the stable runner/watch supervisor so
+    # restart and stop can terminate the whole process tree.
+    if (-not $apiReusedExistingListener) {
+        Set-Content -LiteralPath $apiPidFile -Value $apiPid -Encoding ascii
+    }
 }
 
 if ($SkipVite) {

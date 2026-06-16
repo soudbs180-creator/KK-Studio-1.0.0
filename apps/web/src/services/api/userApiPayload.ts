@@ -424,8 +424,7 @@ export function compactUserApisPayloadForTransport(
     return sanitized;
   }
 
-  // Last-resort compaction: keep provider definitions and trim per-slot history-heavy fields.
-  return {
+  sanitized = {
     ...sanitized,
     slots: toArray(sanitized.slots).map((slot) => {
       if (!isRecord(slot)) return slot;
@@ -433,4 +432,43 @@ export function compactUserApisPayloadForTransport(
       return rest;
     }),
   };
+
+  if (estimateJsonSize(sanitized) <= maxBytes) {
+    return sanitized;
+  }
+
+  // If still too large, iteratively truncate supportedModels or models lists
+  // until it fits.
+  let currentCompacted = { ...sanitized };
+  let maxModelLength = 1000;
+
+  while (estimateJsonSize(currentCompacted) > maxBytes && maxModelLength > 0) {
+    maxModelLength = Math.floor(maxModelLength * 0.8);
+    currentCompacted = {
+      ...currentCompacted,
+      slots: toArray(currentCompacted.slots).map((slot) => {
+        if (!isRecord(slot) || !Array.isArray(slot.supportedModels)) return slot;
+        return {
+          ...slot,
+          supportedModels: slot.supportedModels.slice(0, maxModelLength),
+        };
+      }),
+      providers: toArray(currentCompacted.providers).map((provider) => {
+        if (!isRecord(provider) || !Array.isArray(provider.models)) return provider;
+        return {
+          ...provider,
+          models: provider.models.slice(0, maxModelLength),
+        };
+      }),
+      entries: toArray(currentCompacted.entries).map((entry) => {
+        if (!isRecord(entry) || !Array.isArray(entry.supportedModels)) return entry;
+        return {
+          ...entry,
+          supportedModels: entry.supportedModels.slice(0, maxModelLength),
+        };
+      }),
+    };
+  }
+
+  return currentCompacted;
 }

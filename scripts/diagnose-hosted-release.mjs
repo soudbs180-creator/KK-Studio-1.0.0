@@ -24,18 +24,24 @@ const hostedFrontendRecommended = [
 ];
 
 const hostedFrontendOptional = [
+  "VITE_PUBLIC_API_BASE_URL",
   "VITE_PAYMENT_GATEWAY_URL",
 ];
 
 const hostedFrontendForbidden = [
-  "VITE_ENABLE_LEGACY_WEB_API_FALLBACK",
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_TURNSTILE_LOCAL_BYPASS",
+  { key: "VITE_ENABLE_LEGACY_WEB_API_FALLBACK", mode: "enabled-flag" },
+  { key: "VITE_SUPABASE_URL", mode: "present" },
+  { key: "VITE_SUPABASE_ANON_KEY", mode: "present" },
+  { key: "VITE_TURNSTILE_LOCAL_BYPASS", mode: "enabled-flag" },
 ];
 
 const hostedApiRequired = [
   "DATABASE_URL",
+  "GEMINI_API_KEY",
+  "OPENAI_API_KEY",
+  "PASSWORD_SALT",
+  "JWT_SECRET",
+  "KK_API_SESSION_SIGNING_SECRET",
   "USER_API_ENCRYPTION_SECRET",
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
@@ -59,12 +65,43 @@ const hostedApiRecommended = [
   "KK_PRIMARY_ADMIN_USER_ID",
 ];
 
+const DISABLED_ENV_FLAG_VALUES = new Set(["0", "false", "no", "off"]);
+
+function isEnabledEnvFlag(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Boolean(normalized) && !DISABLED_ENV_FLAG_VALUES.has(normalized);
+}
+
 function formatStatus(sourceRecord) {
   if (!sourceRecord) return "<missing>";
   if (isPlaceholder(sourceRecord.value)) {
     return `<placeholder from ${sourceRecord.source}>`;
   }
   return `<present from ${sourceRecord.source}>`;
+}
+
+function isForbiddenFrontendEnvActive(rule, sourceRecord) {
+  if (!sourceRecord || !String(sourceRecord.value || "").trim()) {
+    return false;
+  }
+
+  if (rule.mode === "enabled-flag") {
+    return isEnabledEnvFlag(sourceRecord.value);
+  }
+
+  return true;
+}
+
+function formatForbiddenFrontendStatus(rule, sourceRecord) {
+  if (!sourceRecord) {
+    return "<not set>";
+  }
+
+  if (rule.mode === "enabled-flag" && !isEnabledEnvFlag(sourceRecord.value)) {
+    return `<disabled in ${sourceRecord.source}>`;
+  }
+
+  return `<present in ${sourceRecord.source}>`;
 }
 
 function runCommand(command, args) {
@@ -211,6 +248,77 @@ function isRemoteHttpUrl(value) {
   }
 }
 
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return normalized === "localhost"
+    || normalized === "::1"
+    || normalized.startsWith("127.");
+}
+
+function isPrivateNetworkHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return Boolean(
+    normalized
+    && (
+      /^10\./.test(normalized)
+      || /^192\.168\./.test(normalized)
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
+      || /^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\./.test(normalized)
+      || /^169\.254\./.test(normalized)
+      || normalized === "0.0.0.0"
+      || normalized === "::"
+      || /^fe[89ab]/i.test(normalized)
+      || /^f[cd]/i.test(normalized)
+    ),
+  );
+}
+
+function isLocalOrPrivateApiBaseUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return isLoopbackHostname(url.hostname) || isPrivateNetworkHostname(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isSameOriginApiBaseUrl(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "proxy"
+    || normalized === "self"
+    || normalized === "relative"
+    || normalized === "/"
+    || (normalized.startsWith("/") && !normalized.startsWith("//"));
+}
+
+function isHttpsApiBaseUrl(value) {
+  try {
+    return new URL(String(value || "").trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function pushUnsafeHostedApiBaseUrlBlocker(blockers, key, sourceRecord) {
+  if (!sourceRecord) {
+    return;
+  }
+
+  if (isLocalOrPrivateApiBaseUrl(sourceRecord.value)) {
+    blockers.push(`Hosted frontend ${key} must point at HTTPS, same-origin, or a deployed VPS API. Current local snapshot via ${sourceRecord.source} points at a local/private API URL.`);
+    return;
+  }
+
+  if (isRemoteHttpUrl(sourceRecord.value)) {
+    blockers.push(`Hosted frontend ${key} must be HTTPS or same-origin. Current local snapshot via ${sourceRecord.source} points at remote HTTP.`);
+    return;
+  }
+
+  if (!isSameOriginApiBaseUrl(sourceRecord.value) && !isHttpsApiBaseUrl(sourceRecord.value)) {
+    blockers.push(`Hosted frontend ${key} must point at HTTPS, same-origin, or a deployed VPS API. Current local snapshot via ${sourceRecord.source} is not a valid hosted API base URL.`);
+  }
+}
+
 function run() {
   const snapshots = collectEnvSnapshots(rootPath, { includeFunctionEnv: false });
   const frontendSnapshots = snapshots.frontendSnapshots;
@@ -275,13 +383,9 @@ function run() {
   printKeyStatuses("Hosted API Recommended Env", localApiSnapshots, hostedApiRecommended);
 
   printSection("Hosted Frontend Forbidden Env");
-  hostedFrontendForbidden.forEach((key) => {
-    const value = getEffectiveValue(frontendSnapshots, key);
-    if (!value) {
-      console.log(`- ${key}: <not set>`);
-      return;
-    }
-    console.log(`- ${key}: <present in ${value.source}>`);
+  hostedFrontendForbidden.forEach((rule) => {
+    const value = getEffectiveValue(frontendSnapshots, rule.key);
+    console.log(`- ${rule.key}: ${formatForbiddenFrontendStatus(rule, value)}`);
   });
 
   const blockers = [];
@@ -300,18 +404,29 @@ function run() {
   pushMissingEnvChecks(remoteChecks, "Hosted frontend env", frontendSnapshots, hostedFrontendRequired);
   pushMissingEnvChecks(remoteChecks, "Hosted API env", localApiSnapshots, hostedApiRequired);
 
-  hostedFrontendForbidden.forEach((key) => {
-    const value = getEffectiveValue(frontendSnapshots, key);
-    if (value && String(value.value || "").trim()) {
-      blockers.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Use a clean hosted build environment and do not copy local/dev bypass flags into Vercel.`);
+  hostedFrontendForbidden.forEach((rule) => {
+    const value = getEffectiveValue(frontendSnapshots, rule.key);
+    if (isForbiddenFrontendEnvActive(rule, value)) {
+      blockers.push(`Hosted frontend forbidden env ${rule.key} is present in the local snapshot via ${value.source}. Use a clean hosted build environment and do not copy local/dev bypass flags into Vercel.`);
     }
   });
-  const hostedApiBaseUrl = getEffectiveValue(frontendSnapshots, "VITE_KK_API_BASE_URL");
-  if (hostedApiBaseUrl && isRemoteHttpUrl(hostedApiBaseUrl.value)) {
-    blockers.push(`Hosted frontend VITE_KK_API_BASE_URL must be HTTPS or same-origin. Current local snapshot via ${hostedApiBaseUrl.source} points at remote HTTP.`);
-  }
+  pushUnsafeHostedApiBaseUrlBlocker(
+    blockers,
+    "VITE_KK_API_BASE_URL",
+    getEffectiveValue(frontendSnapshots, "VITE_KK_API_BASE_URL"),
+  );
+  pushUnsafeHostedApiBaseUrlBlocker(
+    blockers,
+    "VITE_PUBLIC_API_BASE_URL",
+    getEffectiveValue(frontendSnapshots, "VITE_PUBLIC_API_BASE_URL"),
+  );
   const misplacedRootServerEnv = findSnapshotEntries(frontendSnapshots, [
     "DATABASE_URL",
+    "GEMINI_API_KEY",
+    "OPENAI_API_KEY",
+    "PASSWORD_SALT",
+    "JWT_SECRET",
+    "KK_API_SESSION_SIGNING_SECRET",
     "USER_API_ENCRYPTION_SECRET",
     "PROFILE_USER_APIS_ENCRYPTION_SECRET",
     "GOOGLE_OAUTH_CLIENT_SECRET",

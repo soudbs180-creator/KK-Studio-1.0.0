@@ -17,6 +17,8 @@
     "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-stop.ps1",
     "dev:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-status.ps1",
     "dev:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/restart-dev.ps1",
+    "install:diagnose-locks": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/diagnose-install-locks.ps1",
+    "install:recover": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/diagnose-install-locks.ps1 -StopProjectDevProcesses -CleanStaleNativeAddonDirs",
     "admin:dev": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",
     "admin:build": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",
     "admin:preview": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",

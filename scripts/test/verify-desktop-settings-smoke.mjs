@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -33,6 +33,13 @@ const SMOKE_AUTH_SESSION = {
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
+  }
+}
+
+function rmStaleFallbackArtifact(fileName) {
+  const artifactPath = path.join(ARTIFACT_DIR, fileName);
+  if (existsSync(artifactPath)) {
+    rmSync(artifactPath, { force: true });
   }
 }
 
@@ -300,12 +307,12 @@ function verifyDesktopSourceContracts() {
     /dashboard-grid-card/,
     /Provider settings and capability routing|dashboardPrimaryAction/,
     /data-testid="api-official-editor-back"/,
-    /testId="settings-workbench-stage"/,
-    /testId="settings-workbench-diagnostics"/,
-    /testId="settings-workbench-platform"/,
     /testId="settings-workbench-overview"/,
     /testId="settings-workbench-capability"|Capability roles/,
-    /testId="settings-workbench-route-pool"/,
+    /testId="settings-model-center"/,
+    /data-testid="api-model-center-provider-pool"/,
+    /data-testid="api-model-center-preset-directory"/,
+    /data-testid="api-proxy-provider-add"/,
   ];
 
   const sources = [
@@ -347,6 +354,7 @@ async function runFallbackVerification(error, browserPreflight, targetUrl) {
 }
 
 ensureArtifactsDir();
+rmStaleFallbackArtifact('desktop-settings-fallback.json');
 
 let browser;
 let viteServer;
@@ -434,38 +442,24 @@ try {
   await gotoWithRetry(page, `${targetUrl}${SETTINGS_API_PATH}`);
 
   const addProviderEntry = page.getByTestId('api-official-provider-add');
+  const proxyProviderEntry = page.getByTestId('api-proxy-provider-add');
   const officialEditorBack = page.getByTestId('api-official-editor-back');
-  const advancedModeToggle = page.getByRole('button', { name: 'Advanced mode', exact: true });
-  const hideAdvancedModeToggle = page.getByRole('button', { name: 'Hide advanced mode', exact: true });
-  const hideMoreAdvancedItemsToggle = page.getByRole('button', { name: 'Hide more advanced items', exact: true });
-  const workbenchStage = page.getByTestId('settings-workbench-stage');
-  const diagnosticsToggle = page.getByTestId('api-workbench-diagnostics-toggle');
-  const diagnosticsPanel = page.getByTestId('settings-workbench-diagnostics');
+  const modelCenter = page.getByTestId('settings-model-center');
+  const providerPool = page.getByTestId('api-model-center-provider-pool');
+  const presetDirectory = page.getByTestId('api-model-center-preset-directory');
 
+  await assertVisible(modelCenter, 'API model center did not render.');
+  await assertVisible(providerPool, 'API provider card pool did not render.');
+  await assertVisible(presetDirectory, 'API preset directory did not render.');
   await assertVisible(addProviderEntry, 'Local API add entry did not render.');
+  await assertVisible(proxyProviderEntry, 'Proxy provider add entry did not render.');
   await addProviderEntry.click();
   await page.waitForURL(`${targetUrl}${SETTINGS_API_PATH}/official/new`, { timeout: 15000, waitUntil: 'domcontentloaded' });
   await assertVisible(officialEditorBack, 'Local API editor did not open.');
   await officialEditorBack.click();
   await page.waitForURL(`${targetUrl}${SETTINGS_API_PATH}`, { timeout: 15000, waitUntil: 'domcontentloaded' });
+  await assertVisible(modelCenter, 'API model center did not return after closing the editor.');
   await assertVisible(addProviderEntry, 'Local API add entry did not return after closing the editor.');
-
-  await assertVisible(advancedModeToggle, 'Advanced mode toggle did not render.');
-  await clickButtonByName(page, 'Advanced mode');
-  await assertVisible(hideAdvancedModeToggle, 'Advanced mode did not switch into the expanded state.');
-  await assertVisible(workbenchStage, 'API Management stage section did not render.');
-  await assertVisible(diagnosticsToggle, 'Diagnostics toggle did not render.');
-  await clickByTestId(page, 'api-workbench-diagnostics-toggle');
-  await assertVisible(hideMoreAdvancedItemsToggle, 'Diagnostics did not expand the advanced details section.');
-  await assertVisible(diagnosticsPanel, 'Diagnostics section did not open.');
-  await clickButtonByName(page, 'Hide more advanced items');
-  await diagnosticsPanel.waitFor({ state: 'hidden', timeout: 15000 });
-  try {
-    await workbenchStage.waitFor({ state: 'hidden', timeout: 3000 });
-  } catch {
-    await clickButtonByName(page, 'Hide advanced mode');
-    await workbenchStage.waitFor({ state: 'hidden', timeout: 15000 });
-  }
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-direct-api-management.png'),

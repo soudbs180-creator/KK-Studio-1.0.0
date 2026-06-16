@@ -16,7 +16,7 @@ try {
         Remove-Item Env:PATH -ErrorAction SilentlyContinue
     }
 
-    & $nodeExe $viteCli --configLoader native
+    & $nodeExe $viteCli --configLoader native --config apps/web/vite.config.ts
 } finally {
     if ($originalPathUpper) {
         $env:PATH = $originalPathUpper

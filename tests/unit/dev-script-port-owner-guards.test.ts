@@ -37,13 +37,31 @@ test('dev launch tracks the stable API watch supervisor and stop scripts clean s
 
   assert.match(devLaunchSource, /function Get-KnownDevProcessIds/);
   assert.match(devStopSource, /function Get-KnownDevProcessIds/);
+  assert.match(devLaunchSource, /\$processRecords = @\(Get-CimInstance Win32_Process/);
+  assert.match(devStopSource, /\$processRecords = @\(Get-CimInstance Win32_Process/);
+  assert.doesNotMatch(
+    devLaunchSource,
+    /Get-Process -ErrorAction SilentlyContinue \|[\s\S]*?ForEach-Object \{[\s\S]*?Is-KnownDevProcess -ProcessId/,
+  );
+  assert.doesNotMatch(
+    devStopSource,
+    /Get-Process -ErrorAction SilentlyContinue \|[\s\S]*?ForEach-Object \{[\s\S]*?Is-KnownDevProcess -ProcessId/,
+  );
   assert.match(devLaunchSource, /\$knownProcessIds = @\(Get-KnownDevProcessIds -Port \$Port \| Where-Object/);
   assert.match(devStopSource, /foreach \(\$knownProcessId in @\(Get-KnownDevProcessIds -Port \$service\.Port\)\)/);
   assert.match(devLaunchSource, /Stop-Process -Id \$ProcessId -Force -ErrorAction Stop/);
   assert.match(devStopSource, /Stop-Process -Id \$processId -Force -ErrorAction Stop/);
-  assert.match(
+  assert.match(devLaunchSource, /taskkill \/PID \$ProcessId \/T \/F 2>\$null \| Out-Null/);
+  assert.match(devStopSource, /taskkill \/PID \$processId \/T \/F 2>\$null \| Out-Null/);
+  assert.match(devStopSource, /taskkill \/PID \$fallbackProcessId \/T \/F 2>\$null \| Out-Null/);
+  assert.match(devStopSource, /taskkill \/PID \$knownProcessId \/T \/F 2>\$null \| Out-Null/);
+  assert.doesNotMatch(
     devLaunchSource,
     /\$apiPid = Sync-PidFileToPortOwner -PidFile \$apiPidFile -Port 3001 -FallbackProcessId \$apiPid/,
+  );
+  assert.match(
+    devLaunchSource,
+    /if \(\$Restart\) \{[\s\S]*?Clear-KnownDevPortConflicts -Port 3001[\s\S]*?}/,
   );
   assert.match(devLaunchSource, /if \(\$resolvedOwnerPids\.Count -eq 1\) \{/);
   assert.match(devLaunchSource, /return \$resolvedOwnerPids\[0\]/);

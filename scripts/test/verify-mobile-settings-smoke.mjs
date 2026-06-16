@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -254,6 +254,13 @@ function ensureArtifactsDir() {
   }
 }
 
+function rmStaleFallbackArtifact(fileName) {
+  const artifactPath = path.join(ARTIFACT_DIR, fileName);
+  if (existsSync(artifactPath)) {
+    rmSync(artifactPath, { force: true });
+  }
+}
+
 function readSource(relativePath) {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
@@ -418,10 +425,9 @@ function verifyMobileSourceContracts() {
     /testId\?: string;/,
     /data-testid=\{testId\}/,
     /testId="settings-workbench-overview"/,
-    /testId="settings-workbench-current-view"/,
-    /testId="settings-workbench-stage"/,
-    /testId="settings-workbench-diagnostics"/,
-    /testId="settings-workbench-platform"/,
+    /testId="settings-model-center"/,
+    /data-testid="api-model-center-provider-pool"/,
+    /data-testid="api-model-center-preset-directory"/,
   ];
 
   const sources = [
@@ -469,6 +475,7 @@ async function runFallbackVerification(error, browserPreflight, targetUrl) {
 }
 
 ensureArtifactsDir();
+rmStaleFallbackArtifact('mobile-settings-fallback.json');
 
 let browser;
 let viteServer;
@@ -662,48 +669,41 @@ try {
   const settingsOverviewHeading = page.getByRole('heading', { name: /设置总览|Settings Overview/i });
   const apiEntry = page.getByRole('button', { name: /\+ 添加 API|\+ Add API/i });
 
+  const currentApiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace/i });
+
   await assertVisible(settingsOverviewHeading, 'Mobile settings overview did not open by default.');
-  await assertVisible(apiEntry, 'Mobile settings overview API action did not render.');
+  await assertVisible(currentApiEntry, 'Mobile settings overview API action did not render.');
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-overview.png'),
     fullPage: true,
   });
 
-  await apiEntry.click();
+  await currentApiEntry.click();
 
   const addProviderEntry = page.getByTestId('api-official-provider-add');
+  const proxyProviderEntry = page.getByTestId('api-proxy-provider-add');
   const officialEditorBack = page.getByTestId('api-official-editor-back');
-  const advancedModeToggle = page.getByRole('button', { name: 'Advanced mode' });
-  const hideAdvancedModeToggle = page.getByRole('button', { name: 'Hide advanced mode' });
   const workbenchOverview = page.getByTestId('settings-workbench-overview');
-  const workbenchCurrentView = page.getByTestId('settings-workbench-current-view');
-  const workbenchStage = page.getByTestId('settings-workbench-stage');
-  const workbenchPlatform = page.getByTestId('settings-workbench-platform');
+  const modelCenter = page.getByTestId('settings-model-center');
+  const providerPool = page.getByTestId('api-model-center-provider-pool');
+  const presetDirectory = page.getByTestId('api-model-center-preset-directory');
 
+  await assertVisible(modelCenter, 'Mobile API model center did not render.');
+  await assertVisible(providerPool, 'Mobile API provider card pool did not render.');
+  await assertVisible(presetDirectory, 'Mobile API preset directory did not render.');
   await assertVisible(addProviderEntry, 'Mobile API local add entry did not render.');
+  await assertVisible(proxyProviderEntry, 'Mobile API proxy add entry did not render.');
   await addProviderEntry.click();
   await assertVisible(officialEditorBack, 'Mobile local API editor did not open.');
   await officialEditorBack.click();
+  await assertVisible(modelCenter, 'Mobile API model center did not return after closing the editor.');
   await assertVisible(addProviderEntry, 'Mobile API local add entry did not return after closing the editor.');
 
-  await assertVisible(advancedModeToggle, 'Mobile API advanced mode toggle did not render.');
-  await advancedModeToggle.click();
-  await assertVisible(hideAdvancedModeToggle, 'Mobile API advanced mode did not expand.');
   await assertVisible(workbenchOverview, 'Settings workbench overview section did not render.');
-  await assertVisible(workbenchStage, 'Settings workbench stage section did not render.');
-
-  const diagnosticsToggle = page.getByTestId('api-workbench-diagnostics-toggle');
-  await assertVisible(diagnosticsToggle, 'Mobile diagnostics toggle did not render.');
-  await diagnosticsToggle.click();
-
-  const workbenchDiagnostics = page.getByTestId('settings-workbench-diagnostics');
-  await assertVisible(workbenchDiagnostics, 'Settings workbench diagnostics section did not appear after toggling.');
-  await assertVisible(workbenchCurrentView, 'Settings workbench current-view section did not render.');
-  await assertVisible(workbenchPlatform, 'Settings workbench platform section did not render.');
 
   await page.screenshot({
-    path: path.join(ARTIFACT_DIR, 'settings-workbench.png'),
+    path: path.join(ARTIFACT_DIR, 'settings-model-center.png'),
     fullPage: true,
   });
 
@@ -721,10 +721,9 @@ try {
     settingsWorkbench: {
       settingsOverviewVisible: true,
       overviewVisible: true,
-      currentViewVisible: true,
-      stageVisible: true,
-      diagnosticsVisible: true,
-      platformVisible: true,
+      modelCenterVisible: true,
+      providerPoolVisible: true,
+      presetDirectoryVisible: true,
     },
     artifactDir: ARTIFACT_DIR,
   }, null, 2));

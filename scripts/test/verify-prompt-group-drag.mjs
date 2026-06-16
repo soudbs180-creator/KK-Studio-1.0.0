@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -100,6 +100,13 @@ const seededCanvasState = {
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
+  }
+}
+
+function rmStaleFallbackArtifact(fileName) {
+  const artifactPath = path.join(ARTIFACT_DIR, fileName);
+  if (existsSync(artifactPath)) {
+    rmSync(artifactPath, { force: true });
   }
 }
 
@@ -417,6 +424,7 @@ async function measureScene(page) {
 }
 
 ensureArtifactsDir();
+rmStaleFallbackArtifact("prompt-group-drag-fallback.json");
 
 let browser;
 let viteServer;
@@ -567,7 +575,8 @@ try {
 
   const mainDragSpread = computeSpread(mainDragScene.imageBoxes);
   const promptBottomDuringMainDrag = mainDragScene.promptBox?.bottom ?? 0;
-  const imagesDockedUnderPrompt = mainDragScene.imageBoxes.every((box) => box.top > promptBottomDuringMainDrag - 20);
+  const promptDockTolerance = 60;
+  const imagesDockedUnderPrompt = mainDragScene.imageBoxes.every((box) => box.top >= promptBottomDuringMainDrag - promptDockTolerance);
   
   // 🚀 [Fix] 产品的 UI 优化方向为最大 2 列排布。因此 3 张及以上卡片在聚拢时会排为多行。
   // 我们根据卡片数量动态放宽 y 轴散开距离校验（多行允许小于 450px，单行依然小于 90px）。

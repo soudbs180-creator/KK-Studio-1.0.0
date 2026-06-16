@@ -543,7 +543,7 @@ describe('user api cloud storage helpers', () => {
     assert.equal('debugOnly' in compactedEntry, false);
   });
 
-  test.skip('trims oversized model lists until the transport payload fits within the safe budget', () => {
+  test('trims oversized model lists until the transport payload fits within the safe budget', () => {
     const hugeModelList = Array.from({ length: 12000 }, (_, index) => (
       `very-large-model-${index.toString().padStart(5, '0')}-${'x'.repeat(32)}`
     ));

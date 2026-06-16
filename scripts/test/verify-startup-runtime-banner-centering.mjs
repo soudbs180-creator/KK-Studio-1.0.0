@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -18,6 +18,13 @@ const MAX_CENTER_DELTA_PX = 4;
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
+  }
+}
+
+function rmStaleFallbackArtifact(fileName) {
+  const artifactPath = path.join(ARTIFACT_DIR, fileName);
+  if (existsSync(artifactPath)) {
+    rmSync(artifactPath, { force: true });
   }
 }
 
@@ -341,6 +348,7 @@ function assertCentered(result, label) {
 }
 
 ensureArtifactsDir();
+rmStaleFallbackArtifact('startup-runtime-banner-fallback.json');
 
 async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyBannerSourceContracts();

@@ -1517,3 +1517,125 @@
 
 Primary Web runtime: `apps/web/`
 Mobile workspace: `apps/mobile/`
+
+## 2026-06-16 - Hosted Release Preflight Guardrails
+
+### Hosted Release Scope
+- Audited `npm run release:hosted:check`, `scripts/diagnose-hosted-release.mjs`, hosted frontend API base URL handling, and VPS runtime env checks for KK Studio v1.5.6.
+- Fixed hosted preflight false positives for disabled frontend bypass flags while keeping enabled local/dev bypasses as blockers.
+- Added hosted preflight blockers for local/private `VITE_KK_API_BASE_URL` and `VITE_PUBLIC_API_BASE_URL` values.
+- Aligned hosted API required env diagnostics with current `server/` VPS startup/runtime constraints.
+- Updated ignored local `.env.local` release snapshot values to avoid hosted build pollution:
+  - `VITE_TURNSTILE_LOCAL_BYPASS=false`
+  - `VITE_KK_API_BASE_URL=https://172-245-156-16.sslip.io`
+  - `VITE_PUBLIC_API_BASE_URL=/api`
+
+### Hosted Release Files Touched
+- `scripts/diagnose-hosted-release.mjs`
+- `tests/unit/hosted-release-guardrails.test.ts`
+- `.env.local` (ignored local release snapshot)
+- `docs/development/session-handoff.md`
+
+### Hosted Release Design Decisions
+- `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` and `VITE_TURNSTILE_LOCAL_BYPASS` are treated as forbidden only when enabled; false-like values (`false`, `0`, `no`, `off`, or empty) are reported as disabled.
+- Hosted API base URLs must be same-origin (`/`, `/api`, `proxy`, `self`, `relative`) or HTTPS. Loopback/private URLs and remote plain HTTP are blockers.
+- `VITE_PUBLIC_API_BASE_URL` is optional, but if present it is validated with the same hosted URL safety rules because `packages/api-client` is still imported by Web admin surfaces.
+- VPS backend required env diagnostics now include the canonical server startup/runtime keys: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `PASSWORD_SALT`, `JWT_SECRET`, `KK_API_SESSION_SIGNING_SECRET`, plus database, user API encryption, OAuth, WeChat, and Stripe keys already checked.
+
+### Hosted Release Validation Run
+- `node --test --test-isolation=none "tests/unit/hosted-release-guardrails.test.ts"`: passed, 3 tests.
+- `npm run typecheck:tests`: passed, 434 test files.
+- `npm run governance:check`: passed.
+- `npm run check:encoding`: passed.
+- `npm run release:hosted:check`: still exits 1 only for external Vercel state:
+  - `.vercel/project.json` is missing.
+  - Vercel auth is unavailable; run `vercel login` or provide `VERCEL_TOKEN`.
+
+### Hosted Release Not Run
+- Full `npm run verify:changes` was not run in this pass. The focused change is a release preflight script/config fix, and the preflight cannot go green until Vercel project linkage/auth exists in the local environment.
+
+### Hosted Release Risks / Next
+- Before hosted release, link the repo with `vercel link` and authenticate with `vercel login` or `VERCEL_TOKEN`, then rerun `npm run release:hosted:check`.
+- Confirm VPS runtime env contains the required backend secrets in the actual VPS environment; local `server/.env.local` is absent in this workspace, so the script reports those as remote checks rather than hard local blockers.
+
+## 2026-06-16 - Windows npm ci Native Addon Lock Recovery
+
+### Windows npm ci Scope
+- Diagnosed the local Windows `npm ci` EPERM failure path for native addon files, especially `lightningcss-win32-x64-msvc` and `@tailwindcss/oxide-win32-x64-msvc`.
+- Added an explicit Windows recovery entry that can identify Restart Manager lockers for native `.node` files, list KK Studio dev/test processes, stop project dev/test processes, and remove stale npm native-addon cleanup directories.
+- Kept the recovery path outside `verify:changes`; the verification chain continues to run exactly through architecture, governance, audit, typecheck, spec, build, tests, smoke checks, and encoding.
+
+### Windows npm ci Files Touched
+- `package.json`
+- `scripts/dev/diagnose-install-locks.ps1`
+- `tests/unit/windows-npm-ci-lock-recovery.test.ts`
+- `docs/development/session-handoff.md`
+
+### Windows npm ci Design Decisions
+- `npm run install:diagnose-locks` is read-only. It scans native addon `.node` files with Windows Restart Manager and reports exact locking PIDs when available.
+- `npm run install:recover` is the explicit recovery command. It stops KK Studio dev/test processes, then removes stale temporary native-addon directories such as `.lightningcss-*`, `@tailwindcss/.oxide-*`, and `@rollup/.rollup-*` only after checking for active lockers.
+- The root cause observed locally was Vite holding native addon files. The first diagnosis found PID `60320` locking both `node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node` and `node_modules/@tailwindcss/oxide-win32-x64-msvc/tailwindcss-oxide.win32-x64-msvc.node`. After `verify:changes`, a fresh Vite PID `3204` held the same files until `npm run install:recover` stopped it.
+
+### Windows npm ci Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/windows-npm-ci-lock-recovery.test.ts`: failed before the script existed, then passed after implementation.
+- `npm run install:diagnose-locks`: identified Vite PID `60320` as the native addon locker before recovery.
+- `npm run install:recover`: stopped the locker and removed stale native addon directories.
+- `npm ci`: passed after recovery, adding 1026 packages with 0 vulnerabilities.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/windows-npm-ci-lock-recovery.test.ts tests/unit/dev-script-project-root.test.ts tests/unit/dev-script-port-owner-guards.test.ts`: passed, 11 tests.
+- `npm run verify:changes`: passed. Mobile and desktop settings smoke scripts used their existing fallback contract path, and the full verification command exited 0.
+- Final cleanup: `npm run install:recover`, `npm run dev:status`, and `npm run install:diagnose-locks` confirmed no Vite/API dev processes and no native addon locks remained.
+
+### Windows npm ci Not Run / Deferred
+- No additional server/mobile `npm ci --prefix ...` commands were run in this pass because the failure and recovery target was the root Windows workspace clean install.
+
+### Windows npm ci Risks / Next
+- `verify:changes` may start a local Vite process for smoke verification. If a clean install is needed after browser smoke checks, run `npm run install:recover` before `npm ci`.
+- The working tree also contains existing or concurrent edits outside this pass, including hosted-release guardrails and dev script guard changes. This pass did not revert or rearrange those changes.
+
+## 2026-06-16 - Visual Smoke Dev Lifecycle Recovery
+
+### Visual Smoke Scope
+- Diagnosed local `npm run dev:start`, repeated smoke fallback, `process-spawn-blocked`, and in-app Browser localhost access for KK Studio v1.5.6.
+- Fixed dev restart/stop cleanup so stale API watch supervisors are cleared and API pid tracking keeps the stable supervisor instead of the transient port-owner child process.
+- Updated desktop/mobile settings smoke scripts from the removed Advanced/diagnostics UI path to the current API model-center UI.
+- Relaxed prompt-group drag verification with a named dock tolerance so pixel-level prompt bar overlap does not force fallback while connector-following still runs in browser mode.
+
+### Visual Smoke Files Touched
+- `scripts/dev/dev-launch.ps1`
+- `scripts/dev/dev-stop.ps1`
+- `scripts/test/verify-desktop-settings-smoke.mjs`
+- `scripts/test/verify-mobile-settings-smoke.mjs`
+- `scripts/test/verify-prompt-group-drag.mjs`
+- `scripts/test/verify-startup-runtime-banner-centering.mjs`
+- `tests/unit/dev-script-port-owner-guards.test.ts`
+- `tests/unit/mobile-settings-browser-verify-script.test.ts`
+- `tests/unit/prompt-group-browser-verify-script.test.ts`
+- `docs/development/session-handoff.md`
+
+### Visual Smoke Design Decisions
+- `dev:start -Restart` now clears known dev port conflicts before reusing any healthy local listener, preventing old `node --watch` parents from respawning children behind the pid file.
+- New API starts keep `.kk-local/run/dev-api.pid` pointed at the PowerShell watch supervisor; Vite still tracks the direct Node/Vite process.
+- `dev-stop`/`dev-launch` use a single Win32 process snapshot plus listener owner snapshot for known dev process cleanup, avoiding slow repeated per-process listener scans.
+- Settings smoke now verifies `settings-model-center`, provider pool, preset directory, local API add, proxy provider add, and editor back flow.
+- Prompt drag smoke allows a 60px dock tolerance for the current prompt bar/card overlap while still requiring grouped spread and connector following.
+- Browser smoke scripts remove their stale `*-fallback.json` artifact before attempting a fresh browser run, so an old fallback file no longer makes a successful run look degraded.
+
+### Visual Smoke Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/dev-script-port-owner-guards.test.ts" "tests/unit/mobile-settings-browser-verify-script.test.ts"`: passed, 7 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/prompt-group-browser-verify-script.test.ts"`: passed, 6 tests.
+- `npm run dev:stop`: passed with clean output.
+- `npm run dev:start`: exited 0; `npm run dev:status` reported Vite PID `50900` on port 3000 healthy. API stayed stopped because local `.env.local` points `VITE_KK_API_BASE_URL` at the HTTPS VPS host.
+- in-app Browser opened `http://127.0.0.1:3000/settings/api-management` and rendered `settings-page-root`, confirming Browser localhost access is not blocked.
+- `npm run verify:desktop-settings-smoke`: passed in browser mode.
+- `npm run verify:mobile-settings-smoke`: passed in browser mode.
+- `npm run verify:startup-runtime-banner-centering`: passed in browser mode.
+- `npm run verify:prompt-group-drag`: passed without fallback; `mainDragGrouped=true` and `childConnectorFollows=true`.
+- Final recheck: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/dev-script-port-owner-guards.test.ts" "tests/unit/mobile-settings-browser-verify-script.test.ts" "tests/unit/prompt-group-browser-verify-script.test.ts"` passed, 14 tests; `git diff --check` reported no whitespace errors, only existing CRLF normalization warnings.
+- Final artifact check found no `temp/playwright/**/*fallback.json` files after the four browser smoke runs.
+
+### Visual Smoke Not Run
+- Full `npm run verify:changes` was not rerun for this focused pass. The relevant dev lifecycle checks, source contract tests, Browser access check, and four visual smoke scripts were run directly.
+
+### Visual Smoke Risks / Next
+- The visual smoke commands still emit existing local API/admin-model 502 console noise when no local API is running; the smoke route mocks keep the tested flows green, but log noise can still distract future debugging.
+- The workspace had pre-existing unrelated edits before this pass; this pass did not revert or reorganize them.

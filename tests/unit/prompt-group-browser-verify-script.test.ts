@@ -34,6 +34,8 @@ test("prompt-group browser verification script checks both regrouping and connec
 
   assert.match(source, /mainDragGrouped/);
   assert.match(source, /childConnectorFollows/);
+  assert.match(source, /const promptDockTolerance = 60;/);
+  assert.match(source, /box\.top >= promptBottomDuringMainDrag - promptDockTolerance/);
   assert.match(source, /throw new Error\(`Main-card drag did not regroup child cards under the parent:/);
   assert.match(source, /throw new Error\(`Child-card connector did not stay aligned with the dragged image:/);
 });

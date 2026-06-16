@@ -47,16 +47,18 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /mobile-result-detail-screen/);
   assert.match(scriptSource, /设置总览\|Settings Overview/);
   assert.match(scriptSource, /添加 API|本地 API|Local API/);
+  assert.match(scriptSource, /Open API Workspace/);
   assert.match(scriptSource, /api-official-provider-add|api-simple-provider-add/);
   assert.match(scriptSource, /api-official-editor-back/);
-  assert.match(scriptSource, /Advanced mode/);
-  assert.match(scriptSource, /Hide advanced mode/);
+  assert.match(scriptSource, /settings-model-center/);
+  assert.match(scriptSource, /api-model-center-provider-pool/);
+  assert.match(scriptSource, /api-model-center-preset-directory/);
   assert.doesNotMatch(scriptSource, /mobile-settings-home/);
   assert.doesNotMatch(scriptSource, /mobile-settings-entry-api-management/);
   assert.doesNotMatch(scriptSource, /鏌ョ湅璇婃柇/);
   assert.match(scriptSource, /settings-workbench-overview/);
-  assert.match(scriptSource, /settings-workbench-diagnostics/);
-  assert.match(scriptSource, /settings-workbench-platform/);
+  assert.doesNotMatch(scriptSource, /Advanced mode/);
+  assert.doesNotMatch(scriptSource, /Hide advanced mode/);
   assert.match(scriptSource, /mode: 'fallback'/);
   assert.match(scriptSource, /assertHttpHtml/);
   assert.match(scriptSource, /browserPreflight/);
@@ -75,10 +77,7 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scaffoldSource, /testId\?: string;/);
   assert.match(scaffoldSource, /data-testid=\{testId\}/);
   assert.match(workbenchSectionsSource, /testId="settings-workbench-overview"/);
-  assert.match(workbenchSectionsSource, /testId="settings-workbench-current-view"/);
-  assert.match(workbenchSectionsSource, /testId="settings-workbench-stage"/);
-  assert.match(workbenchSectionsSource, /testId="settings-workbench-diagnostics"/);
-  assert.match(workbenchSectionsSource, /testId="settings-workbench-platform"/);
+  assert.match(workbenchSectionsSource, /testId="settings-model-center"/);
 });
 
 test('desktop settings smoke verification covers direct settings routes and the in-app settings entry with stable selectors', () => {
@@ -94,20 +93,18 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /desktop-user-menu-settings/);
   assert.match(scriptSource, /settings-page-root/);
   assert.match(scriptSource, /api-official-provider-add/);
-  assert.match(scriptSource, /Advanced mode/);
-  assert.match(scriptSource, /Hide advanced mode/);
+  assert.match(scriptSource, /api-proxy-provider-add/);
   assert.match(scriptSource, /SETTINGS_API_PATH\}\/official\/new/);
-  assert.match(scriptSource, /settings-workbench-stage/);
-  assert.match(scriptSource, /settings-workbench-diagnostics/);
+  assert.match(scriptSource, /settings-model-center/);
+  assert.match(scriptSource, /api-model-center-provider-pool/);
+  assert.match(scriptSource, /api-model-center-preset-directory/);
   assert.match(scriptSource, /testId="settings-workbench-overview"/);
   assert.match(scriptSource, /testId="settings-workbench-capability"\|Capability roles/);
-  assert.match(scriptSource, /api-workbench-diagnostics-toggle/);
+  assert.match(scriptSource, /testId="settings-model-center"/);
   assert.match(scriptSource, /Provider settings and capability routing\|dashboardPrimaryAction/);
   assert.doesNotMatch(scriptSource, /\/API setup\//);
   assert.doesNotMatch(scriptSource, /\/Usage & Status\//);
   assert.doesNotMatch(scriptSource, /\/API & Capability Routing\//);
-  assert.match(scriptSource, /Hide more advanced items/);
-  assert.match(scriptSource, /name: 'Hide more advanced items', exact: true/);
   assert.match(scriptSource, /api-official-editor-back/);
   assert.match(scriptSource, /mode: 'fallback'/);
   assert.match(scriptSource, /assertHttpHtml/);
@@ -116,17 +113,20 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /officialEditorBack/);
   assert.match(scriptSource, /temp_user_session_v1/);
   assert.match(scriptSource, /smoke-temp-user/);
-  assert.match(scriptSource, /waitFor\(\{ state: 'hidden', timeout: 15000 \}\)/);
+  assert.doesNotMatch(scriptSource, /Advanced mode/);
+  assert.doesNotMatch(scriptSource, /Hide advanced mode/);
+  assert.doesNotMatch(scriptSource, /Hide more advanced items/);
   assert.doesNotMatch(scriptSource, /waitForPathname\(page, '\/settings\/api-management\/official\/new'\)/);
   assert.doesNotMatch(scriptSource, /settings-shell-desktop/);
   assert.doesNotMatch(scriptSource, /overlayWorkbenchStage/);
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Show diagnostics\/i \}\)/);
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Hide diagnostics\/i \}\)/);
+  assert.doesNotMatch(scriptSource, /api-workbench-diagnostics-toggle/);
 
   assert.match(desktopChromeSource, /data-testid="desktop-user-menu-trigger"/);
   assert.match(desktopChromeSource, /testId="desktop-user-menu-settings"/);
   assert.match(settingsPanelSource, /data-testid="settings-page-root"/);
-  assert.match(workbenchSectionsSource, /data-testid="api-workbench-diagnostics-toggle"/);
+  assert.match(workbenchSectionsSource, /testId="settings-model-center"/);
   assert.ok((apiSettingsViewSource.match(/data-testid="api-official-editor-back"/g) || []).length >= 2);
 });
 
@@ -142,5 +142,19 @@ test('browser smoke scripts prefer stable Playwright npx cache entries over alph
     assert.match(scriptSource, /readPlaywrightCacheVersion/);
     assert.match(scriptSource, /isStablePlaywrightVersion/);
     assert.match(scriptSource, /Number\(right\.stable\) - Number\(left\.stable\)/);
+  }
+});
+
+test('browser smoke scripts remove stale fallback artifacts before browser verification', () => {
+  const scriptSources = [
+    readSource('scripts/test/verify-mobile-settings-smoke.mjs'),
+    readSource('scripts/test/verify-desktop-settings-smoke.mjs'),
+    readSource('scripts/test/verify-prompt-group-drag.mjs'),
+    readSource('scripts/test/verify-startup-runtime-banner-centering.mjs'),
+  ];
+
+  for (const scriptSource of scriptSources) {
+    assert.match(scriptSource, /rmStaleFallbackArtifact/);
+    assert.match(scriptSource, /rmSync\(artifactPath, \{ force: true \}\)/);
   }
 });
