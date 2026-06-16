@@ -60,13 +60,24 @@ body.auth-screen-active #root {
 
 .auth-page--landing .auth-modal-content {
   position: relative;
-  width: min(100%, 520px);
+  width: min(100%, 500px);
   max-height: calc(100dvh - 40px);
   overflow: auto;
-  border-radius: 28px;
-  background: rgba(13, 22, 40, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 24px 70px rgba(12, 20, 40, 0.16) !important;
+  backdrop-filter: blur(24px) saturate(1.25) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.25) !important;
+}
+
+.auth-page--landing .auth-panel {
+  background: transparent !important;
+  border: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  padding: 32px 28px !important;
 }
 
 .auth-page--landing .auth-modal-close {
@@ -76,10 +87,10 @@ body.auth-screen-active #root {
   z-index: 2;
   width: 38px;
   height: 38px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(15, 29, 58, 0.12) !important;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.6) !important;
+  color: #0f1d3a !important;
   cursor: pointer;
   display: inline-grid;
   place-items: center;
@@ -87,8 +98,8 @@ body.auth-screen-active #root {
 }
 
 .auth-page--landing .auth-modal-close:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  background: rgba(15, 29, 58, 0.08) !important;
+  color: #0f1d3a !important;
 }
 
 /* 4. 头部导航栏 & 首屏 Hero 区 (Dark Section - 深色段样式自适应) */
@@ -624,4 +635,256 @@ body.auth-screen-active #root {
 
 .kk-cta-section p {
   color: rgba(15, 29, 58, 0.76) !important;
+}
+
+/* ==========================================
+   6. 登录面板内部文字高对比度深色适配 (Contrast Text Rules)
+   ========================================== */
+.auth-page--landing .auth-header h2 {
+  color: #0f1d3a !important;
+  font-weight: 800 !important;
+  font-size: 28px !important;
+}
+
+.auth-page--landing .auth-header p {
+  color: rgba(15, 29, 58, 0.72) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.auth-page--landing .auth-field > span {
+  color: #0f1d3a !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+}
+
+.auth-page--landing .auth-remember span {
+  color: rgba(15, 29, 58, 0.76) !important;
+}
+
+.auth-page--landing .auth-text-btn {
+  color: #1e40af !important;
+  font-weight: 600 !important;
+}
+
+.auth-page--landing .auth-text-btn:hover {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+
+.auth-page--landing .auth-link-back {
+  color: rgba(15, 29, 58, 0.7) !important;
+  font-weight: 600 !important;
+}
+
+.auth-page--landing .auth-link-back:hover {
+  background: rgba(15, 29, 58, 0.06) !important;
+  color: #0f1d3a !important;
+}
+
+.auth-page--landing .auth-divider span {
+  color: rgba(15, 29, 58, 0.4) !important;
+  background: transparent !important;
+}
+
+.auth-page--landing .auth-divider::before,
+.auth-page--landing .auth-divider::after {
+  border-bottom-color: rgba(15, 29, 58, 0.12) !important;
+}
+
+.auth-page--landing .auth-version {
+  color: rgba(15, 29, 58, 0.35) !important;
+}
+
+/* ==========================================
+   7. 登录卡片输入框亮色配色重构 (Contrast Input Styling)
+   ========================================== */
+.auth-page--landing .auth-input-wrap {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(15, 29, 58, 0.14) !important;
+  box-shadow: inset 0 2px 4px rgba(12, 20, 40, 0.02) !important;
+  border-radius: 12px !important;
+}
+
+.auth-page--landing .auth-input-wrap:focus-within {
+  border-color: #1e40af !important;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.12) !important;
+}
+
+.auth-page--landing .auth-input-wrap input {
+  color: #0c1018 !important;
+}
+
+.auth-page--landing .auth-input-wrap input::placeholder {
+  color: rgba(15, 29, 58, 0.4) !important;
+}
+
+.auth-page--landing .auth-input-wrap svg {
+  color: rgba(15, 29, 58, 0.5) !important;
+}
+
+.auth-page--landing .auth-eye-btn {
+  color: rgba(15, 29, 58, 0.5) !important;
+}
+
+.auth-page--landing .auth-eye-btn:hover {
+  color: #0f1d3a !important;
+}
+
+.auth-page--landing .auth-field-help {
+  color: rgba(15, 29, 58, 0.5) !important;
+}
+
+/* ==========================================
+   8. 微信扫码、Cloudflare Turnstile 与第三方按钮浅色磨砂适配
+   ========================================== */
+.auth-page--landing .wechat-qr-card {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(28px) !important;
+  -webkit-backdrop-filter: blur(28px) !important;
+  color: #0f1d3a !important;
+}
+
+.auth-page--landing .wechat-qr-card h3 {
+  color: #0f1d3a !important;
+}
+
+.auth-page--landing .wechat-qr-card p {
+  color: rgba(15, 29, 58, 0.76) !important;
+}
+
+.auth-page--landing .auth-turnstile-card {
+  background: rgba(255, 255, 255, 0.5) !important;
+  border: 1px solid rgba(15, 29, 58, 0.1) !important;
+}
+
+.auth-page--landing .auth-turnstile-header span {
+  color: #0f1d3a !important;
+}
+
+.auth-page--landing .auth-turnstile-header p {
+  color: rgba(15, 29, 58, 0.6) !important;
+}
+
+.auth-page--landing .auth-btn-main {
+  background: #0f1d3a !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(15, 29, 90, 0.15) !important;
+}
+
+.auth-page--landing .auth-btn-main:hover {
+  background: #091122 !important;
+}
+
+.auth-page--landing .auth-btn-google {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(15, 29, 58, 0.12) !important;
+  color: #0f1d3a !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+}
+
+.auth-page--landing .auth-btn-google:hover {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(15, 29, 58, 0.2) !important;
+}
+
+.auth-page--landing .auth-btn-ghost {
+  border: 1px solid rgba(15, 29, 58, 0.12) !important;
+  color: rgba(15, 29, 58, 0.8) !important;
+  border-radius: 12px !important;
+}
+
+.auth-page--landing .auth-btn-ghost:hover {
+  background: rgba(15, 29, 58, 0.05) !important;
+  color: #0f1d3a !important;
+}
+
+/* ==========================================
+   9. 系统能力 Work Tags 个性化色彩渲染
+   ========================================== */
+.kk-work-card[style*="coral"] .kk-work-tag {
+  background: rgba(255, 107, 90, 0.12) !important;
+  color: #d13d2a !important;
+  border: 1px solid rgba(255, 107, 90, 0.18) !important;
+  border-radius: 999px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kk-work-card[style*="lavender"] .kk-work-tag {
+  background: rgba(184, 164, 237, 0.15) !important;
+  color: #6d4ebe !important;
+  border: 1px solid rgba(184, 164, 237, 0.22) !important;
+  border-radius: 999px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kk-work-card[style*="ochre"] .kk-work-tag {
+  background: rgba(228, 108, 68, 0.1) !important;
+  color: #b34e2b !important;
+  border: 1px solid rgba(228, 108, 68, 0.16) !important;
+  border-radius: 999px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kk-work-card[style*="teal"] .kk-work-tag {
+  background: rgba(77, 230, 207, 0.12) !important;
+  color: #088296 !important;
+  border: 1px solid rgba(77, 230, 207, 0.2) !important;
+  border-radius: 999px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ==========================================
+   10. 服务行 (Services) 与 洞察行 (Thoughts) 悬停微动效 (Micro-animations)
+   ========================================== */
+.kk-service-row, 
+.kk-thought-row {
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), padding-left 320ms ease, border-bottom-color 320ms ease !important;
+}
+
+.kk-service-row:hover {
+  padding-left: 16px !important;
+  border-bottom-color: rgba(15, 29, 58, 0.28) !important;
+}
+
+.kk-service-row svg {
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), color 320ms ease !important;
+}
+
+.kk-service-row:hover svg {
+  transform: translate3d(6px, -6px, 0) scale(1.1) !important;
+  color: #0f1d3a !important;
+}
+
+.kk-thought-row:hover {
+  transform: translateY(-4px) !important;
+  border-bottom-color: rgba(15, 29, 58, 0.28) !important;
 }
