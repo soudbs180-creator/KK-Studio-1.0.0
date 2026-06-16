@@ -41,8 +41,7 @@ export const navItems: NavItem[] = [
   { label: { zh: '作品', en: 'Work' }, href: '#work' },
   { label: { zh: '方法', en: 'Approach' }, href: '#approach' },
   { label: { zh: '能力', en: 'Services' }, href: '#services' },
-  { label: { zh: '洞察', en: 'Thoughts' }, href: '#thoughts' },
-  { label: { zh: '联系', en: 'Contact' }, href: '#contact' }
+  { label: { zh: '洞察', en: 'Thoughts' }, href: '#thoughts' }
 ];
 
 export const heroBadges: LocaleText[] = [

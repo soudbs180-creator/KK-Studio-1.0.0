@@ -70,16 +70,7 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
                   en: 'From prompts, references and model outputs to commerce assets, PPT, video and agent queues. KK Studio turns scattered AI generations into a manageable, reusable and auditable visual production system.'
                 })}
               </p>
-              <div className="kk-hero__actions">
-                <button className="kk-editorial-button kk-editorial-button--dark" onClick={primaryAction}>
-                  <span>{t({ zh: '开始创作', en: 'Start creating' })}</span>
-                  <ArrowRight size={16} />
-                </button>
-                <button className="kk-editorial-button kk-editorial-button--ghost" onClick={onLoginClick}>
-                  <span>{t({ zh: '配置模型', en: 'Configure models' })}</span>
-                  <ArrowDownRight size={16} />
-                </button>
-              </div>
+
             </aside>
           </div>
 

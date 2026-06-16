@@ -85,13 +85,14 @@ export const LandingChrome: React.FC<LandingChromeProps> = ({
         </div>
 
         <div className="kk-landing-actions">
-          {!isLoggedIn && (
-            <button type="button" className="kk-landing-link-button" onClick={onLoginClick}>
-              {t({ zh: '登录', en: 'Sign in' })}
-            </button>
-          )}
-          <button type="button" className="kk-landing-start-button" onClick={handlePrimaryAction}>
-            {isLoggedIn ? t({ zh: '进入工作台', en: 'Enter workspace' }) : t({ zh: '开始创作', en: 'Start' })}
+          <button 
+            type="button" 
+            className="kk-landing-start-button" 
+            onClick={isLoggedIn ? onEnterWorkspace : onLoginClick}
+          >
+            {isLoggedIn 
+              ? t({ zh: '进入工作区', en: 'Enter workspace' }) 
+              : t({ zh: '登录 / 开始创作', en: 'Sign in / Start' })}
           </button>
         </div>
 

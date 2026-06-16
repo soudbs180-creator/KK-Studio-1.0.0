@@ -35,21 +35,7 @@ export const LandingCTA: React.FC<LandingCTAProps> = ({
           <p className="text-sm md:text-lg text-[#3a3a3a] leading-relaxed max-w-xl mb-10 font-light">
             {t(ctaCopy.subtitle)}
           </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-            <button
-              onClick={onPrimaryClick}
-              className="clay-btn clay-btn-primary w-full sm:w-auto flex items-center gap-2"
-            >
-              {t(ctaCopy.primaryBtn)}
-              <ArrowRight size={16} />
-            </button>
-            <button
-              onClick={onSecondaryClick}
-              className="clay-btn clay-btn-secondary w-full sm:w-auto"
-            >
-              {t(ctaCopy.secondaryBtn)}
-            </button>
-          </div>
+
         </div>
       </div>
 
