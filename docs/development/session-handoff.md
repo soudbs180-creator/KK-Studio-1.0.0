@@ -3,6 +3,88 @@
 **Last Updated:** 2026-06-16
 **Version:** KK Studio v1.5.6
 
+## 2026-06-16 - Mobile Settings Topbar and Position Optimization
+
+### Mobile Topbar Scope
+- 优化了手机端（移动端）设置面板顶部条的布局，移除左右边距（设置 `left: 0 !important`，`right: 0 !important`），使其宽度与外层面板框完全齐平撑满。
+- 引入 `border-radius: inherit !important` 并清空底角圆角，使顶栏顶角的圆角弧度自动继承并贴合外层容器。
+- 优化了返回按钮和关闭按钮的左右安全边距（调整为 `8px`），并将居中标题的左右 padding 提升到 `56px`，防止按钮和边框贴死或与长标题文本发生冲突。
+- 修复了在平板尺寸（`768px` 至 `1023px` 之间）绝对定位顶栏会遮挡页面顶部内容的问题，将对应的 content padding-top 统一优化为 `76px !important`。
+
+### Mobile Topbar Files Touched
+- [index.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/index.css)
+- [settings.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/styles/settings.css)
+- [SettingsPanel.localized.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/SettingsPanel.localized.tsx)
+- [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+
+### Mobile Topbar Design Decisions
+- 顶栏宽度与框齐平让面板整体显得更加大气完整，搭配 `border-bottom: 1px solid var(--settings-visual-border)` 分割线，极大地提升了移动端设置界面的精致程度与整体感。
+- 按钮和标题文字的呼吸间隙确保在各种小屏设备下都有优秀的视觉比例与防误触体验。
+
+### Mobile Topbar Verification Run
+- `npm run typecheck`: Passed.
+
+### Mobile Topbar Not Run / Deferred
+- 暂无。
+
+### Mobile Topbar Risks / Next
+- 暂无。
+
+## 2026-06-16 - Minimap UI and Interaction Optimization
+
+### Minimap Scope
+- 优化了画布小地图（Minimap）在 AI 助手展开时的避让算法，将偏移距离从 16px 增加到 32px，以解决小地图右侧被 AI 助手折叠按钮部分遮挡的问题。
+- 调整了小地图整体布局，从原先的地图在上、控制条在下，重构为控制条在上、地图在下的排版结构，并对高度进行了极致优化。
+- 简化了卡片渲染，将小地图上的卡片调整为极简的半透明中性空白卡片占位，使界面具备更高端的视觉质感。
+- 引入了基于虚拟状态的“目标视口”机制。在小地图上拖动定位框或操作缩放控制条时，大画布保持静止以避免频繁重绘的性能卡顿，并新增“确认定位”与“重置”按钮供确认生效。
+- 支持在小地图 SVG 画面上通过鼠标滚轮进行无感的拟定位缩放比调节。
+
+### Minimap Files Touched
+- `apps/web/src/App.tsx`
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx`
+- `docs/development/session-handoff.md`
+
+### Minimap Design Decisions
+- 确保在 AI 助手侧边栏滑入动画和常驻展示时，小地图组件能被推到可视范围，且留出充足距离避开悬浮把手。
+- 将定位框分为虚线框（大画布实际位置）和高亮珊瑚色实线框（目标定位位置），提供更精准且逻辑清晰的“延迟确认定位”体验。
+- 空白卡片采用统一的半透明灰色 `rgba(156, 163, 175, 0.15)`，去除了业务状态颜色与文字干扰，整体设计呈现高级毛玻璃悬浮效果。
+
+### Minimap Verification Run
+- `npm run typecheck`: Passed.
+- `npm run architecture:check`: Passed.
+- `npm run governance:check`: Passed.
+
+### Minimap Not Run / Deferred
+- 暂未启动本地 dev 服务器对全流程交互在不同屏幕分辨率下进行 E2E 回归测试。
+
+### Minimap Risks / Next
+- 暂无。
+
+## 2026-06-16 - Mobile Scroll-to-Bottom Icon and Alignment Optimization
+
+### Mobile Icon Scope
+- Replaced the generic `ArrowDown` icon with a more user-friendly and standard `ChevronsDown` icon for the mobile result feed's scroll-to-bottom button.
+- Fixed the alignment and symmetry issue between the scroll-to-bottom button and the standard/detail mode switcher.
+- Added explicit layout properties (`flex items-center justify-center`) and strict size bounds (`!w-10 !h-10 !min-w-0 !min-h-0`) to keep the button perfectly centered and horizontally aligned with the 40px mode switching capsule.
+
+### Mobile Icon Files Touched
+- `apps/web/src/components/mobile/MobileResultFeed.tsx`
+- `docs/development/session-handoff.md`
+
+### Mobile Icon Design Decisions
+- Keeping the button dimensions strictly bounded at 40px (`w-10 h-10`) matches the height of the mode-switching capsule, delivering a clean, symmetrical layout.
+- The `ChevronsDown` icon is enlarged to size `16` (from `14`) to stand out clearly as a navigation control.
+
+### Mobile Icon Verification Run
+- `npm run typecheck`: Passed.
+- `npm run build`: Passed (Web client compiled successfully with Vite 8).
+
+### Mobile Icon Not Run
+- E2E mobile tests (since the layout change was manually verified by inspection and standard desktop-side tests do not touch mobile DOM structures).
+
+### Mobile Icon Risks
+- None.
+
 ## 2026-06-16 - Cross-Manifest Dependency Audit Closure
 
 ### Audit Closure Scope

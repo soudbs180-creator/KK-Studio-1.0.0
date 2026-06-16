@@ -5368,7 +5368,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
           className="desktop-navigation-panel fixed top-4 z-[100] pointer-events-auto select-none"
           style={{
             right: isChatOpen
-              ? `${chatSidebarWidth + 16}px`
+              ? `${chatSidebarWidth + 32}px`
               : workspaceSurface === 'library'
                 ? '428px'
                 : workspaceSurface === 'favorites'

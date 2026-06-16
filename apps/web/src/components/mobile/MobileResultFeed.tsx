@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, ArrowLeft, ArrowDown, Copy, Download, Trash2 } from 'lucide-react';
+import { Search, X, ArrowLeft, ChevronsDown, Copy, Download, Trash2 } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -763,9 +763,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}
-                className="kk-result-icon-control flex rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)]"
+                className="kk-result-icon-control flex items-center justify-center rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] !w-10 !h-10 !min-w-0 !min-h-0"
               >
-                <ArrowDown size={14} />
+                <ChevronsDown size={16} />
               </button>
             </div>
           </>
