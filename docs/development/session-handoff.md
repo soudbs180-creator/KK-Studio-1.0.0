@@ -1,7 +1,46 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-15
+**Last Updated:** 2026-06-16
 **Version:** KK Studio v1.5.6
+
+## 2026-06-16 - Cross-Manifest Dependency Audit Closure
+
+### Audit Closure Scope
+- Closed the new root/server audit findings introduced by updated npm advisories: `tar <=7.5.15`, `form-data <4.0.6`, and `protobufjs <=7.6.2`.
+- Completed the dedicated `apps/mobile` dependency security pass that was deferred on 2026-06-15.
+- Removed unused mobile production dependencies `expo-three` and `@expo/ngrok`, which were pulling vulnerable legacy fetch, uuid, fbjs, and tunnel-tooling chains into the mobile manifest.
+- Added mobile overrides for patched transitive packages while staying on Expo 54 / React Native 0.81 to avoid an unplanned mobile platform migration.
+
+### Audit Closure Files Touched
+- `package.json`
+- `package-lock.json`
+- `server/package.json`
+- `server/package-lock.json`
+- `apps/mobile/package.json`
+- `apps/mobile/package-lock.json`
+- `docs/development/session-handoff.md`
+
+### Audit Closure Design Decisions
+- Root and server both pin `protobufjs@7.6.4`; this stays within the Google GenAI v1 dependency line and avoids a broader `@google/genai` major upgrade.
+- Root `tar` and nested `@mapbox/node-pre-gyp` tar resolution are pinned to `7.5.16`; `form-data` is pinned to `4.0.6`.
+- Mobile keeps the current Expo 54 / RN 0.81 runtime. The security closure uses targeted npm overrides for patched transitive packages instead of moving to Expo 56 / RN 0.86 in this pass.
+- Mobile `@istanbuljs/load-nyc-config` is safely overridden to `js-yaml@4.2.0` after source inspection confirmed it uses `require('js-yaml').load(...)`, which remains supported in js-yaml 4.x.
+- `expo-three` was removed because no mobile source imports it. Reintroducing 3D features should select a maintained Expo-compatible path rather than restoring the vulnerable legacy chain.
+- `@expo/ngrok` was removed because no project script or source imports it; local tunnel workflows should use the Expo CLI's current supported tunnel path instead of keeping the old package in production dependencies.
+
+### Audit Closure Verification Run
+- All npm audit surfaces passed with 0 vulnerabilities at `--audit-level=moderate`: root prod/all, `apps/web` prod/all, `server` prod/all, and `apps/mobile` prod/all.
+- `npm install --ignore-scripts`: restored root install after Windows blocked `npm ci` from unlinking a locked native `lightningcss` binary; completed with 0 vulnerabilities. npm reported local cleanup warnings for locked temporary native addon directories only.
+- `npm ci --prefix server --ignore-scripts`: passed with 0 vulnerabilities.
+- `npm ci --prefix apps/mobile --legacy-peer-deps --ignore-scripts`: passed with 0 vulnerabilities.
+- `npm run verify:changes`: passed, including architecture, governance, root dependency audit, typecheck, OpenAPI spec check, build, unit/integration/contract/e2e tests, smoke checks, and encoding checks.
+
+### Audit Closure Not Run / Deferred
+- Full Expo 56 / RN 0.86 migration was not performed; the current audit surface is clean without that platform jump.
+
+### Audit Closure Risks / Next
+- Mobile still prints deprecation warnings for old Expo/RN/Jest ecosystem packages during install, especially `glob@7`, `rimraf@3`, and related tooling. These are not npm audit vulnerabilities after this pass, but they should be revisited during a planned mobile platform upgrade.
+- Root `npm ci` was blocked by a Windows EPERM lock on native addon files. The non-destructive `npm install --ignore-scripts` recovery completed successfully; if this recurs, stop local processes using Tailwind/lightningcss before rerunning clean installs.
 
 ## 2026-06-15 - Dependency Security and Integrity Audit
 

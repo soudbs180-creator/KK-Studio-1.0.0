@@ -8,7 +8,6 @@
   "dependencies": {
     "@anythingai/app": "0.1.98",
     "@expo-google-fonts/dev": "0.4.7",
-    "@expo/ngrok": "4.1.3",
     "@expo/vector-icons": "15.0.3",
     "@gorhom/bottom-sheet": "5.2.6",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -60,12 +59,11 @@
     "expo-store-review": "9.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
-    "expo-three": "8.0.0",
     "expo-updates": "~29.0.17",
     "expo-video": "~3.0.16",
     "expo-web-browser": "15.0.11",
     "html-to-image": "1.11.13",
-    "lodash": "4.17.21",
+    "lodash": "4.18.1",
     "lucide-react-native": "0.525.0",
     "moti": "0.30.0",
     "papaparse": "5.5.3",
@@ -106,7 +104,7 @@
     "babel-preset-expo": "54.0.10",
     "jest": "29.7.0",
     "jest-expo": "~54.0.17",
-    "patch-package": "8.0.0",
+    "patch-package": "8.0.1",
     "postcss": "8.5.10",
     "tailwind-scrollbar": "3.1.0",
     "tailwindcss": "3",
@@ -127,8 +125,59 @@
     "@react-navigation/native-stack": "7.3.27",
     "@react-navigation/routers": "7.5.1",
     "@react-navigation/stack": "7.4.7",
+    "@babel/core": "7.29.7",
+    "@expo/cli": {
+      "glob": "10.5.0",
+      "picomatch": "3.0.2",
+      "ws": "8.21.0"
+    },
+    "@expo/metro-config": {
+      "postcss": "8.5.15"
+    },
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "4.2.0"
+    },
+    "@tootallnate/once": "2.0.1",
+    "@react-native/dev-middleware": {
+      "ws": "6.2.4"
+    },
+    "@uploadcare/upload-client": {
+      "ws": "8.21.0"
+    },
+    "@xmldom/xmldom": "0.8.13",
+    "ajv": "8.20.0",
+    "diff": "4.0.4",
+    "fast-uri": "3.1.2",
+    "form-data": "4.0.6",
+    "lodash": "4.18.1",
+    "markdown-it": "14.2.0",
+    "metro": {
+      ".": "0.83.3",
+      "ws": "7.5.11"
+    },
+    "metro-config": "0.83.3",
+    "metro-transform-worker": "0.83.3",
+    "prismjs": "1.30.0",
+    "jsdom": {
+      "ws": "8.21.0"
+    },
+    "js-yaml": "4.2.0",
+    "react-devtools-core": {
+      "ws": "7.5.11"
+    },
+    "react-native": {
+      "ws": "6.2.4"
+    },
     "react-server-dom-webpack": "19.0.4",
     "react-native-safe-area-context": "$react-native-safe-area-context",
-    "react-native-screens": "4.16.0"
+    "react-native-screens": "4.16.0",
+    "shell-quote": "1.8.4",
+    "tar": "7.5.16",
+    "undici": "6.24.0",
+    "validator": "13.15.35",
+    "xcode": {
+      "uuid": "11.1.1"
+    },
+    "yaml": "1.10.3"
   }
 }
