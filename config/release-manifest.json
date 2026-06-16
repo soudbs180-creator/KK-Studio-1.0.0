@@ -1,7 +1,7 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.6",
-  "displayVersion": "v1.5.6",
+  "version": "1.5.7",
+  "displayVersion": "v1.5.7",
   "releaseDate": "2026-06-08",
   "releaseNotes": [
     "推送主要是API调整。",

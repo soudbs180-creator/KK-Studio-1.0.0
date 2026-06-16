@@ -1,7 +1,7 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
 **Last Updated:** 2026-06-16
-**Version:** KK Studio v1.5.6
+**Version:** KK Studio v1.5.7
 
 ## 2026-06-16 - Code Review Issue Fixes
 
@@ -1674,7 +1674,7 @@
 - 下一步建议继续审计：PromptBar 更深层模型菜单/弹窗 / Canvas 交互浮层 / Admin 浮层 / ecommerce panels，以及 ChatSidebar 资源面板剩余卡片，这些是用户日常最高频 UI 面。
 
 ## 7. 版本治理与声明
-- 本轮遵循 KK Studio v1.5.6 当前事实，`config/release-manifest.json` 为主版本源。
+- 本轮遵循 KK Studio v1.5.7 当前事实，`config/release-manifest.json` 为主版本源。
 - `apps/web/src/config/appInfo.ts` 运行时只读导出。
 - `release/publish/stable/manifest.json` 为 portable stable 发布清单。
 - 当前 Web runtime 为 `apps/web/`，未回退到根 `src/` 或历史入口。
@@ -1687,7 +1687,7 @@ Mobile workspace: `apps/mobile/`
 ## 2026-06-16 - Hosted Release Preflight Guardrails
 
 ### Hosted Release Scope
-- Audited `npm run release:hosted:check`, `scripts/diagnose-hosted-release.mjs`, hosted frontend API base URL handling, and VPS runtime env checks for KK Studio v1.5.6.
+- Audited `npm run release:hosted:check`, `scripts/diagnose-hosted-release.mjs`, hosted frontend API base URL handling, and VPS runtime env checks for KK Studio v1.5.7.
 - Fixed hosted preflight false positives for disabled frontend bypass flags while keeping enabled local/dev bypasses as blockers.
 - Added hosted preflight blockers for local/private `VITE_KK_API_BASE_URL` and `VITE_PUBLIC_API_BASE_URL` values.
 - Aligned hosted API required env diagnostics with current `server/` VPS startup/runtime constraints.
@@ -1761,7 +1761,7 @@ Mobile workspace: `apps/mobile/`
 ## 2026-06-16 - Visual Smoke Dev Lifecycle Recovery
 
 ### Visual Smoke Scope
-- Diagnosed local `npm run dev:start`, repeated smoke fallback, `process-spawn-blocked`, and in-app Browser localhost access for KK Studio v1.5.6.
+- Diagnosed local `npm run dev:start`, repeated smoke fallback, `process-spawn-blocked`, and in-app Browser localhost access for KK Studio v1.5.7.
 - Fixed dev restart/stop cleanup so stale API watch supervisors are cleared and API pid tracking keeps the stable supervisor instead of the transient port-owner child process.
 - Updated desktop/mobile settings smoke scripts from the removed Advanced/diagnostics UI path to the current API model-center UI.
 - Relaxed prompt-group drag verification with a named dock tolerance so pixel-level prompt bar overlap does not force fallback while connector-following still runs in browser mode.
@@ -1809,7 +1809,7 @@ Mobile workspace: `apps/mobile/`
 ## 2026-06-16 - UI Resource and Dependency Governance
 
 ### UI Resource / Dependency Scope
-- Normalized UI asset ownership for KK Studio v1.5.6:
+- Normalized UI asset ownership for KK Studio v1.5.7:
   - `apps/web/public` remains the URL-addressed runtime asset surface.
   - `apps/web/src/assets` keeps imported bundled UI assets only.
   - `packages/ui` remains code/tokens/components only, with no binary business assets.
