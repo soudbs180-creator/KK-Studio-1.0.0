@@ -14,13 +14,14 @@ export interface UseCaseTag {
   category: 'ecommerce' | 'workflow' | 'model' | 'agent' | 'media';
 }
 
-export interface FeatureCard {
+export interface WorkCard {
   id: string;
   num: string;
-  badge: LocaleText;
+  eyebrow: LocaleText;
   title: LocaleText;
   desc: LocaleText;
-  color: string; // Clay block color
+  tags: LocaleText[];
+  tone: 'coral' | 'lavender' | 'teal' | 'ochre';
 }
 
 export interface ProcessStep {
@@ -29,121 +30,183 @@ export interface ProcessStep {
   desc: LocaleText;
 }
 
+export interface ThoughtItem {
+  category: LocaleText;
+  title: LocaleText;
+  desc: LocaleText;
+  meta: LocaleText;
+}
+
 export const navItems: NavItem[] = [
-  { label: { zh: '无限画布', en: 'Canvas' }, href: '#canvas-preview' },
-  { label: { zh: '产品叙事', en: 'Narrative' }, href: '#narrative' },
-  { label: { zh: '生产流', en: 'Process' }, href: '#process' },
-  { label: { zh: '模型路由', en: 'Models' }, href: '#models' },
-  { label: { zh: '积分说明', en: 'Pricing' }, href: '#pricing' }
+  { label: { zh: '作品', en: 'Work' }, href: '#work' },
+  { label: { zh: '方法', en: 'Approach' }, href: '#approach' },
+  { label: { zh: '能力', en: 'Services' }, href: '#services' },
+  { label: { zh: '洞察', en: 'Thoughts' }, href: '#thoughts' },
+  { label: { zh: '联系', en: 'Contact' }, href: '#contact' }
 ];
 
 export const heroBadges: LocaleText[] = [
-  { zh: '多模态 AI 画布', en: 'Multimodal AI Canvas' },
-  { zh: '智能路由中继', en: 'Model Routing' },
-  { zh: 'Agent 协同生产', en: 'Agent Workflow' }
+  { zh: 'Multimodal Canvas', en: 'Multimodal Canvas' },
+  { zh: 'Model Routing', en: 'Model Routing' },
+  { zh: 'Agent Workflow', en: 'Agent Workflow' }
 ];
+
+export const trustHeadline: LocaleText = {
+  zh: '为把 AI 从灵感推进到生产的团队而设计',
+  en: 'Trusted by teams turning AI from spark into production'
+};
 
 export const useCaseTags: UseCaseTag[] = [
-  { label: { zh: '电商批量素材生成', en: 'Bulk Ecommerce Assets' }, category: 'ecommerce' },
-  { label: { zh: '商品主图智能延展', en: 'Product Image Expansion' }, category: 'ecommerce' },
-  { label: { zh: 'Prompt 节点化排版', en: 'Visual Prompt Composing' }, category: 'workflow' },
-  { label: { zh: '全球顶尖大模型路由', en: 'Model Relay & Routing' }, category: 'model' },
-  { label: { zh: 'PPT 页面生成与编辑', en: 'PPT Layout Generation' }, category: 'media' },
-  { label: { zh: '多模型并发结果对比', en: 'Multi-Model Benchmarking' }, category: 'model' },
-  { label: { zh: '局部重绘选区编辑', en: 'Inpainting Canvas Selection' }, category: 'media' },
-  { label: { zh: '任务级 Agent 自动接管', en: 'Durable Agent Execution' }, category: 'agent' },
-  { label: { zh: '电商商品切图与抠图', en: 'Ecommerce Background Removal' }, category: 'ecommerce' },
-  { label: { zh: '参考图库多节点管理', en: 'Visual Reference Hub' }, category: 'workflow' }
+  { label: { zh: '电商批量素材', en: 'Bulk ecommerce assets' }, category: 'ecommerce' },
+  { label: { zh: '商品主图生成', en: 'Product image generation' }, category: 'ecommerce' },
+  { label: { zh: 'Prompt 可视化编排', en: 'Visual prompt composing' }, category: 'workflow' },
+  { label: { zh: '多模型路由', en: 'Model routing' }, category: 'model' },
+  { label: { zh: 'PPT 页面生产', en: 'PPT production' }, category: 'media' },
+  { label: { zh: '视频与图像实验', en: 'Video and image studies' }, category: 'media' },
+  { label: { zh: '局部重绘', en: 'Inpainting selection' }, category: 'media' },
+  { label: { zh: 'Agent 自动接管', en: 'Agent handoff' }, category: 'agent' },
+  { label: { zh: '参考图谱管理', en: 'Reference graph' }, category: 'workflow' },
+  { label: { zh: '积分与任务审计', en: 'Credit audit' }, category: 'model' }
 ];
 
-export const featureCards: FeatureCard[] = [
+export const workCards: WorkCard[] = [
   {
-    id: 'infinite-canvas',
+    id: 'canvas-system',
     num: '01',
-    badge: { zh: '无限创意空间', en: 'Infinite Canvas' },
-    title: { zh: '在同一张画布上组织 Prompt、参考图与生成资产', en: 'Arrange Prompts, references, and results on a single board' },
+    eyebrow: { zh: 'Canvas System', en: 'Canvas System' },
+    title: { zh: '把 Prompt、参考图与生成资产放进同一张工作画布。', en: 'Prompts, references and generated assets on one living canvas.' },
     desc: {
-      zh: '打破传统聊天框的维度限制。在无限可缩放画布中，你可以自由地框选图片、将图片连线作为参考注入 Prompt 节点，让所有的灵感、实验状态与批量任务流可视化排版。',
-      en: 'Break free from the chat box. On an infinite, zoomable canvas, wire up images as prompt inputs, group elements, and organize your complete production steps visually.'
+      zh: '不再用一次性聊天框管理复杂创作。KK Studio 用节点、连线、分组和缩放视口组织完整的 AI 生产上下文。',
+      en: 'Move beyond one-off chat boxes. KK Studio uses nodes, links, groups and a zoomable viewport to keep the whole production context visible.'
     },
-    color: '#ff4d8b' // Pink
+    tags: [
+      { zh: '无限画布', en: 'Infinite canvas' },
+      { zh: '节点编排', en: 'Node workflow' },
+      { zh: '参考图', en: 'References' }
+    ],
+    tone: 'coral'
   },
   {
-    id: 'model-routing',
+    id: 'model-relay',
     num: '02',
-    badge: { zh: '中立接入与智能路由', en: 'Model Routing' },
-    title: { zh: '统一管理 API 与自有密钥，无缝热切各供应商模型', en: 'Manage APIs and credentials, hot-swap model endpoints seamlessly' },
+    eyebrow: { zh: 'Model Relay', en: 'Model Relay' },
+    title: { zh: '在同一界面里切换模型、密钥与供应商路由。', en: 'Switch models, keys and providers without leaving the workspace.' },
     desc: {
-      zh: '无需忍受平台方专有协议绑死。支持 OpenAI、Claude、DeepSeek 等顶尖模型中继，支持配置个人专属密钥，智能适配多模态模型输入输出，保证创作无边界、计费可审计。',
-      en: 'No vendor lock-in. Relay to OpenAI, Claude, DeepSeek, and custom endpoints under unified schemas. Toggle models dynamically and secure your API credentials locally.'
+      zh: '用统一的模型边界隐藏供应商差异，让创作者专注于结果、成本和可复现的生成流程。',
+      en: 'A unified model boundary hides provider differences so creators can focus on output quality, cost and repeatable generation flows.'
     },
-    color: '#b8a4ed' // Lavender
+    tags: [
+      { zh: '自有密钥', en: 'Own keys' },
+      { zh: '路由审计', en: 'Route audit' },
+      { zh: '多模型', en: 'Multi-model' }
+    ],
+    tone: 'lavender'
   },
   {
-    id: 'ecommerce-workflow',
+    id: 'ecommerce-studio',
     num: '03',
-    badge: { zh: '电商批量流水线', en: 'Ecommerce Workflow' },
-    title: { zh: '导入商品原图与排版规格，自动批量输出电商素材', en: 'Import product images, auto-generate batch ecommerce assets' },
+    eyebrow: { zh: 'Commerce Studio', en: 'Commerce Studio' },
+    title: { zh: '从商品原图到批量主图，形成可管理的商业素材流水线。', en: 'From product shots to batch-ready commerce visuals.' },
     desc: {
-      zh: '专为电商团队打造的商业级素材流水线。从商品抠图、场景 Prompt 套用、多维版面排布到多模型并行生成，KK Studio 支持以结构化表格管理批量任务，一键打包导出 ZIP 原图。',
-      en: 'A commercial-grade material pipeline built for ecommerce. From auto-background removal to prompt templating and batch generation, KK Studio handles raw assets with ease.'
+      zh: '上传需求、原图和参考素材后，系统将任务拆解成可追踪的生成队列，并支持分组导出。',
+      en: 'Upload requirements, source shots and references, then turn them into traceable generation queues with grouped export.'
     },
-    color: '#ffb084' // Peach
+    tags: [
+      { zh: '批量生成', en: 'Batch generation' },
+      { zh: '任务队列', en: 'Task queue' },
+      { zh: 'ZIP 导出', en: 'ZIP export' }
+    ],
+    tone: 'ochre'
   },
   {
     id: 'agent-runtime',
     num: '04',
-    badge: { zh: '智能体异步接管', en: 'Agent Runtime' },
-    title: { zh: '基于画布感知的 Agent 执行引擎，自主流转创作任务', en: 'State-aware Agent runtime executing complex task lists' },
+    eyebrow: { zh: 'Agent Runtime', en: 'Agent Runtime' },
+    title: { zh: '让 Agent 读取画布状态，继续推进复杂任务。', en: 'Let agents read canvas state and push complex work forward.' },
     desc: {
-      zh: 'KK Studio 配备先进 of Agent 自动化接管逻辑。通过声明式 ToolRegistry 工具箱与 CanvasRuntimeState 视口感知，Agent 可以自主规划批处理任务、轮询队列，即使暂时离线，生产依然继续。',
-      en: 'Equipped with a high-fault-tolerant Agent runtime. Driven by standard ToolRegistry and CanvasRuntimeState, the agent plans multi-step pipelines and resolves errors asynchronously.'
+      zh: '基于画布状态、工具声明和持久任务队列，Agent 可以在更长的生产链路中承担拆解、重试和整理工作。',
+      en: 'With canvas state, declared tools and durable queues, agents can plan, retry and organize work across longer production chains.'
     },
-    color: '#a4d4c5' // Teal
+    tags: [
+      { zh: '画布感知', en: 'State aware' },
+      { zh: '工具注册', en: 'Tool registry' },
+      { zh: '持久队列', en: 'Durable queue' }
+    ],
+    tone: 'teal'
   }
 ];
 
 export const processSteps: ProcessStep[] = [
   {
     num: '01',
-    title: { zh: '输入与捕获 / Capture', en: 'Capture Ideas & Files' },
+    title: { zh: 'Capture / 捕获', en: 'Capture' },
     desc: {
-      zh: '双击画布快速创建节点，或将本地参考图、电商商品原图、需求文件一键拖拽入无限画布，将创作素材转化为可视化资产。',
-      en: 'Double-click to create nodes, or drag references, raw product images, and requirements documents directly onto the canvas to capture your workspace state.'
+      zh: '将 Prompt、商品原图、参考图、需求文件和灵感碎片拖入画布，建立第一层创作上下文。',
+      en: 'Bring prompts, product shots, references, requirement files and raw ideas into the canvas to build the first layer of context.'
     }
   },
   {
     num: '02',
-    title: { zh: '编排与连线 / Compose', en: 'Compose Pipelines' },
+    title: { zh: 'Compose / 编排', en: 'Compose' },
     desc: {
-      zh: '通过直观的节点连线将参考图、基础 Prompt 与模型路由卡片连接，让模型的路由规则、生成条件和批处理队列跃然纸上。',
-      en: 'Draw connection links between reference nodes, base prompt inputs, and routing cards. Visualizing model routing and batch queues simplifies configuration.'
+      zh: '通过节点、连线和分组，把模型输入、参考关系、批处理任务和输出目标编排成清晰路径。',
+      en: 'Use nodes, links and groups to compose model inputs, reference relationships, batch jobs and output targets into a clear path.'
     }
   },
   {
     num: '03',
-    title: { zh: '调度与生成 / Generate', en: 'Generate at Scale' },
+    title: { zh: 'Generate / 生成', en: 'Generate' },
     desc: {
-      zh: '并发调度多模型提供商进行大批量图片生成、视频渲染或 PPT 文档排版。你可以通过能量轨迹和状态进度条精准把控全局进度。',
-      en: 'Dispatch batch generation across multiple suppliers. Monitor real-time status bars and watch render processes execute parallelly in prompt group cards.'
+      zh: '调度图像、视频、PPT 和电商任务，以可追踪队列并行推进，随时查看结果和失败状态。',
+      en: 'Dispatch image, video, PPT and commerce jobs in traceable queues, then inspect results, retries and failures as they happen.'
     }
   },
   {
     num: '04',
-    title: { zh: '审计与管治 / Govern', en: 'Audit & Govern' },
+    title: { zh: 'Govern / 管治', en: 'Govern' },
     desc: {
-      zh: '基于用户自有密钥进行额度扣减与细粒度积分预扣审计，失败任务自动全额退回，提供企业级的任务安全审计与生产管理。',
-      en: 'Track token usage with real-time balance pre-deduction and transactional audit logs. Failsafe auto-refund secures billing and guarantees stable production.'
+      zh: '用积分预扣、失败退款、密钥隔离和导出记录，让 AI 创作从实验走向可审计的生产系统。',
+      en: 'Use credit holds, refund-on-failure, key isolation and export records to turn AI exploration into an auditable production system.'
     }
   }
 ];
 
-export const ctaCopy = {
-  title: { zh: '以 Prompt 启程，编排为高生产力工作流。', en: 'Start with a prompt. Scale into a workflow.' },
-  subtitle: {
-    zh: 'KK Studio 将一次性 AI 试验，改造为可批量、可管理、可审计的生产级创作工作系统。',
-    en: 'Upgrade one-time AI generations into a reusable, batch-driven, and fully-auditable production operating system.'
+export const serviceItems: LocaleText[] = [
+  { zh: '图像生成与局部重绘', en: 'Image generation and inpainting' },
+  { zh: '电商主图与批量素材', en: 'Ecommerce hero and batch assets' },
+  { zh: 'PPT 视觉稿与页面生产', en: 'PPT decks and page production' },
+  { zh: '多模型 API 路由与密钥隔离', en: 'Model API routing and key isolation' },
+  { zh: 'Agent 工作流与持久任务队列', en: 'Agent workflow and durable queues' },
+  { zh: '生成资产整理、下载与审计', en: 'Asset organization, export and audit' }
+];
+
+export const thoughtItems: ThoughtItem[] = [
+  {
+    category: { zh: 'Studio Note', en: 'Studio Note' },
+    title: { zh: '为什么 AI 创作需要画布，而不是更长的聊天记录。', en: 'Why AI production needs a canvas, not a longer chat history.' },
+    desc: { zh: '复杂创作由素材、模型、版本和任务关系组成，画布让这些关系被看见。', en: 'Serious production is made from assets, models, versions and task relationships. A canvas makes those relationships visible.' },
+    meta: { zh: 'Product Thinking', en: 'Product Thinking' }
   },
-  primaryBtn: { zh: '立即进入工作台', en: 'Start Creating' },
-  secondaryBtn: { zh: '查看配置指南', en: 'Configure APIs' }
+  {
+    category: { zh: 'Workflow', en: 'Workflow' },
+    title: { zh: '把一次性生成变成可复用流水线。', en: 'Turning one-off generations into repeatable systems.' },
+    desc: { zh: '从 Prompt 到导出包，每一步都应当可追踪、可重试、可复用。', en: 'From prompt to export, every step should be traceable, retryable and reusable.' },
+    meta: { zh: 'Workflow Design', en: 'Workflow Design' }
+  },
+  {
+    category: { zh: 'Commerce', en: 'Commerce' },
+    title: { zh: '电商团队如何用多模型流程压缩素材生产周期。', en: 'How commerce teams compress asset production with multi-model flows.' },
+    desc: { zh: '批量素材的瓶颈不是单张图，而是需求、参考、版本和导出的管理。', en: 'The bottleneck is rarely one image. It is requirements, references, versions and export management.' },
+    meta: { zh: 'Commerce Ops', en: 'Commerce Ops' }
+  }
+];
+
+export const ctaCopy = {
+  title: { zh: '所有创作星座，汇入一张画布。', en: 'All your creative constellations, under one canvas.' },
+  subtitle: {
+    zh: '从灵感到商品素材、从 Prompt 到 Agent 队列，KK Studio 把 AI 创作组织成可管理、可复用、可审计的生产系统。',
+    en: 'From spark to commerce assets, from prompts to agent queues, KK Studio organizes AI work into a manageable, reusable and auditable production system.'
+  },
+  primaryBtn: { zh: '开始创作', en: 'Start creating' },
+  secondaryBtn: { zh: '配置模型', en: 'Configure models' }
 };
