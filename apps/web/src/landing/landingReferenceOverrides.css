@@ -9,6 +9,7 @@ body.auth-screen-active #root {
   min-height: 100% !important;
   overflow-y: auto !important;
   overflow-x: clip !important;
+  background: transparent !important; /* 解除根底色绑定，露出天空长渐变 */
 }
 
 /* 2. 黎明天空长渐变背景及全局文本基色 */
@@ -39,26 +40,26 @@ body.auth-screen-active #root {
 }
 
 /* 隐藏外层背景伪元素 */
-.auth-page--landing::before,
-.auth-page--landing::after {
+.auth-page.auth-page--landing::before,
+.auth-page.auth-page--landing::after {
   display: none !important;
   content: none !important;
 }
 
 /* 3. 登录弹窗 (Modal Overlay & Content) 深度视觉美化 */
-.auth-page--landing .auth-modal-overlay {
+.auth-page.auth-page--landing .auth-modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(12, 20, 40, 0.46);
+  background: rgba(12, 20, 40, 0.46) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
-.auth-page--landing .auth-modal-content {
+.auth-page.auth-page--landing .auth-modal-content {
   position: relative;
   width: min(100%, 500px);
   max-height: calc(100dvh - 40px);
@@ -71,7 +72,7 @@ body.auth-screen-active #root {
   -webkit-backdrop-filter: blur(24px) saturate(1.25) !important;
 }
 
-.auth-page--landing .auth-panel {
+.auth-page.auth-page--landing .auth-modal-content .auth-panel {
   background: transparent !important;
   border: 0 !important;
   backdrop-filter: none !important;
@@ -752,32 +753,79 @@ body.auth-screen-active #root {
 /* ==========================================
    8. 微信扫码、Cloudflare Turnstile 与第三方按钮浅色磨砂适配
    ========================================== */
-.auth-page--landing .wechat-qr-card {
+.auth-page.auth-page--landing .kk-overlay-backdrop {
+  background: rgba(12, 20, 40, 0.46) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-panel {
   background: rgba(255, 255, 255, 0.82) !important;
   border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  backdrop-filter: blur(28px) !important;
-  -webkit-backdrop-filter: blur(28px) !important;
+  backdrop-filter: blur(28px) saturate(1.25) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.25) !important;
+  color: #0f1d3a !important;
+  box-shadow: 0 24px 70px rgba(12, 20, 40, 0.16) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-header {
+  border-bottom-color: rgba(15, 29, 58, 0.12) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-title {
   color: #0f1d3a !important;
 }
 
-.auth-page--landing .wechat-qr-card h3 {
-  color: #0f1d3a !important;
-}
-
-.auth-page--landing .wechat-qr-card p {
+.auth-page.auth-page--landing .kk-auth-modal-description {
   color: rgba(15, 29, 58, 0.76) !important;
 }
 
-.auth-page--landing .auth-turnstile-card {
+.auth-page.auth-page--landing .kk-auth-modal-muted {
+  color: rgba(15, 29, 58, 0.5) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-close {
+  color: #0f1d3a !important;
+  border: 1px solid rgba(15, 29, 58, 0.12) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-close:hover {
+  background: rgba(15, 29, 58, 0.08) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-state--loading {
+  background: rgba(15, 29, 58, 0.03) !important;
+  color: #0f1d3a !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-widget-shell {
+  border-color: rgba(15, 29, 58, 0.12) !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-external-action {
+  background: rgba(15, 29, 58, 0.05) !important;
+  color: #0f1d3a !important;
+}
+
+.auth-page.auth-page--landing .kk-auth-modal-external-action:hover {
+  background: rgba(15, 29, 58, 0.1) !important;
+}
+
+.auth-page.auth-page--landing .auth-turnstile-card {
   background: rgba(255, 255, 255, 0.5) !important;
   border: 1px solid rgba(15, 29, 58, 0.1) !important;
 }
 
-.auth-page--landing .auth-turnstile-header span {
+.auth-page.auth-page--landing .auth-turnstile-card small {
+  color: rgba(15, 29, 58, 0.72) !important;
+}
+
+.auth-page.auth-page--landing .auth-turnstile-header span {
   color: #0f1d3a !important;
 }
 
-.auth-page--landing .auth-turnstile-header p {
+.auth-page.auth-page--landing .auth-turnstile-header p {
   color: rgba(15, 29, 58, 0.6) !important;
 }
 
