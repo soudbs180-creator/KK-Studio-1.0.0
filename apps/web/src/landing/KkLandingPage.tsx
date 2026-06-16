@@ -6,7 +6,7 @@ import { CanvasPreviewMock } from './CanvasPreviewMock';
 import { FeatureNarrative } from './FeatureNarrative';
 import { ProcessTimeline } from './ProcessTimeline';
 import { LandingCTA } from './LandingCTA';
-import { heroBadges, thoughtItems, trustHeadline, useCaseTags } from './landingContent';
+import { heroBadges, serviceItems, thoughtItems, trustHeadline, useCaseTags } from './landingContent';
 import { useLocale } from '../context/LocaleContext';
 import { pickByResolvedLanguage } from '../utils/localeText';
 import './landingStyles.css';
@@ -106,6 +106,30 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
         <FeatureNarrative />
 
         <ProcessTimeline />
+
+        <section className="kk-services-section" id="services">
+          <div className="kk-services-section__inner">
+            <div className="kk-section-kicker">{t({ zh: 'Services', en: 'Services' })}</div>
+            <div className="kk-services-section__header">
+              <h2>{t({ zh: '面向真实生产，而不是演示样张。', en: 'Built for production work, not demo shots.' })}</h2>
+              <p>
+                {t({
+                  zh: 'KK Studio 的界面不是为了展示按钮，而是为了让 AI 创作里的模型、素材、版本、成本与交付关系保持清晰。',
+                  en: 'KK Studio is not a showcase of buttons. It keeps models, assets, versions, cost and delivery relationships clear throughout AI production.'
+                })}
+              </p>
+            </div>
+            <div className="kk-services-list">
+              {serviceItems.map((item, index) => (
+                <div className="kk-service-row" key={item.en}>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <p>{t(item)}</p>
+                  <ArrowRight size={18} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section className="kk-thoughts" id="thoughts">
           <div className="kk-section-kicker">{t({ zh: 'Thoughts', en: 'Thoughts' })}</div>
