@@ -19,13 +19,14 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-page {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr;
   background: #07111f;
   color: #f7f9ff;
-  overflow: hidden;
+  overflow-y: visible;
+  overflow-x: clip;
   isolation: isolate;
 }
 
