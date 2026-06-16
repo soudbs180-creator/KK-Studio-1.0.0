@@ -173,8 +173,9 @@ body.auth-screen-active #root {
 }
 
 /* Hero Section */
-.kk-hero {
-  padding-top: clamp(150px, 16vw, 240px) !important;
+.kk-landing-root .kk-hero {
+  padding-top: clamp(160px, 16vw, 240px) !important;
+  margin-top: 0 !important;
 }
 
 .kk-hero__meta {
@@ -182,11 +183,12 @@ body.auth-screen-active #root {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.kk-hero__title {
+.kk-landing-root .kk-hero__title {
   color: #ffffff !important;
-  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.25);
-  font-size: clamp(32px, 5.8vw, 76px) !important;
-  line-height: 1.08 !important;
+  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.25) !important;
+  font-size: clamp(32px, 5.4vw, 68px) !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.04em !important;
 }
 
 .kk-hero__badges span {
@@ -534,8 +536,11 @@ body.auth-screen-active #root {
   border-bottom: 1px solid rgba(15, 29, 58, 0.08) !important;
 }
 
-#process h2 {
+.kk-landing-root #process h2 {
   color: #0f1d3a !important;
+  font-size: clamp(28px, 4.8vw, 54px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.05em !important;
 }
 
 #process p {
@@ -556,29 +561,37 @@ body.auth-screen-active #root {
   border-bottom: 1px solid rgba(15, 29, 58, 0.08) !important;
 }
 
-.kk-services-section__header h2 {
+.kk-landing-root .kk-services-section__header h2 {
   color: #0f1d3a !important;
-  font-size: clamp(38px, 6.2vw, 92px) !important;
-  letter-spacing: -0.07em !important;
+  font-size: clamp(28px, 4.8vw, 54px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.05em !important;
 }
 
 .kk-services-section__header p {
   color: rgba(15, 29, 58, 0.76) !important;
 }
 
-.kk-service-row {
+.kk-landing-root .kk-service-row {
+  grid-template-columns: 60px 1fr auto !important;
+  gap: 16px !important;
+  min-height: 72px !important;
+  padding: 18px 0 !important;
   border-bottom-color: rgba(15, 29, 58, 0.1) !important;
   color: #0f1d3a !important;
 }
 
-.kk-service-row span {
+.kk-landing-root .kk-service-row span {
   color: rgba(15, 29, 58, 0.45) !important;
+  font-size: 13px !important;
 }
 
-.kk-service-row p {
+.kk-landing-root .kk-service-row p {
   color: #0f1d3a !important;
-  font-size: clamp(20px, 3.6vw, 48px) !important;
-  letter-spacing: -0.05em !important;
+  font-size: clamp(16px, 2.2vw, 28px) !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.02em !important;
+  font-weight: 580 !important;
 }
 
 .kk-service-row svg {
@@ -590,10 +603,11 @@ body.auth-screen-active #root {
   background: transparent !important;
 }
 
-.kk-thoughts__header h2 {
+.kk-landing-root .kk-thoughts__header h2 {
   color: #0f1d3a !important;
-  font-size: clamp(38px, 6.2vw, 92px) !important;
-  letter-spacing: -0.07em !important;
+  font-size: clamp(28px, 4.8vw, 54px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.05em !important;
 }
 
 .kk-thoughts__header p {
