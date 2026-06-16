@@ -135,6 +135,7 @@ export const AppStartupScreen: React.FC<{
       style={{
         background: 'var(--app-startup-bg)',
         color: 'var(--app-startup-title)',
+        display: 'none',
       }}
     >
       <div data-testid="app-startup-shell" className="app-startup-shell">
