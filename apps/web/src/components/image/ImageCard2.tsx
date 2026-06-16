@@ -1965,14 +1965,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 <span className={joinClasses('inline-flex items-center rounded-md font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap', capsulePaddingClass, modelCapsuleTextClass)}>
                                                     {aspectSizeLabel}
                                                 </span>
-                                                <button
-                                                    onClick={handleToggleFavorite}
-                                                    className={joinClasses(imageFavorite ? 'text-[var(--accent-coral)]' : 'hover:text-[var(--accent-coral)]', 'transition-colors', iconButtonPaddingClass)}
-                                                    title={imageFavorite ? '取消收藏' : '添加至收藏'}
-                                                    aria-pressed={Boolean(imageFavorite)}
-                                                >
-                                                    <Heart size={actionIconSize} fill={imageFavorite ? 'currentColor' : 'none'} />
-                                                </button>
+
                                                 <div className="relative" ref={downloadMenuRef}>
                                                     <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-coral)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
                                                         <Download size={actionIconSize} />

@@ -6,6 +6,7 @@ import type { CanvasPoint, LiveSceneSnapshot } from '../canvas/liveScene';
 import { resolveLiveSceneNodePosition } from '../canvas/liveScene';
 import type { CanvasPerformanceProfile } from '../canvas/performanceProfile';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
+import { canvasLivePositionStore } from './canvasLivePositionStore';
 
 export type ConnectorRenderSnapshot = {
   promptIds: string[];
@@ -217,6 +218,8 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
 
   const resolveLivePromptPosition = useCallback((promptNode: PromptNode | undefined | null) => {
     if (!promptNode) return null;
+    const livePos = canvasLivePositionStore.getPosition(promptNode.id);
+    if (livePos) return livePos;
     return resolveLiveSceneNodePosition(
       liveSceneRef.current,
       promptNode.id,
@@ -226,6 +229,8 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
 
   const resolveLiveImagePosition = useCallback((imageNode: GeneratedImage | undefined | null) => {
     if (!imageNode) return null;
+    const livePos = canvasLivePositionStore.getPosition(imageNode.id);
+    if (livePos) return livePos;
     return resolveLiveSceneNodePosition(
       liveSceneRef.current,
       imageNode.id,

@@ -765,6 +765,7 @@ export type ApiWorkbenchModelCenterPresetItem = {
   kind: 'official' | 'relay';
   kindLabel: string;
   protocolLabel: string;
+  baseUrl?: string;
   baseUrlLabel: string;
   recommendedModel: string;
   accentColor: string;
@@ -814,10 +815,21 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
   onAddOfficial,
   onAddProvider,
 }) => {
-  /* 按标签页类型过滤预设：官方（Official）或中转站（Relay） */
-  const filteredPresets = presets.filter((p) =>
-    presetTab === 'official' ? p.kind === 'official' : presetTab === 'relay' ? p.kind === 'relay' : true
-  );
+  /* 按标签页类型过滤预设并对相同 baseUrl 进行去重 */
+  const seenBaseUrls = new Set<string>();
+  const filteredPresets = presets.filter((p) => {
+    const isTabMatch = presetTab === 'official' ? p.kind === 'official' : presetTab === 'relay' ? p.kind === 'relay' : true;
+    if (!isTabMatch) return false;
+
+    if (p.baseUrl) {
+      const normalizedUrl = p.baseUrl.trim().replace(/\/+$/, '').toLowerCase();
+      if (seenBaseUrls.has(normalizedUrl)) {
+        return false;
+      }
+      seenBaseUrls.add(normalizedUrl);
+    }
+    return true;
+  });
 
   return (
   <SettingsSection

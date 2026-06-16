@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 
 import type {
@@ -121,10 +121,16 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         return 'billing';
       case 'api-management':
         return 'api';
+      case 'ai-management':
+        return 'ai-management';
       case 'storage-settings':
         return 'storage';
       case 'system-logs':
         return 'logs';
+      case 'browser-assistant':
+        return 'browser-assistant';
+      case 'appearance-motion':
+        return 'appearance';
       default:
         return 'default';
     }
@@ -134,31 +140,31 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
   const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId) => {
     if (itemId === 'dashboard') {
       return (
-        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {pick('工作区健康和总览面板就绪', 'Workspace health & overview panel ready')}
         </div>
       );
     }
     if (itemId === 'api-management') {
       return (
-        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {channelStats.officialCount} 个官方直连 / {channelStats.activeProviders} 个中转就绪
         </div>
       );
     }
     if (itemId === 'consumption-records') {
       return (
-        <div className="mt-2 text-[11px] leading-4 flex items-center justify-between">
-          <span className="text-[var(--text-secondary)]">{pick('今日消耗', 'Today Cost')}</span>
-          <span className="settings-sidebar-card__balance text-xs">{remainingBalanceDisplay}</span>
+        <div className="mt-1 text-[11px] leading-4 flex items-center justify-between">
+          <span className="text-[var(--text-secondary)] truncate mr-1">{pick('今日消耗', 'Today Cost')}</span>
+          <span className="settings-sidebar-card__balance text-xs shrink-0">{remainingBalanceDisplay}</span>
         </div>
       );
     }
     if (itemId === 'system-logs') {
       const isHealthy = importantLogCount === 0;
       return (
-        <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
-          <span className="settings-sidebar-card__status-dot h-2 w-2 rounded-full" data-state={isHealthy ? 'healthy' : 'warning'} />
+        <div className="mt-1 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
+          <span className="settings-sidebar-card__status-dot h-2 w-2 rounded-full shrink-0" data-state={isHealthy ? 'healthy' : 'warning'} />
           <span className="settings-sidebar-card__status-text truncate" data-state={isHealthy ? 'healthy' : 'warning'}>
             {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
           </span>
@@ -167,7 +173,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     }
     if (itemId === 'storage-settings') {
       return (
-        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {storedImages} 张图 · {storageUsageMb.toFixed(1)} MB / 1 GB
         </div>
       );
@@ -184,7 +190,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         background: 'var(--settings-nav-glass-bg)',
       }}
     >
-      <div className="settings-shell-nav__title px-3 pb-3">
+      <div className="settings-shell-nav__title px-3 pb-4">
         <h1 className="text-sm font-semibold text-[var(--settings-nav-text-primary)]">{title}</h1>
         <p className="mt-1 text-[11px] leading-5 text-[var(--settings-nav-text-secondary)]">{description}</p>
       </div>
@@ -214,7 +220,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           </div>
         ) : (
           sections.map((section) => {
-            const sectionItems = items.filter((item) => item.section === section.id);
+            const sectionItems = filteredNavItems.filter((item) => item.section === section.id);
             if (sectionItems.length === 0) {
               return null;
             }
@@ -248,25 +254,24 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                           data-state={isActive ? 'active' : 'idle'}
                           data-accent={accent}
                         >
-                          <div className="flex w-full items-center justify-between">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="card-avatar-icon shrink-0">
-                                <Icon size={14} />
-                              </span>
+                          <div className="flex w-full items-center gap-3 min-w-0 pr-6">
+                            <span className="card-avatar-icon shrink-0">
+                              <Icon size={20} />
+                            </span>
+                            <div className="flex flex-col min-w-0 flex-1 text-left">
                               <span className="truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">
                                 {item.label}
                               </span>
+                              {renderCardStatusInfo(item.id) || (
+                                <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+                                  {item.description}
+                                </div>
+                              )}
                             </div>
-                            {!isActive && (
-                              <ChevronRight size={13} className="text-[var(--settings-nav-text-tertiary)] opacity-60 shrink-0" />
-                            )}
                           </div>
-                          {renderCardStatusInfo(item.id)}
-                          {isActive && (
-                            <span className="settings-sidebar-card__active-chevron">
-                              <ChevronRight size={13} />
-                            </span>
-                          )}
+                          <span className="settings-sidebar-card__active-chevron">
+                            <ChevronRight size={13} />
+                          </span>
                         </button>
                       </div>
                     );

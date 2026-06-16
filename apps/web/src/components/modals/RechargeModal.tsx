@@ -20,9 +20,9 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
-import alipayIcon from '../../assets/payment/alipay.png';
-import cardIcon from '../../assets/payment/card.png';
-import wechatIcon from '../../assets/payment/wechat.png';
+import alipayIcon from '../../assets/payment/alipay.svg';
+import cardIcon from '../../assets/payment/card.svg';
+import wechatIcon from '../../assets/payment/wechat.svg';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useAdminRole } from '../../hooks/useAdminRole';

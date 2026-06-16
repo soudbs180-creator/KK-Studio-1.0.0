@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { type PromptNode, AspectRatio, GenerationMode, type PromptGenerationMetadata, type EcommerceEditableTaskState, type EcommerceFrameworkQueueItem } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
-import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download, Heart } from 'lucide-react';
+import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download, Heart, AlertCircle } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -374,8 +374,10 @@ const ReferenceThumbnail: React.FC<{
 }> = ({ image, label, onClick }) => {
     const [data, setData] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
 
     useEffect(() => {
+        setHasError(false);
         // 🚀 [Fix] If data exists and is NOT a blob URL, use it directly
         // Blob URLs can expire after page refresh, so we should try to recover from IDB
         if (image.data && !image.data.startsWith('blob:')) {
@@ -423,7 +425,7 @@ const ReferenceThumbnail: React.FC<{
         <div
             className="w-10 h-10 rounded border border-[var(--border-light)] overflow-hidden relative bg-[var(--bg-tertiary)] cursor-pointer active:scale-95 transition-transform"
             data-native-drag-source="true"
-            draggable={!!src}
+            draggable={!!src && !hasError}
             onMouseDown={(e) => {
                 // Allow Standard Click, but prevent Drag unless moved
                 e.stopPropagation();
@@ -433,7 +435,7 @@ const ReferenceThumbnail: React.FC<{
                 if (onClick) onClick(e);
             }}
             onDragStart={(e) => {
-                if (!src) {
+                if (!src || hasError) {
                     e.preventDefault();
                     return;
                 }
@@ -453,7 +455,7 @@ const ReferenceThumbnail: React.FC<{
                 e.dataTransfer.effectAllowed = 'copy';
             }}
         >
-            {src ? (
+            {src && !hasError ? (
                 <img
                     src={src}
                     alt="Ref"
@@ -462,13 +464,16 @@ const ReferenceThumbnail: React.FC<{
                         imageRendering: 'auto',
                         display: 'block'
                     }}
+                    onError={() => setHasError(true)}
                 />
             ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-tertiary)]">
                     {loading ? (
                         <Loader2 className="w-3 h-3 text-[var(--text-tertiary)] animate-spin" />
                     ) : (
-                        <div className="w-3 h-3 rounded-full bg-red-500/20" title="Lost" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60" title="Lost">
+                            <AlertCircle className="w-5 h-5 text-white/80" />
+                        </div>
                     )}
                 </div>
             )}
@@ -1031,7 +1036,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             return;
         }
         if ('button' in e && e.button === 2) {
+            e.stopPropagation();
             onBringToFront?.();
+            onSelect();
             return;
         }
         onBringToFront?.();
@@ -1629,21 +1636,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             </div>
                         )}
 
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (promptFavorite) {
-                                    void removeFavorite(promptFavorite.id);
-                                } else {
-                                    void addPromptFavorite(node);
-                                }
-                            }}
-                            className={`p-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer ${promptFavorite ? 'text-[var(--accent-coral)]' : 'text-[var(--text-tertiary)] hover:text-[var(--accent-coral)]'}`}
-                            title={promptFavorite ? '取消收藏' : '收藏提示词'}
-                            aria-pressed={Boolean(promptFavorite)}
-                        >
-                            <Heart size={14} fill={promptFavorite ? 'currentColor' : 'none'} />
-                        </button>
+
 
                         {/* Delete Button */}
                         {onDelete && (

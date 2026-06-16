@@ -112,7 +112,7 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(stageSource, /export function resolveApiWorkbenchStageMeta/);
   assert.doesNotMatch(stageSource, /input\.showDiagnostics \? 'diagnostics' : input\.stage/);
 
-  assert.match(viewSource, /<ApiWorkbenchOverviewSection/);
+  assert.doesNotMatch(viewSource, /<ApiWorkbenchOverviewSection/);
   assert.match(viewSource, /<ApiWorkbenchCurrentViewSection/);
   assert.match(viewSource, /<ApiWorkbenchStageSection/);
   assert.match(viewSource, /<ApiWorkbenchPlatformSection/);

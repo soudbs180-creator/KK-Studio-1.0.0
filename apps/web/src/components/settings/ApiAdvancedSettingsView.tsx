@@ -57,7 +57,6 @@ import {
   ApiWorkbenchDiagnosticsSection,
   ApiWorkbenchModelCenterSection,
   ApiWorkbenchOcrSection,
-  ApiWorkbenchOverviewSection,
   ApiWorkbenchPlatformSection,
   ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,

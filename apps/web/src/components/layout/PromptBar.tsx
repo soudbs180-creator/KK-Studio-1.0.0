@@ -107,6 +107,7 @@ const ReferenceThumbnail = React.memo(({
     const [data, setData] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [imageLoadError, setImageLoadError] = useState(false);
     const onRecoveredRef = useRef(onRecovered);
 
     useEffect(() => {
@@ -114,6 +115,7 @@ const ReferenceThumbnail = React.memo(({
     }, [onRecovered]);
 
     useEffect(() => {
+        setImageLoadError(false);
         // 🚀 [Fix] If parent provided data and it's NOT a blob URL, use it directly
         // Blob URLs can expire after page refresh, so we should always try to recover from IDB
         if (image.data && !image.data.startsWith('blob:')) {
@@ -184,10 +186,10 @@ const ReferenceThumbnail = React.memo(({
         return () => { active = false; };
     }, [image.data, image.url, image.storageId, image.id, image.mimeType]);
 
-    if (error) {
+    if (error || imageLoadError) {
         return (
-            <div className="w-12 h-12 rounded-lg border border-red-500/30 bg-red-500/10 flex items-center justify-center flex-col gap-0.5" title="图片加载失败">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 opacity-70">
+            <div className="w-12 h-12 rounded-lg border border-[var(--border-light)] bg-black/60 flex items-center justify-center" title="图片加载失败">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/80">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
                     <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -227,6 +229,7 @@ const ReferenceThumbnail = React.memo(({
                 src={src}
                 className="w-full h-full object-cover"
                 alt="参考图"
+                onError={() => setImageLoadError(true)}
             />
         </div>
     );

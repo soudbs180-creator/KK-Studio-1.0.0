@@ -70,7 +70,7 @@ export function buildPromptGroupRenderLayout({
     ? node
     : { ...node, position: promptConnectorPosition };
   const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping || Boolean(promptGroupLayoutState);
-  const connectorCanvasPadding = 128;
+  const connectorCanvasPadding = 1024; // 简体中文：从 128 提升到 1024，给大范围拖拽留出足够的绘制缓冲区，解决连线在边缘消失的问题
 
   const childVisualLayouts = groupView.childImages.map((childNode) => {
     const livePosition = resolveLiveImagePosition(childNode) ?? childNode.position;

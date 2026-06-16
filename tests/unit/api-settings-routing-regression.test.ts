@@ -71,7 +71,7 @@ test('ApiSettingsView list mode delegates calmer workbench overview copy to dedi
   const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(source, /<ApiWorkbenchOverviewSection/);
+  assert.doesNotMatch(source, /<ApiWorkbenchOverviewSection/);
   assert.match(source, /<ApiWorkbenchCurrentViewSection/);
   assert.match(sectionSource, /title=\{pick\('API 运行概览', 'API Operations Overview'\)\}/);
   assert.match(sectionSource, /title=\{pick\('当前视图', 'Current view'\)\}/);

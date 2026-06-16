@@ -81,8 +81,23 @@ export function getImageNodePositionFromDom(id: string): Point | null {
   return x && y ? { x: parseFloat(x), y: parseFloat(y) } : null;
 }
 
-// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性，零 React Diff
-export function updateConnectorDom(promptId: string, imageId: string) {
+// 简体中文：用来记录需要在下一帧更新的连线
+const pendingConnectorUpdates = new Set<string>();
+let isConnectorUpdateScheduled = false;
+
+function flushConnectorUpdates() {
+  isConnectorUpdateScheduled = false;
+
+  pendingConnectorUpdates.forEach((key) => {
+    const parts = key.split(':');
+    if (parts.length === 2) {
+      performUpdateConnectorDom(parts[0], parts[1]);
+    }
+  });
+  pendingConnectorUpdates.clear();
+}
+
+function performUpdateConnectorDom(promptId: string, imageId: string) {
   const pathEl = document.getElementById(`connector-${promptId}-${imageId}`) as SVGPathElement | null;
   if (!pathEl) return;
 
@@ -107,5 +122,14 @@ export function updateConnectorDom(promptId: string, imageId: string) {
       );
       pathEl.setAttribute('d', newPath);
     }
+  }
+}
+
+// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性，使用 requestAnimationFrame 进行防抖与微任务合并
+export function updateConnectorDom(promptId: string, imageId: string) {
+  pendingConnectorUpdates.add(`${promptId}:${imageId}`);
+  if (!isConnectorUpdateScheduled) {
+    isConnectorUpdateScheduled = true;
+    requestAnimationFrame(flushConnectorUpdates);
   }
 }

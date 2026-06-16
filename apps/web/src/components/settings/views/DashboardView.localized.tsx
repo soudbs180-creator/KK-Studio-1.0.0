@@ -942,14 +942,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-chart__empty span {
-          border: 1px solid rgb(var(--settings-accent-rgb) / 0.15);
+          border: 1px solid rgb(var(--settings-accent-rgb) / 0.18);
           border-radius: 999px;
-          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.85));
+          background: rgba(15, 20, 35, 0.92);
           color: var(--text-secondary);
           font-size: var(--type-micro);
-          padding: 4px 10px;
-          backdrop-filter: blur(8px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          padding: 5px 12px;
+          backdrop-filter: blur(12px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
         }
 
         .dashboard-chart-bars {
@@ -1154,11 +1154,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           border: 1px solid rgb(var(--dashboard-tone-rgb) / 0.20);
-          border-radius: 16px;
+          border-radius: 12px;
           background: rgb(var(--dashboard-tone-rgb) / 0.07);
-          padding: 8px 10px;
+          padding: 4px 8px;
         }
 
         .dashboard-flow-step[data-tone="emerald"] { --dashboard-tone-rgb: 16 185 129; }
@@ -1168,11 +1168,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-flow-step__icon {
           display: inline-flex;
-          width: 32px;
-          height: 32px;
+          width: 24px;
+          height: 24px;
           align-items: center;
           justify-content: center;
-          border-radius: 12px;
+          border-radius: 8px;
           background: rgb(var(--dashboard-tone-rgb) / 0.14);
           color: rgb(var(--dashboard-tone-rgb));
         }
@@ -1675,21 +1675,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             />
             <div className="dashboard-flow-map" aria-label={pick('浏览器助手流程图', 'Browser assistant flow diagram')}>
               <FlowStep
-                icon={<Monitor size={16} />}
+                icon={<Monitor size={12} />}
                 label={pick('本地守护进程', 'Local daemon')}
                 helper={pick('负责 WSS 控制与本地浏览器桥接', 'WSS control and local bridge')}
                 value={pick('检测', 'Check')}
                 tone="indigo"
               />
               <FlowStep
-                icon={<Layers size={16} />}
+                icon={<Layers size={12} />}
                 label={pick('Chrome 插件', 'Chrome extension')}
                 helper={pick('承接页面读取、截图与上下文采集', 'Page reading, screenshots, context capture')}
                 value={pick('连接', 'Link')}
                 tone="amber"
               />
               <FlowStep
-                icon={<Sparkles size={16} />}
+                icon={<Sparkles size={12} />}
                 label={pick('网页抓取/生图素材', 'Extraction and generation assets')}
                 helper={pick('价格、商品图、提示词素材流入工作流', 'Price, images, and prompts enter the workflow')}
                 value={pick('自动化', 'Automate')}

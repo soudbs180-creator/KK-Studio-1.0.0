@@ -44,7 +44,7 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(routeConfigSource, /export function renderSettingsRouteElements/);
   assert.doesNotMatch(shellSource, /settings-toolbar-search/);
   assert.doesNotMatch(shellSource, /System Active/);
-  assert.match(sidebarSource, /items\.filter\(\(item\) => item\.section === section\.id\)/);
+  assert.match(sidebarSource, /filteredNavItems\.filter\(\(item\) => item\.section === section\.id\)/);
   assert.match(sidebarSource, /item\.description/);
   assert.match(sidebarSource, /section\.label/);
   assert.doesNotMatch(headerSource, /SettingsBadge/);
@@ -74,6 +74,17 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
   assert.doesNotMatch(headerSource, /languageControl/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
+});
+
+test('desktop settings sidebar keeps navigation search visible and renders filtered entries', () => {
+  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+
+  assert.match(shellSource, /items=\{filteredItems\}/);
+  assert.doesNotMatch(shellSource, /items=\{items\}/);
+  assert.doesNotMatch(sidebarSource, /style=\{\{\s*display: 'none'\s*\}\}/);
+  assert.match(sidebarSource, /const filteredNavItems = useMemo\(\(\) => \{\s*return items;\s*\}, \[items\]\);/);
+  assert.match(sidebarSource, /const sectionItems = filteredNavItems\.filter\(\(item\) => item\.section === section\.id\);/);
 });
 
 test('settings workbench flattens cramped nested containers and clips rounded surfaces cleanly', () => {

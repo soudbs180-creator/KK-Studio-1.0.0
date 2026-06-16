@@ -36,7 +36,7 @@ test('default local API cards use the model center list and keep advanced metric
   const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(source, /modelCenterRoutes[\s\S]*officialSlots\.map\(\(slot\)/);
-  assert.match(source, /<ApiWorkbenchOverviewSection/);
+  assert.doesNotMatch(source, /<ApiWorkbenchOverviewSection/);
   assert.match(source, /<ApiWorkbenchRoutePoolSection/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metrics \{/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metric-value \{[\s\S]*font-variant-numeric: tabular-nums;/);

@@ -22,7 +22,7 @@ test('ApiSettingsView defaults to a simple list mode and gates workbench section
   assert.match(viewSource, /const handleToggleDiagnostics = \(\) => \{/);
   assert.match(viewSource, /if \(!showDiagnostics\) \{\s*setShowAdvancedDetails\(true\);/);
   assert.match(viewSource, /onToggleDiagnostics=\{handleToggleDiagnostics\}/);
-  assert.match(viewSource, /<ApiWorkbenchOverviewSection/);
+  assert.doesNotMatch(viewSource, /<ApiWorkbenchOverviewSection/);
   assert.match(viewSource, /<ApiWorkbenchRoutePoolSection/);
   assert.match(viewSource, /<ApiWorkbenchCapabilitySection/);
   assert.match(viewSource, /showAdvancedDetails \? \(/);

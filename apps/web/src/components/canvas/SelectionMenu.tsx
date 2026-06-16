@@ -1,34 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Trash2, Group, Tag, FolderOutput, LayoutGrid, Rows, Columns, GripHorizontal } from 'lucide-react';
+import { Trash2, Group, Tag, FolderOutput, LayoutGrid, Rows, Columns, GripHorizontal, Heart } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import { type ArrangeMode} from '../../context/CanvasContext';
 
 interface SelectionMenuProps {
     position: { x: number; y: number };
     selectedCount: number;
-    groupCount?: number;
-    imageCount?: number;
-    videoCount?: number;
+    cardGroupCount?: number;
+    isolatedPromptCount?: number;
+    isolatedResultCount?: number;
     onDelete: () => void;
     onGroup: () => void;
     onTag: () => void;
     onMigrate?: () => void;
     onArrange?: (mode: ArrangeMode) => void;
     canArrange?: boolean; // 简体中文注释：标识当前是否可整理排列
+    onFavorite?: () => void;
+    isAllFavorite?: boolean;
 }
 
 export const SelectionMenu: React.FC<SelectionMenuProps> = ({
     position,
     selectedCount,
-    groupCount = 0,
-    imageCount = 0,
-    videoCount = 0,
+    cardGroupCount = 0,
+    isolatedPromptCount = 0,
+    isolatedResultCount = 0,
     onDelete,
     onGroup,
     onTag,
     onMigrate,
     onArrange,
-    canArrange = true
+    canArrange = true,
+    onFavorite,
+    isAllFavorite = false
 }) => {
     const [showArrangeMenu, setShowArrangeMenu] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -71,9 +75,9 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
 
     const getSelectionLabel = () => {
         const parts: string[] = [];
-        if (groupCount > 0) parts.push(`${groupCount} 个组`);
-        if (imageCount > 0) parts.push(`${imageCount} 张图片`);
-        if (videoCount > 0) parts.push(`${videoCount} 个视频`);
+        if (cardGroupCount > 0) parts.push(`${cardGroupCount} 个卡组`);
+        if (isolatedPromptCount > 0) parts.push(`${isolatedPromptCount} 个提示词`);
+        if (isolatedResultCount > 0) parts.push(`${isolatedResultCount} 个结果`);
         return parts.length > 0 ? parts.join(' + ') : `${selectedCount} 个项目`;
     };
 
@@ -100,6 +104,12 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
             <button onClick={onTag} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="teal" title="添加标签 (Tag)">
                 <Tag size={18} />
             </button>
+
+            {onFavorite && (
+                <button onClick={onFavorite} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="pink" title={isAllFavorite ? "取消收藏 (Unfavorite)" : "添加收藏 (Favorite)"}>
+                    <Heart size={18} fill={isAllFavorite ? 'currentColor' : 'none'} style={{ color: isAllFavorite ? 'var(--accent-coral)' : undefined }} />
+                </button>
+            )}
 
             {onMigrate && (
                 <button onClick={onMigrate} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="ochre" title="迁移到其他项目 (Migrate)">

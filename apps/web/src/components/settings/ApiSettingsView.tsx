@@ -127,7 +127,6 @@ import {
   ApiWorkbenchDiagnosticsSection,
   ApiWorkbenchModelCenterSection,
   ApiWorkbenchOcrSection,
-  ApiWorkbenchOverviewSection,
   ApiWorkbenchPlatformSection,
   ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,
@@ -1387,14 +1386,34 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const isOfficialEditorRoute = Boolean(routeOfficialId);
   const isProviderEditorRoute = Boolean(routeProviderId);
   const activeEditorMode: TabType | null = isOfficialEditorRoute ? 'official' : isProviderEditorRoute ? 'third-party' : null;
+
+  useEffect(() => {
+    const shellPage = document.querySelector('.settings-shell-page--desktop') as HTMLElement;
+    if (shellPage) {
+      if (activeEditorMode === null) {
+        shellPage.style.overflowY = 'hidden';
+        shellPage.style.display = 'flex';
+        shellPage.style.flexDirection = 'column';
+      } else {
+        shellPage.style.overflowY = '';
+        shellPage.style.display = '';
+        shellPage.style.flexDirection = '';
+      }
+    }
+    return () => {
+      if (shellPage) {
+        shellPage.style.overflowY = '';
+        shellPage.style.display = '';
+        shellPage.style.flexDirection = '';
+      }
+    };
+  }, [activeEditorMode]);
+
   const isCreatingOfficial = routeOfficialId === ROUTE_NEW_ITEM;
   const isCreatingProvider = routeProviderId === ROUTE_NEW_ITEM;
   const providerRouteMissing = isProviderEditorRoute && !isCreatingProvider && !selectedProvider && !initialSupplier;
   const officialRouteMissing = isOfficialEditorRoute && !isCreatingOfficial && !selectedOfficialSlot;
   const activeProviders = thirdPartyProviders.filter((item) => item.isActive).length;
-  const budgetCount =
-    officialSlots.filter((slot) => getMode(slot.budgetLimit, slot.tokenLimit) !== 'unlimited').length +
-    thirdPartyProviders.filter((provider) => getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited') !== 'unlimited').length;
   const connectedChannels = officialSlots.filter((slot) => !slot.disabled).length + activeProviders;
   const userApiPersistenceWarning = useMemo(() => {
     if (!apiHealth) {
@@ -3520,6 +3539,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       title: preset.name,
       kindLabel: preset.kind === 'relay' ? pick('中转目录', 'Relay') : pick('供应商预设', 'Provider'),
       protocolLabel: getProtocolLabel(preset.format),
+      baseUrl: preset.baseUrl,
       baseUrlLabel: extractDomain(preset.baseUrl),
       recommendedModel: preset.modelId || pick('保存后同步', 'Sync after save'),
       accentColor: preset.color,
@@ -3816,37 +3836,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     );
   }
 
-  // 运行报告状态卡片需要的计算参数
-  const workbenchTone = isUserApiPersistenceDegraded ? 'rose' : connectedChannels > 0 ? 'emerald' : 'neutral';
-  const workbenchStatusLabel = isUserApiPersistenceDegraded
-    ? pick('本地 API 内存模式', 'Local API memory mode')
-    : connectedChannels > 0
-      ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
-      : pick('尚未接入链路', 'No routes connected yet');
-
   return (
-    <SettingsViewShell>
+    <SettingsViewShell className={activeEditorMode === null ? "h-full overflow-hidden flex flex-col min-h-0 pb-0" : ""}>
       {activeEditorMode === null ? (
         <>
-          {/* API 运行概览现在是公共的最上面卡片 */}
-          <div className="w-full mb-4">
-            <ApiWorkbenchOverviewSection
-              testId="settings-workbench-overview"
-              pick={pick}
-              workbenchStatusLabel={workbenchStatusLabel}
-              workbenchTone={workbenchTone}
-              userApiPersistenceWarning={userApiPersistenceWarning || null}
-              isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
-              snapshotHydrationHelper={snapshotHydrationHelper}
-              attentionCount={thirdPartyProviders.filter((provider) => provider.status === 'error' || !provider.isActive).length}
-              connectedChannels={connectedChannels}
-              officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
-              activeProviders={activeProviders}
-              budgetCount={0}
-              activeTab="official"
-            />
-          </div>
-
           <ApiWorkbenchModelCenterSection
             pick={pick}
             routes={modelCenterRoutes}
@@ -4310,7 +4303,6 @@ export default ApiSettingsView;
 // onClick={handleCreateOfficialAction}
 // {renderAdvancedPanels()}
 // if (!showAdvancedWorkbench) return null;
-// <ApiWorkbenchOverviewSection
 // onPrimaryAction={handleStagePrimaryAction}
 // <ApiWorkbenchCurrentViewSection
 // <ApiWorkbenchStageSection

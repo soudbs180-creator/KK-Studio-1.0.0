@@ -443,8 +443,8 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
-        <script type="module" src="/src/__create/dev-error-overlay.js"></script>
-        <link rel="icon" href="/src/__create/favicon.png" />
+        {import.meta.env.DEV ? <script type="module" src="/src/__create/dev-error-overlay.js"></script> : null}
+        <link rel="icon" type="image/png" href="/logo.png" />
         {LoadFontsSSR ? <LoadFontsSSR /> : null}
       </head>
       <body>
@@ -452,8 +452,6 @@ export function Layout({ children }: { children: ReactNode }) {
         <Toaster position={isMobile ? 'top-center' : 'bottom-right'} />
         <ScrollRestoration />
         <Scripts />
-        <link rel="preconnect" href="https://ka-p.fontawesome.com" crossOrigin="anonymous" />
-        <link rel="stylesheet" href="https://ka-p.fontawesome.com/releases/v6.3.0/css/pro.min.css?token=2c15cc0cc7" crossOrigin="anonymous" />
       </body>
     </html>
   );

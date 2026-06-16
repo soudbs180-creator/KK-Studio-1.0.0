@@ -2503,7 +2503,8 @@
   background: var(--settings-border-subtle);
 }
 
-.settings-panel .settings-sidebar-card {
+.settings-panel .settings-sidebar-card,
+.settings-panel .settings-account-card {
   --settings-sidebar-card-accent: var(--settings-state-info-text);
   --settings-sidebar-card-accent-bg: var(--settings-state-info-bg);
   --settings-sidebar-card-accent-border: var(--settings-state-info-border);
@@ -2515,10 +2516,10 @@
   --settings-sidebar-card-active-shadow: 0 12px 28px color-mix(in srgb, var(--settings-sidebar-card-accent) 16%, transparent);
   position: relative;
   display: flex;
-  height: 76px;
+  height: 80px;
   min-width: 0;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: center;
   padding: 12px 14px;
   text-align: left;
   cursor: pointer;
@@ -2538,43 +2539,75 @@
 }
 
 .settings-panel .settings-sidebar-card[data-accent="overview"] {
-  --settings-sidebar-card-accent: var(--settings-state-info-text);
-  --settings-sidebar-card-accent-bg: var(--settings-state-info-bg);
-  --settings-sidebar-card-accent-border: var(--settings-state-info-border);
+  --settings-sidebar-card-accent: rgb(249, 115, 22);
+  --settings-sidebar-card-accent-bg: rgba(249, 115, 22, 0.08);
+  --settings-sidebar-card-accent-border: rgba(249, 115, 22, 0.22);
 }
 
 .settings-panel .settings-sidebar-card[data-accent="billing"] {
-  --settings-sidebar-card-accent: var(--settings-state-warning-text);
-  --settings-sidebar-card-accent-bg: var(--settings-state-warning-bg);
-  --settings-sidebar-card-accent-border: var(--settings-state-warning-border);
+  --settings-sidebar-card-accent: rgb(234, 179, 8);
+  --settings-sidebar-card-accent-bg: rgba(234, 179, 8, 0.08);
+  --settings-sidebar-card-accent-border: rgba(234, 179, 8, 0.22);
 }
 
 .settings-panel .settings-sidebar-card[data-accent="api"] {
-  --settings-sidebar-card-accent: var(--settings-state-info-text);
-  --settings-sidebar-card-accent-bg: var(--settings-state-info-bg);
-  --settings-sidebar-card-accent-border: var(--settings-state-info-border);
+  --settings-sidebar-card-accent: rgb(16, 185, 129);
+  --settings-sidebar-card-accent-bg: rgba(16, 185, 129, 0.08);
+  --settings-sidebar-card-accent-border: rgba(16, 185, 129, 0.22);
+}
+
+.settings-panel .settings-sidebar-card[data-accent="ai-management"] {
+  --settings-sidebar-card-accent: rgb(59, 130, 246);
+  --settings-sidebar-card-accent-bg: rgba(59, 130, 246, 0.08);
+  --settings-sidebar-card-accent-border: rgba(59, 130, 246, 0.22);
 }
 
 .settings-panel .settings-sidebar-card[data-accent="storage"] {
-  --settings-sidebar-card-accent: var(--settings-state-success-text);
-  --settings-sidebar-card-accent-bg: var(--settings-state-success-bg);
-  --settings-sidebar-card-accent-border: var(--settings-state-success-border);
+  --settings-sidebar-card-accent: rgb(168, 85, 247);
+  --settings-sidebar-card-accent-bg: rgba(168, 85, 247, 0.08);
+  --settings-sidebar-card-accent-border: rgba(168, 85, 247, 0.22);
 }
 
 .settings-panel .settings-sidebar-card[data-accent="logs"] {
-  --settings-sidebar-card-accent: var(--settings-focus-border);
-  --settings-sidebar-card-accent-bg: var(--settings-state-info-bg);
-  --settings-sidebar-card-accent-border: var(--settings-state-info-border);
+  --settings-sidebar-card-accent: rgb(239, 68, 68);
+  --settings-sidebar-card-accent-bg: rgba(239, 68, 68, 0.08);
+  --settings-sidebar-card-accent-border: rgba(239, 68, 68, 0.22);
 }
 
-.settings-panel .settings-sidebar-card:hover {
+.settings-panel .settings-sidebar-card[data-accent="browser-assistant"] {
+  --settings-sidebar-card-accent: rgb(6, 182, 212);
+  --settings-sidebar-card-accent-bg: rgba(6, 182, 212, 0.08);
+  --settings-sidebar-card-accent-border: rgba(6, 182, 212, 0.22);
+}
+
+.settings-panel .settings-sidebar-card[data-accent="appearance"] {
+  --settings-sidebar-card-accent: rgb(148, 163, 184);
+  --settings-sidebar-card-accent-bg: rgba(148, 163, 184, 0.08);
+  --settings-sidebar-card-accent-border: rgba(148, 163, 184, 0.20);
+}
+
+.settings-panel .settings-account-card[data-accent="profile"] {
+  --settings-sidebar-card-accent: rgb(217, 119, 6);
+  --settings-sidebar-card-accent-bg: rgba(217, 119, 6, 0.08);
+  --settings-sidebar-card-accent-border: rgba(217, 119, 6, 0.22);
+}
+
+.settings-panel .settings-sidebar-card:hover,
+.settings-panel .settings-account-card:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--settings-sidebar-card-accent-border) 72%, var(--settings-border-subtle));
   background: color-mix(in srgb, var(--settings-sidebar-card-accent-bg) 28%, var(--settings-surface-overlay));
 }
 
 .settings-panel .settings-sidebar-card[data-state="active"] {
-  padding-left: 26px;
+  padding-left: 14px;
+  border-color: var(--settings-sidebar-card-accent-border);
+  background: var(--settings-sidebar-card-active-bg);
+  box-shadow: var(--settings-sidebar-card-active-shadow);
+}
+
+.settings-panel .settings-account-card[data-state="active"] {
+  padding-left: 14px;
   border-color: var(--settings-sidebar-card-accent-border);
   background: var(--settings-sidebar-card-active-bg);
   box-shadow: var(--settings-sidebar-card-active-shadow);
@@ -2582,7 +2615,7 @@
 
 .settings-panel .settings-sidebar-card__active-rail {
   position: absolute;
-  left: 8px;
+  left: 4px;
   top: 50%;
   z-index: 1;
   width: 4px;
@@ -2595,12 +2628,12 @@
 
 .settings-panel .card-avatar-icon {
   display: flex;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--settings-border-subtle);
-  border-radius: var(--radius-control-sm);
+  border-radius: 10px;
   background: var(--settings-surface-overlay);
   color: var(--text-primary);
   transition:
@@ -2616,7 +2649,6 @@
   border-color: var(--settings-sidebar-card-accent-border);
   background: var(--settings-sidebar-card-accent-bg);
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--settings-sidebar-card-accent) 32%, transparent));
-  transform: scale(0.96);
 }
 
 .settings-panel .settings-sidebar-card__active-chevron {
@@ -2628,9 +2660,14 @@
   height: 14px;
   align-items: center;
   justify-content: center;
+  color: var(--settings-nav-text-tertiary);
+  opacity: 0.6;
+  transition: color var(--motion-duration-standard) ease, opacity var(--motion-duration-standard) ease;
+}
+
+.settings-panel .settings-sidebar-card[data-state="active"] .settings-sidebar-card__active-chevron {
   color: var(--settings-sidebar-card-accent);
-  opacity: 0.82;
-  animation: settings-sidebar-chevron-nudge 1.4s var(--motion-ease-standard) infinite;
+  opacity: 0.85;
 }
 
 .settings-panel .settings-sidebar-card__balance {
@@ -5014,5 +5051,77 @@ body.light-mode :where(
   .settings-panel :where(.settings-reference-card, .settings-section-card, .settings-system-card, .settings-provider-card, .settings-sidebar-card, .settings-system-control-menu, .settings-system-control-menu-option) {
     transition: none !important;
     transform: none !important;
+  }
+}
+
+/* ----------------------------------------------------
+   API 供应商管理布局：左右独立滚动，整页禁止滚动
+   ---------------------------------------------------- */
+.settings-panel [data-testid="settings-model-center"] {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.settings-panel [data-testid="settings-model-center"] > .settings-section-card {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.settings-panel [data-testid="settings-model-center"] > .settings-section-card > div:last-child {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: hidden !important; /* 隐藏容器外滚动条，确保只在左右列子容器中自滚动 */
+}
+
+.settings-panel .settings-model-center-layout {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-rows: 100% !important;
+}
+
+/* 电脑端下限制左右两栏的高度并独立滚动 */
+@media (min-width: 1024px) {
+  .settings-panel .settings-model-center-layout {
+    grid-template-columns: minmax(0, 620px) minmax(270px, 1fr) !important;
+    gap: 28px !important;
+  }
+
+  .settings-panel .settings-model-center-pool,
+  .settings-panel .settings-model-center-directory {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* 左边供应商卡片池独立滚动 */
+  .settings-panel .settings-model-center-toolbar {
+    flex-shrink: 0 !important;
+  }
+
+  .settings-panel .settings-model-center-route-grid,
+  .settings-panel .settings-model-center-empty {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-right: 4px;
+  }
+
+  /* 右边预设供应商目录独立滚动 */
+  .settings-panel .settings-model-center-directory__header,
+  .settings-panel .settings-model-center-directory__tabs {
+    flex-shrink: 0 !important;
+  }
+
+  .settings-panel .settings-model-center-preset-list {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-right: 4px;
   }
 }

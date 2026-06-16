@@ -5012,6 +5012,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   const selectionMenuOverlay = useSelectionMenuOverlay({
     activeCanvas,
+    canvasTransform,
     selectedNodeIds,
     selectionMenuPosition,
     isMobile,

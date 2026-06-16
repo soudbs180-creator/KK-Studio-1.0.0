@@ -3,6 +3,90 @@
 **Last Updated:** 2026-06-16
 **Version:** KK Studio v1.5.6
 
+## 2026-06-16 - Code Review Issue Fixes
+
+### Code Review Fixes Scope
+- Fixed review findings in the current uncommitted web changes.
+- Restored desktop settings navigation search filtering and added a source contract regression test.
+- Removed the unused `@lobehub/ui` dependency from the web workspace to stay aligned with the current UI boundary policy.
+- Loaded favorites before selection-menu favorite state checks and removed a dead local collection.
+- Cleaned `canvasLivePositionStore.ts` whitespace reported by `git diff --check`.
+- Removed the stale API workbench overview render/comment path and kept model-center list mode aligned with the current API settings tests.
+- Aligned workspace package ownership for React/UI runtime dependencies after the new UI resource dependency governance test surfaced the boundary requirement.
+
+### Code Review Fixes Files Touched
+- `apps/web/src/components/settings/SettingsPanel.localized.tsx`
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `apps/web/src/components/settings/ApiSettingsView.tsx`
+- `apps/web/src/components/settings/ApiAdvancedSettingsView.tsx`
+- `apps/web/src/components/settings/apiWorkbenchSections.tsx`
+- `apps/web/src/app/useSelectionMenuOverlay.ts`
+- `apps/web/src/app/canvasLivePositionStore.ts`
+- `package.json`
+- `apps/web/package.json`
+- `package-lock.json`
+- `packages/ui/package.json`
+- `packages/ui/tsconfig.json`
+- `tests/unit/settings-desktop-workbench-regression.test.ts`
+- `docs/development/session-handoff.md`
+
+### Code Review Fixes Design Decisions
+- Keep the settings search UI visible and let the parent shell own the query filtering, while the sidebar groups the already-filtered items by section.
+- Do not keep unused heavy UI dependencies for future work; reintroduce a dependency only with a concrete source usage and updated governance.
+- Use the favorites store's loaded state and latest `getState()` snapshot for the selection menu so first-run favorite toggles do not act on an empty stale list.
+- Keep API settings default mode on the model-center provider list and move advanced/legacy overview details out of the default source path.
+- Keep app-owned React dependencies out of the root workspace while declaring local workspace packages explicitly in `apps/web`.
+
+### Code Review Fixes Verification Run
+- `git diff --check`: Passed with CRLF normalization warnings only.
+- Targeted regressions passed:
+  - `tests/unit/settings-desktop-workbench-regression.test.ts`
+  - `tests/unit/ui-resource-dependency-governance.test.ts`
+  - `tests/unit/api-settings-provider-compact-ui-contract.test.ts`
+  - `tests/unit/api-settings-routing-regression.test.ts`
+  - `tests/unit/api-settings-simple-mode-contract.test.ts`
+  - `tests/unit/api-settings-workbench-structure.test.ts`
+- `npm run architecture:check`: Passed. Non-fatal existing UI token literal warnings remain.
+- `npm run governance:check`: Passed.
+- `npm run typecheck`: Passed.
+- `npm run check:encoding`: Passed.
+- `npm run build`: Passed.
+- `npm run test`: Passed.
+- `npm run verify:changes`: Passed. Mobile settings smoke used its fallback contract path after `settings-workbench-overview` was not visible, and the script exited successfully.
+- `npm ls @lobehub/ui antd --all`: Output was empty as expected. `npm ls` returned exit code 1 because the queried packages are not installed.
+
+### Code Review Fixes Risks / Next
+- No blocking issue remains from this review pass.
+- Follow-up cleanup can tokenize the long-standing hardcoded UI color literals reported by `architecture:check`.
+
+## 2026-06-16 - Reference Image Loss Display Pass
+
+### Reference Image Loss Display 修改范围
+- 优化了卡片上的参考图组件 `ReferenceThumbnail`（`PromptNodeComponent.tsx`）在找不到图片或图片加载失败时的显示效果。
+- 增加了 `hasError` 状态变量并为图片标签添加 `onError` 监听以检测渲染失败的情况。
+- 重新设计了丢失态的降级 UI：引入 `lucide-react` 的 `AlertCircle` 警告图标，并采用半透明黑色蒙层（`bg-black/60`）配合深灰色背景，展现出类似图二中圆圈感叹号的视觉效果，确保图片丢失时优雅显示且带有“Ref”标签。
+- 同样优化了输入栏参考图缩略图组件 `ReferenceThumbnail`（`PromptBar.tsx`），为其添加 `imageLoadError` 捕获并将错误占位符统一为圆圈感叹号加半透明黑色背景的样式。
+
+### Reference Image Loss Display 修改文件
+- [PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)
+- [PromptBar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/PromptBar.tsx)
+- [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+
+### Reference Image Loss Display 当前设计决策
+- 当参考图在本地读取时，通常因连接在本地所以丢失概率较低。如果确实因 expired blob 或其他问题导致加载失败，则需要有降级 UI。
+- 降级 UI 设计为：在变暗的半透明黑色遮罩之上居中显示白色的 `AlertCircle`（圆圈感叹号）。
+- 依然保留卡片上 `Ref` 标签在最上层展示，使用户容易辨识是哪一张参考图发生了丢失。
+
+### Reference Image Loss Display 已运行验证
+- `npm run typecheck`：通过，没有报错。
+- `npm run build`：成功构建，无任何编译错误。
+
+### Reference Image Loss Display 未运行验证及原因
+- 暂未在真实浏览器界面上手工上传损坏的图片以进行交互式视觉走查（因宿主环境本地访问策略限制）。已通过编译、TS 类型检查和语法静态校验确保了安全性。
+
+### Reference Image Loss Display 风险与下一步
+- 目前已经完成了对提示词卡片上参考图以及 Prompt 输入条中参考图的防丢失及加载错误占位图优化，无新增风险。
+
 ## 2026-06-16 - Mobile Settings Topbar and Position Optimization
 
 ### Mobile Topbar Scope
@@ -1721,3 +1805,75 @@ Mobile workspace: `apps/mobile/`
 ### Visual Smoke Risks / Next
 - The visual smoke commands still emit existing local API/admin-model 502 console noise when no local API is running; the smoke route mocks keep the tested flows green, but log noise can still distract future debugging.
 - The workspace had pre-existing unrelated edits before this pass; this pass did not revert or reorganize them.
+
+## 2026-06-16 - UI Resource and Dependency Governance
+
+### UI Resource / Dependency Scope
+- Normalized UI asset ownership for KK Studio v1.5.6:
+  - `apps/web/public` remains the URL-addressed runtime asset surface.
+  - `apps/web/src/assets` keeps imported bundled UI assets only.
+  - `packages/ui` remains code/tokens/components only, with no binary business assets.
+- Replaced production favicon ownership from `/src/__create/favicon.png` to `/logo.png` and gated the dev-only error overlay script behind `import.meta.env.DEV`.
+- Removed the FontAwesome CDN stylesheet with an embedded token from the Web root document.
+- Switched recharge payment icons to existing SVG assets and removed duplicate PNG payment icons plus unused legacy avatar/Gemini/logo assets.
+- Removed Web-local package locks (`apps/web/package-lock.json`, `apps/web/bun.lock`) and ignored them so the root npm lockfile stays the only Web dependency source of truth.
+- Moved browser runtime dependencies into `apps/web/package.json`, kept root dependencies to root scripts/tooling (`jszip`, `pg`) plus CI/build dev tools, and kept `server/` package ownership separate.
+- Added explicit workspace dependencies for `@kk/ui`, `@kk/shared`, and `@nano-banana/api-client`.
+- Made `@kk/ui` independently typecheckable with React peer/dev dependencies, DOM/JSX compiler options, and a no-emit build.
+- Updated `packages/api-client` query/client/type dependencies to the current compatible line.
+- Rebuilt the root `package-lock.json` from a clean root lock state after removing stale hidden npm lock data that preserved workspace-local `@types/node@20.x` entries.
+
+### UI Resource / Dependency Files Touched
+- `.gitignore`
+- `package.json`
+- `package-lock.json`
+- `apps/web/package.json`
+- `apps/web/src/app/root.tsx`
+- `apps/web/src/components/modals/RechargeModal.tsx`
+- Removed `apps/web/package-lock.json`
+- Removed `apps/web/bun.lock`
+- Removed unused assets:
+  - `apps/web/src/assets/payment/alipay.png`
+  - `apps/web/src/assets/payment/card.png`
+  - `apps/web/src/assets/payment/wechat.png`
+  - `apps/web/src/assets/avatars/preset-male-1.svg`
+  - `apps/web/src/assets/avatars/preset-male-2.svg`
+  - `apps/web/src/assets/avatars/preset-male-3.svg`
+  - `apps/web/src/assets/avatars/preset-female-1.svg`
+  - `apps/web/src/assets/avatars/preset-female-2.svg`
+  - `apps/web/src/assets/avatars/preset-female-3.svg`
+  - `apps/web/src/assets/icons/google-gemini.svg`
+  - `apps/web/src/assets/logo.png`
+- `packages/api-client/package.json`
+- `packages/ui/package.json`
+- `packages/ui/tsconfig.json`
+- `tests/unit/ui-resource-dependency-governance.test.ts`
+- `docs/development/session-handoff.md`
+
+### UI Resource / Dependency Design Decisions
+- Root `npm@11.12.1` lockfile is the only Web workspace lock. Mobile/server lockfiles stay separate because they are not root npm workspaces.
+- Root `build` now runs `npm run build -w packages/ui` before `packages/api-client` and the Web Vite build, so UI package compiler drift is caught in the normal build path.
+- `@types/node` is pinned to the Node 24 line (`^24.13.2`) to match the root `engines.node = 24.x`; the generated dependency tree was verified clean with `npm ls --depth=0 --workspaces --include-workspace-root`.
+- Web keeps Tailwind 3.4.19 for the app stylesheet/runtime while root/tooling uses Tailwind 4.3.1 and `@tailwindcss/postcss` 4.3.1. This avoids a Tailwind 4 application migration inside a dependency-governance pass.
+- Chakra stays on the latest v2-compatible line (`^2.10.10`) because the project exposes it through `apps/web/src/client-integrations/chakra-ui.jsx`; jumping to Chakra v3 would be an API migration, not a safe dependency hygiene update.
+- `vitest` remains in root devDependencies because root `tsc --noEmit` resolves `apps/web/*vitest.config.ts`, so the root toolchain must provide `vitest/config`.
+
+### UI Resource / Dependency Verification Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ui-resource-dependency-governance.test.ts`: passed, 3 tests.
+- `npm install`: passed, regenerated the root dependency state with 0 vulnerabilities.
+- `npm run build -w packages/ui`: passed.
+- `npm run architecture:check`: passed; the UI token checker still prints existing hardcoded color suggestions as non-blocking output.
+- `npm run governance:check`: passed.
+- `npm run typecheck`: passed, including server syntax check for 47 files and semantic test check for 436 test files.
+- `npm run build`: passed, including `packages/ui`, `packages/api-client`, and the Web Vite production build.
+- `npm audit --omit=dev --audit-level=moderate`: passed with 0 vulnerabilities.
+- `npm ls --depth=0 --workspaces --include-workspace-root`: passed with no invalid or extraneous dependencies after hidden npm lock cleanup.
+- `npm run verify:changes`: passed after the clean lockfile regeneration. It covered architecture, governance, audit, typecheck, spec, build, unit/integration/contract/e2e tests, prompt-group drag smoke, mobile settings smoke, desktop settings smoke, startup banner centering, and encoding/mojibake checks.
+
+### UI Resource / Dependency Not Run
+- No separate server/mobile install or build commands were run. This pass intentionally targeted the root npm workspace, Web UI resources, `packages/ui`, and `packages/api-client`; `server/` and `apps/mobile/` keep their own package locks.
+
+### UI Resource / Dependency Risks / Next
+- `verify:mobile-settings-smoke` currently exits 0 through its existing fallback contract path because Playwright times out waiting for `settings-workbench-overview`; desktop settings smoke and startup banner smoke run in browser mode. This was not caused by the dependency tree after the clean lockfile pass, but it is still a useful future smoke-script follow-up.
+- The architecture check still reports existing hardcoded color literal suggestions from the UI token checker without failing. This pass did not broaden into token migration.
+- The working tree already contained unrelated settings/canvas edits before this pass. This pass did not revert or reorganize those changes.

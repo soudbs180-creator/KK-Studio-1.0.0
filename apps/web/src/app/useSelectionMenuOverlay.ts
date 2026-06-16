@@ -1,10 +1,12 @@
 import React from 'react';
 
-import { GenerationMode, type AspectRatio, type Canvas, type CanvasGroup } from '../types';
+import { type AspectRatio, type Canvas, type CanvasGroup } from '../types';
 import type { ArrangeMode } from '../context/CanvasContext';
 import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import type { SelectionMenuOverlay } from './AppCanvasOverlays';
+import { useFavoritesStore } from '../features/favorites';
+import { notify } from '../services/system/notificationService';
 
 interface SelectionMenuPosition {
   x: number;
@@ -18,6 +20,7 @@ interface SelectionCardDimensions {
 
 interface UseSelectionMenuOverlayArgs {
   activeCanvas: Canvas | null | undefined;
+  canvasTransform: { x: number; y: number; scale: number };
   selectedNodeIds: string[];
   selectionMenuPosition: SelectionMenuPosition | null;
   isMobile: boolean;
@@ -37,6 +40,7 @@ interface UseSelectionMenuOverlayArgs {
 
 export function useSelectionMenuOverlay({
   activeCanvas,
+  canvasTransform,
   selectedNodeIds,
   selectionMenuPosition,
   isMobile,
@@ -53,6 +57,21 @@ export function useSelectionMenuOverlay({
   onTag,
   onOpenMigrate,
 }: UseSelectionMenuOverlayArgs): SelectionMenuOverlay | null {
+  const favoriteItems = useFavoritesStore((state) => state.items);
+  const favoritesLoaded = useFavoritesStore((state) => state.loaded);
+  const loadFavorites = useFavoritesStore((state) => state.load);
+  const addImageFavorite = useFavoritesStore((state) => state.addImageFavorite);
+  const addPromptFavorite = useFavoritesStore((state) => state.addPromptFavorite);
+  const removeFavorite = useFavoritesStore((state) => state.removeFavorite);
+
+  React.useEffect(() => {
+    if (!selectionMenuPosition || selectedNodeIds.length === 0 || favoritesLoaded) {
+      return;
+    }
+
+    void loadFavorites();
+  }, [favoritesLoaded, loadFavorites, selectionMenuPosition, selectedNodeIds.length]);
+
   const handleDeleteSelectionMenuNodes = React.useCallback(() => {
     if (!activeCanvas) {
       return;
@@ -183,6 +202,154 @@ export function useSelectionMenuOverlay({
     closeSelectionMenu();
   }, [arrangeAllNodes, closeSelectionMenu]);
 
+  const handleFavoriteSelectionMenuNodes = React.useCallback(async () => {
+    if (!activeCanvas) return;
+    if (!useFavoritesStore.getState().loaded) {
+      await useFavoritesStore.getState().load();
+    }
+
+    const currentFavoriteItems = useFavoritesStore.getState().items;
+    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
+    const images = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
+
+    // 计算哪些已被收藏
+    const itemsToRemoveFavoriteIds: string[] = [];
+
+    prompts.forEach(p => {
+      const fav = currentFavoriteItems.find(item => (
+        item.kind === 'favorite-prompt'
+        && (
+          item.sourcePromptId === p.id
+          || item.prompt.trim() === p.prompt.trim()
+        )
+      ));
+      if (fav) {
+        itemsToRemoveFavoriteIds.push(fav.id);
+      }
+    });
+
+    images.forEach(img => {
+      const fav = currentFavoriteItems.find(item => (
+        item.kind === 'favorite-image'
+        && (
+          item.sourceImageId === img.id
+          || (!!img.storageId && item.storageId === img.storageId)
+          || (!!img.originalUrl && item.originalUrl === img.originalUrl)
+          || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
+          || (!!img.url && item.url === img.url)
+        )
+      ));
+      if (fav) {
+        itemsToRemoveFavoriteIds.push(fav.id);
+      }
+    });
+
+    const isAllFav = (prompts.length + images.length) > 0 && (itemsToRemoveFavoriteIds.length === prompts.length + images.length);
+
+    try {
+      if (isAllFav) {
+        // 全部取消收藏
+        for (const favId of itemsToRemoveFavoriteIds) {
+          await removeFavorite(favId);
+        }
+        notify.success('取消收藏成功', '已取消收藏选中节点');
+      } else {
+        // 收藏未收藏的
+        for (const p of prompts) {
+          const fav = currentFavoriteItems.find(item => (
+            item.kind === 'favorite-prompt'
+            && (
+              item.sourcePromptId === p.id
+              || item.prompt.trim() === p.prompt.trim()
+            )
+          ));
+          if (!fav) {
+            await addPromptFavorite(p);
+          }
+        }
+        for (const img of images) {
+          const fav = currentFavoriteItems.find(item => (
+            item.kind === 'favorite-image'
+            && (
+              item.sourceImageId === img.id
+              || (!!img.storageId && item.storageId === img.storageId)
+              || (!!img.originalUrl && item.originalUrl === img.originalUrl)
+              || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
+              || (!!img.url && item.url === img.url)
+            )
+          ));
+          if (!fav) {
+            await addImageFavorite(img);
+          }
+        }
+        notify.success('收藏成功', '已将选中节点添加至收藏');
+      }
+    } catch (e) {
+      console.error('[useSelectionMenuOverlay] 收藏操作失败:', e);
+      notify.error('操作失败', '无法更新节点收藏状态');
+    }
+  }, [activeCanvas, selectedNodeIds, addPromptFavorite, addImageFavorite, removeFavorite]);
+
+  const dynamicPosition = React.useMemo(() => {
+    if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let hasNodes = false;
+
+    activeCanvas.promptNodes
+      .filter((node) => selectedNodeIds.includes(node.id))
+      .forEach((node) => {
+        const width = getPromptNodeBoundsWidth(node, isMobile);
+        const height = node.height || 200;
+        minX = Math.min(minX, node.position.x - width / 2);
+        maxX = Math.max(maxX, node.position.x + width / 2);
+        minY = Math.min(minY, node.position.y - height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
+    activeCanvas.imageNodes
+      .filter((node) => selectedNodeIds.includes(node.id))
+      .forEach((node) => {
+        const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
+        minX = Math.min(minX, node.position.x - width / 2);
+        maxX = Math.max(maxX, node.position.x + width / 2);
+        minY = Math.min(minY, node.position.y - totalHeight);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
+    const workflowNodes = activeCanvas.workflow?.nodes || [];
+    workflowNodes
+      .filter((node) => selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind))
+      .forEach((node) => {
+        const width = node.width || 284;
+        const height = node.height || 176;
+        minX = Math.min(minX, node.position.x - width / 2);
+        maxX = Math.max(maxX, node.position.x + width / 2);
+        minY = Math.min(minY, node.position.y - height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
+    if (!hasNodes) {
+      return selectionMenuPosition;
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const topY = minY;
+
+    return {
+      x: centerX * canvasTransform.scale + canvasTransform.x,
+      y: topY * canvasTransform.scale + canvasTransform.y,
+    };
+  }, [selectionMenuPosition, selectedNodeIds, activeCanvas, canvasTransform, isMobile, getCardDimensions]);
+
   return React.useMemo(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
       return null;
@@ -190,11 +357,41 @@ export function useSelectionMenuOverlay({
 
     const selectedPrompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
     const selectedImages = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
-    const videoCount = selectedImages.filter((imageNode) => (
-      imageNode.mode === GenerationMode.VIDEO
-      || imageNode.url?.includes('.mp4')
-      || imageNode.url?.startsWith('data:video')
-    )).length;
+
+    // 计算卡组、提示词和结果数量
+    const groupPrompts = selectedPrompts.filter(p => selectedImages.some(img => img.parentPromptId === p.id));
+    const cardGroupCount = groupPrompts.length;
+
+    const isolatedPrompts = selectedPrompts.filter(p => !selectedImages.some(img => img.parentPromptId === p.id));
+    const isolatedPromptCount = isolatedPrompts.length;
+
+    const isolatedImages = selectedImages.filter(img => !img.parentPromptId || !selectedPrompts.some(p => p.id === img.parentPromptId));
+    const isolatedResultCount = isolatedImages.length;
+
+    // 计算是否全部已收藏
+    const promptFavCount = selectedPrompts.filter(p => {
+      return favoriteItems.some(item => (
+        item.kind === 'favorite-prompt'
+        && (
+          item.sourcePromptId === p.id
+          || item.prompt.trim() === p.prompt.trim()
+        )
+      ));
+    }).length;
+    const imageFavCount = selectedImages.filter(img => {
+      return favoriteItems.some(item => (
+        item.kind === 'favorite-image'
+        && (
+          item.sourceImageId === img.id
+          || (!!img.storageId && item.storageId === img.storageId)
+          || (!!img.originalUrl && item.originalUrl === img.originalUrl)
+          || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
+          || (!!img.url && item.url === img.url)
+        )
+      ));
+    }).length;
+    const totalSelected = selectedPrompts.length + selectedImages.length;
+    const isAllFavorite = totalSelected > 0 && (promptFavCount + imageFavCount === totalSelected);
 
     // 简体中文注释：计算当前选区是否允许整理排列
     const canArrange = (() => {
@@ -229,26 +426,31 @@ export function useSelectionMenuOverlay({
     })();
 
     return {
-      position: selectionMenuPosition,
+      position: dynamicPosition || selectionMenuPosition,
       selectedCount: selectedNodeIds.length,
-      groupCount: selectedPrompts.length,
-      imageCount: selectedImages.length - videoCount,
-      videoCount,
+      cardGroupCount,
+      isolatedPromptCount,
+      isolatedResultCount,
       onDelete: handleDeleteSelectionMenuNodes,
       onGroup: handleGroupSelectionMenuNodes,
       onTag,
       onMigrate: handleSelectionMenuMigrate,
       onArrange: handleSelectionMenuArrange,
       canArrange,
+      onFavorite: handleFavoriteSelectionMenuNodes,
+      isAllFavorite,
     } satisfies SelectionMenuOverlay;
   }, [
     selectionMenuPosition,
+    dynamicPosition,
     selectedNodeIds,
     activeCanvas,
+    favoriteItems,
     handleDeleteSelectionMenuNodes,
     handleGroupSelectionMenuNodes,
     onTag,
     handleSelectionMenuMigrate,
     handleSelectionMenuArrange,
+    handleFavoriteSelectionMenuNodes,
   ]);
 }

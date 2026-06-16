@@ -1476,6 +1476,9 @@
 .kk-canvas-selection-menu-item {
   min-width: var(--kk-touch-target-min);
   min-height: var(--kk-touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .kk-canvas-selection-menu-item:hover,

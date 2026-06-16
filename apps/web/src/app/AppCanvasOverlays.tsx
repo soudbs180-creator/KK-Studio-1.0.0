@@ -7,15 +7,17 @@ import type { SelectionBoxState } from './appCanvasTypes';
 export type SelectionMenuOverlay = {
   position: { x: number; y: number };
   selectedCount: number;
-  groupCount: number;
-  imageCount: number;
-  videoCount: number;
+  cardGroupCount: number;
+  isolatedPromptCount: number;
+  isolatedResultCount: number;
   onDelete: () => void;
   onGroup: () => void;
   onTag: () => void;
   onMigrate?: () => void;
   onArrange?: (mode: ArrangeMode) => void;
   canArrange?: boolean; // 简体中文注释：标识当前选择卡片是否符合排列整理的条件
+  onFavorite?: () => void;
+  isAllFavorite?: boolean;
 };
 
 interface AppCanvasOverlaysProps {
@@ -44,15 +46,17 @@ const AppCanvasOverlays: React.FC<AppCanvasOverlaysProps> = ({
       <SelectionMenu
         position={selectionMenu.position}
         selectedCount={selectionMenu.selectedCount}
-        groupCount={selectionMenu.groupCount}
-        imageCount={selectionMenu.imageCount}
-        videoCount={selectionMenu.videoCount}
+        cardGroupCount={selectionMenu.cardGroupCount}
+        isolatedPromptCount={selectionMenu.isolatedPromptCount}
+        isolatedResultCount={selectionMenu.isolatedResultCount}
         onDelete={selectionMenu.onDelete}
         onGroup={selectionMenu.onGroup}
         onTag={selectionMenu.onTag}
         onMigrate={selectionMenu.onMigrate}
         onArrange={selectionMenu.onArrange}
         canArrange={selectionMenu.canArrange}
+        onFavorite={selectionMenu.onFavorite}
+        isAllFavorite={selectionMenu.isAllFavorite}
       />
     )}
   </>
