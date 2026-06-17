@@ -76,11 +76,6 @@ export function usePromptGroupDragHandlers({
       return;
     }
 
-    if (shouldRegroup) {
-      applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta);
-      return;
-    }
-
     applyLiveNodeDeltaToDraggedSet(sourceNodeId, groupNodeIds, delta);
   }, [
     applyLiveNodeDeltaToDraggedSet,

@@ -1336,6 +1336,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         }
     }, [sidebarWidth, onWidthChange]);
 
+    // 简体中文：AI接管模式与侧边栏宽度联动，当开启接管模式时锁定 380px，普通对话时恢复 420px，保证小地图与大画布的自适应避让距离无缝对齐
+    useEffect(() => {
+        if (aiTakeoverMode) {
+            setSidebarWidth(380);
+        } else {
+            const saved = localStorage.getItem('kk_chat_width');
+            setSidebarWidth(saved ? Math.max(320, parseInt(saved, 10)) : 420);
+        }
+    }, [aiTakeoverMode]);
+
 
     // 4. Drag State (must be declared before scheduleAutoClose uses it)
     const [isDragging, setIsDragging] = useState(false);

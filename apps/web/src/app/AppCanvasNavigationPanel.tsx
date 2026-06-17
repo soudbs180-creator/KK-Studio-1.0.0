@@ -41,19 +41,20 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   // 小地图的固定物理尺寸
   const miniWidth = 200;
-  const miniHeight = 120;
-  const padding = 150; // 包围盒的外边距 padding，防止内容顶格
+  const miniHeight = 90; // 简体中文：优化高度，使之更矮平精致
 
-  // 1. 获取所有可见卡片的绝对位置 (使用可选链 ?. 避免在 activeCanvas 缺失时 Crash)
-  const promptNodes = activeCanvas?.promptNodes || [];
-  const imageNodes = activeCanvas?.imageNodes || [];
+  if (isMobile || !activeCanvas) return null;
+
+  const scale = canvasTransform.scale || 1;
+
+  // 1. 获取所有可见卡片的绝对位置
+  const promptNodes = activeCanvas.promptNodes || [];
+  const imageNodes = activeCanvas.imageNodes || [];
 
   const visibleNodes = [
     ...promptNodes.filter((n: any) => !n.hiddenInCanvas),
     ...imageNodes,
   ];
-
-  const scale = canvasTransform.scale || 1;
 
   // 2. 确定大画布容器的实际尺寸，若无法获取则回退默认值
   const canvasRect = canvasRef.current?.getCanvasRect();
@@ -71,7 +72,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const viewportMaxX = (safeContainerWidth - canvasTransform.x) / safeScale;
   const viewportMaxY = (safeContainerHeight - canvasTransform.y) / safeScale;
 
-  // 监听大画布变化，当没有处于手动编辑（待确认）状态时同步目标中心点和缩放比
+  // 监听大画布变化，当没有处于手动编辑（待确认）状态时同步目标中心点 and 缩放比
   useEffect(() => {
     if (!isEdited) {
       const realCenterX = viewportMinX + (viewportMaxX - viewportMinX) / 2;
@@ -87,37 +88,25 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const currentTargetScale = isEdited ? targetScale : scale;
   const displayZoomPercent = Math.round(currentTargetScale * 100);
 
-  // 4. 汇总所有元素（卡片 + 视口）计算总的真实坐标包围盒
-  let minX = isNaN(viewportMinX) ? 0 : viewportMinX;
-  let maxX = isNaN(viewportMaxX) ? 100 : viewportMaxX;
-  let minY = isNaN(viewportMinY) ? 0 : viewportMinY;
-  let maxY = isNaN(viewportMaxY) ? 100 : viewportMaxY;
+  // 4. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘 3.0，保持聚焦框适中尺寸
+  const viewportW = isNaN(viewportMaxX - viewportMinX) ? 800 : (viewportMaxX - viewportMinX);
+  const viewportH = isNaN(viewportMaxY - viewportMinY) ? 600 : (viewportMaxY - viewportMinY);
+  
+  const currentCenterX = viewportMinX + viewportW / 2;
+  const currentCenterY = viewportMinY + viewportH / 2;
 
-  visibleNodes.forEach((node: any) => {
-    const isImage = node.url || node.storageId;
-    const w = isImage ? 380 : 500;
-    const h = isImage ? 380 : 300;
+  const totalWidth = viewportW * 3;
+  const totalHeight = viewportH * 3;
 
-    minX = Math.min(minX, node.position.x);
-    maxX = Math.max(maxX, node.position.x + w);
-    minY = Math.min(minY, node.position.y);
-    maxY = Math.max(maxY, node.position.y + h);
-  });
+  const minX = currentCenterX - totalWidth / 2;
+  const maxX = currentCenterX + totalWidth / 2;
+  const minY = currentCenterY - totalHeight / 2;
+  const maxY = currentCenterY + totalHeight / 2;
 
-  // 加上 padding，让视口边缘有呼吸感
-  minX -= padding;
-  maxX += padding;
-  minY -= padding;
-  maxY += padding;
-
-  const totalWidth = maxX - minX;
-  const totalHeight = maxY - minY;
-
-  // 防止缩放计算除以零
   const safeTotalWidth = totalWidth <= 0 || isNaN(totalWidth) ? 1 : totalWidth;
   const safeTotalHeight = totalHeight <= 0 || isNaN(totalHeight) ? 1 : totalHeight;
 
-  // 5. 计算等比例缩放至小地图 (200x120) 的比例因子
+  // 5. 计算等比例缩放至小地图 (200x90) 的比例因子
   const scaleMiniX = miniWidth / safeTotalWidth;
   const scaleMiniY = miniHeight / safeTotalHeight;
   let scaleMini = Math.min(scaleMiniX, scaleMiniY);
@@ -269,7 +258,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   return (
     <div
-      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-2 rounded-2xl border p-2.5 select-none transition-all duration-300 ease-in-out"
+      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border py-1.5 px-2 select-none transition-all duration-300 ease-in-out"
       style={{
         width: '224px',
         boxShadow: 'var(--frost-card-framework-shadow)',
@@ -279,12 +268,12 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
       }}
     >
-      {/* 简体中文：常驻横向缩放及折叠控制栏（控制栏始终置于最顶端，简洁高级） */}
-      <div className="flex items-center justify-between gap-1.5 px-0.5">
-        {/* 折叠切换按钮 */}
+      {/* 简体中文：常驻极窄高度横向缩放及折叠控制栏（与顶栏头像按钮高度 32px 保持视觉一致） */}
+      <div className="flex items-center justify-between gap-1.5 px-0.5 h-7">
+        {/* 折叠切换按钮 (自定义 28px 精致圆角微标) */}
         <button
           onClick={toggleCollapsed}
-          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
+          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
           title={isCollapsed ? "展开小地图" : "收起小地图"}
         >
           {isCollapsed ? (
@@ -297,7 +286,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 缩小按钮 */}
         <button
           onClick={handleZoomOut}
-          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
+          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
           title="缩小"
         >
           <Minus size={13} />
@@ -322,7 +311,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 放大按钮 */}
         <button
           onClick={handleZoomIn}
-          className="kk-workspace-icon-control rounded-lg active:scale-90 outline-none cursor-pointer"
+          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
           title="放大"
         >
           <Plus size={13} />
@@ -341,7 +330,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
       {/* 简体中文：小地图 SVG 画面层 — 展开状态下在下方打开 */}
       {!isCollapsed && (
-        <div className="flex flex-col gap-2 transition-all">
+        <div className="flex flex-col gap-1.5 transition-all">
           <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.01)]">
             <svg
               ref={svgRef}
@@ -359,30 +348,42 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               </defs>
               <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
 
-              {/* 渲染所有卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
-              {visibleNodes.map((node: any) => {
-                const isImage = node.url || node.storageId;
-                const w = isImage ? 380 : 500;
-                const h = isImage ? 380 : 300;
+              {/* 渲染视口范围内的卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
+              {visibleNodes
+                .filter((node: any) => {
+                  const isImage = node.url || node.storageId;
+                  const w = isImage ? 380 : 500;
+                  const h = isImage ? 380 : 300;
+                  return (
+                    node.position.x + w >= minX &&
+                    node.position.x <= maxX &&
+                    node.position.y + h >= minY &&
+                    node.position.y <= maxY
+                  );
+                })
+                .map((node: any) => {
+                  const isImage = node.url || node.storageId;
+                  const w = isImage ? 380 : 500;
+                  const h = isImage ? 380 : 300;
 
-                const pos = mapToMini(node.position.x, node.position.y);
-                const rw = w * scaleMini;
-                const rh = h * scaleMini;
+                  const pos = mapToMini(node.position.x, node.position.y);
+                  const rw = w * scaleMini;
+                  const rh = h * scaleMini;
 
-                return (
-                  <rect
-                    key={node.id}
-                    x={pos.x}
-                    y={pos.y}
-                    width={Math.max(2, rw)}
-                    height={Math.max(2, rh)}
-                    rx={Math.max(1, scaleMini * 24)}
-                    fill="rgba(156, 163, 175, 0.15)"
-                    stroke="rgba(156, 163, 175, 0.25)"
-                    strokeWidth="0.5"
-                  />
-                );
-              })}
+                  return (
+                    <rect
+                      key={node.id}
+                      x={pos.x}
+                      y={pos.y}
+                      width={Math.max(2, rw)}
+                      height={Math.max(2, rh)}
+                      rx={Math.max(1, scaleMini * 24)}
+                      fill="rgba(156, 163, 175, 0.15)"
+                      stroke="rgba(156, 163, 175, 0.25)"
+                      strokeWidth="0.5"
+                    />
+                  );
+                })}
 
               {/* 渲染当前大画布的实际位置框（仅在待确认编辑状态下显示，灰色虚线框表示） */}
               {isEdited && (
@@ -417,24 +418,32 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             </svg>
           </div>
 
-          {/* 确认与重置按钮栏，仅在拟定位变更后优雅展现 */}
-          {isEdited && (
-            <div className="flex gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-              <button
-                onClick={handleConfirmLocation}
-                className="flex-1 bg-[var(--accent-coral)] text-white text-[11px] font-bold py-1.5 rounded-lg text-center hover:opacity-90 active:scale-95 cursor-pointer outline-none transition-all shadow-sm"
-              >
-                确认定位
-              </button>
-              <button
-                onClick={handleCancelLocation}
-                className="px-2.5 bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] text-[11px] font-medium py-1.5 rounded-lg text-center hover:opacity-90 active:scale-95 cursor-pointer outline-none transition-all"
-                title="取消更改，回到当前位置"
-              >
-                重置
-              </button>
-            </div>
-          )}
+          {/* 确认与重置按钮栏，展开状态下始终常驻，由 disabled 状态平滑过渡 */}
+          <div className="flex gap-1.5 mt-0.5">
+            <button
+              disabled={!isEdited}
+              onClick={handleConfirmLocation}
+              className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg text-center outline-none transition-all shadow-sm ${
+                isEdited
+                  ? 'bg-[var(--accent-coral)] text-white hover:opacity-90 active:scale-95 cursor-pointer'
+                  : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
+              }`}
+            >
+              确认定位
+            </button>
+            <button
+              disabled={!isEdited}
+              onClick={handleCancelLocation}
+              className={`px-2.5 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
+                isEdited
+                  ? 'bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] hover:opacity-90 active:scale-95 cursor-pointer'
+                  : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
+              }`}
+              title="取消更改，回到当前位置"
+            >
+              重置
+            </button>
+          </div>
         </div>
       )}
     </div>

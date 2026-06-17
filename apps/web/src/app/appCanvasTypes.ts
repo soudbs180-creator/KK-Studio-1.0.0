@@ -38,6 +38,7 @@ export type PromptGroupLayoutPresentationState = {
   startedAt: number;
   settleUntil: number | null;
   targetSlotIndicesByChildId: Record<string, number>;
+  regroupStartPositionsByChildId?: Record<string, Point>;
 };
 
 export type PromptGroupRegroupLayout = {

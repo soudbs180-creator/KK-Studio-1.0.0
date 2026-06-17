@@ -362,7 +362,9 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         : Math.min(1, (layoutState.regroupProgress - fastPhaseRatio) / (1 - fastPhaseRatio));
 
     const liveStartPositions = childImages.map((imageNode) => (
-      liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
+      layoutState.regroupStartPositionsByChildId?.[imageNode.id] ??
+      liveNodePositionByIdRef.current[imageNode.id] ??
+      imageNode.position
     ));
     const layouts = buildDockedPromptChildRegroupLayout({
       basePosition: promptPosition,
@@ -824,6 +826,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       const regroupStartPositions = childImages.map((imageNode) => (
         liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
       ));
+      const regroupStartPositionsByChildId = childImages.reduce<Record<string, Point>>((acc, imageNode, index) => {
+        acc[imageNode.id] = regroupStartPositions[index] ?? imageNode.position;
+        return acc;
+      }, {});
       const targetSlotIndices = hasStableTargetSlots
         ? childImages.map((imageNode) => existing!.targetSlotIndicesByChildId[imageNode.id])
         : resolveRegroupTargetSlotIndices(
@@ -857,6 +863,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
           startedAt: existing?.startedAt ?? now,
           settleUntil: null,
           targetSlotIndicesByChildId,
+          regroupStartPositionsByChildId,
         },
       };
     });
@@ -1029,10 +1036,43 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         };
         hasLivePositionChanged = true;
       }
+
+      const isPromptNode = currentPromptNodesById.has(nodeId);
+      if (isPromptNode) {
+        const childImages = actualChildImagesByPromptId.get(nodeId) || [];
+        const layoutState = promptGroupLayoutStateByIdRef.current[nodeId];
+        if (childImages.length > 0 && layoutState && (layoutState.layoutMode === 'regrouping' || layoutState.layoutMode === 'docked')) {
+          const layouts = buildPromptGroupRegroupLayouts(
+            currentPromptNodesById.get(nodeId)!,
+            childImages,
+            position,
+            layoutState
+          );
+
+          const companionIds: string[] = [];
+
+          layouts.forEach((layout, childImageId) => {
+            const childPrev = nextLivePositions[childImageId];
+            const childNext = layout.renderPosition;
+            if (!childPrev || childPrev.x !== childNext.x || childPrev.y !== childNext.y) {
+              if (nextLivePositions === liveNodePositionByIdRef.current) {
+                nextLivePositions = { ...nextLivePositions };
+              }
+              nextLivePositions[childImageId] = childNext;
+              hasLivePositionChanged = true;
+            }
+            companionIds.push(childImageId);
+          });
+
+          liveDerivedNodeIdsByOwnerRef.current = {
+            ...liveDerivedNodeIdsByOwnerRef.current,
+            [nodeId]: companionIds,
+          };
+        }
+      }
     }
 
     if (!position && hasLivePositionChanged) {
-      // Flush the last queued drag delta before clearing the live snapshot.
       moveSelectedNodesImmediate({ x: 0, y: 0 });
     }
 
@@ -1040,6 +1080,17 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       liveNodePositionByIdRef.current = nextLivePositions;
       if (position) {
         canvasLivePositionStore.setPosition(nodeId, position);
+
+        const isPromptNode = currentPromptNodesById.has(nodeId);
+        if (isPromptNode) {
+          const childImages = actualChildImagesByPromptId.get(nodeId) || [];
+          childImages.forEach((childImage) => {
+            const pos = nextLivePositions[childImage.id];
+            if (pos) {
+              canvasLivePositionStore.setPosition(childImage.id, pos);
+            }
+          });
+        }
       } else {
         canvasLivePositionStore.setPosition(nodeId, null);
         syncLiveNodePositionState();
