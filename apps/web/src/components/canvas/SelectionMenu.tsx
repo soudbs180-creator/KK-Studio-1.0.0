@@ -41,6 +41,10 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
     const initialOffsetRef = useRef({ x: 0, y: 0 });
 
     useEffect(() => {
+        setDragOffset({ x: 0, y: 0 });
+    }, [position.x, position.y]);
+
+    useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (!isDraggingRef.current) return;
             const dx = e.clientX - dragStartRef.current.x;

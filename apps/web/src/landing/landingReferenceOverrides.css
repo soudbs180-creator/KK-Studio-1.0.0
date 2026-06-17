@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap'); */
 
 /* 简体中文：参考 New Genre 风格的高端最终一致性覆盖层 */
 
@@ -1093,13 +1093,17 @@ body.auth-screen-active #root {
 }
 
 .auth-page.auth-page--landing .auth-modal-content .auth-panel {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  backdrop-filter: blur(28px) saturate(1.25) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(1.25) !important;
-  box-shadow: 0 24px 70px rgba(12, 20, 40, 0.16) !important;
+  position: relative !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(36px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(1.4) !important;
+  box-shadow: 
+    0 4px 12px rgba(12, 20, 40, 0.03),
+    0 24px 70px rgba(12, 20, 40, 0.16) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
+  border-radius: 28px !important;
 }
 
 .auth-page.auth-page--landing .kk-auth-modal-header {
@@ -1283,4 +1287,174 @@ body.auth-screen-active #root {
 .kk-thought-row:hover {
   transform: translateY(-4px) !important;
   border-bottom-color: rgba(15, 29, 58, 0.28) !important;
+}
+
+/* ==========================================
+   11. 社交登录胶囊横排按钮组 (Social pill row)
+   ========================================== */
+.auth-social-row {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: 14px !important;
+  width: 100% !important;
+}
+
+.auth-social-btn {
+  flex: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 38px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(15, 29, 58, 0.1) !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+  color: #0f1d3a !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.auth-social-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(15, 29, 58, 0.22) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(15, 29, 58, 0.05) !important;
+}
+
+.auth-social-btn:active:not(:disabled) {
+  transform: translateY(0) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+.auth-social-icon {
+  flex-shrink: 0 !important;
+}
+
+/* ==========================================
+   12. 页脚极简水平连接排版 (Footer links)
+   ========================================== */
+.auth-footer-links {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  font-size: 13px !important;
+}
+
+.auth-footer-sep {
+  color: rgba(15, 29, 58, 0.18) !important;
+  font-size: 12px !important;
+  user-select: none !important;
+}
+
+/* ==========================================
+   13. 绝对定位人机验证磨砂玻璃浮层 (Popup Captcha Overlay)
+   ========================================== */
+.auth-captcha-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 200 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 28px !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(1.35) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.35) !important;
+  border-radius: 28px !important;
+  animation: auth-captcha-zoom 0.35s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+@keyframes auth-captcha-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.auth-captcha-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 300px !important;
+}
+
+.auth-captcha-icon {
+  color: #ff6b5a !important;
+  margin-bottom: 12px !important;
+  animation: auth-pulse 2s infinite ease-in-out !important;
+}
+
+@keyframes auth-pulse {
+  0% { transform: scale(0.95); opacity: 0.85; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.85; }
+}
+
+.auth-captcha-title {
+  color: #0f1d3a !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  margin: 0 0 6px 0 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.auth-captcha-desc {
+  color: rgba(15, 29, 58, 0.68) !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  margin: 0 0 20px 0 !important;
+}
+
+.auth-captcha-cancel {
+  margin-top: 18px !important;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(15, 29, 58, 0.52) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  text-decoration: underline !important;
+  transition: color 0.16s ease !important;
+}
+
+.auth-captcha-cancel:hover {
+  color: #ff6b5a !important;
+}
+
+/* ==========================================
+   14. 主登录确认按钮渐变及动效重构 (Main button styling)
+   ========================================== */
+.auth-page--landing .auth-btn-main {
+  background: linear-gradient(135deg, #1e40af, #0f1d3a) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  min-height: 44px !important;
+  box-shadow: 
+    0 4px 12px rgba(15, 29, 90, 0.12),
+    0 12px 30px rgba(15, 29, 90, 0.08) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.auth-page--landing .auth-btn-main:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #111827) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 
+    0 6px 16px rgba(15, 29, 90, 0.18),
+    0 16px 40px rgba(15, 29, 90, 0.12) !important;
+}
+
+.auth-page--landing .auth-btn-main:active:not(:disabled) {
+  transform: translateY(0) !important;
 }

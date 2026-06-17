@@ -112,7 +112,16 @@ function performUpdateConnectorDom(promptId: string, imageId: string) {
       const svgLeft = leftAttr ? parseFloat(leftAttr) : 0;
       const svgTop = topAttr ? parseFloat(topAttr) : 0;
       
-      const imageCardHeight = Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0);
+      // 🚀 简体中文：优化获取副卡卡片高度的逻辑，优先从子图像卡片自身的 DOM 元素上读取 data-card-height 或 offsetHeight
+      const imageCardEl = document.getElementById(`image-card-${imageId}`);
+      let imageCardHeight = 0;
+      if (imageCardEl) {
+        const hAttr = imageCardEl.getAttribute('data-card-height');
+        imageCardHeight = hAttr ? Number(hAttr) : imageCardEl.offsetHeight;
+      }
+      if (!imageCardHeight) {
+        imageCardHeight = Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0);
+      }
 
       const newPath = buildDockedVerticalConnectorPath(
         promptPos.x - svgLeft,
@@ -125,8 +134,13 @@ function performUpdateConnectorDom(promptId: string, imageId: string) {
   }
 }
 
-// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性，使用 requestAnimationFrame 进行防抖与微任务合并
-export function updateConnectorDom(promptId: string, imageId: string) {
+// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性。在拖拽的高频场景下，同步执行更新可以消除一帧的延迟，大幅提升跟手性。
+export function updateConnectorDom(promptId: string, imageId: string, sync = true) {
+  if (sync) {
+    performUpdateConnectorDom(promptId, imageId);
+    return;
+  }
+
   pendingConnectorUpdates.add(`${promptId}:${imageId}`);
   if (!isConnectorUpdateScheduled) {
     isConnectorUpdateScheduled = true;

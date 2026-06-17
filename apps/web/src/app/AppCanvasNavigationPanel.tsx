@@ -44,18 +44,16 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const miniHeight = 120;
   const padding = 150; // 包围盒的外边距 padding，防止内容顶格
 
-  if (isMobile || !activeCanvas) return null;
-
-  const scale = canvasTransform.scale || 1;
-
-  // 1. 获取所有可见卡片的绝对位置
-  const promptNodes = activeCanvas.promptNodes || [];
-  const imageNodes = activeCanvas.imageNodes || [];
+  // 1. 获取所有可见卡片的绝对位置 (使用可选链 ?. 避免在 activeCanvas 缺失时 Crash)
+  const promptNodes = activeCanvas?.promptNodes || [];
+  const imageNodes = activeCanvas?.imageNodes || [];
 
   const visibleNodes = [
     ...promptNodes.filter((n: any) => !n.hiddenInCanvas),
     ...imageNodes,
   ];
+
+  const scale = canvasTransform.scale || 1;
 
   // 2. 确定大画布容器的实际尺寸，若无法获取则回退默认值
   const canvasRect = canvasRef.current?.getCanvasRect();
@@ -194,6 +192,9 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // ⚠️ Rules of Hooks: 必须在所有 Hook 声明完毕后进行条件性提前返回
+  if (isMobile || !activeCanvas) return null;
 
   // 9. 计算视口框在小地图中 of 绘制参数
   // 9.1 当前实际大画布位置（虚线框）

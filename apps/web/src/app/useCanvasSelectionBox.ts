@@ -2,6 +2,7 @@ import React from 'react';
 
 import type { AspectRatio, Canvas } from '../types';
 import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
+import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import type { Point, SelectionBoxState } from './appCanvasTypes';
 
 interface CanvasTransformState {
@@ -209,11 +210,12 @@ export function useCanvasSelectionBox({
 
       activeCanvas?.promptNodes.forEach((node) => {
         const nodeWidth = getPromptNodeBoundsWidth(node, isMobile);
+        const nodeHeight = node.height || 200;
         const nodeRect = {
           x: node.position.x - nodeWidth / 2,
-          y: node.position.y - 140,
+          y: node.position.y - nodeHeight,
           width: nodeWidth,
-          height: 140,
+          height: nodeHeight,
         };
 
         if (intersectsRect(nodeRect, canvasSelectionRect)) {
@@ -223,6 +225,22 @@ export function useCanvasSelectionBox({
 
       activeCanvas?.imageNodes.forEach((node) => {
         const { width: nodeWidth, totalHeight: nodeHeight } = getCardDimensions(node.aspectRatio, true);
+        const nodeRect = {
+          x: node.position.x - nodeWidth / 2,
+          y: node.position.y - nodeHeight,
+          width: nodeWidth,
+          height: nodeHeight,
+        };
+
+        if (intersectsRect(nodeRect, canvasSelectionRect)) {
+          ids.push(node.id);
+        }
+      });
+
+      (activeCanvas?.workflow?.nodes || []).forEach((node) => {
+        if (!isWorkflowUtilityNodeKind(node.kind)) return;
+        const nodeWidth = node.width || 284;
+        const nodeHeight = node.height || 176;
         const nodeRect = {
           x: node.position.x - nodeWidth / 2,
           y: node.position.y - nodeHeight,

@@ -5382,7 +5382,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       {/* 简体中文：左下角悬浮缩放卡片 - 竖直摆放，极致纤细宽度 (w-10)，不要和侧边工具栏宽度一致，版本号在其下方另外渲染为精致的独立毛玻璃卡片 */}
       {!isMobile && (
         <div 
-          className="desktop-navigation-panel fixed top-4 z-[100] pointer-events-auto select-none"
+          className="desktop-navigation-panel fixed top-4 z-[650] pointer-events-auto select-none"
           style={{
             right: isChatOpen
               ? `${chatSidebarWidth + 32}px`

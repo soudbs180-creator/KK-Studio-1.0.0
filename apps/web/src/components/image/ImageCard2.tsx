@@ -1325,6 +1325,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
+                data-card-height={cardHeight}
                 style={{
                     position: 'absolute',
                     left: `${snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX}px`,
@@ -1363,6 +1364,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 id={`image-card-${image.id}`}
                 data-x={image.position.x}
                 data-y={image.position.y}
+                data-card-height={cardHeight}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
@@ -1495,6 +1497,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 id={`image-card-${image.id}`}
                 data-x={image.position.x}
                 data-y={image.position.y}
+                data-card-height={cardHeight}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
