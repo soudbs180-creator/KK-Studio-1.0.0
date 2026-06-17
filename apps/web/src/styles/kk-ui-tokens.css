@@ -30,7 +30,7 @@
   --kk-touch-target-min: 44px;
   --kk-control-height-desktop: 40px;
   --kk-control-height-mobile: 48px;
-  --kk-ui-glass-opacity: 0.76;
+  --kk-ui-glass-opacity: 0.68;
   --kk-ui-glass-blur: 20px;
   --kk-ui-motion-scale: 1;
   --kk-motion-fast: calc(120ms * var(--kk-ui-motion-scale));

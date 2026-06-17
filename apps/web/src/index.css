@@ -13974,22 +13974,22 @@ body.dark-mode .settings-panel { --settings-shell-bg: #000000; --settings-page-b
   --clay-desktop-shell-padding: 16px 28px 18px;
   --clay-mobile-shell-padding: 12px 8px calc(env(safe-area-inset-bottom, 0px) + 14px);
   --frost-input-bg-solid: #ffffff;
-  --frost-input-bg: #ffffff;
+  --frost-input-bg: rgb(255 255 255 / 0.66);
   --frost-input-border: rgb(17 24 39 / 0.14);
   --frost-input-shadow: none;
   --frost-input-blur: 16px;
   --frost-card-main-bg-solid: var(--clay-surface-card);
-  --frost-card-main-bg: #ffffff;
+  --frost-card-main-bg: rgb(255 255 255 / 0.70);
   --frost-card-main-border: rgb(17 24 39 / 0.12);
   --frost-card-main-shadow: none;
   --frost-card-main-blur: 20px;
   --frost-card-sub-bg-solid: var(--clay-paper);
-  --frost-card-sub-bg: #ffffff;
+  --frost-card-sub-bg: rgb(255 255 255 / 0.60);
   --frost-card-sub-border: rgb(17 24 39 / 0.10);
   --frost-card-sub-shadow: none;
   --frost-card-sub-blur: 14px;
   --frost-card-framework-bg-solid: var(--clay-surface-soft);
-  --frost-card-framework-bg: #ffffff;
+  --frost-card-framework-bg: rgb(255 255 255 / 0.76);
   --frost-card-framework-border: rgb(17 24 39 / 0.14);
   --frost-card-framework-shadow: none;
   --frost-card-framework-blur: 24px;
@@ -14099,19 +14099,19 @@ body:not(.dark-mode) {
 
 body.dark-mode {
   --frost-input-bg-solid: var(--clay-dark-elevated);
-  --frost-input-bg: rgb(31 31 31 / 0.70);
+  --frost-input-bg: rgb(31 31 31 / 0.64);
   --frost-input-border: rgb(255 250 240 / 0.12);
   --frost-input-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 8px 18px rgb(0 0 0 / 0.20);
   --frost-card-main-bg-solid: var(--clay-dark-elevated);
-  --frost-card-main-bg: rgb(31 31 31 / 0.72);
+  --frost-card-main-bg: rgb(26 26 30 / 0.66);
   --frost-card-main-border: rgb(255 250 240 / 0.12);
   --frost-card-main-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 24px rgb(0 0 0 / 0.22);
   --frost-card-sub-bg-solid: var(--clay-dark-surface);
-  --frost-card-sub-bg: rgb(20 20 20 / 0.62);
+  --frost-card-sub-bg: rgb(16 16 20 / 0.54);
   --frost-card-sub-border: rgb(255 250 240 / 0.10);
   --frost-card-sub-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 6px 16px rgb(0 0 0 / 0.18);
   --frost-card-framework-bg-solid: var(--clay-dark-surface);
-  --frost-card-framework-bg: rgb(20 20 20 / 0.76);
+  --frost-card-framework-bg: rgb(16 16 20 / 0.68);
   --frost-card-framework-border: rgb(255 250 240 / 0.14);
   --frost-card-framework-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 12px 28px rgb(0 0 0 / 0.24);
   --bg-base: var(--clay-dark-canvas);
@@ -14198,19 +14198,19 @@ body.dark-mode {
 
 .settings-panel {
   --frost-input-bg-solid: #ffffff;
-  --frost-input-bg: #ffffff;
+  --frost-input-bg: rgb(255 255 255 / 0.66);
   --frost-input-border: rgb(17 24 39 / 0.14);
   --frost-input-shadow: none;
   --frost-card-main-bg-solid: var(--clay-surface-card);
-  --frost-card-main-bg: #ffffff;
+  --frost-card-main-bg: rgb(255 255 255 / 0.70);
   --frost-card-main-border: rgb(17 24 39 / 0.12);
   --frost-card-main-shadow: none;
   --frost-card-sub-bg-solid: var(--clay-paper);
-  --frost-card-sub-bg: #ffffff;
+  --frost-card-sub-bg: rgb(255 255 255 / 0.60);
   --frost-card-sub-border: rgb(17 24 39 / 0.10);
   --frost-card-sub-shadow: none;
   --frost-card-framework-bg-solid: var(--clay-surface-soft);
-  --frost-card-framework-bg: #ffffff;
+  --frost-card-framework-bg: rgb(255 255 255 / 0.76);
   --frost-card-framework-border: rgb(17 24 39 / 0.14);
   --frost-card-framework-shadow: none;
   --settings-accent-rgb: 255 107 90;
@@ -14320,19 +14320,19 @@ body.dark-mode {
 
 body.dark-mode .settings-panel {
   --frost-input-bg-solid: var(--clay-dark-elevated);
-  --frost-input-bg: rgb(31 31 31 / 0.70);
+  --frost-input-bg: rgb(31 31 31 / 0.64);
   --frost-input-border: rgb(255 250 240 / 0.12);
   --frost-input-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 8px 18px rgb(0 0 0 / 0.20);
   --frost-card-main-bg-solid: var(--clay-dark-elevated);
-  --frost-card-main-bg: rgb(31 31 31 / 0.72);
+  --frost-card-main-bg: rgb(26 26 30 / 0.66);
   --frost-card-main-border: rgb(255 250 240 / 0.12);
   --frost-card-main-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 24px rgb(0 0 0 / 0.22);
   --frost-card-sub-bg-solid: var(--clay-dark-surface);
-  --frost-card-sub-bg: rgb(20 20 20 / 0.62);
+  --frost-card-sub-bg: rgb(16 16 20 / 0.54);
   --frost-card-sub-border: rgb(255 250 240 / 0.10);
   --frost-card-sub-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 6px 16px rgb(0 0 0 / 0.18);
   --frost-card-framework-bg-solid: var(--clay-dark-surface);
-  --frost-card-framework-bg: rgb(20 20 20 / 0.76);
+  --frost-card-framework-bg: rgb(16 16 20 / 0.68);
   --frost-card-framework-border: rgb(255 250 240 / 0.14);
   --frost-card-framework-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 12px 28px rgb(0 0 0 / 0.24);
   --settings-accent-rgb: 255 176 132;
