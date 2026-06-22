@@ -56,6 +56,14 @@ project metadata as linked and the hosted release script passes the token to the
 Vercel CLI through an environment-variable reference. When they are absent, the
 remaining manual steps are `vercel login` and `vercel link`.
 
+If the release was deployed through the Vercel plugin or the Git integration and
+the deployment has already been verified as `READY`, record that local proof in
+`.kk-local/hosted-release-verification.json` or set
+`KK_RELEASE_VERCEL_REMOTE_VERIFIED=true` for the current shell. The preflight
+still reports missing local Vercel CLI auth as a warning, but it does not block
+when the proof matches the current Git `HEAD`, Vercel project metadata, and a
+READY deployment.
+
 ## Hosted Frontend
 
 Required:

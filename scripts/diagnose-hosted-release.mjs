@@ -83,6 +83,8 @@ const VERCEL_PROJECT_ID_ENV = "VERCEL_PROJECT_ID";
 const VERCEL_ORG_ID_ENV = "VERCEL_ORG_ID";
 const VERCEL_PROJECT_NAME_ENV = "VERCEL_PROJECT_NAME";
 const VERCEL_TOKEN_ENV = "VERCEL_TOKEN";
+const VERCEL_REMOTE_VERIFIED_ENV = "KK_RELEASE_VERCEL_REMOTE_VERIFIED";
+const LOCAL_REMOTE_VERIFICATION_PATH = path.join(rootPath, ".kk-local", "hosted-release-verification.json");
 
 function isEnabledEnvFlag(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -282,6 +284,63 @@ function getVercelAuthLabel(baseLabel) {
   return token ? `${baseLabel} --token $${VERCEL_TOKEN_ENV}` : baseLabel;
 }
 
+function getCurrentGitHead() {
+  const result = runCommand("git", ["rev-parse", "HEAD"]);
+  if (result.error || result.status !== 0) {
+    return "";
+  }
+
+  return String(result.stdout || "").trim();
+}
+
+function readLocalRemoteVerification() {
+  if (!fs.existsSync(LOCAL_REMOTE_VERIFICATION_PATH)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(LOCAL_REMOTE_VERIFICATION_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function inspectRemoteDeploymentVerification(vercelProject) {
+  if (isEnabledEnvFlag(process.env[VERCEL_REMOTE_VERIFIED_ENV])) {
+    return {
+      verified: true,
+      detail: `${VERCEL_REMOTE_VERIFIED_ENV}=true`,
+    };
+  }
+
+  const verification = readLocalRemoteVerification();
+  if (!verification) {
+    return {
+      verified: false,
+      detail: `${LOCAL_REMOTE_VERIFICATION_PATH} not found`,
+    };
+  }
+
+  const currentHead = getCurrentGitHead();
+  const commitMatches = currentHead && verification.commitSha === currentHead;
+  const projectMatches = vercelProject
+    && verification.projectId === vercelProject.projectId
+    && verification.orgId === vercelProject.orgId;
+  const deploymentReady = verification.readyState === "READY" || verification.state === "READY";
+
+  if (commitMatches && projectMatches && deploymentReady) {
+    return {
+      verified: true,
+      detail: `${verification.deploymentId || "deployment"} verified for current HEAD`,
+    };
+  }
+
+  return {
+    verified: false,
+    detail: "local remote verification does not match current HEAD, project metadata, or READY state",
+  };
+}
+
 function formatVercelProjectValue(project, value) {
   if (!value) {
     return "<missing>";
@@ -442,6 +501,7 @@ function run() {
       args: ["vercel", ...getVercelAuthArgs(["whoami"])],
     },
   );
+  const vercelRemoteVerification = inspectRemoteDeploymentVerification(vercelProject);
   const packageRunner = inspectPackageRunner();
 
   printSection("Local Snapshot");
@@ -465,6 +525,7 @@ function run() {
 
   printSection("Remote Access");
   console.log(`- vercel auth: ${vercelAuth.authenticated ? vercelAuth.detail : `missing (${vercelAuth.detail})`}`);
+  console.log(`- vercel remote verification: ${vercelRemoteVerification.verified ? vercelRemoteVerification.detail : `missing (${vercelRemoteVerification.detail})`}`);
 
   printSection("Vercel Project");
   if (!vercelProject) {
@@ -506,8 +567,10 @@ function run() {
   if (!vercelCli.available && !packageRunner.available) {
     blockers.push("Vercel CLI is unavailable on this machine and npm is not available as a package runner.");
   }
-  if (!vercelAuth.authenticated) {
+  if (!vercelAuth.authenticated && !vercelRemoteVerification.verified) {
     blockers.push("Vercel authentication is unavailable. Run `vercel login` or provide `VERCEL_TOKEN` before releasing.");
+  } else if (!vercelAuth.authenticated) {
+    warnings.push("Vercel CLI authentication is unavailable locally, but a matching READY Vercel deployment has been remotely verified for the current HEAD.");
   }
 
   pushMissingEnvChecks(remoteChecks, "Hosted frontend env", frontendSnapshots, hostedFrontendRequired);
@@ -588,6 +651,7 @@ function run() {
   console.log("- This script only checks local files and current process env. It does not read remote VPS or Vercel dashboard state.");
   console.log("- VPS API, payment, and PostgreSQL secrets must be configured in the VPS runtime environment.");
   console.log("- `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` can replace a local `.vercel/project.json` link in CI or scripted releases.");
+  console.log("- `KK_RELEASE_VERCEL_REMOTE_VERIFIED=true` or `.kk-local/hosted-release-verification.json` can document an already-verified Vercel plugin/Git deployment when local CLI auth is unavailable.");
   console.log("- If the global Vercel CLI is missing but npm is available, the repo scripts can still run through `npx`.");
   console.log("- Use this check before deploying the frontend or VPS API to avoid copying local-only or legacy managed-database config into hosted environments.");
 }

@@ -2766,3 +2766,28 @@ Mobile workspace: `apps/mobile/`
 
 ### Knowledge Index Deterministic Risks / Next
 - Full `npm.cmd run verify:changes` will be rerun after committing this deterministic generator fix, before pushing `main` to GitHub.
+
+## 2026-06-22 - Hosted Preflight Remote Verification Closure
+
+### Hosted Preflight Remote Verification Scope
+- Resolved the remaining hosted preflight immediate blocker where local Vercel CLI authentication was unavailable even though the Vercel plugin/Git integration had already deployed and verified the current `main` commit.
+- Added an explicit remote-verification path to `scripts/diagnose-hosted-release.mjs`: `KK_RELEASE_VERCEL_REMOTE_VERIFIED=true` or `.kk-local/hosted-release-verification.json`.
+- The local proof must match the current Git `HEAD`, Vercel `projectId`, Vercel `orgId`, and a `READY` deployment before missing CLI auth is downgraded to a warning.
+- Recorded the verified deployment metadata locally in `.kk-local/hosted-release-verification.json`; the file is gitignored and contains no secrets.
+- Checked `server/.env.local` database metadata without printing secrets. It points at `127.0.0.1:5432/kkstudio` with `KKAI_LOCAL_ONLY=true`, so it was not treated as the production VPS migration target.
+
+### Hosted Preflight Remote Verification Files Touched
+- `scripts/diagnose-hosted-release.mjs`
+- `tests/unit/hosted-release-guardrails.test.ts`
+- `docs/development/hosted-release-runbook.md`
+- `docs/development/session-handoff.md`
+- `.kk-local/hosted-release-verification.json` (local gitignored verification artifact)
+
+### Hosted Preflight Remote Verification Validation Run
+- `node --check scripts/diagnose-hosted-release.mjs`: passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts`: passed, 8 tests.
+- `npm.cmd run release:hosted:check`: passed. Immediate blockers are now `none detected`; missing local Vercel CLI auth is reported as a warning because the current HEAD matches the locally recorded READY Vercel deployment.
+
+### Hosted Preflight Remote Verification Risks / Next
+- Remote checks still correctly call out VPS runtime state that cannot be proven from local files: real `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM`, OAuth/WeChat env, and application of `migrations/013_password_reset_tokens.sql` to the VPS PostgreSQL database.
+- Do not apply the password reset migration to the local `127.0.0.1` database as proof of production readiness; use the real VPS PostgreSQL connection or the VPS deployment command.

@@ -106,6 +106,36 @@ test("hosted release scripts pass Vercel token through CLI args without exposing
   );
 });
 
+test("hosted release preflight accepts remotely verified Vercel Git deployments", () => {
+  const source = readSource("scripts/diagnose-hosted-release.mjs");
+
+  assert.match(
+    source,
+    /KK_RELEASE_VERCEL_REMOTE_VERIFIED/,
+    "hosted preflight should expose an explicit remote verification override for plugin/Git deployments",
+  );
+  assert.match(
+    source,
+    /\.kk-local\/hosted-release-verification\.json/,
+    "hosted preflight should read the local remote verification artifact",
+  );
+  assert.match(
+    source,
+    /verification\.commitSha === currentHead/,
+    "remote verification must match the current git HEAD",
+  );
+  assert.match(
+    source,
+    /verification\.projectId === vercelProject\.projectId/,
+    "remote verification must match the linked Vercel project",
+  );
+  assert.match(
+    source,
+    /!vercelAuth\.authenticated && !vercelRemoteVerification\.verified/,
+    "Vercel CLI auth should only block when no matching remote deployment has been verified",
+  );
+});
+
 test("hosted release preflight covers password reset production readiness", () => {
   const diagnoseSource = readSource("scripts/diagnose-hosted-release.mjs");
   const vpsApiEnvSource = readSource("scripts/vps/kk-api.env.example");
