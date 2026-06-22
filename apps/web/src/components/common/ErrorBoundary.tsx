@@ -1,10 +1,9 @@
 import React, { Component, ReactNode } from 'react';
 import {
     DEFAULT_LANGUAGE,
-    LANGUAGE_STORAGE_KEY,
     type ResolvedLanguage,
+    getInitialAppLanguage,
     localizeUserFacingText,
-    normalizeLanguage,
     pickByResolvedLanguage,
 } from '../../utils/localeText';
 
@@ -22,13 +21,7 @@ const getBoundaryLanguage = (): ResolvedLanguage => {
         return DEFAULT_LANGUAGE;
     }
 
-    let language: ResolvedLanguage = DEFAULT_LANGUAGE as ResolvedLanguage;
-
-    try {
-        language = normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
-    } catch {
-        language = DEFAULT_LANGUAGE as ResolvedLanguage;
-    }
+    const language = getInitialAppLanguage();
 
     if (typeof document !== 'undefined') {
         document.documentElement.lang = language;

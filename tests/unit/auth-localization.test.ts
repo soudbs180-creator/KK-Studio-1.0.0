@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
 import {
+  getBrowserPreferredLanguage,
   getDocumentLanguage,
+  getInitialAppLanguage,
   localizeUserFacingText,
   pickByResolvedLanguage,
 } from "../../apps/web/src/utils/localeText.ts";
@@ -21,6 +23,10 @@ type MockWindow = {
   localStorage: {
     getItem: (key: string) => string | null;
   };
+  navigator?: {
+    language?: string;
+    languages?: string[];
+  };
 };
 
 const globalLike = globalThis as any;
@@ -32,6 +38,8 @@ function setMockLanguageEnvironment(options: {
   htmlLang?: string;
   documentLanguage?: string;
   storedLanguage?: string | null;
+  browserLanguage?: string;
+  browserLanguages?: string[];
 }) {
   globalLike.document = {
     documentElement: {
@@ -51,6 +59,10 @@ function setMockLanguageEnvironment(options: {
         return options.storedLanguage ?? null;
       },
     },
+    navigator: {
+      language: options.browserLanguage,
+      languages: options.browserLanguages,
+    },
   };
 }
 
@@ -60,6 +72,47 @@ afterEach(() => {
 });
 
 describe("locale text helpers", () => {
+  test("detects English as the initial app language from the browser when no language is stored", () => {
+    setMockLanguageEnvironment({
+      htmlLang: "zh-CN",
+      storedLanguage: null,
+      browserLanguages: ["en-US", "zh-CN"],
+    });
+
+    assert.equal(getBrowserPreferredLanguage(), "en-US");
+    assert.equal(getInitialAppLanguage(), "en-US");
+  });
+
+  test("keeps Chinese as the default initial language for Chinese and non-English browsers", () => {
+    setMockLanguageEnvironment({
+      htmlLang: "zh-CN",
+      storedLanguage: null,
+      browserLanguages: ["zh-Hans-CN", "en-US"],
+    });
+
+    assert.equal(getBrowserPreferredLanguage(), "zh-CN");
+    assert.equal(getInitialAppLanguage(), "zh-CN");
+
+    setMockLanguageEnvironment({
+      htmlLang: "zh-CN",
+      storedLanguage: null,
+      browserLanguages: ["fr-FR", "en-US"],
+    });
+
+    assert.equal(getBrowserPreferredLanguage(), "zh-CN");
+    assert.equal(getInitialAppLanguage(), "zh-CN");
+  });
+
+  test("keeps a stored user language preference ahead of browser detection", () => {
+    setMockLanguageEnvironment({
+      htmlLang: "zh-CN",
+      storedLanguage: "zh-CN",
+      browserLanguages: ["en-US"],
+    });
+
+    assert.equal(getInitialAppLanguage(), "zh-CN");
+  });
+
   test("prefers the stored app language over the static html lang before providers mount", () => {
     setMockLanguageEnvironment({
       htmlLang: "zh-CN",
@@ -120,6 +173,13 @@ describe("auth-facing localization helpers", () => {
     assert.equal(
       authLocalization.mapTurnstileErrorMessage("en-US", "400070"),
       "The current Turnstile site key has been disabled. Check the widget status in Cloudflare.",
+    );
+    assert.equal(
+      authLocalization.mapTurnstileErrorMessage(
+        "zh-CN",
+        "Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。",
+      ),
+      "Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。",
     );
     assert.equal(
       authLocalization.mapAuthErrorMessage("zh-CN", new Error("Incorrect email or password."), "login"),

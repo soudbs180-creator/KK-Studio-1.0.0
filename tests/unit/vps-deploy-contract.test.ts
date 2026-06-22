@@ -7,6 +7,7 @@ import { test } from "node:test";
 // 中文注释：此测试验证 VPS 部署契约与静态文件的正确性
 
 const ROOT_DIR = process.cwd();
+const TURNSTILE_CSP_ORIGIN = "https://challenges.cloudflare.com";
 
 
 
@@ -120,6 +121,34 @@ test("VPS nginx gateway does not expose internal payment routes on public virtua
       /location\s+=\s+\/internal\s*\{[\s\S]*?return\s+404;/,
       `${label} nginx config should fail closed for the exact public /internal path`,
     );
+  }
+});
+
+test("Nginx CSP declarations allow Cloudflare Turnstile scripts and frames", () => {
+  const nginxConfigPaths = [
+    "config/deploy/nginx/kk-admin.conf",
+    "config/deploy/nginx/kk-vps-stack.conf",
+    "config/deploy/nginx/kk-vps.conf.legacy",
+    "config/deploy/nginx/kk-vps-gateway.conf",
+  ];
+
+  for (const nginxConfigPath of nginxConfigPaths) {
+    const source = readSource(nginxConfigPath);
+    const cspDeclarations = [...source.matchAll(/Content-Security-Policy "([^"]+)"/g)];
+
+    for (const declaration of cspDeclarations) {
+      const policy = declaration[1];
+      assert.match(
+        policy,
+        new RegExp(`script-src[^;]*${TURNSTILE_CSP_ORIGIN.replace(/\./g, "\\.")}`),
+        `${nginxConfigPath} must allow Turnstile api.js in script-src`,
+      );
+      assert.match(
+        policy,
+        new RegExp(`frame-src[^;]*${TURNSTILE_CSP_ORIGIN.replace(/\./g, "\\.")}`),
+        `${nginxConfigPath} must allow Turnstile challenge iframes in frame-src`,
+      );
+    }
   }
 });
 

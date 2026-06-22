@@ -9,6 +9,8 @@ import { getTurnstileStatusMessage, mapTurnstileErrorMessage } from './authLocal
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TURNSTILE_TIMEOUT_MS = 12000;
+const TURNSTILE_SCRIPT_LOAD_ERROR = 'Failed to load Turnstile script';
+const TURNSTILE_TIMEOUT_ERROR = 'Timed out while waiting for Turnstile';
 const TURNSTILE_SCRIPT_SELECTOR = 'script[data-turnstile-script="true"]';
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 const TURNSTILE_DNS_PREFETCH_SELECTOR = 'link[data-turnstile-dns-prefetch="true"]';
@@ -108,10 +110,7 @@ function previewSiteKey(sitekey: string, language: ResolvedLanguage): string {
   return `${sitekey.slice(0, 6)}...${sitekey.slice(-4)}`;
 }
 
-async function waitForTurnstile(
-  timeoutMs = TURNSTILE_TIMEOUT_MS,
-  language: ResolvedLanguage = getDocumentLanguage(),
-): Promise<void> {
+async function waitForTurnstile(timeoutMs = TURNSTILE_TIMEOUT_MS): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeoutMs) {
@@ -122,7 +121,7 @@ async function waitForTurnstile(
     await new Promise((resolve) => window.setTimeout(resolve, 50));
   }
 
-  throw new Error(mapTurnstileErrorMessage(language, 'Timed out while waiting for Turnstile'));
+  throw new Error(TURNSTILE_TIMEOUT_ERROR);
 }
 
 function ensureTurnstileConnectionHints(): void {
@@ -165,8 +164,18 @@ export async function ensureTurnstileScript(language: ResolvedLanguage = getDocu
     const existingScript = document.querySelector<HTMLScriptElement>(TURNSTILE_SCRIPT_SELECTOR);
 
     if (existingScript) {
-      waitForTurnstile(TURNSTILE_TIMEOUT_MS, language).then(resolve).catch(reject);
-      return;
+      if (existingScript.dataset.turnstileLoadState === 'error') {
+        existingScript.remove();
+      } else {
+        waitForTurnstile(TURNSTILE_TIMEOUT_MS)
+          .then(resolve)
+          .catch((error) => {
+            existingScript.dataset.turnstileLoadState = 'error';
+            existingScript.remove();
+            reject(error);
+          });
+        return;
+      }
     }
 
     ensureTurnstileConnectionHints();
@@ -176,15 +185,25 @@ export async function ensureTurnstileScript(language: ResolvedLanguage = getDocu
     script.async = true;
     script.defer = true;
     script.dataset.turnstileScript = 'true';
+    script.dataset.turnstileLoadState = 'loading';
     if ('fetchPriority' in script) {
       script.fetchPriority = 'high';
     }
     script.onload = () => {
-      waitForTurnstile(TURNSTILE_TIMEOUT_MS, language).then(resolve).catch(reject);
+      script.dataset.turnstileLoadState = 'loaded';
+      waitForTurnstile(TURNSTILE_TIMEOUT_MS)
+        .then(resolve)
+        .catch((error) => {
+          script.dataset.turnstileLoadState = 'error';
+          script.remove();
+          reject(error);
+        });
     };
     script.onerror = () => {
       turnstileScriptPromise = null;
-      reject(new Error(mapTurnstileErrorMessage(language, 'Failed to load Turnstile script')));
+      script.dataset.turnstileLoadState = 'error';
+      script.remove();
+      reject(new Error(TURNSTILE_SCRIPT_LOAD_ERROR));
     };
 
     document.head.appendChild(script);

@@ -126,3 +126,11 @@
 - Queue archive and output locate are local UI actions with `toolName: undefined`; they are intentionally not advertised as LLM tools because they do not go through `ToolRegistry`.
 - `AIAssistantDock` and `ChatSidebar` now both show retry and locate controls for durable queue jobs, preventing one AI control surface from having a different queue capability set than the other.
 - Composer and resource controls also use `AGENT_CONTROL_ACTIONS`: context compression, send message, image import, folder import, file connect, resource panel toggle/close, and resource removal are local UI actions with stable `data-agent-action` values and no `ToolRegistry` tool name.
+
+## 7. Implementation update - Browser Assistant local actions - 2026-06-22
+
+- Browser Assistant external automation buttons continue to use `BROWSER_ACTIONS` for `browser.*` ToolRegistry names and Browser Bridge command kinds.
+- Browser Assistant station-internal buttons now use `BROWSER_LOCAL_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts` as the shared local action contract.
+- Product import and result-to-canvas buttons expose `data-browser-local-action` plus `data-agent-tool="canvas.createPromptCards"` because they create KK Studio canvas prompt/product cards rather than clicking PromptBar.
+- ZIP export buttons expose `data-browser-local-action` plus `data-agent-tool="assets.zipOriginals"`.
+- Pipeline run, exported ZIP locate, and sensed clipboard import expose stable `data-browser-local-action` values with no ToolRegistry tool name because they remain local Browser Assistant UI actions.

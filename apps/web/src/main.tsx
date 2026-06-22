@@ -11,10 +11,9 @@ import { isLoopbackHostname, isPrivateNetworkHostname } from './services/api/kkA
 import { disableVercelToolbar } from './utils/disableVercelToolbar';
 import {
   DEFAULT_LANGUAGE,
-  LANGUAGE_STORAGE_KEY,
   type ResolvedLanguage,
+  getInitialAppLanguage,
   localizeUserFacingText,
-  normalizeLanguage,
   pickByResolvedLanguage,
 } from './utils/localeText';
 import { isChunkLoadError, handleChunkLoadError } from './utils/lazyWithRetry';
@@ -29,11 +28,7 @@ function getStoredStartupLanguage(): ResolvedLanguage {
     return DEFAULT_LANGUAGE;
   }
 
-  try {
-    return normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
-  } catch {
-    return DEFAULT_LANGUAGE;
-  }
+  return getInitialAppLanguage();
 }
 
 function applyStartupLanguage(language: ResolvedLanguage) {

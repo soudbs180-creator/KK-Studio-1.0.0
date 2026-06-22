@@ -40,7 +40,7 @@ import {
   type BrowserBridgeCommand,
   type BrowserBridgeResult,
 } from '../../../features/ai-assistant-runtime/browser/browserBridge';
-import { BROWSER_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
+import { BROWSER_ACTIONS, BROWSER_LOCAL_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
 import { agentRuntimeInstance } from '../../../features/ai-assistant-runtime';
 import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 
@@ -410,17 +410,26 @@ export const BrowserAssistantView: React.FC = () => {
       return;
     }
 
+    if (daemonStatus === 'connected' && !devFallback) {
+      window.dispatchEvent(new CustomEvent('takeover-zip-originals', {
+        detail: {
+          scope: 'all_canvas_outputs'
+        }
+      }));
+      return;
+    }
+
     setZipLoading(true);
     setZipProgress(0);
     setZippedFileLoc(null);
-    const isFallback = daemonStatus !== 'connected' && devFallback;
+    const isFallback = true;
     
     const steps = [
-      isFallback ? '[Dev Fallback] 【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...' : '【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...',
-      isFallback ? '[Dev Fallback] 【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...' : '【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...',
-      isFallback ? '[Dev Fallback] 【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...' : '【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...',
-      isFallback ? '[Dev Fallback] 【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...' : '【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...',
-      isFallback ? '[Dev Fallback] 【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...' : '【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...'
+      '[Dev Fallback] 【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...',
+      '[Dev Fallback] 【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...',
+      '[Dev Fallback] 【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...',
+      '[Dev Fallback] 【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...',
+      '[Dev Fallback] 【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...'
     ];
 
     setZipStep(steps[0]!);
@@ -441,7 +450,7 @@ export const BrowserAssistantView: React.FC = () => {
         setZipLoading(false);
         setZippedFileLoc('C:/Users/Administrator/Downloads/kk_studio_assets_manifest.zip');
         notify.success(
-          isFallback ? '[Dev Fallback] 打包原图下载成功' : '打包原图下载成功',
+          '[Dev Fallback] 打包原图下载成功',
           '已成功导出 kk_studio_assets_manifest.zip！包内已严格包含符合 AGENTS.md 规范的 manifest.json 属性索引。'
         );
       }
@@ -915,6 +924,21 @@ export const BrowserAssistantView: React.FC = () => {
   // 7. 本地抠图导入画布 (Web Worker 后台处理)
   const handleImportToCanvasWithClip = () => {
     if (!extractedData) return;
+
+    const triggerImport = (imgUrl: string, isClipped: boolean) => {
+      window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
+        detail: {
+          prompts: [
+            `提取商品: ${extractedData.title}\n价格: ${extractedData.price}\n来源: ${extractedData.platform}`
+          ],
+          imageUrl: imgUrl
+        }
+      }));
+      notify.success(
+        isClipped ? '导入成功 (透明 PNG)' : '导入成功',
+        isClipped ? '已在画布上自动创建透明背景商品切图卡片。' : '已成功在画布上自动创建原始商品主图卡片。'
+      );
+    };
     
     if (autoClip && workerRef.current) {
       setClippingProgress(true);
@@ -925,17 +949,14 @@ export const BrowserAssistantView: React.FC = () => {
 
       workerRef.current.onmessage = (e) => {
         if (!isMountedRef.current) return;
-        const { type } = e.data;
+        const { type, data } = e.data;
         if (type === 'done') {
           setClippingProgress(false);
-          notify.success(
-            '抠图成功 (透明 PNG)',
-            '主体边缘无损裁切完成！已在画布中央创建透明背景商品切图。'
-          );
+          triggerImport(data.url, true);
         }
       };
     } else {
-      notify.success('导入成功', '已成功在画布中央创建原始商品主图卡片与价格文本节点。');
+      triggerImport(extractedData.imageUrl, false);
     }
   };
 
@@ -1387,7 +1408,29 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   const handleCreateCardInCanvas = () => {
-    notify.success('已同步至画布', '卡片已成功创建于画布中央，正在调起 AI 自动布局...');
+    if (!generatedImageUrl) return;
+    window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
+      detail: {
+        prompts: [
+          `外部生图提示词: ${promptText}`
+        ],
+        imageUrl: generatedImageUrl
+      }
+    }));
+    notify.success('已同步至画布', '已成功在画布上自动创建提示词卡片与生成的图片。');
+  };
+
+  const handleImportPipelineCompletedToCanvas = () => {
+    if (!pipelineCompletedData) return;
+    window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
+      detail: {
+        prompts: [
+          `流水线自动编排海报: ${pipelineCompletedData.productTitle}\n营销文案: ${pipelineCompletedData.postText}`
+        ],
+        imageUrl: pipelineCompletedData.finalImageUrl
+      }
+    }));
+    notify.success('已同步至画布', '海报大纲及生成的电商海报已成功同步至画布中央。');
   };
 
   return (
@@ -2290,6 +2333,8 @@ export const BrowserAssistantView: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleImportToCanvasWithClip}
+                          data-browser-local-action={BROWSER_LOCAL_ACTIONS.importProductToCanvas.actionName}
+                          data-agent-tool={BROWSER_LOCAL_ACTIONS.importProductToCanvas.agentToolName}
                           className="settings-browser-action settings-browser-action--primary"
                         >
                           <span>导入画布商品切图</span>
@@ -2459,6 +2504,8 @@ export const BrowserAssistantView: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleCreateCardInCanvas}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.createCanvasPromptCard.actionName}
+                        data-agent-tool={BROWSER_LOCAL_ACTIONS.createCanvasPromptCard.agentToolName}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <span>同步结果至画布</span>
@@ -2478,6 +2525,8 @@ export const BrowserAssistantView: React.FC = () => {
                         type="button"
                         onClick={handleZipOriginals}
                         disabled={zipLoading}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.zipOriginals.actionName}
+                        data-agent-tool={BROWSER_LOCAL_ACTIONS.zipOriginals.agentToolName}
                         className="settings-browser-action settings-browser-action--neutral"
                       >
                         <Download size={13} />
@@ -2597,6 +2646,7 @@ export const BrowserAssistantView: React.FC = () => {
                       type="button"
                       onClick={handleRunPipeline}
                       disabled={pipelineRunning}
+                      data-browser-local-action={BROWSER_LOCAL_ACTIONS.runPipeline.actionName}
                       className="settings-browser-action settings-browser-action--primary settings-browser-action--full"
                     >
                       {pipelineRunning ? (
@@ -2680,7 +2730,9 @@ export const BrowserAssistantView: React.FC = () => {
                     <div className="settings-browser-result-card__actions">
                       <button
                         type="button"
-                        onClick={handleCreateCardInCanvas}
+                        onClick={handleImportPipelineCompletedToCanvas}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.createCanvasPromptCard.actionName}
+                        data-agent-tool={BROWSER_LOCAL_ACTIONS.createCanvasPromptCard.agentToolName}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <span>同步商品海报至画布</span>
@@ -2700,6 +2752,8 @@ export const BrowserAssistantView: React.FC = () => {
                         type="button"
                         onClick={handleZipOriginals}
                         disabled={zipLoading}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.zipOriginals.actionName}
+                        data-agent-tool={BROWSER_LOCAL_ACTIONS.zipOriginals.agentToolName}
                         className="settings-browser-action settings-browser-action--neutral"
                       >
                         <Download size={13} />
@@ -2736,6 +2790,7 @@ export const BrowserAssistantView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleLocateZippedFile}
+                data-browser-local-action={BROWSER_LOCAL_ACTIONS.locateZippedFile.actionName}
                 className="settings-browser-subtle-action"
               >
                 在管理器中定位
@@ -2763,6 +2818,7 @@ export const BrowserAssistantView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleImportSimulatedClipboard}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.importClipboardPayload.actionName}
                   className="settings-browser-subtle-action"
                 >
                   导入画布

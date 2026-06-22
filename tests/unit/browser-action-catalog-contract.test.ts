@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BROWSER_ACTIONS,
+  BROWSER_LOCAL_ACTIONS,
   getBrowserActionByCommandKind,
   getBrowserActionByToolName,
 } from '../../apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts';
@@ -28,6 +29,20 @@ test('Browser action catalog is the single source for browser tool permissions a
   assert.equal(getBrowserActionByCommandKind('write_back_dom')?.toolName, 'browser.writeBackDom');
 });
 
+test('Browser local action catalog names station-internal assistant actions and their ToolRegistry mapping', () => {
+  const actions = Object.values(BROWSER_LOCAL_ACTIONS);
+  const actionNames = actions.map(action => action.actionName);
+
+  assert.ok(actionNames.includes('import-product-cards'));
+
+  assert.equal(BROWSER_LOCAL_ACTIONS.importProductToCanvas.agentToolName, 'canvas.createPromptCards');
+  assert.equal(BROWSER_LOCAL_ACTIONS.createCanvasPromptCard.agentToolName, 'canvas.createPromptCards');
+  assert.equal(BROWSER_LOCAL_ACTIONS.zipOriginals.agentToolName, 'assets.zipOriginals');
+  assert.equal(BROWSER_LOCAL_ACTIONS.locateZippedFile.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.runPipeline.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName, undefined);
+});
+
 test('Browser tools and Browser Assistant buttons consume the shared browser action catalog', () => {
   const toolSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts');
   const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
@@ -44,4 +59,15 @@ test('Browser tools and Browser Assistant buttons consume the shared browser act
   assert.match(viewSource, /data-browser-tool=\{BROWSER_ACTIONS\.generateExternal\.toolName\}/);
   assert.match(viewSource, /data-browser-tool=\{BROWSER_ACTIONS\.publishDraft\.toolName\}/);
   assert.match(viewSource, /data-browser-tool=\{BROWSER_ACTIONS\.writeBackDom\.toolName\}/);
+
+  assert.match(viewSource, /BROWSER_LOCAL_ACTIONS/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.importProductToCanvas\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.importProductToCanvas\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.createCanvasPromptCard\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.createCanvasPromptCard\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.zipOriginals\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.zipOriginals\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.locateZippedFile\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.runPipeline\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.importClipboardPayload\.actionName\}/);
 });

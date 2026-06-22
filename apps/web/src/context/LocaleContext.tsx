@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { pickByDocumentLanguage } from '../utils/localeText';
+import {
+  LANGUAGE_STORAGE_KEY,
+  getInitialAppLanguage,
+  pickByDocumentLanguage,
+  type ResolvedLanguage,
+} from '../utils/localeText';
 
-export type AppLanguage = 'zh-CN' | 'en-US';
+export type AppLanguage = ResolvedLanguage;
 
 type LocaleContextValue = {
   language: AppLanguage;
@@ -12,20 +17,7 @@ type LocaleContextValue = {
   pick: <T,>(zh: T, en: T) => T;
 };
 
-const DEFAULT_LANGUAGE: AppLanguage = 'zh-CN';
-const STORAGE_KEY = 'kk_language';
-
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
-
-const normalizeLanguage = (value?: string | null): AppLanguage => {
-  if (!value) return DEFAULT_LANGUAGE;
-  return value.toLowerCase().startsWith('en') ? 'en-US' : 'zh-CN';
-};
-
-const getStoredLanguage = (): AppLanguage => {
-  if (typeof window === 'undefined') return DEFAULT_LANGUAGE;
-  return normalizeLanguage(window.localStorage.getItem(STORAGE_KEY));
-};
 
 const applyDocumentLanguage = (language: AppLanguage) => {
   if (typeof document === 'undefined') return;
@@ -37,11 +29,11 @@ export const pickByLanguage = <T,>(language: AppLanguage, zh: T, en: T): T =>
   language === 'zh-CN' ? zh : en;
 
 export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<AppLanguage>(getStoredLanguage);
+  const [language, setLanguageState] = useState<AppLanguage>(getInitialAppLanguage);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(STORAGE_KEY, language);
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
     applyDocumentLanguage(language);
   }, [language]);
 

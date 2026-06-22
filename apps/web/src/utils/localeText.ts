@@ -8,19 +8,40 @@ export const normalizeLanguage = (value?: string | null): ResolvedLanguage => {
   return value.toLowerCase().startsWith('en') ? 'en-US' : 'zh-CN';
 };
 
+const getBrowserPrimaryLanguage = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const browserNavigator = window.navigator;
+  const preferredLanguage = browserNavigator.languages?.[0] || browserNavigator.language;
+  return preferredLanguage || null;
+};
+
+export const getBrowserPreferredLanguage = (): ResolvedLanguage =>
+  normalizeLanguage(getBrowserPrimaryLanguage());
+
+export const getStoredLanguagePreference = (): ResolvedLanguage | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawStoredLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return rawStoredLanguage ? normalizeLanguage(rawStoredLanguage) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const getInitialAppLanguage = (): ResolvedLanguage =>
+  getStoredLanguagePreference() || getBrowserPreferredLanguage();
+
 export const pickByResolvedLanguage = <T,>(language: ResolvedLanguage, zh: T, en: T): T =>
   language === DEFAULT_LANGUAGE ? zh : en;
 
 export const getDocumentLanguage = (): ResolvedLanguage => {
-  let storedLanguage: ResolvedLanguage | null = null;
-  if (typeof window !== 'undefined') {
-    try {
-      const rawStoredLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-      storedLanguage = rawStoredLanguage ? normalizeLanguage(rawStoredLanguage) : null;
-    } catch {
-      storedLanguage = null;
-    }
-  }
+  const storedLanguage = getStoredLanguagePreference();
 
   if (typeof document !== 'undefined') {
     const { documentElement } = document;
@@ -36,7 +57,7 @@ export const getDocumentLanguage = (): ResolvedLanguage => {
     return storedLanguage;
   }
 
-  return DEFAULT_LANGUAGE;
+  return getBrowserPreferredLanguage();
 };
 
 export const isChineseDocumentLanguage = () => getDocumentLanguage() === DEFAULT_LANGUAGE;

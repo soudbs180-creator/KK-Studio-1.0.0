@@ -78,3 +78,67 @@ export const getBrowserActionByCommandKind = (
   commandKind: BrowserBridgeCommandKind
 ): BrowserActionDefinition | undefined =>
   BROWSER_ACTION_LIST.find(action => action.commandKind === commandKind);
+
+export type BrowserLocalAgentToolName = 'canvas.createPromptCards' | 'assets.zipOriginals';
+
+export interface BrowserLocalActionDefinition {
+  key: string;
+  actionName: string;
+  agentToolName?: BrowserLocalAgentToolName;
+  label: string;
+  requiresUserGesture: boolean;
+}
+
+export const BROWSER_LOCAL_ACTIONS = {
+  importProductToCanvas: {
+    key: 'importProductToCanvas',
+    actionName: 'import-product-cards',
+    agentToolName: 'canvas.createPromptCards',
+    label: 'Import extracted product into the canvas',
+    requiresUserGesture: true
+  },
+  createCanvasPromptCard: {
+    key: 'createCanvasPromptCard',
+    actionName: 'import-product-cards',
+    agentToolName: 'canvas.createPromptCards',
+    label: 'Create canvas prompt cards from Browser Assistant results',
+    requiresUserGesture: true
+  },
+  zipOriginals: {
+    key: 'zipOriginals',
+    actionName: 'zip-originals',
+    agentToolName: 'assets.zipOriginals',
+    label: 'Package original assets as ZIP',
+    requiresUserGesture: true
+  },
+  locateZippedFile: {
+    key: 'locateZippedFile',
+    actionName: 'locate-zipped-file',
+    agentToolName: undefined,
+    label: 'Locate the exported ZIP file',
+    requiresUserGesture: true
+  },
+  runPipeline: {
+    key: 'runPipeline',
+    actionName: 'run-pipeline',
+    agentToolName: undefined,
+    label: 'Run Browser Assistant product pipeline',
+    requiresUserGesture: true
+  },
+  importClipboardPayload: {
+    key: 'importClipboardPayload',
+    actionName: 'import-clipboard',
+    agentToolName: undefined,
+    label: 'Import sensed clipboard payload into the canvas',
+    requiresUserGesture: true
+  }
+} as const satisfies Record<string, BrowserLocalActionDefinition>;
+
+export const BROWSER_LOCAL_ACTION_LIST = Object.values(BROWSER_LOCAL_ACTIONS);
+
+export type BrowserLocalActionName = (typeof BROWSER_LOCAL_ACTION_LIST)[number]['actionName'];
+
+export const getBrowserLocalActionByActionName = (
+  actionName: BrowserLocalActionName
+): BrowserLocalActionDefinition | undefined =>
+  BROWSER_LOCAL_ACTION_LIST.find(action => action.actionName === actionName);

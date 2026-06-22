@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import test from 'node:test';
 
-import { readSource } from '../support/workspacePaths.js';
+import { readSource, workspacePath } from '../support/workspacePaths.js';
 
 const LOGIN_SCREEN_PATH = 'apps/web/src/components/auth/LoginScreen.tsx';
 const LOGIN_SCREEN_CSS_PATH = 'apps/web/src/components/auth/LoginScreen.css';
@@ -37,6 +38,8 @@ test('landing page keeps KK Studio brand while using the reference structure and
   const combinedCss = `${landingCssSource}\n${referenceCssSource}`;
 
   assert.match(landingSource, /className="ng-landing-root"/);
+  assert.match(landingSource, /useLocale/);
+  assert.match(landingSource, /AI 原生创意工作台/);
   assert.match(landingSource, /KK Studio/);
   assert.match(landingSource, /AI-native creative workspace/);
   assert.match(landingSource, /AI takeover/);
@@ -50,11 +53,22 @@ test('landing page keeps KK Studio brand while using the reference structure and
   assert.doesNotMatch(landingSource, /newgenre_static/);
   assert.doesNotMatch(landingSource, /CanvasPreviewMock|ProcessTimeline|LandingCTA|FeatureNarrative|heroBadges|serviceItems|thoughtItems/);
 
-  assert.match(combinedCss, /height:\s*240vh;/);
-  assert.match(combinedCss, /linear-gradient\(\s*#280e01 0%,\s*#182644 15\.2608%,\s*#5a769f 30\.284%,\s*#87a1c4 43\.3787%,\s*#c1d3e6 58\.8313%,\s*#fef9e1 79\.7139%,\s*#f7f3f0 100%\s*\)/);
-  assert.match(combinedCss, /linear-gradient\(\s*180deg,\s*#f7f3f000 0%,\s*#f1bd7af7 17\.3899%,\s*#fcbe6d 32\.9462%,\s*#e46c44 51\.4622%,\s*#542512 78\.2939%,\s*#1e1310 100%\s*\)/);
+  assert.match(combinedCss, /\.ng-continuous-stage\s*\{/);
+  assert.match(combinedCss, /--ng-page-gradient:/);
+  assert.match(combinedCss, /min-height:\s*100%;/);
+  assert.doesNotMatch(combinedCss, /\.ng-gradient-stage\s*\{[\s\S]*height:\s*240vh;/);
+  assert.match(combinedCss, /url\("\/landing\/kk-canvas-flow\.webp"\)/);
+  assert.match(combinedCss, /url\("\/landing\/kk-batch-board\.webp"\)/);
+  assert.match(combinedCss, /url\("\/landing\/kk-agent-trail\.webp"\)/);
   assert.match(combinedCss, /\.ng-work-card\s*\{/);
   assert.match(combinedCss, /touch-action:\s*pan-y;/);
+
+  for (const assetName of ['kk-canvas-flow.webp', 'kk-batch-board.webp', 'kk-agent-trail.webp']) {
+    assert.ok(
+      existsSync(workspacePath(`apps/web/public/landing/${assetName}`)),
+      `${assetName} should exist as a real landing image asset`,
+    );
+  }
 });
 
 test('login card uses neutral KK reference styling instead of the rejected blue treatment', () => {

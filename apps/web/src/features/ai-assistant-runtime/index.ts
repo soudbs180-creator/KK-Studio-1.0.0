@@ -23,11 +23,17 @@ export { writeHandoff, formatRunRecordToMarkdown } from './memory/handoffWriter.
 export {
   BROWSER_ACTIONS,
   BROWSER_ACTION_LIST,
+  BROWSER_LOCAL_ACTIONS,
+  BROWSER_LOCAL_ACTION_LIST,
   getBrowserActionByCommandKind,
+  getBrowserLocalActionByActionName,
   getBrowserActionByToolName
 } from './browser/browserActionCatalog.ts';
 export type {
   BrowserActionDefinition,
+  BrowserLocalActionDefinition,
+  BrowserLocalActionName,
+  BrowserLocalAgentToolName,
   BrowserToolName
 } from './browser/browserActionCatalog.ts';
 

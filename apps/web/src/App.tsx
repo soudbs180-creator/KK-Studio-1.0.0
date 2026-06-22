@@ -262,6 +262,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 );
 
 // Lucide icons replaced with SVGs
+import { zipOutputs } from './features/assets/zipOutputs';
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AppearanceMotionProvider } from './context/AppearanceMotionContext';
@@ -1701,6 +1702,90 @@ export const AppContent: React.FC<AppContentProps> = () => {
     window.addEventListener('takeover-fill-prompt', handleFillPrompt);
     return () => window.removeEventListener('takeover-fill-prompt', handleFillPrompt);
   }, [setConfig]);
+
+  // 简体中文：AI接管创建提示词与图片卡片事件处理器
+  useEffect(() => {
+    const handleCreatePromptCards = async (e: Event) => {
+      const { prompts, model, aspectRatio, imageUrl } = (e as CustomEvent).detail;
+      if (prompts && prompts.length > 0) {
+        let startX = 0;
+        let startY = 0;
+        
+        if (typeof findSmartPosition === 'function') {
+          const smartPos = findSmartPosition(100, 100, 360, 480);
+          startX = smartPos.x;
+          startY = smartPos.y;
+        } else {
+          startX = 100 + Math.random() * 200;
+          startY = 100 + Math.random() * 200;
+        }
+
+        const promptNodeId = 'takeover_opt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        const imageNodeId = 'takeover_img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
+        const promptNode: PromptNode = {
+          id: promptNodeId,
+          prompt: prompts[0],
+          optimizedPromptEn: prompts[0],
+          optimizedPromptZh: '本地导入成功',
+          position: { x: startX, y: startY },
+          aspectRatio: (aspectRatio || '1:1') as AspectRatio,
+          imageSize: ImageSize.SIZE_1K,
+          model: model || config.model || 'gemini-2.5-flash',
+          childImageIds: imageUrl ? [imageNodeId] : [],
+          timestamp: Date.now()
+        };
+
+        await addPromptNode(promptNode);
+
+        if (imageUrl) {
+          const imageNode: GeneratedImage = {
+            id: imageNodeId,
+            url: imageUrl,
+            prompt: prompts[0],
+            aspectRatio: (aspectRatio || '1:1') as AspectRatio,
+            model: model || config.model || 'gemini-2.5-flash',
+            canvasId: activeCanvas?.id || 'default_canvas',
+            parentPromptId: promptNodeId,
+            position: { x: startX + 480, y: startY },
+            timestamp: Date.now(),
+          };
+          if (typeof addImageNodes === 'function') {
+            await addImageNodes([imageNode]);
+          }
+        }
+      }
+    };
+    window.addEventListener('takeover-create-prompt-cards', handleCreatePromptCards);
+    return () => window.removeEventListener('takeover-create-prompt-cards', handleCreatePromptCards);
+  }, [addPromptNode, addImageNodes, findSmartPosition, config.model, activeCanvas]);
+
+  // 简体中文：AI接管ZIP导出原图事件处理器
+  useEffect(() => {
+    const handleZipOriginals = async (e: Event) => {
+      const { scope } = (e as CustomEvent).detail;
+      const { notify } = await import('./services/system/notificationService');
+      try {
+        notify.info('正在打包', '正在提取生成图像并进行压缩归档...');
+        
+        await zipOutputs(scope || 'all_canvas_outputs', {
+          projectName: activeCanvas?.name || 'KKStudio',
+          canvasId: activeCanvas?.id,
+          batchId: 'takeover_zip_' + Date.now(),
+          imageNodes: activeCanvas?.imageNodes || [],
+          selectedNodeIds: selectedNodeIds || [],
+          promptNodes: activeCanvas?.promptNodes || [],
+          preferOriginal: true
+        });
+        
+        notify.success('打包下载完成', 'ZIP 压缩包及 manifest.json 已成功保存！');
+      } catch (err: any) {
+        notify.error('打包下载失败', err.message || '未知错误');
+      }
+    };
+    window.addEventListener('takeover-zip-originals', handleZipOriginals);
+    return () => window.removeEventListener('takeover-zip-originals', handleZipOriginals);
+  }, [activeCanvas, selectedNodeIds]);
 
   // Derived Pending Position: Always Center (or linked to source)
   const pendingPosition = React.useMemo(() => {

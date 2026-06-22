@@ -43,12 +43,24 @@
   --ng-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ng-gutter: clamp(18px, 3.7vw, 64px);
   --ng-max: 1440px;
+  --ng-page-gradient: linear-gradient(
+    180deg,
+    #280e01 0%,
+    #182644 12%,
+    #5a769f 27%,
+    #c1d3e6 39%,
+    #f7f3f0 51%,
+    #f1bd7a 66%,
+    #e46c44 79%,
+    #542512 91%,
+    #0c1018 100%
+  );
 
   min-height: 720vh;
   position: relative;
   overflow-x: clip;
   touch-action: pan-y;
-  background: var(--ng-cream);
+  background: var(--ng-page-gradient);
   color: var(--ng-ink);
   font-family: "Saans Regular", "Saans Variable", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -61,41 +73,27 @@
   box-sizing: border-box;
 }
 
-.ng-gradient-stage {
-  position: fixed;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 240vh;
+.ng-continuous-stage {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(
-    #280e01 0%,
-    #182644 15.2608%,
-    #5a769f 30.284%,
-    #87a1c4 43.3787%,
-    #c1d3e6 58.8313%,
-    #fef9e1 79.7139%,
-    #f7f3f0 100%
-  );
+  background:
+    radial-gradient(circle at 18% 8%, rgba(241, 189, 122, 0.24), transparent 20%),
+    radial-gradient(circle at 82% 35%, rgba(135, 161, 196, 0.2), transparent 24%),
+    radial-gradient(circle at 72% 78%, rgba(228, 108, 68, 0.26), transparent 22%),
+    var(--ng-page-gradient);
 }
 
-.ng-warm-stage {
+.ng-continuous-stage::after {
+  content: "";
   position: absolute;
-  top: 390vh;
-  left: 0;
-  width: 100%;
-  height: 260vh;
-  z-index: 0;
+  inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    #f7f3f000 0%,
-    #f1bd7af7 17.3899%,
-    #fcbe6d 32.9462%,
-    #e46c44 51.4622%,
-    #542512 78.2939%,
-    #1e1310 100%
-  );
+  background:
+    linear-gradient(180deg, rgba(12, 16, 24, 0.18) 0%, transparent 17%, transparent 70%, rgba(12, 16, 24, 0.36) 100%),
+    radial-gradient(ellipse at 50% 48%, rgba(247, 243, 240, 0.38), transparent 36%);
 }
 
 .ng-noise {
@@ -179,7 +177,7 @@
 
 .ng-hero {
   position: relative;
-  min-height: 240vh;
+  min-height: 82vh;
   padding: clamp(118px, 11vw, 170px) var(--ng-gutter) 12vh;
 }
 
@@ -273,7 +271,8 @@
   z-index: 3;
   width: min(100%, var(--ng-max));
   margin: 0 auto;
-  padding: clamp(118px, 13vw, 210px) var(--ng-gutter);
+  padding: clamp(78px, 8vw, 132px) var(--ng-gutter);
+  scroll-margin-top: 96px;
 }
 
 .ng-work-section {
@@ -324,10 +323,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(12, 16, 24, 0.1);
+  border: 1px solid rgba(12, 16, 24, 0.12);
   border-radius: 0;
-  background: rgba(255, 255, 255, 0.36);
-  box-shadow: 0 18px 64px rgba(12, 16, 24, 0.07);
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 18px 64px rgba(12, 16, 24, 0.08);
   scroll-snap-align: start;
   transform: translateZ(0);
 }
@@ -337,10 +336,10 @@
   flex: 1 1 auto;
   min-height: 360px;
   overflow: hidden;
-  background-color: #1e1310;
+  background-color: #182644;
   background-position: center;
   background-size: cover;
-  filter: saturate(0.92) contrast(1.02);
+  filter: saturate(1.02) contrast(1.02);
 }
 
 .ng-work-card__image::before,
@@ -352,41 +351,41 @@
 }
 
 .ng-work-card__image::before {
-  inset: -7%;
+  inset: -4%;
   background-image: var(--ng-project-image);
   background-position: var(--ng-project-position, center);
   background-repeat: no-repeat;
-  background-size: var(--ng-project-size, 132%);
-  filter: saturate(0.86) contrast(1.06);
-  transform: scale(1.01);
+  background-size: var(--ng-project-size, cover);
+  filter: saturate(1.02) contrast(1.02);
+  transform: scale(1.02);
 }
 
 .ng-work-card__image::after {
   background:
-    linear-gradient(180deg, rgba(12, 16, 24, 0.06) 0%, rgba(12, 16, 24, 0.38) 100%),
-    radial-gradient(circle at 32% 24%, rgba(254, 249, 225, 0.26), transparent 34%),
-    linear-gradient(135deg, rgba(193, 211, 230, 0.08), rgba(228, 108, 68, 0.16));
-  mix-blend-mode: multiply;
+    linear-gradient(180deg, rgba(12, 16, 24, 0.03) 0%, rgba(12, 16, 24, 0.18) 100%),
+    radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.24), transparent 36%),
+    linear-gradient(135deg, rgba(193, 211, 230, 0.1), rgba(228, 108, 68, 0.12));
+  mix-blend-mode: soft-light;
 }
 
 .ng-work-card__image--canvas {
-  --ng-project-image: url("/newgenre_static/assets/framerusercontent.com__0zWnd6s1LhW8RB02sj5hl6NV1o__330eb4e59450.webp");
+  --ng-project-image: url("/landing/kk-canvas-flow.webp");
   --ng-project-position: 50% 44%;
-  --ng-project-size: 138%;
+  --ng-project-size: cover;
   background-color: #c1d3e6;
 }
 
 .ng-work-card__image--batch {
-  --ng-project-image: url("/newgenre_static/assets/framerusercontent.com__3O9GZSq8HZQu3oKgXi0k8lIY__12d479d69846.webp");
-  --ng-project-position: 48% 52%;
-  --ng-project-size: 146%;
+  --ng-project-image: url("/landing/kk-batch-board.webp");
+  --ng-project-position: 50% 50%;
+  --ng-project-size: cover;
   background-color: #f1bd7a;
 }
 
 .ng-work-card__image--takeover {
-  --ng-project-image: url("/newgenre_static/assets/framerusercontent.com__44bCNJ0znztOFmPNp0OLtVXDSA__c51ff8d28054.webp");
-  --ng-project-position: 54% 38%;
-  --ng-project-size: 152%;
+  --ng-project-image: url("/landing/kk-agent-trail.webp");
+  --ng-project-position: 52% 50%;
+  --ng-project-size: cover;
   background-color: #182644;
 }
 
@@ -496,6 +495,7 @@
   width: min(100%, var(--ng-max));
   margin: 0 auto;
   padding: clamp(118px, 13vw, 210px) var(--ng-gutter);
+  scroll-margin-top: 96px;
 }
 
 .ng-news-section p {
@@ -533,13 +533,13 @@
   width: min(68vw, 920px);
   aspect-ratio: 1;
   max-width: none;
-  opacity: 0.78;
+  opacity: 0.7;
   mix-blend-mode: screen;
-  background-image: url("/newgenre_static/assets/framerusercontent.com__3O9GZSq8HZQu3oKgXi0k8lIY__12d479d69846.webp");
+  background-image: url("/landing/kk-agent-trail.webp");
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
-  filter: saturate(0.88) contrast(1.04);
+  background-size: cover;
+  filter: saturate(0.92) contrast(1.04);
   pointer-events: none;
 }
 
@@ -602,7 +602,7 @@
   }
 
   .ng-hero {
-    min-height: 210vh;
+    min-height: 88vh;
   }
 
   .ng-hero-card {
@@ -641,6 +641,17 @@
 
   .ng-hero {
     padding-top: 102px;
+  }
+
+  .ng-work-section,
+  .ng-approach-section,
+  .ng-services-section,
+  .ng-news-section,
+  .ng-about-section,
+  .ng-join-section {
+    padding-top: 64px;
+    padding-bottom: 96px;
+    scroll-margin-top: 72px;
   }
 
   .ng-hero h1 {

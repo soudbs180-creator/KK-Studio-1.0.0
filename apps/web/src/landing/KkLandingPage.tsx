@@ -1,5 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { useLocale } from '../context/LocaleContext';
+import { pickByResolvedLanguage } from '../utils/localeText';
 import './landingStyles.css';
 import './landingReferenceOverrides.css';
 
@@ -9,59 +11,89 @@ interface KkLandingPageProps {
   onEnterWorkspace: () => void;
 }
 
-const navItems = ['Work', 'Approach', 'AI Flow', 'Services', 'About', 'Join', 'Contact'] as const;
+type LocalizedText = {
+  zh: string;
+  en: string;
+};
+
+const navItems = [
+  { label: { zh: '作品', en: 'Work' }, href: '#work' },
+  { label: { zh: '方法', en: 'Approach' }, href: '#approach' },
+  { label: { zh: 'AI 流程', en: 'AI Flow' }, href: '#ai-flow' },
+  { label: { zh: '能力', en: 'Services' }, href: '#services' },
+  { label: { zh: '关于', en: 'About' }, href: '#about' },
+  { label: { zh: '加入', en: 'Join' }, href: '#join' },
+  { label: { zh: '联系', en: 'Contact' }, href: '#contact' },
+] as const;
 
 const workItems = [
   {
     index: '01',
-    title: 'Canvas that keeps up with intent.',
-    type: 'Infinite canvas / Creation',
+    title: { zh: '跟得上意图的无限画布。', en: 'Canvas that keeps up with intent.' },
+    type: { zh: '无限画布 / 创作生产', en: 'Infinite canvas / Creation' },
     visualClass: 'canvas',
   },
   {
     index: '02',
-    title: 'Batch work with memory and control.',
-    type: 'Durable queue / Automation',
+    title: { zh: '带记忆和控制的批量生产。', en: 'Batch work with memory and control.' },
+    type: { zh: '持久队列 / 自动化', en: 'Durable queue / Automation' },
     visualClass: 'batch',
   },
   {
     index: '03',
-    title: 'AI takeover with a visible trail.',
-    type: 'Agent runtime / Verification',
+    title: { zh: '每一步都可见的 AI 接管。', en: 'AI takeover with a visible trail.' },
+    type: { zh: 'Agent 运行时 / 验证', en: 'Agent runtime / Verification' },
     visualClass: 'takeover',
   },
 ] as const;
 
 const approachItems = [
-  ['01', 'IntentGate reads the job before the system moves the canvas.'],
-  ['02', 'Planner and ToolRegistry turn user goals into reversible product actions.'],
-  ['03', 'PermissionPolicy, Executor, Verification, and Memory keep AI takeover visible end to end.'],
+  ['01', {
+    zh: 'IntentGate 先读懂任务，再允许系统移动画布和资产。',
+    en: 'IntentGate reads the job before the system moves the canvas.',
+  }],
+  ['02', {
+    zh: 'Planner 与 ToolRegistry 把用户目标转成可回退的产品动作。',
+    en: 'Planner and ToolRegistry turn user goals into reversible product actions.',
+  }],
+  ['03', {
+    zh: 'PermissionPolicy、Executor、Verification 与 Memory 让 AI 接管全程可见。',
+    en: 'PermissionPolicy, Executor, Verification, and Memory keep AI takeover visible end to end.',
+  }],
 ] as const;
 
-const sectionIdFor = (item: (typeof navItems)[number]) => item.toLowerCase().replace(/\s+/g, '-');
+const capabilityTiles: LocalizedText[] = [
+  { zh: '画布运行时', en: 'Canvas runtime' },
+  { zh: '批量生成', en: 'Batch generation' },
+  { zh: '原图资产', en: 'Original assets' },
+  { zh: '知识更新', en: 'Knowledge update' },
+];
 
 export const KkLandingPage: React.FC<KkLandingPageProps> = ({
   onLoginClick,
   isLoggedIn,
   onEnterWorkspace,
 }) => {
+  const { language } = useLocale();
+  const t = <T,>(text: { zh: T; en: T }): T => pickByResolvedLanguage(language, text.zh, text.en);
   const primaryAction = isLoggedIn ? onEnterWorkspace : onLoginClick;
-  const primaryLabel = isLoggedIn ? 'Open workspace' : 'Sign in';
+  const primaryLabel = isLoggedIn
+    ? t({ zh: '进入工作区', en: 'Open workspace' })
+    : t({ zh: '登录', en: 'Sign in' });
 
   return (
     <div className="ng-landing-root">
-      <div className="ng-gradient-stage" aria-hidden />
-      <div className="ng-warm-stage" aria-hidden />
+      <div className="ng-continuous-stage" aria-hidden />
       <div className="ng-noise" aria-hidden />
 
-      <header className="ng-nav" aria-label="Primary navigation">
+      <header className="ng-nav" aria-label={t({ zh: '主导航', en: 'Primary navigation' })}>
         <a className="ng-nav__brand" href="#top" aria-label="KK Studio home">
           KK Studio
         </a>
-        <nav className="ng-nav__links" aria-label="Landing sections">
+        <nav className="ng-nav__links" aria-label={t({ zh: '介绍页分区', en: 'Landing sections' })}>
           {navItems.map((item) => (
-            <a key={item} href={`#${sectionIdFor(item)}`}>
-              {item}
+            <a key={item.href} href={item.href}>
+              {t(item.label)}
             </a>
           ))}
         </nav>
@@ -73,44 +105,51 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
       <main className="ng-main" id="top">
         <section className="ng-hero" aria-labelledby="ng-hero-title">
           <div className="ng-hero__copy">
-            <p className="ng-kicker">AI-native creative workspace</p>
+            <p className="ng-kicker">{t({ zh: 'AI 原生创意工作台', en: 'AI-native creative workspace' })}</p>
             <h1 id="ng-hero-title">
-              KK Studio is an AI-native creative workspace for full-flow creative production.
+              {t({
+                zh: 'KK Studio 是面向全流程创意生产的 AI 原生工作区。',
+                en: 'KK Studio is an AI-native creative workspace for full-flow creative production.',
+              })}
             </h1>
           </div>
 
           <a className="ng-work-pill" href="#ai-flow">
-            <span>See AI Flow</span>
+            <span>{t({ zh: '查看 AI 流程', en: 'See AI Flow' })}</span>
             <ArrowUpRight size={14} strokeWidth={1.7} />
           </a>
 
-          <aside className="ng-hero-card" aria-label="AI takeover note">
-            <span>AI takeover</span>
+          <aside className="ng-hero-card" aria-label={t({ zh: 'AI 接管说明', en: 'AI takeover note' })}>
+            <span>{t({ zh: 'AI 接管', en: 'AI takeover' })}</span>
             <p>
-              From intent to verification, every automated canvas action stays visible, scoped,
-              and ready for the next product step.
+              {t({
+                zh: '从意图到验证，每一次自动化画布动作都保持可见、可控，并准备好衔接下一步生产。',
+                en: 'From intent to verification, every automated canvas action stays visible, scoped, and ready for the next product step.',
+              })}
             </p>
           </aside>
         </section>
 
         <section className="ng-work-section" id="work" aria-labelledby="ng-work-title">
-          <div className="ng-section-label">Work</div>
+          <div className="ng-section-label">{t({ zh: '作品', en: 'Work' })}</div>
           <div className="ng-work-heading">
-            <h2 id="ng-work-title">Production work, not demo decks.</h2>
+            <h2 id="ng-work-title">{t({ zh: '真正的生产工作，不只是演示稿。', en: 'Production work, not demo decks.' })}</h2>
             <p>
-              KK Studio brings prompts, images, batches, originals, and layout decisions into one
-              scrollable creative system that stays fast under real workloads.
+              {t({
+                zh: 'KK Studio 把 Prompt、图片、批量任务、原图和排版决策放进同一个可滚动的创意系统，在真实工作量下依然清晰快速。',
+                en: 'KK Studio brings prompts, images, batches, originals, and layout decisions into one scrollable creative system that stays fast under real workloads.',
+              })}
             </p>
           </div>
 
           <div className="ng-work-grid">
             {workItems.map((item) => (
-              <article className="ng-work-card" key={item.title}>
+              <article className="ng-work-card" key={item.index}>
                 <div className={`ng-work-card__image ng-work-card__image--${item.visualClass}`} aria-hidden />
                 <div className="ng-work-card__body">
                   <span>{item.index}</span>
-                  <h3>{item.title}</h3>
-                  <p>{item.type}</p>
+                  <h3>{t(item.title)}</h3>
+                  <p>{t(item.type)}</p>
                 </div>
               </article>
             ))}
@@ -118,48 +157,66 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
         </section>
 
         <section className="ng-approach-section" id="approach" aria-labelledby="ng-approach-title">
-          <div className="ng-section-label">Approach</div>
-          <h2 id="ng-approach-title">Smooth enough for daily creation, strict enough for agents.</h2>
+          <div className="ng-section-label">{t({ zh: '方法', en: 'Approach' })}</div>
+          <h2 id="ng-approach-title">
+            {t({ zh: '足够顺滑地日常创作，也足够严格地交给 Agent。', en: 'Smooth enough for daily creation, strict enough for agents.' })}
+          </h2>
           <div className="ng-approach-list">
             {approachItems.map(([index, text]) => (
               <article key={index} className="ng-approach-row">
                 <span>{index}</span>
-                <p>{text}</p>
+                <p>{t(text)}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section className="ng-news-section" id="ai-flow" aria-label="AI Flow">
-          <p>AI Flow</p>
-          <h2>IntentGate to Memory: the full-flow AI takeover path stays on screen.</h2>
+        <section className="ng-news-section" id="ai-flow" aria-label={t({ zh: 'AI 流程', en: 'AI Flow' })}>
+          <p>{t({ zh: 'AI 流程', en: 'AI Flow' })}</p>
+          <h2>
+            {t({
+              zh: '从 IntentGate 到 Memory，完整 AI 接管路径始终留在屏幕上。',
+              en: 'IntentGate to Memory: the full-flow AI takeover path stays on screen.',
+            })}
+          </h2>
         </section>
 
         <section className="ng-services-section" id="services" aria-labelledby="ng-services-title">
-          <div className="ng-section-label">Services</div>
-          <h2 id="ng-services-title">Canvas, generation, assets, knowledge, verification.</h2>
+          <div className="ng-section-label">{t({ zh: '能力', en: 'Services' })}</div>
+          <h2 id="ng-services-title">
+            {t({ zh: '画布、生成、资产、知识和验证。', en: 'Canvas, generation, assets, knowledge, verification.' })}
+          </h2>
           <div className="ng-services-grid">
-            {['Canvas runtime', 'Batch generation', 'Original assets', 'Knowledge update'].map((service) => (
-              <span key={service}>{service}</span>
+            {capabilityTiles.map((service) => (
+              <span key={service.en}>{t(service)}</span>
             ))}
           </div>
         </section>
 
         <section className="ng-about-section" id="about" aria-labelledby="ng-about-title">
-          <div className="ng-section-label">About</div>
-          <h2 id="ng-about-title">A studio surface for creators who need intelligent flow.</h2>
+          <div className="ng-section-label">{t({ zh: '关于', en: 'About' })}</div>
+          <h2 id="ng-about-title">
+            {t({ zh: '为需要智能生产流的创作者准备的工作台。', en: 'A studio surface for creators who need intelligent flow.' })}
+          </h2>
         </section>
 
         <section className="ng-join-section" id="join" aria-labelledby="ng-join-title">
-          <div className="ng-section-label">Join</div>
-          <h2 id="ng-join-title">For teams that want AI to act carefully, quickly, and visibly.</h2>
+          <div className="ng-section-label">{t({ zh: '加入', en: 'Join' })}</div>
+          <h2 id="ng-join-title">
+            {t({ zh: '给希望 AI 谨慎、快速、可见地行动的团队。', en: 'For teams that want AI to act carefully, quickly, and visibly.' })}
+          </h2>
         </section>
 
         <footer className="ng-footer" id="contact">
           <div className="ng-footer__flower" aria-hidden />
           <div className="ng-footer__content">
-            <p>Start with KK Studio</p>
-            <h2>Turn the whole creative flow into a controlled AI workspace.</h2>
+            <p>{t({ zh: '从 KK Studio 开始', en: 'Start with KK Studio' })}</p>
+            <h2>
+              {t({
+                zh: '把完整创意流程变成可控的 AI 工作区。',
+                en: 'Turn the whole creative flow into a controlled AI workspace.',
+              })}
+            </h2>
             <button type="button" onClick={primaryAction}>
               {primaryLabel}
               <ArrowUpRight size={16} strokeWidth={1.7} />

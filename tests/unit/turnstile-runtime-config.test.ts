@@ -27,3 +27,14 @@ test('turnstile uses Cloudflare-supported lowercase Chinese locale code', () => 
   assert.match(source, /language === 'en-US' \? 'en' : 'zh-cn'/);
   assert.doesNotMatch(source, /language === 'en-US' \? 'en' : 'zh-CN'/);
 });
+
+test('turnstile script loader keeps failures retryable and reports stable error codes', () => {
+  const source = readSource('apps/web/src/components/auth/TurnstileWidget.tsx');
+
+  assert.match(source, /const TURNSTILE_SCRIPT_LOAD_ERROR = 'Failed to load Turnstile script';/);
+  assert.match(source, /const TURNSTILE_TIMEOUT_ERROR = 'Timed out while waiting for Turnstile';/);
+  assert.match(source, /throw new Error\(TURNSTILE_TIMEOUT_ERROR\);/);
+  assert.match(source, /script\.dataset\.turnstileLoadState = 'loading';/);
+  assert.match(source, /script\.dataset\.turnstileLoadState = 'error';[\s\S]*script\.remove\(\);[\s\S]*reject\(new Error\(TURNSTILE_SCRIPT_LOAD_ERROR\)\);/);
+  assert.match(source, /existingScript\.dataset\.turnstileLoadState === 'error'[\s\S]*existingScript\.remove\(\);/);
+});

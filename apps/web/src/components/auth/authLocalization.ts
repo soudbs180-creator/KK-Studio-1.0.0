@@ -57,6 +57,18 @@ function extractErrorCode(error: unknown): string | null {
   return null;
 }
 
+function isTurnstileScriptLoadFailure(normalizedCode: string | undefined): boolean {
+  return Boolean(
+    normalizedCode
+    && (
+      normalizedCode.includes("failed to load turnstile script")
+      || normalizedCode.includes("timed out while waiting")
+      || normalizedCode.includes("turnstile 脚本加载失败")
+      || normalizedCode.includes("等待 turnstile")
+    ),
+  );
+}
+
 export function getTurnstileMissingSiteKeyMessage(language: ResolvedLanguage): string {
   return pick(
     language,
@@ -119,7 +131,7 @@ export function mapTurnstileErrorMessage(language: ResolvedLanguage, error: unkn
   const code = extractErrorCode(error);
   const normalizedCode = code?.toLowerCase();
 
-  if (normalizedCode?.includes("failed to load turnstile script") || normalizedCode?.includes("timed out while waiting")) {
+  if (isTurnstileScriptLoadFailure(normalizedCode)) {
     return pick(
       language,
       "Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。",

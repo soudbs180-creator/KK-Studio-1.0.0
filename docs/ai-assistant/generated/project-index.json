@@ -86,8 +86,8 @@
     "path": "docs/ai-assistant/tool-registry.md",
     "title": "工具注册表说明 (Tool Registry)",
     "summary": "在 KK Studio v1.5.7 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
-    "contentHash": "ecf06590bd52accc8f7eb9fe8ebe1745",
-    "updatedAt": "2026-06-22T07:07:14.827Z"
+    "contentHash": "0405c8a324d3507695b4bc954bc34306",
+    "updatedAt": "2026-06-22T09:08:14.964Z"
   },
   {
     "id": "doc_ui_map_md",
