@@ -27,8 +27,8 @@
 - **云端大模型规划器**: [llmBrain.ts](../../apps/web/src/features/ai-takeover/core/llmBrain.ts)
 - **意图分析**: [intentGate.ts](../../apps/web/src/features/ai-takeover/core/intentGate.ts)
 - **工具/动作执行**:
-  - 工具定义与注册: [toolRegistry.ts](../../apps/web/src/features/ai-takeover/core/toolRegistry.ts)
-  - 动作分发兼容代理: [actionExecutor.ts](../../apps/web/src/features/ai-takeover/core/actionExecutor.ts)
+  - 运行时协调器: [AgentRuntime.ts](../../apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts)
+  - 工具定义与注册: [ToolRegistry.ts](../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts)
 - **安全与确认策略**:
   - 安全门禁: [safetyPolicy.ts](../../apps/web/src/features/ai-takeover/core/safetyPolicy.ts)
   - 强确认弹出卡片: [confirmationPolicy.ts](../../apps/web/src/features/ai-takeover/core/confirmationPolicy.ts)

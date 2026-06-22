@@ -40,6 +40,7 @@ import {
   type BrowserBridgeCommand,
   type BrowserBridgeResult,
 } from '../../../features/ai-assistant-runtime/browser/browserBridge';
+import { BROWSER_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
 import { agentRuntimeInstance } from '../../../features/ai-assistant-runtime';
 import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 
@@ -785,12 +786,12 @@ export const BrowserAssistantView: React.FC = () => {
     try {
       setExtractStep('正在通过 Browser Bridge runtime adapter 下发商品解析指令...');
       const result = await dispatchBrowserCommand({
-        kind: 'extract_product',
+        kind: BROWSER_ACTIONS.extractProduct.commandKind,
         target: targetUrl,
         payload: {
           targets: ['price', 'title', 'image', 'description']
         },
-        requiresUserGesture: true
+        requiresUserGesture: BROWSER_ACTIONS.extractProduct.requiresUserGesture
       });
 
       if (!isMountedRef.current) return;
@@ -873,14 +874,14 @@ export const BrowserAssistantView: React.FC = () => {
     try {
       notify.info('启动 DOM 同步', '正在通过 Browser Bridge adapter 下发 DOM 回写指令...');
       const result = await dispatchBrowserCommand({
-        kind: 'write_back_dom',
+        kind: BROWSER_ACTIONS.writeBackDom.commandKind,
         target: targetUrl || 'active_tab',
         payload: {
           title: editedTitle,
           price: editedPrice,
           platform: extractedData.platform
         },
-        requiresUserGesture: true
+        requiresUserGesture: BROWSER_ACTIONS.writeBackDom.requiresUserGesture
       });
 
       if (!isMountedRef.current) return;
@@ -935,7 +936,7 @@ export const BrowserAssistantView: React.FC = () => {
     try {
       setGenStep(`正在通过 Browser Bridge adapter 分配至外部 ${selectedPlat.name} 生图队列...`);
       const result = await dispatchBrowserCommand({
-        kind: 'generate_external',
+        kind: BROWSER_ACTIONS.generateExternal.commandKind,
         target: selectedPlat.id,
         payload: {
           prompt: promptText,
@@ -943,7 +944,7 @@ export const BrowserAssistantView: React.FC = () => {
           count: 1,
           sessionIds: selectedSessionsForGen
         },
-        requiresUserGesture: true
+        requiresUserGesture: BROWSER_ACTIONS.generateExternal.requiresUserGesture
       });
 
       if (!isMountedRef.current) return;
@@ -998,7 +999,7 @@ export const BrowserAssistantView: React.FC = () => {
     try {
       setPublishingStep('正在通过 Browser Bridge adapter 下发草稿箱保存指令...');
       const result = await dispatchBrowserCommand({
-          kind: 'publish_draft',
+          kind: BROWSER_ACTIONS.publishDraft.commandKind,
           target: xhsPlat.id,
           payload: {
             channelId: xhsPlat.id,
@@ -1007,7 +1008,7 @@ export const BrowserAssistantView: React.FC = () => {
             body: pipelineCompletedData?.postText || '由 KK Studio AI 辅助生成的创意海报。',
           publishMode: 'draft_only'
         },
-        requiresUserGesture: true
+        requiresUserGesture: BROWSER_ACTIONS.publishDraft.requiresUserGesture
       });
 
       if (!isMountedRef.current) return;
@@ -1328,8 +1329,11 @@ export const BrowserAssistantView: React.FC = () => {
           </div>
           <div className="settings-browser-diagnostic-card__footer">
             <button
+              type="button"
               onClick={() => void checkConnectivity(true)}
               disabled={testingConnection}
+              data-browser-tool={BROWSER_ACTIONS.getStatus.toolName}
+              data-browser-command-kind={BROWSER_ACTIONS.getStatus.commandKind}
               className="settings-browser-action settings-browser-action--primary"
             >
               {testingConnection ? (
@@ -2036,6 +2040,8 @@ export const BrowserAssistantView: React.FC = () => {
                     type="button"
                     onClick={handleExtractTest}
                     disabled={extractLoading}
+                    data-browser-tool={BROWSER_ACTIONS.extractProduct.toolName}
+                    data-browser-command-kind={BROWSER_ACTIONS.extractProduct.commandKind}
                     className="settings-browser-action settings-browser-action--primary"
                   >
                     {extractLoading ? (
@@ -2154,6 +2160,8 @@ export const BrowserAssistantView: React.FC = () => {
                               type="button"
                               onClick={handleWriteBackDom}
                               disabled={writeBackLoading}
+                              data-browser-tool={BROWSER_ACTIONS.writeBackDom.toolName}
+                              data-browser-command-kind={BROWSER_ACTIONS.writeBackDom.commandKind}
                               className="settings-browser-action settings-browser-action--primary"
                             >
                               {writeBackLoading ? (
@@ -2213,6 +2221,8 @@ export const BrowserAssistantView: React.FC = () => {
                         type="button"
                         onClick={handleGenTest}
                         disabled={genLoading}
+                        data-browser-tool={BROWSER_ACTIONS.generateExternal.toolName}
+                        data-browser-command-kind={BROWSER_ACTIONS.generateExternal.commandKind}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         {genLoading ? (
@@ -2286,6 +2296,8 @@ export const BrowserAssistantView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handlePublishToSocial()}
+                        data-browser-tool={BROWSER_ACTIONS.publishDraft.toolName}
+                        data-browser-command-kind={BROWSER_ACTIONS.publishDraft.commandKind}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <Share2 size={13} />
@@ -2506,6 +2518,8 @@ export const BrowserAssistantView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handlePublishToSocial(pipelineCompletedData.finalImageUrl)}
+                        data-browser-tool={BROWSER_ACTIONS.publishDraft.toolName}
+                        data-browser-command-kind={BROWSER_ACTIONS.publishDraft.commandKind}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <Share2 size={13} />

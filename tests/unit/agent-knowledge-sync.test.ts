@@ -40,7 +40,7 @@ test('KnowledgeStore records change summaries and redacts sensitive strings', ()
     title: 'Secret handling update',
     summary: `Never store ${fakeApiKey} or ${fakeBearer} in knowledge records.`,
     source: 'runtime',
-    paths: ['apps/web/src/features/ai-takeover/core/toolRegistry.ts'],
+    paths: ['apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts'],
     tools: ['knowledge.recordChange'],
     validation: ['npm run governance:check'],
   });

@@ -15,7 +15,7 @@
 
 ## 2. 第一批工具清单描述
 
-当前代码入口位于 `apps/web/src/features/ai-takeover/core/toolRegistry.ts`。为兼容旧 `AssistantAction`，注册表同时保留 `fillPrompt`、`zipOutputs`、`startBatchGeneration` 等 legacy 名称；新流程应优先使用 namespaced 工具名。每次工具执行都会写入脱敏的 `AgentToolCallLog`，包含 `runId`、`toolName`、输入/输出摘要、状态、错误和时间戳。
+当前代码入口位于 `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`。AI Takeover 通过 `AgentRuntime.executePendingRun` 统一执行计划，不再保留单独的 `actionExecutor` 生产路径。为兼容旧 `AssistantAction`，注册表同时保留 `fillPrompt`、`zipOutputs`、`startBatchGeneration` 等 legacy 名称；新流程应优先使用 namespaced 工具名。每次工具执行都会写入脱敏的 `AgentToolCallLog`，包含 `runId`、`toolName`、输入/输出摘要、状态、错误和时间戳。
 
 ### `canvas.getState`
 - **说明**: 获取当前画布节点数、画布名称、尺寸与视口状态。
@@ -117,3 +117,12 @@
 - Runtime implementation: `apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts`.
 - Storage note: browser `localStorage` is only a projection/cache, not long-term authoritative storage. It stores redacted summaries only.
 - Safety note: ToolRegistry execution console logs now emit the redacted `inputSummary` rather than raw tool input, matching the `AgentToolCallLog` redaction path.
+
+## 6. Implementation update - AI control action surface - 2026-06-22
+
+- AI Takeover UI control buttons use `AGENT_CONTROL_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts` as the shared action contract.
+- Confirmation buttons expose `data-agent-action="confirm-plan|cancel-plan"` plus `data-agent-runtime-action="executePendingRun|cancelPendingRun"` so both `AIAssistantDock` and `ChatSidebar` route pending plans through the same `AgentRuntime` methods.
+- Durable generation queue buttons expose `data-agent-action` on both surfaces. Pause, resume, retry, and cancel also expose `data-agent-tool` mapped to `generation.pauseJob`, `generation.resumeJob`, `generation.retryJob`, and `generation.cancelJob`.
+- Queue archive and output locate are local UI actions with `toolName: undefined`; they are intentionally not advertised as LLM tools because they do not go through `ToolRegistry`.
+- `AIAssistantDock` and `ChatSidebar` now both show retry and locate controls for durable queue jobs, preventing one AI control surface from having a different queue capability set than the other.
+- Composer and resource controls also use `AGENT_CONTROL_ACTIONS`: context compression, send message, image import, folder import, file connect, resource panel toggle/close, and resource removal are local UI actions with stable `data-agent-action` values and no `ToolRegistry` tool name.

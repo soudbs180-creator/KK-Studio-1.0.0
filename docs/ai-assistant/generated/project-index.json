@@ -23,8 +23,8 @@
     "path": "docs/ai-assistant/flow-map.md",
     "title": "流程地图 (Flow Map)",
     "summary": "本文件整理了 KK Studio v1.5.7 的核心工作流流转路径。",
-    "contentHash": "3eb0a7df79a9daa7099a3f57b5c48ca1",
-    "updatedAt": "2026-06-22T03:17:39.156Z"
+    "contentHash": "00ebdb77f4041fb666ae6aba7769e213",
+    "updatedAt": "2026-06-22T06:39:45.485Z"
   },
   {
     "id": "doc_module_map_md",
@@ -32,8 +32,8 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "本文件整理了 KK Studio v1.5.7 的核心模块，供 AI 助手理解代码依赖和调用边界。",
-    "contentHash": "c2afbd967a4e53b062522e39d0350293",
-    "updatedAt": "2026-06-22T03:17:39.156Z"
+    "contentHash": "b08af2ea2a40c4e62b63b55b2ac18720",
+    "updatedAt": "2026-06-22T06:39:44.754Z"
   },
   {
     "id": "doc_readme_md",
@@ -86,8 +86,8 @@
     "path": "docs/ai-assistant/tool-registry.md",
     "title": "工具注册表说明 (Tool Registry)",
     "summary": "在 KK Studio v1.5.7 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
-    "contentHash": "104a0403f23d3c4841b23508c38eff6d",
-    "updatedAt": "2026-06-22T06:07:34.244Z"
+    "contentHash": "ecf06590bd52accc8f7eb9fe8ebe1745",
+    "updatedAt": "2026-06-22T07:07:14.827Z"
   },
   {
     "id": "doc_ui_map_md",

@@ -111,7 +111,7 @@ The selected-original download path is implemented by:
 
 - `apps/web/src/features/assets/resolveOriginalAssets.ts`
 - `apps/web/src/features/assets/zipOutputs.ts`
-- `apps/web/src/features/ai-takeover/core/toolRegistry.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
 
 Runtime rule: `selected_cards` never means all canvases. It means the current `selectedNodeIds`; selected Prompt cards expand to their child image nodes. The ZIP source resolver tries `originalUrl`, then `apiResultUrl`, then `url`, then `storageId`, then local asset recovery. `manifest.json` is always written, including manifest-only archives when every download fails.
 

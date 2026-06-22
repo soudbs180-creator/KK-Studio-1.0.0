@@ -2853,3 +2853,179 @@ Mobile workspace: `apps/mobile/`
 - Direct public social publishing remains intentionally out of scope; Browser Assistant only saves drafts through this governed path.
 - A future product pass can surface per-command Browser Bridge result streaming in the AI takeover timeline.
 - Mobile Expo dependency remediation stayed within the existing `undici` 6.x override path; broader Expo upgrades remain a separate release decision.
+
+## 2026-06-22 - Browser Action Catalog Button / Tool Alignment
+
+### Browser Action Catalog Scope
+- Added `browserActionCatalog.ts` as the single metadata source for Browser Assistant tool names, Browser Bridge command kinds, permissions, labels, and user-gesture requirements.
+- Updated `browserTools.ts` to consume the catalog instead of hardcoding `browser.*` names and `extract_product` / `generate_external` / `publish_draft` / `write_back_dom` command kinds.
+- Updated `BrowserAssistantView.tsx` so Browser Bridge buttons expose matching `data-browser-tool` and `data-browser-command-kind` attributes. This gives tests and future UI automation a stable button-to-tool contract.
+- Updated `check-skills-consistency.mjs` so catalog-driven Browser tools remain visible to governance as registered tools and sensitive `confirm` / `dangerous` tools.
+
+### Browser Action Catalog Files Touched
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `scripts/ai-assistant/check-skills-consistency.mjs`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`
+- `tests/unit/agent-knowledge-index-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Browser Action Catalog Design Decisions
+- Browser tool metadata should not be duplicated between UI buttons, ToolRegistry definitions, and governance scripts.
+- `browser.openAssistant` intentionally has no Browser Bridge command kind because it is a local settings navigation action.
+- Governance now treats the `browser` namespace as first-class; Skills docs that mention an unregistered `browser.*` tool should fail consistency checks.
+
+### Browser Action Catalog Validation Run
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-action-catalog-contract.test.ts` failed because `browserActionCatalog.ts` did not exist.
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/agent-knowledge-index-contract.test.ts` failed because `check-skills-consistency.mjs` did not list `browser.*` tools from the catalog.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-action-catalog-contract.test.ts tests/unit/ai-takeover-intentGate.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/browser-bridge-protocol.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: passed, 54 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/agent-knowledge-index-contract.test.ts`: passed, 2 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm.cmd run governance:check`: passed and now lists `browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, and `browser.writeBackDom` in the registered tool set.
+- `npm.cmd run build`: passed.
+
+### Browser Action Catalog Risks / Next
+- The broader objective still needs a full AI-control surface audit beyond Browser Assistant to prove every button across AI Takeover, settings, canvas, queue, downloads, and generation maps to exactly one canonical tool.
+
+## 2026-06-22 - AI Control Single Runtime Path Cleanup
+
+### AI Control Single Runtime Scope
+- Removed the unused legacy `apps/web/src/features/ai-takeover/core/actionExecutor.ts` file so AI Takeover no longer appears to have a second production execution path.
+- Removed the legacy `apps/web/src/features/ai-takeover/core/toolRegistry.ts` wrapper and migrated tests to import `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts` directly.
+- Updated active AI assistant docs so ToolRegistry and execution diagrams point at `AgentRuntime` and runtime `ToolRegistry.ts`, not the removed legacy wrapper.
+- Added a contract test proving AI control execution flows through `AgentRuntime.executePendingRun` and runtime ToolRegistry only.
+
+### AI Control Single Runtime Files Touched
+- `apps/web/src/features/ai-takeover/core/actionExecutor.ts`
+- `apps/web/src/features/ai-takeover/core/toolRegistry.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/ai-assistant/module-map.md`
+- `docs/ai-assistant/flow-map.md`
+- `docs/ai-assistant/generated/project-index.json`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/agent-knowledge-sync.test.ts`
+- `docs/development/session-handoff.md`
+
+### AI Control Single Runtime Design Decisions
+- `AgentRuntime` is now the only production AI plan execution coordinator.
+- Runtime `ToolRegistry.ts` is the only production ToolRegistry source; legacy aliases still exist inside that registry for old `AssistantAction` names.
+- Historical roadmap mentions of `actionExecutor` remain historical references only; current docs and source no longer depend on that path.
+
+### AI Control Single Runtime Validation Run
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` failed while `actionExecutor.ts` still existed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts`: passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/agent-knowledge-sync.test.ts tests/unit/agent-knowledge-index-contract.test.ts`: passed, 27 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm.cmd run build`: passed.
+
+### AI Control Single Runtime Risks / Next
+- Continue auditing non-Browser AI-control buttons and panels so canvas, queue, download, generation, settings, and favorites surfaces all expose stable button-to-tool contracts.
+
+## 2026-06-22 - AI Takeover Confirmation Button Runtime Contract
+
+### AI Takeover Confirmation Button Scope
+- Added `AGENT_CONTROL_ACTIONS` as the stable mapping between AI confirmation UI buttons and `AgentRuntime` methods.
+- Updated `AIAssistantDock.tsx` and `ChatSidebar.tsx` confirmation cards so cancel/confirm buttons expose `data-agent-action` and `data-agent-runtime-action` attributes.
+- Added a focused contract test proving both AI Takeover surfaces use the shared action mapping and continue to route execution through `AgentRuntime.executePendingRun` / `cancelPendingRun`.
+
+### AI Takeover Confirmation Button Files Touched
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `tests/unit/ai-takeover-control-buttons-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### AI Takeover Confirmation Button Design Decisions
+- Confirmation/cancel button semantics should not depend on visible text because confirmation text is dynamic and localized.
+- The UI action name and runtime method name are intentionally both exposed so future automation, QA, and governance can verify button-to-runtime alignment without simulating a click.
+
+### AI Takeover Confirmation Button Validation Run
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts` failed before `AGENT_CONTROL_ACTIONS` existed and before the buttons exposed runtime action attributes.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts`: passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/agent-knowledge-sync.test.ts tests/unit/agent-knowledge-index-contract.test.ts`: passed, 28 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-action-catalog-contract.test.ts tests/unit/ai-takeover-intentGate.test.ts tests/unit/browser-bridge-protocol.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts`: passed, 37 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed.
+
+### AI Takeover Confirmation Button Risks / Next
+- Continue auditing direct action buttons around queue retry, canvas sync, download, favorites/@ references, and generation controls so each important AI-controlled button maps to one canonical runtime tool or action.
+
+## 2026-06-22 - AI Takeover Durable Queue Control Alignment
+
+### AI Takeover Durable Queue Control Scope
+- Extended `AGENT_CONTROL_ACTIONS` to cover durable generation queue UI actions and their matching `generation.*` ToolRegistry names.
+- Updated `AIAssistantDock.tsx` durable queue controls so archive, pause, resume, retry, locate, and cancel expose stable `data-agent-action` attributes; pause/resume/retry/cancel also expose `data-agent-tool`.
+- Added missing retry-failed and locate-output controls to `AIAssistantDock.tsx`, matching the existing ChatSidebar queue capability set.
+- Updated `ChatSidebar.tsx` durable queue controls to use the same shared action mapping while retaining the existing `data-action` attributes for compatibility.
+- Updated `docs/ai-assistant/tool-registry.md` with the current queue button-to-tool contract.
+
+### AI Takeover Durable Queue Control Files Touched
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `tests/unit/ai-takeover-control-buttons-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### AI Takeover Durable Queue Control Design Decisions
+- Queue pause/resume/retry/cancel are existing `generation.*` tools, so their user-facing buttons now explicitly advertise the matching `data-agent-tool`.
+- Queue archive and output locate stay local UI actions because they do not execute through `ToolRegistry`; they still need stable `data-agent-action` values for QA and future automation.
+- `AIAssistantDock` should not be a reduced subset of ChatSidebar for durable jobs; both surfaces now expose retry and locate affordances.
+
+### AI Takeover Durable Queue Control Validation Run
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts` failed because queue actions were missing from `AGENT_CONTROL_ACTIONS` and queue buttons lacked `data-agent-*` attributes.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts`: passed, 2 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts`: passed, 21 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed.
+
+### AI Takeover Durable Queue Control Risks / Next
+- Continue the broader AI control audit for download/original ZIP, favorites/@ reference insertion, canvas sync, and generation composer buttons.
+
+## 2026-06-22 - AI Takeover Composer Resource Control Alignment
+
+### AI Takeover Composer Resource Control Scope
+- Extended `AGENT_CONTROL_ACTIONS` to cover local composer/resource controls: context compression, send takeover message, image import, folder import, file connect, resource panel toggle/close, and resource removal.
+- Updated `AIAssistantDock.tsx` so direct composer/resource buttons expose stable `data-agent-action` attributes.
+- Updated `ChatSidebar.tsx` takeover menu, resource panel, context compression, and send button to use the same shared local action names.
+- Updated `docs/ai-assistant/tool-registry.md` so the local UI action surface is documented next to ToolRegistry-backed actions.
+
+### AI Takeover Composer Resource Control Files Touched
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts`
+- `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `tests/unit/ai-takeover-control-buttons-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### AI Takeover Composer Resource Control Design Decisions
+- These controls are local UI actions, not LLM tools, so they intentionally expose `toolName: undefined`.
+- The same `data-agent-action` values are used in Dock and Sidebar to avoid duplicate semantics for upload/import/connect/send/resource operations.
+
+### AI Takeover Composer Resource Control Validation Run
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts` failed because composer/resource actions were missing from `AGENT_CONTROL_ACTIONS` and buttons lacked `data-agent-action`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts`: passed, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: passed, 31 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed.
+
+### AI Takeover Composer Resource Control Risks / Next
+- Continue the full AI-control audit for normal chat controls, favorite insertion affordances, canvas sync actions, and original ZIP/download surfaces.

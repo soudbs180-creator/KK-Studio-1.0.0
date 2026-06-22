@@ -5,6 +5,8 @@ export { agentRunStore } from './runtime/AgentRunStore.ts';
 export type { AgentRunRecord } from './runtime/AgentRunStore.ts';
 export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
+export { AGENT_CONTROL_ACTIONS } from './runtime/agentControlActions.ts';
+export type { AgentControlActionKey, AgentControlRuntimeAction, AgentControlToolName, AgentControlUiAction } from './runtime/agentControlActions.ts';
 export { agentPermissionPolicy } from './runtime/AgentPermissionPolicy.ts';
 export { agentAuditLog } from './runtime/AgentAuditLog.ts';
 
@@ -18,6 +20,17 @@ export { knowledgeStore } from './knowledge/KnowledgeStore.ts';
 export type { KnowledgeDocument, KnowledgeSearchResult, KnowledgeChangeInput, KnowledgeChangeRecord } from './knowledge/KnowledgeStore.ts';
 
 export { writeHandoff, formatRunRecordToMarkdown } from './memory/handoffWriter.ts';
+export {
+  BROWSER_ACTIONS,
+  BROWSER_ACTION_LIST,
+  getBrowserActionByCommandKind,
+  getBrowserActionByToolName
+} from './browser/browserActionCatalog.ts';
+export type {
+  BrowserActionDefinition,
+  BrowserToolName
+} from './browser/browserActionCatalog.ts';
+
 export {
   browserBridgeAdapter,
   createBrowserBridgeCommand,

@@ -17,10 +17,10 @@ test('chat sidebar surfaces DurableGenerationQueue jobs in the real AI takeover 
 test('chat sidebar durable queue panel exposes pause resume cancel and locate actions', () => {
   const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
-  assert.match(source, /data-action="pause-durable-job"[\s\S]{0,260}durableGenerationQueue\.pauseJob\(job\.id\)/);
-  assert.match(source, /data-action="resume-durable-job"[\s\S]{0,260}durableGenerationQueue\.resumeJob\(job\.id\)/);
-  assert.match(source, /data-action="retry-durable-job"[\s\S]{0,260}durableGenerationQueue\.retryFailedPrompts\(job\.id\)/);
-  assert.match(source, /data-action="cancel-durable-job"[\s\S]{0,260}durableGenerationQueue\.cancelJob\(job\.id\)/);
+  assert.match(source, /data-action="pause-durable-job"[\s\S]{0,400}durableGenerationQueue\.pauseJob\(job\.id\)/);
+  assert.match(source, /data-action="resume-durable-job"[\s\S]{0,400}durableGenerationQueue\.resumeJob\(job\.id\)/);
+  assert.match(source, /data-action="retry-durable-job"[\s\S]{0,400}durableGenerationQueue\.retryFailedPrompts\(job\.id\)/);
+  assert.match(source, /data-action="cancel-durable-job"[\s\S]{0,400}durableGenerationQueue\.cancelJob\(job\.id\)/);
   assert.match(source, /data-action="locate-durable-job"[\s\S]{0,360}handleLocateDurableJob\(job\)/);
   assert.match(source, /durableGenerationQueue\.archiveFinishedJobs\(\)/);
   assert.match(source, /new CustomEvent\('canvas-center-on-node'/);

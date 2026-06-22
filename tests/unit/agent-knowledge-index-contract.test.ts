@@ -61,6 +61,15 @@ test('一致性校验：物理运行 check-skills-consistency.mjs 脚本且必�
   try {
     const stdout = execSync('node scripts/ai-assistant/check-skills-consistency.mjs', { encoding: 'utf-8' });
     assert.match(stdout, /校验成功/);
+    assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.getStatus/);
+    assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.extractProduct/);
+    assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.generateExternal/);
+    assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.publishDraft/);
+    assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.writeBackDom/);
+    assert.match(stdout, /敏感风险操作工具: \[[^\]]*browser\.extractProduct/);
+    assert.match(stdout, /敏感风险操作工具: \[[^\]]*browser\.generateExternal/);
+    assert.match(stdout, /敏感风险操作工具: \[[^\]]*browser\.publishDraft/);
+    assert.match(stdout, /敏感风险操作工具: \[[^\]]*browser\.writeBackDom/);
   } catch (err: any) {
     assert.fail(`一致性脚本 check-skills-consistency.mjs 校验异常: ${err.stdout || err.message}`);
   }

@@ -5,7 +5,7 @@ import { useAITakeover } from '../context/AITakeoverContext';
 import { useAssetStore } from '../../assets/assetStore';
 import { ensureFileUploaded } from '../../assets/lazyUpload';
 import { estimateTokens, getModelContextLimit } from '../../../utils/contextHelper';
-import { durableGenerationQueue } from '../../ai-assistant-runtime';
+import { AGENT_CONTROL_ACTIONS, durableGenerationQueue } from '../../ai-assistant-runtime';
 import type { GenerationBatchJob } from '../../ai-assistant-runtime';
 import {
   ReferenceMentionPanel,
@@ -32,9 +32,16 @@ import {
   Cpu,
   Pause,
   Play,
+  RotateCcw,
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
+
+const getDurableQueueJobNodeIds = (job: GenerationBatchJob): string[] => Array.from(new Set([
+  ...(job.outputGroup?.nodeIds || []),
+  ...job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id)),
+  ...job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []),
+]));
 
 const getUploadStateText = (state: string) => {
   switch (state) {
@@ -96,7 +103,11 @@ export const AIAssistantDock: React.FC = () => {
   useEffect(() => durableGenerationQueue.subscribe(setJobs), []);
 
   const activeJobs = React.useMemo(() => jobs.filter(job => (
-    job.status === 'running' || job.status === 'queued' || job.status === 'paused'
+    job.status === 'running' ||
+    job.status === 'queued' ||
+    job.status === 'paused' ||
+    job.prompts.some(prompt => prompt.status === 'failed') ||
+    getDurableQueueJobNodeIds(job).length > 0
   )), [jobs]);
 
   const [inputVal, setInputVal] = useState('');
@@ -216,6 +227,29 @@ export const AIAssistantDock: React.FC = () => {
     sendMessage(inputVal);
     setInputVal('');
   };
+
+  const handleLocateDurableJob = useCallback((job: GenerationBatchJob) => {
+    const outputNodeIds = getDurableQueueJobNodeIds(job);
+    const canvasNodes = [
+      ...(activeCanvas?.promptNodes || []),
+      ...(activeCanvas?.imageNodes || []),
+    ];
+    const targetNode = canvasNodes.find((node: any) => outputNodeIds.includes(node.id));
+
+    if (!targetNode?.position) {
+      notify?.info?.('队列定位', '当前任务还没有可定位的画布产物。');
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('canvas-center-on-node', {
+      detail: {
+        x: targetNode.position.x,
+        y: targetNode.position.y,
+        nodeId: targetNode.id,
+      },
+    }));
+    notify?.success?.('已定位队列输出', job.outputGroup?.label || `Job ${job.id.slice(-6)}`);
+  }, [activeCanvas?.imageNodes, activeCanvas?.promptNodes, notify]);
 
   // 处理图片选择
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -487,6 +521,7 @@ export const AIAssistantDock: React.FC = () => {
             <button
               onClick={compressContext}
               disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
+              data-agent-action={AGENT_CONTROL_ACTIONS.compressContext.uiAction}
               className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
                 isNearLimit
                   ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
@@ -669,6 +704,7 @@ export const AIAssistantDock: React.FC = () => {
             </span>
             <button 
               onClick={() => durableGenerationQueue.archiveFinishedJobs()}
+              data-agent-action={AGENT_CONTROL_ACTIONS.archiveFinishedGenerationJobs.uiAction}
               className="text-[9px] text-zinc-500 hover:text-zinc-300 transition-all cursor-pointer"
               title="只归档已完成或已取消的历史任务，不影响正在执行的任务"
             >
@@ -682,6 +718,7 @@ export const AIAssistantDock: React.FC = () => {
               const completed = job.prompts.filter((p: any) => p.status === 'completed').length;
               const failed = job.prompts.filter((p: any) => p.status === 'failed').length;
               const running = job.prompts.filter((p: any) => p.status === 'running').length;
+              const outputNodeCount = getDurableQueueJobNodeIds(job).length;
               const percent = Math.round(((completed + failed) / total) * 100);
 
               return (
@@ -715,6 +752,8 @@ export const AIAssistantDock: React.FC = () => {
                       {job.status === 'running' && (
                         <button 
                           onClick={() => durableGenerationQueue.pauseJob(job.id)}
+                          data-agent-action={AGENT_CONTROL_ACTIONS.pauseGenerationJob.uiAction}
+                          data-agent-tool={AGENT_CONTROL_ACTIONS.pauseGenerationJob.toolName}
                           className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
                           title="暂停任务"
                         >
@@ -724,15 +763,39 @@ export const AIAssistantDock: React.FC = () => {
                       {(job.status === 'paused' || job.status === 'queued') && (
                         <button 
                           onClick={() => durableGenerationQueue.resumeJob(job.id)}
+                          data-agent-action={AGENT_CONTROL_ACTIONS.resumeGenerationJob.uiAction}
+                          data-agent-tool={AGENT_CONTROL_ACTIONS.resumeGenerationJob.toolName}
                           className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
                           title="恢复并继续"
                         >
                           <Play size={10} />
                         </button>
                       )}
+                      {failed > 0 && job.status !== 'cancelled' && (
+                        <button
+                          onClick={() => durableGenerationQueue.retryFailedPrompts(job.id)}
+                          data-agent-action={AGENT_CONTROL_ACTIONS.retryGenerationJob.uiAction}
+                          data-agent-tool={AGENT_CONTROL_ACTIONS.retryGenerationJob.toolName}
+                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-amber-300 hover:text-amber-200 cursor-pointer"
+                          title="重试失败项"
+                        >
+                          <RotateCcw size={10} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleLocateDurableJob(job)}
+                        disabled={outputNodeCount === 0}
+                        data-agent-action={AGENT_CONTROL_ACTIONS.locateGenerationJobOutputs.uiAction}
+                        className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                        title="定位队列产物"
+                      >
+                        <Eye size={10} />
+                      </button>
                       {(job.status === 'running' || job.status === 'paused' || job.status === 'queued') && (
                         <button 
                           onClick={() => durableGenerationQueue.cancelJob(job.id)}
+                          data-agent-action={AGENT_CONTROL_ACTIONS.cancelGenerationJob.uiAction}
+                          data-agent-tool={AGENT_CONTROL_ACTIONS.cancelGenerationJob.toolName}
                           className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-rose-400 hover:text-rose-300 cursor-pointer"
                           title="取消任务"
                         >
@@ -767,12 +830,16 @@ export const AIAssistantDock: React.FC = () => {
           <div className="flex gap-2 justify-end">
             <button
               onClick={cancelPendingPlan}
+              data-agent-action={AGENT_CONTROL_ACTIONS.cancelPlan.uiAction}
+              data-agent-runtime-action={AGENT_CONTROL_ACTIONS.cancelPlan.runtimeAction}
               className="px-3 py-1.5 rounded-lg border border-zinc-700 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
             >
               {pendingPlan.confirmation.cancelText}
             </button>
             <button
               onClick={executePendingPlan}
+              data-agent-action={AGENT_CONTROL_ACTIONS.confirmPlan.uiAction}
+              data-agent-runtime-action={AGENT_CONTROL_ACTIONS.confirmPlan.runtimeAction}
               className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-[10px] font-bold text-white hover:brightness-110 hover:shadow-[0_2px_10px_rgba(168,85,247,0.3)] transition-all cursor-pointer"
             >
               {pendingPlan.confirmation.confirmText}
@@ -811,6 +878,7 @@ export const AIAssistantDock: React.FC = () => {
         {/* 上传图片药丸按钮 */}
         <button
           onClick={() => imgInputRef.current?.click()}
+          data-agent-action={AGENT_CONTROL_ACTIONS.importTakeoverImage.uiAction}
           className="flex-1 py-1 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-[10px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
           title="选择单图或多图导入资源池"
         >
@@ -821,6 +889,7 @@ export const AIAssistantDock: React.FC = () => {
         {/* 导入文件夹药丸按钮 */}
         <button
           onClick={() => dirInputRef.current?.click()}
+          data-agent-action={AGENT_CONTROL_ACTIONS.importTakeoverFolder.uiAction}
           className="flex-1 py-1 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-[10px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
           title="选择本地文件夹图片导入"
         >
@@ -831,6 +900,7 @@ export const AIAssistantDock: React.FC = () => {
         {/* 连接文件药丸按钮 */}
         <button
           onClick={() => fileInputRef.current?.click()}
+          data-agent-action={AGENT_CONTROL_ACTIONS.connectTakeoverFile.uiAction}
           className="flex-1 py-1 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-[10px] font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
           title="连接配置文件（懒加载）"
         >
@@ -841,6 +911,7 @@ export const AIAssistantDock: React.FC = () => {
         {/* 展开/折叠资源管理器按钮 */}
         <button
           onClick={() => setShowResourcePanel(!showResourcePanel)}
+          data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverResources.uiAction}
           className={`px-2 py-1 rounded-lg border text-[10px] font-black flex items-center gap-1 cursor-pointer transition-all ${
             showResourcePanel
               ? 'bg-purple-600/20 border-purple-500/60 text-purple-400'
@@ -860,6 +931,7 @@ export const AIAssistantDock: React.FC = () => {
             <span className="text-[10px] font-bold text-zinc-400">已连结的本地项目资源池 ({images.length + files.length})</span>
             <button
               onClick={() => setShowResourcePanel(false)}
+              data-agent-action={AGENT_CONTROL_ACTIONS.closeTakeoverResources.uiAction}
               className="text-zinc-500 hover:text-white text-[9px] cursor-pointer"
             >
               关闭
@@ -883,6 +955,7 @@ export const AIAssistantDock: React.FC = () => {
                 </div>
                 <button
                   onClick={() => removeAsset(img.id, 'image')}
+                  data-agent-action={AGENT_CONTROL_ACTIONS.removeTakeoverImage.uiAction}
                   className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
                 >
                   <Trash2 size={11} />
@@ -912,6 +985,7 @@ export const AIAssistantDock: React.FC = () => {
                 </div>
                 <button
                   onClick={() => removeAsset(f.id, 'file')}
+                  data-agent-action={AGENT_CONTROL_ACTIONS.removeTakeoverFile.uiAction}
                   className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
                 >
                   <Trash2 size={11} />
@@ -971,6 +1045,7 @@ export const AIAssistantDock: React.FC = () => {
           <button
             onClick={handleSend}
             disabled={!inputVal.trim() || isThinking}
+            data-agent-action={AGENT_CONTROL_ACTIONS.sendTakeoverMessage.uiAction}
             className="absolute right-2 p-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-500 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-md"
           >
             <Send size={12} fill="white" />

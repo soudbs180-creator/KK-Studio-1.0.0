@@ -54,7 +54,7 @@ import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
-import { durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
+import { AGENT_CONTROL_ACTIONS, durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
 import { useAssetStore } from '../../features/assets/assetStore';
 import {
     ReferenceMentionPanel,
@@ -3132,6 +3132,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <button
                                     onClick={handleCompressContext}
                                     disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
+                                    data-agent-action={AGENT_CONTROL_ACTIONS.compressContext.uiAction}
                                     className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
                                         isNearLimit
                                             ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
@@ -3558,6 +3559,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <button
                                         type="button"
                                         onClick={() => durableGenerationQueue.archiveFinishedJobs()}
+                                        data-agent-action={AGENT_CONTROL_ACTIONS.archiveFinishedGenerationJobs.uiAction}
                                         className="shrink-0 rounded-lg border border-[var(--frost-card-sub-border)] px-2 py-1 text-[9px] font-bold text-[var(--text-tertiary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-secondary)]"
                                         title="归档已完成或已取消的队列任务"
                                     >
@@ -3604,6 +3606,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         <button
                                                             type="button"
                                                             data-action="pause-durable-job"
+                                                            data-agent-action={AGENT_CONTROL_ACTIONS.pauseGenerationJob.uiAction}
+                                                            data-agent-tool={AGENT_CONTROL_ACTIONS.pauseGenerationJob.toolName}
                                                             onClick={() => durableGenerationQueue.pauseJob(job.id)}
                                                             className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
                                                             title="暂停队列任务"
@@ -3615,6 +3619,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         <button
                                                             type="button"
                                                             data-action="resume-durable-job"
+                                                            data-agent-action={AGENT_CONTROL_ACTIONS.resumeGenerationJob.uiAction}
+                                                            data-agent-tool={AGENT_CONTROL_ACTIONS.resumeGenerationJob.toolName}
                                                             onClick={() => durableGenerationQueue.resumeJob(job.id)}
                                                             className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
                                                             title="继续队列任务"
@@ -3626,6 +3632,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         <button
                                                             type="button"
                                                             data-action="retry-durable-job"
+                                                            data-agent-action={AGENT_CONTROL_ACTIONS.retryGenerationJob.uiAction}
+                                                            data-agent-tool={AGENT_CONTROL_ACTIONS.retryGenerationJob.toolName}
                                                             onClick={() => durableGenerationQueue.retryFailedPrompts(job.id)}
                                                             className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--state-warning-border)] text-[var(--state-warning-text)] transition-colors hover:bg-[var(--state-warning-bg)]"
                                                             title="重试失败队列项"
@@ -3636,6 +3644,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                     <button
                                                         type="button"
                                                         data-action="locate-durable-job"
+                                                        data-agent-action={AGENT_CONTROL_ACTIONS.locateGenerationJobOutputs.uiAction}
                                                         onClick={() => handleLocateDurableJob(job)}
                                                         disabled={outputNodeCount === 0}
                                                         className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-35"
@@ -3647,6 +3656,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         <button
                                                             type="button"
                                                             data-action="cancel-durable-job"
+                                                            data-agent-action={AGENT_CONTROL_ACTIONS.cancelGenerationJob.uiAction}
+                                                            data-agent-tool={AGENT_CONTROL_ACTIONS.cancelGenerationJob.toolName}
                                                             onClick={() => durableGenerationQueue.cancelJob(job.id)}
                                                             className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--state-danger-border)] text-[var(--state-danger-text)] transition-colors hover:bg-[var(--state-danger-bg)]"
                                                             title="取消队列任务"
@@ -3677,12 +3688,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <div className="flex gap-2 justify-end">
                                     <button
                                         onClick={cancelPendingPlan}
+                                        data-agent-action={AGENT_CONTROL_ACTIONS.cancelPlan.uiAction}
+                                        data-agent-runtime-action={AGENT_CONTROL_ACTIONS.cancelPlan.runtimeAction}
                                         className="px-2.5 py-1 rounded-lg border border-zinc-700 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
                                     >
                                         {pendingPlan.confirmation.cancelText}
                                     </button>
                                     <button
                                         onClick={executePendingPlan}
+                                        data-agent-action={AGENT_CONTROL_ACTIONS.confirmPlan.uiAction}
+                                        data-agent-runtime-action={AGENT_CONTROL_ACTIONS.confirmPlan.runtimeAction}
                                         className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-[10px] font-bold text-white hover:brightness-110 hover:shadow-[0_2px_8px_rgba(168,85,247,0.25)] transition-all cursor-pointer"
                                     >
                                         {pendingPlan.confirmation.confirmText}
@@ -3698,6 +3713,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <span className="text-[10px] font-bold text-zinc-400">已连结的本地项目资源池 ({takeoverImages.length + takeoverFiles.length})</span>
                                     <button
                                         onClick={() => setShowResourcePanel(false)}
+                                        data-agent-action={AGENT_CONTROL_ACTIONS.closeTakeoverResources.uiAction}
                                         className="text-zinc-500 hover:text-white text-[9px] cursor-pointer"
                                     >
                                         关闭
@@ -3721,6 +3737,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             </div>
                                             <button
                                                 onClick={() => removeTakeoverAsset(img.id, 'image')}
+                                                data-agent-action={AGENT_CONTROL_ACTIONS.removeTakeoverImage.uiAction}
                                                 className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
                                             >
                                                 <Trash2 size={10} />
@@ -3750,6 +3767,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             </div>
                                             <button
                                                 onClick={() => removeTakeoverAsset(f.id, 'file')}
+                                                data-agent-action={AGENT_CONTROL_ACTIONS.removeTakeoverFile.uiAction}
                                                 className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
                                             >
                                                 <Trash2 size={10} />
@@ -3961,6 +3979,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverImgInputRef.current?.click();
                                                     }}
+                                                    data-agent-action={AGENT_CONTROL_ACTIONS.importTakeoverImage.uiAction}
                                                     className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
                                                     <Picture size={13} className="text-[var(--clay-brand-lavender)]" />
@@ -3971,6 +3990,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverDirInputRef.current?.click();
                                                     }}
+                                                    data-agent-action={AGENT_CONTROL_ACTIONS.importTakeoverFolder.uiAction}
                                                     className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
                                                     <FolderOpen size={13} className="text-[var(--clay-brand-pink)]" />
@@ -3981,6 +4001,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         takeoverFileInputRef.current?.click();
                                                     }}
+                                                    data-agent-action={AGENT_CONTROL_ACTIONS.connectTakeoverFile.uiAction}
                                                     className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
                                                     <FileText size={13} className="text-[var(--clay-brand-coral)]" />
@@ -3992,6 +4013,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         setShowTakeoverMenu(false);
                                                         setShowResourcePanel(prev => !prev);
                                                     }}
+                                                    data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverResources.uiAction}
                                                     className="kk-chat-sidebar-menu-item w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium flex items-center gap-2 cursor-pointer"
                                                 >
                                                     <Eye size={13} className="text-[var(--text-tertiary)]" />
@@ -4060,6 +4082,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                 }
                                             }}
                                             disabled={!input.trim() && attachments.length === 0}
+                                            data-agent-action={AGENT_CONTROL_ACTIONS.sendTakeoverMessage.uiAction}
                                             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                                                 input.trim() || attachments.length > 0
                                                     ? 'bg-gradient-to-br from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white hover:brightness-110 active:scale-90 shadow-[0_2px_8px_rgba(244,63,94,0.25)] cursor-pointer'

@@ -2,7 +2,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toolRegistryInstance, AgentToolRegistry } from '../../apps/web/src/features/ai-takeover/core/toolRegistry.ts';
+import { toolRegistryInstance, AgentToolRegistry } from '../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts';
 import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 
 test('工具注册表：已注册工具清单检查', () => {
@@ -465,7 +465,7 @@ test('ToolRegistry: KnowledgeSync tools record and search changes', async () => 
   const change = await toolRegistryInstance.execute('knowledge.recordChange', {
     title: 'Tool registry knowledge sync',
     summary: 'Registered knowledge.searchProject and knowledge.recordChange tools.',
-    paths: ['apps/web/src/features/ai-takeover/core/toolRegistry.ts'],
+    paths: ['apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts'],
     tools: ['knowledge.recordChange', 'knowledge.searchProject'],
     validation: ['tests/unit/ai-assistant-tool-registry.test.ts']
   }, {});

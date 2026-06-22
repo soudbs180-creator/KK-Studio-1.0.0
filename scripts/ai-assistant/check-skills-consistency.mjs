@@ -6,7 +6,38 @@ import path from 'path';
 
 const ROOT_DIR = process.cwd();
 const TOOLS_DIR = path.join(ROOT_DIR, 'apps', 'web', 'src', 'features', 'ai-assistant-runtime', 'tools');
+const BROWSER_ACTION_CATALOG_PATH = path.join(
+  ROOT_DIR,
+  'apps',
+  'web',
+  'src',
+  'features',
+  'ai-assistant-runtime',
+  'browser',
+  'browserActionCatalog.ts'
+);
 const SKILLS_DIR = path.join(ROOT_DIR, 'docs', 'ai-assistant');
+
+function getBrowserActionCatalogEntries() {
+  const entries = [];
+  if (!fs.existsSync(BROWSER_ACTION_CATALOG_PATH)) {
+    return entries;
+  }
+
+  const content = fs.readFileSync(BROWSER_ACTION_CATALOG_PATH, 'utf-8');
+  const blockRegex = /\w+:\s*\{([\s\S]*?)\n\s*\}/g;
+  let match;
+  while ((match = blockRegex.exec(content)) !== null) {
+    const block = match[1];
+    const toolName = block.match(/toolName:\s*['"]([a-zA-Z0-9_.-]+)['"]/)?.[1];
+    const permission = block.match(/permission:\s*['"](safe|confirm|dangerous|forbidden)['"]/)?.[1];
+    if (toolName && permission) {
+      entries.push({ toolName, permission });
+    }
+  }
+
+  return entries;
+}
 
 // 1. 扫描所有的工具文件，通过正则匹配获取所有注册的工具名和别名
 function getRegisteredTools() {
@@ -36,6 +67,10 @@ function getRegisteredTools() {
     }
   }
 
+  for (const entry of getBrowserActionCatalogEntries()) {
+    tools.add(entry.toolName);
+  }
+
   // 加上一些已知且必要的系统工具
   tools.add('fillApiKey');
   tools.add('optimizePromptLocally');
@@ -57,6 +92,12 @@ function getSensitiveTools() {
     let match;
     while ((match = toolBlockRegex.exec(content)) !== null) {
       sensitiveTools.add(match[1]);
+    }
+  }
+
+  for (const entry of getBrowserActionCatalogEntries()) {
+    if (entry.permission === 'confirm' || entry.permission === 'dangerous') {
+      sensitiveTools.add(entry.toolName);
     }
   }
   return sensitiveTools;
@@ -120,7 +161,7 @@ function run() {
   let failed = false;
 
   // 1. 校验：Skills 中引用的工具名必须真实存在于注册表中
-  const validNamespaces = new Set(['canvas', 'ui', 'assets', 'generation', 'prompt', 'knowledge', 'skills']);
+  const validNamespaces = new Set(['canvas', 'ui', 'assets', 'generation', 'prompt', 'knowledge', 'skills', 'browser']);
   for (const tool of referenced) {
     const parts = tool.split('.');
     const isNamespacedTool = parts.length === 2 && validNamespaces.has(parts[0]);
