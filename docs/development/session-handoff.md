@@ -2745,3 +2745,24 @@ Mobile workspace: `apps/mobile/`
 - Deploy through the authenticated Vercel plugin or push `main` so the Vercel Git integration builds the verified commit.
 - After deployment, verify `https://kkai.plus` and `https://www.kkai.plus`, inspect production runtime logs, and confirm the new deployment is `READY`.
 - Configure real VPS/backend mail env and apply `migrations/013_password_reset_tokens.sql` before enabling password reset email delivery for users.
+
+## 2026-06-22 - Knowledge Index Deterministic Verification Closure
+
+### Knowledge Index Deterministic Scope
+- Fixed `scripts/ai-assistant/build-knowledge-index.mjs` so unchanged document content preserves the previous `updatedAt` from `docs/ai-assistant/generated/project-index.json`.
+- Added a dedicated unit contract proving two consecutive knowledge index builds produce identical output when source docs are unchanged.
+- Kept the refreshed generated index in the main-branch commit so post-verification worktrees stay clean before push/deploy.
+
+### Knowledge Index Deterministic Files Touched
+- `scripts/ai-assistant/build-knowledge-index.mjs`
+- `docs/ai-assistant/generated/project-index.json`
+- `tests/unit/agent-knowledge-index-stability.test.ts`
+- `docs/development/session-handoff.md`
+
+### Knowledge Index Deterministic Validation Run
+- `node --check scripts/ai-assistant/build-knowledge-index.mjs`: passed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/agent-knowledge-index-stability.test.ts`: passed, 1 test.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/agent-knowledge-index-contract.test.ts`: passed, 2 tests.
+
+### Knowledge Index Deterministic Risks / Next
+- Full `npm.cmd run verify:changes` will be rerun after committing this deterministic generator fix, before pushing `main` to GitHub.

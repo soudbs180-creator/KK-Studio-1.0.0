@@ -36,6 +36,22 @@ function parseMarkdown(filePath, content) {
   return { title, summary };
 }
 
+function readExistingIndex(outputPath) {
+  if (!fs.existsSync(outputPath)) {
+    return new Map();
+  }
+
+  try {
+    const existing = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+    if (!Array.isArray(existing)) {
+      return new Map();
+    }
+    return new Map(existing.map((document) => [document.id, document]));
+  } catch {
+    return new Map();
+  }
+}
+
 function run() {
   console.log('[Knowledge Index] 开始构建项目知识库索引...');
 
@@ -46,6 +62,8 @@ function run() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
+  const outputPath = path.join(OUTPUT_DIR, 'project-index.json');
+  const existingDocuments = readExistingIndex(outputPath);
   const files = fs.readdirSync(DOCS_DIR);
   const documents = [];
 
@@ -59,6 +77,11 @@ function run() {
       
       const id = 'doc_' + filename.toLowerCase().replace(/[^a-z0-9]/g, '_');
       const relativePath = path.relative(ROOT_DIR, filePath).replace(/\\/g, '/');
+      const contentHash = getHash(content);
+      const existing = existingDocuments.get(id);
+      const updatedAt = existing?.contentHash === contentHash && typeof existing.updatedAt === 'string'
+        ? existing.updatedAt
+        : stat.mtime.toISOString();
       
       documents.push({
         id,
@@ -66,14 +89,13 @@ function run() {
         path: relativePath,
         title,
         summary,
-        contentHash: getHash(content),
-        updatedAt: stat.mtime.toISOString()
+        contentHash,
+        updatedAt
       });
     }
   }
 
   // 写入 output
-  const outputPath = path.join(OUTPUT_DIR, 'project-index.json');
   fs.writeFileSync(outputPath, JSON.stringify(documents, null, 2), 'utf-8');
   console.log(`[Knowledge Index] 构建成功，已生成索引文件: ${outputPath}`);
 }
