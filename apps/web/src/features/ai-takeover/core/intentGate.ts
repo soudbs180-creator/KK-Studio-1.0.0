@@ -25,7 +25,7 @@ const quickSettingsRoutes = [
   {
     view: 'browser-assistant',
     label: 'Browser Assistant',
-    pattern: /浏览器助手|browser\s*assistant|browser\s*bridge|chrome\s*bridge|浏览器接管/i
+    pattern: /浏览器助手|browser\s*assistant|browser\s*bridge|chrome\s*bridge|浏览器接管|网页直通|多端控制/i
   },
   {
     view: 'consumption-records',

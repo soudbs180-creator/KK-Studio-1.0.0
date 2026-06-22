@@ -44,6 +44,8 @@ import { BROWSER_ACTIONS } from '../../../features/ai-assistant-runtime/browser/
 import { agentRuntimeInstance } from '../../../features/ai-assistant-runtime';
 import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 
+const SETUP_HINT = '请先启动本地守护进程并连接 Chrome Bridge 插件，然后回到浏览器助手重试。';
+
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface ImageGenPlatform {
@@ -236,6 +238,16 @@ export const BrowserAssistantView: React.FC = () => {
   const [daemonLatency, setDaemonLatency] = useState<number | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   
+  // 开发演示数据 (Dev-only Fallback) 开关
+  const [devFallback, setDevFallback] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_dev_fallback') === 'true';
+  });
+
+  // 同步 devFallback 到 localStorage
+  useEffect(() => {
+    localStorage.setItem('kk_browser_dev_fallback', String(devFallback));
+  }, [devFallback]);
+  
   // 演示区 Tab
   const [playgroundTab, setPlaygroundTab] = useState<'extract' | 'generate' | 'pipeline'>('extract');
 
@@ -367,15 +379,25 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 桌面通道测试
   const handleTestIde = () => {
+    if (daemonStatus !== 'connected' && !devFallback) {
+      notify.error('桌面调起失败', '请先启动本地守护进程并确保插件已连通。提示：' + SETUP_HINT);
+      setDesktopStatus('error');
+      return;
+    }
+
     setTestingDesktop(true);
     setDesktopStatus('connecting');
-    notify.success('桌面通道就绪', `正在通过本地守护进程连接您的桌面开发环境并尝试挂载文件...`);
+    const isFallback = daemonStatus !== 'connected' && devFallback;
+    notify.success(
+      isFallback ? '[Dev Fallback] 桌面通道就绪' : '桌面通道就绪',
+      `正在通过本地守护进程连接您的桌面开发环境并尝试挂载文件...`
+    );
     window.setTimeout(() => {
       if (!isMountedRef.current) return;
       setDesktopStatus('connected');
       setTestingDesktop(false);
       notify.success(
-        '桌面调起成功', 
+        isFallback ? '[Dev Fallback] 桌面调起成功' : '桌面调起成功', 
         `已成功在本地调起 ${selectedIde === 'cursor' ? 'Cursor IDE' : selectedIde === 'trae' ? 'Trae IDE' : 'VS Code'} 并定位当前项目工程！`
       );
     }, 1200);
@@ -383,16 +405,22 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 打包原图下载适配器 (遵循 AGENTS.md 规范与 ZIP manifest 契约)
   const handleZipOriginals = () => {
+    if (daemonStatus !== 'connected' && !devFallback) {
+      notify.error('打包原图下载失败', '本地守护进程未连接。提示：' + SETUP_HINT);
+      return;
+    }
+
     setZipLoading(true);
     setZipProgress(0);
     setZippedFileLoc(null);
+    const isFallback = daemonStatus !== 'connected' && devFallback;
     
     const steps = [
-      '【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...',
-      '【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...',
-      '【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...',
-      '【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...',
-      '【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...'
+      isFallback ? '[Dev Fallback] 【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...' : '【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...',
+      isFallback ? '[Dev Fallback] 【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...' : '【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...',
+      isFallback ? '[Dev Fallback] 【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...' : '【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...',
+      isFallback ? '[Dev Fallback] 【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...' : '【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...',
+      isFallback ? '[Dev Fallback] 【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...' : '【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...'
     ];
 
     setZipStep(steps[0]!);
@@ -413,7 +441,7 @@ export const BrowserAssistantView: React.FC = () => {
         setZipLoading(false);
         setZippedFileLoc('C:/Users/Administrator/Downloads/kk_studio_assets_manifest.zip');
         notify.success(
-          '打包原图下载成功',
+          isFallback ? '[Dev Fallback] 打包原图下载成功' : '打包原图下载成功',
           '已成功导出 kk_studio_assets_manifest.zip！包内已严格包含符合 AGENTS.md 规范的 manifest.json 属性索引。'
         );
       }
@@ -549,6 +577,25 @@ export const BrowserAssistantView: React.FC = () => {
     errors: []
   });
 
+  // 定期从 browserBridgeAdapter 同步连通性状态
+  useEffect(() => {
+    const syncStatus = async () => {
+      try {
+        const status = await browserBridgeAdapter.getStatus();
+        if (isMountedRef.current) {
+          setDaemonStatus(status.daemonStatus);
+          setExtensionStatus(status.extensionStatus);
+          setDaemonLatency(status.latencyMs ?? null);
+        }
+      } catch (err) {
+        console.warn('Failed to sync status from browserBridgeAdapter', err);
+      }
+    };
+    syncStatus();
+    const interval = setInterval(syncStatus, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   // 1. 初始化 WebSocket 和 Web Worker，组件卸载时 100% 回收资源
   useEffect(() => {
     isMountedRef.current = true;
@@ -650,7 +697,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 4. 检测外部平台登录状态 (安全脱敏校验)
   const checkPlatformLogin = (id: string) => {
-    if (daemonStatus !== 'connected' || extensionStatus !== 'connected') {
+    if (daemonStatus !== 'connected' && !devFallback) {
       notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
       return;
     }
@@ -659,6 +706,7 @@ export const BrowserAssistantView: React.FC = () => {
       prev.map((p) => (p.id === id ? { ...p, status: 'checking' } : p))
     );
 
+    const isFallback = daemonStatus !== 'connected' && devFallback;
     window.setTimeout(() => {
       if (!isMountedRef.current) return;
       const isLoggedIn = Math.random() > 0.2;
@@ -670,9 +718,15 @@ export const BrowserAssistantView: React.FC = () => {
         )
       );
       if (isLoggedIn) {
-        notify.success('登录状态就绪', `${platforms.find((p) => p.id === id)?.name} 已处于已登录态`);
+        notify.success(
+          isFallback ? '[Dev Fallback] 登录状态就绪' : '登录状态就绪', 
+          `${platforms.find((p) => p.id === id)?.name} 已处于已登录态`
+        );
       } else {
-        notify.warning('未登录', `未检测到 ${platforms.find((p) => p.id === id)?.name} 的登录凭证`);
+        notify.warning(
+          isFallback ? '[Dev Fallback] 未登录' : '未登录', 
+          `未检测到 ${platforms.find((p) => p.id === id)?.name} 的登录凭证`
+        );
       }
     }, 1000);
   };
@@ -692,7 +746,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 5. 检测社交分发通道
   const checkSocialLogin = (id: string) => {
-    if (daemonStatus !== 'connected' || extensionStatus !== 'connected') {
+    if (daemonStatus !== 'connected' && !devFallback) {
       notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
       return;
     }
@@ -701,6 +755,7 @@ export const BrowserAssistantView: React.FC = () => {
       prev.map((sc) => (sc.id === id ? { ...sc, status: 'checking' } : sc))
     );
 
+    const isFallback = daemonStatus !== 'connected' && devFallback;
     window.setTimeout(() => {
       if (!isMountedRef.current) return;
       const isLoggedIn = Math.random() > 0.15;
@@ -712,9 +767,15 @@ export const BrowserAssistantView: React.FC = () => {
         )
       );
       if (isLoggedIn) {
-        notify.success('登录检测成功', `${socialChannels.find((sc) => sc.id === id)?.name} 分发通道就绪`);
+        notify.success(
+          isFallback ? '[Dev Fallback] 登录检测成功' : '登录检测成功', 
+          `${socialChannels.find((sc) => sc.id === id)?.name} 分发通道就绪`
+        );
       } else {
-        notify.warning('未登录', `未检测到 ${socialChannels.find((sc) => sc.id === id)?.name} 登录状态`);
+        notify.warning(
+          isFallback ? '[Dev Fallback] 未登录' : '未登录', 
+          `未检测到 ${socialChannels.find((sc) => sc.id === id)?.name} 登录状态`
+        );
       }
     }, 1000);
   };
@@ -755,15 +816,27 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   const checkSessionLogin = (id: string) => {
+    if (daemonStatus !== 'connected' && !devFallback) {
+      notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, status: 'unknown' } : s))
+      );
+      return;
+    }
+
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: 'checking' } : s))
     );
+    const isFallback = daemonStatus !== 'connected' && devFallback;
     window.setTimeout(() => {
       if (!isMountedRef.current) return;
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, status: 'logged_in' } : s))
       );
-      notify.success('检测成功', '多开网页会话登录状态有效！');
+      notify.success(
+        isFallback ? '[Dev Fallback] 检测成功' : '检测成功', 
+        isFallback ? '多开网页会话登录状态有效 (仿真验证)！' : '多开网页会话登录状态有效！'
+      );
     }, 800);
   };
 
@@ -1044,16 +1117,56 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 10. 阶段四：本地 LLM 网关连通性测试
-  const handleTestLocalLlm = () => {
+  const handleTestLocalLlm = async () => {
     setTestingLlm(true);
     setLocalLlmStatus('connecting');
-    window.setTimeout(() => {
-      if (isMountedRef.current) {
+
+    if (daemonStatus !== 'connected' && !devFallback) {
+      setLocalLlmStatus('error');
+      setTestingLlm(false);
+      notify.error('Ollama 网关测试失败', '本地守护进程未连接，无法通过守护进程代理访问本地网关。');
+      return;
+    }
+
+    if (devFallback) {
+      window.setTimeout(() => {
+        if (isMountedRef.current) {
+          setLocalLlmStatus('connected');
+          setTestingLlm(false);
+          notify.success('[Dev Fallback] Ollama 网关测试就绪', `已成功连接本地守护进程并检测到活跃模型：${localLlmModel}`);
+        }
+      }, 1200);
+      return;
+    }
+
+    let timeoutId: any = null;
+    try {
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${localLlmEndpoint}/api/tags`, {
+        signal: controller.signal
+      });
+
+      if (!isMountedRef.current) return;
+      if (res.ok) {
         setLocalLlmStatus('connected');
-        setTestingLlm(false);
         notify.success('Ollama 网关测试就绪', `已成功连接本地守护进程并检测到活跃模型：${localLlmModel}`);
+      } else {
+        setLocalLlmStatus('error');
+        notify.error('Ollama 网关测试失败', `网关返回错误代码: ${res.status}`);
       }
-    }, 1200);
+    } catch (err: any) {
+      if (!isMountedRef.current) return;
+      setLocalLlmStatus('error');
+      notify.error('Ollama 网关测试失败', `无法连通 Ollama 网关: ${err?.message || String(err)}`);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (isMountedRef.current) {
+        setTestingLlm(false);
+      }
+    }
   };
 
   // 11. 阶段四：智能剪贴板流入模拟
@@ -1078,8 +1191,17 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 12. 阶段四：模拟屏幕捕捉设计转译
   const handleScreenInspect = () => {
+    if (daemonStatus !== 'connected' && !devFallback) {
+      notify.error('屏幕感知失败', '本地守护进程未连接。提示：' + SETUP_HINT);
+      return;
+    }
+
     setScreenInspectStatus('capturing');
-    notify.success('屏幕感知启动', '正在通过插件捕捉活动浏览器标签页的可见视口并检测 DOM 树布局...');
+    const isFallback = daemonStatus !== 'connected' && devFallback;
+    notify.success(
+      isFallback ? '[Dev Fallback] 屏幕感知启动' : '屏幕感知启动', 
+      '正在通过插件捕捉活动浏览器标签页的可见视口并检测 DOM 树布局...'
+    );
     window.setTimeout(() => {
       if (!isMountedRef.current) return;
       setScreenInspectStatus('parsing');
@@ -1091,7 +1213,10 @@ export const BrowserAssistantView: React.FC = () => {
           layoutType: '双栏自适应网格 (Sidebar + Content Stream)',
           ocrText: '极客首发！钛合金智能主动降噪耳机，原价 1599 元，限时特惠 1299 元！',
         });
-        notify.success('设计转译成功', '已分析完成！在画布中自动生成了该网页的色卡和线框 UI 布局框架。');
+        notify.success(
+          isFallback ? '[Dev Fallback] 设计转译成功' : '设计转译成功', 
+          '已分析完成！在画布中自动生成了该网页的色卡和线框 UI 布局框架。'
+        );
       }, 1200);
     }, 800);
   };
@@ -1100,15 +1225,32 @@ export const BrowserAssistantView: React.FC = () => {
   const handleRunPipeline = () => {
     if (pipelineRunning || !workerRef.current) return;
     
+    if (daemonStatus !== 'connected' && !devFallback) {
+      notify.error('流水线启动失败', '本地守护进程未连接。提示：' + SETUP_HINT);
+      setPipelineLogs([
+        '❌ 启动失败：未检测到本地守护进程。',
+        `提示：${SETUP_HINT}`,
+        '请参考下方「启动本地 Daemon 进程」指南，启动服务后重试。'
+      ]);
+      return;
+    }
+
     setPipelineRunning(true);
     setPipelineStep(1);
     setPipelineCompletedData(null);
     
-    logsBufferRef.current = ['[1/5] 启动全自动宏流水线任务...'];
+    const isFallback = daemonStatus !== 'connected' && devFallback;
+    logsBufferRef.current = [
+      isFallback ? '[Dev Fallback] [1/5] 启动全自动宏流水线任务...' : '[1/5] 启动全自动宏流水线任务...'
+    ];
     
     // 增加路由策略日志
     if (routingMode === 'api') {
-      logsBufferRef.current.push('【路由中心】已选择：[官方 API 路线] -> 将直接扣减系统 API 积分 (10点/次)。');
+      logsBufferRef.current.push(
+        isFallback 
+          ? '[Dev Fallback] 【路由中心】已选择：[官方 API 路线] -> 将模拟扣减系统 API 积分 (10点/次)。'
+          : '【路由中心】已选择：[官方 API 路线] -> 将直接扣减系统 API 积分 (10点/次)。'
+      );
     } else {
       const activeUsernames = sessions
         .filter((s) => s.platformId === genPlatform && s.enabled && selectedSessionsForGen.includes(s.id))
@@ -1119,11 +1261,19 @@ export const BrowserAssistantView: React.FC = () => {
         setPipelineRunning(false);
         return;
       }
-      logsBufferRef.current.push(`【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`);
+      logsBufferRef.current.push(
+        isFallback
+          ? `[Dev Fallback] 【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`
+          : `【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`
+      );
     }
 
     setPipelineLogs([...logsBufferRef.current]);
-    setPipelineStatusText('【步骤 1/5】正在通过插件后台提取商品天猫详情页数据...');
+    setPipelineStatusText(
+      isFallback 
+        ? '[Dev Fallback] 【步骤 1/5】正在通过插件后台提取商品天猫详情页数据...' 
+        : '【步骤 1/5】正在通过插件后台提取商品天猫详情页数据...'
+    );
 
     // 获取被选中的 session 标识列表传给 Web Worker，供并发分发模拟
     const selectedUsernames = sessions
@@ -1144,9 +1294,11 @@ export const BrowserAssistantView: React.FC = () => {
         const { progress, log } = data;
         const currentStepNum = Math.floor(progress / 20);
         setPipelineStep(currentStepNum);
-        setPipelineStatusText(log);
         
-        logsBufferRef.current.push(log);
+        const finalLog = isFallback ? `[Dev Fallback] ${log}` : log;
+        setPipelineStatusText(finalLog);
+        
+        logsBufferRef.current.push(finalLog);
         if (logsBufferRef.current.length > 200) {
           logsBufferRef.current.shift();
         }
@@ -1159,13 +1311,21 @@ export const BrowserAssistantView: React.FC = () => {
           generatedBySession: routingMode === 'proxy' ? data.generatedBySession : undefined,
           postText: data.postText
         });
-        logsBufferRef.current.push(
-          routingMode === 'proxy' 
-            ? `🎉 流水线执行成功！本次任务已通过浏览器会话 [${data.generatedBySession}] 零点数完成生成。`
-            : '🎉 流水线执行成功！本次生成已从您的官方 API 账户扣减了 10 点积分。'
-        );
+        
+        const doneLog = routingMode === 'proxy'
+          ? (isFallback 
+              ? `[Dev Fallback] 🎉 流水线执行成功！本次任务已模拟通过浏览器会话 [${data.generatedBySession}] 零点数完成生成。`
+              : `🎉 流水线执行成功！本次任务已通过浏览器会话 [${data.generatedBySession}] 零点数完成生成。`)
+          : (isFallback
+              ? `[Dev Fallback] 🎉 流水线执行成功！本次生成模拟已从您的官方 API 账户扣减了 10 点积分。`
+              : `🎉 流水线执行成功！本次生成已从您的官方 API 账户扣减了 10 点积分。`);
+        
+        logsBufferRef.current.push(doneLog);
         setPipelineLogs([...logsBufferRef.current]);
-        notify.success('宏流水线运行完毕', '五步自动化创作分发流程一次性成功跑通！');
+        notify.success(
+          isFallback ? '[Dev Fallback] 宏流水线运行完毕' : '宏流水线运行完毕', 
+          '五步自动化创作分发流程一次性成功跑通！'
+        );
       }
     };
   };
@@ -1322,7 +1482,18 @@ export const BrowserAssistantView: React.FC = () => {
         <div className="dashboard-grid-card settings-browser-diagnostic-card a-card-span-2-col">
           <div>
             <div className="settings-browser-status-card__kicker">多端连通诊断</div>
-            <h3 className="settings-browser-status-card__title">Connectivity Doctor</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="settings-browser-status-card__title">Connectivity Doctor</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#94a3b8' }}>
+                <input
+                  type="checkbox"
+                  checked={devFallback}
+                  onChange={(e) => setDevFallback(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>演示数据 (Dev Fallback)</span>
+              </label>
+            </div>
             <p className="settings-browser-status-card__note">
               通过对本地 9099 端口与 Chrome Web Socket 进行实时测试，诊断链路健康状况。
             </p>

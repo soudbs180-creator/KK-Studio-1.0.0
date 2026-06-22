@@ -26,8 +26,56 @@ describe('AI 接管单元测试集', () => {
     });
 
     it('常规画图指令必须触发确认卡片', () => {
-      const result = analyzeIntent('开始生成一张未来的猫咪图');
+      const result = analyzeIntent('开始生成 2 张未来的猫咪图');
       expect(result.intent).toBe('generate_images');
+      expect(result.needsConfirmation).toBe(true);
+    });
+
+    it('打开浏览器助手 / 网页直通 / 多端控制应映射到 open_settings_view 目标为 browser-assistant', () => {
+      const result1 = analyzeIntent('帮我打开浏览器助手');
+      expect(result1.intent).toBe('open_settings_view');
+      expect(result1.extracted.settingsView).toBe('browser-assistant');
+
+      const result2 = analyzeIntent('跳转到网页直通面板');
+      expect(result2.intent).toBe('open_settings_view');
+      expect(result2.extracted.settingsView).toBe('browser-assistant');
+
+      const result3 = analyzeIntent('带我去多端控制设置页');
+      expect(result3.intent).toBe('open_settings_view');
+      expect(result3.extracted.settingsView).toBe('browser-assistant');
+    });
+
+    it('检查连接 / 守护进程状态 / Chrome 插件状态映射到 control_multidevice', () => {
+      const result1 = analyzeIntent('检查浏览器助手连接状态');
+      expect(result1.intent).toBe('control_multidevice');
+      expect(result1.extracted.browserAction).toBe('status');
+
+      const result2 = analyzeIntent('诊断守护进程和插件状态');
+      expect(result2.intent).toBe('control_multidevice');
+      expect(result2.extracted.browserAction).toBe('status');
+    });
+
+    it('抓取商品链接或提取网页价格映射为 extract_page_content', () => {
+      const result = analyzeIntent('帮我抓取这个商品链接 https://item.jd.com/123.html');
+      expect(result.intent).toBe('extract_page_content');
+      expect(result.extracted.browserAction).toBe('extract_product');
+      expect(result.extracted.url).toBe('https://item.jd.com/123.html');
+      expect(result.needsConfirmation).toBe(true);
+    });
+
+    it('网页直通生图映射为 browser_generate_external', () => {
+      const result = analyzeIntent('用网页直通代理多开 2 个号并发跑 3 张商品海报图');
+      expect(result.intent).toBe('browser_generate_external');
+      expect(result.extracted.browserAction).toBe('generate_external');
+      expect(result.extracted.count).toBe(3);
+      expect(result.extracted.sessionCount).toBe(2);
+      expect(result.needsConfirmation).toBe(true);
+    });
+
+    it('分发到小红书草稿映射为 browser_publish_draft', () => {
+      const result = analyzeIntent('分发到小红书草稿箱');
+      expect(result.intent).toBe('browser_publish_draft');
+      expect(result.extracted.browserAction).toBe('publish_draft');
       expect(result.needsConfirmation).toBe(true);
     });
   });
