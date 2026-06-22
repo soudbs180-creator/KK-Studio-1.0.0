@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toolRegistryInstance, AgentToolRegistry } from '../../apps/web/src/features/ai-takeover/core/toolRegistry.ts';
+import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 
 test('工具注册表：已注册工具清单检查', () => {
   const tools = toolRegistryInstance.getAllTools();
@@ -23,6 +24,9 @@ test('工具注册表：已注册工具清单检查', () => {
   assert.ok(toolRegistryInstance.getTool('assets.zipOriginals'));
   assert.ok(toolRegistryInstance.getTool('generation.createBatchJob'));
   assert.ok(toolRegistryInstance.getTool('generation.getJobStatus'));
+  const retryJobTool = toolRegistryInstance.getTool('generation.retryJob');
+  assert.ok(retryJobTool);
+  assert.equal(retryJobTool.permission, 'safe');
   const ecommerceBatchTool = toolRegistryInstance.getTool('ecommerce.createBatchTransformJob');
   assert.ok(ecommerceBatchTool);
   assert.equal(ecommerceBatchTool.permission, 'confirm');
@@ -253,6 +257,151 @@ test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job
   assert.equal(result.promptCount, 2);
   assert.equal(result.outputGroup.color, '#ffffff');
   assert.equal(result.outputGroup.includePromptNodes, true);
+});
+
+test('ToolRegistry: generation.retryJob retries failed durable queue prompts', async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  durableGenerationQueue.clearAllJobs();
+
+  let shouldFail = true;
+  let executionCount = 0;
+  (globalThis as any).setTimeout = ((handler: any, timeout?: number, ...args: any[]) => (
+    originalSetTimeout(handler, typeof timeout === 'number' && timeout > 20 ? 1 : timeout, ...args)
+  )) as typeof setTimeout;
+
+  try {
+    durableGenerationQueue.registerExecutor(async (_prompt, _options, _jobId, promptId) => {
+      executionCount += 1;
+      if (shouldFail) {
+        throw new Error('tool_retry_later');
+      }
+      return {
+        promptNodeId: `prompt-node-${promptId}`,
+        resultImageNodeIds: [`image-node-${promptId}`]
+      };
+    });
+
+    const createdJob = durableGenerationQueue.createJob(
+      [{ id: 'prompt-1', prompt: 'retry through registry' }],
+      {
+        modelId: 'test-model',
+        aspectRatio: '1:1',
+        imageSize: '1K',
+        countPerPrompt: 1,
+        concurrency: 1,
+        layout: 'grid'
+      },
+      'canvas-1',
+      'tool-registry-retry-job'
+    );
+
+    await new Promise(resolve => originalSetTimeout(resolve, 120));
+
+    const failedJob = durableGenerationQueue.getJob(createdJob.id);
+    assert.equal(failedJob?.prompts[0]?.status, 'failed');
+    assert.equal(failedJob?.prompts[0]?.retryCount, 3);
+
+    shouldFail = false;
+    const result = await toolRegistryInstance.execute('generation.retryJob', { jobId: createdJob.id }, {
+      runId: 'run-retry-job-tool',
+      notify: {
+        success: () => {}
+      }
+    });
+
+    assert.equal(result.id, createdJob.id);
+    assert.equal(result.retryingCount, 1);
+    assert.equal(result.failedCount, 0);
+
+    await new Promise(resolve => originalSetTimeout(resolve, 50));
+
+    const recoveredJob = durableGenerationQueue.getJob(createdJob.id);
+    assert.equal(recoveredJob?.prompts[0]?.status, 'completed');
+    assert.deepEqual(recoveredJob?.prompts[0]?.resultImageNodeIds, ['image-node-prompt-1']);
+    assert.equal(executionCount, 5);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    durableGenerationQueue.clearAllJobs();
+    durableGenerationQueue.registerExecutor(async () => []);
+  }
+});
+
+test('ToolRegistry: generation.retryJob without jobId retries the latest failed durable job', async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  durableGenerationQueue.clearAllJobs();
+
+  let shouldFail = true;
+  (globalThis as any).setTimeout = ((handler: any, timeout?: number, ...args: any[]) => (
+    originalSetTimeout(handler, typeof timeout === 'number' && timeout > 20 ? 1 : timeout, ...args)
+  )) as typeof setTimeout;
+
+  try {
+    durableGenerationQueue.registerExecutor(async (_prompt, _options, _jobId, promptId) => {
+      if (shouldFail) {
+        throw new Error('latest_failed_retry_later');
+      }
+      return {
+        promptNodeId: `prompt-node-${promptId}`,
+        resultImageNodeIds: [`image-node-${promptId}`]
+      };
+    });
+
+    const olderJob = durableGenerationQueue.createJob(
+      [{ id: 'older-prompt', prompt: 'older failed job' }],
+      {
+        modelId: 'test-model',
+        aspectRatio: '1:1',
+        imageSize: '1K',
+        countPerPrompt: 1,
+        concurrency: 1,
+        layout: 'grid'
+      },
+      'canvas-1',
+      'tool-registry-latest-failed-older'
+    );
+
+    await new Promise(resolve => originalSetTimeout(resolve, 120));
+
+    const newerJob = durableGenerationQueue.createJob(
+      [{ id: 'newer-prompt', prompt: 'newer failed job' }],
+      {
+        modelId: 'test-model',
+        aspectRatio: '1:1',
+        imageSize: '1K',
+        countPerPrompt: 1,
+        concurrency: 1,
+        layout: 'grid'
+      },
+      'canvas-1',
+      'tool-registry-latest-failed-newer'
+    );
+
+    await new Promise(resolve => originalSetTimeout(resolve, 120));
+
+    assert.equal(durableGenerationQueue.getJob(olderJob.id)?.prompts[0]?.status, 'failed');
+    assert.equal(durableGenerationQueue.getJob(newerJob.id)?.prompts[0]?.status, 'failed');
+
+    shouldFail = false;
+    const result = await toolRegistryInstance.execute('generation.retryJob', {}, {
+      runId: 'run-retry-latest-failed-job-tool',
+      notify: {
+        success: () => {}
+      }
+    });
+
+    assert.equal(result.id, newerJob.id);
+    assert.equal(result.resolvedFrom, 'latest_failed');
+    assert.equal(result.retryingCount, 1);
+
+    await new Promise(resolve => originalSetTimeout(resolve, 50));
+
+    assert.equal(durableGenerationQueue.getJob(olderJob.id)?.prompts[0]?.status, 'failed');
+    assert.equal(durableGenerationQueue.getJob(newerJob.id)?.prompts[0]?.status, 'completed');
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    durableGenerationQueue.clearAllJobs();
+    durableGenerationQueue.registerExecutor(async () => []);
+  }
 });
 
 test('ToolRegistry: assets.resolveOriginals returns selected original source summary', async () => {

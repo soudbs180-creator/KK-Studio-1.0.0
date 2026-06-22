@@ -43,13 +43,11 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const miniWidth = 200;
   const miniHeight = 90; // 简体中文：优化高度，使之更矮平精致
 
-  if (isMobile || !activeCanvas) return null;
-
   const scale = canvasTransform.scale || 1;
 
   // 1. 获取所有可见卡片的绝对位置
-  const promptNodes = activeCanvas.promptNodes || [];
-  const imageNodes = activeCanvas.imageNodes || [];
+  const promptNodes = activeCanvas?.promptNodes || [];
+  const imageNodes = activeCanvas?.imageNodes || [];
 
   const visibleNodes = [
     ...promptNodes.filter((n: any) => !n.hiddenInCanvas),
@@ -58,8 +56,10 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   // 2. 确定大画布容器的实际尺寸，若无法获取则回退默认值
   const canvasRect = canvasRef.current?.getCanvasRect();
-  const containerWidth = canvasRect?.width || window.innerWidth;
-  const containerHeight = canvasRect?.height || window.innerHeight;
+  const fallbackWidth = typeof window !== 'undefined' ? window.innerWidth : 800;
+  const fallbackHeight = typeof window !== 'undefined' ? window.innerHeight : 600;
+  const containerWidth = canvasRect?.width || fallbackWidth;
+  const containerHeight = canvasRect?.height || fallbackHeight;
 
   // 避免容器宽高计算为 0 导致缩放比例计算出错
   const safeContainerWidth = containerWidth <= 0 || isNaN(containerWidth) ? 800 : containerWidth;
@@ -273,7 +273,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 折叠切换按钮 (自定义 28px 精致圆角微标) */}
         <button
           onClick={toggleCollapsed}
-          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
+          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
           title={isCollapsed ? "展开小地图" : "收起小地图"}
         >
           {isCollapsed ? (
@@ -286,7 +286,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 缩小按钮 */}
         <button
           onClick={handleZoomOut}
-          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
+          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
           title="缩小"
         >
           <Minus size={13} />
@@ -311,7 +311,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 放大按钮 */}
         <button
           onClick={handleZoomIn}
-          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[rgba(156,163,175,0.15)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-90 outline-none cursor-pointer"
+          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
           title="放大"
         >
           <Plus size={13} />
@@ -331,7 +331,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       {/* 简体中文：小地图 SVG 画面层 — 展开状态下在下方打开 */}
       {!isCollapsed && (
         <div className="flex flex-col gap-1.5 transition-all">
-          <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.01)]">
+          <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
             <svg
               ref={svgRef}
               width={miniWidth}
@@ -378,8 +378,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
                       width={Math.max(2, rw)}
                       height={Math.max(2, rh)}
                       rx={Math.max(1, scaleMini * 24)}
-                      fill="rgba(156, 163, 175, 0.15)"
-                      stroke="rgba(156, 163, 175, 0.25)"
+                      fill={isImage ? 'var(--kk-workspace-minimap-image-bg)' : 'var(--kk-workspace-minimap-node-bg)'}
+                      stroke={isImage ? 'var(--kk-workspace-minimap-image-stroke)' : 'var(--kk-workspace-minimap-node-stroke)'}
                       strokeWidth="0.5"
                     />
                   );

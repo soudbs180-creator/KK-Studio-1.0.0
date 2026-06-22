@@ -44,6 +44,18 @@ npm.cmd run api:diagnose
 npm.cmd run release:hosted:check
 ```
 
+For scripted or CI releases, provide Vercel state through environment variables
+instead of relying on a local interactive link:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+When those values are present, `npm.cmd run release:hosted:check` treats the
+project metadata as linked and the hosted release script passes the token to the
+Vercel CLI through an environment-variable reference. When they are absent, the
+remaining manual steps are `vercel login` and `vercel link`.
+
 ## Hosted Frontend
 
 Required:
@@ -72,10 +84,24 @@ The VPS backend must provide:
 - `JWT_SECRET`
 - `KK_API_SESSION_SIGNING_SECRET`
 - `USER_API_ENCRYPTION_SECRET`
+- `PUBLIC_APP_URL` or `KK_PUBLIC_APP_URL` or `WEB_PUBLIC_URL`
+- `PASSWORD_RESET_TOKEN_SECRET`
+- `PASSWORD_RESET_EMAIL_FROM`
+- `RESEND_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 
 Optional provider/runtime secrets should stay in the VPS runtime env, never in frontend env files.
+
+## Password Reset Production Readiness
+
+Password reset is part of the hosted auth release surface. Before enabling it:
+
+- Apply `migrations/013_password_reset_tokens.sql` to the VPS PostgreSQL database.
+- Set one public app origin in the VPS backend env: `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, or `WEB_PUBLIC_URL`.
+- Set `PASSWORD_RESET_TOKEN_SECRET` to a stable long random secret. Do not rotate it while active reset links may still exist.
+- Set `PASSWORD_RESET_EMAIL_FROM` and `RESEND_API_KEY` in the VPS backend env so reset links are actually delivered.
+- Keep all password-reset mail secrets out of root frontend env files and Vercel public env.
 
 ## Preflight Checklist
 

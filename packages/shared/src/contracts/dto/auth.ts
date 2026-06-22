@@ -16,6 +16,30 @@ export interface LoginRequestDto {
   turnstileToken?: string;
 }
 
+export interface PasswordResetRequestDto {
+  email: string;
+  turnstileToken?: string;
+}
+
+export interface PasswordResetRequestResponseDto {
+  requested: boolean;
+  email: string;
+  delivery: "email";
+  status: "accepted";
+  message: string;
+}
+
+export interface PasswordResetConfirmDto {
+  token: string;
+  newPassword: string;
+}
+
+export interface PasswordResetConfirmResponseDto {
+  updated: boolean;
+  status: "completed";
+  message: string;
+}
+
 export interface ProfileDto {
   id: string;
   email: string;

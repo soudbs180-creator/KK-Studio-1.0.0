@@ -3,6 +3,8 @@
 export { agentRuntimeInstance, AgentRuntime } from './runtime/AgentRuntime.ts';
 export { agentRunStore } from './runtime/AgentRunStore.ts';
 export type { AgentRunRecord } from './runtime/AgentRunStore.ts';
+export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
+export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
 export { agentPermissionPolicy } from './runtime/AgentPermissionPolicy.ts';
 export { agentAuditLog } from './runtime/AgentAuditLog.ts';
 

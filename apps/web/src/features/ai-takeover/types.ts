@@ -36,6 +36,7 @@ export type AssistantIntent =
   | 'extract_page_content'         // 抓取指定网页内容（包括价格、主图等商品信息）
   | 'control_multidevice'          // 网页控制多端相关设置与诊断
   | 'arrange_nodes'                // 整理卡片/排版布局
+  | 'retry_generation_job'         // 重试失败的持久化批量生成任务
   | 'unknown';
 
 // 意图分析结果
@@ -51,6 +52,8 @@ export interface IntentResult {
     cardQuery?: string;            // 查找卡片的关键字
     downloadScope?: string;        // 下载范围
     prompt?: string;               // 直接发送生成时提取的提示词
+    jobId?: string;                // 持久化批量生成任务 ID
+    retryTarget?: 'latest_failed';
     settingsView?: string;         // 设置页子功能 ID
     taskDomain?: AssistantBatchTaskDomain;
     aspectRatio?: AspectRatio | string;
@@ -70,6 +73,7 @@ export type AssistantAction =
   | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
   | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
+  | { type: 'generation.retryJob'; payload: { jobId?: string; target?: 'latest_failed' } }
   | { type: 'ecommerce.createBatchTransformJob'; payload: { imageIds?: string[]; rawUserRequest: string; aspectRatio?: string; layoutPreset?: AssistantBatchLayoutPreset; outputGroup?: AssistantOutputGroupPlan; idempotencyKey?: string } }
   | { type: 'locateCard'; payload: { keyword: string } }
   | { type: 'highlightElement'; payload: { selector: string } }

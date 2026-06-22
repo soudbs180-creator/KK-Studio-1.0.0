@@ -2435,6 +2435,259 @@ router.post('/v1/auth/login', async (req, res) => {
   }
 });
 
+const PASSWORD_RESET_ACCEPTED_MESSAGE = 'If an account exists for this email, password reset instructions will be sent shortly.';
+const PASSWORD_RESET_COMPLETED_MESSAGE = 'Password has been reset. You can sign in with the new password.';
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || 30);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function buildPasswordResetRequestResponse(email) {
+  return {
+    requested: true,
+    email,
+    delivery: 'email',
+    status: 'accepted',
+    message: PASSWORD_RESET_ACCEPTED_MESSAGE
+  };
+}
+
+function getPasswordResetTokenSecret() {
+  return process.env.PASSWORD_RESET_TOKEN_SECRET || getRequiredPasswordSalt();
+}
+
+function hashPasswordResetToken(token) {
+  return crypto.createHmac('sha256', getPasswordResetTokenSecret()).update(String(token || '')).digest('hex');
+}
+
+function createPasswordResetToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function getRequestIp(req) {
+  const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+  return forwardedFor || req.socket?.remoteAddress || '';
+}
+
+function getPublicAppOrigin(req) {
+  const configured = process.env.PUBLIC_APP_URL || process.env.KK_PUBLIC_APP_URL || process.env.WEB_PUBLIC_URL || '';
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0]?.trim();
+  const host = forwardedHost || req.headers.host || 'localhost:3000';
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0]?.trim();
+  const protocol = forwardedProto || (isHttpsRequest(req) ? 'https' : 'http');
+  return `${protocol}://${host}`.replace(/\/+$/, '');
+}
+
+function buildPasswordResetUrl(req, token) {
+  const url = new URL(getPublicAppOrigin(req));
+  url.searchParams.set('auth-mode', 'reset-password');
+  url.searchParams.set('token', token);
+  return url.toString();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function sendPasswordResetEmail(email, resetUrl) {
+  const resendApiKey = process.env.RESEND_API_KEY || '';
+  const from = process.env.PASSWORD_RESET_EMAIL_FROM || '';
+  if (!resendApiKey || !from || typeof fetch !== 'function') {
+    return { queued: false, reason: 'mail_provider_not_configured' };
+  }
+
+  const safeResetUrl = escapeHtml(resetUrl);
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: 'Reset your KK Studio password',
+      text: `Use this link to reset your KK Studio password. The link expires in ${PASSWORD_RESET_TOKEN_TTL_MINUTES} minutes.\n\n${resetUrl}`,
+      html: `<p>Use this link to reset your KK Studio password. The link expires in ${PASSWORD_RESET_TOKEN_TTL_MINUTES} minutes.</p><p><a href="${safeResetUrl}">Reset password</a></p>`
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`password reset email provider returned HTTP ${response.status}`);
+  }
+
+  return { queued: true };
+}
+
+// privacy-preserving: never reveal whether the submitted email belongs to an existing account.
+async function handlePasswordResetRequest(req, res) {
+  const normalizedEmail = String(req.body?.email || '').trim().toLowerCase();
+  if (!normalizedEmail || !EMAIL_RE.test(normalizedEmail)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_INVALID_EMAIL',
+        message: 'Enter a valid email address.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const data = buildPasswordResetRequestResponse(normalizedEmail);
+  const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
+
+  if (!isNoDb) {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        'SELECT id, email FROM public.users WHERE email = $1 LIMIT 1',
+        [normalizedEmail]
+      );
+      if (result.rows.length > 0) {
+        const user = result.rows[0];
+        const rawToken = createPasswordResetToken();
+        const tokenHash = hashPasswordResetToken(rawToken);
+        const expiresAt = new Date(Date.now() + Math.max(5, PASSWORD_RESET_TOKEN_TTL_MINUTES) * 60 * 1000).toISOString();
+        await pool.query(
+          'UPDATE public.password_reset_tokens SET consumed_at = NOW() WHERE user_id = $1 AND consumed_at IS NULL',
+          [user.id]
+        );
+        await pool.query(
+          'INSERT INTO public.password_reset_tokens (id, user_id, email, token_hash, expires_at, request_ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [
+            crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'),
+            user.id,
+            user.email,
+            tokenHash,
+            expiresAt,
+            getRequestIp(req),
+            String(req.headers['user-agent'] || '').slice(0, 500)
+          ]
+        );
+        await sendPasswordResetEmail(user.email, buildPasswordResetUrl(req, rawToken));
+      }
+      console.info('[auth] Password reset request accepted.');
+    } catch (err) {
+      console.error('[auth] Password reset request lookup failed:', err?.message || err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      ...data,
+      code: 'AUTH_PASSWORD_RESET_REQUESTED'
+    },
+    meta: buildMeta(req)
+  });
+}
+
+async function handlePasswordResetConfirm(req, res) {
+  const token = String(req.body?.token || '').trim();
+  const newPassword = String(req.body?.newPassword || '');
+  if (!token || token.length < 24) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_INVALID_RESET_TOKEN',
+        message: 'Password reset token is invalid or expired.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_WEAK_PASSWORD',
+        message: 'Password must be at least 8 characters.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'AUTH_PASSWORD_RESET_UNAVAILABLE',
+        message: 'Password reset confirmation requires the hosted database runtime.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const tokenHash = hashPasswordResetToken(token);
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const tokenResult = await client.query(
+      'SELECT id, user_id, expires_at, consumed_at FROM public.password_reset_tokens WHERE token_hash = $1 LIMIT 1 FOR UPDATE',
+      [tokenHash]
+    );
+    const tokenRow = tokenResult.rows[0];
+    const tokenExpired = !tokenRow || tokenRow.consumed_at || new Date(tokenRow.expires_at).getTime() <= Date.now();
+    if (tokenExpired) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_RESET_TOKEN',
+          message: 'Password reset token is invalid or expired.'
+        },
+        meta: buildMeta(req)
+      });
+    }
+
+    await client.query(
+      'UPDATE public.users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [hashPassword(newPassword), tokenRow.user_id]
+    );
+    await client.query(
+      'UPDATE public.password_reset_tokens SET consumed_at = NOW() WHERE user_id = $1 AND consumed_at IS NULL',
+      [tokenRow.user_id]
+    );
+    await client.query('COMMIT');
+    return res.json({
+      success: true,
+      data: {
+        updated: true,
+        status: 'completed',
+        code: 'AUTH_PASSWORD_RESET_COMPLETED',
+        message: PASSWORD_RESET_COMPLETED_MESSAGE
+      },
+      meta: buildMeta(req)
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[auth] Password reset confirmation failed:', err?.message || err);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error during password reset.'
+      },
+      meta: buildMeta(req)
+    });
+  } finally {
+    client.release();
+  }
+}
+
+router.post('/v1/auth/password-reset/request', handlePasswordResetRequest);
+router.post('/auth/password-reset/request', handlePasswordResetRequest);
+router.post('/v1/auth/password-reset/confirm', handlePasswordResetConfirm);
+router.post('/auth/password-reset/confirm', handlePasswordResetConfirm);
+
 // 简体中文注释：常规注册接口，优先注册到数据库，默认写入 0 积分，调试环境直接返回 Mock 成功
 router.post('/v1/auth/register', async (req, res) => {
   const { email, password } = req.body;

@@ -233,6 +233,16 @@
   --kk-prompt-bar-deep-popover-bg: var(--prompt-bar-shell-bg);
   --kk-prompt-bar-deep-popover-border: var(--prompt-bar-shell-border);
   --kk-prompt-bar-deep-popover-shadow: var(--frost-card-sub-shadow);
+  --kk-prompt-bar-deep-input-bg: var(--frost-input-bg);
+  --kk-prompt-bar-deep-input-border: var(--frost-input-border);
+  --kk-prompt-bar-deep-input-text: var(--text-primary);
+  --kk-prompt-bar-deep-input-placeholder: var(--text-tertiary);
+  --kk-prompt-bar-deep-item-hover-bg: var(--prompt-bar-shell-hover);
+  --kk-prompt-bar-deep-item-active-bg: var(--frost-card-sub-bg);
+  --kk-prompt-bar-deep-section-bg: var(--frost-card-sub-bg);
+  --kk-prompt-bar-deep-primary-bg: var(--settings-button-primary-bg);
+  --kk-prompt-bar-deep-primary-text: var(--text-inverse);
+  --kk-prompt-bar-deep-primary-shadow: var(--settings-button-primary-shadow);
   --kk-prompt-bar-deep-modal-backdrop-bg: color-mix(in srgb, var(--bg-base) 52%, transparent);
   --kk-prompt-bar-deep-modal-backdrop-blur: 12px;
   --kk-prompt-bar-deep-modal-panel-bg: var(--frost-card-framework-bg);
@@ -309,6 +319,8 @@
   --kk-canvas-context-menu-swatch-selected-shadow: 0 0 0 2px color-mix(in srgb, var(--kk-canvas-context-menu-swatch-color) 40%, transparent);
   --kk-canvas-context-menu-swatch-check-on-light: #111827;
   --kk-canvas-context-menu-swatch-check-on-dark: #ffffff;
+  --kk-canvas-drawing-overlay-extent: 200000px;
+  --kk-canvas-drawing-overlay-offset: 100000px;
   --kk-canvas-drawing-selection-stroke: var(--kk-color-brand-primary);
   --kk-canvas-drawing-selection-fill: rgb(99 102 241 / 0.12);
   --kk-canvas-drawing-text-input-bg: var(--frost-card-main-bg);
@@ -921,6 +933,88 @@
   -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.12);
 }
 
+.kk-prompt-bar-deep-model-search {
+  border: 1px solid var(--kk-prompt-bar-deep-popover-border);
+  background: var(--kk-prompt-bar-deep-popover-bg);
+  box-shadow: var(--kk-prompt-bar-deep-popover-shadow);
+  backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.16);
+  -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.16);
+}
+
+.kk-prompt-bar-deep-model-search-input,
+.kk-prompt-bar-deep-field {
+  border: 1px solid var(--kk-prompt-bar-deep-input-border);
+  background: var(--kk-prompt-bar-deep-input-bg);
+  color: var(--kk-prompt-bar-deep-input-text);
+}
+
+.kk-prompt-bar-deep-model-search-input::placeholder,
+.kk-prompt-bar-deep-field::placeholder {
+  color: var(--kk-prompt-bar-deep-input-placeholder);
+}
+
+.kk-prompt-bar-deep-model-list,
+.kk-prompt-bar-deep-count-popover,
+.kk-prompt-bar-deep-audio-panel {
+  border: 1px solid var(--kk-prompt-bar-deep-popover-border);
+  background: var(--kk-prompt-bar-deep-popover-bg);
+  box-shadow: var(--kk-prompt-bar-deep-popover-shadow);
+  backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.16);
+  -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.16);
+}
+
+.kk-prompt-bar-deep-model-section {
+  border: 1px solid var(--kk-prompt-bar-deep-popover-border);
+  background: var(--kk-prompt-bar-deep-section-bg);
+}
+
+.kk-prompt-bar-deep-provider-row,
+.kk-prompt-bar-deep-model-item,
+.kk-prompt-bar-deep-count-option,
+.kk-prompt-bar-deep-audio-option,
+.kk-prompt-bar-deep-menu-item,
+.kk-prompt-bar-deep-modal-action {
+  border: 1px solid var(--kk-prompt-bar-deep-popover-border);
+  background: var(--kk-prompt-bar-deep-input-bg);
+  color: var(--text-secondary);
+}
+
+.kk-prompt-bar-deep-provider-row:hover,
+.kk-prompt-bar-deep-model-item:hover,
+.kk-prompt-bar-deep-count-option:hover,
+.kk-prompt-bar-deep-audio-option:hover,
+.kk-prompt-bar-deep-menu-item:hover,
+.kk-prompt-bar-deep-modal-action:hover {
+  background: var(--kk-prompt-bar-deep-item-hover-bg);
+  color: var(--text-primary);
+}
+
+.kk-prompt-bar-deep-provider-row--dragged,
+.kk-prompt-bar-deep-model-item--active,
+.kk-prompt-bar-deep-count-option--active,
+.kk-prompt-bar-deep-audio-option--active {
+  border-color: var(--prompt-bar-shell-border-strong);
+  background: var(--kk-prompt-bar-deep-item-active-bg);
+  color: var(--text-primary);
+}
+
+.kk-prompt-bar-deep-menu-item {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.kk-prompt-bar-deep-modal-action {
+  border-radius: 10px;
+}
+
+.kk-prompt-bar-deep-modal-action--primary {
+  border-color: transparent;
+  background: var(--kk-prompt-bar-deep-primary-bg);
+  color: var(--kk-prompt-bar-deep-primary-text);
+  box-shadow: var(--kk-prompt-bar-deep-primary-shadow);
+}
+
 .kk-prompt-bar-deep-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -934,6 +1028,7 @@
 }
 
 .kk-prompt-bar-deep-modal-panel {
+  position: relative;
   width: 100%;
   max-width: 448px;
   border: 1px solid var(--kk-prompt-bar-deep-modal-panel-border);
@@ -1273,6 +1368,10 @@
 }
 
 .kk-canvas-drawing-overlay {
+  width: var(--kk-canvas-drawing-overlay-extent);
+  height: var(--kk-canvas-drawing-overlay-extent);
+  left: calc(var(--kk-canvas-drawing-overlay-offset) * -1);
+  top: calc(var(--kk-canvas-drawing-overlay-offset) * -1);
   cursor: crosshair;
   pointer-events: auto;
   background: transparent;

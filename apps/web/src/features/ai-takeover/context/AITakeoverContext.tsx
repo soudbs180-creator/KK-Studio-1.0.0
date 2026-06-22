@@ -6,7 +6,13 @@ import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { resolveAgentGroupBounds, resolveAgentNodeArrangeUpdates } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
-import { agentRuntimeInstance } from '../../ai-assistant-runtime';
+import {
+  agentRuntimeInstance,
+  agentRunStore,
+  buildAgentRunTimeline,
+  type AgentRunRecord,
+  type AgentRunTimelineStep,
+} from '../../ai-assistant-runtime';
 
 type LlmChat = typeof import('../../../services/llm/LLMService')['llmService']['chat'];
 
@@ -38,6 +44,8 @@ interface AITakeoverContextType {
   selectedModel: any;
   setSelectedModel: (model: any) => void;
   currentRunId: string | null;
+  currentRun: AgentRunRecord | null;
+  agentRunTimeline: AgentRunTimelineStep[];
   compressContext: () => Promise<void>;
   isCompressing: boolean;
   onOpenSettings?: (view?: any) => void;
@@ -161,6 +169,8 @@ export function AITakeoverProvider({
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [currentRun, setCurrentRun] = useState<AgentRunRecord | null>(null);
+  const agentRunTimeline = React.useMemo(() => buildAgentRunTimeline(currentRun), [currentRun]);
 
   // 简体中文：前端生图最大 3 并发排队队列状态
   const [generationQueue, setGenerationQueue] = useState<any[]>([]);
@@ -238,7 +248,12 @@ export function AITakeoverProvider({
       onGenerate
     };
 
-    await agentRuntimeInstance.executePendingRun(runId, ctx);
+    setCurrentRun(agentRunStore.getRun(runId) ?? null);
+    try {
+      await agentRuntimeInstance.executePendingRun(runId, ctx);
+    } finally {
+      setCurrentRun(agentRunStore.getRun(runId) ?? null);
+    }
   }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
 
 
@@ -256,6 +271,7 @@ export function AITakeoverProvider({
     setIsThinking(true);
     setPendingPlan(null);
     setCurrentRunId(null);
+    setCurrentRun(null);
 
     // 智能脱敏上下文构建
     const assetsSummary = useAssetStore.getState().getAssetsSummary();
@@ -294,6 +310,7 @@ export function AITakeoverProvider({
 
       setMessages(prev => [...prev, assistantMsg]);
       setCurrentRunId(record.id);
+      setCurrentRun(record);
 
       // 评估是否需要确认卡片
       if (plan.requiresConfirmation) {
@@ -321,7 +338,15 @@ export function AITakeoverProvider({
 
   // 用户点击“取消计划”
   const cancelPendingPlan = useCallback(() => {
+    const runId = currentRunId;
     setPendingPlan(null);
+
+    if (runId) {
+      void agentRuntimeInstance.cancelPendingRun(runId)
+        .then(() => setCurrentRun(agentRunStore.getRun(runId) ?? null))
+        .catch(error => console.error('[AITakeover] cancel pending run failed:', error));
+      setCurrentRunId(null);
+    }
     
     // 取消后，智能友好地提醒用户可选润色方案
     const cancelMsg: Message = {
@@ -335,7 +360,7 @@ export function AITakeoverProvider({
       timestamp: Date.now()
     };
     setMessages(prev => [...prev, cancelMsg]);
-  }, []);
+  }, [currentRunId]);
 
   // 简体中文：利用 Refs 跟踪最新的 React 状态与生图回调，供单例持久化队列消费以防闭包陈旧
   const activeCanvasRef = useRef(activeCanvas);
@@ -572,6 +597,8 @@ export function AITakeoverProvider({
         selectedModel,
         setSelectedModel,
         currentRunId,
+        currentRun,
+        agentRunTimeline,
         compressContext,
         isCompressing,
         onOpenSettings,

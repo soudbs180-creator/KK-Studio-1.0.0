@@ -135,6 +135,13 @@ const rootPackage = readJson("package.json");
 const expectedVersion = manifest.version;
 const expectedDisplayVersion = manifest.displayVersion || `v${expectedVersion}`;
 const expectedAppName = manifest.appName || "KK Studio";
+const activeGovernanceVersionDocs = [
+  "docs/governance/SECURITY_AND_BACKLOG.md",
+  "docs/governance/VERSION_AND_RELEASE.md",
+  "docs/governance/ENCODING_AND_POWERSHELL.md",
+  "docs/governance/architecture_review.md",
+];
+const staleDisplayVersions = ["v1.5.6", "KK Studio v1.5.6", "`v1.5.6`", "项目版本：KK Studio v1.5.6"];
 
 if (rootPackage.version !== expectedVersion) {
   fail(`package.json version ${rootPackage.version} does not match release manifest ${expectedVersion}`);
@@ -190,6 +197,13 @@ for (const currentFactDoc of ["AGENTS.md", "docs/governance/PROJECT_STATE_AND_VA
   }
   expectIncludes(currentFactDoc, expectedDisplayVersion, `${currentFactDoc} must state the current release line.`);
   expectIncludes(currentFactDoc, "config/release-manifest.json", `${currentFactDoc} must name the version source of truth.`);
+}
+
+for (const governanceDoc of activeGovernanceVersionDocs) {
+  expectIncludes(governanceDoc, expectedDisplayVersion, `${governanceDoc} must follow config/release-manifest.json (${expectedDisplayVersion}).`);
+  for (const staleToken of staleDisplayVersions) {
+    expectNotIncludes(governanceDoc, staleToken, `${governanceDoc} is an active governance document and cannot keep stale active version assertions.`);
+  }
 }
 
 expectIncludes("AGENTS.md", "apps/web/", "Current Web runtime must be explicit.");

@@ -1,14 +1,5 @@
-// 简体中文：KK Studio 高端编辑排版营销落地页主框架组件
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
-import { LandingChrome } from './LandingChrome';
-import { CanvasPreviewMock } from './CanvasPreviewMock';
-import { FeatureNarrative } from './FeatureNarrative';
-import { ProcessTimeline } from './ProcessTimeline';
-import { LandingCTA } from './LandingCTA';
-import { heroBadges, serviceItems, thoughtItems, trustHeadline, useCaseTags } from './landingContent';
-import { useLocale } from '../context/LocaleContext';
-import { pickByResolvedLanguage } from '../utils/localeText';
+import { ArrowUpRight } from 'lucide-react';
 import './landingStyles.css';
 import './landingReferenceOverrides.css';
 
@@ -18,145 +9,172 @@ interface KkLandingPageProps {
   onEnterWorkspace: () => void;
 }
 
+const navItems = ['Work', 'Approach', 'AI Flow', 'Services', 'About', 'Join', 'Contact'] as const;
+
+const workItems = [
+  {
+    index: '01',
+    title: 'Canvas that keeps up with intent.',
+    type: 'Infinite canvas / Creation',
+    visualClass: 'canvas',
+  },
+  {
+    index: '02',
+    title: 'Batch work with memory and control.',
+    type: 'Durable queue / Automation',
+    visualClass: 'batch',
+  },
+  {
+    index: '03',
+    title: 'AI takeover with a visible trail.',
+    type: 'Agent runtime / Verification',
+    visualClass: 'takeover',
+  },
+] as const;
+
+const approachItems = [
+  ['01', 'IntentGate reads the job before the system moves the canvas.'],
+  ['02', 'Planner and ToolRegistry turn user goals into reversible product actions.'],
+  ['03', 'PermissionPolicy, Executor, Verification, and Memory keep AI takeover visible end to end.'],
+] as const;
+
+const sectionIdFor = (item: (typeof navItems)[number]) => item.toLowerCase().replace(/\s+/g, '-');
+
 export const KkLandingPage: React.FC<KkLandingPageProps> = ({
   onLoginClick,
   isLoggedIn,
-  onEnterWorkspace
+  onEnterWorkspace,
 }) => {
-  const { language } = useLocale();
-
-  const t = <T,>(text: { zh: T; en: T }): T => pickByResolvedLanguage(language, text.zh, text.en);
-
   const primaryAction = isLoggedIn ? onEnterWorkspace : onLoginClick;
+  const primaryLabel = isLoggedIn ? 'Open workspace' : 'Sign in';
 
   return (
-    <div className="kk-landing-root">
-      <div className="kk-landing-noise" aria-hidden />
-      <div className="kk-landing-ambient" aria-hidden />
+    <div className="ng-landing-root">
+      <div className="ng-gradient-stage" aria-hidden />
+      <div className="ng-warm-stage" aria-hidden />
+      <div className="ng-noise" aria-hidden />
 
-      <LandingChrome
-        onLoginClick={onLoginClick}
-        isLoggedIn={isLoggedIn}
-        onEnterWorkspace={onEnterWorkspace}
-      />
+      <header className="ng-nav" aria-label="Primary navigation">
+        <a className="ng-nav__brand" href="#top" aria-label="KK Studio home">
+          KK Studio
+        </a>
+        <nav className="ng-nav__links" aria-label="Landing sections">
+          {navItems.map((item) => (
+            <a key={item} href={`#${sectionIdFor(item)}`}>
+              {item}
+            </a>
+          ))}
+        </nav>
+        <button type="button" className="ng-nav__login" onClick={primaryAction}>
+          {primaryLabel}
+        </button>
+      </header>
 
-      <main>
-        <section className="kk-hero" id="top">
-          <div className="kk-hero__meta kk-reveal-up">
-            <span>{t({ zh: 'KK Studio / Multimodal AI Canvas', en: 'KK Studio / Multimodal AI Canvas' })}</span>
-            <span>{t({ zh: 'For visual production teams', en: 'For visual production teams' })}</span>
+      <main className="ng-main" id="top">
+        <section className="ng-hero" aria-labelledby="ng-hero-title">
+          <div className="ng-hero__copy">
+            <p className="ng-kicker">AI-native creative workspace</p>
+            <h1 id="ng-hero-title">
+              KK Studio is an AI-native creative workspace for full-flow creative production.
+            </h1>
           </div>
 
-          <div className="kk-hero__grid">
-            <div className="kk-hero__copy">
-              <div className="kk-hero__badges kk-reveal-up kk-reveal-delay-1">
-                {heroBadges.map((badge) => (
-                  <span key={badge.en}>{t(badge)}</span>
-                ))}
-              </div>
+          <a className="ng-work-pill" href="#ai-flow">
+            <span>See AI Flow</span>
+            <ArrowUpRight size={14} strokeWidth={1.7} />
+          </a>
 
-              <h1 className="kk-hero__title kk-reveal-title">
-                {t({
-                  zh: '把 AI 创作\n组织成一张\n无限画布。',
-                  en: 'A canvas\nfor AI\nproduction.'
-                })}
-              </h1>
-            </div>
-
-            <aside className="kk-hero__aside kk-reveal-up kk-reveal-delay-2">
-              <p>
-                {t({
-                  zh: '从 Prompt、参考图和模型结果，到电商素材、PPT、视频与 Agent 队列。KK Studio 将零散的 AI 生成，转化为可管理、可复用、可审计的视觉生产系统。',
-                  en: 'From prompts, references and model outputs to commerce assets, PPT, video and agent queues. KK Studio turns scattered AI generations into a manageable, reusable and auditable visual production system.'
-                })}
-              </p>
-            </aside>
-          </div>
-
-          <div className="kk-hero__preview kk-reveal-up kk-reveal-delay-3">
-            <CanvasPreviewMock />
-          </div>
-        </section>
-
-        <section className="kk-trust-strip" aria-label={t({ zh: '核心场景', en: 'Use cases' })}>
-          <div className="kk-trust-strip__heading">
-            <span>{t({ zh: 'Our trusted workflows', en: 'Our trusted workflows' })}</span>
-            <p>{t(trustHeadline)}</p>
-          </div>
-          <div className="kk-usecase-marquee" aria-hidden="false">
-            <div className="kk-usecase-marquee__track">
-              {[...useCaseTags, ...useCaseTags].map((tag, index) => (
-                <span className={`kk-usecase-pill kk-usecase-pill--${tag.category}`} key={`${tag.label.en}-${index}`}>
-                  {t(tag.label)}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <FeatureNarrative />
-
-        <ProcessTimeline />
-
-        <section className="kk-services-section" id="services">
-          <div className="kk-services-section__inner">
-            <div className="kk-section-kicker">{t({ zh: 'Services', en: 'Services' })}</div>
-            <div className="kk-services-section__header">
-              <h2>{t({ zh: '面向真实生产，而不是演示样张。', en: 'Built for production work, not demo shots.' })}</h2>
-              <p>
-                {t({
-                  zh: 'KK Studio 的界面不是为了展示按钮，而是为了让 AI 创作里的模型、素材、版本、成本与交付关系保持清晰。',
-                  en: 'KK Studio is not a showcase of buttons. It keeps models, assets, versions, cost and delivery relationships clear throughout AI production.'
-                })}
-              </p>
-            </div>
-            <div className="kk-services-list">
-              {serviceItems.map((item, index) => (
-                <div className="kk-service-row" key={item.en}>
-                  <span>{String(index + 1).padStart(2, '0')}</span>
-                  <p>{t(item)}</p>
-                  <ArrowRight size={18} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="kk-thoughts" id="thoughts">
-          <div className="kk-section-kicker">{t({ zh: 'Thoughts', en: 'Thoughts' })}</div>
-          <div className="kk-thoughts__header">
-            <h2>{t({ zh: '来自画布世界的笔记。', en: 'Notes from the canvas world.' })}</h2>
+          <aside className="ng-hero-card" aria-label="AI takeover note">
+            <span>AI takeover</span>
             <p>
-              {t({
-                zh: '产品不是更多按钮，而是让复杂创作关系被看见、被复用、被交付。',
-                en: 'The product is not more buttons. It is a way to make complex creative relationships visible, reusable and shippable.'
-              })}
+              From intent to verification, every automated canvas action stays visible, scoped,
+              and ready for the next product step.
+            </p>
+          </aside>
+        </section>
+
+        <section className="ng-work-section" id="work" aria-labelledby="ng-work-title">
+          <div className="ng-section-label">Work</div>
+          <div className="ng-work-heading">
+            <h2 id="ng-work-title">Production work, not demo decks.</h2>
+            <p>
+              KK Studio brings prompts, images, batches, originals, and layout decisions into one
+              scrollable creative system that stays fast under real workloads.
             </p>
           </div>
 
-          <div className="kk-thoughts__list">
-            {thoughtItems.map((item) => (
-              <article className="kk-thought-row" key={item.title.en}>
-                <div className="kk-thought-row__category">{t(item.category)}</div>
-                <div>
-                  <h3>{t(item.title)}</h3>
-                  <p>{t(item.desc)}</p>
+          <div className="ng-work-grid">
+            {workItems.map((item) => (
+              <article className="ng-work-card" key={item.title}>
+                <div className={`ng-work-card__image ng-work-card__image--${item.visualClass}`} aria-hidden />
+                <div className="ng-work-card__body">
+                  <span>{item.index}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.type}</p>
                 </div>
-                <div className="kk-thought-row__meta">{t(item.meta)}</div>
               </article>
             ))}
           </div>
         </section>
 
-        <LandingCTA
-          onPrimaryClick={primaryAction}
-          onSecondaryClick={onLoginClick}
-        />
+        <section className="ng-approach-section" id="approach" aria-labelledby="ng-approach-title">
+          <div className="ng-section-label">Approach</div>
+          <h2 id="ng-approach-title">Smooth enough for daily creation, strict enough for agents.</h2>
+          <div className="ng-approach-list">
+            {approachItems.map(([index, text]) => (
+              <article key={index} className="ng-approach-row">
+                <span>{index}</span>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="ng-news-section" id="ai-flow" aria-label="AI Flow">
+          <p>AI Flow</p>
+          <h2>IntentGate to Memory: the full-flow AI takeover path stays on screen.</h2>
+        </section>
+
+        <section className="ng-services-section" id="services" aria-labelledby="ng-services-title">
+          <div className="ng-section-label">Services</div>
+          <h2 id="ng-services-title">Canvas, generation, assets, knowledge, verification.</h2>
+          <div className="ng-services-grid">
+            {['Canvas runtime', 'Batch generation', 'Original assets', 'Knowledge update'].map((service) => (
+              <span key={service}>{service}</span>
+            ))}
+          </div>
+        </section>
+
+        <section className="ng-about-section" id="about" aria-labelledby="ng-about-title">
+          <div className="ng-section-label">About</div>
+          <h2 id="ng-about-title">A studio surface for creators who need intelligent flow.</h2>
+        </section>
+
+        <section className="ng-join-section" id="join" aria-labelledby="ng-join-title">
+          <div className="ng-section-label">Join</div>
+          <h2 id="ng-join-title">For teams that want AI to act carefully, quickly, and visibly.</h2>
+        </section>
+
+        <footer className="ng-footer" id="contact">
+          <div className="ng-footer__flower" aria-hidden />
+          <div className="ng-footer__content">
+            <p>Start with KK Studio</p>
+            <h2>Turn the whole creative flow into a controlled AI workspace.</h2>
+            <button type="button" onClick={primaryAction}>
+              {primaryLabel}
+              <ArrowUpRight size={16} strokeWidth={1.7} />
+            </button>
+          </div>
+          <div className="ng-footer__links">
+            <span>Canvas</span>
+            <span>ToolRegistry</span>
+            <span>Verification</span>
+            <span>2026 KK Studio</span>
+          </div>
+        </footer>
       </main>
     </div>
   );
 };
 
 export default KkLandingPage;
-
-

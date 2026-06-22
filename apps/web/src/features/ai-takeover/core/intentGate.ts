@@ -59,6 +59,10 @@ function extractSimpleGeneratePrompt(input: string): string {
 const matchAny = (input: string, patterns: RegExp[]): boolean =>
   patterns.some(pattern => pattern.test(input));
 
+function extractGenerationJobId(input: string): string | undefined {
+  return input.match(/\b(?:job|batch)_[a-zA-Z0-9_-]+\b/)?.[0];
+}
+
 function extractAspectRatio(input: string): string | undefined {
   const match = input.match(/(?:aspect\s*ratio|ratio|比例|画幅|比例改成|比例调整为|改成比例)?\s*(\d{1,2})\s*[:：]\s*(\d{1,2})/i);
   if (!match) return undefined;
@@ -98,6 +102,24 @@ export function shouldTreatAsGeneration(input: string): boolean {
 export function analyzeIntent(input: string, context?: SanitizedProjectContext): IntentResult {
   const cleanInput = (input || '').trim();
   const lowerInput = cleanInput.toLowerCase();
+  const retryJobId = extractGenerationJobId(cleanInput);
+  const hasRetryGenerationCommand = /重试|重新跑|再试|retry|rerun/i.test(cleanInput);
+  const hasFailedBatchTarget = Boolean(retryJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
+
+  if (
+    hasRetryGenerationCommand &&
+    hasFailedBatchTarget
+  ) {
+    return {
+      intent: 'retry_generation_job',
+      confidence: 0.93,
+      extracted: retryJobId ? { jobId: retryJobId } : { retryTarget: 'latest_failed' },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到重试失败批量生成任务的安全队列控制指令。'
+    };
+  }
+
   // 1. 复杂串联模式生图+生视频
   if ((lowerInput.includes('生图') && lowerInput.includes('视频')) || (lowerInput.includes('生成一张图片') && lowerInput.includes('生成一个视频'))) {
     return {

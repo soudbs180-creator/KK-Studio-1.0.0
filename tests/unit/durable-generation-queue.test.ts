@@ -338,6 +338,63 @@ describe('DurableGenerationQueue Tests', () => {
     }
   });
 
+  it('should retry failed prompts when requested explicitly', async () => {
+    mockLocalStorage.clear();
+    const originalSetTimeout = globalThis.setTimeout;
+
+    globalThis.setTimeout = function (cb: any, ms?: number, ...args: any[]) {
+      const actualMs = ms === 2000 ? 1 : ms;
+      return originalSetTimeout(cb, actualMs, ...args);
+    } as any;
+
+    try {
+      const queue = new DurableGenerationQueue();
+      let callCount = 0;
+      let shouldFail = true;
+
+      queue.registerExecutor(async (_prompt, _options, _jobId, promptId) => {
+        callCount++;
+        if (shouldFail) {
+          throw new Error('retry_later');
+        }
+
+        return {
+          promptNodeId: `prompt-node-${promptId}`,
+          resultImageNodeIds: [`image-node-${promptId}`],
+        };
+      });
+
+      const createdJob = queue.createJob([{ id: 'p1', prompt: 'retry explicit' }], { concurrency: 1 }, 'canvas-1');
+      await new Promise(resolve => originalSetTimeout(resolve, 150));
+
+      let job = requireJob(queue, createdJob.id);
+      assert.equal(callCount, 4);
+      assert.equal(job.status, 'completed');
+      assert.equal(job.prompts[0].status, 'failed');
+      assert.equal(job.prompts[0].retryCount, 3);
+      assert.equal(job.prompts[0].error, 'retry_later');
+
+      shouldFail = false;
+      queue.retryFailedPrompts(job.id);
+
+      job = requireJob(queue, createdJob.id);
+      assert.equal(job.status, 'queued');
+      assert.equal(job.prompts[0].status, 'queued');
+      assert.equal(job.prompts[0].retryCount, 0);
+      assert.equal(job.prompts[0].error, undefined);
+
+      await new Promise(resolve => originalSetTimeout(resolve, 50));
+      job = requireJob(queue, createdJob.id);
+      assert.equal(callCount, 5);
+      assert.equal(job.status, 'completed');
+      assert.equal(job.prompts[0].status, 'completed');
+      assert.equal(job.prompts[0].promptNodeId, 'prompt-node-p1');
+      assert.deepEqual(job.prompts[0].resultImageNodeIds, ['image-node-p1']);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
   it('should persist output group node ids and reuse the same job by idempotency key', async () => {
     mockLocalStorage.clear();
     const queue = new DurableGenerationQueue();

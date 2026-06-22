@@ -5,7 +5,7 @@ import {
 } from "../../utils/localeText.ts";
 import { HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE } from "../../services/auth/passwordSignIn.ts";
 
-export type AuthView = "login" | "register" | "forgot-password";
+export type AuthView = "login" | "register" | "forgot-password" | "reset-password";
 
 function pick(language: ResolvedLanguage, zh: string, en: string): string {
   return pickByResolvedLanguage(language, zh, en);
@@ -194,11 +194,19 @@ export function mapAuthErrorMessage(
     );
   }
 
-  if (message.includes("AUTH_RESET_PASSWORD_UNAVAILABLE")) {
+  if (message.includes("AUTH_RESET_PASSWORD_UNAVAILABLE") || message.includes("AUTH_PASSWORD_RESET_UNAVAILABLE")) {
     return pick(
       language,
-      "当前本地运行时尚未接入重置密码接口。",
-      "The local runtime does not expose password reset yet.",
+      "当前运行时尚未接入完整重置密码确认接口。",
+      "This runtime does not expose the password reset confirmation flow yet.",
+    );
+  }
+
+  if (message.includes("AUTH_INVALID_RESET_TOKEN")) {
+    return pick(
+      language,
+      "重置链接无效或已过期，请重新发送重置邮件。",
+      "The reset link is invalid or expired. Send a new reset email.",
     );
   }
 

@@ -14,6 +14,20 @@ const skipVercel = args.has("--skip-vercel");
 const preview = args.has("--preview");
 const help = args.has("--help") || args.has("-h");
 
+function hasVercelToken() {
+  return Boolean(String(process.env.VERCEL_TOKEN || "").trim());
+}
+
+function getVercelTokenShellArg() {
+  if (!hasVercelToken()) {
+    return "";
+  }
+
+  return process.platform === "win32"
+    ? ' --token "%VERCEL_TOKEN%"'
+    : ' --token "$VERCEL_TOKEN"';
+}
+
 function shellCommand(command) {
   if (process.platform === "win32") {
     return ["cmd.exe", ["/d", "/s", "/c", command]];
@@ -50,7 +64,9 @@ Options:
 
 Environment:
   KK_VPS_DEPLOY_COMMAND          Command that deploys PostgreSQL migrations and the server/ backend on the production VPS.
-  KK_VPS_PREVIEW_DEPLOY_COMMAND  Optional command that deploys the preview/staging VPS API. Production VPS deploy is skipped for --preview unless this is set.`);
+  KK_VPS_PREVIEW_DEPLOY_COMMAND  Optional command that deploys the preview/staging VPS API. Production VPS deploy is skipped for --preview unless this is set.
+  VERCEL_TOKEN                   Optional token passed to Vercel CLI as an env var reference for non-interactive deployments.
+  VERCEL_ORG_ID / VERCEL_PROJECT_ID  Optional project metadata used by Vercel CLI when the repo has not been linked locally.`);
 }
 
 function deployVps() {
@@ -89,9 +105,10 @@ function main() {
   }
 
   if (!skipVercel) {
+    const vercelTokenArg = getVercelTokenShellArg();
     const vercelCommand = preview
-      ? "npx vercel deploy -y"
-      : "npx vercel deploy --prod -y";
+      ? `npx vercel deploy -y${vercelTokenArg}`
+      : `npx vercel deploy --prod -y${vercelTokenArg}`;
     runStep(preview ? "Deploy Vercel preview" : "Deploy Vercel production", vercelCommand);
   }
 

@@ -6,6 +6,11 @@ import type { AssistantOutputGroupPlan, BatchGenerationPlan } from '../../ai-tak
 
 type BatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
 
+type RetryJobInput = {
+  jobId?: string;
+  target?: 'latest_failed';
+};
+
 // ==========================================
 // 1. 核心算法：模型能力评估轻量级 LRU 缓存
 // ==========================================
@@ -57,68 +62,6 @@ const fetchWithRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<
     }
   }
   throw new Error('Retries exhausted');
-};
-
-// ==========================================
-// 3. 原生 Material Design 风格的 Progress UI
-// ==========================================
-const createProgressToast = (title: string, message: string) => {
-  if (typeof document === 'undefined') return null;
-
-  const toastId = 'kk-progress-toast-' + Date.now();
-  const container = document.createElement('div');
-  container.id = toastId;
-  container.style.cssText = `
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    z-index: 99999;
-    width: 320px;
-    padding: 16px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    color: #1d1d1f;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  `;
-
-  container.innerHTML = `
-    <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${title}</div>
-    <div style="font-size: 12px; color: #86868b; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${message}</div>
-    <div style="width: 100%; height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px; overflow: hidden; position: relative;">
-      <div id="${toastId}-bar" style="width: 10%; height: 100%; background: linear-gradient(90deg, #0071e3, #3399ff); border-radius: 2px; transition: width 0.3s ease;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(container);
-  
-  requestAnimationFrame(() => {
-    container.style.opacity = '1';
-    container.style.transform = 'translateY(0) scale(1)';
-  });
-
-  return {
-    id: toastId,
-    updateProgress: (percentage: number) => {
-      const bar = document.getElementById(`${toastId}-bar`);
-      if (bar) {
-        bar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
-      }
-    },
-    destroy: () => {
-      container.style.opacity = '0';
-      container.style.transform = 'translateY(-20px) scale(0.95)';
-      setTimeout(() => {
-        container.remove();
-      }, 300);
-    }
-  };
 };
 
 const normalizeLayoutOptions = (params: {
@@ -190,6 +133,27 @@ const buildQueueOptions = (params: {
     ...layoutOptions,
     outputGroup: params.outputGroup
   };
+};
+
+const resolveRetryJob = (input: RetryJobInput) => {
+  if (input.jobId) {
+    const explicitJob = durableGenerationQueue.getJob(input.jobId);
+    if (!explicitJob) {
+      throw new Error(`generation job not found: ${input.jobId}`);
+    }
+    return { job: explicitJob, resolvedFrom: 'explicit' as const };
+  }
+
+  const latestFailedJob = durableGenerationQueue
+    .getJobs()
+    .filter(job => job.status !== 'cancelled' && job.prompts.some(prompt => prompt.status === 'failed'))
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+
+  if (!latestFailedJob) {
+    throw new Error('generation retry target not found: no failed durable generation job');
+  }
+
+  return { job: latestFailedJob, resolvedFrom: 'latest_failed' as const };
 };
 
 export const generationTools: AgentToolDefinition[] = [
@@ -499,7 +463,59 @@ export const generationTools: AgentToolDefinition[] = [
     }
   },
 
-  // 7. generation.getJobStatus - 读取批量生图任务状态摘要
+  // 7. generation.retryJob - retry failed prompts in a durable generation job
+  {
+    name: 'generation.retryJob',
+    description: 'Retry failed prompts in a durable batch generation job without resubmitting completed items.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'Durable generation job ID' },
+        target: { type: 'string', enum: ['latest_failed'], description: 'Retry the latest failed durable generation job when jobId is omitted.' }
+      }
+    },
+    handler: async (input: RetryJobInput, ctx) => {
+      const { job: resolvedJob, resolvedFrom } = resolveRetryJob(input);
+
+      const retryingCount = resolvedJob.prompts.filter(prompt => prompt.status === 'failed').length;
+      if (retryingCount === 0) {
+        return {
+          id: resolvedJob.id,
+          status: resolvedJob.status,
+          resolvedFrom,
+          retryingCount: 0,
+          failedCount: 0,
+          queuedCount: resolvedJob.prompts.filter(prompt => prompt.status === 'queued').length,
+          promptCount: resolvedJob.prompts.length,
+          outputGroup: resolvedJob.outputGroup,
+          updatedAt: resolvedJob.updatedAt
+        };
+      }
+
+      durableGenerationQueue.retryFailedPrompts(resolvedJob.id);
+      const job = durableGenerationQueue.getJob(resolvedJob.id) || resolvedJob;
+
+      ctx.notify?.success?.('失败项已重新入队', `已将 ${retryingCount} 个失败项重新加入 DurableGenerationQueue。`);
+      return {
+        id: job.id,
+        idempotencyKey: job.idempotencyKey,
+        canvasId: job.canvasId,
+        status: job.status,
+        resolvedFrom,
+        retryingCount,
+        promptCount: job.prompts.length,
+        completedCount: job.prompts.filter(prompt => prompt.status === 'completed').length,
+        failedCount: job.prompts.filter(prompt => prompt.status === 'failed').length,
+        runningCount: job.prompts.filter(prompt => prompt.status === 'running').length,
+        queuedCount: job.prompts.filter(prompt => prompt.status === 'queued').length,
+        outputGroup: job.outputGroup,
+        updatedAt: job.updatedAt
+      };
+    }
+  },
+
+  // 8. generation.getJobStatus - 读取批量生图任务状态摘要
   {
     name: 'generation.getJobStatus',
     description: '读取指定持久化批量生图任务的状态摘要',
@@ -566,12 +582,10 @@ export const generationTools: AgentToolDefinition[] = [
     handler: async (input: { prompt: string; voice?: string; model?: string }, ctx) => {
       const { generateAudio, notify } = ctx;
 
-      // 动态创建极简磨砂 Progress UI 视觉反馈
-      const toast = createProgressToast('音频合成中', `正在合成: "${input.prompt.slice(0, 20)}..."`);
+      notify.info('音频合成中', `正在合成: "${input.prompt.slice(0, 20)}..."`);
       
       try {
         let res;
-        toast?.updateProgress(25);
 
         if (typeof generateAudio === 'function') {
           // 底层环境韧性：自动进行指数退避重试 (Max Retries: 3)
@@ -579,7 +593,6 @@ export const generationTools: AgentToolDefinition[] = [
         } else {
           // 降级模式，模拟真实的进度条变化与网络延迟
           await new Promise(resolve => setTimeout(resolve, 800));
-          toast?.updateProgress(65);
           await new Promise(resolve => setTimeout(resolve, 600));
           res = {
             taskId: 'audio_task_' + Date.now(),
@@ -588,14 +601,11 @@ export const generationTools: AgentToolDefinition[] = [
           };
         }
 
-        toast?.updateProgress(100);
         notify.success('音频合成成功', '已生成最新的多媒体音频任务并就绪。');
         return res;
       } catch (err: any) {
         notify.error('音频合成触发失败', err.message || '网络或接口超载异常');
         throw err;
-      } finally {
-        toast?.destroy();
       }
     }
   },

@@ -18,6 +18,10 @@ import type {
   LoginRequestDto,
   LoginResponseDto,
   LogoutResponseDto,
+  PasswordResetRequestDto,
+  PasswordResetRequestResponseDto,
+  PasswordResetConfirmDto,
+  PasswordResetConfirmResponseDto,
   ProfileDto,
   RefreshSessionRequestDto,
   ReplaceKeyManagerCloudStateRequestDto,
@@ -130,6 +134,14 @@ export interface KkApiClient {
     input: LoginRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<LoginResponseDto>>;
+  requestPasswordReset(
+    input: PasswordResetRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<PasswordResetRequestResponseDto>>;
+  confirmPasswordReset(
+    input: PasswordResetConfirmDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<PasswordResetConfirmResponseDto>>;
   getSession(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AuthSessionDto>>;
@@ -648,6 +660,30 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<LoginResponseDto>(
         config,
         "api/v1/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    requestPasswordReset(input, options) {
+      return requestJson<PasswordResetRequestResponseDto>(
+        config,
+        "api/v1/auth/password-reset/request",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    confirmPasswordReset(input, options) {
+      return requestJson<PasswordResetConfirmResponseDto>(
+        config,
+        "api/v1/auth/password-reset/confirm",
         {
           method: "POST",
           body: JSON.stringify(input),

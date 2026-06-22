@@ -324,6 +324,23 @@ ${optResult.optimizedPromptZh}
         break;
       }
 
+      case 'retry_generation_job': {
+        const jobId = intentResult.extracted.jobId || '';
+        const retryTargetLabel = jobId ? `任务 \`${jobId}\`` : '最近一个存在失败项的批量任务';
+        const retryPayload = {
+          ...(intentResult.extracted.jobId ? { jobId: intentResult.extracted.jobId } : {}),
+          target: intentResult.extracted.jobId ? undefined : 'latest_failed'
+        } as { jobId?: string; target?: 'latest_failed' };
+        reply = `### 已准备重试失败批次
+我会通过 \`generation.retryJob\` 将${retryTargetLabel}中失败的队列项重新加入 DurableGenerationQueue，已完成的结果不会重复提交。`;
+
+        actions.push({
+          type: 'generation.retryJob',
+          payload: retryPayload
+        });
+        break;
+      }
+
       case 'explain_error': {
         // 分析当前画布上的节点报错
         const failedNode = context.canvas?.promptNodes?.find(n => n.status === 'failed');

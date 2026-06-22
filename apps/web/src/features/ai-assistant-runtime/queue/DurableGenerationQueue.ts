@@ -379,6 +379,27 @@ export class DurableGenerationQueue {
     }
   }
 
+  public retryFailedPrompts(jobId: string) {
+    const job = this.findJob(jobId);
+    if (!job || job.status === 'cancelled') return;
+
+    let hasRetryablePrompt = false;
+    job.prompts.forEach(promptItem => {
+      if (promptItem.status !== 'failed') return;
+      promptItem.status = 'queued';
+      promptItem.retryCount = 0;
+      delete promptItem.error;
+      hasRetryablePrompt = true;
+    });
+
+    if (!hasRetryablePrompt) return;
+
+    job.status = 'queued';
+    job.updatedAt = Date.now();
+    this.saveJobs();
+    this.scheduleProcess();
+  }
+
   public cancelJob(jobId: string) {
     const job = this.findJob(jobId);
     if (job) {

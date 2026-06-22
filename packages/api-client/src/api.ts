@@ -94,6 +94,30 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface PasswordResetRequestPayload {
+  email: string;
+  turnstileToken?: string;
+}
+
+export interface PasswordResetRequestResponse {
+  requested: boolean;
+  email: string;
+  delivery: 'email';
+  status: 'accepted';
+  message: string;
+}
+
+export interface PasswordResetConfirmPayload {
+  token: string;
+  newPassword: string;
+}
+
+export interface PasswordResetConfirmResponse {
+  updated: boolean;
+  status: 'completed';
+  message: string;
+}
+
 export interface AuthResponse {
   message: string;
   token: string;
@@ -192,7 +216,23 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
 }
 
 /**
- * 3. 刷新 JWT Token
+ * 3. 请求密码重置说明
+ */
+export async function requestPasswordReset(payload: PasswordResetRequestPayload): Promise<PasswordResetRequestResponse> {
+  const { data } = await apiClient.post<PasswordResetRequestResponse>('/auth/password-reset/request', payload);
+  return data;
+}
+
+/**
+ * 4. 使用重置 token 更新密码
+ */
+export async function confirmPasswordReset(payload: PasswordResetConfirmPayload): Promise<PasswordResetConfirmResponse> {
+  const { data } = await apiClient.post<PasswordResetConfirmResponse>('/auth/password-reset/confirm', payload);
+  return data;
+}
+
+/**
+ * 5. 刷新 JWT Token
  */
 export async function refresh(): Promise<AuthResponse> {
   const { data } = await apiClient.post<AuthResponse>('/auth/refresh');

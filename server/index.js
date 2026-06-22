@@ -12,12 +12,15 @@ const DEFAULT_PORT = 3001;
 
 function loadServerEnvFiles() {
   const protectedKeys = new Set(Object.keys(process.env));
+  const parseEnv = typeof dotenv.parse === 'function'
+    ? (filePath) => dotenv.parse(fs.readFileSync(filePath))
+    : () => ({});
   const serverEnv = ['.env', '.env.local']
     .map((fileName) => path.resolve(__dirname, fileName))
     .filter((filePath) => fs.existsSync(filePath))
     .reduce((values, filePath) => ({
       ...values,
-      ...dotenv.parse(fs.readFileSync(filePath)),
+      ...parseEnv(filePath),
     }), {});
 
   for (const [key, value] of Object.entries(serverEnv)) {
@@ -119,6 +122,76 @@ function captureRawJsonBody(req, _res, buf) {
   }
 }
 
+function hasPostgresRuntimeConfig() {
+  return Boolean(
+    process.env.DATABASE_URL
+    || (process.env.PGHOST && process.env.PGDATABASE && process.env.PGUSER)
+  );
+}
+
+function buildHealthPayload() {
+  const localOnly = process.env.KKAI_LOCAL_ONLY === 'true';
+  const hasPostgresConfig = hasPostgresRuntimeConfig();
+  const hasUserApiEncryptionSecret = Boolean(
+    process.env.USER_API_ENCRYPTION_SECRET || process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET
+  );
+  const hasAuthSecrets = Boolean(process.env.JWT_SECRET && process.env.PASSWORD_SALT);
+  const canonicalPersistenceReady = !localOnly && hasPostgresConfig && hasUserApiEncryptionSecret;
+  const selfHostedCoreReady = localOnly || (hasPostgresConfig && hasAuthSecrets);
+  const persistenceMode = canonicalPersistenceReady ? 'postgres' : (localOnly ? 'local-only' : 'unavailable');
+  const blockers = [];
+
+  if (!localOnly && !hasPostgresConfig) {
+    blockers.push('DATABASE_URL');
+  }
+
+  if (!hasUserApiEncryptionSecret) {
+    blockers.push('USER_API_ENCRYPTION_SECRET');
+  }
+
+  if (!hasAuthSecrets) {
+    blockers.push('JWT_SECRET_OR_PASSWORD_SALT');
+  }
+
+  return {
+    ok: true,
+    success: true,
+    service: 'kk-studio-api',
+    status: 'ok',
+    selfHostedCoreReady,
+    canonicalPersistenceReady,
+    config: {
+      hasPostgresConfig,
+      hasValidPostgresConfig: canonicalPersistenceReady,
+      databaseConfigStatus: hasPostgresConfig ? 'configured' : 'missing',
+      hasUserApiEncryptionSecret,
+      canonicalPersistenceReady,
+    },
+    repositories: {
+      adminConsole: persistenceMode,
+      authData: persistenceMode,
+      creditAccounts: persistenceMode,
+      creditProviders: persistenceMode,
+      workspaceLayout: persistenceMode,
+    },
+    persistence: {
+      userApiKeys: canonicalPersistenceReady,
+      keyManager: canonicalPersistenceReady,
+      authData: canonicalPersistenceReady || localOnly,
+      authSessions: canonicalPersistenceReady || localOnly,
+      tempUsers: canonicalPersistenceReady || localOnly,
+      credits: canonicalPersistenceReady,
+      creditProviders: canonicalPersistenceReady,
+      workspaceLayout: canonicalPersistenceReady || localOnly,
+    },
+    runtime: {
+      localOnly,
+      allowDegradedPersistence: localOnly,
+      blockers,
+    },
+  };
+}
+
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
@@ -148,7 +221,7 @@ function createApp() {
   }));
 
   app.get('/healthz', (_req, res) => {
-    res.json({ ok: true, service: 'kk-api' });
+    res.json(buildHealthPayload());
   });
 
   // 简体中文注释：限制图像生成与编辑路由（含大 base64 数据）的请求体最大为 10mb

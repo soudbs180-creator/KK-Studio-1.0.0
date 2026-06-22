@@ -33,7 +33,7 @@ import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, 
 import './LoginScreen.css';
 import KkLandingPage from '../../landing/KkLandingPage';
 
-type AuthView = 'login' | 'register' | 'forgot-password';
+type AuthView = 'login' | 'register' | 'forgot-password' | 'reset-password';
 type FieldName = 'email' | 'password' | 'confirmPassword';
 type FieldErrors = Partial<Record<FieldName, string>>;
 type FieldTouched = Record<FieldName, boolean>;
@@ -44,6 +44,8 @@ type IdleSchedulerWindow = Window & typeof globalThis & {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RESET_AUTH_MODE_QUERY = 'auth-mode=reset-password';
+const PASSWORD_RESET_AUTH_MODE = PASSWORD_RESET_AUTH_MODE_QUERY.slice('auth-mode='.length) as 'reset-password';
 
 const WechatQrModal = lazyWithRetry(() => import('./WechatQrModal'));
 
@@ -64,6 +66,15 @@ function toAuthError(code: string | undefined, message: string): Error {
   return new Error(normalizedCode ? `${normalizedCode}: ${message}` : message);
 }
 
+function clearPasswordResetUrlParams(): void {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.delete('auth-mode');
+  nextUrl.searchParams.delete('mode');
+  nextUrl.searchParams.delete('token');
+  nextUrl.searchParams.delete('reset_token');
+  window.history.replaceState({}, document.title, `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+}
+
 
 
 function validateFields(
@@ -77,9 +88,9 @@ function validateFields(
   const pickText = <T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en);
   const emailValue = email.trim();
 
-  if (!emailValue) {
+  if (view !== 'reset-password' && !emailValue) {
     errors.email = pickText('请输入邮箱地址。', 'Enter your email address.');
-  } else if (!EMAIL_RE.test(emailValue)) {
+  } else if (view !== 'reset-password' && !EMAIL_RE.test(emailValue)) {
     errors.email = pickText('邮箱格式不正确。', 'Enter a valid email address.');
   }
 
@@ -91,7 +102,7 @@ function validateFields(
     }
   }
 
-  if (view === 'register') {
+  if (view === 'register' || view === 'reset-password') {
     if (!confirmPassword) {
       errors.confirmPassword = pickText('请再次输入密码。', 'Enter your password again.');
     } else if (confirmPassword !== password) {
@@ -132,6 +143,7 @@ const LoginScreen: React.FC = () => {
   const [wechatError, setWechatError] = useState<string | null>(null);
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
+  const [passwordResetToken, setPasswordResetToken] = useState('');
 
   const [turnstileWidgetStatus, setTurnstileWidgetStatus] = useState<TurnstileStatus>('idle');
   const t = useCallback(<T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en), [language]);
@@ -152,20 +164,21 @@ const LoginScreen: React.FC = () => {
     const body = document.body;
     const root = document.documentElement;
     const authThemeClass = `auth-screen-active--${resolvedTheme}`;
-    const backgroundColor = 'var(--clay-dark-canvas)';
+    const authLandingClass = 'auth-screen-active--landing';
+    const backgroundColor = 'transparent';
     const previousBodyBackground = body.style.background;
     const previousRootBackground = root.style.background;
     const previousColorScheme = root.style.colorScheme;
 
-    body.classList.add('auth-screen-active', authThemeClass);
-    root.classList.add('auth-screen-active', authThemeClass);
+    body.classList.add('auth-screen-active', authThemeClass, authLandingClass);
+    root.classList.add('auth-screen-active', authThemeClass, authLandingClass);
     body.style.background = backgroundColor;
     root.style.background = backgroundColor;
     root.style.colorScheme = resolvedTheme;
 
     return () => {
-      body.classList.remove('auth-screen-active', authThemeClass);
-      root.classList.remove('auth-screen-active', authThemeClass);
+      body.classList.remove('auth-screen-active', authThemeClass, authLandingClass);
+      root.classList.remove('auth-screen-active', authThemeClass, authLandingClass);
       body.style.background = previousBodyBackground;
       root.style.background = previousRootBackground;
       root.style.colorScheme = previousColorScheme || '';
@@ -177,17 +190,25 @@ const LoginScreen: React.FC = () => {
     void ensureTurnstileScript(language).catch(() => {});
   }, [language, turnstileAvailable]);
 
-
-
-  // 控制外层页面滚动：弹窗打开时禁用滚动
   useEffect(() => {
-    if (isLoginModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('auth-mode') || params.get('mode');
+    const token = params.get('token') || params.get('reset_token');
+    if (mode === PASSWORD_RESET_AUTH_MODE && token) {
+      setPasswordResetToken(token);
+      setView('reset-password');
+      setIsLoginModalOpen(true);
+      clearPasswordResetUrlParams();
     }
+  }, []);
+
+
+
+  useEffect(() => {
+    const modalOpenClass = 'auth-modal-open';
+    document.body.classList.toggle(modalOpenClass, isLoginModalOpen);
     return () => {
-      document.body.style.overflow = '';
+      document.body.classList.remove(modalOpenClass);
     };
   }, [isLoginModalOpen]);
 
@@ -234,8 +255,36 @@ const LoginScreen: React.FC = () => {
     setFieldErrors(validateFields(view, email, password, nextConfirmPassword, language));
   }, [email, language, password, view]);
 
+  const clearPasswordResetUrl = useCallback(() => {
+    clearPasswordResetUrlParams();
+  }, []);
+
+  const returnToLoginView = useCallback(() => {
+    setPasswordResetToken('');
+    clearPasswordResetUrl();
+    setView('login');
+  }, [clearPasswordResetUrl]);
+
+  const closeAuthModal = useCallback(() => {
+    setIsLoginModalOpen(false);
+    if (view === 'reset-password') {
+      returnToLoginView();
+    }
+  }, [returnToLoginView, view]);
+
   const attemptAuth = async (captchaToken?: string) => {
     const emailValue = email.trim();
+    if (view === 'reset-password') {
+      const response = await kkWebApiClient.confirmPasswordReset({ token: passwordResetToken, newPassword: password });
+      if (!response.success) throw toAuthError(response.error.code, response.error.message || 'Password reset failed.');
+      setMessage(t('密码已更新，请使用新密码登录。', 'Password updated. Sign in with your new password.'));
+      setPasswordResetToken('');
+      setPassword('');
+      setConfirmPassword('');
+      clearPasswordResetUrl();
+      window.setTimeout(returnToLoginView, 1500);
+      return;
+    }
     if (view === 'register') {
       const response = await kkWebApiClient.register({ email: emailValue, password, turnstileToken: captchaToken || '' });
       if (!response.success) throw toAuthError(response.error.code, response.error.message || 'Registration failed.');
@@ -249,7 +298,9 @@ const LoginScreen: React.FC = () => {
       setMessage(hostedRuntime ? t('VPS 会话已建立，正在进入工作区...', 'VPS session active, entering workspace...') : t('本地运行时会话已建立。', 'Local runtime session active.'));
       return;
     }
-    throw toAuthError('AUTH_RESET_PASSWORD_UNAVAILABLE', t('当前本地运行时尚未接入重置密码接口。', 'The local runtime does not expose password reset yet.'));
+    const response = await kkWebApiClient.requestPasswordReset({ email: emailValue, ...(captchaToken ? { turnstileToken: captchaToken } : {}) });
+    if (!response.success) throw toAuthError(response.error.code, response.error.message || 'Password reset request failed.');
+    setMessage(t('如果该邮箱已注册，重置说明会发送到邮箱。', 'If an account exists for that email, reset instructions will be sent shortly.'));
   };
 
   useEffect(() => {
@@ -380,6 +431,8 @@ const LoginScreen: React.FC = () => {
       {/* 高级极简产品营销落地页 */}
       <KkLandingPage
         onLoginClick={() => {
+          setPasswordResetToken('');
+          clearPasswordResetUrl();
           setIsLoginModalOpen(true);
           setView('login');
         }}
@@ -390,12 +443,12 @@ const LoginScreen: React.FC = () => {
 
       {/* 登录弹窗 Modal */}
       {isLoginModalOpen && (
-        <div className="auth-modal-overlay" onClick={() => setIsLoginModalOpen(false)}>
+        <div className="auth-modal-overlay" onClick={closeAuthModal}>
           <div className="auth-modal-content" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className="auth-modal-close"
-              onClick={() => setIsLoginModalOpen(false)}
+              onClick={closeAuthModal}
               aria-label="Close modal"
             >
               <X size={20} />
@@ -405,7 +458,7 @@ const LoginScreen: React.FC = () => {
                 <button
                   type="button"
                   className="auth-link-back"
-                  onClick={() => setView('login')}
+                  onClick={returnToLoginView}
                 >
                   <ChevronLeft size={16} />
                   {t('返回登录', 'Back to sign in')}
@@ -417,6 +470,8 @@ const LoginScreen: React.FC = () => {
                     ? t('欢迎回来', 'Welcome back')
                     : view === 'register'
                     ? t('创建账号', 'Create your account')
+                    : view === 'reset-password'
+                    ? t('设置新密码', 'Set a new password')
                     : t('找回密码', 'Reset your password')}
                 </h2>
                 <p>
@@ -426,7 +481,9 @@ const LoginScreen: React.FC = () => {
                       : t('使用 KK API 或本地运行时继续进入工作区。', 'Use the KK API or the local runtime to continue into the workspace.')
                     : view === 'register'
                     ? t('注册入口已切换到 KK API，后端未就绪时会直接提示。', 'The sign-up flow now goes through the KK API and will tell you clearly when the backend is not ready.')
-                    : t('当前仅保留占位入口，等待后端接入重置密码接口。', 'This is currently a placeholder while the backend reset-password route is still being wired up.')}
+                    : view === 'reset-password'
+                    ? t('重置链接已识别。设置新密码后即可返回登录。', 'Reset link detected. Set a new password, then return to sign in.')
+                    : t('输入注册邮箱后，我们会通过安全接口发送重置说明；为保护隐私，页面不会显示该邮箱是否已注册。', 'Enter your account email and we will send reset instructions through the secure reset flow. For privacy, this page will not reveal whether the email is registered.')}
                 </p>
               </header>
 
@@ -444,23 +501,25 @@ const LoginScreen: React.FC = () => {
                   </div>
                 )}
 
-                <label className="auth-field">
-                  <span>{t('邮箱地址', 'Email')}</span>
-                  <div className={`auth-input-wrap ${showFieldError('email') ? 'auth-input-error' : ''}`}>
-                    <Mail size={18} />
-                    <input
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={handleEmailChange}
-                      onBlur={() => setFieldTouched((prev) => ({ ...prev, email: true }))}
-                      placeholder={t('you@example.com', 'you@example.com')}
-                    />
-                  </div>
-                  <small className={`auth-field-help ${showFieldError('email') ? 'auth-field-error' : ''}`}>
-                    {showFieldError('email') ? fieldErrors.email : ' '}
-                  </small>
-                </label>
+                {view !== 'reset-password' && (
+                  <label className="auth-field">
+                    <span>{t('邮箱地址', 'Email')}</span>
+                    <div className={`auth-input-wrap ${showFieldError('email') ? 'auth-input-error' : ''}`}>
+                      <Mail size={18} />
+                      <input
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={handleEmailChange}
+                        onBlur={() => setFieldTouched((prev) => ({ ...prev, email: true }))}
+                        placeholder={t('you@example.com', 'you@example.com')}
+                      />
+                    </div>
+                    <small className={`auth-field-help ${showFieldError('email') ? 'auth-field-error' : ''}`}>
+                      {showFieldError('email') ? fieldErrors.email : ' '}
+                    </small>
+                  </label>
+                )}
 
                 {view !== 'forgot-password' && (
                   <label className="auth-field">
@@ -469,7 +528,7 @@ const LoginScreen: React.FC = () => {
                       <Lock size={18} />
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        autoComplete={view === 'register' ? 'new-password' : 'current-password'}
+                        autoComplete={view === 'register' || view === 'reset-password' ? 'new-password' : 'current-password'}
                         value={password}
                         onChange={handlePasswordChange}
                         onBlur={() => setFieldTouched((prev) => ({ ...prev, password: true }))}
@@ -485,7 +544,7 @@ const LoginScreen: React.FC = () => {
                   </label>
                 )}
 
-                {view === 'register' && (
+                {(view === 'register' || view === 'reset-password') && (
                   <label className="auth-field">
                     <span>{t('确认密码', 'Confirm password')}</span>
                     <div className={`auth-input-wrap ${showFieldError('confirmPassword') ? 'auth-input-error' : ''}`}>
@@ -524,6 +583,8 @@ const LoginScreen: React.FC = () => {
                     ? t('登录并进入工作区', 'Sign in and enter workspace')
                     : view === 'register'
                     ? t('创建账号', 'Create account')
+                    : view === 'reset-password'
+                    ? t('更新密码', 'Update password')
                     : t('发送重置链接', 'Send reset link')}
                   {!loading && <ArrowRight size={16} />}
                 </button>
@@ -598,7 +659,7 @@ const LoginScreen: React.FC = () => {
                       {t('还没有账号？创建一个', 'No account yet? Create one')}
                     </button>
                   ) : view === 'register' ? (
-                    <button type="button" className="auth-text-btn" onClick={() => setView('login')}>
+                    <button type="button" className="auth-text-btn" onClick={returnToLoginView}>
                       {t('已有账号？返回登录', 'Already have an account? Sign in')}
                     </button>
                   ) : null}

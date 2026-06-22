@@ -5,12 +5,23 @@ import {
   collectEnvSnapshots,
   findSnapshotEntries,
   getEffectiveValue,
+  isPlaceholder,
   summarizeValue,
 } from "../lib/env-contract.mjs";
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_JSON_BODY_MAX_BYTES = 1024 * 1024;
 const DEFAULT_PROFILE_JSON_BODY_MAX_BYTES = 4 * 1024 * 1024;
+const passwordResetMailKeys = [
+  "PASSWORD_RESET_TOKEN_SECRET",
+  "PASSWORD_RESET_EMAIL_FROM",
+  "RESEND_API_KEY",
+];
+const passwordResetPublicOriginKeys = [
+  "PUBLIC_APP_URL",
+  "KK_PUBLIC_APP_URL",
+  "WEB_PUBLIC_URL",
+];
 
 function printKeyStatus(label, record) {
   if (!record) {
@@ -19,6 +30,11 @@ function printKeyStatus(label, record) {
   }
 
   console.log(`- ${label}: ${summarizeValue(record.value)} from ${record.source}`);
+}
+
+function isConfiguredEnvRecord(record) {
+  const value = String(record?.value || "").trim();
+  return Boolean(value) && !isPlaceholder(record.value);
 }
 
 function parsePositiveInteger(rawValue, fallback) {
@@ -35,7 +51,8 @@ async function fetchHealth() {
       return { ok: false, message: `HTTP ${response.status}` };
     }
     const body = await response.json();
-    return { ok: true, data: body?.data || null };
+    const data = body?.data || body;
+    return { ok: true, data: data || null };
   } catch (error) {
     return { ok: false, message: error?.message || "fetch failed" };
   }
@@ -62,6 +79,12 @@ async function run() {
     "USER_API_ENCRYPTION_SECRET",
     "PROFILE_USER_APIS_ENCRYPTION_SECRET",
     "KK_API_SESSION_SIGNING_SECRET",
+    "PASSWORD_RESET_TOKEN_SECRET",
+    "PASSWORD_RESET_EMAIL_FROM",
+    "RESEND_API_KEY",
+    "PUBLIC_APP_URL",
+    "KK_PUBLIC_APP_URL",
+    "WEB_PUBLIC_URL",
     "KK_API_MAX_JSON_BODY_BYTES",
     "KK_API_PROFILE_MAX_JSON_BODY_BYTES",
     "KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES",
@@ -104,6 +127,12 @@ async function run() {
   apiServerKeys.forEach((key) => {
     printKeyStatus(key, getEffectiveValue(snapshots.apiSnapshots, key));
   });
+  const passwordResetMailReady = passwordResetMailKeys.every((key) => isConfiguredEnvRecord(getEffectiveValue(snapshots.apiSnapshots, key)));
+  const passwordResetPublicOriginReady = passwordResetPublicOriginKeys.some((key) => isConfiguredEnvRecord(getEffectiveValue(snapshots.apiSnapshots, key)));
+  console.log("[diagnose-api-env] Password reset runtime readiness:");
+  console.log(`- passwordResetMailReady: ${passwordResetMailReady}`);
+  console.log(`- passwordResetPublicOriginReady: ${passwordResetPublicOriginReady}`);
+  console.log(`- passwordResetReady: ${passwordResetMailReady && passwordResetPublicOriginReady}`);
   const configuredGlobalBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_MAX_JSON_BODY_BYTES")?.value;
   const configuredProfileBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_PROFILE_MAX_JSON_BODY_BYTES")?.value;
   const configuredKeyManagerBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES")?.value;

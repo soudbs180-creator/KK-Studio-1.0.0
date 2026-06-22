@@ -8,6 +8,7 @@
   - `canvas.arrangeNodes`
   - `generation.pauseJob`
   - `generation.resumeJob`
+  - `generation.retryJob`
   - `generation.cancelJob`
 - **执行步骤**:
   1. 获取 `assetsSummary` 中已导入文件夹内的图片列表。
@@ -23,6 +24,7 @@
 ## ⚙️ 任务控制机制 (Queue Controls)
 - **暂停 (Pause)**: 调用 `generation.pauseJob(jobId)` 挂起任务，重置正在运行的子任务为 `queued`，暂不占用并发配额。
 - **恢复 (Resume)**: 调用 `generation.resumeJob(jobId)` 将任务状态改回 `queued`，自动触发队列调度恢复处理。
+- **重试失败项 (Retry failed)**: 调用 `generation.retryJob(jobId)` 只把失败子项重置为 `queued`，不重复提交已完成的 Prompt/Image 输出；若用户要求“重试最近失败批次”但未提供 ID，调用 `generation.retryJob({ target: 'latest_failed' })`。
 - **取消 (Cancel)**: 调用 `generation.cancelJob(jobId)` 取消任务，处于排队或运行中的子任务全部标记为 `failed` 且原因为用户取消。
 
 ## 🛠️ 实现规约与规则

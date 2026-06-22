@@ -1,4 +1,4 @@
-# AI Assistant Runbooks — KK Studio v1.5.6
+# AI Assistant Runbooks — KK Studio v1.5.7
 
 Last updated: 2026-06-05
 Primary rules: `AGENTS.md`  
@@ -136,6 +136,7 @@ ecommerce.createBatchTransformJob
 generation.getJobStatus
 generation.pauseJob
 generation.resumeJob
+generation.retryJob
 canvas.createPromptCards
 canvas.createImageCards
 canvas.arrangeNodes
@@ -161,7 +162,8 @@ knowledge.recordChange
 14. 执行 `canvas.arrangeNodes({ nodeIds, preset })`，只整理本 job 节点。
 15. 创建或更新一个 `CanvasGroup`，默认 `color: '#ffffff'`。
 16. 打 automation 和 batch:<jobId> tag。
-17. 写入 ToolCallLog、AgentRunRecord、KnowledgeSync。
+17. 若部分子项失败且用户要求重试，调用 `generation.retryJob` 仅重试 failed 子项；如果用户未提供 jobId 但指向最近失败批次，使用 `generation.retryJob({ target: 'latest_failed' })`。
+18. 写入 ToolCallLog、AgentRunRecord、KnowledgeSync。
 ```
 
 ### Safety
@@ -457,6 +459,7 @@ skills.upsertSkill
 ```text
 generation.getJobStatus
 generation.resumeJob
+generation.retryJob
 canvas.getState
 knowledge.searchProject
 knowledge.recordChange
@@ -471,8 +474,9 @@ knowledge.recordChange
 4. 重建 CanvasRuntimeState。
 5. 对比画布节点与 job item 状态。
 6. 可自动恢复的 safe 操作直接恢复。
-7. 涉及扣积分、上传、覆盖、删除的操作重新确认。
-8. 写入新的 handoff。
+7. 若任务已结束但存在 failed 子项，调用 `generation.retryJob` 只重试失败项；恢复语境中没有明确 jobId 时，允许使用 `generation.retryJob({ target: 'latest_failed' })` 定位最近失败任务。
+8. 涉及扣积分、上传、覆盖、删除的操作重新确认。
+9. 写入新的 handoff。
 ```
 
 ### Safety

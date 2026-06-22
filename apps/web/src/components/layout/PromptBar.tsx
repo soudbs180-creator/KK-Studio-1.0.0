@@ -82,6 +82,10 @@ const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TE
 const MODEL_MENU_SKELETON_COUNT = 3;
 const PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR = '[data-prompt-bar-mobile-model-layer="true"]';
 const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '[data-kk-mobile-overlay-layer="true"], [data-prompt-bar-mobile-model-layer="true"]';
+const PROMPT_BAR_DEEP_DROPDOWN_LAYER = KK_LAYER.dropdown;
+const PROMPT_BAR_DEEP_MODAL_BACKDROP_LAYER = KK_LAYER.modalBackdrop;
+const PROMPT_BAR_DEEP_MODAL_PANEL_LAYER = KK_LAYER.modal;
+const PROMPT_BAR_DEEP_SHEET_LAYER = KK_LAYER.modal;
 
 type LlmServiceModule = typeof import('../../services/llm/LLMService');
 
@@ -3612,15 +3616,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
             }}
             summaryContent={ecommerceOptionsSummary}
             optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
-                <div className="w-56 p-3 rounded-xl border  animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
+                <div className="kk-prompt-bar-deep-audio-panel w-56 p-3 rounded-xl animate-scaleIn origin-bottom">
                     <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
                     <div className="flex flex-wrap gap-1.5">
                         {['自动', '30s', '60s', '120s', '240s'].map(dur => (
                             <button
                                 key={dur}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                    ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
-                                    : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
+                                className={`kk-prompt-bar-deep-audio-option px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(config.audioDuration || '自动') === dur
+                                    ? 'kk-prompt-bar-deep-audio-option--active'
+                                    : ''
                                     }`}
                                 onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                             >
@@ -3691,7 +3695,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                 <div
-                    className="model-library-surface mb-2 rounded-2xl border p-2.5  max-w-[calc(100vw-24px)]"
+                    className="kk-prompt-bar-deep-model-search model-library-surface mb-2 rounded-2xl p-2.5 max-w-[calc(100vw-24px)]"
                     style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}
                 >
                     <div className="relative flex items-center">
@@ -3704,7 +3708,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             onChange={(e) => setModelSearch(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="搜索模型..."
-                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                            className="kk-prompt-bar-deep-model-search-input w-full text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none focus:border-[var(--frost-input-border)]"
                             autoFocus
                         />
                         {modelSearch && (
@@ -3730,7 +3734,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
             {/* 🚀 [重构] 拆分为外层非滚动玻璃层 + 内层滚动区域 */}
             <div
-                className="model-library-surface dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] origin-bottom overflow-hidden"
+                className="kk-prompt-bar-deep-model-list model-library-surface dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] origin-bottom overflow-hidden"
                 style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
             >
                 <div
@@ -3854,7 +3858,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className="space-y-4">
                                     {/* (A) 系统积分模型（置于最上方） */}
                                     {systemExclusiveModels.length > 0 && (
-                                        <div className="space-y-1.5 bg-black/5 dark:bg-white/5 p-2 rounded-2xl border border-[var(--frost-card-sub-border)]">
+                                        <div className="kk-prompt-bar-deep-model-section space-y-1.5 p-2 rounded-2xl">
                                             <div className="text-[10px] font-bold text-[var(--text-secondary)] px-1 pb-1 flex items-center gap-1">
                                                 <span>✨ 系统智能积分模型</span>
                                                 <span className="text-[9px] bg-[color:var(--accent-coral)]/10 text-[color:var(--accent-coral)] px-1 rounded font-semibold scale-90">官方信道</span>
@@ -3862,7 +3866,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             {systemExclusiveModels.map((model) => (
                                                 <div 
                                                     key={model.id}
-                                                    className={`rounded-xl border transition-all ${config.model === model.id ? 'border-[color:var(--accent-coral)] bg-black/10' : 'border-transparent'}`}
+                                                    className={`kk-prompt-bar-deep-model-item rounded-xl transition-all ${config.model === model.id ? 'kk-prompt-bar-deep-model-item--active' : ''}`}
                                                 >
                                                     <PromptBarModelMenuButton
                                                         model={model}
@@ -3901,10 +3905,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             setDesktopActiveProvider(group.provider);
                                                         }
                                                     }}
-                                                    className={`provider-row-container flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
+                                                    className={`kk-prompt-bar-deep-provider-row provider-row-container flex items-center justify-between p-3 rounded-xl transition-all duration-200 select-none cursor-pointer
                                                         ${isDragged 
-                                                            ? 'border-dashed border-[color:var(--accent-coral)] bg-[color:var(--accent-coral)]/5 opacity-50 scale-95' 
-                                                            : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)] active:scale-[0.99] hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                                                            ? 'kk-prompt-bar-deep-provider-row--dragged border-dashed opacity-50 scale-95'
+                                                            : 'active:scale-[0.99]'
                                                         }`}
                                                 >
                                                     <div className="flex items-center gap-2.5 min-w-0">
@@ -3931,7 +3935,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             </svg>
                                                         </div>
 
-                                                        <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+                                                        <div className="w-7 h-7 rounded-lg bg-[var(--frost-card-sub-bg)] flex items-center justify-center flex-shrink-0">
                                                             <ModelLogo
                                                                 modelId=""
                                                                 provider={group.provider}
@@ -4583,7 +4587,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             <div className="flex-1 overflow-y-auto p-1.5 space-y-3" style={{ touchAction: mobileDragMode ? 'none' : 'pan-y' }}>
                                                 {/* (A) 系统积分模型（置于最上方） */}
                                                 {systemExclusiveModels.length > 0 && (
-                                                    <div className="space-y-1 bg-black/5 dark:bg-white/5 p-2 rounded-2xl border border-[var(--frost-card-sub-border)]">
+                                                    <div className="kk-prompt-bar-deep-model-section space-y-1 p-2 rounded-2xl">
                                                         <div className="text-[10px] font-bold text-[var(--text-secondary)] px-1 pb-1 flex items-center gap-1">
                                                             <span>✨ 系统智能积分模型</span>
                                                             <span className="text-[9px] bg-[color:var(--accent-coral)]/10 text-[color:var(--accent-coral)] px-1 rounded">官方信道</span>
@@ -4591,7 +4595,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         {systemExclusiveModels.map((model) => (
                                                             <div 
                                                                 key={model.id}
-                                                                className={`rounded-xl border transition-all ${config.model === model.id ? 'border-[color:var(--accent-coral)] bg-black/10' : 'border-transparent'}`}
+                                                                className={`kk-prompt-bar-deep-model-item rounded-xl transition-all ${config.model === model.id ? 'kk-prompt-bar-deep-model-item--active' : ''}`}
                                                             >
                                                                 <PromptBarModelMenuButton
                                                                     model={model}
@@ -4715,16 +4719,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                         setMobileActiveProvider(group.provider);
                                                                     }
                                                                 }}
-                                                                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
+                                                                className={`kk-prompt-bar-deep-provider-row flex items-center justify-between p-3 rounded-xl transition-all duration-200 select-none cursor-pointer
                                                                     ${isSortingThis
-                                                                        ? 'bg-[var(--frost-card-sub-bg)] border-[color:var(--accent-coral)] shadow-[0_0_15px_rgba(235,94,85,0.3)] scale-[1.03] relative z-20 active-drag-card'
+                                                                        ? 'kk-prompt-bar-deep-provider-row--dragged scale-[1.03] relative z-20 active-drag-card'
                                                                         : mobileDragMode
-                                                                            ? 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] opacity-40 scale-[0.97]'
-                                                                            : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] active:scale-[0.98] active:bg-black/5 dark:active:bg-white/5'
+                                                                            ? 'opacity-40 scale-[0.97]'
+                                                                            : 'active:scale-[0.98]'
                                                                     }`}
                                                             >
                                                                 <div className="flex items-center gap-2.5 min-w-0">
-                                                                    <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+                                                                    <div className="w-7 h-7 rounded-lg bg-[var(--frost-card-sub-bg)] flex items-center justify-center flex-shrink-0">
                                                                         <ModelLogo
                                                                             modelId=""
                                                                             provider={group.provider}
@@ -5975,7 +5979,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             if (!anchorEl) return { top: 0, left: 0 };
                                             const rect = anchorEl.getBoundingClientRect();
                                             return {
-                                                zIndex: KK_LAYER.dropdown,
+                                                zIndex: PROMPT_BAR_DEEP_DROPDOWN_LAYER,
                                                 left: rect.left + rect.width / 2,
                                                 top: rect.top - 12, // mb-3 ≈ 12px 间距
                                                 transform: 'translateX(-50%) translateY(-100%)',
@@ -6017,15 +6021,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 }}
                                 summaryContent={ecommerceOptionsSummary}
                                 optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
-                                    <div className="w-56 p-3 rounded-xl border  animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
+                                    <div className="kk-prompt-bar-deep-audio-panel w-56 p-3 rounded-xl animate-scaleIn origin-bottom">
                                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
                                         <div className="flex flex-wrap gap-1.5">
                                             {['自动', '30s', '60s', '120s', '240s'].map(dur => (
                                                 <button
                                                     key={dur}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                                        ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
-                                                        : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
+                                                    className={`kk-prompt-bar-deep-audio-option px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(config.audioDuration || '自动') === dur
+                                                        ? 'kk-prompt-bar-deep-audio-option--active'
+                                                        : ''
                                                         }`}
                                                     onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                                                 >
@@ -6143,15 +6147,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             </button>
                                             {
                                                 activeMenu === 'count' && (
-                                                    <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                        <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
+                                                    <div className="absolute bottom-full mb-2" style={{ left: '50%', transform: 'translateX(-50%)', zIndex: PROMPT_BAR_DEEP_DROPDOWN_LAYER }}>
+                                                        <div className="kk-prompt-bar-deep-count-popover w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1 rounded-xl">
                                                             {(config.mode === GenerationMode.PPT
                                                                 ? Array.from({ length: 20 }, (_, i) => i + 1)
                                                                 : [1, 2, 3, 4]
                                                             ).map((count) => (
                                                                 <button
                                                                     key={count}
-                                                                    className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                    className={`kk-prompt-bar-deep-count-option justify-between rounded-md px-3 py-2 text-xs font-medium ${config.parallelCount === count ? 'kk-prompt-bar-deep-count-option--active' : ''}`}
                                                                     onClick={() => {
                                                                         updateConfigFields({ parallelCount: count as number });
                                                                         setActiveMenu(null);
@@ -6173,7 +6177,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                                 className="kk-prompt-bar-deep-context-menu"
                                                 style={{
-                                                    zIndex: KK_LAYER.dropdown,
+                                                    zIndex: PROMPT_BAR_DEEP_DROPDOWN_LAYER,
                                                     top: contextMenu.y,
                                                     left: contextMenu.x,
                                                 }}
@@ -6185,8 +6189,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             toggleModelPin(contextMenu.modelId);
                                                             setContextMenu(null);
                                                         }}
-                                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
-                                                        style={{ color: 'var(--text-primary)' }}
+                                                        className="kk-prompt-bar-deep-menu-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
                                                     >
                                                         {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
                                                     </button>
@@ -6202,8 +6205,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         });
                                                         setContextMenu(null);
                                                     }}
-                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
-                                                    style={{ color: 'var(--text-primary)' }}
+                                                    className="kk-prompt-bar-deep-menu-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
                                                 >
                                                     ⚙️ 设置
                                                 </button>
@@ -6216,58 +6218,49 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             <div
                                                 onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                                 className="kk-prompt-bar-deep-modal-backdrop"
-                                                style={{ zIndex: KK_LAYER.modal }}
+                                                style={{ zIndex: PROMPT_BAR_DEEP_MODAL_BACKDROP_LAYER }}
                                                 onClick={() => setModelSettingsModal(null)}
                                             >
                                                 <div
                                                     className="kk-prompt-bar-deep-modal-panel"
+                                                    style={{ zIndex: PROMPT_BAR_DEEP_MODAL_PANEL_LAYER }}
+                                                    role="dialog"
+                                                    aria-modal="true"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <div className="flex justify-between items-center">
-                                                        <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>模型设置</h3>
+                                                        <h3 className="text-lg font-bold text-[var(--text-primary)]">模型设置</h3>
                                                         <button
                                                             onClick={() => setModelSettingsModal(null)}
-                                                            className="transition-colors"
-                                                            style={{ color: 'var(--text-tertiary)' }}
+                                                            className="transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
                                                         >
                                                             ✕
                                                         </button>
                                                     </div>
-                                                    <div className="text-xs font-mono break-all" style={{ color: 'var(--text-tertiary)' }}>ID: {modelSettingsModal.modelId}</div>
+                                                    <div className="text-xs font-mono break-all text-[var(--text-tertiary)]">ID: {modelSettingsModal.modelId}</div>
                                                     <div>
-                                                        <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>显示别名</label>
+                                                        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">显示别名</label>
                                                         <input
                                                             value={modelSettingsModal.alias}
                                                             onChange={(e) => setModelSettingsModal({ ...modelSettingsModal, alias: e.target.value })}
                                                             placeholder="留空则使用默认名称"
-                                                            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                                                            style={{
-                                                                background: 'var(--frost-input-bg)',
-                                                                borderColor: 'var(--prompt-bar-shell-border)',
-                                                                color: 'var(--text-primary)',
-                                                            }}
+                                                            className="kk-prompt-bar-deep-field w-full rounded-lg px-3 py-2 text-sm outline-none"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>模型介绍</label>
+                                                        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">模型介绍</label>
                                                         <textarea
                                                             value={modelSettingsModal.description}
                                                             onChange={(e) => setModelSettingsModal({ ...modelSettingsModal, description: e.target.value })}
                                                             placeholder="留空则使用默认介绍"
                                                             rows={2}
-                                                            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                                                            style={{
-                                                                background: 'var(--frost-input-bg)',
-                                                                borderColor: 'var(--prompt-bar-shell-border)',
-                                                                color: 'var(--text-primary)',
-                                                            }}
+                                                            className="kk-prompt-bar-deep-field w-full rounded-lg px-3 py-2 text-sm outline-none"
                                                         />
                                                     </div>
                                                     <div className="flex justify-end gap-2 pt-2">
                                                         <button
                                                             onClick={() => setModelSettingsModal(null)}
-                                                            className="rounded-lg px-4 py-2 text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
-                                                            style={{ color: 'var(--text-secondary)' }}
+                                                            className="kk-prompt-bar-deep-modal-action px-4 py-2 text-sm transition-colors"
                                                         >
                                                             取消
                                                         </button>
@@ -6280,12 +6273,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                 );
                                                                 setModelSettingsModal(null);
                                                             }}
-                                                            className="rounded-lg px-4 py-2 text-sm font-bold"
-                                                            style={{
-                                                                background: 'var(--settings-button-primary-bg)',
-                                                                color: 'var(--text-inverse)',
-                                                                boxShadow: 'var(--settings-button-primary-shadow)',
-                                                            }}
+                                                            className="kk-prompt-bar-deep-modal-action kk-prompt-bar-deep-modal-action--primary px-4 py-2 text-sm font-bold"
                                                         >
                                                             保存
                                                         </button>
@@ -6369,7 +6357,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 {isMobile && activeMenu === 'count' && ReactDOM.createPortal(
                     <div 
                         className="kk-prompt-bar-deep-count-sheet-backdrop"
-                        style={{ zIndex: KK_LAYER.modal }}
+                        style={{ zIndex: PROMPT_BAR_DEEP_SHEET_LAYER }}
                         onClick={() => setActiveMenu(null)}
                     >
                         <div 
@@ -6379,7 +6367,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-semibold text-[var(--text-primary)]">选择并发张数</span>
                                 <button 
-                                    className="text-xs text-[var(--text-secondary)] font-medium px-3.5 py-1.5 rounded-full border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] active:scale-95 transition-all"
+                                    className="kk-prompt-bar-deep-modal-action text-xs font-medium px-3.5 py-1.5 rounded-full active:scale-95 transition-all"
                                     onClick={() => setActiveMenu(null)}
                                 >
                                     关闭
@@ -6392,9 +6380,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 ).map((count) => (
                                     <button
                                         key={count}
-                                        className={`flex flex-col items-center justify-center py-3 rounded-xl border font-semibold transition-all active:scale-95 ${config.parallelCount === count 
-                                            ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)] shadow-sm' 
-                                            : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)]'}`}
+                                        className={`kk-prompt-bar-deep-count-option flex flex-col items-center justify-center py-3 rounded-xl font-semibold transition-all active:scale-95 ${config.parallelCount === count
+                                            ? 'kk-prompt-bar-deep-count-option--active'
+                                            : ''}`}
                                         onClick={() => {
                                             updateConfigFields({ parallelCount: count });
                                             setActiveMenu(null);

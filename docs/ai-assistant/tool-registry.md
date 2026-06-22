@@ -1,6 +1,6 @@
 # 工具注册表说明 (Tool Registry)
 
-在 KK Studio v1.5.6 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。
+在 KK Studio v1.5.7 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。
 
 ## 1. 安全等级权限矩阵
 
@@ -61,6 +61,11 @@
 - **说明**: 恢复指定的处于暂停状态的批量生图任务，使其重新进入调度队列。
 - **权限**: `safe`
 
+### `generation.retryJob`
+- **说明**: 将指定持久化批量任务中的失败子项重新加入 `DurableGenerationQueue`，已完成子项不会重复提交。
+- **权限**: `safe`
+- **适用场景**: 用户明确提供 `jobId` 并要求“重试失败批次 / retry failed job”时调用；用户说“重试最近失败批次 / retry latest failed batch”但未提供 ID 时，可传 `target: 'latest_failed'` 自动选择最近失败任务。若任务没有失败子项，只返回状态摘要。
+
 ### `generation.submitComposer`
 - **说明**: 提交当前画布输入框，复用输入框已设置的模型、比例、参考图、数量与模式直接发起生成。
 - **权限**: `safe`
@@ -87,6 +92,7 @@
 - Alias registration is idempotent: if a namespaced tool such as `generation.createBatchJob` already has a real implementation, the legacy alias wrapper does not overwrite it.
 - `generation.createBatchJob` passes `idempotencyKey` into `DurableGenerationQueue`; when no key is provided, the queue derives a stable key from `canvasId`, prompt list, and options.
 - `DurableGenerationQueue` enforces `maxBatchSize=100`, normalizes concurrency into `1..8` with default `3`, and keeps retry behavior at `3` retries after the initial attempt with `2000ms` backoff.
+- `generation.retryJob` exposes `DurableGenerationQueue.retryFailedPrompts(jobId)` as a safe ToolRegistry action for failed batch recovery without resubmitting completed prompts; when the user omits an ID, `target: 'latest_failed'` resolves the most recent non-cancelled job that still has failed prompts.
 - `DurableGenerationQueue` records `outputGroup`, each item `promptNodeId`, and completed `nodeIds`; completion handlers can create or update one canvas group per job and reuse it on idempotent resume.
 - `canvas.arrangeNodes` supports targeted `nodeIds` layout through `updateNodes`; without `nodeIds` it calls the existing `CanvasContext.arrangeAllNodes(mode)` path.
 - `ecommerce.createBatchTransformJob` is registered as a `confirm` tool and maps compact ecommerce folder/image commands to one grouped durable batch job.

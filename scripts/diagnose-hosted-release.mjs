@@ -43,6 +43,9 @@ const hostedApiRequired = [
   "JWT_SECRET",
   "KK_API_SESSION_SIGNING_SECRET",
   "USER_API_ENCRYPTION_SECRET",
+  "RESEND_API_KEY",
+  "PASSWORD_RESET_EMAIL_FROM",
+  "PASSWORD_RESET_TOKEN_SECRET",
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
@@ -65,11 +68,34 @@ const hostedApiRecommended = [
   "KK_PRIMARY_ADMIN_USER_ID",
 ];
 
+const hostedApiPasswordResetPublicOriginEnv = [
+  "PUBLIC_APP_URL",
+  "KK_PUBLIC_APP_URL",
+  "WEB_PUBLIC_URL",
+];
+
+const hostedApiRequiredMigrations = [
+  "migrations/013_password_reset_tokens.sql",
+];
+
 const DISABLED_ENV_FLAG_VALUES = new Set(["0", "false", "no", "off"]);
+const VERCEL_PROJECT_ID_ENV = "VERCEL_PROJECT_ID";
+const VERCEL_ORG_ID_ENV = "VERCEL_ORG_ID";
+const VERCEL_PROJECT_NAME_ENV = "VERCEL_PROJECT_NAME";
+const VERCEL_TOKEN_ENV = "VERCEL_TOKEN";
 
 function isEnabledEnvFlag(value) {
   const normalized = String(value || "").trim().toLowerCase();
   return Boolean(normalized) && !DISABLED_ENV_FLAG_VALUES.has(normalized);
+}
+
+function readProcessEnvValue(key) {
+  const value = String(process.env[key] || "").trim();
+  if (!value || isPlaceholder(value)) {
+    return "";
+  }
+
+  return value;
 }
 
 function formatStatus(sourceRecord) {
@@ -77,7 +103,13 @@ function formatStatus(sourceRecord) {
   if (isPlaceholder(sourceRecord.value)) {
     return `<placeholder from ${sourceRecord.source}>`;
   }
+  if (!isConfiguredEnvRecord(sourceRecord)) return "<missing>";
   return `<present from ${sourceRecord.source}>`;
+}
+
+function isConfiguredEnvRecord(sourceRecord) {
+  const value = String(sourceRecord?.value || "").trim();
+  return Boolean(value) && !isPlaceholder(sourceRecord.value);
 }
 
 function isForbiddenFrontendEnvActive(rule, sourceRecord) {
@@ -196,15 +228,32 @@ function inspectAuthenticatedAccess(primary, fallback) {
   };
 }
 
+function readVercelProjectFromEnv() {
+  const projectId = readProcessEnvValue(VERCEL_PROJECT_ID_ENV);
+  const orgId = readProcessEnvValue(VERCEL_ORG_ID_ENV);
+  const projectName = readProcessEnvValue(VERCEL_PROJECT_NAME_ENV);
+  if (!projectId && !orgId && !projectName) {
+    return null;
+  }
+
+  return {
+    source: "process.env",
+    projectId,
+    orgId,
+    projectName,
+  };
+}
+
 function readVercelProject() {
   const projectFile = path.join(rootPath, ".vercel", "project.json");
   if (!fs.existsSync(projectFile)) {
-    return null;
+    return readVercelProjectFromEnv();
   }
 
   try {
     const parsed = JSON.parse(fs.readFileSync(projectFile, "utf8"));
     return {
+      source: ".vercel/project.json",
       filePath: projectFile,
       projectId: parsed.projectId || "",
       orgId: parsed.orgId || "",
@@ -212,10 +261,37 @@ function readVercelProject() {
     };
   } catch (error) {
     return {
+      source: ".vercel/project.json",
       filePath: projectFile,
       parseError: error instanceof Error ? error.message : "invalid json",
     };
   }
+}
+
+function getVercelAuthArgs(baseArgs) {
+  const token = readProcessEnvValue(VERCEL_TOKEN_ENV);
+  if (!token) {
+    return baseArgs;
+  }
+
+  return [...baseArgs, "--token", token];
+}
+
+function getVercelAuthLabel(baseLabel) {
+  const token = readProcessEnvValue(VERCEL_TOKEN_ENV);
+  return token ? `${baseLabel} --token $${VERCEL_TOKEN_ENV}` : baseLabel;
+}
+
+function formatVercelProjectValue(project, value) {
+  if (!value) {
+    return "<missing>";
+  }
+
+  if (project.source === "process.env") {
+    return "<present from process.env>";
+  }
+
+  return value;
 }
 
 function printSection(title) {
@@ -232,9 +308,34 @@ function printKeyStatuses(title, snapshots, keys) {
 function pushMissingEnvChecks(remoteChecks, label, snapshots, keys) {
   keys.forEach((key) => {
     const value = getEffectiveValue(snapshots, key);
-    if (!value || isPlaceholder(value.value)) {
+    if (!isConfiguredEnvRecord(value)) {
       remoteChecks.push(`${label} ${key} is missing or still a placeholder in the local snapshot. Confirm it in the runtime environment before deploying.`);
     }
+  });
+}
+
+function hasEffectiveEnvValue(snapshots, key) {
+  const value = getEffectiveValue(snapshots, key);
+  return isConfiguredEnvRecord(value);
+}
+
+function pushPasswordResetPublicOriginCheck(remoteChecks, snapshots) {
+  if (hostedApiPasswordResetPublicOriginEnv.some((key) => hasEffectiveEnvValue(snapshots, key))) {
+    return;
+  }
+
+  remoteChecks.push(`Hosted API password reset public app URL env is missing in the local snapshot. Confirm one of ${hostedApiPasswordResetPublicOriginEnv.join(", ")} exists in the VPS runtime environment before deploying.`);
+}
+
+function pushRequiredMigrationChecks(blockers, remoteChecks) {
+  hostedApiRequiredMigrations.forEach((migrationPath) => {
+    const absolutePath = path.join(rootPath, migrationPath);
+    if (!fs.existsSync(absolutePath)) {
+      blockers.push(`Required hosted database migration ${migrationPath} is missing from the repository.`);
+      return;
+    }
+
+    remoteChecks.push(`Confirm VPS PostgreSQL has applied ${migrationPath} before deploying the hosted password reset confirmation flow.`);
   });
 }
 
@@ -331,14 +432,14 @@ function run() {
   });
   const vercelAuth = inspectAuthenticatedAccess(
     {
-      label: "vercel whoami",
+      label: getVercelAuthLabel("vercel whoami"),
       command: "vercel",
-      args: ["whoami"],
+      args: getVercelAuthArgs(["whoami"]),
     },
     {
-      label: "npx vercel whoami",
+      label: getVercelAuthLabel("npx vercel whoami"),
       command: "npx",
-      args: ["vercel", "whoami"],
+      args: ["vercel", ...getVercelAuthArgs(["whoami"])],
     },
   );
   const packageRunner = inspectPackageRunner();
@@ -367,13 +468,14 @@ function run() {
 
   printSection("Vercel Project");
   if (!vercelProject) {
-    console.log("- .vercel/project.json: <missing>");
+    console.log("- project metadata: <missing>");
   } else if (vercelProject.parseError) {
     console.log(`- .vercel/project.json: parse error (${vercelProject.parseError})`);
   } else {
-    console.log(`- projectName: ${vercelProject.projectName || "<unknown>"}`);
-    console.log(`- projectId: ${vercelProject.projectId || "<missing>"}`);
-    console.log(`- orgId: ${vercelProject.orgId || "<missing>"}`);
+    console.log(`- source: ${vercelProject.source || ".vercel/project.json"}`);
+    console.log(`- projectName: ${formatVercelProjectValue(vercelProject, vercelProject.projectName)}`);
+    console.log(`- projectId: ${formatVercelProjectValue(vercelProject, vercelProject.projectId)}`);
+    console.log(`- orgId: ${formatVercelProjectValue(vercelProject, vercelProject.orgId)}`);
   }
 
   printKeyStatuses("Hosted Frontend Required Env", frontendSnapshots, hostedFrontendRequired);
@@ -381,6 +483,13 @@ function run() {
   printKeyStatuses("Hosted Frontend Optional Env", frontendSnapshots, hostedFrontendOptional);
   printKeyStatuses("Hosted API Required Env", localApiSnapshots, hostedApiRequired);
   printKeyStatuses("Hosted API Recommended Env", localApiSnapshots, hostedApiRecommended);
+  printKeyStatuses("Hosted API Password Reset Public Origin Env", localApiSnapshots, hostedApiPasswordResetPublicOriginEnv);
+
+  printSection("Hosted API Required Migrations");
+  hostedApiRequiredMigrations.forEach((migrationPath) => {
+    const status = fs.existsSync(path.join(rootPath, migrationPath)) ? "<present>" : "<missing>";
+    console.log(`- ${migrationPath}: ${status}`);
+  });
 
   printSection("Hosted Frontend Forbidden Env");
   hostedFrontendForbidden.forEach((rule) => {
@@ -392,17 +501,19 @@ function run() {
   const remoteChecks = [];
   const warnings = [];
   if (!vercelProject || vercelProject.parseError || !vercelProject.projectId || !vercelProject.orgId) {
-    blockers.push("Vercel project metadata is incomplete. Re-link the repo with `vercel link` if needed.");
+    blockers.push("Vercel project metadata is incomplete. Run `vercel link` or provide `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` before releasing.");
   }
   if (!vercelCli.available && !packageRunner.available) {
     blockers.push("Vercel CLI is unavailable on this machine and npm is not available as a package runner.");
   }
   if (!vercelAuth.authenticated) {
-    blockers.push("Vercel authentication is unavailable. Run `vercel login` or export `VERCEL_TOKEN` before releasing.");
+    blockers.push("Vercel authentication is unavailable. Run `vercel login` or provide `VERCEL_TOKEN` before releasing.");
   }
 
   pushMissingEnvChecks(remoteChecks, "Hosted frontend env", frontendSnapshots, hostedFrontendRequired);
   pushMissingEnvChecks(remoteChecks, "Hosted API env", localApiSnapshots, hostedApiRequired);
+  pushPasswordResetPublicOriginCheck(remoteChecks, localApiSnapshots);
+  pushRequiredMigrationChecks(blockers, remoteChecks);
 
   hostedFrontendForbidden.forEach((rule) => {
     const value = getEffectiveValue(frontendSnapshots, rule.key);
@@ -476,6 +587,7 @@ function run() {
   printSection("Notes");
   console.log("- This script only checks local files and current process env. It does not read remote VPS or Vercel dashboard state.");
   console.log("- VPS API, payment, and PostgreSQL secrets must be configured in the VPS runtime environment.");
+  console.log("- `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` can replace a local `.vercel/project.json` link in CI or scripted releases.");
   console.log("- If the global Vercel CLI is missing but npm is available, the repo scripts can still run through `npx`.");
   console.log("- Use this check before deploying the frontend or VPS API to avoid copying local-only or legacy managed-database config into hosted environments.");
 }

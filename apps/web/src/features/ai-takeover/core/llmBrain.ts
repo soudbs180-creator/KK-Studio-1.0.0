@@ -66,6 +66,12 @@ export class LLMBrain {
   "requiresConfirmation": false
 }`;
 
+    const retryJobToolPrompt = `
+[DurableGenerationQueue failed-item retry]
+- Tool whitelist includes {"type":"generation.retryJob","payload":{"jobId":"job_xxx"}} and {"type":"generation.retryJob","payload":{"target":"latest_failed"}}.
+- Use it when the user explicitly asks to retry a failed batch/job and provides a job_id/batch_id, or asks for the latest/recent/last failed batch.
+- This is a safe queue-control action: set requiresConfirmation=false and never resubmit completed prompts.`;
+
     // 2. 原生搜索联网配置 (Grounding)
     // 开启 Agent 后肯定开启搜索功能（如果模型是原生支持搜索的 Gemini 模型系列）
     const providerConfig = isGemini ? {
@@ -77,7 +83,7 @@ export class LLMBrain {
     const responseText = await chatWithLlm({
       modelId: activeModelId,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: systemPrompt + retryJobToolPrompt },
         { role: 'user', content: `当前项目脱敏上下文信息：\n${JSON.stringify(context, null, 2)}\n\n用户最新的聊天指令：\n${userInput}` }
       ],
       temperature: 0.2,

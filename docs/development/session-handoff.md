@@ -2025,3 +2025,723 @@ Mobile workspace: `apps/mobile/`
 - `verify:mobile-settings-smoke` currently exits 0 through its existing fallback contract path because Playwright times out waiting for `settings-workbench-overview`; desktop settings smoke and startup banner smoke run in browser mode. This was not caused by the dependency tree after the clean lockfile pass, but it is still a useful future smoke-script follow-up.
 - The architecture check still reports existing hardcoded color literal suggestions from the UI token checker without failing. This pass did not broaden into token migration.
 - The working tree already contained unrelated settings/canvas edits before this pass. This pass did not revert or reorganize those changes.
+
+## 2026-06-18 - Hosted Release Preflight Scripted Vercel State
+
+### Hosted Release Scripted State Scope
+- Continued closing the KK Studio v1.5.7 hosted release preflight chain without restoring retired runtime entries.
+- Kept the active release path on `scripts/release/diagnose-hosted-release.mjs`, `scripts/diagnose-hosted-release.mjs`, `scripts/release-hosted.mjs`, Vercel, and the current `server/` VPS backend.
+- Reduced the local preflight's remaining hard manual state to Vercel authentication and project metadata, with scripted alternatives for both.
+
+### Hosted Release Scripted State Files Touched
+- `scripts/diagnose-hosted-release.mjs`
+- `scripts/release-hosted.mjs`
+- `tests/unit/hosted-release-guardrails.test.ts`
+- `docs/development/hosted-release-runbook.md`
+- `docs/development/session-handoff.md`
+
+### Hosted Release Scripted State Design Decisions
+- `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` are accepted as a non-interactive replacement for local `.vercel/project.json` metadata. This keeps CI/scripted releases from requiring `vercel link` when the project metadata is already provided.
+- `VERCEL_TOKEN` is passed to `vercel whoami` checks through `--token` and to `npx vercel deploy` through an environment-variable reference, so logs do not print the raw token.
+- Missing VPS backend secrets remain remote confirmation items, not local blockers, because the release preflight cannot read the actual VPS runtime environment from this workspace.
+
+### Hosted Release Scripted State Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/hosted-release-guardrails.test.ts"`: first failed with the new scripted Vercel metadata/token assertions, then passed after implementation, 5 tests.
+- `node scripts/release-hosted.mjs --help`: passed and documents `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
+- `npm run release:hosted:check`: exits 1 as expected in this local environment with 2 immediate blockers: missing project metadata and missing Vercel authentication.
+- `VERCEL_ORG_ID=org_test VERCEL_PROJECT_ID=prj_test npm run release:hosted:check`: exits 1 as expected with only 1 immediate blocker: missing Vercel authentication. This confirms scripted project metadata removes the local project-link blocker.
+- `npm run architecture:check`: passed; the UI token checker still reports existing non-blocking hardcoded color suggestions.
+- `npm run governance:check`: first failed because the new handoff entry reused duplicate subsection headings; after renaming this entry's headings, passed.
+- `npm run check:encoding`: passed.
+- `git diff --check`: failed on unrelated `apps/web/src/components/layout/PromptBar.tsx:3910` trailing whitespace; Git also printed existing CRLF/LF normalization warnings for unrelated working-tree files.
+
+### Hosted Release Scripted State Not Run
+- Full `npm run verify:changes` was not run in this focused pass. The changed surface is release scripting, the runbook, and focused guardrail tests.
+- A green `npm run release:hosted:check` was not possible in this local environment because neither `.vercel/project.json` nor `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` exists here, and Vercel auth is unavailable without `vercel login` or `VERCEL_TOKEN`.
+- Full `npm run test:unit` was not used as final validation. An earlier mistaken `npm run test:unit -- tests/unit/hosted-release-guardrails.test.ts` invocation still ran the repository glob and failed on an unrelated workspace chrome UI contract assertion outside this release preflight scope.
+
+### Hosted Release Scripted State Risks / Next
+- Before a hosted release, run `vercel login` and `vercel link`, or provide `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`, then rerun `npm run release:hosted:check`.
+- Confirm required VPS runtime secrets in the VPS environment before smoke tests; the local preflight can only report missing local snapshots as remote checks.
+
+## 2026-06-18 - Prompt Group Drag Follow Fix
+
+### Prompt Group Drag Scope
+- Fixed the infinite-canvas prompt group drag path where a main prompt card drag could also delta-move child image cards while regroup layout was trying to own their live render positions.
+- Kept child image card drags independent: dragging a child still clears regroup presentation state and commits only the dragged child unless an explicit multi-selection is active.
+- Preserved the existing dashed connector rendering path; the fix removes the conflicting child live-position source that made connectors attach to stale or double-moved child positions.
+
+### Prompt Group Drag Files Touched
+- `apps/web/src/app/usePromptGroupDragHandlers.ts`
+- `docs/development/session-handoff.md`
+
+### Prompt Group Drag Design Decisions
+- During single main-card auto-regroup drag, only the prompt's live position should drive the group. Child render positions must come from `promptGroupRegroupLayoutsById`, not from an additional raw drag delta.
+- `applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta)` intentionally has no child companions; the prompt component has already published the prompt live position before the drag-delta handler runs.
+
+### Prompt Group Drag Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/prompt-group-drag-layout.test.ts`: first failed on `App keeps child live positions owned by regroup layout during single main-card drag`, then passed after the fix, 42 tests.
+- `npm run verify:prompt-group-drag`: passed in browser mode; result included `mainDragGrouped=true` and `childConnectorFollows=true`.
+
+### Prompt Group Drag Not Run
+- Full `npm run verify:changes` was not run for this focused canvas interaction fix.
+
+### Prompt Group Drag Risks / Next
+- The browser smoke still emits existing local API/admin-model console noise when no local API is running; the tested drag flow is mocked and passed.
+- The working tree had unrelated pre-existing edits before this fix; this pass did not revert or reorganize them.
+
+## 2026-06-18 - Browser Smoke Local API Noise Reduction
+
+### Browser Smoke Local API Noise Scope
+- Reduced false-positive local API 502 noise in the browser smoke chain when the VPS/local API is not running.
+- Kept the existing Playwright browser-mode paths intact for desktop settings, mobile settings, prompt-group drag, and startup runtime banner centering.
+- Preserved fallback contract behavior for smoke scripts that already degrade to source/HTTP checks.
+
+### Browser Smoke Local API Noise Files Touched
+- `scripts/test/verify-desktop-settings-smoke.mjs`
+- `scripts/test/verify-mobile-settings-smoke.mjs`
+- `scripts/test/verify-prompt-group-drag.mjs`
+- `scripts/test/verify-startup-runtime-banner-centering.mjs`
+- `tests/unit/mobile-settings-browser-verify-script.test.ts`
+- `docs/development/session-handoff.md`
+
+### Browser Smoke Local API Noise Design Decisions
+- Smoke API route mocks now cover `/api/v1/model-catalog/active` and `/api/v1/model-catalog/active-credit-models` with an empty public model catalog. This prevents `AdminModelService` from falling through to the Vite local API proxy and logging expected 502 failures while the backend is offline.
+- Health check mocks now use `**/healthz**` so smart routing probes such as `/healthz?smart_probe=...` are handled by Playwright instead of the Vite proxy.
+- Unknown `/api/v1` requests still fall back to the dev proxy, so the smoke scripts do not silently swallow genuinely new backend dependencies.
+
+### Browser Smoke Local API Noise Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-settings-browser-verify-script.test.ts`: first failed on the new model-catalog and healthz-query smoke-route assertions, then passed after implementation, 8 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/startup-runtime-banner-browser-verify-script.test.ts`: passed, 3 tests.
+- `npm run typecheck:tests`: passed for 436 semantic test files.
+- `npm run verify:desktop-settings-smoke`: passed in browser mode with no local API proxy warning or `AdminModelService` 502 console noise.
+- `npm run verify:mobile-settings-smoke`: exited 0 through its existing fallback contract path with no local API proxy warning or 502 console noise.
+- `npm run verify:startup-runtime-banner-centering`: passed in browser mode with centered banner checks at 1600px and 1280px.
+- `npm run verify:prompt-group-drag`: passed in browser mode with `mainDragGrouped=true` and `childConnectorFollows=true`; it still prints its existing broad `BROWSER_CONSOLE` trace by design.
+- `npm run governance:check`: passed.
+- `npm run check:encoding`: passed.
+- `git diff --check`: failed on unrelated pre-existing `apps/web/src/components/layout/PromptBar.tsx:3910` trailing whitespace; Git also printed CRLF/LF normalization warnings.
+
+### Browser Smoke Local API Noise Not Run
+- Full `npm run verify:changes` was not run for this focused smoke-script maintenance pass.
+- An initial mistaken `npm run test:unit -- tests/unit/mobile-settings-browser-verify-script.test.ts` invocation ran the repository unit-test glob and failed on an unrelated existing `workspace-chrome-ui-system-contract` assertion.
+
+### Browser Smoke Local API Noise Risks / Next
+- `verify:mobile-settings-smoke` still relies on its existing fallback contract path locally because `settings-workbench-overview` times out in Playwright. This pass only removed local API 502 noise around that path.
+- Future smoke dependencies that add new `/api/v1` calls should get explicit Playwright mocks instead of broad catch-all success responses.
+
+## 2026-06-18 - UI System Deep Overlay Closure
+
+### Deep Overlay Closure Scope
+- Continued the KK Studio v1.5.7 UI system closure path for high-frequency floating layers.
+- Migrated `CanvasDrawingInteractionOverlay`, `CanvasGroupComponent`, and deeper `PromptBar` model/count/audio/context/settings overlays toward existing token, layer, and primitive conventions.
+- Kept behavior, model filtering, virtualized model list rendering, canvas drawing export, and group drag logic unchanged.
+
+### Deep Overlay Closure Files Touched
+- `apps/web/src/components/canvas/CanvasDrawingInteractionOverlay.tsx`
+- `apps/web/src/components/canvas/CanvasGroupComponent.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/styles/kk-ui-tokens.css`
+- `tests/unit/canvas-drawing-overlay-ui-system-contract.test.ts`
+- `tests/unit/canvas-context-menu-ui-system-contract.test.ts`
+- `tests/unit/prompt-bar-deep-overlay-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Deep Overlay Closure Design Decisions
+- Drawing overlay extent and offset now live in CSS tokens, while the component keeps named layer and coordinate constants.
+- Canvas group context menu now uses named layer/offset constants plus `role="menu"` / `role="menuitem"` to make the floating layer easier to audit.
+- PromptBar deep model overlays now use `PROMPT_BAR_DEEP_*` semantic layer constants and `kk-prompt-bar-deep-*` primitives for search, list, provider rows, model items, context menu items, modal fields/actions, count popovers, count sheets, and audio duration panels.
+- Mobile model sheet kept its existing `KK_LAYER.modalBackdrop` / `KK_LAYER.modal` contract because it already has a separate stable layer selector.
+
+### Deep Overlay Closure Validation Run
+- `node --test --test-isolation=none "tests/unit/canvas-drawing-overlay-ui-system-contract.test.ts" "tests/unit/canvas-context-menu-ui-system-contract.test.ts" "tests/unit/prompt-bar-deep-overlay-ui-system-contract.test.ts"`: first failed on the new contracts, then passed after implementation, 6 tests.
+- `npm run architecture:check`: passed. The UI token checker still reports existing non-blocking hardcoded color suggestions, including historical drawing export white and canvas group swatch colors.
+- `npm run typecheck`: passed, including server syntax check for 47 files and semantic test check for 436 test files.
+- `node --test --test-isolation=none "tests/unit/workspace-chrome-ui-system-contract.test.ts"`: failed on existing `AppCanvasNavigationPanel.tsx` missing `kk-workspace-icon-control`, outside this pass's touched files.
+- `git diff --check`: passed after removing PromptBar trailing whitespace; Git still printed CRLF/LF normalization warnings for pre-existing touched files.
+
+### Deep Overlay Closure Not Run
+- Full `npm run verify:changes` was not run for this focused UI system pass.
+- `npm run test:unit` was attempted and failed on the unrelated existing `workspace-chrome-ui-system-contract` minimap assertion described above.
+
+### Deep Overlay Closure Risks / Next
+- Follow up separately on `apps/web/src/app/AppCanvasNavigationPanel.tsx` to finish the workspace chrome/minimap primitive contract and unblock full unit runs.
+- The architecture token checker continues to print non-blocking historical hardcoded color suggestions. This pass did not broaden into general color token cleanup.
+- The working tree already had unrelated hosted-release, smoke-script, and prompt-group-drag edits before this pass; this pass did not revert or reorganize them.
+
+## 2026-06-18 - KK Landing Stability And AI Governance Drift Fix
+
+### KK Landing Stability Scope
+- Restored the signed-out landing direction to KK Studio branding while retaining the reference-inspired scroll structure and neutral login treatment.
+- Fixed the workspace minimap contract by moving navigation buttons onto shared workspace chrome primitives and removing the hook-order risk from the pre-hook `activeCanvas` return.
+- Updated AI assistant docs and governance so v1.5.7 is enforced from `config/release-manifest.json`.
+
+### KK Landing Stability Files Touched
+- `apps/web/src/landing/KkLandingPage.tsx`
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx`
+- `scripts/governance/check-agent-docs.mjs`
+- `tests/unit/newgenre-landing-auth-contract.test.ts`
+- `tests/unit/runtime-governance-upgrade.test.ts`
+- `docs/ai-assistant/`
+- `docs/development/session-handoff.md`
+
+### KK Landing Stability Design Decisions
+- Keep `KK Studio` as the product brand and use the reference page only for visual rhythm, spacing, project-card treatment, and scroll feel.
+- Keep the existing AI execution path through `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update`; no parallel assistant entry was added.
+- Treat `docs/ai-assistant/generated/project-index.json` as generated output and rebuild it after source doc version updates.
+
+### KK Landing Stability Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/newgenre-landing-auth-contract.test.ts`: first failed on the updated KK Studio landing contract while the page still contained New Genre copy, then passed after implementation, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/workspace-chrome-ui-system-contract.test.ts`: first failed on missing `kk-workspace-icon-control`, then passed after the minimap primitive fix, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/runtime-governance-upgrade.test.ts`: first failed on the new agent-doc version drift contract, then passed after governance updates, 4 tests.
+- `npm run build`: passed.
+- `npm run architecture:check`: passed; the UI token checker still prints existing non-blocking hardcoded color suggestions.
+- `npm run governance:check`: passed.
+- `npm run typecheck`: passed, including server syntax check for 47 files and semantic test check for 437 test files.
+- `npm run spec:check`: passed.
+- `npm audit --omit=dev --audit-level=moderate`: passed with 0 vulnerabilities.
+- `npm run check:encoding`: passed after repairing the AI docs UTF-8 content from source and reapplying the v1.5.7 version update.
+- `npm run test:unit`: passed, 1462 passing tests and 2 skipped.
+- `npm run verify:changes`: passed. Browser smoke checks used their existing fallback paths where Playwright reported the newer headless shell path was missing.
+- `git diff --check`: passed; Git still printed existing CRLF/LF normalization warnings for pre-existing touched files.
+
+### KK Landing Stability Not Run
+- No planned verification remains unrun for this pass.
+
+### KK Landing Stability Risks / Next
+- The working tree had many pre-existing edits before this pass; this entry only records the landing/auth, minimap, AI docs, governance, and related test changes.
+- Product follow-up: build a visible AI takeover run timeline and DurableGenerationQueue panel so batch jobs, permission confirmations, verification, and knowledge updates feel like one continuous workflow.
+
+## 2026-06-18 - New Genre Reference Auth Landing Rebuild
+
+### New Genre Reference Auth Landing Scope
+- Rebuilt the signed-out KK Studio landing experience against the local New Genre reference kit rhythm: fixed 240vh gradient, warm lower gradient, sparse navigation, large whitespace, floating note card, project cards, and dark footer.
+- Split landing scroll state from auth modal state so the introduction page scrolls normally and only the login modal locks the page background.
+- Restyled the login card to the neutral reference treatment while preserving login, registration, forgot password, Google, WeChat, temporary local access, admin entry, and Turnstile behavior.
+- Replaced the remaining synthetic project-card visuals and footer logo treatment with cropped New Genre reference flower assets driven from CSS.
+
+### New Genre Reference Auth Landing Files Touched
+- `apps/web/src/components/auth/LoginScreen.tsx`
+- `apps/web/src/components/auth/LoginScreen.css`
+- `apps/web/src/landing/KkLandingPage.tsx`
+- `apps/web/src/landing/landingStyles.css`
+- `apps/web/src/landing/landingReferenceOverrides.css`
+- `tests/unit/newgenre-landing-auth-contract.test.ts`
+- `docs/ai-assistant/ui-map.md`
+- `docs/development/session-handoff.md`
+
+### New Genre Reference Auth Landing Design Decisions
+- Keep product copy and brand as KK Studio while using the New Genre reference only as the visual baseline for background, spacing, navigation feel, card treatment, and scroll pacing.
+- Use `auth-screen-active--landing` for the full-page signed-out state and `auth-modal-open` only for modal background locking.
+- Keep the project cards as CSS-driven reference asset crops instead of direct `newgenre_static` image references in the React source; CSS owns the local font and image asset paths.
+- Add only the minimum governance token comment to `docs/ai-assistant/ui-map.md`; that file already had unrelated encoding drift in the working tree.
+
+### New Genre Reference Auth Landing Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/theme-system-adaptation.test.ts tests/unit/theme-contrast-contract.test.ts tests/unit/workspace-auth-gate.test.ts tests/unit/login-screen-auth-actions.test.ts tests/unit/login-screen-admin-entry.test.ts tests/unit/newgenre-landing-auth-contract.test.ts`: passed, 28 tests.
+- `npm run typecheck`: passed, including server syntax check for 47 files and semantic test check for 437 test files.
+- `npm run build`: passed.
+- `npm run architecture:check`: passed; UI token checker still prints existing non-blocking hardcoded color suggestions.
+- `npm run governance:check`: first failed because `docs/ai-assistant/ui-map.md` was missing the required `AI 接管` token, then passed after adding the minimal token comment.
+- `git diff --check -- apps/web/src/components/auth/LoginScreen.tsx apps/web/src/components/auth/LoginScreen.css apps/web/src/landing/KkLandingPage.tsx apps/web/src/landing/landingStyles.css apps/web/src/landing/landingReferenceOverrides.css tests/unit/newgenre-landing-auth-contract.test.ts`: passed.
+- Browser QA on local Vite `http://127.0.0.1:3000/`: desktop 1440x1200, tablet 768x1024, and mobile 390x844 all allowed landing scroll; modal open set body overflow to `hidden`; modal close restored body overflow to `auto`. Screenshots saved under `%TEMP%\kk-newgenre-qa`.
+
+### New Genre Reference Auth Landing Not Run
+- Full `npm run verify:changes` was not run for this focused landing/auth rebuild.
+
+### New Genre Reference Auth Landing Risks / Next
+- The local `docs/ai-assistant/ui-map.md` content remains affected by pre-existing encoding drift; this pass only added the governance token required to unblock current checks.
+- The working tree still contains many unrelated pre-existing edits outside the landing/auth scope; this pass did not revert or reorganize them.
+
+## 2026-06-18 - New Genre Reference Auth Landing Completion Audit
+
+### Completion Audit Scope
+- Continued the signed-out landing rebuild after the initial pass and closed the remaining visual gap where work cards still used synthetic gradient visuals.
+- Replaced the project-card image surfaces and footer decorative flower with cropped New Genre reference flower assets from `/newgenre_static/assets`, while keeping React source free of direct `newgenre_static` paths.
+- Re-verified desktop, tablet, and mobile behavior after restarting Vite so the current bundle, not a stale dev-server transform, was inspected.
+
+### Completion Audit Files Touched
+- `apps/web/src/landing/KkLandingPage.tsx`
+- `apps/web/src/landing/landingStyles.css`
+- `docs/development/session-handoff.md`
+
+### Completion Audit Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/theme-system-adaptation.test.ts tests/unit/theme-contrast-contract.test.ts tests/unit/workspace-auth-gate.test.ts tests/unit/login-screen-auth-actions.test.ts tests/unit/login-screen-admin-entry.test.ts tests/unit/newgenre-landing-auth-contract.test.ts`: passed, 28 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run build`: passed.
+- `npm.cmd run architecture:check`: passed; UI token checker still reports existing non-blocking hardcoded color suggestions.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `npm.cmd run spec:check`: passed with escalation after sandboxed registry/cache access failed.
+- `npm.cmd run verify:changes`: passed with escalation. The earlier sandboxed full run failed only on npm cache access during `spec:check`.
+- Browser QA on `http://127.0.0.1:3000/`: desktop 1440x1200, tablet 768x1024, and mobile 390x844 all allowed landing scroll; all three project-card image surfaces rendered `/newgenre_static/assets/...webp`; modal open set body overflow to `hidden`; modal close restored body overflow to `auto`. Screenshots saved under `%TEMP%\kk-newgenre-qa-current`.
+
+### Completion Audit Not Run
+- No planned verification remains unrun for this landing/auth pass.
+
+### Completion Audit Risks / Next
+- The working tree still contains many unrelated pre-existing edits outside the landing/auth scope; this pass did not revert or reorganize them.
+- Repository smoke scripts currently fall back to source/HTTP contract checks because the newest Playwright headless shell executable is not installed locally; `verify:changes` still exits 0 by design.
+
+## 2026-06-18 - AI Takeover Run Timeline Surface
+
+### AI Takeover Run Timeline Scope
+- Added a RunStore-backed AI takeover timeline that turns the active `AgentRunRecord` into the canonical visible stages: `IntentGate`, `Planner`, `PermissionPolicy`, `Executor`, and `Verification / Memory`.
+- Exposed `currentRun` and `agentRunTimeline` from `AITakeoverContext` so `AIAssistantDock` renders status from the existing `AgentRuntime -> AgentRunStore` chain.
+- Updated pending-plan cancellation to call `AgentRuntime.cancelPendingRun(runId)`, allowing the UI to show cancelled state instead of only removing the confirmation card.
+- Added a compact timeline rail to the dock header with stable `.ai-takeover-run-timeline` and `.ai-takeover-run-timeline__step[data-status]` selectors.
+
+### AI Takeover Run Timeline Files Touched
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentRunTimeline.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx`
+- `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+- `tests/unit/ai-takeover-run-timeline-contract.test.ts`
+- `docs/ai-assistant/ui-map.md`
+- `docs/development/session-handoff.md`
+
+### AI Takeover Run Timeline Design Decisions
+- Keep the assistant path singular: no new runtime instance and no parallel assistant entry; the UI reads the existing `AgentRunStore` record.
+- Use a pure `buildAgentRunTimeline(record)` helper so status mapping is testable without React or browser state.
+- Keep the dock timeline compact and machine-addressable; detailed descriptions live in `title` text and the visible surface stays focused on state.
+
+### AI Takeover Run Timeline Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-run-timeline-contract.test.ts`: first failed on missing helper/context/dock/barrel contract, then passed after implementation, 4 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-run-timeline-contract.test.ts tests/unit/ai-takeover-intentGate.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/agent-handoff-writer.test.ts tests/unit/favorites-ui-contract.test.ts`: passed, 35 tests.
+- `npm run architecture:check`: passed; the UI token checker still reports existing non-blocking hardcoded color suggestions.
+- `npm run governance:check`: passed.
+- `npm run typecheck`: passed, including server syntax check for 47 files and semantic test check for 438 test files.
+- `npm run build`: passed.
+- `npm run check:encoding`: passed.
+- `npm run verify:changes`: passed. Unit tests reported 1466 passing and 2 skipped; integration, contract, and e2e suites also passed. Browser smoke scripts used their existing fallback contract path because the newer Playwright headless shell path was missing locally.
+- `git diff --check`: passed; Git still printed existing CRLF/LF normalization warnings for unrelated working-tree files.
+- Browser QA attempt on local Vite `http://127.0.0.1:3000/`: Vite was healthy, temporary local workspace access succeeded, and `#btn-ai-takeover-toggle` existed. The in-app browser could not click the AI takeover button because its reported coordinates stayed outside the viewport, even after temporary desktop viewport expansion; the viewport was reset afterward.
+- `npm audit --omit=dev --audit-level=moderate`: run separately after `verify:changes`, but failed because the npm registry audit endpoint disconnected before TLS completed.
+
+### AI Takeover Run Timeline Not Run
+- Live visual confirmation of the opened dock timeline remains unverified because the in-app browser could not click the off-viewport AI takeover toggle.
+
+### AI Takeover Run Timeline Risks / Next
+- The timeline currently reflects run lifecycle state at plan, confirmation, execution, completion, failure, and cancellation boundaries; per-tool streaming updates would require `AgentRunStore` subscriptions or runtime progress events.
+- The full verification wrapper passed despite the audit network warning because `npm run audit:dependencies` intentionally downgrades audit endpoint errors. A clean vulnerability audit still needs a successful registry connection.
+- Follow-up product work can add a queue-linked live progress stream so each ToolRegistry call updates the timeline while it is running, not only after the run record changes.
+
+## 2026-06-18 - AI Takeover Entrypoint And Browser Smoke Closure
+
+### AI Takeover Entrypoint Scope
+- Added a visible desktop AI assistant entrypoint to the left workspace chrome so users do not have to discover the hidden edge handle before opening the assistant.
+- Kept AI takeover inside the existing `AITakeoverProvider` / `ChatSidebar` path and did not add another assistant runtime or parallel entry.
+- Connected the RunStore-backed takeover timeline to the actual ChatSidebar composer surface, closing the prior visual gap where the timeline existed only in the unused `AIAssistantDock`.
+- Replaced the audio generation raw DOM progress toast with the shared notification service and kept progress feedback inside app primitives.
+- Added a repeatable browser smoke script for the full path: temporary workspace access, desktop AI entrypoint, AI takeover toggle, composer input, send, and timeline rendering.
+
+### AI Takeover Entrypoint Files Touched
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+- `scripts/test/verify-ai-takeover-smoke.mjs`
+- `tests/unit/ai-takeover-entrypoint-contract.test.ts`
+- `package.json`
+- `docs/development/session-handoff.md`
+
+### AI Takeover Entrypoint Design Decisions
+- The desktop AI button only toggles the existing ChatSidebar and mirrors `isChatOpen` through `aria-pressed`; the old side handle remains a secondary affordance.
+- The ChatSidebar takeover timeline reuses `.ai-takeover-run-timeline` and `.ai-takeover-run-timeline__step[data-status]` so dock, sidebar, tests, and smoke automation share one contract.
+- The smoke script uses a high local port pool starting at `3007` to avoid stale dev servers on port `3000`, and falls back to source contracts only when browser launch itself is unavailable.
+- The takeover composer now has a stable `#ai-takeover-composer-input` selector so browser verification does not depend on localized placeholder text.
+
+### AI Takeover Entrypoint Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-entrypoint-contract.test.ts`: first failed before implementation, then passed after the desktop entrypoint, composer wrapping, and notification-service changes, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-entrypoint-contract.test.ts tests/unit/notification-toast-ui-system-contract.test.ts tests/unit/ai-takeover-run-timeline-contract.test.ts tests/unit/app-shell-panel-layer.test.ts tests/unit/workspace-chrome-ui-system-contract.test.ts`: passed, 13 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-entrypoint-contract.test.ts tests/unit/ai-takeover-run-timeline-contract.test.ts`: passed after wiring the timeline into the actual ChatSidebar, 7 tests.
+- `node scripts/test/verify-ai-takeover-smoke.mjs`: passed in browser mode; screenshot saved to `temp/playwright/ai-takeover-smoke/ai-takeover-timeline.png`.
+- `npm.cmd run verify:ai-takeover-smoke`: passed in browser mode and confirmed timeline statuses `done`, `active`, `pending`, `pending`, `pending`.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 439 test files.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:changes`: passed. Unit tests reported 1469 passing and 2 skipped; integration, contract, e2e, build, typecheck, spec, governance, dependency audit, and encoding checks passed. Existing repository smoke scripts for prompt group drag, mobile settings, desktop settings, and startup banner used their fallback contract paths because Playwright looked for a newer missing headless shell, while `verify:ai-takeover-smoke` passed separately in browser mode.
+
+### AI Takeover Entrypoint Not Run
+- No planned verification remains unrun for this final closure pass.
+
+### AI Takeover Entrypoint Risks / Next
+- The visible sidebar timeline is compact; long step labels truncate by design. A future polish pass can add a hover card or expandable history for per-tool streaming details.
+- The new AI takeover smoke is registered as `verify:ai-takeover-smoke` but is not yet added to `verify:changes`; keep it separate until the team decides browser smoke cost is acceptable for every full verification run.
+
+## 2026-06-18 - AI Takeover DurableGenerationQueue Panel Closure
+
+### DurableGenerationQueue Panel Scope
+- Surfaced the real `DurableGenerationQueue` inside the actual `ChatSidebar` AI takeover panel, not only the unused dock component.
+- Added visible job status, completion/failed/running/queued counts, output-group labels, output count, first failure reason, archive, pause, resume, retry, cancel, and locate controls.
+- Added `DurableGenerationQueue.retryFailedPrompts(jobId)` so failed prompt items can be reset to `queued` and re-enter the existing queue scheduler without creating a parallel assistant path.
+- Expanded `verify:ai-takeover-smoke` to seed a persisted queue job and assert the browser-rendered queue panel, controls, timeline, and failure reason.
+- Tokenized the new queue panel surface and controls with `frost-card-*`, `state-*`, `toolbar-hover`, and Clay brand variables.
+
+### DurableGenerationQueue Panel Files Touched
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts`
+- `scripts/test/verify-ai-takeover-smoke.mjs`
+- `tests/unit/ai-takeover-queue-panel-contract.test.ts`
+- `tests/unit/durable-generation-queue.test.ts`
+- `docs/development/session-handoff.md`
+
+### DurableGenerationQueue Panel Design Decisions
+- Keep the execution chain singular: the panel observes and controls the existing queue singleton used by `generation.createBatchJob`; it does not create another assistant runtime.
+- Retry only resets failed prompt items and clears their error/retry count; completed prompt outputs are preserved.
+- Locate uses the existing `canvas-center-on-node` event and falls back to a notification when the persisted queue output no longer exists on the active canvas.
+- The visible panel is capped to four active/recent jobs to keep the ChatSidebar composer area usable.
+
+### DurableGenerationQueue Panel Validation Run
+- TDD red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-queue-panel-contract.test.ts tests/unit/durable-generation-queue.test.ts` first failed on missing `retry-durable-job` and missing `retryFailedPrompts`.
+- Green pass: the same command passed after implementation, 14 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-queue-panel-contract.test.ts tests/unit/ai-takeover-entrypoint-contract.test.ts tests/unit/ai-takeover-run-timeline-contract.test.ts tests/unit/durable-generation-queue.test.ts tests/unit/clay-frosted-surface-contract.test.ts`: passed, 28 tests.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 440 test files.
+- `npm.cmd run check:encoding`: passed after replacing a new mojibake title with normal Simplified Chinese.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallbacks, and encoding checks all completed. `npm audit` reported 0 vulnerabilities in this final full run.
+- `npm.cmd run verify:ai-takeover-smoke`: passed in browser mode on `http://127.0.0.1:3007`; it confirmed the AI takeover timeline and queue text `DurableGenerationQueue (1)...失败 1...smoke failure reason`.
+- `git diff --check`: passed; Git still prints existing CRLF/LF normalization warnings for unrelated working-tree files.
+
+### DurableGenerationQueue Panel Not Run
+- No planned validation remains unrun for this queue-panel closure pass.
+
+### DurableGenerationQueue Panel Risks / Next
+- `retryFailedPrompts` is currently exposed through the runtime queue and UI, not as a new ToolRegistry tool. If natural-language "retry this failed batch" should be handled by the agent planner, add a governed `generation.retryJob` tool and update AI assistant docs.
+- Repository smoke scripts other than `verify:ai-takeover-smoke` still use fallback contracts because their Playwright runtime looks for missing headless shell `1228`; the dedicated AI takeover smoke uses the available preflight browser path and runs in browser mode.
+- The compact queue panel truncates long output-group labels and failure messages; a future polish pass can add a details popover or expandable job history.
+
+## 2026-06-19 - AI Takeover generation.retryJob Tool Closure
+
+### generation.retryJob Scope
+- Exposed `DurableGenerationQueue.retryFailedPrompts(jobId)` through the governed ToolRegistry as `generation.retryJob`.
+- Added local natural-language intent handling for "retry failed batch/job job_xxx" in Chinese and English, mapping it to the existing `IntentGate -> LocalBrain -> ToolRegistry -> Executor` chain.
+- Added a small LLM planner prompt supplement so cloud planning also knows the safe retry action without adding a parallel assistant entry.
+- Updated AI assistant docs and runbooks so queue recovery, batch generation, and skills governance all include `generation.retryJob`.
+
+### generation.retryJob Files Touched
+- `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+- `apps/web/src/features/ai-takeover/types.ts`
+- `apps/web/src/features/ai-takeover/core/intentGate.ts`
+- `apps/web/src/features/ai-takeover/core/localBrain.ts`
+- `apps/web/src/features/ai-takeover/core/llmBrain.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/ai-takeover-intentGate.test.ts`
+- `tests/unit/ai-assistant-retry-job-docs-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/ai-assistant/skills/batch-generate-to-canvas.md`
+- `docs/ai-assistant/RUNBOOKS.md`
+- `docs/ai-assistant/skills.md`
+- `docs/development/session-handoff.md`
+
+### generation.retryJob Design Decisions
+- `generation.retryJob` is `safe` because it only resets already failed prompt items to `queued`; it does not create a new paid batch, upload assets, delete canvas nodes, or resubmit completed outputs.
+- The tool returns the same kind of job summary as `generation.getJobStatus`, plus `retryingCount`, so the run timeline and future UI surfaces can explain what changed.
+- Intent matching runs before generic error diagnosis so the word "failed" in "retry failed job" does not incorrectly route to `explain_error`.
+- Existing queue retry semantics remain unchanged: the underlying queue still enforces its normal retry count and backoff for each prompt after requeue.
+
+### generation.retryJob Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-takeover-intentGate.test.ts tests/unit/ai-assistant-retry-job-docs-contract.test.ts` failed on the missing tool, missing intent, and missing docs contract.
+- Green pass: the same targeted command passed after implementation, 31 tests.
+- `npm.cmd run governance:check`: passed and confirmed `generation.retryJob` is aligned between ToolRegistry and AI assistant skills docs.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 441 test files.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:ai-takeover-smoke`: passed in browser mode on `http://127.0.0.1:3007`; it confirmed timeline statuses and the durable queue failure summary.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallbacks, and encoding checks all completed. `npm audit` reported 0 vulnerabilities.
+
+### generation.retryJob Not Run
+- No planned verification remains unrun for this closure pass.
+
+### generation.retryJob Risks / Next
+- Repository smoke scripts other than `verify:ai-takeover-smoke` still use fallback contracts because they look for missing Playwright headless shell `1228`; the dedicated AI takeover smoke uses the available preflight browser path and runs in browser mode.
+- The initial explicit-`jobId` retry path is now extended by the latest-failed retry optimization recorded below, so no separate parallel retry entry is needed.
+
+## 2026-06-19 - AI Takeover Latest Failed Retry Optimization
+
+### Latest Failed Retry Scope
+- Extended `generation.retryJob` so natural-language requests such as "重试刚才失败的批次" can retry the most recent non-cancelled `DurableGenerationQueue` job with failed prompt items when no explicit `jobId` is provided.
+- Kept the execution path inside the existing `IntentGate -> LocalBrain / LlmBrain -> ToolRegistry -> DurableGenerationQueue` chain; no parallel assistant entry or queue was added.
+- Added regression coverage for ToolRegistry resolution, IntentGate no-ID recognition, LocalBrain payload mapping, and AI assistant docs/runbook contracts.
+- Updated AI assistant docs so `generation.retryJob({ target: 'latest_failed' })` is documented alongside explicit `jobId` retry.
+
+### Latest Failed Retry Files Touched
+- `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+- `apps/web/src/features/ai-takeover/types.ts`
+- `apps/web/src/features/ai-takeover/core/intentGate.ts`
+- `apps/web/src/features/ai-takeover/core/localBrain.ts`
+- `apps/web/src/features/ai-takeover/core/llmBrain.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/ai-takeover-intentGate.test.ts`
+- `tests/unit/ai-assistant-retry-job-docs-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/ai-assistant/skills/batch-generate-to-canvas.md`
+- `docs/ai-assistant/RUNBOOKS.md`
+- `docs/ai-assistant/skills.md`
+- `docs/development/session-handoff.md`
+
+### Latest Failed Retry Design Decisions
+- `jobId` remains the precise path. When omitted, `target: 'latest_failed'` resolves the newest job by `updatedAt` that is not cancelled and has at least one failed prompt.
+- The IntentGate rule requires a retry command plus a failed batch/job target, so broad troubleshooting questions do not automatically execute a retry.
+- The ToolRegistry response now includes `resolvedFrom` (`explicit` or `latest_failed`) so future run timelines can explain whether the job was selected directly or inferred.
+- Completed prompts remain preserved; only failed prompt items are reset through the existing `retryFailedPrompts` queue method.
+
+### Latest Failed Retry Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-takeover-intentGate.test.ts tests/unit/ai-assistant-retry-job-docs-contract.test.ts` failed on missing no-ID retry resolution, missing latest-failed intent, and missing docs contracts.
+- Green pass: the same targeted command passed after implementation, 33 tests.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 441 test files.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+
+### Latest Failed Retry Not Run
+- No planned validation remains unrun for this optimization pass.
+
+### Latest Failed Retry Risks / Next
+- The latest-failed selection is timestamp based; if several failed jobs update close together, the newest updated failed job wins. A future UI polish can show an explicit job picker before retry when multiple failed jobs are visible.
+- Repository smoke scripts other than `verify:ai-takeover-smoke` still use fallback contracts because their Playwright runtime looks for a missing headless shell; this did not block `verify:changes`.
+
+## 2026-06-20 - Governance Version Drift And Password Reset Request Closure
+
+### Governance / Password Reset Scope
+- Added a current-facts governance guard for active `docs/governance/` version drift so v1.5.6 assertions cannot remain in current governance docs while `config/release-manifest.json` is v1.5.7.
+- Updated active governance docs to KK Studio v1.5.7: security backlog, version/release rules, encoding/PowerShell rules, and architecture review.
+- Replaced the login page forgot-password dead end with a typed KK API password-reset request flow.
+- Added shared DTO/client support plus a server route for `POST /api/v1/auth/password-reset/request`; the route is privacy-preserving and returns a generic accepted response without revealing whether the email exists.
+
+### Governance / Password Reset Files Touched
+- `scripts/governance/check-current-facts.mjs`
+- `docs/governance/SECURITY_AND_BACKLOG.md`
+- `docs/governance/VERSION_AND_RELEASE.md`
+- `docs/governance/ENCODING_AND_POWERSHELL.md`
+- `docs/governance/architecture_review.md`
+- `packages/shared/src/contracts/dto/auth.ts`
+- `packages/shared/src/contracts/client/kk-api-client.ts`
+- `packages/api-client/src/api.ts`
+- `server/routes/user.js`
+- `apps/web/src/components/auth/LoginScreen.tsx`
+- `tests/unit/runtime-governance-upgrade.test.ts`
+- `tests/unit/auth-password-reset-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Governance / Password Reset Design Decisions
+- `config/release-manifest.json` remains the only version source of truth; active governance docs must include the current display version and must not keep stale v1.5.6 current assertions.
+- Password reset request is intentionally enumeration-safe: invalid email format returns `AUTH_INVALID_EMAIL`, but valid emails always get the same accepted response.
+- The route accepts both `/api/v1/auth/password-reset/request` for the typed shared client and `/api/auth/password-reset/request` for the legacy API client.
+- This pass does not implement email delivery, reset-token storage, or final password update by token. It removes the product dead end and establishes the governed request boundary for that later backend work.
+
+### Governance / Password Reset Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/runtime-governance-upgrade.test.ts` failed before implementation because `check-current-facts.mjs` did not guard active governance docs.
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-password-reset-contract.test.ts` failed before implementation because DTO, client, server route, and login page integration were missing.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-password-reset-contract.test.ts`: passed, 1 test.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/runtime-governance-upgrade.test.ts`: passed, 5 tests.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 442 test files.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+
+### Governance / Password Reset Not Run
+- No planned validation remains unrun for this pass.
+
+### Governance / Password Reset Risks / Next
+- Password reset is request-accepted only until a mail provider, reset-token persistence, and token-confirm endpoint are added.
+- The route logs only request id and matched-account boolean, not the submitted email; if production privacy policy treats even matched status as sensitive telemetry, remove that boolean before deployment.
+- Repository smoke scripts may still use fallback contract paths when the local Playwright headless shell is unavailable.
+
+## 2026-06-20 - Password Reset Token Confirmation Closure
+
+### Password Reset Token Closure Scope
+- Extended the password reset flow from request-only to a token-backed confirmation loop.
+- Added database persistence for HMAC-hashed reset tokens, expiry, consumption state, request IP, and user agent metadata.
+- Added typed shared DTO/client and legacy API-client methods for `requestPasswordReset` and `confirmPasswordReset`.
+- Updated the server routes so valid reset requests generate a raw token, store only its hash, consume previous active tokens, optionally send the reset link through Resend, and accept password updates through `/v1/auth/password-reset/confirm`.
+- Updated the login modal to open `reset-password` mode from `auth-mode=reset-password&token=...`, clear token query params after capture, submit the new password through `kkWebApiClient.confirmPasswordReset`, and cleanly return to sign-in.
+- Tightened password-reset logging so request handling remains enumeration-safe and does not log account-match status or provider-secret-derived payloads.
+
+### Password Reset Token Closure Files Touched
+- `migrations/013_password_reset_tokens.sql`
+- `packages/shared/src/contracts/dto/auth.ts`
+- `packages/shared/src/contracts/client/kk-api-client.ts`
+- `packages/api-client/src/api.ts`
+- `server/routes/user.js`
+- `apps/web/src/components/auth/LoginScreen.tsx`
+- `apps/web/src/components/auth/authLocalization.ts`
+- `tests/unit/auth-password-reset-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Password Reset Token Closure Design Decisions
+- Raw reset tokens are never persisted; `server/routes/user.js` stores only `hashPasswordResetToken(token)` in `public.password_reset_tokens.token_hash`.
+- Existing active reset tokens for the same user are consumed before issuing a new one, and all active tokens are consumed after a successful password update.
+- Reset links use `auth-mode=reset-password` so the login screen can switch directly into a focused new-password form without requiring the email field again.
+- The frontend clears reset URL parameters immediately after capturing the token, while retaining the token in component state until submit or dismissal.
+- Password reset request responses remain generic for any syntactically valid email. The confirmation endpoint returns invalid/expired token errors only after the user follows a reset link.
+- Email delivery is optional at runtime: the route accepts requests without a configured mail provider, but production needs `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM`, and a public app URL env to actually deliver reset links.
+
+### Password Reset Token Closure Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-password-reset-contract.test.ts` failed before implementation because `migrations/013_password_reset_tokens.sql` and confirm-route contracts were missing.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-password-reset-contract.test.ts`: passed, 1 test.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 442 test files.
+- `npm.cmd run governance:check`: initially failed on a sensitive-looking password-reset log block, then passed after the log was reduced to a pure event.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+
+### Password Reset Token Closure Not Run
+- No planned validation remains unrun for this closure pass.
+
+### Password Reset Token Closure Risks / Next
+- Production must apply `migrations/013_password_reset_tokens.sql` before enabling password reset confirmation.
+- Production should set a stable public app origin through `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, or `WEB_PUBLIC_URL` so reset emails do not depend on request host headers.
+- Actual email delivery depends on Resend runtime configuration. Without `RESEND_API_KEY` and `PASSWORD_RESET_EMAIL_FROM`, the request remains enumeration-safe but no reset email is sent.
+- Repository smoke scripts may still use fallback contract paths when the local Playwright headless shell is unavailable; this did not block `verify:changes`.
+
+## 2026-06-22 - Password Reset Hosted Release Guardrail Closure
+
+### Password Reset Hosted Guardrail Scope
+- Converted the remaining password reset production configuration risk into hosted release preflight checks and templates.
+- Added hosted API required env coverage for `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM`, and `PASSWORD_RESET_TOKEN_SECRET`.
+- Added a one-of public app origin check for `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, or `WEB_PUBLIC_URL`.
+- Added required migration visibility for `migrations/013_password_reset_tokens.sql`, including a remote confirmation prompt to ensure VPS PostgreSQL has applied it before release.
+- Updated VPS and local backend env templates so operators see all password reset runtime requirements in the normal setup path.
+- Added a `Password Reset Production Readiness` section to the hosted release runbook.
+
+### Password Reset Hosted Guardrail Files Touched
+- `scripts/diagnose-hosted-release.mjs`
+- `scripts/vps/kk-api.env.example`
+- `server/.env.local.example`
+- `docs/development/hosted-release-runbook.md`
+- `tests/unit/hosted-release-guardrails.test.ts`
+- `docs/development/session-handoff.md`
+
+### Password Reset Hosted Guardrail Design Decisions
+- The preflight treats mail delivery secrets as hosted API required env because password reset confirmation is now a production auth surface.
+- Public app origin is a one-of requirement because the server supports `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, and `WEB_PUBLIC_URL`; the preflight reports a single remote check when all are absent.
+- Migration application cannot be proven from local files, so the script blocks only if the migration file is missing and otherwise records an explicit remote confirmation item.
+- Env templates use placeholder values only; no real secrets or deployment-specific domains were added.
+
+### Password Reset Hosted Guardrail Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts` failed before implementation because `RESEND_API_KEY` was not part of hosted API required checks.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts`: passed, 6 tests.
+- `node --check scripts/diagnose-hosted-release.mjs`: passed.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 442 test files.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `npm.cmd run architecture:check`: passed; it still reports existing non-blocking hardcoded color literal suggestions.
+- `npm.cmd run build`: passed.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+
+### Password Reset Hosted Guardrail Not Run
+- `npm.cmd run release:hosted:check` was not used as a green final check because this local workspace still lacks live Vercel auth/project state; the changed preflight behavior is covered by the hosted-release guardrail unit test and script syntax check.
+
+### Password Reset Hosted Guardrail Risks / Next
+- Operators still need to apply `migrations/013_password_reset_tokens.sql` to the real VPS database and set the actual runtime secret values in the deployment environment.
+- The preflight does not connect to remote VPS PostgreSQL, so migration application remains an explicit release checklist confirmation rather than an automated remote assertion.
+
+## 2026-06-22 - Password Reset Runtime Diagnose Closure
+
+### Password Reset Diagnose Scope
+- Extended `npm.cmd run api:diagnose` so local/runtime diagnosis reports password reset readiness, not only the hosted release preflight.
+- Added password reset server-only env keys to `scripts/dev/diagnose-api-env.mjs` so root frontend env misplacement checks also catch them.
+- Added a focused `Password reset runtime readiness` section with `passwordResetMailReady`, `passwordResetPublicOriginReady`, and `passwordResetReady`.
+- Added a unit contract to prevent the API diagnose script from drifting away from the password reset runtime requirements.
+
+### Password Reset Diagnose Files Touched
+- `scripts/dev/diagnose-api-env.mjs`
+- `tests/unit/api-diagnose-password-reset-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Password Reset Diagnose Design Decisions
+- `api:diagnose` remains read-only and does not require a running API; it reports local env readiness first and then attempts `/healthz`.
+- The readiness summary is boolean-only, while existing env source output continues to use `summarizeValue` so secrets are not printed raw.
+- `PASSWORD_RESET_TOKEN_SECRET`, `PASSWORD_RESET_EMAIL_FROM`, `RESEND_API_KEY`, `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, and `WEB_PUBLIC_URL` are listed in `apiServerKeys` so accidental placement in root frontend env files is visible.
+
+### Password Reset Diagnose Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-diagnose-password-reset-contract.test.ts` failed before implementation because `PASSWORD_RESET_TOKEN_SECRET` was missing from API diagnostics.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-diagnose-password-reset-contract.test.ts`: passed, 1 test.
+- `node --check scripts/dev/diagnose-api-env.mjs`: passed.
+- `npm.cmd run api:diagnose`: passed and reported the current local machine as `passwordResetReady: false` because backend password reset env is not configured locally; `/healthz` was unreachable because no API server was running.
+- `npm.cmd run typecheck`: passed, including server syntax check for 47 files and semantic test check for 443 test files.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+
+### Password Reset Diagnose Not Run
+- No planned validation remains unrun for this diagnose pass.
+
+### Password Reset Diagnose Risks / Next
+- `api:diagnose` does not validate remote VPS PostgreSQL migration state; release preflight still records that as an operator confirmation.
+- A future backend health expansion could expose sanitized password reset readiness from `/healthz`, but this pass intentionally kept health endpoint semantics unchanged.
+
+## 2026-06-22 - Local Password Reset Env Execution And API Health Closure
+
+### Local Password Reset Env Scope
+- Created a gitignored `server/.env.local` for local backend execution, with generated local-only server secrets, `PUBLIC_APP_URL`, password reset token secret, body limits, and local-only runtime mode.
+- Left `RESEND_API_KEY` and `PASSWORD_RESET_EMAIL_FROM` unset because the provided VPS key/hash is not a Resend mail credential and must not be written into the repo or frontend.
+- Tightened `api:diagnose` so empty values and placeholder values no longer count as password reset ready.
+- Updated `api:diagnose` to read both wrapped health payloads and top-level `/healthz` envelopes.
+- Updated `/healthz` to return the canonical KK API envelope expected by dev scripts and frontend health readers: `success`, `service: kk-studio-api`, `status`, `selfHostedCoreReady`, `canonicalPersistenceReady`, config, repositories, persistence, and runtime summaries.
+- Updated the reconciliation daemon so test, local-only, or missing database runtimes do not start database-backed polling.
+
+### Local Password Reset Env Files Touched
+- `server/.env.local` (local gitignored runtime file)
+- `scripts/dev/diagnose-api-env.mjs`
+- `server/index.js`
+- `server/lib/dispatcher/reconciliation.js`
+- `tests/unit/api-diagnose-password-reset-contract.test.ts`
+- `tests/unit/api-local-startup.test.ts`
+- `docs/development/session-handoff.md`
+
+### Local Password Reset Env Design Decisions
+- The pasted VPS key/hash was treated as exposed secret material and was not persisted; operators should rotate it at the provider.
+- Local backend startup uses `KKAI_LOCAL_ONLY=true`; this allows auth/session smoke checks without requiring a local PostgreSQL service.
+- Password reset is only partially configured locally: token generation and stable public origin are present, but actual email delivery remains disabled until a real `RESEND_API_KEY` and verified `PASSWORD_RESET_EMAIL_FROM` are set.
+- `/healthz` reports `canonicalPersistenceReady: false` in local-only mode, while still returning `success: true` and `selfHostedCoreReady: true` so local dev tooling can distinguish healthy local mode from production-ready VPS persistence.
+
+### Local Password Reset Env Validation Run
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-diagnose-password-reset-contract.test.ts` failed before implementation because `api:diagnose` counted env record presence instead of real values and did not accept top-level health envelopes.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-diagnose-password-reset-contract.test.ts`: passed, 3 tests.
+- Red pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-local-startup.test.ts` failed before implementation because reconciliation did not skip local-only database polling and `/healthz` still exposed the old `kk-api` shape.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-local-startup.test.ts`: passed, 3 tests.
+- `node --check scripts/dev/diagnose-api-env.mjs`: passed.
+- `node --check server/index.js`: passed.
+- `npm.cmd run api:diagnose`: passed and correctly reported `passwordResetReady: false` while mail env remains unset.
+- Live local API smoke passed with temporary `VITE_KK_API_BASE_URL=http://127.0.0.1:3001`: `/healthz` returned `success=true`, `service=kk-studio-api`, `status=ok`, `selfHostedCoreReady=true`, and `canonicalPersistenceReady=false`; `api:diagnose` read the health details correctly.
+- `npm.cmd run dev:status`: Vite is running and healthy on port 3000; API is not left running because the current frontend `.env.local` points at the remote VPS API.
+
+### Local Password Reset Env Not Run
+- Full `npm.cmd run verify:changes` was not rerun in this small env/health pass after the earlier full green run; targeted tests and syntax checks were run.
+- Production Vercel/VPS env mutation was not run because this workspace is not bound to a Vercel project and the provided key/hash is not enough to identify a safe VPS env API.
+
+### Local Password Reset Env Risks / Next
+- Set real server-only `RESEND_API_KEY` and `PASSWORD_RESET_EMAIL_FROM` in the VPS backend environment to enable actual password reset email delivery.
+- Confirm `migrations/013_password_reset_tokens.sql` has been applied to the real VPS PostgreSQL database.
+- If local API should stay running alongside Vite, either point local `VITE_KK_API_BASE_URL` at `http://127.0.0.1:3001` for that session or use the dedicated API runner; the current frontend env intentionally uses the remote VPS API.
+
+## 2026-06-22 - Main Branch Vercel Deployment Preparation
+
+### Main Branch Vercel Deployment Scope
+- Switched the workspace back to `main` and kept all deployment preparation on the main branch per operator direction.
+- Confirmed the Vercel project binding for `kk-studio` with project ID `prj_g3fFVqUnhQC1Td6eHTAYMqMs5nQE` and team/org ID `team_tPzUTzx9QB67PuwtGZAyTRt1`.
+- Confirmed the Vercel project already owns the production domains `kkai.plus` and `www.kkai.plus`.
+- Re-ran full repository verification after the password reset, health, diagnose, landing, workspace chrome, and AI takeover updates.
+- Fixed the final unit regression in `server/index.js` by making server env file loading tolerant of test/runtime `dotenv` stubs that do not expose `dotenv.parse`.
+- Re-ran hosted release preflight with local Vercel project metadata present.
+
+### Main Branch Vercel Deployment Files Touched
+- `.vercel/project.json` (local gitignored Vercel project metadata)
+- `server/index.js`
+- `docs/development/session-handoff.md`
+
+### Main Branch Vercel Deployment Design Decisions
+- Local Vercel CLI auth is not available in this Windows sandbox, but the Vercel plugin has authenticated project access; deployment should use plugin/Git integration rather than requiring a local CLI login.
+- The Vercel project metadata file remains gitignored and must not be committed.
+- The provided VPS key/hash was treated as exposed secret material and was not written to tracked files or Vercel env.
+- Hosted password reset email delivery remains disabled until real server-side `RESEND_API_KEY` and `PASSWORD_RESET_EMAIL_FROM` values are configured in the backend runtime.
+
+### Main Branch Vercel Deployment Validation Run
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/payment-webhook-raw-body.test.ts`: passed, 1 test.
+- `node --check server/index.js`: passed.
+- `npm.cmd run test:unit`: passed, 1490 tests with 0 failures and 2 skipped.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, repository smoke fallback checks, and encoding checks all completed; `npm audit` reported 0 vulnerabilities.
+- `npm.cmd run release:hosted:check`: blocked only by local Vercel CLI authentication. The script detected the correct Vercel project metadata and reported remote confirmation items for password reset mail env, OAuth/WeChat env, and `migrations/013_password_reset_tokens.sql`.
+
+### Main Branch Vercel Deployment Not Run
+- Local `vercel deploy` was not run because the local Vercel CLI cannot read or write its auth files in this sandbox and has no existing credentials.
+
+### Main Branch Vercel Deployment Risks / Next
+- Deploy through the authenticated Vercel plugin or push `main` so the Vercel Git integration builds the verified commit.
+- After deployment, verify `https://kkai.plus` and `https://www.kkai.plus`, inspect production runtime logs, and confirm the new deployment is `READY`.
+- Configure real VPS/backend mail env and apply `migrations/013_password_reset_tokens.sql` before enabling password reset email delivery for users.

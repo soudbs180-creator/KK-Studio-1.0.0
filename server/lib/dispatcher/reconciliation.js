@@ -11,6 +11,12 @@ const credits = require('../credits');
 
 let timerId = null;
 
+function shouldSkipReconciliationDaemon() {
+  return process.env.NODE_ENV === 'test'
+    || process.env.KKAI_LOCAL_ONLY === 'true'
+    || !String(process.env.DATABASE_URL || '').trim();
+}
+
 /**
  * 执行超时挂起任务的自动补偿对账与退费
  */
@@ -77,9 +83,8 @@ function startReconciliationDaemon(intervalMs = 60000) {
     return;
   }
 
-  // 简体中文：仅在非测试环境下做定时轮询，避免阻塞测试套件的退出
-  if (process.env.NODE_ENV === 'test') {
-    console.log('[Reconciliation] 测试环境下跳过定时守护进程轮询');
+  if (shouldSkipReconciliationDaemon()) {
+    console.log('[Reconciliation] Local-only, test, or missing DATABASE_URL runtime; skipping scheduled reconciliation daemon.');
     return;
   }
 
@@ -109,5 +114,6 @@ function stopReconciliationDaemon() {
 module.exports = {
   startReconciliationDaemon,
   stopReconciliationDaemon,
-  reconcilePendingJobs // 导出以便于测试执行
+  reconcilePendingJobs, // 导出以便于测试执行
+  shouldSkipReconciliationDaemon
 };

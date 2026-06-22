@@ -64,7 +64,9 @@ export const AIAssistantDock: React.FC = () => {
     selectedModel,
     onOpenSettings,
     notify,
-    activeCanvas
+    activeCanvas,
+    currentRun,
+    agentRunTimeline
   } = useAITakeover();
 
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
@@ -417,6 +419,29 @@ export const AIAssistantDock: React.FC = () => {
     return parts.length > 0 ? parts : content;
   };
 
+  const visibleRunTimeline = React.useMemo(() => {
+    if (!currentRun && isThinking) {
+      return agentRunTimeline.map((step, index) => (
+        index === 0 ? { ...step, status: 'active' as const, detail: 'Reading request' } : step
+      ));
+    }
+
+    return agentRunTimeline;
+  }, [agentRunTimeline, currentRun, isThinking]);
+
+  const shouldShowRunTimeline = Boolean(currentRun || isThinking || pendingPlan);
+  const verificationStepLabel = 'Verification / Memory';
+  const getRunTimelineStatusText = (status: string) => {
+    switch (status) {
+      case 'active': return '进行中';
+      case 'done': return '完成';
+      case 'needs_confirmation': return '待确认';
+      case 'failed': return '失败';
+      case 'cancelled': return '已取消';
+      default: return '等待';
+    }
+  };
+
   return (
     <div
       className="flex flex-col h-full bg-[#0b0c10] border-l border-zinc-800 font-inter select-none"
@@ -499,6 +524,63 @@ export const AIAssistantDock: React.FC = () => {
             </div>
           )}
         </div>
+
+        {shouldShowRunTimeline && (
+          <div className="ai-takeover-run-timeline mx-4 mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950/55 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
+            <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-500 mb-2">
+              <span className="font-bold text-zinc-300">接管时间线</span>
+              {currentRun && (
+                <span className="font-mono truncate max-w-[150px]" title={currentRun.id}>
+                  {currentRun.status} - {currentRun.id.slice(-8)}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-5 gap-1.5">
+              {visibleRunTimeline.map(step => {
+                const label = step.id === 'verification' ? verificationStepLabel : step.label;
+                return (
+                  <div
+                    key={step.id}
+                    className={`ai-takeover-run-timeline__step min-w-0 rounded-lg border px-1.5 py-1.5 text-center transition-colors ${
+                      step.status === 'done'
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                        : step.status === 'active'
+                          ? 'border-purple-500/40 bg-purple-500/10 text-purple-200'
+                          : step.status === 'needs_confirmation'
+                            ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                            : step.status === 'failed'
+                              ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                              : step.status === 'cancelled'
+                                ? 'border-zinc-700 bg-zinc-900/80 text-zinc-500'
+                                : 'border-zinc-800 bg-zinc-900/40 text-zinc-500'
+                    }`}
+                    data-status={step.status}
+                    title={`${label}: ${step.description}${step.detail ? ` - ${step.detail}` : ''}`}
+                  >
+                    <div className="flex items-center justify-center h-4 mb-1">
+                      {step.status === 'done' ? (
+                        <CheckCircle size={13} />
+                      ) : step.status === 'active' ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : step.status === 'needs_confirmation' ? (
+                        <AlertTriangle size={13} />
+                      ) : step.status === 'failed' ? (
+                        <AlertCircle size={13} />
+                      ) : (
+                        <span className="block h-2 w-2 rounded-full bg-current opacity-55" />
+                      )}
+                    </div>
+                    <div className="truncate text-[8px] font-bold leading-none">{label}</div>
+                    <div className="mt-1 truncate text-[8px] opacity-75 leading-none">
+                      {getRunTimelineStatusText(step.status)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. Message Area 消息对话区 */}

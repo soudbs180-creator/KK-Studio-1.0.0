@@ -158,7 +158,7 @@ async function fulfillSmokeJson(route, data) {
 }
 
 async function installSmokeApiRoutes(page) {
-  await page.route('**/healthz', async (route) => {
+  await page.route('**/healthz**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json; charset=utf-8',
@@ -216,6 +216,11 @@ async function installSmokeApiRoutes(page) {
 
     if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
       await fulfillSmokeJson(route, { version: 1, slots: [], providers: [], entries: [] });
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/model-catalog/active') || pathname.endsWith('/api/v1/model-catalog/active-credit-models')) {
+      await fulfillSmokeJson(route, { items: [] });
       return;
     }
 

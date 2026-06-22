@@ -67,6 +67,8 @@ export function usePromptGroupDragHandlers({
     const shouldRegroup = shouldAutoRegroupPromptGroup(node, childImages, sourceNodeId);
     if (shouldRegroup) {
       beginPromptGroupRegroup(node.id, childImages);
+      applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta);
+      return;
     } else {
       clearPromptGroupRegroup(node.id);
     }

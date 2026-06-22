@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Ghost } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Pause, Play, Ghost } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
@@ -54,6 +54,7 @@ import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
+import { durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
 import { useAssetStore } from '../../features/assets/assetStore';
 import {
     ReferenceMentionPanel,
@@ -243,6 +244,43 @@ const createWelcomeMessage = (): Message => ({
     content: '你好！我是 KK Studio 数字助手。\n有什么我可以帮您？\n\n试试输入 "/image 一只猫" 来生成图片！',
     timestamp: 0
 });
+
+const getDurableQueueJobNodeIds = (job: GenerationBatchJob): string[] => Array.from(new Set([
+    ...(job.outputGroup?.nodeIds || []),
+    ...job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id)),
+    ...job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []),
+]));
+
+const getDurableQueueStatusLabel = (job: GenerationBatchJob): string => {
+    if (job.status === 'running') return '运行中';
+    if (job.status === 'paused') return '已暂停';
+    if (job.status === 'queued') return '排队中';
+    if (job.status === 'cancelled') return '已取消';
+    if (job.prompts.some(prompt => prompt.status === 'failed')) return '有失败';
+    if (job.status === 'completed') return '已完成';
+    return '失败';
+};
+
+const getDurableQueueStatusClass = (job: GenerationBatchJob): string => {
+    if (job.status === 'running') return 'border-[var(--state-info-border)] bg-[var(--state-info-bg)] text-[var(--state-info-text)]';
+    if (job.status === 'paused') return 'border-[var(--state-warning-border)] bg-[var(--state-warning-bg)] text-[var(--state-warning-text)]';
+    if (job.status === 'queued') return 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)]';
+    if (job.status === 'cancelled') return 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-tertiary)]';
+    if (job.prompts.some(prompt => prompt.status === 'failed')) return 'border-[var(--state-danger-border)] bg-[var(--state-danger-bg)] text-[var(--state-danger-text)]';
+    return 'border-[var(--state-success-border)] bg-[var(--state-success-bg)] text-[var(--state-success-text)]';
+};
+
+const getDurableQueueJobCounts = (job: GenerationBatchJob) => {
+    const total = job.prompts.length;
+    const completed = job.prompts.filter(prompt => prompt.status === 'completed').length;
+    const failed = job.prompts.filter(prompt => prompt.status === 'failed').length;
+    const running = job.prompts.filter(prompt => prompt.status === 'running').length;
+    const queued = job.prompts.filter(prompt => prompt.status === 'queued').length;
+    const percent = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+    const firstFailure = job.prompts.find(prompt => prompt.status === 'failed' && prompt.error)?.error || '';
+
+    return { total, completed, failed, running, queued, percent, firstFailure };
+};
 
 const cleanGreeting = (text: string): string => {
     let cleaned = text.trim();
@@ -596,8 +634,33 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         pendingPlan,
         executePendingPlan,
         cancelPendingPlan,
+        currentRun,
+        agentRunTimeline,
         setSelectedModel: ctxSetSelectedModel
     } = useAITakeover();
+
+    const visibleTakeoverTimeline = useMemo(() => {
+        if (!currentRun && takeoverIsThinking) {
+            return agentRunTimeline.map((step, index) => ({
+                ...step,
+                status: index === 0 ? 'done' as const : index === 1 ? 'active' as const : 'pending' as const,
+            }));
+        }
+
+        return agentRunTimeline;
+    }, [agentRunTimeline, currentRun, takeoverIsThinking]);
+    const shouldShowTakeoverTimeline = aiTakeoverMode && Boolean(currentRun || takeoverIsThinking || pendingPlan);
+
+    const [durableQueueJobs, setDurableQueueJobs] = useState<GenerationBatchJob[]>(() => durableGenerationQueue.getJobs());
+    useEffect(() => durableGenerationQueue.subscribe(setDurableQueueJobs), []);
+    const activeDurableJobs = useMemo(() => durableQueueJobs.filter(job => (
+        job.status === 'queued' ||
+        job.status === 'running' ||
+        job.status === 'paused' ||
+        job.prompts.some(prompt => prompt.status === 'failed') ||
+        getDurableQueueJobNodeIds(job).length > 0
+    )).slice(0, 4), [durableQueueJobs]);
+    const shouldShowDurableQueuePanel = aiTakeoverMode && activeDurableJobs.length > 0;
 
     const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
 
@@ -802,6 +865,28 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
     const { activeCanvas, addPromptNode, getNextCardPosition } = useCanvas();
+    const handleLocateDurableJob = useCallback((job: GenerationBatchJob) => {
+        const outputNodeIds = getDurableQueueJobNodeIds(job);
+        const canvasNodes = [
+            ...(activeCanvas?.promptNodes || []),
+            ...(activeCanvas?.imageNodes || []),
+        ];
+        const targetNode = canvasNodes.find((node: any) => outputNodeIds.includes(node.id));
+
+        if (!targetNode?.position) {
+            notify.info('队列定位', '当前任务还没有可定位的画布产物。');
+            return;
+        }
+
+        window.dispatchEvent(new CustomEvent('canvas-center-on-node', {
+            detail: {
+                x: targetNode.position.x,
+                y: targetNode.position.y,
+                nodeId: targetNode.id,
+            },
+        }));
+        notify.success('已定位队列输出', job.outputGroup?.label || `Job ${job.id.slice(-6)}`);
+    }, [activeCanvas?.imageNodes, activeCanvas?.promptNodes]);
     const { executeGeneration } = useImageGeneration({
         isMobile,
         getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
@@ -3427,7 +3512,156 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         className="px-4 pb-4 pt-2 shrink-0 flex flex-col"
                         style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' } : undefined}
                     >
+                        {shouldShowTakeoverTimeline && (
+                            <div className="ai-takeover-run-timeline mb-2 rounded-xl border border-zinc-800/80 bg-zinc-950/55 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+                                <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-zinc-500">
+                                    <span className="font-bold text-zinc-300">接管时间线</span>
+                                    {currentRun && (
+                                        <span className="max-w-[150px] truncate font-mono" title={currentRun.id}>
+                                            {currentRun.status} - {currentRun.id.slice(-8)}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-5 gap-1">
+                                    {visibleTakeoverTimeline.map((step) => (
+                                        <div
+                                            key={step.id}
+                                            className={`ai-takeover-run-timeline__step min-w-0 rounded-lg border px-1.5 py-1.5 text-center transition-colors ${
+                                                step.status === 'done'
+                                                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                                    : step.status === 'active'
+                                                        ? 'border-purple-500/40 bg-purple-500/15 text-purple-200'
+                                                        : step.status === 'needs_confirmation'
+                                                            ? 'border-amber-500/40 bg-amber-500/12 text-amber-200'
+                                                            : step.status === 'failed' || step.status === 'cancelled'
+                                                                ? 'border-rose-500/35 bg-rose-500/10 text-rose-200'
+                                                                : 'border-zinc-800 bg-zinc-900/40 text-zinc-500'
+                                            }`}
+                                            data-status={step.status}
+                                            title={`${step.label}: ${step.description}${step.detail ? ` - ${step.detail}` : ''}`}
+                                        >
+                                            <div className="truncate text-[9px] font-black">{step.label}</div>
+                                            <div className="mt-0.5 truncate text-[8px] opacity-80">{step.detail || step.status}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         {/* 简体中文：AI接管模式下的意图强确认卡片 */}
+                        {shouldShowDurableQueuePanel && (
+                            <div className="ai-takeover-durable-queue-panel mb-2 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2 shadow-[var(--frost-card-sub-shadow)]">
+                                <div className="mb-2 flex items-center justify-between gap-2 text-[10px]">
+                                    <span className="flex min-w-0 items-center gap-1.5 font-black text-[var(--text-secondary)]">
+                                        <Cpu size={12} className="shrink-0 text-[var(--clay-brand-lavender)]" />
+                                        <span className="truncate">DurableGenerationQueue ({activeDurableJobs.length})</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => durableGenerationQueue.archiveFinishedJobs()}
+                                        className="shrink-0 rounded-lg border border-[var(--frost-card-sub-border)] px-2 py-1 text-[9px] font-bold text-[var(--text-tertiary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-secondary)]"
+                                        title="归档已完成或已取消的队列任务"
+                                    >
+                                        归档
+                                    </button>
+                                </div>
+                                <div className="max-h-44 space-y-2 overflow-y-auto pr-0.5">
+                                    {activeDurableJobs.map((job) => {
+                                        const counts = getDurableQueueJobCounts(job);
+                                        const outputNodeCount = getDurableQueueJobNodeIds(job).length;
+
+                                        return (
+                                            <div key={job.id} className="ai-takeover-durable-queue__job rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-main-bg)] p-2 text-[10px] text-[var(--text-secondary)]">
+                                                <div className="mb-1.5 flex items-center justify-between gap-2">
+                                                    <span className="min-w-0 truncate font-mono text-[9px] text-[var(--text-tertiary)]" title={job.id}>
+                                                        {job.outputGroup?.label || `Job ${job.id.slice(-8)}`}
+                                                    </span>
+                                                    <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black ${getDurableQueueStatusClass(job)}`}>
+                                                        {getDurableQueueStatusLabel(job)}
+                                                    </span>
+                                                </div>
+                                                <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--frost-card-sub-bg)]">
+                                                    <div
+                                                        className="h-full rounded-full transition-[width] duration-300"
+                                                        style={{
+                                                            width: `${counts.percent}%`,
+                                                            background: 'linear-gradient(90deg, var(--clay-brand-lavender), var(--clay-brand-coral))',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 text-[8px] text-[var(--text-tertiary)]">
+                                                    <span className="min-w-0 truncate">
+                                                        完成 {counts.completed}/{counts.total} · 运行 {counts.running} · 等待 {counts.queued} · 失败 {counts.failed}
+                                                    </span>
+                                                    <span className="shrink-0">产物 {outputNodeCount}</span>
+                                                </div>
+                                                {counts.firstFailure && (
+                                                    <div className="mt-1 truncate rounded-md border border-[var(--state-danger-border)] bg-[var(--state-danger-bg)] px-1.5 py-1 text-[8px] text-[var(--state-danger-text)]" title={counts.firstFailure}>
+                                                        {counts.firstFailure}
+                                                    </div>
+                                                )}
+                                                <div className="mt-2 flex items-center justify-end gap-1.5">
+                                                    {job.status === 'running' && (
+                                                        <button
+                                                            type="button"
+                                                            data-action="pause-durable-job"
+                                                            onClick={() => durableGenerationQueue.pauseJob(job.id)}
+                                                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
+                                                            title="暂停队列任务"
+                                                        >
+                                                            <Pause size={11} />
+                                                        </button>
+                                                    )}
+                                                    {(job.status === 'paused' || job.status === 'queued') && (
+                                                        <button
+                                                            type="button"
+                                                            data-action="resume-durable-job"
+                                                            onClick={() => durableGenerationQueue.resumeJob(job.id)}
+                                                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
+                                                            title="继续队列任务"
+                                                        >
+                                                            <Play size={11} />
+                                                        </button>
+                                                    )}
+                                                    {counts.failed > 0 && job.status !== 'cancelled' && (
+                                                        <button
+                                                            type="button"
+                                                            data-action="retry-durable-job"
+                                                            onClick={() => durableGenerationQueue.retryFailedPrompts(job.id)}
+                                                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--state-warning-border)] text-[var(--state-warning-text)] transition-colors hover:bg-[var(--state-warning-bg)]"
+                                                            title="重试失败队列项"
+                                                        >
+                                                            <RotateCcw size={11} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        data-action="locate-durable-job"
+                                                        onClick={() => handleLocateDurableJob(job)}
+                                                        disabled={outputNodeCount === 0}
+                                                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-35"
+                                                        title="定位队列产物"
+                                                    >
+                                                        <Eye size={11} />
+                                                    </button>
+                                                    {(job.status === 'running' || job.status === 'paused' || job.status === 'queued') && (
+                                                        <button
+                                                            type="button"
+                                                            data-action="cancel-durable-job"
+                                                            onClick={() => durableGenerationQueue.cancelJob(job.id)}
+                                                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--state-danger-border)] text-[var(--state-danger-text)] transition-colors hover:bg-[var(--state-danger-bg)]"
+                                                            title="取消队列任务"
+                                                        >
+                                                            <X size={11} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         {aiTakeoverMode && pendingPlan && pendingPlan.confirmation && (
                             <div className="mb-2 p-3 rounded-xl border border-purple-900/40 bg-[#120f21]/70 backdrop-blur-md shadow-lg relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
                                 <div className="absolute top-0 right-0 p-2 opacity-5">
@@ -3583,6 +3817,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     onClose={closeReferenceMentionPanel}
                                 />
                                 <textarea
+                                    id={aiTakeoverMode ? 'ai-takeover-composer-input' : 'chat-composer-input'}
                                     ref={inputRef}
                                     className="w-full border-none shadow-none text-[15px] p-0.5 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed"
                                     placeholder="开启你的灵感之旅..."
@@ -3659,9 +3894,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             )}
 
                             {/* 4. 一体化工具栏底栏 */}
-                            <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-[var(--frost-card-sub-border)]/40">
+                            <div className="kk-chat-sidebar-composer-actions flex min-w-0 flex-wrap items-center justify-between gap-2 mt-1 pt-1.5 border-t border-[var(--frost-card-sub-border)]/40">
                                 {/* 左侧：附件添加 & Agent 切换 */}
-                                <div className="flex items-center gap-2">
+                                <div className="kk-chat-sidebar-agent-controls flex min-w-0 flex-1 flex-wrap items-center gap-2">
                                     {/* 隐藏的 File Input */}
                                     <input
                                         ref={fileInputRef}
@@ -3699,7 +3934,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     />
 
                                     {/* 附件添加按钮 */}
-                                    <div className="relative">
+                                    <div className="relative shrink-0">
                                         <button
                                             id="btn-takeover-plus-button"
                                             onClick={() => {
@@ -3775,7 +4010,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                 setCurrentAgent(agentService.getActive());
                                             }
                                         }}
-                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
+                                        className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             agentMode
                                                 ? 'agent-active-btn'
                                                 : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
@@ -3794,7 +4029,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             setAiTakeoverMode(!aiTakeoverMode);
                                             registerActivity();
                                         }}
-                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
+                                        className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             aiTakeoverMode
                                                 ? 'ai-takeover-active-btn'
                                                 : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
@@ -3808,7 +4043,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 </div>
 
                                 {/* 右侧：发送 / 停止按钮 */}
-                                <div>
+                                <div className="kk-chat-sidebar-send-control shrink-0">
                                     {isThinking ? (
                                         <button
                                             onClick={handleStopGeneration}

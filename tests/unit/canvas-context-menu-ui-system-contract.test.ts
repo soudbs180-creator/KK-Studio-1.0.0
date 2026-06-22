@@ -42,9 +42,15 @@ test('canvas group context menu consumes KK_LAYER and canvas menu primitives', (
   const menuSource = menuMatch[0];
 
   assert.match(source, /import\s+\{\s*KK_LAYER\s*\}\s+from\s+'@kk\/ui'/);
+  assert.match(source, /const CANVAS_GROUP_CONTEXT_MENU_LAYER = KK_LAYER\.dropdown;/);
+  assert.match(source, /const CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX = 6;/);
+  assert.match(source, /const CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX = 8;/);
   assert.match(menuSource, /className="kk-canvas-context-menu fixed animate-fadeIn"/);
-  assert.match(menuSource, /style=\{\{[\s\S]*zIndex:\s*KK_LAYER\.dropdown/);
+  assert.match(menuSource, /data-kk-canvas-context-menu-layer="true"/);
+  assert.match(menuSource, /role="menu"/);
+  assert.match(menuSource, /style=\{\{[\s\S]*zIndex:\s*CANVAS_GROUP_CONTEXT_MENU_LAYER/);
   assert.match(menuSource, /className="kk-canvas-context-menu-item"/);
+  assert.match(menuSource, /role="menuitem"/);
   assert.match(menuSource, /className="kk-canvas-context-menu-item kk-canvas-context-menu-item--danger"/);
   assert.match(menuSource, /className="kk-canvas-context-menu-divider"/);
   assert.match(menuSource, /className="kk-canvas-context-menu-label"/);
@@ -52,5 +58,6 @@ test('canvas group context menu consumes KK_LAYER and canvas menu primitives', (
   assert.match(menuSource, /data-selected=\{selected\}/);
 
   assert.doesNotMatch(menuSource, /z-\[9999\]/);
+  assert.doesNotMatch(menuSource, /contextMenu\.x \+ 6|contextMenu\.y \+ 6|window\.innerWidth - rect\.width - 8|window\.innerHeight - rect\.height - 8/);
   assert.doesNotMatch(menuSource, /text-red-500|hover:text-red-400|hover:bg-\[rgba\(255,107,90,0\.10\)\]|bg-\[var\(--border-light\)\]/);
 });

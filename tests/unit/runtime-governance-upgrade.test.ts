@@ -59,3 +59,35 @@ test("version governance checks internal package versions against the release ma
   assert.match(versionCheckSource, /packages\/domain\/package\.json/);
   assert.match(versionCheckSource, /packages\/shared\/package\.json/);
 });
+
+test("agent docs governance blocks stale AI assistant version drift", () => {
+  const agentDocsSource = readSource("scripts/governance/check-agent-docs.mjs");
+
+  assert.match(agentDocsSource, /requiredCurrentVersionDocs/);
+  assert.match(agentDocsSource, /docs\/ai-assistant\/README\.md/);
+  assert.match(agentDocsSource, /KK Studio \$\{currentDisplayVersion\}/);
+  assert.match(agentDocsSource, /projectVersion: '\$\{releaseManifest\.version\}'/);
+});
+
+test("current facts governance blocks stale active governance document versions", () => {
+  const manifest = JSON.parse(readSource("config/release-manifest.json")) as {
+    version: string;
+    displayVersion?: string;
+  };
+  const currentFactsSource = readSource("scripts/governance/check-current-facts.mjs");
+  const activeGovernanceDocs = [
+    "docs/governance/SECURITY_AND_BACKLOG.md",
+    "docs/governance/VERSION_AND_RELEASE.md",
+    "docs/governance/ENCODING_AND_POWERSHELL.md",
+    "docs/governance/architecture_review.md",
+  ];
+
+  assert.match(currentFactsSource, /activeGovernanceVersionDocs/);
+  assert.match(currentFactsSource, /staleDisplayVersions/);
+
+  for (const docPath of activeGovernanceDocs) {
+    const source = readSource(docPath);
+    assert.match(source, new RegExp(manifest.displayVersion || `v${manifest.version}`));
+    assert.doesNotMatch(source, /KK Studio v1\.5\.6|项目版本：KK Studio v1\.5\.6|`v1\.5\.6`/);
+  }
+});

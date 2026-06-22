@@ -104,3 +104,43 @@ test('AgentRuntime 源码契约：本地可处理的意图即使已有模型也�
   assert.match(source, /localPlan\.intent === 'unknown'/);
   assert.match(source, /plan = localPlan/);
 });
+
+test('IntentGate: retry failed durable generation job is a safe queue control', () => {
+  const result = analyzeIntent('重试失败批次 job_abc123');
+
+  assert.equal(result.intent, 'retry_generation_job');
+  assert.equal(result.needsConfirmation, false);
+  assert.equal(result.risk, 'none');
+  assert.equal(result.extracted.jobId, 'job_abc123');
+});
+
+test('IntentGate: English retry failed job command extracts the job id', () => {
+  const result = analyzeIntent('retry failed job job_def456');
+
+  assert.equal(result.intent, 'retry_generation_job');
+  assert.equal(result.needsConfirmation, false);
+  assert.equal(result.extracted.jobId, 'job_def456');
+});
+
+test('IntentGate: retry latest failed batch works without an explicit job id', () => {
+  const result = analyzeIntent('重试刚才失败的批次');
+
+  assert.equal(result.intent, 'retry_generation_job');
+  assert.equal(result.needsConfirmation, false);
+  assert.equal(result.risk, 'none');
+  assert.equal(result.extracted.jobId, undefined);
+});
+
+test('Local brain source contract: retry job intent maps to generation.retryJob', () => {
+  const typesSource = readSource('apps/web/src/features/ai-takeover/types.ts');
+  const brainSource = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
+
+  assert.match(typesSource, /'retry_generation_job'/);
+  assert.match(typesSource, /jobId\?: string/);
+  assert.match(typesSource, /target\?: 'latest_failed'/);
+  assert.match(typesSource, /type: 'generation\.retryJob'/);
+  assert.match(brainSource, /case 'retry_generation_job'/);
+  assert.match(brainSource, /type: 'generation\.retryJob'/);
+  assert.match(brainSource, /jobId: intentResult\.extracted\.jobId/);
+  assert.match(brainSource, /target: intentResult\.extracted\.jobId \? undefined : 'latest_failed'/);
+});

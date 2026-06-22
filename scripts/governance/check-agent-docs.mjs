@@ -68,6 +68,7 @@ const files = {
 
 const aiAssistantDocs = {
   readme: "docs/ai-assistant/README.md",
+  runbooks: "docs/ai-assistant/RUNBOOKS.md",
   moduleMap: "docs/ai-assistant/module-map.md",
   flowMap: "docs/ai-assistant/flow-map.md",
   toolRegistry: "docs/ai-assistant/tool-registry.md",
@@ -89,6 +90,7 @@ const handoff = exists(files.handoff) ? read(files.handoff) : "";
 const agents = exists(files.agents) ? read(files.agents) : "";
 const assistantPlan = exists(files.assistantPlan) ? read(files.assistantPlan) : "";
 const aiReadme = exists(aiAssistantDocs.readme) ? read(aiAssistantDocs.readme) : "";
+const runbooks = exists(aiAssistantDocs.runbooks) ? read(aiAssistantDocs.runbooks) : "";
 const moduleMap = exists(aiAssistantDocs.moduleMap) ? read(aiAssistantDocs.moduleMap) : "";
 const flowMap = exists(aiAssistantDocs.flowMap) ? read(aiAssistantDocs.flowMap) : "";
 const toolRegistry = exists(aiAssistantDocs.toolRegistry) ? read(aiAssistantDocs.toolRegistry) : "";
@@ -121,6 +123,22 @@ expectIncludes(uiMap, aiAssistantDocs.uiMap, "AI 接管");
 expectIncludes(skills, aiAssistantDocs.skills, "download-selected-originals");
 expectIncludes(safetyPolicy, aiAssistantDocs.safetyPolicy, "API Key");
 expectIncludes(sessionMemory, aiAssistantDocs.sessionMemory, "session-handoff.md");
+
+const requiredCurrentVersionDocs = [
+  [aiAssistantDocs.readme, aiReadme, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.runbooks, runbooks, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.moduleMap, moduleMap, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.flowMap, flowMap, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.toolRegistry, toolRegistry, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.canvasRuntimeState, canvasRuntimeState, `projectVersion: '${releaseManifest.version}'`],
+  [aiAssistantDocs.uiMap, uiMap, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.skills, skills, `KK Studio ${currentDisplayVersion}`],
+  [aiAssistantDocs.safetyPolicy, safetyPolicy, `KK Studio ${currentDisplayVersion}`],
+];
+
+for (const [relativePath, content, token] of requiredCurrentVersionDocs) {
+  expectIncludes(content, relativePath, token);
+}
 
 for (const [relativePath, content] of [
   [files.agents, agents],

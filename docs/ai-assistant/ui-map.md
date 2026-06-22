@@ -1,6 +1,6 @@
 # UI 映射表 (UI Map)
 
-本文件维护 KK Studio v1.5.6 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
+本文件维护 KK Studio v1.5.7 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
 
 ---
 
@@ -29,6 +29,8 @@
 
 AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、提交生成、整理卡片、批量生成等操作应优先调用 ToolRegistry 或 Context API。按钮移动到别的位置时，需要更新本 UI Map 和对应 Skill/Runbook，但不应改变 `ui.openSettings`、`generation.submitComposer` 等工具语义。
 
+Current AI ?? selector source of truth for KK Studio v1.5.7.
+
 ## 3. Canvas Group Controls - 2026-06-05
 
 | Component | Selector / State | Assistant meaning |
@@ -56,3 +58,13 @@ Runtime note: hidden groups are raised above their member cards so the blur over
 | AI takeover dock composer | composer id `ai-dock` | Inserts `@name` into the dock input and uses the takeover resource pool as context. |
 
 Rule: favorites are global browser/app state. Workspace mirroring, when a file-system handle exists, writes `favorites/manifest.json`, `favorites/originals/`, and `favorites/thumbnails/` without deleting canvas originals. The heart entry opens the Favorites collection window with Chinese UI copy; typing `@` opens only the lightweight reference popup above the typed token.
+
+## 5. AI Takeover Run Timeline - 2026-06-18
+
+| Component | Selector / State | Assistant meaning |
+| :--- | :--- | :--- |
+| AI takeover run timeline shell | `.ai-takeover-run-timeline` | Compact status rail in the AIAssistantDock header. It is derived from the active `AgentRunRecord` in `AgentRunStore`, not from a separate assistant runtime. |
+| AI takeover run timeline step | `.ai-takeover-run-timeline__step[data-status]` | One of the canonical execution stages: `IntentGate`, `Planner`, `PermissionPolicy`, `Executor`, `Verification / Memory`. |
+| Timeline step status | `data-status="pending|active|done|needs_confirmation|failed|cancelled"` | Machine-readable status for automation and visual QA. Confirmation-heavy actions should surface `needs_confirmation` on `PermissionPolicy`; tool execution should surface `active` on `Executor`. |
+
+Rule: the run timeline must continue to reflect the single `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update` flow. Do not add a parallel assistant entry or a second runtime just to power this UI.

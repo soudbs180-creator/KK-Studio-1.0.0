@@ -158,3 +158,31 @@ test('browser smoke scripts remove stale fallback artifacts before browser verif
     assert.match(scriptSource, /rmSync\(artifactPath, \{ force: true \}\)/);
   }
 });
+
+test('browser smoke API routes stub the public model catalog to avoid local API 502 noise', () => {
+  const scriptSources = [
+    readSource('scripts/test/verify-mobile-settings-smoke.mjs'),
+    readSource('scripts/test/verify-desktop-settings-smoke.mjs'),
+    readSource('scripts/test/verify-prompt-group-drag.mjs'),
+    readSource('scripts/test/verify-startup-runtime-banner-centering.mjs'),
+  ];
+
+  for (const scriptSource of scriptSources) {
+    assert.match(scriptSource, /\/api\/v1\/model-catalog\/active'\)/);
+    assert.match(scriptSource, /\/api\/v1\/model-catalog\/active-credit-models'\)/);
+    assert.match(scriptSource, /fulfillSmokeJson\(route, \{ items: \[\] \}\)/);
+  }
+});
+
+test('browser smoke health checks also stub smart probe query requests', () => {
+  const scriptSources = [
+    readSource('scripts/test/verify-mobile-settings-smoke.mjs'),
+    readSource('scripts/test/verify-desktop-settings-smoke.mjs'),
+    readSource('scripts/test/verify-prompt-group-drag.mjs'),
+    readSource('scripts/test/verify-startup-runtime-banner-centering.mjs'),
+  ];
+
+  for (const scriptSource of scriptSources) {
+    assert.match(scriptSource, /page\.route\('\*\*\/healthz\*\*'/);
+  }
+});

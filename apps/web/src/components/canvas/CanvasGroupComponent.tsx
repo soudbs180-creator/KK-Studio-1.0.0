@@ -16,6 +16,10 @@ const GROUP_BORDER_COLOR_SWATCHES = [
     '#111827',
 ];
 
+const CANVAS_GROUP_CONTEXT_MENU_LAYER = KK_LAYER.dropdown;
+const CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX = 6;
+const CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX = 8;
+
 function normalizeHexColor(color: string | undefined): string {
     return /^#[0-9a-fA-F]{6}$/.test(color || '') ? color! : '#ffffff';
 }
@@ -210,13 +214,25 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         const updatePosition = () => {
             const menuEl = menuRef.current;
             if (!menuEl) {
-                setMenuPosition({ x: contextMenu.x + 6, y: contextMenu.y + 6 });
+                setMenuPosition({
+                    x: contextMenu.x + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX,
+                    y: contextMenu.y + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX,
+                });
                 return;
             }
             const rect = menuEl.getBoundingClientRect();
-            const x = Math.min(contextMenu.x + 6, window.innerWidth - rect.width - 8);
-            const y = Math.min(contextMenu.y + 6, window.innerHeight - rect.height - 8);
-            setMenuPosition({ x: Math.max(8, x), y: Math.max(8, y) });
+            const x = Math.min(
+                contextMenu.x + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX,
+                window.innerWidth - rect.width - CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX,
+            );
+            const y = Math.min(
+                contextMenu.y + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX,
+                window.innerHeight - rect.height - CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX,
+            );
+            setMenuPosition({
+                x: Math.max(CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX, x),
+                y: Math.max(CANVAS_GROUP_CONTEXT_MENU_VIEWPORT_PADDING_PX, y),
+            });
         };
         updatePosition();
     }, [contextMenu]);
@@ -444,14 +460,17 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                 <div
                     ref={menuRef}
                     className="kk-canvas-context-menu fixed animate-fadeIn"
+                    data-kk-canvas-context-menu-layer="true"
+                    role="menu"
                     style={{
-                        left: (menuPosition?.x ?? contextMenu.x + 6),
-                        top: (menuPosition?.y ?? contextMenu.y + 6),
-                        zIndex: KK_LAYER.dropdown,
+                        left: (menuPosition?.x ?? contextMenu.x + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX),
+                        top: (menuPosition?.y ?? contextMenu.y + CANVAS_GROUP_CONTEXT_MENU_OFFSET_PX),
+                        zIndex: CANVAS_GROUP_CONTEXT_MENU_LAYER,
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     <button
+                        role="menuitem"
                         onClick={() => {
                             setContextMenu(null);
                             setIsEditing(true);
@@ -500,6 +519,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     </div>
                     <div className="kk-canvas-context-menu-divider" />
                     <button
+                        role="menuitem"
                         onClick={() => {
                             setContextMenu(null);
                             onUngroup(group.id);

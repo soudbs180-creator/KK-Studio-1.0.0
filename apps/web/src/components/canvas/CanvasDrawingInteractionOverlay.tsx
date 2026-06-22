@@ -17,6 +17,10 @@ interface CanvasDrawingInteractionOverlayProps {
     imageNodes?: any[];
 }
 
+const CANVAS_DRAWING_OVERLAY_LAYER = KK_LAYER.nodeSelected;
+const CANVAS_DRAWING_TEXT_INPUT_LAYER = KK_LAYER.floating;
+const CANVAS_DRAWING_OVERLAY_ORIGIN_OFFSET = 100000;
+
 /**
  * 资深架构师性能重构方案：
  * 直接使用原生 Canvas 2D 上下文在内存中完成同步重绘并导出 Base64
@@ -586,11 +590,7 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
         <div
             className="kk-canvas-drawing-overlay absolute"
             style={{
-                width: '200000px',
-                height: '200000px',
-                left: '-100000px',
-                top: '-100000px',
-                zIndex: KK_LAYER.nodeSelected,
+                zIndex: CANVAS_DRAWING_OVERLAY_LAYER,
             }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -652,10 +652,10 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
                 <div
                     className="kk-canvas-drawing-text-input-anchor"
                     style={{
-                        left: textInputPos.x + 100000,
-                        top: textInputPos.y + 100000,
+                        left: textInputPos.x + CANVAS_DRAWING_OVERLAY_ORIGIN_OFFSET,
+                        top: textInputPos.y + CANVAS_DRAWING_OVERLAY_ORIGIN_OFFSET,
                         transformOrigin: 'top left',
-                        zIndex: KK_LAYER.floating,
+                        zIndex: CANVAS_DRAWING_TEXT_INPUT_LAYER,
                     }}
                 >
                     <input

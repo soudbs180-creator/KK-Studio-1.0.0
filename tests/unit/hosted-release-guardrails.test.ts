@@ -64,3 +64,118 @@ test("hosted release preflight checks canonical VPS backend startup secrets", ()
     );
   });
 });
+
+test("hosted release preflight accepts scripted Vercel project metadata", () => {
+  const source = readSource("scripts/diagnose-hosted-release.mjs");
+
+  assert.match(
+    source,
+    /VERCEL_PROJECT_ID/,
+    "hosted release preflight should allow VERCEL_PROJECT_ID as a non-interactive project link source",
+  );
+  assert.match(
+    source,
+    /VERCEL_ORG_ID/,
+    "hosted release preflight should allow VERCEL_ORG_ID as a non-interactive project link source",
+  );
+  assert.match(
+    source,
+    /process\.env/,
+    "scripted Vercel metadata should come from the process environment when .vercel/project.json is absent",
+  );
+});
+
+test("hosted release scripts pass Vercel token through CLI args without exposing the value", () => {
+  const diagnoseSource = readSource("scripts/diagnose-hosted-release.mjs");
+  const releaseSource = readSource("scripts/release-hosted.mjs");
+
+  assert.match(
+    diagnoseSource,
+    /--token/,
+    "hosted preflight should authenticate Vercel CLI checks with VERCEL_TOKEN when present",
+  );
+  assert.match(
+    releaseSource,
+    /--token/,
+    "hosted deployment should pass VERCEL_TOKEN through to Vercel CLI when present",
+  );
+  assert.match(
+    releaseSource,
+    /%VERCEL_TOKEN%|\$VERCEL_TOKEN/,
+    "deployment logs should reference the env var instead of interpolating the raw token",
+  );
+});
+
+test("hosted release preflight covers password reset production readiness", () => {
+  const diagnoseSource = readSource("scripts/diagnose-hosted-release.mjs");
+  const vpsApiEnvSource = readSource("scripts/vps/kk-api.env.example");
+  const localApiEnvSource = readSource("server/.env.local.example");
+  const runbookSource = readSource("docs/development/hosted-release-runbook.md");
+
+  [
+    "RESEND_API_KEY",
+    "PASSWORD_RESET_EMAIL_FROM",
+    "PASSWORD_RESET_TOKEN_SECRET",
+  ].forEach((key) => {
+    assert.match(
+      diagnoseSource,
+      new RegExp(`hostedApiRequired[\\s\\S]*"${key}"`),
+      `${key} should be a hosted API required env check for password reset delivery`,
+    );
+    assert.match(vpsApiEnvSource, new RegExp(`${key}=`), `${key} should be documented in the VPS API env template`);
+    assert.match(localApiEnvSource, new RegExp(`${key}=`), `${key} should be documented in the local API env template`);
+  });
+
+  [
+    "PUBLIC_APP_URL",
+    "KK_PUBLIC_APP_URL",
+    "WEB_PUBLIC_URL",
+  ].forEach((key) => {
+    assert.match(
+      diagnoseSource,
+      new RegExp(`hostedApiPasswordResetPublicOriginEnv[\\s\\S]*"${key}"`),
+      `${key} should be accepted as a password reset public app origin env`,
+    );
+  });
+
+  assert.match(
+    diagnoseSource,
+    /migrations\/013_password_reset_tokens\.sql/,
+    "hosted preflight should know the password reset token migration must ship before enabling reset confirmation",
+  );
+  assert.match(
+    diagnoseSource,
+    /Confirm VPS PostgreSQL has applied/,
+    "hosted preflight should tell operators to confirm the password reset migration is applied remotely",
+  );
+  assert.match(
+    runbookSource,
+    /Password Reset Production Readiness/,
+    "hosted runbook should document password reset release requirements",
+  );
+});
+
+test("hosted release preflight does not count blank or placeholder env values as present", () => {
+  const source = readSource("scripts/diagnose-hosted-release.mjs");
+
+  assert.match(
+    source,
+    /function isConfiguredEnvRecord/,
+    "hosted preflight should centralize real-value detection",
+  );
+  assert.match(
+    source,
+    /String\(sourceRecord\?\.value \|\| ""\)\.trim\(\)/,
+    "hosted preflight should reject blank env values",
+  );
+  assert.match(
+    source,
+    /!isPlaceholder\(sourceRecord\.value\)/,
+    "hosted preflight should reject placeholder env values",
+  );
+  assert.match(
+    source,
+    /if \(!isConfiguredEnvRecord\(sourceRecord\)\) return "<missing>";/,
+    "hosted preflight status output should not report blank env records as present",
+  );
+});
