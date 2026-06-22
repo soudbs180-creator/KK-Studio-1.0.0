@@ -35,6 +35,9 @@ export type AssistantIntent =
   | 'open_settings_view'           // 快速打开设置页子功能
   | 'extract_page_content'         // 抓取指定网页内容（包括价格、主图等商品信息）
   | 'control_multidevice'          // 网页控制多端相关设置与诊断
+  | 'browser_generate_external'    // 通过 Browser Bridge 调外部网页平台生图
+  | 'browser_publish_draft'        // 通过 Browser Bridge 保存外部社媒草稿
+  | 'browser_write_back_dom'       // 通过 Browser Bridge 回写外部网页 DOM
   | 'arrange_nodes'                // 整理卡片/排版布局
   | 'retry_generation_job'         // 重试失败的持久化批量生成任务
   | 'unknown';
@@ -55,6 +58,9 @@ export interface IntentResult {
     jobId?: string;                // 持久化批量生成任务 ID
     retryTarget?: 'latest_failed';
     settingsView?: string;         // 设置页子功能 ID
+    url?: string;
+    browserAction?: 'status' | 'open' | 'extract_product' | 'generate_external' | 'publish_draft' | 'write_back_dom';
+    sessionCount?: number;
     taskDomain?: AssistantBatchTaskDomain;
     aspectRatio?: AspectRatio | string;
     layoutPreset?: AssistantBatchLayoutPreset;
@@ -85,8 +91,12 @@ export type AssistantAction =
   | { type: 'fillInputPrompt'; payload: { prompt: string } }
   | { type: 'changeMode'; payload: { mode: GenerationMode } }
   | { type: 'submitPromptComposer'; payload: {} }
-  | { type: 'browser.extract'; payload: { url: string; targets: ('price' | 'title' | 'image' | 'description')[]; label?: string } }
-  | { type: 'browser.control'; payload: { command: 'open' | 'click' | 'fill' | 'extract'; args?: any } };
+  | { type: 'browser.getStatus'; payload: {} }
+  | { type: 'browser.openAssistant'; payload: {} }
+  | { type: 'browser.extractProduct'; payload: { url: string; targets?: ('price' | 'title' | 'image' | 'description')[]; label?: string } }
+  | { type: 'browser.generateExternal'; payload: { prompt: string; platformId?: string; count?: number; sessionIds?: string[]; sessionCount?: number } }
+  | { type: 'browser.publishDraft'; payload: { channelId: string; imageUrl?: string; title?: string; body?: string } }
+  | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } };
 
 // 执行计划
 export interface AssistantPlan {

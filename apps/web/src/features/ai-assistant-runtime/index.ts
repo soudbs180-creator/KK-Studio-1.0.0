@@ -18,3 +18,17 @@ export { knowledgeStore } from './knowledge/KnowledgeStore.ts';
 export type { KnowledgeDocument, KnowledgeSearchResult, KnowledgeChangeInput, KnowledgeChangeRecord } from './knowledge/KnowledgeStore.ts';
 
 export { writeHandoff, formatRunRecordToMarkdown } from './memory/handoffWriter.ts';
+export {
+  browserBridgeAdapter,
+  createBrowserBridgeCommand,
+  createBrowserBridgeSetupRequiredResult,
+  redactBrowserBridgePayload,
+  sanitizeBrowserBridgeUrl
+} from './browser/browserBridge.ts';
+export type {
+  BrowserBridgeClient,
+  BrowserBridgeCommand,
+  BrowserBridgeCommandKind,
+  BrowserBridgeResult,
+  BrowserBridgeStatusSnapshot
+} from './browser/browserBridge.ts';

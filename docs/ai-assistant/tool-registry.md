@@ -70,6 +70,15 @@
 - **说明**: 提交当前画布输入框，复用输入框已设置的模型、比例、参考图、数量与模式直接发起生成。
 - **权限**: `safe`
 
+### Browser Assistant Bridge tools
+- **`browser.getStatus`**: 读取本地守护进程、Chrome 插件、平台池、会话池和社媒草稿通道的脱敏状态，权限为 `safe`。
+- **`browser.openAssistant`**: 打开 `browser-assistant` 设置页入口，权限为 `safe`。
+- **`browser.extractProduct`**: 通过 Browser Bridge 提取外部商品页标题、价格、主图和描述摘要，权限为 `confirm`。URL 仅允许 `http://` / `https://`，并拦截 localhost、私有网段和浏览器内部协议。
+- **`browser.generateExternal`**: 通过已连接平台和会话池创建外部网页生图任务，权限为 `confirm`。
+- **`browser.publishDraft`**: 保存到外部社媒草稿箱，权限为 `confirm`，不得直接公开发布。
+- **`browser.writeBackDom`**: 回写外部网页 DOM 字段，权限为 `dangerous`，必须二次确认。
+- **断开状态**: 未连接本地守护进程或 Chrome 插件时，Browser 工具必须返回 `setup_required` 或连接引导，不得返回演示成功数据。
+
 ## 3. Legacy Action 兼容映射
 
 | Legacy action | Namespaced tool |

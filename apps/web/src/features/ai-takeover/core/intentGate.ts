@@ -23,6 +23,11 @@ const quickSettingsRoutes = [
     pattern: /\bapi\b|api\s*设置|api工作台|api\s*工作台|接口设置|接口管理|模型配置|模型设置|供应商|密钥管理/
   },
   {
+    view: 'browser-assistant',
+    label: 'Browser Assistant',
+    pattern: /浏览器助手|browser\s*assistant|browser\s*bridge|chrome\s*bridge|浏览器接管/i
+  },
+  {
     view: 'consumption-records',
     label: '计费账本',
     pattern: /计费|账单|消费|消耗|用量|积分记录|充值记录|消费记录/
@@ -61,6 +66,20 @@ const matchAny = (input: string, patterns: RegExp[]): boolean =>
 
 function extractGenerationJobId(input: string): string | undefined {
   return input.match(/\b(?:job|batch)_[a-zA-Z0-9_-]+\b/)?.[0];
+}
+
+function extractHttpUrl(input: string): string | undefined {
+  return input.match(/https?:\/\/[^\s"'<>]+/i)?.[0]?.replace(/[，。；、,.!?]+$/u, '');
+}
+
+function extractCountNear(input: string, fallback = 1): number {
+  const match = input.match(/(\d+)\s*(?:张|个|次|幅|份|images?|pics?|outputs?)/i);
+  return match ? Math.max(1, parseInt(match[1], 10)) : fallback;
+}
+
+function extractBrowserSessionCount(input: string): number | undefined {
+  const match = input.match(/(\d+)\s*(?:个)?\s*(?:号|账号|会话|sessions?|tabs?)/i);
+  return match ? Math.max(1, parseInt(match[1], 10)) : undefined;
 }
 
 function extractAspectRatio(input: string): string | undefined {
@@ -103,6 +122,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   const cleanInput = (input || '').trim();
   const lowerInput = cleanInput.toLowerCase();
   const retryJobId = extractGenerationJobId(cleanInput);
+  const firstUrl = extractHttpUrl(cleanInput);
   const hasRetryGenerationCommand = /重试|重新跑|再试|retry|rerun/i.test(cleanInput);
   const hasFailedBatchTarget = Boolean(retryJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
 
@@ -117,6 +137,81 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       risk: 'none',
       needsConfirmation: false,
       reason: '识别到重试失败批量生成任务的安全队列控制指令。'
+    };
+  }
+
+  const hasBrowserAssistantSurface = /浏览器助手|browser\s*assistant|网页直通|多端|守护进程|chrome\s*插件|bridge\s*插件|插件状态|daemon/i.test(cleanInput);
+  if (hasBrowserAssistantSurface && /检查|检测|诊断|状态|连接|连通|是否可用|健康/i.test(cleanInput)) {
+    return {
+      intent: 'control_multidevice',
+      confidence: 0.94,
+      extracted: {
+        browserAction: 'status'
+      },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到 Browser Assistant 本地守护进程与 Chrome 插件连接诊断请求。'
+    };
+  }
+
+  if (firstUrl && /抓取|提取|解析|读取|商品|价格|主图|详情页|网页|extract/i.test(cleanInput)) {
+    return {
+      intent: 'extract_page_content',
+      confidence: 0.92,
+      extracted: {
+        browserAction: 'extract_product',
+        url: firstUrl
+      },
+      risk: 'upload',
+      needsConfirmation: true,
+      reason: '识别到外部网页商品信息提取请求，需通过 Browser Bridge 并经用户确认。'
+    };
+  }
+
+  if (/回写|写回|同步.*dom|dom.*同步|修改网页|改网页/.test(lowerInput)) {
+    return {
+      intent: 'browser_write_back_dom',
+      confidence: 0.9,
+      extracted: {
+        browserAction: 'write_back_dom',
+        url: firstUrl
+      },
+      risk: 'destructive',
+      needsConfirmation: true,
+      reason: '识别到外部网页 DOM 回写请求，属于危险操作，必须二次确认。'
+    };
+  }
+
+  if (/小红书|微博|草稿|分发|发布草稿|保存草稿/.test(lowerInput) && /分发|发布|草稿|保存/.test(lowerInput)) {
+    return {
+      intent: 'browser_publish_draft',
+      confidence: 0.88,
+      extracted: {
+        browserAction: 'publish_draft'
+      },
+      risk: 'upload',
+      needsConfirmation: true,
+      reason: '识别到外部社媒草稿箱分发请求，只允许保存草稿，不直接公开发布。'
+    };
+  }
+
+  if (
+    /网页直通|代理|多开|外部平台|leonardo|midjourney|tensor|browser\s*bridge/i.test(cleanInput) &&
+    /生成|生图|跑图|跑\s*\d*\s*张|海报|出图|generate/i.test(cleanInput)
+  ) {
+    const countMatch = lowerInput.match(/(\d+)\s*(?:张|幅|份)(?=.*(?:图|海报|图片|生成|生图|出图|跑))/);
+    const sessionCount = extractBrowserSessionCount(cleanInput);
+    return {
+      intent: 'browser_generate_external',
+      confidence: 0.91,
+      extracted: {
+        browserAction: 'generate_external',
+        count: countMatch ? Number.parseInt(countMatch[1], 10) : extractCountNear(cleanInput, 1),
+        sessionCount
+      },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到网页直通或多账号代理生图请求，需通过 Browser Bridge 并经用户确认。'
     };
   }
 

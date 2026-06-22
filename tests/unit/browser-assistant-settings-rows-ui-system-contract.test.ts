@@ -211,3 +211,16 @@ test('browser assistant playground uses tab progress result pipeline and notice 
   assert.match(css, /\.settings-panel \.settings-browser-terminal\s*\{/);
   assert.match(css, /\.settings-panel \.settings-browser-notice\[data-tone="warning"\]\s*\{/);
 });
+
+test('browser assistant actions route external automation through Browser Bridge runtime adapter', () => {
+  const source = viewSource();
+
+  assert.match(source, /browserBridgeAdapter/);
+  assert.match(source, /createBrowserBridgeCommand/);
+  assert.match(source, /kind: 'extract_product'/);
+  assert.match(source, /kind: 'generate_external'/);
+  assert.match(source, /kind: 'publish_draft'/);
+  assert.match(source, /kind: 'write_back_dom'/);
+  assert.doesNotMatch(source, /零 API 积分损耗！/);
+  assert.doesNotMatch(source, /已成功通过 Chrome 插件将价格回写至网页 DOM！/);
+});

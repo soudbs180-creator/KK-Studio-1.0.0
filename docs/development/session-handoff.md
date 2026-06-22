@@ -2791,3 +2791,65 @@ Mobile workspace: `apps/mobile/`
 ### Hosted Preflight Remote Verification Risks / Next
 - Remote checks still correctly call out VPS runtime state that cannot be proven from local files: real `RESEND_API_KEY`, `PASSWORD_RESET_EMAIL_FROM`, OAuth/WeChat env, and application of `migrations/013_password_reset_tokens.sql` to the VPS PostgreSQL database.
 - Do not apply the password reset migration to the local `127.0.0.1` database as proof of production readiness; use the real VPS PostgreSQL connection or the VPS deployment command.
+
+## 2026-06-22 - Browser Bridge AI Takeover Runtime Extension
+
+### Browser Bridge AI Takeover Scope
+- Completed the Browser Assistant / Browser Bridge AI takeover path inside the existing `IntentGate -> LocalBrain -> ToolRegistry -> PermissionPolicy -> Executor` chain.
+- Added governed `browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, and `browser.writeBackDom` tools.
+- Routed Browser Assistant settings actions through the shared Browser Bridge adapter so disconnected daemon / Chrome extension states return `setup_required` instead of simulated success.
+- Added URL sanitization, payload redaction, sensitive-tool confirmation policy, compatibility registry coverage, and skills/runbook governance docs for Browser Bridge automation.
+- Separated Browser Bridge execution payloads from redacted `auditPayload` data so long prompts and image URLs still reach the connected bridge while audit records stay safe.
+- Hardened Browser Bridge URL sanitization to reject local/private IPv6 targets in addition to file, browser-internal, localhost, and private IPv4 targets.
+- Closed the mobile dependency audit warning by moving the Expo workspace `undici` override to `6.27.0` and refreshing `apps/mobile/package-lock.json`.
+
+### Browser Bridge AI Takeover Files Touched
+- `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentPermissionPolicy.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/features/ai-takeover/core/intentGate.ts`
+- `apps/web/src/features/ai-takeover/core/localBrain.ts`
+- `apps/web/src/features/ai-takeover/core/confirmationPolicy.ts`
+- `apps/web/src/features/ai-takeover/core/llmBrain.ts`
+- `apps/web/src/features/ai-takeover/types.ts`
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `docs/ai-assistant/skills/browser-bridge-automation.md`
+- `docs/ai-assistant/skills.md`
+- `docs/ai-assistant/skills/README.md`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/architecture/COMPATIBILITY_LAYER_REGISTRY.json`
+- `apps/mobile/package.json`
+- `apps/mobile/package-lock.json`
+- Browser Assistant and AI takeover unit contract tests.
+
+### Browser Bridge AI Takeover Design Decisions
+- Browser automation remains a ToolRegistry capability, not a parallel assistant runtime.
+- External page automation uses Browser Bridge commands only; raw selector-click scripts and UI coordinate simulation are not allowed.
+- Product extraction, external generation, and draft publishing are `confirm`; DOM write-back is `dangerous`.
+- Browser Bridge rejects file/browser-internal/private-network URLs and redacts credentials or long opaque tokens in `auditPayload` before audit logging.
+- Browser Bridge commands keep their execution payload intact so confirmed external generation and draft-saving actions do not lose long prompts or media URLs.
+- API-only mode can control KK Studio internal tools and open Browser Assistant, but external web extraction/generation/publishing returns setup guidance until the local daemon or Chrome extension bridge is connected.
+
+### Browser Bridge AI Takeover Validation Run
+- Red pass first: focused Browser Assistant tests failed before implementation because browser tools, URL protocol module, intent routes, and settings adapter wiring were missing.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-takeover-intentGate.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/browser-bridge-protocol.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: passed, 52 tests.
+- `npm run typecheck`: passed.
+- `npm run architecture:check`: passed. The UI token checker still reports pre-existing hardcoded color warnings while exiting successfully.
+- `npm run governance:check`: initially failed until Browser Bridge sensitive tools were added to Skills docs and the compatibility registry; passed after documentation updates.
+- `npm run build`: passed.
+- `npm run verify:ai-takeover-smoke`: passed in browser mode on `http://127.0.0.1:3007`.
+- `npm run dev:status`: reported an existing healthy Vite process on port `3000` and no API process.
+- `npm.cmd audit --omit=dev --audit-level=moderate`: passed, 0 vulnerabilities.
+- `npm.cmd audit --audit-level=low --prefix .\apps\mobile`: passed, 0 vulnerabilities.
+- `npm.cmd run verify:changes`: passed. Architecture, governance, dependency audit, typecheck, spec, build, unit, integration, contract, e2e, smoke fallback checks, and encoding checks completed successfully.
+
+### Browser Bridge AI Takeover Validation Not Run
+- None for this pass.
+
+### Browser Bridge AI Takeover Risks / Next
+- Browser Bridge still requires the real local daemon and Chrome Bridge extension to be installed by the operator before external automation can run beyond `setup_required`.
+- Direct public social publishing remains intentionally out of scope; Browser Assistant only saves drafts through this governed path.
+- A future product pass can surface per-command Browser Bridge result streaming in the AI takeover timeline.
+- Mobile Expo dependency remediation stayed within the existing `undici` 6.x override path; broader Expo upgrades remain a separate release decision.

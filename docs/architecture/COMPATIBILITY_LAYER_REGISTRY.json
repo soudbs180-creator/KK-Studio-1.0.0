@@ -98,6 +98,22 @@
         "tests/unit/ecommerce-text-fallback.test.ts"
       ],
       "removalCondition": "Delete when final ML analysis API is online."
+    },
+    {
+      "path": "apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Normalizes Browser Assistant daemon and Chrome extension commands for the AI ToolRegistry and settings UI while the external bridge transport remains optional.",
+      "upstreamCanonicalSource": "apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts",
+      "downstreamDependents": [
+        "apps/web/src/components/settings/views/BrowserAssistantView.tsx",
+        "apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/browser-bridge-protocol.test.ts",
+        "tests/unit/ai-assistant-tool-registry.test.ts"
+      ],
+      "removalCondition": "Delete or rename when Browser Assistant transport is a stable first-party runtime module and no longer needs bridge-pattern compatibility registration."
     }
   ]
 }

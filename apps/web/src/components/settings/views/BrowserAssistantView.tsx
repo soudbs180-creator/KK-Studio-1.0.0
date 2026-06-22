@@ -33,6 +33,15 @@ import {
   SettingsViewShell,
 } from '../SettingsScaffold';
 import { notify } from '../../../services/system/notificationService';
+import {
+  browserBridgeAdapter,
+  createBrowserBridgeCommand,
+  createBrowserBridgeSetupRequiredResult,
+  type BrowserBridgeCommand,
+  type BrowserBridgeResult,
+} from '../../../features/ai-assistant-runtime/browser/browserBridge';
+import { agentRuntimeInstance } from '../../../features/ai-assistant-runtime';
+import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -472,6 +481,73 @@ export const BrowserAssistantView: React.FC = () => {
   // 采用 Ref 缓存的日志缓冲池，限制最大存储长度，避免引发大规模重排与内存溢出
   const logsBufferRef = useRef<string[]>([]);
 
+  const getBrowserBridgeSnapshot = () => ({
+    daemonStatus,
+    extensionStatus,
+    latencyMs: daemonLatency,
+    setupRequired: daemonStatus !== 'connected' || extensionStatus !== 'connected',
+    setupHint: '请先启动本地守护进程并连接 Chrome Bridge 插件，然后重试此 Browser Assistant 操作。',
+    platforms,
+    sessions,
+    socialChannels
+  });
+
+  const dispatchBrowserCommand = async (
+    input: Parameters<typeof createBrowserBridgeCommand>[0]
+  ): Promise<BrowserBridgeResult> => {
+    const command = createBrowserBridgeCommand(input);
+    return browserBridgeAdapter.execute(command, {
+      snapshot: getBrowserBridgeSnapshot(),
+      transport: async (queuedCommand: BrowserBridgeCommand) => {
+        const sent = wsClientRef.current?.send({
+          type: 'browser_bridge_command',
+          command: queuedCommand
+        });
+
+        if (!sent) {
+          return createBrowserBridgeSetupRequiredResult(queuedCommand.id);
+        }
+
+        return {
+          id: queuedCommand.id,
+          status: 'queued',
+          summary: 'Browser Bridge 指令已下发，等待本地守护进程或 Chrome 插件回传结果。',
+          audit: {
+            redacted: true,
+            commandKind: queuedCommand.kind,
+            targetHost: queuedCommand.target
+          }
+        };
+      }
+    });
+  };
+
+  const createBrowserAssistantPreviewContext = (): SanitizedProjectContext => ({
+    currentPage: 'settings',
+    aiTakeover: { enabled: true, mode: 'local' },
+    agent: { enabled: true },
+    canvas: {
+      selectedNodeIds: [],
+      promptNodes: [],
+      imageNodes: []
+    },
+    assets: {
+      imageCollections: [],
+      images: [],
+      files: [],
+      outputs: []
+    },
+    settings: {
+      apiKeyStatus: 'missing',
+      providerCount: 0
+    },
+    billing: {
+      balanceKnown: false,
+      canEstimateCost: false
+    },
+    errors: []
+  });
+
   // 1. 初始化 WebSocket 和 Web Worker，组件卸载时 100% 回收资源
   useEffect(() => {
     isMountedRef.current = true;
@@ -697,75 +773,69 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 6. 商品提取核心流程
-  const handleExtractTest = () => {
+  const handleExtractTest = async () => {
     if (!targetUrl) {
       notify.warning('请输入 URL', '提取测试需要有效的电商或网页链接');
       return;
     }
 
-    if (daemonStatus !== 'connected' || extensionStatus !== 'connected') {
-      notify.error('多端连接未就绪', '请先启动本地守护进程并确保插件连接成功');
-      return;
-    }
-
     setExtractLoading(true);
     setExtractedData(null);
-    
-    const steps = [
-      '正在向本地守护进程分配网页解析指令...',
-      '插件正在连接目标页面并提取 DOM 快照...',
-      'AI 正在读取 DOM 节点并智能解析核心价格数据...',
-      '数据流解析完成，正在同步至画布上下文！'
-    ];
 
-    let currentStepIdx = 0;
-    setExtractStep(steps[0]!);
+    try {
+      setExtractStep('正在通过 Browser Bridge runtime adapter 下发商品解析指令...');
+      const result = await dispatchBrowserCommand({
+        kind: 'extract_product',
+        target: targetUrl,
+        payload: {
+          targets: ['price', 'title', 'image', 'description']
+        },
+        requiresUserGesture: true
+      });
 
-    const interval = window.setInterval(() => {
-      if (!isMountedRef.current) {
-        window.clearInterval(interval);
+      if (!isMountedRef.current) return;
+
+      if (result.status === 'setup_required') {
+        setExtractStep(result.summary);
+        notify.warning('Browser Bridge 未连接', result.summary);
         return;
       }
-      currentStepIdx++;
-      if (currentStepIdx < steps.length) {
-        setExtractStep(steps[currentStepIdx]!);
-      } else {
-        window.clearInterval(interval);
-        
-        let platform = '通用网页';
-        let title = '智能无线降噪头戴式耳机 Pro';
-        let price = '￥1,299.00';
-        let originalPrice = '￥1,599.00';
-        let imageUrl = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60';
-        
-        if (targetUrl.includes('taobao.com') || targetUrl.includes('tmall.com')) {
-          platform = '淘宝 / 天猫';
-          title = '【极客爆款】立式人体工学智能升降桌 双电机实木版';
-          price = '￥2,499.00';
-          originalPrice = '￥2,999.00';
-          imageUrl = 'https://images.unsplash.com/photo-1595515106969-1ce29566ff1c?w=500&auto=format&fit=crop&q=60';
-        } else if (targetUrl.includes('jd.com')) {
-          platform = '京东 (JD.COM)';
-          title = '钛金属智能运动手表 (独立心率血氧监测版)';
-          price = '￥1,899.00';
-          originalPrice = '￥2,199.00';
-          imageUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
-        }
 
+      if (result.status === 'queued') {
+        setExtractStep(result.summary);
+        notify.info('解析指令已下发', '等待本地守护进程或 Chrome 插件回传结构化商品摘要。');
+        return;
+      }
+
+      if (result.status === 'success' && result.data) {
+        const data = result.data as any;
+        const title = String(data.title || '未命名商品');
+        const price = String(data.price || '价格未识别');
         setExtractedData({
           title,
           price,
-          originalPrice,
-          imageUrl,
-          platform,
-          description: '商品抓取成功。该商品信息和主图已注入画布上下文。'
+          originalPrice: data.originalPrice,
+          imageUrl: String(data.imageUrl || ''),
+          platform: String(data.platform || '外部网页'),
+          description: String(data.description || 'Browser Bridge 已返回商品摘要。')
         });
         setEditedTitle(title);
         setEditedPrice(price);
-        setExtractLoading(false);
-        notify.success('提取成功', `成功提取来自【${platform}】的价格和商品参数`);
+        setExtractStep('Browser Bridge 商品摘要已回传。');
+        notify.success('提取成功', `成功提取来自【${data.platform || '外部网页'}】的商品摘要`);
+        return;
       }
-    }, 700);
+
+      setExtractStep(result.error || result.summary);
+      notify.error('提取失败', result.error || result.summary);
+    } catch (error: any) {
+      setExtractStep(error?.message || 'Browser Bridge 商品提取失败');
+      notify.error('提取失败', error?.message || 'Browser Bridge 商品提取失败');
+    } finally {
+      if (isMountedRef.current) {
+        setExtractLoading(false);
+      }
+    }
   };
 
   // 7. 本地抠图导入画布 (Web Worker 后台处理)
@@ -796,48 +866,59 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 7b. 双向 DOM 实时篡改与回写仿真
-  const handleWriteBackDom = () => {
+  const handleWriteBackDom = async () => {
     if (!extractedData) return;
     setWriteBackLoading(true);
-    notify.success('启动 DOM 同步', '正在通过守护进程下发 DOM 修改指令...');
-    
-    window.setTimeout(() => {
+
+    try {
+      notify.info('启动 DOM 同步', '正在通过 Browser Bridge adapter 下发 DOM 回写指令...');
+      const result = await dispatchBrowserCommand({
+        kind: 'write_back_dom',
+        target: targetUrl || 'active_tab',
+        payload: {
+          title: editedTitle,
+          price: editedPrice,
+          platform: extractedData.platform
+        },
+        requiresUserGesture: true
+      });
+
       if (!isMountedRef.current) return;
-      setWriteBackLoading(false);
-      
-      setExtractedData(prev => prev ? {
-        ...prev,
-        title: editedTitle,
-        price: editedPrice
-      } : null);
-      
-      notify.success(
-        'DOM 同步成功', 
-        `已成功通过 Chrome 插件将价格回写至网页 DOM！原商品详情页标题已修改为「${editedTitle}」，价格已修改为「${editedPrice}」。`
-      );
-      
-      if (wsClientRef.current) {
-        wsClientRef.current.send({
-          action: 'write_back_dom',
-          payload: {
-            title: editedTitle,
-            price: editedPrice,
-            platform: extractedData.platform
-          }
-        });
+
+      if (result.status === 'setup_required') {
+        notify.warning('Browser Bridge 未连接', result.summary);
+        return;
       }
-    }, 1000);
+
+      if (result.status === 'queued') {
+        notify.info('DOM 回写指令已下发', '等待本地守护进程或 Chrome 插件确认目标页面修改结果。');
+        return;
+      }
+
+      if (result.status === 'success') {
+        setExtractedData(prev => prev ? {
+          ...prev,
+          title: editedTitle,
+          price: editedPrice
+        } : null);
+        notify.success('DOM 同步成功', 'Browser Bridge 已确认外部网页字段回写完成。');
+        return;
+      }
+
+      notify.error('DOM 同步失败', result.error || result.summary);
+    } catch (error: any) {
+      notify.error('DOM 同步失败', error?.message || 'Browser Bridge DOM 回写失败');
+    } finally {
+      if (isMountedRef.current) {
+        setWriteBackLoading(false);
+      }
+    }
   };
 
   // 8. 外部网页直通网站生图 (Web Worker 计算隔离)
-  const handleGenTest = () => {
+  const handleGenTest = async () => {
     if (!promptText) {
       notify.warning('请输入 Prompt', '生图测试需要有效的提示词');
-      return;
-    }
-
-    if (daemonStatus !== 'connected' || extensionStatus !== 'connected') {
-      notify.error('多端连接未就绪', '请先启动本地守护进程并确保插件连接成功');
       return;
     }
 
@@ -851,59 +932,60 @@ export const BrowserAssistantView: React.FC = () => {
     setGeneratedImageUrl(null);
     setGenProgress(0);
 
-    const steps = [
-      `正在分配至外部 ${selectedPlat.name} 生图队列...`,
-      '正在调起 Chrome 插件查找可用标签页...',
-      '成功定位生图网页，正在注入提示词与生成参数...',
-      '正在自动模拟点击“Generate”生成按钮...',
-      '已发出生成任务，正在轮询外部平台生成进度...',
-    ];
+    try {
+      setGenStep(`正在通过 Browser Bridge adapter 分配至外部 ${selectedPlat.name} 生图队列...`);
+      const result = await dispatchBrowserCommand({
+        kind: 'generate_external',
+        target: selectedPlat.id,
+        payload: {
+          prompt: promptText,
+          platformId: selectedPlat.id,
+          count: 1,
+          sessionIds: selectedSessionsForGen
+        },
+        requiresUserGesture: true
+      });
 
-    setGenStep(steps[0]!);
+      if (!isMountedRef.current) return;
 
-    let idx = 0;
-    const stepInterval = window.setInterval(() => {
-      if (!isMountedRef.current) {
-        window.clearInterval(stepInterval);
+      if (result.status === 'setup_required') {
+        setGenStep(result.summary);
+        notify.warning('Browser Bridge 未连接', result.summary);
         return;
       }
-      idx++;
-      if (idx < 5) {
-        setGenStep(steps[idx]!);
-      } else {
-        window.clearInterval(stepInterval);
-        
-        let progress = 0;
-        const progressInterval = window.setInterval(() => {
-          if (!isMountedRef.current) {
-            window.clearInterval(progressInterval);
-            return;
-          }
-          progress += 20;
-          if (progress >= 100) {
-            setGenProgress(100);
-            setGenStep('生成成功！正在拦截 CDN 高清大图并提取原图信息...');
-            window.clearInterval(progressInterval);
 
-            window.setTimeout(() => {
-              if (isMountedRef.current) {
-                setGeneratedImageUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80');
-                setGenLoading(false);
-                notify.success('外部生图成功', `成功拉取来自 ${selectedPlat.name} 的生成大图，零 API 积分损耗！`);
-              }
-            }, 800);
-          } else {
-            setGenProgress(progress);
-            setGenStep(`正在轮询外部平台生成进度... ${progress}%`);
-          }
-        }, 300);
+      if (result.status === 'queued') {
+        setGenProgress(5);
+        setGenStep(result.summary);
+        notify.info('网页直通生图指令已下发', '等待本地守护进程或 Chrome 插件回传外部平台生成状态。');
+        return;
       }
-    }, 500);
+
+      if (result.status === 'success' && result.data) {
+        const data = result.data as any;
+        setGenProgress(100);
+        setGeneratedImageUrl(String(data.imageUrl || ''));
+        setGenStep('Browser Bridge 已回传外部平台生成结果。');
+        notify.success('外部生图成功', `Browser Bridge 已拉取来自 ${selectedPlat.name} 的生成结果。`);
+        return;
+      }
+
+      setGenStep(result.error || result.summary);
+      notify.error('外部生图失败', result.error || result.summary);
+    } catch (error: any) {
+      setGenStep(error?.message || 'Browser Bridge 外部生图失败');
+      notify.error('外部生图失败', error?.message || 'Browser Bridge 外部生图失败');
+    } finally {
+      if (isMountedRef.current) {
+        setGenLoading(false);
+      }
+    }
   };
 
   // 9. 社交发布流程一键分发
-  const handlePublishToSocial = () => {
-    if (!generatedImageUrl) return;
+  const handlePublishToSocial = async (overrideImageUrl?: string) => {
+    const imageUrlToPublish = overrideImageUrl || generatedImageUrl;
+    if (!imageUrlToPublish) return;
 
     const xhsPlat = socialChannels.find((sc) => sc.id === 'xhs');
     if (!xhsPlat || !xhsPlat.enabled) {
@@ -912,35 +994,52 @@ export const BrowserAssistantView: React.FC = () => {
     }
 
     setPublishingLoading(true);
-    
-    const pubSteps = [
-      '正在加载小红书分发适配器...',
-      '已成功定位小红书创作者页面标签页...',
-      '正在上传刚生成的网页直通高清商品海报图...',
-      'AI 正在读取商品信息，智能生成小红书发帖文案...',
-      '正在自动填充标题、标签，并保存至草稿箱...'
-    ];
 
-    let idx = 0;
-    setPublishingStep(pubSteps[0]!);
+    try {
+      setPublishingStep('正在通过 Browser Bridge adapter 下发草稿箱保存指令...');
+      const result = await dispatchBrowserCommand({
+          kind: 'publish_draft',
+          target: xhsPlat.id,
+          payload: {
+            channelId: xhsPlat.id,
+            imageUrl: imageUrlToPublish,
+            title: extractedData?.title || 'KK Studio AI 海报',
+            body: pipelineCompletedData?.postText || '由 KK Studio AI 辅助生成的创意海报。',
+          publishMode: 'draft_only'
+        },
+        requiresUserGesture: true
+      });
 
-    const pubInterval = window.setInterval(() => {
-      if (!isMountedRef.current) {
-        window.clearInterval(pubInterval);
+      if (!isMountedRef.current) return;
+
+      if (result.status === 'setup_required') {
+        setPublishingStep(result.summary);
+        notify.warning('Browser Bridge 未连接', result.summary);
         return;
       }
-      idx++;
-      if (idx < pubSteps.length) {
-        setPublishingStep(pubSteps[idx]!);
-      } else {
-        window.clearInterval(pubInterval);
-        setPublishingLoading(false);
-        notify.success(
-          '小红书草稿保存成功',
-          '已成功将 1 张海报及配文保存到您的小红书创作者后台草稿箱！'
-        );
+
+      if (result.status === 'queued') {
+        setPublishingStep(result.summary);
+        notify.info('草稿保存指令已下发', '等待本地守护进程或 Chrome 插件回传草稿箱状态。');
+        return;
       }
-    }, 800);
+
+      if (result.status === 'success') {
+        setPublishingStep('Browser Bridge 已确认草稿箱保存完成。');
+        notify.success('小红书草稿保存成功', 'Browser Bridge 已确认素材和文案保存至草稿箱。');
+        return;
+      }
+
+      setPublishingStep(result.error || result.summary);
+      notify.error('草稿保存失败', result.error || result.summary);
+    } catch (error: any) {
+      setPublishingStep(error?.message || 'Browser Bridge 草稿保存失败');
+      notify.error('草稿保存失败', error?.message || 'Browser Bridge 草稿保存失败');
+    } finally {
+      if (isMountedRef.current) {
+        setPublishingLoading(false);
+      }
+    }
   };
 
   // 10. 阶段四：本地 LLM 网关连通性测试
@@ -1071,90 +1170,59 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 14. 阶段五：AI Takeover 自然语言解析仿真与真实回注驱动
-  const handleTakeoverSimulate = () => {
+  const handleTakeoverSimulate = async () => {
     if (!takeoverInput) return;
     
     setTakeoverLoading(true);
     setTakeoverOutput(null);
 
-    window.setTimeout(() => {
+    try {
+      const record = await agentRuntimeInstance.run(
+        takeoverInput,
+        createBrowserAssistantPreviewContext()
+      );
       if (!isMountedRef.current) return;
       setTakeoverLoading(false);
-      
-      let parsedRouting = 'api';
-      let parsedSessions: string[] = [];
-      let reason = '用户未指定使用代理，默认匹配官方付费高并发 API';
-      let intent = 'generate_images';
 
-      // 提取 URL
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const foundUrls = takeoverInput.match(urlRegex);
-      const extractedUrl = foundUrls ? foundUrls[0] : '';
-
-      if (takeoverInput.includes('提取') || takeoverInput.includes('抓取') || takeoverInput.includes('DOM') || extractedUrl) {
-        intent = 'extract_product';
-      }
-
-      if (takeoverInput.includes('网页直通') || takeoverInput.includes('代理') || takeoverInput.includes('多开')) {
-        parsedRouting = 'agent_proxy';
-        parsedSessions = sessions.filter((s) => s.platformId === 'leonardo' && s.enabled).map((s) => s.username);
-        reason = '检测到包含“网页直通 / 代理 / 多开”关键字，AI 接管引擎已自动将本生成任务切换至网页直通代理轮询调度池';
-      }
-
-      // 提取 Prompt
-      let extractedPrompt = '';
-      if (intent === 'generate_images') {
-        const promptPatterns = [
-          /跑\s*(.+?)\s*图/,
-          /生成\s*(.+?)\s*的?图片/,
-          /生成\s*(.+?)\s*海报/,
-          /画\s*(.+?)\s*/
-        ];
-        for (const pattern of promptPatterns) {
-          const match = takeoverInput.match(pattern);
-          if (match && match[1]) {
-            extractedPrompt = match[1].trim();
-            break;
-          }
-        }
-        if (extractedPrompt) {
-          reason += `，并且已将提取到的提示词「${extractedPrompt}」注入 Playground 输入框。`;
-        }
-      }
+      const plan = record.plan;
+      const firstAction = plan.actions[0] as any;
+      const isProxyRoute = plan.actions.some((action: AssistantAction) => action.type === 'browser.generateExternal');
+      const isExtractRoute = plan.actions.some((action: AssistantAction) => action.type === 'browser.extractProduct');
+      const parsedSessions = isProxyRoute
+        ? sessions.filter((s) => s.platformId === 'leonardo' && s.enabled).map((s) => s.username)
+        : [];
+      const extractedUrl = firstAction?.payload?.url || '';
+      const extractedPrompt = firstAction?.payload?.prompt || '';
 
       setTakeoverOutput({
-        intent,
-        routing: parsedRouting,
+        intent: plan.intent,
+        routing: isProxyRoute ? 'agent_proxy' : 'api',
         sessions: parsedSessions,
-        risk: parsedRouting === 'api' ? 'cost' : 'none',
-        confidence: 0.96,
-        reason
+        risk: plan.requiresConfirmation ? 'confirm' : 'none',
+        confidence: plan.confidence,
+        reason: plan.reply
       });
 
-      notify.success('AI Takeover 解析成功', '接管意图已被正确分类并映射至多端分配路由！');
+      notify.success('AI Takeover 解析成功', '已使用真实 AgentRuntime 生成预览计划。');
       
-      // 真实回注与状态驱动
-      if (intent === 'extract_product') {
+      if (isExtractRoute) {
         setPlaygroundTab('extract');
         if (extractedUrl) {
           setTargetUrl(extractedUrl);
           notify.success('参数回注成功', `已提取商品链接并注入抓取输入框，已切换至「商品抓取与抠图」控制台！`);
         }
-      } else if (intent === 'generate_images') {
+      } else if (isProxyRoute || plan.intent === 'browser_generate_external') {
         if (extractedPrompt) {
           setPromptText(extractedPrompt);
         }
-        if (parsedRouting === 'agent_proxy') {
-          setPlaygroundTab('pipeline');
-          setRoutingMode('proxy');
-          notify.success('参数回注成功', '已切换至「全自动宏流水线」，并已注入提取的提示词与代理会话！');
-        } else {
-          setPlaygroundTab('generate');
-          setRoutingMode('api');
-          notify.success('参数回注成功', '已切换至「网页直通生图与社交分发」，并已填入提取的提示词！');
-        }
+        setPlaygroundTab('pipeline');
+        setRoutingMode('proxy');
+        notify.success('参数回注成功', '已切换至「全自动宏流水线」，并已注入真实规划器识别出的代理路线。');
       }
-    }, 1000);
+    } catch (error: any) {
+      setTakeoverLoading(false);
+      notify.error('AI Takeover 解析失败', error?.message || 'AgentRuntime 预览计划失败');
+    }
   };
 
   const handleCreateCardInCanvas = () => {
@@ -2217,7 +2285,7 @@ export const BrowserAssistantView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={handlePublishToSocial}
+                        onClick={() => void handlePublishToSocial()}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <Share2 size={13} />
@@ -2437,9 +2505,7 @@ export const BrowserAssistantView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          notify.success('分发成功', '已成功将海报与文案一键托管更新至小红书草稿！');
-                        }}
+                        onClick={() => void handlePublishToSocial(pipelineCompletedData.finalImageUrl)}
                         className="settings-browser-action settings-browser-action--primary"
                       >
                         <Share2 size={13} />

@@ -15,7 +15,8 @@ const SETTINGS_VIEW_LABELS: Record<string, string> = {
   'consumption-records': '计费账本',
   'storage-settings': '存储设置',
   'system-logs': '系统日志',
-  'user-profile': '个人中心'
+  'user-profile': '个人中心',
+  'browser-assistant': '浏览器助手'
 };
 
 export class LocalAssistantBrain {
@@ -225,6 +226,73 @@ ${optResult.optimizedPromptZh}
           type: 'openSettings',
           payload: { tab: settingsView }
         });
+        break;
+      }
+
+      case 'control_multidevice': {
+        reply = `### 🌐 正在检查 Browser Assistant 连接状态
+我会读取本地守护进程、Chrome Bridge 插件、平台池和会话池的脱敏状态；如果未连接，只返回安装/连接引导，不会伪造成功结果。`;
+
+        actions.push({
+          type: 'browser.getStatus',
+          payload: {}
+        });
+        break;
+      }
+
+      case 'extract_page_content': {
+        const url = intentResult.extracted.url || '';
+        reply = `### 🌐 准备通过 Browser Bridge 提取商品页
+目标链接：\`${url || '未识别到链接'}\`
+
+此操作会读取外部网页的标题、价格、主图和描述摘要。执行前需要您确认 Browser Bridge 授权。`;
+
+        actions.push({
+          type: 'browser.extractProduct',
+          payload: {
+            url,
+            targets: ['price', 'title', 'image', 'description'],
+            label: 'Browser Assistant product extraction'
+          }
+        });
+        break;
+      }
+
+      case 'browser_generate_external': {
+        const prompt = context.promptBarInput?.prompt || userInput || '商品海报图';
+        const count = intentResult.extracted.count || 1;
+        reply = `### 🌐 网页直通生图计划已准备
+我会通过 Browser Bridge 调用外部网页平台会话池执行生图任务，预计生成 **${count}** 张。若本地守护进程或 Chrome 插件未连接，系统只会返回连接引导。`;
+
+        actions.push({
+          type: 'browser.generateExternal',
+          payload: {
+            prompt,
+            platformId: 'leonardo',
+            count,
+            sessionCount: intentResult.extracted.sessionCount
+          }
+        });
+        break;
+      }
+
+      case 'browser_publish_draft': {
+        reply = `### 🌐 外部草稿箱分发计划已准备
+我只会通过 Browser Bridge 保存到草稿箱，不会直接公开发布内容。`;
+
+        actions.push({
+          type: 'browser.publishDraft',
+          payload: {
+            channelId: 'xhs'
+          }
+        });
+        break;
+      }
+
+      case 'browser_write_back_dom': {
+        reply = `### ⚠️ 网页 DOM 回写需要二次确认
+此操作会修改外部网页可见 DOM 字段。请确认目标页面和字段无误后再执行。`;
+
         break;
       }
 

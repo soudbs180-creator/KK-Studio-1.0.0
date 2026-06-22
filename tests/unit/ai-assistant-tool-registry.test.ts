@@ -24,6 +24,24 @@ test('工具注册表：已注册工具清单检查', () => {
   assert.ok(toolRegistryInstance.getTool('assets.zipOriginals'));
   assert.ok(toolRegistryInstance.getTool('generation.createBatchJob'));
   assert.ok(toolRegistryInstance.getTool('generation.getJobStatus'));
+  const browserStatusTool = toolRegistryInstance.getTool('browser.getStatus');
+  assert.ok(browserStatusTool);
+  assert.equal(browserStatusTool.permission, 'safe');
+  const browserOpenTool = toolRegistryInstance.getTool('browser.openAssistant');
+  assert.ok(browserOpenTool);
+  assert.equal(browserOpenTool.permission, 'safe');
+  const browserExtractTool = toolRegistryInstance.getTool('browser.extractProduct');
+  assert.ok(browserExtractTool);
+  assert.equal(browserExtractTool.permission, 'confirm');
+  const browserGenerateTool = toolRegistryInstance.getTool('browser.generateExternal');
+  assert.ok(browserGenerateTool);
+  assert.equal(browserGenerateTool.permission, 'confirm');
+  const browserPublishTool = toolRegistryInstance.getTool('browser.publishDraft');
+  assert.ok(browserPublishTool);
+  assert.equal(browserPublishTool.permission, 'confirm');
+  const browserWriteBackTool = toolRegistryInstance.getTool('browser.writeBackDom');
+  assert.ok(browserWriteBackTool);
+  assert.equal(browserWriteBackTool.permission, 'dangerous');
   const retryJobTool = toolRegistryInstance.getTool('generation.retryJob');
   assert.ok(retryJobTool);
   assert.equal(retryJobTool.permission, 'safe');
@@ -476,4 +494,54 @@ test('ToolRegistry: KnowledgeSync tools record and search changes', async () => 
   assert.equal(uiChange.component, 'AI takeover toggle');
   assert.equal(skill.name, 'record-knowledge-after-agent-change');
   assert.ok(search.results.length > 0);
+});
+
+test('ToolRegistry: browser.getStatus returns setup guidance when Browser Bridge is disconnected', async () => {
+  const result = await toolRegistryInstance.execute('browser.getStatus', {}, {
+    browserBridge: {
+      getStatus: async () => ({
+        daemonStatus: 'disconnected',
+        extensionStatus: 'disconnected',
+        setupRequired: true,
+        setupHint: '请先启动本地守护进程并连接 Chrome Bridge 插件。',
+        platforms: [],
+        sessions: [],
+        socialChannels: []
+      })
+    }
+  });
+
+  assert.equal(result.daemonStatus, 'disconnected');
+  assert.equal(result.extensionStatus, 'disconnected');
+  assert.equal(result.setupRequired, true);
+  assert.match(result.setupHint, /守护进程/);
+});
+
+test('ToolRegistry: browser.extractProduct validates URL before dispatching bridge command', async () => {
+  await assert.rejects(
+    () => toolRegistryInstance.execute('browser.extractProduct', {
+      url: 'file:///C:/Users/Administrator/secrets.txt'
+    }, {}),
+    /Browser Bridge only accepts http or https URLs/
+  );
+});
+
+test('ToolRegistry: disconnected browser.extractProduct returns setup_required instead of fake success', async () => {
+  const result = await toolRegistryInstance.execute('browser.extractProduct', {
+    url: 'https://example.com/item/1'
+  }, {
+    browserBridge: {
+      execute: async () => ({
+        id: 'cmd-test',
+        status: 'setup_required',
+        summary: '需要安装或连接 Browser Bridge。',
+        error: 'Browser Bridge disconnected',
+        audit: { redacted: true }
+      })
+    }
+  });
+
+  assert.equal(result.status, 'setup_required');
+  assert.match(result.summary, /Browser Bridge/);
+  assert.equal(result.data, undefined);
 });

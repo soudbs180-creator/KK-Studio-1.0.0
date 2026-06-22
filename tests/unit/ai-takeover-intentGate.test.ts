@@ -62,6 +62,42 @@ test('意图匹配单元测试：帮我打开 API 直接路由到 API 工作台'
   assert.equal(result.needsConfirmation, false);
 });
 
+test('IntentGate: 打开浏览器助手直接路由到 Browser Assistant 设置页', () => {
+  const result = analyzeIntent('帮我打开浏览器助手');
+
+  assert.equal(result.intent, 'open_settings_view');
+  assert.equal(result.extracted.settingsView, 'browser-assistant');
+  assert.equal(result.needsConfirmation, false);
+});
+
+test('IntentGate: 浏览器助手连接诊断走安全只读多端状态工具', () => {
+  const result = analyzeIntent('检查一下守护进程和 Chrome 插件连接状态');
+
+  assert.equal(result.intent, 'control_multidevice');
+  assert.equal(result.extracted.browserAction, 'status');
+  assert.equal(result.risk, 'none');
+  assert.equal(result.needsConfirmation, false);
+});
+
+test('IntentGate: 商品链接抓取映射到 Browser Assistant 提取计划并要求确认', () => {
+  const result = analyzeIntent('抓取这个商品链接 https://detail.tmall.com/item.htm?id=6582930281 的价格和主图');
+
+  assert.equal(result.intent, 'extract_page_content');
+  assert.equal(result.extracted.url, 'https://detail.tmall.com/item.htm?id=6582930281');
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'upload');
+});
+
+test('IntentGate: 网页直通多账号生图映射到外部生成计划并要求确认', () => {
+  const result = analyzeIntent('用网页直通代理多开 2 个号并发跑 3 张商品海报图');
+
+  assert.equal(result.intent, 'browser_generate_external');
+  assert.equal(result.extracted.sessionCount, 2);
+  assert.equal(result.extracted.count, 3);
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
+});
+
 test('意图匹配单元测试：简单生成复用画布输入框并直接发送', () => {
   const result = analyzeIntent('帮我生成一个赛博猫头像');
 
@@ -143,4 +179,21 @@ test('Local brain source contract: retry job intent maps to generation.retryJob'
   assert.match(brainSource, /type: 'generation\.retryJob'/);
   assert.match(brainSource, /jobId: intentResult\.extracted\.jobId/);
   assert.match(brainSource, /target: intentResult\.extracted\.jobId \? undefined : 'latest_failed'/);
+});
+
+test('Local brain source contract: browser assistant intents map to namespaced browser tools', () => {
+  const typesSource = readSource('apps/web/src/features/ai-takeover/types.ts');
+  const brainSource = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
+
+  assert.match(typesSource, /'browser_generate_external'/);
+  assert.match(typesSource, /browserAction\?:/);
+  assert.match(typesSource, /type: 'browser\.getStatus'/);
+  assert.match(typesSource, /type: 'browser\.extractProduct'/);
+  assert.match(typesSource, /type: 'browser\.generateExternal'/);
+  assert.match(brainSource, /case 'control_multidevice'/);
+  assert.match(brainSource, /type: 'browser\.getStatus'/);
+  assert.match(brainSource, /case 'extract_page_content'/);
+  assert.match(brainSource, /type: 'browser\.extractProduct'/);
+  assert.match(brainSource, /case 'browser_generate_external'/);
+  assert.match(brainSource, /type: 'browser\.generateExternal'/);
 });

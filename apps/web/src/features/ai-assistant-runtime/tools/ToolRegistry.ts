@@ -147,6 +147,7 @@ import { generationTools } from './generationTools.ts';
 import { knowledgeTools } from './knowledgeTools.ts';
 import { uiTools } from './uiTools.ts';
 import { skillTools } from './skillTools.ts';
+import { browserTools } from './browserTools.ts';
 
 // 注册所有导入的工具
 [
@@ -155,7 +156,8 @@ import { skillTools } from './skillTools.ts';
   ...generationTools,
   ...knowledgeTools,
   ...uiTools,
-  ...skillTools
+  ...skillTools,
+  ...browserTools
 ].forEach(tool => {
   toolRegistryInstance.register(tool);
 });

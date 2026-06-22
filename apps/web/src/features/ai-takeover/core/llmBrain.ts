@@ -49,11 +49,18 @@ export class LLMBrain {
 - {"type": "canvas.arrangeNodes", "payload": {"nodeIds": string[], "layout": "grid" | "row" | "column", "columns"?: number, "gap"?: number}} ：在画布上整理并排列指定卡片。若 nodeIds 为空，默认整理当前选区；若无选区，则整理整张画布。
 - {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards" | "latest_batch" | "all_canvas_outputs", "selectedNodeIds"?: string[]}} ：打包下载指定范围的卡片原图并生成 ZIP (别名: zipOutputs)。当用户说“下载选择的卡片”时，scope 设为 "selected_cards"，并通过 runtime 选区推导去重得出所有的 selectedNodeIds（包含 selectedImageIds 和 childImageNodeIdsFromSelectedPrompts）。
 - {"type": "generation.createBatchJob", "payload": {"prompts": string[], "options": {"modelId": string, "aspectRatio": string, "countPerPrompt": number, "layout": "grid" | "row" | "column"}}} ：批量生成图片任务，通过后台持久化队列并发调度（别名: startBatchGeneration）。
+- {"type": "browser.getStatus", "payload": {}} ：读取 Browser Assistant 守护进程、Chrome 插件、平台池和会话池的脱敏状态。
+- {"type": "browser.openAssistant", "payload": {}} ：打开 Browser Assistant 设置页。
+- {"type": "browser.extractProduct", "payload": {"url": "https://...", "targets": ["price", "title", "image", "description"]}} ：通过 Browser Bridge 提取外部商品页摘要，必须确认。
+- {"type": "browser.generateExternal", "payload": {"prompt": "提示词", "platformId": "leonardo", "count": 1, "sessionCount"?: 2}} ：通过 Browser Bridge 调外部网页平台生图，必须确认。
+- {"type": "browser.publishDraft", "payload": {"channelId": "xhs", "imageUrl"?: "https://...", "title"?: "标题", "body"?: "文案"}} ：保存到外部社媒草稿箱，不允许直接公开发布，必须确认。
+- {"type": "browser.writeBackDom", "payload": {"target"?: "active_tab", "title": "标题", "price": "价格"}} ：回写外部网页 DOM，危险操作，必须确认。
 
 [任务拆解要求]
 - 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
 - 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
 - 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。
+- 你绝对不能输出任意 CSS selector 点击脚本来控制外部网页；外部网页只能通过 browser.* 工具和 Browser Bridge 处理。
 - 其余本地/常规操作指令继续遵循原定逻辑。
 
 请直接输出以下 JSON，绝对不要用 \`\`\`json 等任何格式包裹它：

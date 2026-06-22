@@ -32,7 +32,11 @@ const CONFIRM_ACTIONS = [
   'overwriteOutput',
   'publishProject',
   'generation.createBatchJob',
-  'ecommerce.createBatchTransformJob'
+  'ecommerce.createBatchTransformJob',
+  'browser.extractProduct',
+  'browser.generateExternal',
+  'browser.publishDraft',
+  'browser.writeBackDom'
 ];
 
 export const confirmationPolicy = {
@@ -116,6 +120,29 @@ export const confirmationPolicy = {
 
       summary = `该操作将把导入的文件与图片上传至 KK Studio 项目存储库。
 部分大模型将可以读取这些资源的文本描述摘要。`;
+    }
+    // 4. Browser Assistant 外部网页控制
+    else if (
+      plan.intent === 'extract_page_content' ||
+      plan.intent === 'control_multidevice' ||
+      plan.intent === 'browser_generate_external' ||
+      plan.intent === 'browser_publish_draft' ||
+      plan.intent === 'browser_write_back_dom'
+    ) {
+      const actionType = plan.actions[0]?.type as string | undefined;
+      const isDomWrite = actionType === 'browser.writeBackDom';
+      title = isDomWrite ? '二次确认网页 DOM 回写？' : '确认使用 Browser Bridge？';
+      taskType = isDomWrite ? '外部网页 DOM 回写' : '外部网页自动化';
+      source = 'Browser Assistant / Browser Bridge';
+      imageCount = 0;
+      promptStrategy = '结构化 Browser Bridge 工具调用';
+      expectedOutputs = actionType === 'browser.generateExternal' ? 1 : 0;
+      requiresCredits = false;
+      willUpload = actionType === 'browser.publishDraft';
+
+      summary = isDomWrite
+        ? '此操作会通过已连接的 Browser Bridge 修改当前外部网页 DOM。请确认目标页面和字段无误；AI 不会读取或上传密钥、Cookie 或登录凭证。'
+        : '此操作会调用本地守护进程或 Chrome Bridge 插件处理外部网页。若未连接 Bridge，系统只会返回连接引导，不会伪造成功结果。';
     }
 
     return {

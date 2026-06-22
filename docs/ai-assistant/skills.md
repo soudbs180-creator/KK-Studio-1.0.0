@@ -47,6 +47,10 @@
    - 职责：把“帮我打开个人中心 / API / 日志 / 存储 / 计费”等本地导航指令直接映射到底层设置路由能力。
    - 关联工具：`ui.openSettings`
 
+11. **[Browser Bridge Automation Skill (browser-bridge-automation)](skills/browser-bridge-automation.md)**
+   - 职责：把浏览器助手、连接诊断、商品页提取、网页直通生图、社媒草稿和 DOM 回写请求映射到 Browser Bridge 工具链。
+   - 关联工具：`browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.writeBackDom`
+
 ---
 
 ## 🛡️ 静态分析与校验支持

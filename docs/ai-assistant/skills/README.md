@@ -21,6 +21,7 @@
 13. [ppt-outline-batch-generation.md](ppt-outline-batch-generation.md) —— PPT大纲生图与幻灯片批量排版 Skill
 14. [audio-multimedia-generation-playback.md](audio-multimedia-generation-playback.md) —— 音频多媒体生成与播放器并发控制 Skill
 15. [smart-cdn-offline-fallback.md](smart-cdn-offline-fallback.md) —— 智能 CDN 优先加载与离线兜底 SW 路由 Skill
+16. [browser-bridge-automation.md](browser-bridge-automation.md) —— Browser Bridge 外部网页控制 Skill
 
 ## ⚖️ 设计准则
 - 所有技能设计均要求**工具优先，不模拟 UI**。
