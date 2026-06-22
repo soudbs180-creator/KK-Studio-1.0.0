@@ -39,6 +39,15 @@ test('工具注册表：已注册工具清单检查', () => {
   const browserPublishTool = toolRegistryInstance.getTool('browser.publishDraft');
   assert.ok(browserPublishTool);
   assert.equal(browserPublishTool.permission, 'confirm');
+  const browserInspectTool = toolRegistryInstance.getTool('browser.inspectPage');
+  assert.ok(browserInspectTool);
+  assert.equal(browserInspectTool.permission, 'confirm');
+  const browserDesktopTool = toolRegistryInstance.getTool('browser.openDesktopProject');
+  assert.ok(browserDesktopTool);
+  assert.equal(browserDesktopTool.permission, 'confirm');
+  const browserLocalLlmTool = toolRegistryInstance.getTool('browser.checkLocalLlm');
+  assert.ok(browserLocalLlmTool);
+  assert.equal(browserLocalLlmTool.permission, 'safe');
   const browserWriteBackTool = toolRegistryInstance.getTool('browser.writeBackDom');
   assert.ok(browserWriteBackTool);
   assert.equal(browserWriteBackTool.permission, 'dangerous');
@@ -247,6 +256,45 @@ test('ToolRegistry: canvas.arrangeNodes supports targeted compact node layout', 
   assert.equal(arrangeAllCalled, false);
   assert.equal(updatePayload.promptNodes.length, 1);
   assert.equal(updatePayload.imageNodes.length, 1);
+});
+
+test('ToolRegistry: canvas.createPromptCards can attach Browser Assistant image results to prompt cards', async () => {
+  const promptNodes: any[] = [];
+  const imageNodes: any[] = [];
+
+  await toolRegistryInstance.execute('canvas.createPromptCards', {
+    prompts: ['browser assistant product poster'],
+    imageUrl: 'https://assets.example.com/poster.png',
+    model: 'browser-model',
+    aspectRatio: '4:5'
+  }, {
+    activeCanvas: {
+      id: 'canvas-browser',
+      promptNodes: [],
+      imageNodes: [],
+      audioNodes: []
+    },
+    addPromptNodes: async (nodes: any[]) => {
+      promptNodes.push(...nodes);
+    },
+    addImageNodes: async (nodes: any[]) => {
+      imageNodes.push(...nodes);
+    },
+    getNextCardPosition: () => ({ x: 120, y: 240 }),
+    notify: {
+      success: () => {}
+    }
+  });
+
+  assert.equal(promptNodes.length, 1);
+  assert.equal(imageNodes.length, 1);
+  assert.equal(promptNodes[0].childImageIds[0], imageNodes[0].id);
+  assert.equal(imageNodes[0].parentPromptId, promptNodes[0].id);
+  assert.equal(imageNodes[0].url, 'https://assets.example.com/poster.png');
+  assert.equal(imageNodes[0].prompt, 'browser assistant product poster');
+  assert.equal(imageNodes[0].model, 'browser-model');
+  assert.equal(imageNodes[0].aspectRatio, '4:5');
+  assert.equal(imageNodes[0].canvasId, 'canvas-browser');
 });
 
 test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job', async () => {

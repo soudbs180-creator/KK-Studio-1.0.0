@@ -15,6 +15,9 @@ const {
   extractProduct,
   generateExternal,
   publishDraft,
+  inspectPage,
+  openDesktopProject,
+  checkLocalLlm,
   writeBackDom
 } = BROWSER_ACTIONS;
 
@@ -139,6 +142,98 @@ export const browserTools: AgentToolDefinition[] = [
           publishMode: 'draft_only'
         },
         requiresUserGesture: publishDraft.requiresUserGesture
+      });
+
+      return browserBridgeAdapter.execute(command, {
+        client: getBridgeClient(ctx),
+        snapshot: getBridgeSnapshot(ctx)
+      });
+    }
+  },
+  {
+    name: inspectPage.toolName,
+    description: 'Capture the active external browser viewport and return a sanitized visual/layout/OCR summary through Browser Bridge.',
+    permission: inspectPage.permission,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string' },
+        includePalette: { type: 'boolean' },
+        includeOcr: { type: 'boolean' },
+        includeLayout: { type: 'boolean' }
+      }
+    },
+    handler: async (input: { target?: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean }, ctx) => {
+      const command = createBrowserBridgeCommand({
+        kind: inspectPage.commandKind,
+        target: input.target || 'active_tab',
+        payload: {
+          includePalette: input.includePalette ?? true,
+          includeOcr: input.includeOcr ?? true,
+          includeLayout: input.includeLayout ?? true,
+          source: 'browser-assistant-screen-inspect'
+        },
+        requiresUserGesture: inspectPage.requiresUserGesture
+      });
+
+      return browserBridgeAdapter.execute(command, {
+        client: getBridgeClient(ctx),
+        snapshot: getBridgeSnapshot(ctx)
+      });
+    }
+  },
+  {
+    name: openDesktopProject.toolName,
+    description: 'Open the current KK Studio project in a connected desktop IDE through Browser Bridge without exposing a full local path.',
+    permission: openDesktopProject.permission,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ide: { type: 'string', enum: ['cursor', 'trae', 'vscode'] },
+        projectHint: { type: 'string' }
+      }
+    },
+    handler: async (input: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string }, ctx) => {
+      const command = createBrowserBridgeCommand({
+        kind: openDesktopProject.commandKind,
+        target: input.ide || 'cursor',
+        payload: {
+          ide: input.ide || 'cursor',
+          projectHint: input.projectHint || 'current_workspace',
+          source: 'browser-assistant-desktop-adapter'
+        },
+        requiresUserGesture: openDesktopProject.requiresUserGesture
+      });
+
+      return browserBridgeAdapter.execute(command, {
+        client: getBridgeClient(ctx),
+        snapshot: getBridgeSnapshot(ctx)
+      });
+    }
+  },
+  {
+    name: checkLocalLlm.toolName,
+    description: 'Ask Browser Bridge to diagnose the local LLM gateway status and active model without direct browser-side probing.',
+    permission: checkLocalLlm.permission,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        provider: { type: 'string' },
+        endpoint: { type: 'string' },
+        model: { type: 'string' }
+      }
+    },
+    handler: async (input: { provider?: string; endpoint?: string; model?: string }, ctx) => {
+      const command = createBrowserBridgeCommand({
+        kind: checkLocalLlm.commandKind,
+        target: 'local_llm_gateway',
+        payload: {
+          provider: input.provider || 'ollama',
+          endpoint: input.endpoint,
+          model: input.model,
+          source: 'browser-assistant-local-llm'
+        },
+        requiresUserGesture: checkLocalLlm.requiresUserGesture
       });
 
       return browserBridgeAdapter.execute(command, {

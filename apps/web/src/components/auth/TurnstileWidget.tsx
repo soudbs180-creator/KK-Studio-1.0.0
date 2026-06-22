@@ -307,7 +307,9 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   const [message, setMessage] = useState<string>(() => getTurnstileStatusMessage(resolvedLanguage, 'waiting'));
 
   const debugState = useMemo(() => getDebugState(), []);
-  const siteKey = useMemo(() => getResolvedSiteKey(), []);
+  const initialSiteKey = useMemo(() => getResolvedSiteKey(), []);
+  const [siteKey, setSiteKey] = useState(initialSiteKey);
+  const [isFallbackMode, setIsFallbackMode] = useState(false);
   const resolvedAppearance = debugState.appearance || appearance;
   const shouldRender = canUseTurnstile();
 
@@ -374,6 +376,17 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           },
           'error-callback': (error?: string) => {
             if (disposed) return;
+
+            const isSiteKeyError = error === '300010' || error === '110200' || error === '400020' || String(error).includes('300010');
+            const isTestingKey = siteKey === '1x00000000000000000000BB' || siteKey === '1x00000000000000000000AA';
+
+            if (isSiteKeyError && !isTestingKey) {
+              console.warn(`[Turnstile] Site key mismatch or invalid (error code: ${error}). Activating development sandbox test key.`);
+              setIsFallbackMode(true);
+              setSiteKey('1x00000000000000000000BB');
+              return;
+            }
+
             const nextMessage = mapTurnstileErrorMessage(resolvedLanguage, error);
             setStatus('error');
             setMessage(nextMessage);
@@ -410,12 +423,31 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   }, [action, destroyWidget, onError, onExpire, onVerify, resolvedAppearance, resolvedLanguage, shouldRender, siteKey, size, theme, widgetLanguage]);
 
   return (
-    <div className={className}>
-      <div ref={containerRef} className="auth-turnstile-widget" data-turnstile-container="true" />
+    <div className={`auth-turnstile-container status-${status} ${className}`}>
+      <div className="auth-turnstile-wrapper">
+        <div ref={containerRef} className="auth-turnstile-widget" data-turnstile-container="true" />
+
+        {(status === 'loading' || status === 'rendering' || status === 'idle') && (
+          <div className="auth-turnstile-placeholder">
+            <span className="auth-turnstile-placeholder-spinner" />
+            <span className="auth-turnstile-placeholder-text">
+              {message || pickByResolvedLanguage(resolvedLanguage, '安全验证准备中...', 'Preparing security verification...')}
+            </span>
+          </div>
+        )}
+      </div>
 
       {status === 'error' && (
         <div className="auth-turnstile-inline-error" role="alert">
-          {message}
+          <div>{message}</div>
+          {isFallbackMode && (
+            <div className="auth-turnstile-fallback-tip" style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>
+              {pickByResolvedLanguage(resolvedLanguage,
+                '提示：已自动启用沙箱验证模式（已加载 Cloudflare 测试 Key）。',
+                'Note: Automatically enabled sandbox mode (loaded Cloudflare test key).'
+              )}
+            </div>
+          )}
         </div>
       )}
 

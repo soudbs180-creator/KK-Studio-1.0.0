@@ -7,6 +7,9 @@ export type BrowserToolName =
   | 'browser.extractProduct'
   | 'browser.generateExternal'
   | 'browser.publishDraft'
+  | 'browser.inspectPage'
+  | 'browser.openDesktopProject'
+  | 'browser.checkLocalLlm'
   | 'browser.writeBackDom';
 
 export interface BrowserActionDefinition {
@@ -59,6 +62,30 @@ export const BROWSER_ACTIONS = {
     label: '保存外部社媒草稿',
     requiresUserGesture: true
   },
+  inspectPage: {
+    key: 'inspectPage',
+    toolName: 'browser.inspectPage',
+    commandKind: 'inspect_page',
+    permission: 'confirm',
+    label: 'Inspect external browser viewport and sanitized DOM summary',
+    requiresUserGesture: true
+  },
+  openDesktopProject: {
+    key: 'openDesktopProject',
+    toolName: 'browser.openDesktopProject',
+    commandKind: 'open_desktop_project',
+    permission: 'confirm',
+    label: 'Open the current project in a connected desktop IDE through Browser Bridge',
+    requiresUserGesture: true
+  },
+  checkLocalLlm: {
+    key: 'checkLocalLlm',
+    toolName: 'browser.checkLocalLlm',
+    commandKind: 'check_local_llm',
+    permission: 'safe',
+    label: 'Check the local LLM gateway through Browser Bridge without direct browser probing',
+    requiresUserGesture: true
+  },
   writeBackDom: {
     key: 'writeBackDom',
     toolName: 'browser.writeBackDom',
@@ -83,7 +110,7 @@ export type BrowserLocalAgentToolName = 'canvas.createPromptCards' | 'assets.zip
 
 export interface BrowserLocalActionDefinition {
   key: string;
-  actionName: string;
+  actionName: `browser.local.${string}`;
   agentToolName?: BrowserLocalAgentToolName;
   label: string;
   requiresUserGesture: boolean;
@@ -92,43 +119,43 @@ export interface BrowserLocalActionDefinition {
 export const BROWSER_LOCAL_ACTIONS = {
   importProductToCanvas: {
     key: 'importProductToCanvas',
-    actionName: 'import-product-cards',
+    actionName: 'browser.local.importProductToCanvas',
     agentToolName: 'canvas.createPromptCards',
     label: 'Import extracted product into the canvas',
     requiresUserGesture: true
   },
   createCanvasPromptCard: {
     key: 'createCanvasPromptCard',
-    actionName: 'import-product-cards',
+    actionName: 'browser.local.createCanvasPromptCard',
     agentToolName: 'canvas.createPromptCards',
     label: 'Create canvas prompt cards from Browser Assistant results',
     requiresUserGesture: true
   },
   zipOriginals: {
     key: 'zipOriginals',
-    actionName: 'zip-originals',
+    actionName: 'browser.local.zipOriginals',
     agentToolName: 'assets.zipOriginals',
     label: 'Package original assets as ZIP',
     requiresUserGesture: true
   },
   locateZippedFile: {
     key: 'locateZippedFile',
-    actionName: 'locate-zipped-file',
+    actionName: 'browser.local.locateZippedFile',
     agentToolName: undefined,
     label: 'Locate the exported ZIP file',
     requiresUserGesture: true
   },
   runPipeline: {
     key: 'runPipeline',
-    actionName: 'run-pipeline',
+    actionName: 'browser.local.runPipeline',
     agentToolName: undefined,
     label: 'Run Browser Assistant product pipeline',
     requiresUserGesture: true
   },
   importClipboardPayload: {
     key: 'importClipboardPayload',
-    actionName: 'import-clipboard',
-    agentToolName: undefined,
+    actionName: 'browser.local.importClipboardPayload',
+    agentToolName: 'canvas.createPromptCards',
     label: 'Import sensed clipboard payload into the canvas',
     requiresUserGesture: true
   }

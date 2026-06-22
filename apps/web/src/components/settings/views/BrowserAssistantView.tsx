@@ -39,9 +39,10 @@ import {
   createBrowserBridgeSetupRequiredResult,
   type BrowserBridgeCommand,
   type BrowserBridgeResult,
+  type BrowserBridgeStatusSnapshot,
 } from '../../../features/ai-assistant-runtime/browser/browserBridge';
 import { BROWSER_ACTIONS, BROWSER_LOCAL_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
-import { agentRuntimeInstance } from '../../../features/ai-assistant-runtime';
+import { agentRuntimeInstance, toolRegistryInstance } from '../../../features/ai-assistant-runtime';
 import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 
 const SETUP_HINT = '请先启动本地守护进程并连接 Chrome Bridge 插件，然后回到浏览器助手重试。';
@@ -75,158 +76,149 @@ interface AccountSession {
   priority: 'high' | 'normal' | 'low';
 }
 
+type BrowserLoginStatus = ImageGenPlatform['status'];
+
+const normalizeBrowserLoginStatus = (status?: string): BrowserLoginStatus => {
+  const normalized = String(status || '').toLowerCase();
+  if (['logged_in', 'connected', 'ready', 'authenticated', 'active'].includes(normalized)) {
+    return 'logged_in';
+  }
+  if (['logged_out', 'disconnected', 'unauthenticated', 'expired', 'missing'].includes(normalized)) {
+    return 'logged_out';
+  }
+  if (['checking', 'connecting', 'pending'].includes(normalized)) {
+    return 'checking';
+  }
+  return 'unknown';
+};
+
 // -------------------------------------------------------------
 // 生产级 WebSocket 控制器 (自适应 HTTPS/WSS 以及指数避退重连)
 // -------------------------------------------------------------
-class RobustWebSocket {
-  private ws: WebSocket | null = null;
-  private url: string;
-  private autoReconnect: boolean = true;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private reconnectDelay: number = 1000;
-  private onMessageCallback: (msg: any) => void;
-  private onStatusCallback: (status: ConnectionStatus) => void;
-  private reconnectTimer: any = null;
-
-  constructor(
-    url: string,
-    onMessage: (msg: any) => void,
-    onStatus: (status: ConnectionStatus) => void
-  ) {
-    this.url = url;
-    this.onMessageCallback = onMessage;
-    this.onStatusCallback = onStatus;
-  }
-
-  connect() {
-    if (this.ws) {
-      this.disconnect();
-    }
-    this.onStatusCallback('connecting');
-    try {
-      this.ws = new WebSocket(this.url);
-      
-      this.ws.onopen = () => {
-        this.reconnectAttempts = 0;
-        this.reconnectDelay = 1000;
-        this.onStatusCallback('connected');
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.onMessageCallback(data);
-        } catch {
-          this.onMessageCallback(event.data);
-        }
-      };
-
-      this.ws.onclose = () => {
-        this.onStatusCallback('disconnected');
-        if (this.autoReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          const backoff = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
-          this.reconnectTimer = window.setTimeout(() => this.connect(), backoff);
-        }
-      };
-
-      this.ws.onerror = () => {
-        this.onStatusCallback('error');
-      };
-    } catch {
-      this.onStatusCallback('error');
-    }
-  }
-
-  disconnect() {
-    this.autoReconnect = false;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      try {
-        this.ws.close();
-      } catch {
-        // 忽略关闭异常
-      }
-      this.ws = null;
-    }
-  }
-
-  send(data: any): boolean {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(typeof data === 'string' ? data : JSON.stringify(data));
-      return true;
-    }
-    return false;
-  }
-}
-
 // -------------------------------------------------------------
 // Web Worker 核心计算解耦代码 (WASM抠图/OCR计算/多账号轮询分发仿真)
 // -------------------------------------------------------------
 const workerCode = `
-  self.onmessage = function(e) {
+  self.onmessage = async function(e) {
     const { task, data } = e.data;
     if (task === 'clip') {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 25;
-        self.postMessage({ type: 'progress', data: progress });
-        if (progress >= 100) {
-          clearInterval(interval);
-          self.postMessage({ 
-            type: 'done', 
-            data: { 
-              success: true, 
-              url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60' 
-            } 
-          });
-        }
-      }, 300);
-    } else if (task === 'pipeline') {
-      const { selectedSessions } = data || { selectedSessions: ['leo_geek_alpha'] };
-      const steps = [
-        { progress: 20, log: '【抓取线程】正在提取天猫详情页 DOM 并清洗无效标签页...' },
-        { progress: 40, log: '【抠图线程】加载 BGE-Remove-Background WASM。处理遮罩图像分割...' },
-        { progress: 60, log: '【生图调度】网页直通网页多实例管理器调起！准备并发执行...' },
-        { progress: 80, log: '【LLM线程】本地大模型 Qwen 开始执行上下文润色，提取耳机高保真属性...' },
-        { progress: 100, log: '【分发线程】通过 Native Bridge 发送登录凭证，正在填入小红书草稿...' }
-      ];
-      
-      let stepIdx = 0;
-      const pipelineInterval = setInterval(() => {
-        if (stepIdx < steps.length) {
-          const stepData = { ...steps[stepIdx] };
-          // 在调度步骤进行 Session 轮询的日志反馈
-          if (stepIdx === 2) {
-            const sessionsLog = selectedSessions.map((s: string, i: number) => 
-              \`[Round-Robin Dispatcher] 任务子包 #\${i+1} 分流分配至会话: \${s}\`
-            ).join(' | ');
-            stepData.log = \`【调度并发中心】\${sessionsLog}\`;
+      try {
+        self.postMessage({ type: 'progress', data: 15 });
+
+        let blob;
+        if (data.startsWith('data:')) {
+          const parts = data.split(',');
+          const mime = parts[0].match(/:(.*?);/)[1];
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
           }
-          self.postMessage({ 
-            type: 'pipeline_step', 
-            data: stepData 
-          });
-          stepIdx++;
+          blob = new Blob([u8arr], { type: mime });
         } else {
-          clearInterval(pipelineInterval);
-          // 产生随机指定的生成 Session
-          const finalSess = selectedSessions[Math.floor(Math.random() * selectedSessions.length)] || 'leo_geek_alpha';
-          self.postMessage({ 
-            type: 'pipeline_done', 
+          const response = await fetch(data);
+          blob = await response.blob();
+        }
+
+        self.postMessage({ type: 'progress', data: 45 });
+
+        const bitmap = await createImageBitmap(blob);
+        self.postMessage({ type: 'progress', data: 65 });
+
+        const width = bitmap.width;
+        const height = bitmap.height;
+
+        const canvas = new OffscreenCanvas(width, height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('无法在 Web Worker 中获取 OffscreenCanvas 2D 上下文');
+        }
+        ctx.drawImage(bitmap, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const pixels = imageData.data;
+
+        // 采样四个角的背景色以求平均基准背景色，增加对渐变背景的容忍度
+        const corners = [
+          [0, 0],
+          [width - 1, 0],
+          [0, height - 1],
+          [width - 1, height - 1]
+        ];
+        let bgR = 0, bgG = 0, bgB = 0, bgA = 0;
+        for (const [cx, cy] of corners) {
+          const idx = (cy * width + cx) * 4;
+          bgR += pixels[idx];
+          bgG += pixels[idx + 1];
+          bgB += pixels[idx + 2];
+          bgA += pixels[idx + 3];
+        }
+        bgR /= 4;
+        bgG /= 4;
+        bgB /= 4;
+        bgA /= 4;
+
+        // 真正的透明度抠图（Matting）算法：
+        // 在 minDist 内的完全透明，在 maxDist 外的完全保留，中间平滑过渡，消除边缘硬齿
+        const minDist = 20;
+        const maxDist = 70;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const a = pixels[i + 3];
+
+          if (a === 0) continue;
+
+          // 计算像素与平均背景色的 Euclidean 距离
+          const dist = Math.sqrt(
+            Math.pow(r - bgR, 2) +
+            Math.pow(g - bgG, 2) +
+            Math.pow(b - bgB, 2)
+          );
+
+          if (dist < minDist) {
+            pixels[i + 3] = 0;
+          } else if (dist < maxDist) {
+            const factor = (dist - minDist) / (maxDist - minDist);
+            pixels[i + 3] = Math.min(a, Math.floor(a * factor));
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        self.postMessage({ type: 'progress', data: 85 });
+
+        const clippedBlob = await canvas.convertToBlob({ type: 'image/png' });
+
+        const reader = new FileReader();
+        reader.onloadend = function() {
+          self.postMessage({ type: 'progress', data: 100 });
+          self.postMessage({
+            type: 'done',
             data: {
-              productTitle: '智能无线降噪耳机 (WASM透明背景版)',
-              finalImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-              generatedBySession: finalSess,
-              postText: '💥极客首选！这只科技感十足的智能降噪耳机，今日狂飙特惠！磨砂钛合金质感，极致降噪，戴上它，世界只剩下你和音乐。快来围观我的 KK Studio AI 自动海报创作吧！🎨✨ #数码好物 #智能耳机 #AI海报设计 #KKStudio'
+              success: true,
+              mode: 'wasm-transparent',
+              url: reader.result
             }
           });
-        }
-      }, 1500);
+        };
+        reader.readAsDataURL(clippedBlob);
+
+      } catch (err) {
+        console.warn('WASM 抠图失败 (已降级原图):', err);
+        self.postMessage({ type: 'progress', data: 100 });
+        self.postMessage({
+          type: 'done',
+          data: {
+            success: false,
+            mode: 'passthrough',
+            url: data,
+            error: err.message || String(err)
+          }
+        });
+      }
     }
   };
 `;
@@ -237,16 +229,6 @@ export const BrowserAssistantView: React.FC = () => {
   const [extensionStatus, setExtensionStatus] = useState<ConnectionStatus>('disconnected');
   const [daemonLatency, setDaemonLatency] = useState<number | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
-  
-  // 开发演示数据 (Dev-only Fallback) 开关
-  const [devFallback, setDevFallback] = useState<boolean>(() => {
-    return localStorage.getItem('kk_browser_dev_fallback') === 'true';
-  });
-
-  // 同步 devFallback 到 localStorage
-  useEffect(() => {
-    localStorage.setItem('kk_browser_dev_fallback', String(devFallback));
-  }, [devFallback]);
   
   // 演示区 Tab
   const [playgroundTab, setPlaygroundTab] = useState<'extract' | 'generate' | 'pipeline'>('extract');
@@ -378,90 +360,78 @@ export const BrowserAssistantView: React.FC = () => {
   const [zippedFileLoc, setZippedFileLoc] = useState<string | null>(null);
 
   // 桌面通道测试
-  const handleTestIde = () => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.error('桌面调起失败', '请先启动本地守护进程并确保插件已连通。提示：' + SETUP_HINT);
-      setDesktopStatus('error');
-      return;
-    }
-
+  const handleTestIde = async () => {
     setTestingDesktop(true);
     setDesktopStatus('connecting');
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    notify.success(
-      isFallback ? '[Dev Fallback] 桌面通道就绪' : '桌面通道就绪',
-      `正在通过本地守护进程连接您的桌面开发环境并尝试挂载文件...`
-    );
-    window.setTimeout(() => {
+
+    try {
+      const result = await dispatchBrowserCommand({
+        kind: BROWSER_ACTIONS.openDesktopProject.commandKind,
+        target: selectedIde,
+        payload: {
+          ide: selectedIde,
+          projectHint: 'current_workspace',
+          source: 'browser-assistant-desktop-adapter'
+        },
+        requiresUserGesture: BROWSER_ACTIONS.openDesktopProject.requiresUserGesture
+      });
+
       if (!isMountedRef.current) return;
-      setDesktopStatus('connected');
-      setTestingDesktop(false);
-      notify.success(
-        isFallback ? '[Dev Fallback] 桌面调起成功' : '桌面调起成功', 
-        `已成功在本地调起 ${selectedIde === 'cursor' ? 'Cursor IDE' : selectedIde === 'trae' ? 'Trae IDE' : 'VS Code'} 并定位当前项目工程！`
-      );
-    }, 1200);
+
+      if (result.status === 'setup_required') {
+        setDesktopStatus('error');
+        notify.warning('Browser Bridge 未连接', result.summary || SETUP_HINT);
+        return;
+      }
+
+      if (result.status === 'queued') {
+        setDesktopStatus('connecting');
+        notify.info('桌面通道指令已下发', result.summary);
+        return;
+      }
+
+      if (result.status === 'success') {
+        setDesktopStatus('connected');
+        notify.success(
+          '桌面通道已确认',
+          result.summary || `Browser Bridge 已确认 ${selectedIde === 'cursor' ? 'Cursor IDE' : selectedIde === 'trae' ? 'Trae IDE' : 'VS Code'} 调起结果。`
+        );
+        return;
+      }
+
+      setDesktopStatus('error');
+      notify.error('桌面调起失败', result.error || result.summary);
+    } catch (error: any) {
+      if (!isMountedRef.current) return;
+      setDesktopStatus('error');
+      notify.error('桌面调起失败', error?.message || 'Browser Bridge 桌面通道执行失败');
+    } finally {
+      if (isMountedRef.current) {
+        setTestingDesktop(false);
+      }
+    }
   };
 
   // 打包原图下载适配器 (遵循 AGENTS.md 规范与 ZIP manifest 契约)
   const handleZipOriginals = () => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.error('打包原图下载失败', '本地守护进程未连接。提示：' + SETUP_HINT);
-      return;
-    }
-
-    if (daemonStatus === 'connected' && !devFallback) {
-      window.dispatchEvent(new CustomEvent('takeover-zip-originals', {
-        detail: {
-          scope: 'all_canvas_outputs'
-        }
-      }));
-      return;
-    }
-
-    setZipLoading(true);
+    setZipLoading(false);
     setZipProgress(0);
     setZippedFileLoc(null);
-    const isFallback = true;
-    
-    const steps = [
-      '[Dev Fallback] 【AGENTS.md 规范检测】正在扫描选中卡片，进行原图优先级解析...',
-      '[Dev Fallback] 【原图解析成功】已匹配原图 URL (originalUrl)，正在通过 Daemon 代理抓取高清 CDN 原始图像...',
-      '[Dev Fallback] 【Manifest生成】正在根据项目规范自动生成 ZIP 内置的元数据文件 manifest.json...',
-      '[Dev Fallback] 【打包进行中】正在调用本地 WASM zip 服务进行文件压缩编码...',
-      '[Dev Fallback] 【下载就绪】打包压缩完成！正在将资产包写入本地下载目录...'
-    ];
-
-    setZipStep(steps[0]!);
-
-    let currentStep = 0;
-    const interval = window.setInterval(() => {
-      if (!isMountedRef.current) {
-        window.clearInterval(interval);
-        return;
+    setZipStep('正在交给 KK Studio 资源工具打包原图...');
+    window.dispatchEvent(new CustomEvent('takeover-zip-originals', {
+      detail: {
+        scope: 'all_canvas_outputs'
       }
-      currentStep++;
-      if (currentStep < steps.length) {
-        setZipStep(steps[currentStep]!);
-        setZipProgress(currentStep * 20);
-      } else {
-        window.clearInterval(interval);
-        setZipProgress(100);
-        setZipLoading(false);
-        setZippedFileLoc('C:/Users/Administrator/Downloads/kk_studio_assets_manifest.zip');
-        notify.success(
-          '[Dev Fallback] 打包原图下载成功',
-          '已成功导出 kk_studio_assets_manifest.zip！包内已严格包含符合 AGENTS.md 规范的 manifest.json 属性索引。'
-        );
-      }
-    }, 800);
+    }));
   };
 
   const handleLocateZippedFile = () => {
-    notify.success(
-      '定位成功',
-      '已通过 Daemon 自动唤起 Windows 资源管理器 (Explorer) 并高亮定位至: C:/Users/Administrator/Downloads/kk_studio_assets_manifest.zip'
-    );
+    if (zippedFileLoc) {
+      notify.info('ZIP 已准备就绪', '请在浏览器下载记录或系统下载目录中查看刚刚导出的 ZIP 文件。');
+      return;
+    }
+
+    notify.warning('暂无可定位文件', '请先通过 KK Studio 资源工具完成一次真实 ZIP 打包下载。');
   };
 
 
@@ -512,12 +482,20 @@ export const BrowserAssistantView: React.FC = () => {
   ]);
 
   // 引用引用区：防止垃圾回收并用于卸载清理销毁
-  const wsClientRef = useRef<RobustWebSocket | null>(null);
+  const [activePipelineCmdId, setActivePipelineCmdId] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const isMountedRef = useRef<boolean>(true);
   
   // 采用 Ref 缓存的日志缓冲池，限制最大存储长度，避免引发大规模重排与内存溢出
   const logsBufferRef = useRef<string[]>([]);
+
+  const appendPipelineLog = (log: string) => {
+    logsBufferRef.current.push(log);
+    if (logsBufferRef.current.length > 200) {
+      logsBufferRef.current.shift();
+    }
+    setPipelineLogs([...logsBufferRef.current]);
+  };
 
   const getBrowserBridgeSnapshot = () => ({
     daemonStatus,
@@ -534,30 +512,59 @@ export const BrowserAssistantView: React.FC = () => {
     input: Parameters<typeof createBrowserBridgeCommand>[0]
   ): Promise<BrowserBridgeResult> => {
     const command = createBrowserBridgeCommand(input);
+    if (input.kind === BROWSER_ACTIONS.generateExternal.commandKind) {
+      setActivePipelineCmdId(command.id);
+    }
     return browserBridgeAdapter.execute(command, {
-      snapshot: getBrowserBridgeSnapshot(),
-      transport: async (queuedCommand: BrowserBridgeCommand) => {
-        const sent = wsClientRef.current?.send({
-          type: 'browser_bridge_command',
-          command: queuedCommand
-        });
-
-        if (!sent) {
-          return createBrowserBridgeSetupRequiredResult(queuedCommand.id);
-        }
-
-        return {
-          id: queuedCommand.id,
-          status: 'queued',
-          summary: 'Browser Bridge 指令已下发，等待本地守护进程或 Chrome 插件回传结果。',
-          audit: {
-            redacted: true,
-            commandKind: queuedCommand.kind,
-            targetHost: queuedCommand.target
-          }
-        };
-      }
+      snapshot: getBrowserBridgeSnapshot()
     });
+  };
+
+  const applyBrowserStatusSnapshot = (status: BrowserBridgeStatusSnapshot) => {
+    setDaemonStatus(status.daemonStatus);
+    setExtensionStatus(status.extensionStatus);
+    setDaemonLatency(status.latencyMs ?? null);
+
+    const platformById = new Map(status.platforms.map((platform) => [platform.id, platform]));
+    const sessionById = new Map(status.sessions.map((session) => [session.id, session]));
+    const socialById = new Map(status.socialChannels.map((channel) => [channel.id, channel]));
+
+    setPlatforms((prev) =>
+      prev.map((platform) => {
+        const snapshot = platformById.get(platform.id);
+        if (!snapshot) return platform;
+        return {
+          ...platform,
+          enabled: typeof snapshot.enabled === 'boolean' ? snapshot.enabled : platform.enabled,
+          status: normalizeBrowserLoginStatus(snapshot.status)
+        };
+      })
+    );
+
+    setSessions((prev) =>
+      prev.map((session) => {
+        const snapshot = sessionById.get(session.id);
+        if (!snapshot) return session;
+        return {
+          ...session,
+          enabled: typeof snapshot.enabled === 'boolean' ? snapshot.enabled : session.enabled,
+          username: snapshot.username || session.username,
+          status: normalizeBrowserLoginStatus(snapshot.status)
+        };
+      })
+    );
+
+    setSocialChannels((prev) =>
+      prev.map((channel) => {
+        const snapshot = socialById.get(channel.id);
+        if (!snapshot) return channel;
+        return {
+          ...channel,
+          enabled: typeof snapshot.enabled === 'boolean' ? snapshot.enabled : channel.enabled,
+          status: normalizeBrowserLoginStatus(snapshot.status)
+        };
+      })
+    );
   };
 
   const createBrowserAssistantPreviewContext = (): SanitizedProjectContext => ({
@@ -590,14 +597,14 @@ export const BrowserAssistantView: React.FC = () => {
   useEffect(() => {
     const syncStatus = async () => {
       try {
-        const status = await browserBridgeAdapter.getStatus();
+        const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
+          browserAssistantSnapshot: getBrowserBridgeSnapshot()
+        }) as BrowserBridgeStatusSnapshot;
         if (isMountedRef.current) {
-          setDaemonStatus(status.daemonStatus);
-          setExtensionStatus(status.extensionStatus);
-          setDaemonLatency(status.latencyMs ?? null);
+          applyBrowserStatusSnapshot(status);
         }
       } catch (err) {
-        console.warn('Failed to sync status from browserBridgeAdapter', err);
+        console.warn('Failed to sync status from browser.getStatus', err);
       }
     };
     syncStatus();
@@ -605,52 +612,94 @@ export const BrowserAssistantView: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // 1. 初始化 WebSocket 和 Web Worker，组件卸载时 100% 回收资源
+  // 1. 初始化 Web Worker，组件卸载时 100% 回收资源
   useEffect(() => {
     isMountedRef.current = true;
+    let workerUrl: string | null = null;
 
     // 创建 Web Worker 沙盒
     try {
       const blob = new Blob([workerCode], { type: 'application/javascript' });
-      workerRef.current = new Worker(URL.createObjectURL(blob));
+      workerUrl = URL.createObjectURL(blob);
+      workerRef.current = new Worker(workerUrl);
     } catch (err) {
       console.error('Failed to initialize inline calculation worker', err);
     }
 
-    // 初始化生产级 WebSocket 状态通道
-    const wsClient = new RobustWebSocket(
-      'ws://localhost:9099',
-      (msg) => {
-        console.log('[Native WS Message]', msg);
-      },
-      (status) => {
-        if (isMountedRef.current) {
-          setDaemonStatus(status);
-          if (status === 'connected') {
-            setExtensionStatus('connected');
-            setDaemonLatency(8); // 8ms latency in live test
-          } else {
-            setExtensionStatus('disconnected');
-            setDaemonLatency(null);
-          }
-        }
-      }
-    );
-
-    wsClientRef.current = wsClient;
-    wsClient.connect();
-
     return () => {
       isMountedRef.current = false;
-      if (wsClientRef.current) {
-        wsClientRef.current.disconnect();
-      }
       if (workerRef.current) {
         workerRef.current.terminate();
         workerRef.current = null;
       }
+      if (workerUrl) {
+        URL.revokeObjectURL(workerUrl);
+      }
     };
   }, []);
+
+  // 1b. 监听浏览器桥全局异步消息以打通回调闭环
+  useEffect(() => {
+    const handleBridgeMessage = (e: Event) => {
+      const msg = (e as CustomEvent).detail;
+      if (!msg || typeof msg !== 'object') return;
+      const commandId = msg.commandId || msg.id;
+
+      if (commandId && activePipelineCmdId === commandId) {
+        if (msg.status === 'queued') {
+          setPipelineStep(3);
+          setPipelineStatusText(msg.summary || '排队中...');
+          appendPipelineLog(`[queued] ${msg.summary || '指令已加入队列。'}`);
+        } else if (msg.status === 'success' && msg.data) {
+          const data = msg.data;
+          const finalImageUrl = String(data.finalImageUrl || data.imageUrl || data.resultUrl || '');
+          const productTitle = String(data.productTitle || data.title || extractedData?.title || 'Browser Bridge pipeline result');
+          const postText = String(
+            data.postText ||
+            data.caption ||
+            data.body ||
+            data.summary ||
+            'Browser Bridge 已返回外部网页生成结果。'
+          );
+          
+          const activeSessions = sessions.filter(
+            (s) => s.platformId === genPlatform && s.enabled && selectedSessionsForGen.includes(s.id)
+          );
+          const generatedBySession = routingMode === 'proxy'
+            ? String(data.generatedBySession || data.sessionUsername || activeSessions[0]?.username || '')
+            : '';
+
+          setPipelineStep(5);
+          setPipelineStatusText('Browser Bridge 已回传流水线结果。');
+          appendPipelineLog('[success] Browser Bridge 已确认外部网页生成流水线结果。');
+          setPipelineRunning(false);
+
+          if (finalImageUrl) {
+            setPipelineCompletedData({
+              productTitle,
+              finalImageUrl,
+              generatedBySession: generatedBySession || undefined,
+              postText
+            });
+            notify.success('流水线结果已回传', '可以同步到画布、保存草稿或打包原图。');
+          } else {
+            notify.warning('流水线已回传', 'Browser Bridge 未返回可同步到画布的图片 URL。');
+          }
+          setActivePipelineCmdId(null);
+        } else if (msg.status === 'failed') {
+          setPipelineStep(1);
+          setPipelineStatusText(msg.error || msg.summary || '执行失败');
+          appendPipelineLog(`[failed] ${msg.error || msg.summary || '执行失败'}`);
+          setPipelineRunning(false);
+          notify.error('流水线执行失败', msg.error || msg.summary);
+          setActivePipelineCmdId(null);
+        }
+      }
+    };
+
+    window.addEventListener('browser-bridge-message', handleBridgeMessage);
+    return () => window.removeEventListener('browser-bridge-message', handleBridgeMessage);
+  }, [activePipelineCmdId, extractedData, routingMode, sessions, genPlatform, selectedSessionsForGen]);
 
   // Sessions 本地持久化同步
   useEffect(() => {
@@ -686,9 +735,7 @@ export const BrowserAssistantView: React.FC = () => {
     if (testingConnection) return;
     setTestingConnection(true);
 
-    if (wsClientRef.current) {
-      wsClientRef.current.connect();
-    }
+    // 自动重连由全局 RobustWebSocket 托管，无需在此手动连接
 
     window.setTimeout(() => {
       if (isMountedRef.current) {
@@ -705,39 +752,43 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 4. 检测外部平台登录状态 (安全脱敏校验)
-  const checkPlatformLogin = (id: string) => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
-      return;
-    }
-
+  const checkPlatformLogin = async (id: string) => {
     setPlatforms((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: 'checking' } : p))
     );
 
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    window.setTimeout(() => {
+    try {
+      const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
+        browserAssistantSnapshot: getBrowserBridgeSnapshot()
+      }) as BrowserBridgeStatusSnapshot;
       if (!isMountedRef.current) return;
-      const isLoggedIn = Math.random() > 0.2;
+      applyBrowserStatusSnapshot(status);
+      const platformSnapshot = status.platforms.find((platform) => platform.id === id);
+      const nextStatus = normalizeBrowserLoginStatus(platformSnapshot?.status);
       setPlatforms((prev) =>
         prev.map((p) =>
           p.id === id
-            ? { ...p, status: isLoggedIn ? 'logged_in' : 'logged_out' }
+            ? { ...p, status: nextStatus }
             : p
         )
       );
-      if (isLoggedIn) {
+      if (nextStatus === 'logged_in') {
         notify.success(
-          isFallback ? '[Dev Fallback] 登录状态就绪' : '登录状态就绪', 
+          '登录状态就绪',
           `${platforms.find((p) => p.id === id)?.name} 已处于已登录态`
         );
       } else {
         notify.warning(
-          isFallback ? '[Dev Fallback] 未登录' : '未登录', 
-          `未检测到 ${platforms.find((p) => p.id === id)?.name} 的登录凭证`
+          status.setupRequired ? 'Browser Bridge 未连接' : '未登录',
+          status.setupRequired ? status.setupHint : `未检测到 ${platforms.find((p) => p.id === id)?.name} 的登录凭证`
         );
       }
-    }, 1000);
+    } catch (error: any) {
+      setPlatforms((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, status: 'unknown' } : p))
+      );
+      notify.error('登录状态检查失败', error?.message || 'browser.getStatus 执行失败');
+    }
   };
 
   const togglePlatform = (id: string) => {
@@ -754,39 +805,43 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 5. 检测社交分发通道
-  const checkSocialLogin = (id: string) => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
-      return;
-    }
-
+  const checkSocialLogin = async (id: string) => {
     setSocialChannels((prev) =>
       prev.map((sc) => (sc.id === id ? { ...sc, status: 'checking' } : sc))
     );
 
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    window.setTimeout(() => {
+    try {
+      const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
+        browserAssistantSnapshot: getBrowserBridgeSnapshot()
+      }) as BrowserBridgeStatusSnapshot;
       if (!isMountedRef.current) return;
-      const isLoggedIn = Math.random() > 0.15;
+      applyBrowserStatusSnapshot(status);
+      const channelSnapshot = status.socialChannels.find((channel) => channel.id === id);
+      const nextStatus = normalizeBrowserLoginStatus(channelSnapshot?.status);
       setSocialChannels((prev) =>
         prev.map((sc) =>
           sc.id === id
-            ? { ...sc, status: isLoggedIn ? 'logged_in' : 'logged_out' }
+            ? { ...sc, status: nextStatus }
             : sc
         )
       );
-      if (isLoggedIn) {
+      if (nextStatus === 'logged_in') {
         notify.success(
-          isFallback ? '[Dev Fallback] 登录检测成功' : '登录检测成功', 
+          '登录检测成功',
           `${socialChannels.find((sc) => sc.id === id)?.name} 分发通道就绪`
         );
       } else {
         notify.warning(
-          isFallback ? '[Dev Fallback] 未登录' : '未登录', 
-          `未检测到 ${socialChannels.find((sc) => sc.id === id)?.name} 登录状态`
+          status.setupRequired ? 'Browser Bridge 未连接' : '未登录',
+          status.setupRequired ? status.setupHint : `未检测到 ${socialChannels.find((sc) => sc.id === id)?.name} 登录状态`
         );
       }
-    }, 1000);
+    } catch (error: any) {
+      setSocialChannels((prev) =>
+        prev.map((sc) => (sc.id === id ? { ...sc, status: 'unknown' } : sc))
+      );
+      notify.error('登录状态检查失败', error?.message || 'browser.getStatus 执行失败');
+    }
   };
 
   const toggleSocialChannel = (id: string) => {
@@ -824,29 +879,36 @@ export const BrowserAssistantView: React.FC = () => {
     notify.success('实例状态更新', '实例调度使能状态已成功切换');
   };
 
-  const checkSessionLogin = (id: string) => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.warning('连接未建立', '请先启动本地守护进程并确保插件已成功连通');
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: 'unknown' } : s))
-      );
-      return;
-    }
-
+  const checkSessionLogin = async (id: string) => {
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: 'checking' } : s))
     );
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    window.setTimeout(() => {
+
+    try {
+      const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
+        browserAssistantSnapshot: getBrowserBridgeSnapshot()
+      }) as BrowserBridgeStatusSnapshot;
       if (!isMountedRef.current) return;
+      applyBrowserStatusSnapshot(status);
+      const sessionSnapshot = status.sessions.find((session) => session.id === id);
+      const nextStatus = normalizeBrowserLoginStatus(sessionSnapshot?.status);
       setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: 'logged_in' } : s))
+        prev.map((s) => (s.id === id ? { ...s, status: nextStatus } : s))
       );
-      notify.success(
-        isFallback ? '[Dev Fallback] 检测成功' : '检测成功', 
-        isFallback ? '多开网页会话登录状态有效 (仿真验证)！' : '多开网页会话登录状态有效！'
+      if (nextStatus === 'logged_in') {
+        notify.success('检测成功', '多开网页会话登录状态有效！');
+      } else {
+        notify.warning(
+          status.setupRequired ? 'Browser Bridge 未连接' : '会话未登录',
+          status.setupRequired ? status.setupHint : '未检测到该多开网页会话的有效登录状态。'
+        );
+      }
+    } catch (error: any) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, status: 'unknown' } : s))
       );
-    }, 800);
+      notify.error('会话检查失败', error?.message || 'browser.getStatus 执行失败');
+    }
   };
 
   const handleSelectSessionToggle = (sessId: string) => {
@@ -942,7 +1004,7 @@ export const BrowserAssistantView: React.FC = () => {
     
     if (autoClip && workerRef.current) {
       setClippingProgress(true);
-      notify.success('启动 Wasm 抠图', '正在调用 Web Worker 后台提取图像特征边缘并擦除复杂背景...');
+      notify.info('检查 Wasm 抠图', '正在调用 Web Worker；未返回透明图时将保留原始商品主图。');
       
       // 发送抠图指令给 Worker
       workerRef.current.postMessage({ task: 'clip', data: extractedData.imageUrl });
@@ -952,7 +1014,10 @@ export const BrowserAssistantView: React.FC = () => {
         const { type, data } = e.data;
         if (type === 'done') {
           setClippingProgress(false);
-          triggerImport(data.url, true);
+          if (data.success !== true) {
+            notify.info('已保留原图', '当前 Worker 未返回透明抠图结果，已按原始商品主图同步到画布。');
+          }
+          triggerImport(data.url || extractedData.imageUrl, data.success === true);
         }
       };
     } else {
@@ -1142,48 +1207,47 @@ export const BrowserAssistantView: React.FC = () => {
     setTestingLlm(true);
     setLocalLlmStatus('connecting');
 
-    if (daemonStatus !== 'connected' && !devFallback) {
-      setLocalLlmStatus('error');
-      setTestingLlm(false);
-      notify.error('Ollama 网关测试失败', '本地守护进程未连接，无法通过守护进程代理访问本地网关。');
-      return;
-    }
-
-    if (devFallback) {
-      window.setTimeout(() => {
-        if (isMountedRef.current) {
-          setLocalLlmStatus('connected');
-          setTestingLlm(false);
-          notify.success('[Dev Fallback] Ollama 网关测试就绪', `已成功连接本地守护进程并检测到活跃模型：${localLlmModel}`);
-        }
-      }, 1200);
-      return;
-    }
-
-    let timeoutId: any = null;
     try {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${localLlmEndpoint}/api/tags`, {
-        signal: controller.signal
+      const result = await dispatchBrowserCommand({
+        kind: BROWSER_ACTIONS.checkLocalLlm.commandKind,
+        target: 'local_llm_gateway',
+        payload: {
+          provider: 'ollama',
+          endpoint: localLlmEndpoint,
+          model: localLlmModel,
+          source: 'browser-assistant-local-llm'
+        },
+        requiresUserGesture: BROWSER_ACTIONS.checkLocalLlm.requiresUserGesture
       });
 
       if (!isMountedRef.current) return;
-      if (res.ok) {
-        setLocalLlmStatus('connected');
-        notify.success('Ollama 网关测试就绪', `已成功连接本地守护进程并检测到活跃模型：${localLlmModel}`);
-      } else {
+
+      if (result.status === 'setup_required') {
         setLocalLlmStatus('error');
-        notify.error('Ollama 网关测试失败', `网关返回错误代码: ${res.status}`);
+        notify.warning('Browser Bridge 未连接', result.summary || SETUP_HINT);
+        return;
       }
+
+      if (result.status === 'queued') {
+        setLocalLlmStatus('connecting');
+        notify.info('本地 LLM 网关指令已下发', result.summary);
+        return;
+      }
+
+      if (result.status === 'success') {
+        setLocalLlmStatus('connected');
+        const activeModel = String(result.data?.activeModel || result.data?.model || localLlmModel);
+        notify.success('Ollama 网关测试就绪', `Browser Bridge 已确认本地网关可用，活跃模型：${activeModel}`);
+        return;
+      }
+
+      setLocalLlmStatus('error');
+      notify.error('Ollama 网关测试失败', result.error || result.summary);
     } catch (err: any) {
       if (!isMountedRef.current) return;
       setLocalLlmStatus('error');
-      notify.error('Ollama 网关测试失败', `无法连通 Ollama 网关: ${err?.message || String(err)}`);
+      notify.error('Ollama 网关测试失败', `Browser Bridge 本地网关诊断失败: ${err?.message || String(err)}`);
     } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       if (isMountedRef.current) {
         setTestingLlm(false);
       }
@@ -1191,164 +1255,234 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   // 11. 阶段四：智能剪贴板流入模拟
-  const handleSimulateClipboard = () => {
+  const handleSimulateClipboard = async () => {
     if (!clipboardSyncEnabled) {
       notify.warning('监听未开启', '请先开启智能剪贴板监听开关');
       return;
     }
-    setSimulatedClipboardPayload({
-      type: 'url',
-      content: 'https://detail.tmall.com/item.htm?id=6582930281&skuId=49201829',
-      showNotification: true,
-    });
-    notify.success('剪贴板捕获成功', '智能剪贴板已被注入模拟的天猫商品链接，查看 Playground 下方的悬浮提示进行导入！');
+
+    if (!navigator.clipboard?.readText) {
+      notify.warning('剪贴板不可用', '当前浏览器不支持读取文本剪贴板，请手动复制内容后重试。');
+      return;
+    }
+
+    try {
+      const content = (await navigator.clipboard.readText()).trim();
+      if (!content) {
+        notify.warning('剪贴板为空', '没有读取到可导入画布的文本内容。');
+        return;
+      }
+
+      setSimulatedClipboardPayload({
+        type: /^https?:\/\//i.test(content) ? 'url' : 'text',
+        content,
+        showNotification: true,
+      });
+      notify.info('剪贴板已读取', '可在下方提示中确认后导入为画布 Prompt 卡片。');
+    } catch (error: any) {
+      notify.error('剪贴板读取失败', error?.message || '浏览器拒绝了剪贴板读取请求。');
+    }
   };
 
   const handleImportSimulatedClipboard = () => {
     if (!simulatedClipboardPayload) return;
-    notify.success('导入成功', '智能感知器已自动解析剪贴板商品，在画布中央生成了 Prompt 节点和主图卡片。');
+    window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
+      detail: {
+        prompts: [
+          `剪贴板感知内容 (${simulatedClipboardPayload.type}): ${simulatedClipboardPayload.content}`
+        ]
+      }
+    }));
+    notify.info('已提交导入', '剪贴板内容已交给 KK Studio 画布工具创建 Prompt 卡片。');
     setSimulatedClipboardPayload(null);
   };
 
   // 12. 阶段四：模拟屏幕捕捉设计转译
-  const handleScreenInspect = () => {
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.error('屏幕感知失败', '本地守护进程未连接。提示：' + SETUP_HINT);
-      return;
-    }
+  const handleScreenInspect = async () => {
+    if (screenInspectStatus === 'capturing' || screenInspectStatus === 'parsing') return;
 
     setScreenInspectStatus('capturing');
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    notify.success(
-      isFallback ? '[Dev Fallback] 屏幕感知启动' : '屏幕感知启动', 
-      '正在通过插件捕捉活动浏览器标签页的可见视口并检测 DOM 树布局...'
-    );
-    window.setTimeout(() => {
+    setInspectData(null);
+
+    try {
+      const result = await dispatchBrowserCommand({
+        kind: BROWSER_ACTIONS.inspectPage.commandKind,
+        target: 'active_tab',
+        payload: {
+          includePalette: true,
+          includeOcr: true,
+          includeLayout: true,
+          source: 'browser-assistant-screen-inspect'
+        },
+        requiresUserGesture: BROWSER_ACTIONS.inspectPage.requiresUserGesture
+      });
+
       if (!isMountedRef.current) return;
-      setScreenInspectStatus('parsing');
-      window.setTimeout(() => {
-        if (!isMountedRef.current) return;
+
+      if (result.status === 'setup_required') {
+        setScreenInspectStatus('idle');
+        notify.warning('Browser Bridge 未连接', result.summary);
+        return;
+      }
+
+      if (result.status === 'queued') {
+        setScreenInspectStatus('idle');
+        notify.info('屏幕感知指令已下发', '等待本地守护进程或 Chrome 插件回传可见视口摘要。');
+        return;
+      }
+
+      if (result.status === 'success' && result.data) {
+        const data = result.data as any;
         setScreenInspectStatus('done');
         setInspectData({
-          palette: ['#0f172a', '#3b82f6', '#10b981', '#ffffff'],
-          layoutType: '双栏自适应网格 (Sidebar + Content Stream)',
-          ocrText: '极客首发！钛合金智能主动降噪耳机，原价 1599 元，限时特惠 1299 元！',
+          palette: Array.isArray(data.palette) ? data.palette.map(String).slice(0, 8) : [],
+          layoutType: String(data.layoutType || data.layout || data.summary || 'Browser Bridge viewport summary'),
+          ocrText: String(data.ocrText || data.text || data.visibleText || '')
         });
-        notify.success(
-          isFallback ? '[Dev Fallback] 设计转译成功' : '设计转译成功', 
-          '已分析完成！在画布中自动生成了该网页的色卡和线框 UI 布局框架。'
-        );
-      }, 1200);
-    }, 800);
+        notify.success('屏幕感知完成', 'Browser Bridge 已回传可见视口、色彩和文本摘要。');
+        return;
+      }
+
+      setScreenInspectStatus('idle');
+      notify.error('屏幕感知失败', result.error || result.summary);
+    } catch (error: any) {
+      if (!isMountedRef.current) return;
+      setScreenInspectStatus('idle');
+      notify.error('屏幕感知失败', error?.message || 'Browser Bridge 屏幕感知失败');
+    }
   };
 
-  // 13. 阶段四与五：自动化流水线一键运行 (支持 API 与 AI 代理路由切换、以及多账号并发轮询调度)
-  const handleRunPipeline = () => {
-    if (pipelineRunning || !workerRef.current) return;
-    
-    if (daemonStatus !== 'connected' && !devFallback) {
-      notify.error('流水线启动失败', '本地守护进程未连接。提示：' + SETUP_HINT);
-      setPipelineLogs([
-        '❌ 启动失败：未检测到本地守护进程。',
-        `提示：${SETUP_HINT}`,
-        '请参考下方「启动本地 Daemon 进程」指南，启动服务后重试。'
-      ]);
+  // 13. Browser Bridge runtime pipeline: no local success simulation.
+  const handleRunPipeline = async () => {
+    if (pipelineRunning) return;
+
+    if (!promptText.trim()) {
+      notify.warning('请输入 Prompt', '流水线需要先填写外部生图提示词。');
       return;
     }
+
+    const selectedPlat = platforms.find((p) => p.id === genPlatform);
+    if (!selectedPlat || !selectedPlat.enabled) {
+      notify.warning('平台不可用', '请先启用本次流水线要使用的外部生图平台。');
+      return;
+    }
+
+    const activeSessions = sessions.filter(
+      (s) => s.platformId === genPlatform && s.enabled && selectedSessionsForGen.includes(s.id)
+    );
+
+    if (routingMode === 'proxy' && activeSessions.length === 0) {
+      notify.error('调度失败', '网页直通模式下，请至少勾选一个可用的账号会话实例。');
+      setPipelineLogs(['调度失败：未选择可用的网页直通账号会话实例。']);
+      return;
+    }
+
+    const enabledSocialChannels = socialChannels.filter((channel) => channel.enabled);
 
     setPipelineRunning(true);
     setPipelineStep(1);
     setPipelineCompletedData(null);
-    
-    const isFallback = daemonStatus !== 'connected' && devFallback;
-    logsBufferRef.current = [
-      isFallback ? '[Dev Fallback] [1/5] 启动全自动宏流水线任务...' : '[1/5] 启动全自动宏流水线任务...'
-    ];
-    
-    // 增加路由策略日志
-    if (routingMode === 'api') {
-      logsBufferRef.current.push(
-        isFallback 
-          ? '[Dev Fallback] 【路由中心】已选择：[官方 API 路线] -> 将模拟扣减系统 API 积分 (10点/次)。'
-          : '【路由中心】已选择：[官方 API 路线] -> 将直接扣减系统 API 积分 (10点/次)。'
-      );
-    } else {
-      const activeUsernames = sessions
-        .filter((s) => s.platformId === genPlatform && s.enabled && selectedSessionsForGen.includes(s.id))
-        .map((s) => s.username);
-        
-      if (activeUsernames.length === 0) {
-        notify.error('调度失败', 'AI 代理模式下，请至少勾选一个可用的账号会话实例！');
-        setPipelineRunning(false);
+    logsBufferRef.current = ['[1/5] Browser Assistant pipeline 已进入 Browser Bridge runtime。'];
+    appendPipelineLog(
+      routingMode === 'proxy'
+        ? `[2/5] 网页直通会话池：${activeSessions.map((session) => session.username).join(', ')}`
+        : '[2/5] 官方 API 通道将由 Browser Bridge runtime 统一调度，不在前端模拟扣费。'
+    );
+    setPipelineStatusText('正在通过 Browser Bridge adapter 下发网页直通生图流水线指令...');
+
+    let shouldKeepRunning = false;
+
+    try {
+      const result = await dispatchBrowserCommand({
+        kind: BROWSER_ACTIONS.generateExternal.commandKind,
+        target: selectedPlat.id,
+        payload: {
+          prompt: promptText,
+          platformId: selectedPlat.id,
+          count: 1,
+          routingMode,
+          sessionIds: activeSessions.map((session) => session.id),
+          sessionUsernames: activeSessions.map((session) => session.username),
+          pipeline: {
+            sourceUrl: targetUrl || undefined,
+            productTitle: extractedData?.title,
+            productImageUrl: extractedData?.imageUrl,
+            socialChannelIds: enabledSocialChannels.map((channel) => channel.id),
+            publishMode: 'draft_only'
+          }
+        },
+        requiresUserGesture: BROWSER_ACTIONS.generateExternal.requiresUserGesture
+      });
+
+      if (!isMountedRef.current) return;
+
+      if (result.status === 'setup_required') {
+        setPipelineStep(1);
+        setPipelineStatusText(result.summary);
+        appendPipelineLog(`[setup_required] ${result.summary}`);
+        notify.warning('Browser Bridge 未连接', result.summary);
         return;
       }
-      logsBufferRef.current.push(
-        isFallback
-          ? `[Dev Fallback] 【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`
-          : `【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`
-      );
-    }
 
-    setPipelineLogs([...logsBufferRef.current]);
-    setPipelineStatusText(
-      isFallback 
-        ? '[Dev Fallback] 【步骤 1/5】正在通过插件后台提取商品天猫详情页数据...' 
-        : '【步骤 1/5】正在通过插件后台提取商品天猫详情页数据...'
-    );
-
-    // 获取被选中的 session 标识列表传给 Web Worker，供并发分发模拟
-    const selectedUsernames = sessions
-      .filter((s) => s.platformId === genPlatform && s.enabled && selectedSessionsForGen.includes(s.id))
-      .map((s) => s.username);
-
-    // 向 worker 发送流水线指令
-    workerRef.current.postMessage({ 
-      task: 'pipeline', 
-      data: { selectedSessions: selectedUsernames } 
-    });
-
-    workerRef.current.onmessage = (e) => {
-      if (!isMountedRef.current) return;
-      const { type, data } = e.data;
-      
-      if (type === 'pipeline_step') {
-        const { progress, log } = data;
-        const currentStepNum = Math.floor(progress / 20);
-        setPipelineStep(currentStepNum);
-        
-        const finalLog = isFallback ? `[Dev Fallback] ${log}` : log;
-        setPipelineStatusText(finalLog);
-        
-        logsBufferRef.current.push(finalLog);
-        if (logsBufferRef.current.length > 200) {
-          logsBufferRef.current.shift();
-        }
-        setPipelineLogs([...logsBufferRef.current]);
-      } else if (type === 'pipeline_done') {
-        setPipelineRunning(false);
-        setPipelineCompletedData({
-          productTitle: data.productTitle,
-          finalImageUrl: data.finalImageUrl,
-          generatedBySession: routingMode === 'proxy' ? data.generatedBySession : undefined,
-          postText: data.postText
-        });
-        
-        const doneLog = routingMode === 'proxy'
-          ? (isFallback 
-              ? `[Dev Fallback] 🎉 流水线执行成功！本次任务已模拟通过浏览器会话 [${data.generatedBySession}] 零点数完成生成。`
-              : `🎉 流水线执行成功！本次任务已通过浏览器会话 [${data.generatedBySession}] 零点数完成生成。`)
-          : (isFallback
-              ? `[Dev Fallback] 🎉 流水线执行成功！本次生成模拟已从您的官方 API 账户扣减了 10 点积分。`
-              : `🎉 流水线执行成功！本次生成已从您的官方 API 账户扣减了 10 点积分。`);
-        
-        logsBufferRef.current.push(doneLog);
-        setPipelineLogs([...logsBufferRef.current]);
-        notify.success(
-          isFallback ? '[Dev Fallback] 宏流水线运行完毕' : '宏流水线运行完毕', 
-          '五步自动化创作分发流程一次性成功跑通！'
-        );
+      if (result.status === 'queued') {
+        setPipelineStep(3);
+        setPipelineStatusText(result.summary);
+        appendPipelineLog(`[queued] ${result.summary}`);
+        notify.info('流水线指令已下发', '等待本地守护进程或 Chrome 插件回传外部生成与草稿状态。');
+        shouldKeepRunning = true;
+        return;
       }
-    };
+
+      if (result.status === 'success' && result.data) {
+        const data = result.data as any;
+        const finalImageUrl = String(data.finalImageUrl || data.imageUrl || data.resultUrl || '');
+        const productTitle = String(data.productTitle || data.title || extractedData?.title || 'Browser Bridge pipeline result');
+        const postText = String(
+          data.postText ||
+          data.caption ||
+          data.body ||
+          data.summary ||
+          'Browser Bridge 已返回外部网页生成结果。'
+        );
+        const generatedBySession = routingMode === 'proxy'
+          ? String(data.generatedBySession || data.sessionUsername || activeSessions[0]?.username || '')
+          : '';
+
+        setPipelineStep(5);
+        setPipelineStatusText('Browser Bridge 已回传流水线结果。');
+        appendPipelineLog('[success] Browser Bridge 已确认外部网页生成流水线结果。');
+
+        if (!finalImageUrl) {
+          notify.warning('流水线已回传', 'Browser Bridge 未返回可同步到画布的图片 URL。');
+          return;
+        }
+
+        setPipelineCompletedData({
+          productTitle,
+          finalImageUrl,
+          generatedBySession: generatedBySession || undefined,
+          postText
+        });
+        notify.success('流水线结果已回传', '可以同步到画布、保存草稿或打包原图。');
+        return;
+      }
+
+      setPipelineStep(1);
+      setPipelineStatusText(result.error || result.summary);
+      appendPipelineLog(`[failed] ${result.error || result.summary}`);
+      notify.error('流水线执行失败', result.error || result.summary);
+    } catch (error: any) {
+      if (!isMountedRef.current) return;
+      const message = error?.message || 'Browser Bridge 流水线执行失败';
+      setPipelineStep(1);
+      setPipelineStatusText(message);
+      appendPipelineLog(`[error] ${message}`);
+      notify.error('流水线执行失败', message);
+    } finally {
+      if (isMountedRef.current && !shouldKeepRunning) {
+        setPipelineRunning(false);
+      }
+    }
   };
 
   // 14. 阶段五：AI Takeover 自然语言解析仿真与真实回注驱动
@@ -1525,18 +1659,7 @@ export const BrowserAssistantView: React.FC = () => {
         <div className="dashboard-grid-card settings-browser-diagnostic-card a-card-span-2-col">
           <div>
             <div className="settings-browser-status-card__kicker">多端连通诊断</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="settings-browser-status-card__title">Connectivity Doctor</h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', color: '#94a3b8' }}>
-                <input
-                  type="checkbox"
-                  checked={devFallback}
-                  onChange={(e) => setDevFallback(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <span>演示数据 (Dev Fallback)</span>
-              </label>
-            </div>
+            <h3 className="settings-browser-status-card__title">Connectivity Doctor</h3>
             <p className="settings-browser-status-card__note">
               通过对本地 9099 端口与 Chrome Web Socket 进行实时测试，诊断链路健康状况。
             </p>
@@ -1834,6 +1957,8 @@ export const BrowserAssistantView: React.FC = () => {
                 onClick={handleTestIde}
                 disabled={testingDesktop}
                 className="settings-browser-action settings-browser-action--primary"
+                data-browser-tool={BROWSER_ACTIONS.openDesktopProject.toolName}
+                data-browser-command-kind={BROWSER_ACTIONS.openDesktopProject.commandKind}
               >
                 {testingDesktop ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                 <span>调起本地 IDE</span>
@@ -1904,7 +2029,7 @@ export const BrowserAssistantView: React.FC = () => {
                   disabled={!clipboardSyncEnabled}
                   className="settings-browser-subtle-action"
                 >
-                  模拟剪贴板复制
+                  读取剪贴板
                 </button>
               </div>
             </div>
@@ -1948,6 +2073,8 @@ export const BrowserAssistantView: React.FC = () => {
                   onClick={handleTestLocalLlm}
                   disabled={testingLlm}
                   className="settings-browser-subtle-action"
+                  data-browser-tool={BROWSER_ACTIONS.checkLocalLlm.toolName}
+                  data-browser-command-kind={BROWSER_ACTIONS.checkLocalLlm.commandKind}
                 >
                   测试连接
                 </button>
@@ -1982,6 +2109,8 @@ export const BrowserAssistantView: React.FC = () => {
                   type="button"
                   onClick={handleScreenInspect}
                   disabled={screenInspectStatus === 'capturing' || screenInspectStatus === 'parsing'}
+                  data-browser-tool={BROWSER_ACTIONS.inspectPage.toolName}
+                  data-browser-command-kind={BROWSER_ACTIONS.inspectPage.commandKind}
                   className="settings-browser-subtle-action"
                 >
                   智能感知
@@ -2185,7 +2314,7 @@ export const BrowserAssistantView: React.FC = () => {
                   </div>
                 ) : (
                 <div className="settings-browser-report-card__empty">
-                    {takeoverLoading ? '正在分析语义意图...' : '输入左侧指令以模拟大模型接管分析报告'}
+                    {takeoverLoading ? '正在分析语义意图...' : '输入左侧指令以预览 AgentRuntime 分析报告'}
                   </div>
                 )}
             </div>
@@ -2196,7 +2325,7 @@ export const BrowserAssistantView: React.FC = () => {
         <div className="dashboard-grid-card a-card-span-4-col settings-browser-section-card settings-browser-section-card--wide settings-browser-playground">
           <div className="settings-browser-playground__main">
             <div className="settings-browser-playground__header">
-              <div className="settings-browser-tabbar" role="tablist" aria-label="演示沙盒">
+              <div className="settings-browser-tabbar" role="tablist" aria-label="运行沙盒">
                 <button
                   type="button"
                   role="tab"
@@ -2228,7 +2357,7 @@ export const BrowserAssistantView: React.FC = () => {
                   <span>全自动宏流水线</span>
                 </button>
               </div>
-              <div className="settings-browser-tabbar__label">演示沙盒 (Playground)</div>
+              <div className="settings-browser-tabbar__label">运行沙盒 (Runtime)</div>
             </div>
 
             {/* Tab 1: 商品价格提取与自动抠图 */}
@@ -2348,7 +2477,7 @@ export const BrowserAssistantView: React.FC = () => {
                       <div className="settings-browser-result-card__subsection-header">
                         <span className="settings-browser-insight-card__title">
                           <Share2 size={12} className="settings-browser-feature-card__icon" data-tone="info" />
-                          双向 DOM 实时篡改与回写仿真
+                          双向 DOM 实时篡改与回写
                         </span>
                         <span className="settings-browser-result-card__caption">可在画布修改并一键同步到网页 DOM 进行截图预览</span>
                       </div>
@@ -2647,6 +2776,8 @@ export const BrowserAssistantView: React.FC = () => {
                       onClick={handleRunPipeline}
                       disabled={pipelineRunning}
                       data-browser-local-action={BROWSER_LOCAL_ACTIONS.runPipeline.actionName}
+                      data-browser-tool={BROWSER_ACTIONS.generateExternal.toolName}
+                      data-browser-command-kind={BROWSER_ACTIONS.generateExternal.commandKind}
                       className="settings-browser-action settings-browser-action--primary settings-browser-action--full"
                     >
                       {pipelineRunning ? (
@@ -2819,6 +2950,7 @@ export const BrowserAssistantView: React.FC = () => {
                   type="button"
                   onClick={handleImportSimulatedClipboard}
                   data-browser-local-action={BROWSER_LOCAL_ACTIONS.importClipboardPayload.actionName}
+                  data-agent-tool={BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName}
                   className="settings-browser-subtle-action"
                 >
                   导入画布

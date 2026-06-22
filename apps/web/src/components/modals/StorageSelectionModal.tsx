@@ -73,16 +73,9 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
     }
   };
 
-  const chooseBrowser = async () => {
+  const chooseBrowser = () => {
     setError('');
     setSelectedMode('browser');
-
-    try {
-      await disconnectLocalFolder();
-    } catch (disconnectError) {
-      console.error('[StorageSelectionModal] Failed to disconnect local folder:', disconnectError);
-      setError('切换到浏览器存储失败，请稍后重试。');
-    }
   };
 
   const handleConfirm = async () => {
@@ -90,15 +83,20 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
     setError('');
 
     try {
-      if (selectedMode === 'local' && !isConnectedToLocal) {
-        setSelectingLocal(true);
-        await connectLocalFolder();
-        const handle = await getLocalFolderHandle();
+      if (selectedMode === 'local') {
+        if (!isConnectedToLocal) {
+          setSelectingLocal(true);
+          await connectLocalFolder();
+          const handle = await getLocalFolderHandle();
 
-        if (!handle) {
-          setError('本地文件夹尚未连接，请先完成文件夹授权。');
-          return;
+          if (!handle) {
+            setError('本地文件夹尚未连接，请先完成文件夹授权。');
+            return;
+          }
         }
+      } else {
+        // 如果最终确认选择浏览器存储，则在此执行断开连接，避免在切换卡片选项时产生卡顿
+        await disconnectLocalFolder();
       }
 
       const ok = await setStorageMode(selectedMode);
@@ -108,6 +106,9 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
       }
 
       onComplete();
+    } catch (confirmError) {
+      console.error('[StorageSelectionModal] Failed to save storage preference:', confirmError);
+      setError('保存设置失败，请稍后重试。');
     } finally {
       setSelectingLocal(false);
       setSaving(false);
@@ -271,16 +272,18 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           </div>
 
           <div
-            className="mt-4 rounded-2xl border p-4"
+            className="mt-4 rounded-2xl border p-4 relative overflow-hidden"
             style={{
-              borderColor: 'var(--storage-selection-border)',
-              background: 'var(--storage-selection-option-bg)',
+              borderColor: 'color-mix(in srgb, var(--storage-selection-border) 60%, transparent)',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--storage-selection-option-bg) 35%, transparent) 0%, color-mix(in srgb, var(--storage-selection-option-bg) 15%, transparent) 100%)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
             }}
           >
-            <div className="text-sm font-medium" style={{ color: 'var(--storage-selection-text-primary)' }}>
+            <div className="text-sm font-semibold" style={{ color: 'var(--storage-selection-text-primary)' }}>
               当前推荐
             </div>
-            <div className="mt-1 text-xs leading-6" style={{ color: 'var(--storage-selection-text-muted)' }}>
+            <div className="mt-1.5 text-xs leading-6" style={{ color: 'var(--storage-selection-text-muted)' }}>
               如果你只是先体验，直接用“浏览器缓存”就行；如果你的重点是保住原图，建议开启“本地存储（双层保护）”，这样即使浏览器缓存丢失，也还能从本地恢复。
             </div>
           </div>

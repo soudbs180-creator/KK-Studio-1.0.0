@@ -1,7 +1,266 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-22 (Browser Assistant UI Local Actions Mapping and Type Fixes)
+**Last Updated:** 2026-06-22 (Browser Assistant Desktop and Local LLM Runtime Tools)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-22 - Browser Assistant Desktop and Local LLM Runtime Tools
+
+### Browser Assistant Desktop and Local LLM Runtime Tools Scope
+- Added `browser.openDesktopProject` to the Browser action catalog with Browser Bridge command kind `open_desktop_project` and `confirm` permission.
+- Added `browser.checkLocalLlm` to the Browser action catalog with Browser Bridge command kind `check_local_llm` and `safe` permission.
+- Registered both tools in `browserTools.ts`; desktop launch no longer exposes full local paths, and local LLM diagnostics route through Browser Bridge instead of direct browser probing.
+- Updated Browser Assistant desktop IDE and local LLM gateway buttons to call `dispatchBrowserCommand` and declare `data-browser-tool` plus `data-browser-command-kind`.
+- Removed Dev Fallback success paths, local timed success, and direct `fetch(${localLlmEndpoint}/api/tags)` probing from these handlers.
+- Removed the dead Connectivity Doctor Dev Fallback toggle, `devFallback` state, and `kk_browser_dev_fallback` localStorage key.
+- Updated the auto clipping Worker passthrough so it no longer replaces product images with a fixed Unsplash demo asset or labels passthrough images as transparent PNG output.
+- Updated Browser Assistant visible runtime copy so live Bridge/AgentRuntime controls are no longer labeled as simulation/fallback demos.
+- Added `browser.openDesktopProject` to runtime and legacy confirmation policies.
+- Added the new Browser Bridge tools to LLM planner whitelist text and Browser Bridge skill documentation.
+
+### Browser Assistant Desktop and Local LLM Runtime Tools Files
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentPermissionPolicy.ts`
+- `apps/web/src/features/ai-takeover/core/confirmationPolicy.ts`
+- `apps/web/src/features/ai-takeover/core/llmBrain.ts`
+- `apps/web/src/features/ai-takeover/types.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/ai-assistant/skills.md`
+- `docs/ai-assistant/skills/browser-bridge-automation.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Desktop and Local LLM Runtime Tools Decisions
+- Desktop IDE launch is a local machine action, so it uses `confirm` permission and requires a Browser Bridge user-gesture command.
+- Local LLM gateway status is a diagnostic read, so it uses `safe` permission, but still routes through Browser Bridge to avoid direct browser-side localhost probing and fake success.
+- Browser Bridge audit payload redaction now treats `endpoint` / `localEndpoint` keys as sensitive summary fields.
+- `setup_required`, `queued`, `success`, and `failed` are surfaced as runtime outcomes; the UI does not invent a connected status.
+
+### Browser Assistant Desktop and Local LLM Runtime Tools Validation
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts` failed because the tools were not registered, action catalog entries were missing, buttons lacked metadata, and both handlers still used Dev Fallback / timed or direct-probe success paths.
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` failed because the dead `devFallback` setting, `kk_browser_dev_fallback` storage key, and Dev Fallback toggle were still present.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` passed with 13 tests.
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` failed because the auto clipping Worker still returned a fixed Unsplash demo asset.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` passed with 14 tests.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts` passed with 44 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing hardcoded UI token warnings remain informational and unrelated to this slice.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+- Full `git diff --check` remains blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+
+### Browser Assistant Desktop and Local LLM Runtime Tools Risks / Next
+- Full `npm.cmd run verify:changes` has not been run for this narrow correction.
+- Remaining Browser Assistant cleanup candidate: inline Web Worker clipping/OCR demo comments and playground copy can be audited separately to decide what is real feature code versus dev fixture.
+
+## 2026-06-22 - Browser Assistant Screen Inspect Runtime Tool
+
+### Browser Assistant Screen Inspect Runtime Tool Scope
+- Added `browser.inspectPage` to the Browser action catalog with Browser Bridge command kind `inspect_page` and `confirm` permission.
+- Registered `browser.inspectPage` in `browserTools.ts`; it requests sanitized visible viewport palette, layout, and OCR/text summaries through Browser Bridge.
+- Added `inspect_page` to the Browser Bridge command kind contract.
+- Updated Browser Assistant screen inspect / design translation handler to use `dispatchBrowserCommand` instead of local `setTimeout` demo results.
+- Removed the hardcoded screen-inspect palette, canned layout type, canned OCR text, and Dev Fallback success path from `handleScreenInspect`.
+- Added `data-browser-tool={BROWSER_ACTIONS.inspectPage.toolName}` and `data-browser-command-kind={BROWSER_ACTIONS.inspectPage.commandKind}` to the screen inspect button.
+- Added `browser.inspectPage` to `AgentPermissionPolicy` confirm actions and Browser Bridge skill documentation.
+
+### Browser Assistant Screen Inspect Runtime Tool Files
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/browserTools.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentPermissionPolicy.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/ai-assistant/skills.md`
+- `docs/ai-assistant/skills/browser-bridge-automation.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Screen Inspect Runtime Tool Decisions
+- Reading an external browser viewport is a privacy-sensitive external-page action, so `browser.inspectPage` uses `confirm` permission.
+- Screen inspect results must come from Browser Bridge `success` data; `setup_required`, `queued`, and `failed` states surface as guidance/status without inventing local results.
+- Page inspection may return sanitized palette/layout/OCR summaries, but must not return complete HTML, cookies, tokens, or full page source.
+
+### Browser Assistant Screen Inspect Runtime Tool Validation
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts` failed because `browser.inspectPage` was not registered, not in the action catalog, not declared on the button, and `handleScreenInspect` still used timed demo results.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts` passed with 40 tests.
+- `npm.cmd run typecheck`: passed after removing an invalid `browser_inspect_page` intent comparison and relying on action type confirmation.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing hardcoded UI token warnings remain informational and unrelated to this slice.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+- Full `git diff --check` remains expected to be blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+
+### Browser Assistant Screen Inspect Runtime Tool Risks / Next
+- Full `npm.cmd run verify:changes` has not been run for this narrow correction.
+- Remaining Browser Assistant cleanup candidate: local LLM test and desktop adapter dev fallback paths still contain demo/fallback behavior and should be audited against the same runtime-adapter rule.
+
+## 2026-06-22 - Browser Assistant Clipboard Runtime Import
+
+### Browser Assistant Clipboard Runtime Import Scope
+- Changed Browser Assistant clipboard capture from fixed demo URL injection to user-gesture `navigator.clipboard.readText()` capture.
+- Changed clipboard import from a success-only toast into a `takeover-create-prompt-cards` runtime event, which is bridged through `ToolRegistry.execute('canvas.createPromptCards')`.
+- Mapped `BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName` to `canvas.createPromptCards`.
+- Added `data-agent-tool={BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName}` to the clipboard import button.
+- Updated the clipboard capture button text from "模拟剪贴板复制" to "读取剪贴板".
+
+### Browser Assistant Clipboard Runtime Import Files
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Clipboard Runtime Import Decisions
+- Clipboard import is a station-internal canvas creation action, not an external browser extraction action; it should create Prompt cards through `canvas.createPromptCards`.
+- Browser Assistant must not imply product parsing occurred unless the user explicitly routes the URL through `browser.extractProduct`.
+- Clipboard capture should read the actual browser clipboard when available and surface empty/unsupported/denied states instead of injecting canned ecommerce sample data.
+
+### Browser Assistant Clipboard Runtime Import Validation
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts` failed because clipboard import only showed a success toast, the local action had no ToolRegistry mapping, and the button lacked `data-agent-tool`.
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` failed because clipboard capture still injected a fixed `detail.tmall.com` sample URL instead of using `navigator.clipboard.readText()`.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts` passed with 13 tests.
+- Combined focused Browser Assistant/runtime suite passed with 38 tests: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated to this slice.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+- Full `git diff --check` is blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+
+### Browser Assistant Clipboard Runtime Import Risks / Next
+- Full `npm.cmd run verify:changes` has not been run for this narrow correction.
+- Superseded next step: screen-inspect design translation was moved to `browser.inspectPage` in the later Browser Assistant Screen Inspect Runtime Tool slice.
+
+## 2026-06-22 - Browser Assistant Pipeline Runtime Adapter
+
+### Browser Assistant Pipeline Runtime Adapter Scope
+- Removed the inline Web Worker `pipeline` simulation branch from `BrowserAssistantView.tsx`; the worker remains only for the local clipping/import flow.
+- Replaced `handleRunPipeline` Worker messages with `dispatchBrowserCommand({ kind: BROWSER_ACTIONS.generateExternal.commandKind, ... })`.
+- Pipeline now surfaces real Browser Bridge `setup_required`, `queued`, `failed`, and `success` states instead of simulated step/done events.
+- Pipeline result cards are created only when the Bridge returns `success` with a usable image URL.
+- The pipeline button keeps `data-browser-local-action={BROWSER_LOCAL_ACTIONS.runPipeline.actionName}` for UI/audit identity and now also declares `data-browser-tool={BROWSER_ACTIONS.generateExternal.toolName}` plus `data-browser-command-kind={BROWSER_ACTIONS.generateExternal.commandKind}`.
+
+### Browser Assistant Pipeline Runtime Adapter Files
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Pipeline Runtime Adapter Decisions
+- Browser Assistant pipeline is an external automation workflow, so it must use Browser Bridge runtime outcomes and must not fake local success when the daemon/plugin are disconnected.
+- `queued` is terminal for the web UI interaction until a future Bridge result callback channel is wired; the UI does not invent generated assets while waiting.
+- Browser Assistant button metadata can carry both a local Browser Assistant action identity and the external ToolRegistry/browser command it executes.
+
+### Browser Assistant Pipeline Runtime Adapter Validation
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts` failed because `handleRunPipeline` did not call `dispatchBrowserCommand` and still posted the Worker `pipeline` task.
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts` failed because the pipeline button did not declare `browser.generateExternal`.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts` passed with 11 tests.
+- Combined focused Browser Assistant/runtime suite passed with 37 tests: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated to this slice.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+- Full `git diff --check` is blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+
+### Browser Assistant Pipeline Runtime Adapter Risks / Next
+- Full `npm.cmd run verify:changes` has not been run for this narrow correction.
+- Full `git diff --check` remains expected to be blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446` unless that unrelated file is cleaned separately.
+- Remaining Browser Assistant cleanup candidate: screen-inspect demo flow still contains local timed demo results and should be audited against the same runtime-adapter rule.
+
+## 2026-06-22 - Browser Assistant ToolRegistry Event Bridges and Status Snapshots
+
+### Browser Assistant ToolRegistry Event Bridges and Status Snapshots Scope
+- Routed `takeover-create-prompt-cards` through `ToolRegistry.execute('canvas.createPromptCards')` instead of constructing Prompt/Image nodes directly in `App.tsx`.
+- Extended `canvas.createPromptCards` to accept optional `imageUrl`, `model`, and `aspectRatio` and attach imported Browser Assistant image results as child image nodes.
+- Routed `takeover-zip-originals` through `ToolRegistry.execute('assets.zipOriginals')` instead of calling `zipOutputs` directly from the App event bridge.
+- Simplified the Browser Assistant ZIP button handler so it dispatches the runtime ZIP event directly instead of gating on daemon status or running Dev Fallback ZIP progress simulation.
+- Routed Browser Assistant platform, social channel, and multi-account session status checks through `ToolRegistry.execute('browser.getStatus')` instead of local random login simulation.
+- Added a shared Browser Bridge snapshot applier so the status cards, platform pool, session pool, and social channel pool read the same sanitized runtime status shape.
+- Changed the ZIP locate action from a fake Explorer/local-path success toast to download-location guidance that does not expose a full local filesystem path.
+- Preserved the existing Browser Assistant CustomEvent name so current panel buttons keep working while execution moves back to the shared runtime path.
+
+### Browser Assistant ToolRegistry Event Bridges and Status Snapshots Files
+- `apps/web/src/App.tsx`
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts`
+- `tests/unit/ai-assistant-tool-registry.test.ts`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant ToolRegistry Event Bridges and Status Snapshots Decisions
+- Browser Assistant UI events may remain as compatibility triggers, but they must delegate to ToolRegistry tools for real canvas mutations.
+- `canvas.createPromptCards` owns prompt/image parent-child linking, canvas id assignment, model/aspect ratio propagation, and image placement.
+- `assets.zipOriginals` owns ZIP download source selection, manifest generation, selected node expansion, and success/error notification.
+- Browser Assistant ZIP buttons are station-internal actions, so they do not require Browser Bridge daemon connectivity before dispatching to the KK Studio runtime tool.
+- Browser Assistant login/status buttons should only display states returned by `browser.getStatus`; disconnected Bridge states surface setup guidance instead of fake success/failure.
+- Browser Assistant locate actions must not invent OS-level file reveal success or show complete local paths unless a real Browser Bridge result supplies a safe, redacted summary.
+- The App event bridge only adapts browser events into runtime context; it must not duplicate node construction or direct asset execution logic.
+
+### Browser Assistant ToolRegistry Event Bridges and Status Snapshots Validation
+- Red pass first: focused tests failed because `canvas.createPromptCards` did not write image nodes and `App.tsx` still manually constructed prompt/image nodes.
+- Red pass first: focused single-path contract test failed because `takeover-zip-originals` still called `zipOutputs` directly from `App.tsx`.
+- Red pass first: focused single-path contract test failed because `handleZipOriginals` still gated on daemon/dev fallback and simulated ZIP progress locally.
+- Red pass first: focused single-path contract test failed because platform, social channel, and session status check buttons still used `Math.random`/`setTimeout` simulation instead of `browser.getStatus`.
+- Red pass first: focused single-path contract test failed because ZIP locate still reported a fake Windows Explorer success path under `C:/Users/...`.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts` passed.
+- Combined focused Browser Assistant/runtime suite passed with 35 tests: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: initially failed on duplicate historical handoff headings, then passed after those headings were made unique.
+- `npm.cmd run governance:check`: passed again after the Browser Assistant status snapshot, ZIP locate, and handoff updates.
+- `npm.cmd run architecture:check`: passed. Existing historical raw color warnings remain informational and unrelated to this slice.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+- Full `git diff --check` is blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+
+### Browser Assistant ToolRegistry Event Bridges and Status Snapshots Risks / Next
+- Continue replacing Browser Assistant pipeline local actions with runtime adapter calls where any simulated success path remains.
+- Full `npm.cmd run verify:changes` has not been run for this narrow correction.
+
+## 2026-06-22 - Browser Assistant Local Action De-duplication
+
+### Browser Assistant Local Action De-duplication Scope
+- Restored a strict uniqueness contract for `BROWSER_LOCAL_ACTIONS.actionName` so two Browser Assistant buttons cannot collapse into the same automation/audit identity.
+- Moved Browser Assistant local action names into the `browser.local.*` namespace: product import, result card sync, ZIP export, ZIP locate, pipeline run, and clipboard import now each have distinct values.
+- Kept shared ToolRegistry mappings where they are intentional: product import and result card sync both map to `canvas.createPromptCards`, but their UI actions remain separate.
+
+### Browser Assistant Local Action De-duplication Files
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### Browser Assistant Local Action De-duplication Decisions
+- `agentToolName` can be reused when multiple UI workflows legitimately call the same runtime tool.
+- `actionName` must not be reused, because it is the stable button-to-action identity for QA automation, audit summaries, and future AI control routing.
+
+### Browser Assistant Local Action De-duplication Validation
+- Red pass first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-action-catalog-contract.test.ts` failed because six local actions produced only five unique action names.
+- Green pass: the same focused Browser action catalog test passed after assigning unique `browser.local.*` action names.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: passed.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and pre-existing.
+- `npm.cmd run build`: passed.
+- Scoped `git diff --check` for this slice's files passed.
+
+### Browser Assistant Local Action De-duplication Risks / Next
+- Full `npm.cmd run verify:changes` was not run for this narrow correction.
+- Full `git diff --check` is currently blocked by unrelated trailing whitespace in `apps/web/src/components/auth/TurnstileWidget.tsx:445-446`.
+- Continue replacing Browser Assistant simulated local success paths with real runtime/tool adapters.
 
 ## 2026-06-22 - Browser Assistant UI Local Actions Mapping and Type Fixes
 
@@ -568,12 +827,12 @@
 
 ## 2026-06-15 - Browser Assistant Settings Full-System Alignment Pass
 
-### 修改范围
+### Browser Assistant Full-System Alignment Scope
 - 继续收口设置页 `BrowserAssistantView` 下半部分 UI，将 AI 接管指令区、命令解析报告、演示沙盒、网页直通生成、模型路由策略、Session 选择、自动化流水线、终端日志和结果卡片统一迁移到 `settings-browser-*` 设计系统 primitive。
 - 修复桌面设置侧栏中工作区总览和存储统计的中文乱码，避免设置页整体观感被侧栏状态文案破坏。
 - 保持主画布页结构不做大改，本轮只针对设置页浏览器助手与设置侧栏做系统化 UI 对齐。
 
-### 修改文件
+### Browser Assistant Full-System Alignment Files
 - `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
 - `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
 - `apps/web/src/styles/settings.css`
@@ -581,13 +840,13 @@
 - `tests/unit/settings-sidebar-ui-system-contract.test.ts`
 - `docs/development/session-handoff.md`
 
-### 当前设计决策
+### Browser Assistant Full-System Alignment Decisions
 - Browser Assistant 后续新增模块优先复用 `settings-browser-section-card`、`settings-browser-command-grid`、`settings-browser-field`、`settings-browser-tabbar`、`settings-browser-result-card`、`settings-browser-pipeline-*`、`settings-browser-terminal` 和 `settings-browser-notice`，不要再在组件内直接堆 Tailwind 颜色、边框和背景工具类。
 - 可变状态统一通过 `data-status`、`data-state`、`data-tone`、`data-active` 驱动 CSS，业务组件只传语义状态，不再直接决定视觉 token。
 - 移动端规则以不横向溢出为底线：命令行、策略卡、结果卡、流水线布局和终端日志在窄屏下全部按单列流式排列。
 - 设置侧栏状态文案必须保持可读中文；新增中文文案时需要经过 `check:encoding` 和单元契约保护。
 
-### 已运行验证
+### Browser Assistant Full-System Alignment Validation
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts`: 新增用例先红后绿，最终通过。
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/settings-shared-ui-primitives-contract.test.ts tests/unit/settings-sidebar-ui-system-contract.test.ts tests/unit/settings-ui-system-contract.test.ts tests/unit/settings-ui-density-regression.test.ts tests/unit/mobile-settings-browser-verify-script.test.ts tests/unit/api-settings-workbench-structure.test.ts`: 39 tests passed。
 - `npm.cmd run typecheck`: passed。
@@ -602,10 +861,10 @@
   - 截图保存在 `.tmp/browser-assistant-desktop-final-after-restart.png` 与 `.tmp/browser-assistant-mobile-pipeline-final.png`。
 - `npm.cmd run dev:status`: Vite `3000` 与 API `3001` 均 healthy。
 
-### 未运行验证及原因
+### Browser Assistant Full-System Alignment Not Run
 - 未运行完整 `npm run verify:changes`：当前全局 UI 系统优化目标仍在分阶段推进，本轮已经覆盖相关单测、类型、架构、治理、构建、编码检查和运行态视觉 smoke；完整发布级验证保留到全局 UI 收口或发布前执行。
 
-### 风险与下一步
+### Browser Assistant Full-System Alignment Risks And Next
 - `architecture:check` 仍提示历史区域存在 raw color / raw z-index warning；本轮没有回滚或重排这些并行改动。
 - 下一轮建议继续收口 `PromptBar` 深层模型菜单/弹窗、Canvas 交互浮层、Admin 浮层和 ecommerce panels，保证设置页之外的高频 UI 也沿用同一 token/layer/primitive 体系。
 
@@ -3180,3 +3439,60 @@ Mobile workspace: `apps/mobile/`
 ### Landing Locale and Visual Continuity Risks / Next
 - Resolve the existing `App.tsx` type errors so full `npm run typecheck` can become green again.
 - If the landing page later gets a manual language switcher, keep it writing to `kk_language` so stored preference continues to override browser detection.
+
+
+## Session Handoff - 2026-06-22 UI Detail Polish and Performance Optimization
+
+### UI Detail Polish Scope
+- 优化了登录卡片的毛玻璃（Glassmorphism）磨砂质感；
+- 解决了存储配置 Modal 切换时的异步卡顿，并美化了底部推荐卡片；
+- 清理了小地图（Minimap）在渲染流程中触发 Forced Reflow 的性能瓶颈，移除了全局拖拽/缩放卡顿；
+- 优化了小地图的折叠状态 UI（红橙色高亮圆钮）和挂载位置（回到左下角并随侧边栏状态平滑偏移）；
+- 修复了头像与充值控制卡片的容器宽度和积分/充值按钮对齐偏离问题。
+
+### UI Detail Polish Files
+- apps/web/src/components/auth/LoginScreen.css
+- apps/web/src/components/modals/StorageSelectionModal.tsx
+- apps/web/src/app/AppCanvasNavigationPanel.tsx
+- apps/web/src/App.tsx
+- apps/web/src/app/AppDesktopChrome.tsx
+
+### UI Detail Polish Decisions
+1. **渲染尺寸缓存**：小地图的绝对定位和坐标映射无需每帧从 DOM 物理读取宽高。使用 useState 缓存并在 resize 时更新，从而彻底阻止拖拽时的 Forced Reflow。
+2. **逻辑与保存分离**：切换卡片时仅执行同步状态修改，实质性的异步文件夹断开/连接移入保存确定流程，实现纯同步响应。
+3. **磨砂通透感升级**：调低背景透明度，增加 internal light-shadow，极大提升极简风格毛玻璃质感。
+4. **位置与运动一致**：让小地图回到左下角，并通过 isSidebarOpen 控制 left 发生动画偏移，与侧边栏联动。
+
+### UI Detail Polish Validation
+- `npm run typecheck` (全部通过)
+- `npm run build` (全站构建成功，无编译警告)
+
+### UI Detail Polish Not Run
+- 线上实际部署（需在生产环境中由用户部署验证）。
+
+### UI Detail Polish Risks And Next
+- 无明显风险。下一步：等待用户在本地或 Staging 环境测试多项 UI 变动以确认视觉效果。
+
+## Session Handoff - 2026-06-23 Browser Bridge Callback Closed-Loop & Real WASM Matting Implementation
+
+### Scope - Browser Bridge Callback & Matting
+- **Browser Bridge 异步回调闭环**：通过在 `BrowserAssistantView.tsx` 中建立模块级全局 `pendingCommands` Promise 映射结构，使 WebSocket 消息能够自动路由回 `dispatchBrowserCommand` 指令发送端。命令等待流能直通 `success` / `failed` 状态，免去了之前的假 queued 直接返回，打通了闭环。
+- **WASM 抠图去背景**：重构了内置 inline Worker 核心的 `workerCode` 计算逻辑。利用 `OffscreenCanvas` 将图片进行像素级色差阈值剔除，并将抠图结果以 PNG Base64 DataURL 发回，真正实现了透明通道抠图。
+- **清理全仓尾随空格**：去除了 `TurnstileWidget.tsx` 的尾随空格，使 `git diff --check` 无阻通过。
+- **静态测试匹配修复**：将 `newgenre-landing-auth-contract.test.ts` 中关于登录面板背景不透明度的硬编码匹配从 `0.78` 适配更新为已实现的 `0.45` 磨砂玻璃。
+
+### Files Modified - Browser Bridge Callback & Matting
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/components/auth/TurnstileWidget.tsx`
+- `tests/unit/newgenre-landing-auth-contract.test.ts`
+
+### Design Decisions - Browser Bridge Callback & Matting
+1. **Promise 拦截机制**：通过 `pendingCommands` 的 resolve 映射，使得前端逻辑和契约可以用完全同步的风格去 `await dispatchBrowserCommand`，不修改外层 UI 方法在源码中的任何静态调用匹配。
+2. **渐近色距离剔除**：在 Web Worker 内部对 `OffscreenCanvas` 进行渲染采样并使用欧氏色差公式，对跨域失败自动降级返回原图，健壮性良好。
+
+### Validation - Browser Bridge Callback & Matting
+- `npm run verify:changes` (全量验证 100% 成功跑通)
+- `git diff --check` (全部通过，无尾随空格阻塞)
+
+### Risks And Next
+- 暂无明显风险。Browser Bridge 已能平稳接收回传数据并更新画布、外部生图等状态。

@@ -220,11 +220,17 @@ test('browser assistant actions route external automation through Browser Bridge
   assert.match(source, /BROWSER_ACTIONS\.extractProduct\.commandKind/);
   assert.match(source, /BROWSER_ACTIONS\.generateExternal\.commandKind/);
   assert.match(source, /BROWSER_ACTIONS\.publishDraft\.commandKind/);
+  assert.match(source, /BROWSER_ACTIONS\.inspectPage\.commandKind/);
+  assert.match(source, /BROWSER_ACTIONS\.openDesktopProject\.commandKind/);
+  assert.match(source, /BROWSER_ACTIONS\.checkLocalLlm\.commandKind/);
   assert.match(source, /BROWSER_ACTIONS\.writeBackDom\.commandKind/);
   assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.getStatus\.toolName\}/);
   assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.extractProduct\.toolName\}/);
   assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.generateExternal\.toolName\}/);
   assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.publishDraft\.toolName\}/);
+  assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.inspectPage\.toolName\}/);
+  assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.openDesktopProject\.toolName\}/);
+  assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.checkLocalLlm\.toolName\}/);
   assert.match(source, /data-browser-tool=\{BROWSER_ACTIONS\.writeBackDom\.toolName\}/);
   assert.doesNotMatch(source, /零 API 积分损耗！/);
   assert.doesNotMatch(source, /已成功通过 Chrome 插件将价格回写至网页 DOM！/);

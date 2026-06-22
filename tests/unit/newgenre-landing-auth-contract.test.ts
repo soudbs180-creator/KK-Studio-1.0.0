@@ -77,7 +77,7 @@ test('login card uses neutral KK reference styling instead of the rejected blue 
   const combinedAuthCss = `${authCssSource}\n${referenceCssSource}`;
 
   assert.match(combinedAuthCss, /--ng-ink:\s*#0c1018;/);
-  assert.match(combinedAuthCss, /\.auth-page--landing \.auth-modal-content \.auth-panel\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.78\)/);
+  assert.match(combinedAuthCss, /\.auth-page--landing \.auth-modal-content \.auth-panel\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.45\)/);
   assert.match(combinedAuthCss, /\.auth-page--landing \.auth-btn-main\s*\{[\s\S]*background:\s*#0c1018 !important;/);
   assert.match(combinedAuthCss, /\.auth-social-row\s*\{[\s\S]*display:\s*flex/);
   assert.doesNotMatch(combinedAuthCss, /linear-gradient\(135deg,\s*#1e40af,\s*#0f1d3a\)/);

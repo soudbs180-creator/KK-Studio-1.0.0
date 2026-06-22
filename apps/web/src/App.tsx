@@ -262,7 +262,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 );
 
 // Lucide icons replaced with SVGs
-import { zipOutputs } from './features/assets/zipOutputs';
+import { toolRegistryInstance } from './features/ai-assistant-runtime';
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AppearanceMotionProvider } from './context/AppearanceMotionContext';
@@ -1707,58 +1707,37 @@ export const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     const handleCreatePromptCards = async (e: Event) => {
       const { prompts, model, aspectRatio, imageUrl } = (e as CustomEvent).detail;
-      if (prompts && prompts.length > 0) {
-        let startX = 0;
-        let startY = 0;
-        
-        if (typeof findSmartPosition === 'function') {
-          const smartPos = findSmartPosition(100, 100, 360, 480);
-          startX = smartPos.x;
-          startY = smartPos.y;
-        } else {
-          startX = 100 + Math.random() * 200;
-          startY = 100 + Math.random() * 200;
-        }
-
-        const promptNodeId = 'takeover_opt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-        const imageNodeId = 'takeover_img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-
-        const promptNode: PromptNode = {
-          id: promptNodeId,
-          prompt: prompts[0],
-          optimizedPromptEn: prompts[0],
-          optimizedPromptZh: '本地导入成功',
-          position: { x: startX, y: startY },
-          aspectRatio: (aspectRatio || '1:1') as AspectRatio,
-          imageSize: ImageSize.SIZE_1K,
-          model: model || config.model || 'gemini-2.5-flash',
-          childImageIds: imageUrl ? [imageNodeId] : [],
-          timestamp: Date.now()
-        };
-
-        await addPromptNode(promptNode);
-
-        if (imageUrl) {
-          const imageNode: GeneratedImage = {
-            id: imageNodeId,
-            url: imageUrl,
-            prompt: prompts[0],
-            aspectRatio: (aspectRatio || '1:1') as AspectRatio,
-            model: model || config.model || 'gemini-2.5-flash',
-            canvasId: activeCanvas?.id || 'default_canvas',
-            parentPromptId: promptNodeId,
-            position: { x: startX + 480, y: startY },
-            timestamp: Date.now(),
-          };
-          if (typeof addImageNodes === 'function') {
-            await addImageNodes([imageNode]);
-          }
-        }
+      if (!prompts || prompts.length === 0) {
+        return;
       }
+
+      const { notify } = await import('./services/system/notificationService');
+
+      await toolRegistryInstance.execute('canvas.createPromptCards', {
+        prompts,
+        model: model || config.model || 'gemini-2.5-flash',
+        aspectRatio: aspectRatio || '1:1',
+        imageUrl
+      }, {
+        activeCanvas,
+        addPromptNode,
+        addImageNodes,
+        getNextCardPosition: () => {
+          if (typeof findSmartPosition === 'function') {
+            return findSmartPosition(100, 100, 360, 480);
+          }
+          return {
+            x: 100 + Math.random() * 200,
+            y: 100 + Math.random() * 200
+          };
+        },
+        config,
+        notify
+      });
     };
     window.addEventListener('takeover-create-prompt-cards', handleCreatePromptCards);
     return () => window.removeEventListener('takeover-create-prompt-cards', handleCreatePromptCards);
-  }, [addPromptNode, addImageNodes, findSmartPosition, config.model, activeCanvas]);
+  }, [activeCanvas, addPromptNode, addImageNodes, findSmartPosition, config]);
 
   // 简体中文：AI接管ZIP导出原图事件处理器
   useEffect(() => {
@@ -1766,21 +1745,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const { scope } = (e as CustomEvent).detail;
       const { notify } = await import('./services/system/notificationService');
       try {
-        notify.info('正在打包', '正在提取生成图像并进行压缩归档...');
-        
-        await zipOutputs(scope || 'all_canvas_outputs', {
-          projectName: activeCanvas?.name || 'KKStudio',
-          canvasId: activeCanvas?.id,
-          batchId: 'takeover_zip_' + Date.now(),
-          imageNodes: activeCanvas?.imageNodes || [],
-          selectedNodeIds: selectedNodeIds || [],
-          promptNodes: activeCanvas?.promptNodes || [],
-          preferOriginal: true
+        await toolRegistryInstance.execute('assets.zipOriginals', {
+          scope: scope || 'all_canvas_outputs'
+        }, {
+          activeCanvas,
+          selectedNodeIds,
+          notify
         });
-        
-        notify.success('打包下载完成', 'ZIP 压缩包及 manifest.json 已成功保存！');
       } catch (err: any) {
-        notify.error('打包下载失败', err.message || '未知错误');
+        console.error('[BrowserAssistant] Failed to run assets.zipOriginals', err);
       }
     };
     window.addEventListener('takeover-zip-originals', handleZipOriginals);
@@ -5443,7 +5416,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       )}
       {/* 简体中文：左上角等宽悬浮控制卡片 */}
       {!isMobile && (
-        <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
+        <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-72 pointer-events-auto select-none">
           <AppDesktopChrome
             isMobile={isMobile}
             billingUiEnabled={billingUiEnabled}
@@ -5467,16 +5440,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
       {/* 简体中文：左下角悬浮缩放卡片 - 竖直摆放，极致纤细宽度 (w-10)，不要和侧边工具栏宽度一致，版本号在其下方另外渲染为精致的独立毛玻璃卡片 */}
       {!isMobile && (
         <div 
-          className="desktop-navigation-panel fixed top-4 z-[650] pointer-events-auto select-none"
+          className="desktop-navigation-panel fixed bottom-[52px] z-[650] pointer-events-auto select-none"
           style={{
-            right: isChatOpen
-              ? `${chatSidebarWidth + 48}px`
-              : workspaceSurface === 'library'
-                ? '428px'
-                : workspaceSurface === 'favorites'
-                  ? '668px'
-                  : '16px',
-            transition: 'right 0.3s ease-out'
+            left: isSidebarOpen ? '292px' : '16px',
+            transition: 'left 0.3s ease-out'
           }}
         >
           <AppCanvasNavigationPanel
@@ -5490,8 +5457,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
       {/* 简体中文：左下角精致独立的毛玻璃版本号卡片 */}
       {!isMobile && (
-        <div className="desktop-version-badge fixed bottom-4 left-4 z-50 py-1.5 px-3 flex items-center justify-center rounded-xl border select-none pointer-events-auto"
+        <div className="desktop-version-badge fixed bottom-4 z-50 py-1.5 px-3 flex items-center justify-center rounded-xl border select-none pointer-events-auto"
           style={{
+            left: isSidebarOpen ? '292px' : '16px',
+            transition: 'left 0.3s ease-out',
             background: 'var(--frost-card-framework-bg)',
             border: '1px solid var(--frost-card-framework-border)',
             boxShadow: 'var(--frost-card-framework-shadow)',

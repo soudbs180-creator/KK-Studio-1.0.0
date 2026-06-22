@@ -77,8 +77,8 @@
     "path": "docs/ai-assistant/skills.md",
     "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.5.7",
     "summary": "本文件是 KK Studio v1.5.7 规范下 AI 助手的可执行技能手册 (Skills) 索引。",
-    "contentHash": "8f4241ec285137a71f237cac170df285",
-    "updatedAt": "2026-06-22T06:08:40.822Z"
+    "contentHash": "1356d053f76e6b7a4ea1a93ef1331197",
+    "updatedAt": "2026-06-22T15:54:30.770Z"
   },
   {
     "id": "doc_tool_registry_md",
@@ -86,8 +86,8 @@
     "path": "docs/ai-assistant/tool-registry.md",
     "title": "工具注册表说明 (Tool Registry)",
     "summary": "在 KK Studio v1.5.7 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
-    "contentHash": "0405c8a324d3507695b4bc954bc34306",
-    "updatedAt": "2026-06-22T09:08:14.964Z"
+    "contentHash": "fb2187a47db34ba044490786f6bb7e92",
+    "updatedAt": "2026-06-22T15:54:21.709Z"
   },
   {
     "id": "doc_ui_map_md",

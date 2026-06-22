@@ -59,7 +59,7 @@ export interface IntentResult {
     retryTarget?: 'latest_failed';
     settingsView?: string;         // 设置页子功能 ID
     url?: string;
-    browserAction?: 'status' | 'open' | 'extract_product' | 'generate_external' | 'publish_draft' | 'write_back_dom';
+    browserAction?: 'status' | 'open' | 'extract_product' | 'generate_external' | 'publish_draft' | 'inspect_page' | 'open_desktop_project' | 'check_local_llm' | 'write_back_dom';
     sessionCount?: number;
     taskDomain?: AssistantBatchTaskDomain;
     aspectRatio?: AspectRatio | string;
@@ -96,6 +96,9 @@ export type AssistantAction =
   | { type: 'browser.extractProduct'; payload: { url: string; targets?: ('price' | 'title' | 'image' | 'description')[]; label?: string } }
   | { type: 'browser.generateExternal'; payload: { prompt: string; platformId?: string; count?: number; sessionIds?: string[]; sessionCount?: number } }
   | { type: 'browser.publishDraft'; payload: { channelId: string; imageUrl?: string; title?: string; body?: string } }
+  | { type: 'browser.inspectPage'; payload: { target?: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } }
+  | { type: 'browser.openDesktopProject'; payload: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string } }
+  | { type: 'browser.checkLocalLlm'; payload: { provider?: string; endpoint?: string; model?: string } }
   | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } };
 
 // 执行计划

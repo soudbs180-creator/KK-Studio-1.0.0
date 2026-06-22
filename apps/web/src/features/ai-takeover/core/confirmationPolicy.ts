@@ -36,6 +36,8 @@ const CONFIRM_ACTIONS = [
   'browser.extractProduct',
   'browser.generateExternal',
   'browser.publishDraft',
+  'browser.inspectPage',
+  'browser.openDesktopProject',
   'browser.writeBackDom'
 ];
 
@@ -127,7 +129,9 @@ export const confirmationPolicy = {
       plan.intent === 'control_multidevice' ||
       plan.intent === 'browser_generate_external' ||
       plan.intent === 'browser_publish_draft' ||
-      plan.intent === 'browser_write_back_dom'
+      plan.intent === 'browser_write_back_dom' ||
+      (plan.actions[0]?.type as string | undefined) === 'browser.inspectPage' ||
+      (plan.actions[0]?.type as string | undefined) === 'browser.openDesktopProject'
     ) {
       const actionType = plan.actions[0]?.type as string | undefined;
       const isDomWrite = actionType === 'browser.writeBackDom';

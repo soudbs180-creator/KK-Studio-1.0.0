@@ -54,6 +54,9 @@ export class LLMBrain {
 - {"type": "browser.extractProduct", "payload": {"url": "https://...", "targets": ["price", "title", "image", "description"]}} ：通过 Browser Bridge 提取外部商品页摘要，必须确认。
 - {"type": "browser.generateExternal", "payload": {"prompt": "提示词", "platformId": "leonardo", "count": 1, "sessionCount"?: 2}} ：通过 Browser Bridge 调外部网页平台生图，必须确认。
 - {"type": "browser.publishDraft", "payload": {"channelId": "xhs", "imageUrl"?: "https://...", "title"?: "标题", "body"?: "文案"}} ：保存到外部社媒草稿箱，不允许直接公开发布，必须确认。
+- {"type": "browser.inspectPage", "payload": {"target"?: "active_tab", "includePalette"?: true, "includeOcr"?: true, "includeLayout"?: true}} ：通过 Browser Bridge 读取脱敏可见视口摘要，必须确认。
+- {"type": "browser.openDesktopProject", "payload": {"ide"?: "cursor" | "trae" | "vscode", "projectHint"?: "current_workspace"}} ：通过 Browser Bridge 调起本地桌面 IDE，必须确认。
+- {"type": "browser.checkLocalLlm", "payload": {"provider"?: "ollama", "model"?: "qwen2.5-coder:7b"}} ：通过 Browser Bridge 检查本地 LLM 网关，安全诊断工具。
 - {"type": "browser.writeBackDom", "payload": {"target"?: "active_tab", "title": "标题", "price": "价格"}} ：回写外部网页 DOM，危险操作，必须确认。
 
 [任务拆解要求]

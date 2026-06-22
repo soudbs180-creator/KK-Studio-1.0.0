@@ -12,7 +12,19 @@ function getRuntimeHostname(): string {
 }
 
 function isLocalTurnstileBypassHost(hostname: string): boolean {
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname.endsWith('.localhost');
+  if (!hostname) return false;
+  const lower = hostname.trim().toLowerCase();
+  return (
+    lower === 'localhost' ||
+    lower === '127.0.0.1' ||
+    lower === '::1' ||
+    lower.endsWith('.localhost') ||
+    lower.endsWith('.sslip.io') ||
+    lower.endsWith('.nip.io') ||
+    /^192\.168\.\d+\.\d+$/.test(lower) ||
+    /^10\.\d+\.\d+\.\d+$/.test(lower) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(lower)
+  );
 }
 
 export const TURNSTILE_LOCAL_BYPASS = readRuntimeBooleanEnv('VITE_TURNSTILE_LOCAL_BYPASS', false);

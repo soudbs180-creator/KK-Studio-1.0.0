@@ -49,7 +49,7 @@
 
 11. **[Browser Bridge Automation Skill (browser-bridge-automation)](skills/browser-bridge-automation.md)**
    - 职责：把浏览器助手、连接诊断、商品页提取、网页直通生图、社媒草稿和 DOM 回写请求映射到 Browser Bridge 工具链。
-   - 关联工具：`browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.writeBackDom`
+   - 关联工具：`browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.inspectPage`, `browser.openDesktopProject`, `browser.checkLocalLlm`, `browser.writeBackDom`
 
 ---
 

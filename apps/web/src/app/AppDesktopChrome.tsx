@@ -127,20 +127,20 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
       {/* 简体中文：右侧资产展示 & 充值模块 (高度与左侧头像一致，均为 40px 水平居中对齐) */}
       {billingUiEnabled && (
-        <div className="flex-1 flex items-center justify-between gap-1.5 h-10">
-          <div className="flex flex-col items-start leading-none justify-center">
-            <div className="flex items-center gap-0.5 select-none">
-              <span className="text-[16px] font-mono font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+        <div className="flex-1 flex items-center justify-between gap-1.5 h-10 shrink-0">
+          <div className="flex flex-col items-start leading-none justify-center shrink-0">
+            <div className="flex items-center gap-0.5 select-none shrink-0">
+              <span className="text-[16px] font-mono font-black tracking-tight shrink-0" style={{ color: 'var(--text-primary)' }}>
                 {remainingBalanceDisplay}
               </span>
-              <span className="text-[10px] font-bold text-[var(--accent-coral)]">积分</span>
+              <span className="text-[10px] font-bold text-[var(--accent-coral)] shrink-0">积分</span>
             </div>
           </div>
 
           <button
             id="btn-desktop-recharge"
             onClick={onRecharge}
-            className="kk-workspace-primary-action inline-flex items-center justify-center rounded-xl px-4 text-xs font-black leading-none active:scale-95"
+            className="kk-workspace-primary-action inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-black leading-none active:scale-95 shrink-0"
           >
             充值
           </button>

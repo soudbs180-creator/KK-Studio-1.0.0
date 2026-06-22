@@ -34,10 +34,35 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     localStorage.setItem('kk_canvas_minimap_collapsed', String(next));
   };
 
-  // 简体中文：新引入的延迟定位状态管理
+  // 1. 缓存大画布的实际尺寸，避免在渲染期调用 getCanvasRect() 引起 Forced Reflow
+  const [containerSize, setContainerSize] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 800,
+    height: typeof window !== 'undefined' ? window.innerHeight : 600,
+  }));
+
+  const updateContainerSize = useCallback(() => {
+    const rect = canvasRef.current?.getCanvasRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      setContainerSize({ width: rect.width, height: rect.height });
+    }
+  }, [canvasRef]);
+
+  // 2. 简体中文：新引入的延迟定位状态管理
   const [isEdited, setIsEdited] = useState(false);
   const [targetCenter, setTargetCenter] = useState<{ x: number; y: number } | null>(null);
   const [targetScale, setTargetScale] = useState(1);
+
+  // 监听窗口尺寸变化，更新缓存宽高尺寸
+  useEffect(() => {
+    updateContainerSize();
+    const handleResize = () => {
+      updateContainerSize();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateContainerSize]);
 
   // 小地图的固定物理尺寸
   const miniWidth = 200;
@@ -45,7 +70,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   const scale = canvasTransform.scale || 1;
 
-  // 1. 获取所有可见卡片的绝对位置
+  // 3. 获取所有可见卡片的绝对位置
   const promptNodes = activeCanvas?.promptNodes || [];
   const imageNodes = activeCanvas?.imageNodes || [];
 
@@ -54,18 +79,15 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     ...imageNodes,
   ];
 
-  // 2. 确定大画布容器的实际尺寸，若无法获取则回退默认值
-  const canvasRect = canvasRef.current?.getCanvasRect();
-  const fallbackWidth = typeof window !== 'undefined' ? window.innerWidth : 800;
-  const fallbackHeight = typeof window !== 'undefined' ? window.innerHeight : 600;
-  const containerWidth = canvasRect?.width || fallbackWidth;
-  const containerHeight = canvasRect?.height || fallbackHeight;
+  // 4. 确定大画布容器的实际尺寸，使用缓存值
+  const containerWidth = containerSize.width;
+  const containerHeight = containerSize.height;
 
   // 避免容器宽高计算为 0 导致缩放比例计算出错
   const safeContainerWidth = containerWidth <= 0 || isNaN(containerWidth) ? 800 : containerWidth;
   const safeContainerHeight = containerHeight <= 0 || isNaN(containerHeight) ? 600 : containerHeight;
 
-  // 3. 计算视口（Viewport）在真实世界坐标系中的边界
+  // 5. 计算视口（Viewport）在真实世界坐标系中的边界
   const safeScale = scale <= 0 || isNaN(scale) ? 1 : scale;
   const viewportMinX = -canvasTransform.x / safeScale;
   const viewportMinY = -canvasTransform.y / safeScale;
@@ -88,7 +110,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const currentTargetScale = isEdited ? targetScale : scale;
   const displayZoomPercent = Math.round(currentTargetScale * 100);
 
-  // 4. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘 3.0，保持聚焦框适中尺寸
+  // 6. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘 3.0，保持聚焦框适中尺寸
   const viewportW = isNaN(viewportMaxX - viewportMinX) ? 800 : (viewportMaxX - viewportMinX);
   const viewportH = isNaN(viewportMaxY - viewportMinY) ? 600 : (viewportMaxY - viewportMinY);
   
@@ -106,7 +128,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const safeTotalWidth = totalWidth <= 0 || isNaN(totalWidth) ? 1 : totalWidth;
   const safeTotalHeight = totalHeight <= 0 || isNaN(totalHeight) ? 1 : totalHeight;
 
-  // 5. 计算等比例缩放至小地图 (200x90) 的比例因子
+  // 7. 计算等比例缩放至小地图 (200x90) 的比例因子
   const scaleMiniX = miniWidth / safeTotalWidth;
   const scaleMiniY = miniHeight / safeTotalHeight;
   let scaleMini = Math.min(scaleMiniX, scaleMiniY);
@@ -123,7 +145,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const safeDx = isNaN(dx) ? 0 : dx;
   const safeDy = isNaN(dy) ? 0 : dy;
 
-  // 6. 真实坐标映射至小地图相对坐标 of 辅助函数
+  // 8. 真实坐标映射至小地图相对坐标 of 辅助函数
   const mapToMini = (X: number, Y: number) => {
     const xVal = (X - minX) * scaleMini + safeDx;
     const yVal = (Y - minY) * scaleMini + safeDy;
@@ -133,7 +155,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     };
   };
 
-  // 7. 小地图鼠标定位处理函数（点击或拖拽仅修改目标虚拟中心）
+  // 9. 小地图鼠标定位处理函数（点击或拖拽仅修改目标虚拟中心）
   const handleMapAction = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -153,7 +175,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     setIsEdited(true);
   }, [safeDx, scaleMini, minX, minY]);
 
-  // 8. 拖动小地图视口框 of 交互处理
+  // 10. 拖动小地图视口框 of 交互处理
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -184,6 +206,28 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   // ⚠️ Rules of Hooks: 必须在所有 Hook 声明完毕后进行条件性提前返回
   if (isMobile || !activeCanvas) return null;
+
+  // 折叠状态下，在左下角渲染成一个极其精致的 Map 图标高亮悬浮小圆钮 (36x36)
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={toggleCollapsed}
+        className="flex items-center justify-center rounded-xl border transition-all active:scale-90 outline-none cursor-pointer hover:bg-opacity-95"
+        style={{
+          width: '36px',
+          height: '36px',
+          boxShadow: '0 4px 14px rgba(255, 77, 139, 0.22)',
+          background: 'rgba(255, 77, 139, 0.15)',
+          borderColor: 'rgba(255, 77, 139, 0.42)',
+          WebkitBackdropFilter: 'blur(12px)',
+          backdropFilter: 'blur(12px)',
+        }}
+        title="展开小地图"
+      >
+        <Map size={16} style={{ color: 'var(--accent-coral)' }} />
+      </button>
+    );
+  }
 
   // 9. 计算视口框在小地图中 of 绘制参数
   // 9.1 当前实际大画布位置（虚线框）

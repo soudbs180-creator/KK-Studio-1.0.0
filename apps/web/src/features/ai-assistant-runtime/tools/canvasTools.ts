@@ -193,16 +193,24 @@ export const canvasTools: AgentToolDefinition[] = [
         prompts: {
           type: 'array',
           items: { type: 'string' }
-        }
+        },
+        imageUrl: { type: 'string' },
+        model: { type: 'string' },
+        aspectRatio: { type: 'string' }
       },
       required: ['prompts']
     },
-    handler: async (input: { prompts: string[] }, ctx) => {
-      const { prompts } = input;
-      const { addPromptNode, addPromptNodes, getNextCardPosition, notify, activeCanvas } = ctx;
+    handler: async (input: { prompts: string[]; imageUrl?: string; model?: string; aspectRatio?: string }, ctx) => {
+      const { prompts, imageUrl } = input;
+      const { addPromptNode, addPromptNodes, addImageNodes, getNextCardPosition, notify, activeCanvas } = ctx;
       if (!prompts || prompts.length === 0) return;
 
-      const lastPos = getNextCardPosition();
+      const lastPos = typeof getNextCardPosition === 'function'
+        ? getNextCardPosition()
+        : { x: 100, y: 100 };
+      const model = input.model || ctx?.config?.model || ctx?.selectedModel?.id || 'gemini-2.5-flash';
+      const aspectRatio = input.aspectRatio || ctx?.config?.aspectRatio || '16:9';
+      const canvasId = activeCanvas?.id || ctx?.canvasId || 'default_canvas';
       
       // 空间位置感知避免重叠算法
       const existingPositions = [
@@ -218,22 +226,48 @@ export const canvasTools: AgentToolDefinition[] = [
         startY += 260; // 发生重叠时，向下平移避开
       }
 
-      const nodes = prompts.map((promptText, i) => ({
-        id: 'takeover_ppt_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 9),
-        prompt: promptText,
-        position: { x: startX + i * 440, y: startY },
-        aspectRatio: '16:9',
-        imageSize: '1K',
-        model: 'gemini-2.5-flash',
-        childImageIds: [],
-        timestamp: Date.now()
-      }));
+      const now = Date.now();
+      const imageNodes: any[] = [];
+      const nodes = prompts.map((promptText, i) => {
+        const promptNodeId = 'takeover_ppt_' + now + '_' + i + '_' + Math.random().toString(36).substring(2, 9);
+        const imageNodeId = imageUrl
+          ? 'takeover_img_' + now + '_' + i + '_' + Math.random().toString(36).substring(2, 9)
+          : undefined;
+
+        if (imageUrl && imageNodeId) {
+          imageNodes.push({
+            id: imageNodeId,
+            url: imageUrl,
+            prompt: promptText,
+            aspectRatio,
+            model,
+            canvasId,
+            parentPromptId: promptNodeId,
+            position: { x: startX + i * 440 + 480, y: startY },
+            timestamp: now
+          });
+        }
+
+        return {
+          id: promptNodeId,
+          prompt: promptText,
+          position: { x: startX + i * 440, y: startY },
+          aspectRatio,
+          imageSize: '1K',
+          model,
+          childImageIds: imageNodeId ? [imageNodeId] : [],
+          timestamp: now
+        };
+      });
 
       // 批量事务处理：若支持批量写入则单次写入，避免 React 触发循环重绘
       if (typeof addPromptNodes === 'function') {
         await addPromptNodes(nodes);
       } else {
         await Promise.all(nodes.map(node => addPromptNode(node)));
+      }
+      if (imageNodes.length > 0 && typeof addImageNodes === 'function') {
+        await addImageNodes(imageNodes);
       }
       notify.success('卡片已批量创建', `已成功在画布中生成了 ${prompts.length} 个大纲占位卡片。`);
     }

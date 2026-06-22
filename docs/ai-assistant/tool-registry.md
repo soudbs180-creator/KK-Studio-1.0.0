@@ -76,6 +76,9 @@
 - **`browser.extractProduct`**: 通过 Browser Bridge 提取外部商品页标题、价格、主图和描述摘要，权限为 `confirm`。URL 仅允许 `http://` / `https://`，并拦截 localhost、私有网段和浏览器内部协议。
 - **`browser.generateExternal`**: 通过已连接平台和会话池创建外部网页生图任务，权限为 `confirm`。
 - **`browser.publishDraft`**: 保存到外部社媒草稿箱，权限为 `confirm`，不得直接公开发布。
+- **`browser.inspectPage`**: 通过 Browser Bridge 抓取当前外部浏览器可见视口的脱敏色彩、布局和 OCR/文本摘要，权限为 `confirm`，不得传输完整页面源码。
+- **`browser.openDesktopProject`**: 通过 Browser Bridge 调起已连接的本地桌面 IDE，权限为 `confirm`，不得传输完整本地路径。
+- **`browser.checkLocalLlm`**: 通过 Browser Bridge 诊断本地 LLM 网关和活跃模型，权限为 `safe`，不得由网页端直接探测并伪造成功。
 - **`browser.writeBackDom`**: 回写外部网页 DOM 字段，权限为 `dangerous`，必须二次确认。
 - **断开状态**: 未连接本地守护进程或 Chrome 插件时，Browser 工具必须返回 `setup_required` 或连接引导，不得返回演示成功数据。
 
@@ -131,6 +134,20 @@
 
 - Browser Assistant external automation buttons continue to use `BROWSER_ACTIONS` for `browser.*` ToolRegistry names and Browser Bridge command kinds.
 - Browser Assistant station-internal buttons now use `BROWSER_LOCAL_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts` as the shared local action contract.
+- Browser Assistant local `actionName` values must be unique and namespaced as `browser.local.*`; multiple actions may map to the same ToolRegistry tool only when their UI semantics remain distinct.
 - Product import and result-to-canvas buttons expose `data-browser-local-action` plus `data-agent-tool="canvas.createPromptCards"` because they create KK Studio canvas prompt/product cards rather than clicking PromptBar.
+- Browser Assistant canvas import events delegate to `ToolRegistry.execute('canvas.createPromptCards')`; the App event bridge no longer constructs Prompt/Image nodes directly.
+- `canvas.createPromptCards` accepts optional `imageUrl`, `model`, and `aspectRatio` so external Browser Assistant results can create a prompt card and attach the imported image as a child image node through the same runtime path.
 - ZIP export buttons expose `data-browser-local-action` plus `data-agent-tool="assets.zipOriginals"`.
-- Pipeline run, exported ZIP locate, and sensed clipboard import expose stable `data-browser-local-action` values with no ToolRegistry tool name because they remain local Browser Assistant UI actions.
+- Browser Assistant ZIP export events delegate to `ToolRegistry.execute('assets.zipOriginals')`; the App event bridge only supplies scope, selected ids, active canvas, and notification context.
+- Browser Assistant ZIP buttons dispatch the runtime ZIP event directly; they do not gate on Browser Bridge daemon status or run dev fallback ZIP progress simulation.
+- Browser Assistant ZIP locate actions must not fake OS file-manager success or expose full local filesystem paths; they only provide download-location guidance unless a real bridge result is available.
+- Browser Assistant platform, social channel, and multi-account session status buttons read `browser.getStatus` through `ToolRegistry`; they do not use local random login simulation or dev fallback status results.
+- Pipeline run keeps a stable `data-browser-local-action` identity for Browser Assistant UI/audit grouping, and also declares `data-browser-tool="browser.generateExternal"` plus the shared `generate_external` command kind because execution now runs through the Browser Bridge runtime adapter.
+- Pipeline run no longer posts a `pipeline` task to the inline Web Worker, no longer emits simulated `pipeline_step` / `pipeline_done` results, and no longer reports Dev Fallback success. `setup_required` and `queued` states are surfaced as real Browser Bridge outcomes, while result cards appear only after a Bridge `success` response includes a usable image URL.
+- Sensed clipboard import exposes `data-browser-local-action` plus `data-agent-tool="canvas.createPromptCards"` because it creates a KK Studio Prompt card through the same runtime event bridge as Browser Assistant product/card imports.
+- Clipboard capture reads `navigator.clipboard.readText()` from a user gesture instead of injecting a fixed demo product URL; URL content is imported as a prompt-card payload unless the user explicitly asks for Browser Bridge product extraction.
+- Screen inspect / design translation buttons declare `data-browser-tool="browser.inspectPage"` plus the shared `inspect_page` command kind and call the Browser Bridge runtime adapter; they no longer use local timers, fixed color palettes, canned OCR text, or Dev Fallback success paths.
+- Desktop IDE launch declares `data-browser-tool="browser.openDesktopProject"` plus the shared `open_desktop_project` command kind and uses Browser Bridge runtime outcomes instead of Dev Fallback success.
+- Local LLM gateway diagnostics declare `data-browser-tool="browser.checkLocalLlm"` plus the shared `check_local_llm` command kind and use Browser Bridge runtime outcomes instead of direct browser fetch probes or Dev Fallback success.
+- Exported ZIP locate exposes a stable `data-browser-local-action` value with no ToolRegistry tool name because it remains local Browser Assistant UI guidance.

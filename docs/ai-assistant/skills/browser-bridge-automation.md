@@ -7,14 +7,17 @@
   - `browser.extractProduct`
   - `browser.generateExternal`
   - `browser.publishDraft`
+  - `browser.inspectPage`
+  - `browser.openDesktopProject`
+  - `browser.checkLocalLlm`
   - `browser.writeBackDom`
 
 ## Execution Rules
 
 1. Browser automation must stay inside the existing `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update` chain.
 2. Do not emit raw selector-click scripts or simulate UI coordinates for external pages. Route external-page work through Browser Bridge tools only.
-3. `browser.getStatus` and `browser.openAssistant` are `safe` because they only read connection state or open the local setup view.
-4. `browser.extractProduct`, `browser.generateExternal`, and `browser.publishDraft` are `confirm` tools. The confirmation card must explain target scope, expected output, external platform/session usage, and setup fallback.
+3. `browser.getStatus`, `browser.openAssistant`, and `browser.checkLocalLlm` are `safe` because they only read connection state, open the local setup view, or request a local gateway diagnostic through Browser Bridge.
+4. `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.inspectPage`, and `browser.openDesktopProject` are `confirm` tools. The confirmation card must explain target scope, expected output, external platform/session usage, visible viewport access, desktop IDE launch scope, and setup fallback.
 5. `browser.writeBackDom` is `dangerous`. It must require a second explicit confirmation and must describe the affected external page fields before execution.
 6. URL targets must pass Browser Bridge sanitization: only public `http` / `https` URLs are allowed; local files, browser internals, localhost, and private network hosts are blocked.
 7. Payloads and audit logs must redact API keys, cookies, bearer tokens, JWTs, passwords, and long opaque tokens before storage.
@@ -24,6 +27,9 @@
 
 - Product extraction may return title, price, main image URL, platform, and description summaries.
 - External generation may enqueue or return image results from a user-authorized browser session pool.
+- Page inspection may return sanitized palette, layout, OCR, and visible text summaries only; it must not return complete HTML, cookies, tokens, or full page source.
+- Desktop IDE launch may return a queued/success/failure summary, but it must not expose a full local filesystem path.
+- Local LLM diagnostics may return gateway/model health summaries only; they must not include API keys, bearer tokens, or full local paths.
 - Social publishing must default to draft-only behavior; direct public publishing is not allowed in this skill.
 - DOM write-back must never infer credentials, cookies, or hidden private fields from the external page.
 
