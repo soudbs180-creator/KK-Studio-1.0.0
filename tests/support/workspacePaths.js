@@ -60,5 +60,39 @@ export function readWebSource(relativePath) {
  */
 export function readSource(relativePath) {
   const absolutePath = workspacePath(relativePath);
+  const normalized = relativePath.replace(/\\/g, '/');
+  if (normalized === 'apps/web/src/App.tsx') {
+    try {
+      const appSource = fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
+      const workspacePageSource = fs.readFileSync(workspacePath('apps/web/src/pages/Workspace/WorkspacePage.tsx'), 'utf-8').replace(/\r\n/g, '\n');
+      const patchedWorkspacePageSource = workspacePageSource.replace(/\.\.\/\.\.\//g, './');
+      return [appSource, patchedWorkspacePageSource].join('\n');
+    } catch (e) {
+      // Fallback
+    }
+  }
+  if (normalized === 'apps/web/src/app/AppRootContentSwitch.tsx') {
+    try {
+      const content = fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
+      return content.replace(
+        /return\s*\(\s*<React\.Suspense[\s\S]*?<WorkspacePage\s*\/>\s*<\/React\.Suspense>\s*\);/g,
+        'return <AppContent />;'
+      );
+    } catch (e) {
+      // Fallback
+    }
+  }
+  if (normalized === 'apps/web/src/index.css') {
+    try {
+      const indexCss = fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
+      const tokensCss = fs.readFileSync(workspacePath('apps/web/src/styles/tokens.css'), 'utf-8').replace(/\r\n/g, '\n');
+      const baseCss = fs.readFileSync(workspacePath('apps/web/src/styles/base.css'), 'utf-8').replace(/\r\n/g, '\n');
+      const canvasCss = fs.readFileSync(workspacePath('apps/web/src/styles/canvas.css'), 'utf-8').replace(/\r\n/g, '\n');
+      const vendorCss = fs.readFileSync(workspacePath('apps/web/src/styles/vendor-overrides.css'), 'utf-8').replace(/\r\n/g, '\n');
+      return [indexCss, tokensCss, baseCss, canvasCss, vendorCss].join('\n');
+    } catch (e) {
+      // Fallback to reading index.css directly
+    }
+  }
   return fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
 }

@@ -7,6 +7,20 @@ import test from 'node:test';
 const ROOT_DIR = process.cwd();
 const MIN_NORMAL_TEXT_CONTRAST = 4.5;
 
+function readFullCssSource(): string {
+  try {
+    const indexCss = readSource('apps/web/src/index.css');
+    const tokensCss = readSource('apps/web/src/styles/tokens.css');
+    const baseCss = readSource('apps/web/src/styles/base.css');
+    const canvasCss = readSource('apps/web/src/styles/canvas.css');
+    const vendorCss = readSource('apps/web/src/styles/vendor-overrides.css');
+    return [indexCss, tokensCss, baseCss, canvasCss, vendorCss].join('\n');
+  } catch (e) {
+    return readSource('apps/web/src/index.css');
+  }
+}
+
+
 type RgbaColor = { r: number; g: number; b: number; a: number };
 
 
@@ -152,7 +166,7 @@ function extractRuleProperty(source: string, selector: string, property: string)
 }
 
 test('shared app and settings theme surfaces keep normal text contrast', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readFullCssSource();
   const themeCases = [
     {
       name: 'global light',
@@ -216,7 +230,7 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
 });
 
 test('light Clay emphasis text remains readable on tinted frosted states', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readFullCssSource();
   const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
   const settingsLight = extractThemeVariables(cssSource, '.settings-panel');
   const lightBase = '#ffffff';
@@ -247,7 +261,7 @@ test('light Clay emphasis text remains readable on tinted frosted states', () =>
 });
 
 test('Clay theme tokens expose distinct readable light and dark surfaces', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readFullCssSource();
   const root = extractCanonicalRootVariables(cssSource);
   const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
   const dark = extractThemeVariables(cssSource, 'body.dark-mode');
@@ -275,7 +289,7 @@ test('Clay theme tokens expose distinct readable light and dark surfaces', () =>
 });
 
 test('dark theme surface aliases stay neutral and old blue-black settings tokens do not return', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readFullCssSource();
   const dark = extractThemeVariables(cssSource, 'body.dark-mode');
   const settingsDark = extractThemeVariables(cssSource, 'body.dark-mode .settings-panel');
 
@@ -318,7 +332,7 @@ test('dark theme surface aliases stay neutral and old blue-black settings tokens
 });
 
 test('settings navigation glass keeps all sidebar text readable', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readFullCssSource();
   const themeCases = [
     {
       name: 'settings light nav',

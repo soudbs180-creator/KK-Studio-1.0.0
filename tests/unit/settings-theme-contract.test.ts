@@ -7,7 +7,6 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 
 
-
 test('premium settings tokens expose shared typography, radius, and motion scales for both themes', () => {
   const cssSource = readSource('apps/web/src/index.css');
 

@@ -1,0 +1,287 @@
+/* KK Studio - Design System v2.0 */
+@import "tailwindcss/index.css";
+@import "tw-animate-css";
+
+/* ============================================
+   CSS Variables & Design Tokens
+   ============================================ */
+:root {
+  /* ===== 背景层级 - 亮色模式 ===== */
+  --bg-base: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-input: #ffffff;
+  --input-autofill-bg: var(--bg-input);
+  --input-autofill-text: var(--text-primary);
+  --input-selection-bg: rgb(0 113 227 / 0.18);
+  --input-selection-text: var(--text-primary);
+  --bg-hover: rgb(17 24 39 / 0.04);
+  --bg-canvas: #ffffff;
+
+  /* 兼容旧变*/
+  --bg-primary: var(--bg-base);
+  --bg-secondary: var(--bg-surface);
+  --bg-tertiary: var(--bg-elevated);
+  --bg-color: var(--bg-surface);
+  --menu-bg: var(--bg-elevated);
+
+  /* ===== Toolbar & Glass ===== */
+  --toolbar-bg: #ffffff;
+  --toolbar-bg-dark: #ffffff;
+  --toolbar-hover: rgba(15, 23, 42, 0.04);
+  --toolbar-active: rgb(255 77 139 / 0.14);
+  --toolbar-divider: rgba(15, 23, 42, 0.08);
+
+  /* ===== 边框 ===== */
+  --border-subtle: rgba(17, 24, 39, 0.10);
+  --border-default: rgba(17, 24, 39, 0.14);
+  --border-strong: rgba(17, 24, 39, 0.22);
+  --border-focus: rgba(59, 130, 246, 0.5);
+  /* 兼容旧变*/
+  --border-light: var(--border-subtle);
+  --border-medium: var(--border-default);
+
+  /* ===== 文字 ===== */
+  --text-primary: #0a0a0a;
+  --text-secondary: #3a3a3a;
+  --text-tertiary: #6a6a6a;
+  --text-muted: #9a9a9a;
+  --text-disabled: rgba(148, 163, 184, 0.56);
+  --text-color: var(--text-primary);
+  --text-inverse: #ffffff;
+
+  /* ===== 强调?===== */
+  --accent-blue: #0071e3;
+  --accent-green: #16a34a;
+  --accent-red: #dc2626;
+  --accent-gold: #d97706;
+  --accent-purple: #7c3aed;
+  --accent-cyan: #0891b2;
+  --accent-indigo: #4f46e5;
+  --accent-orange: #ea580c;
+  --connector-color: #4338ca;
+  --accent-pink: #db2777;
+  --accent-coral: #ff6b5a;
+  --accent-coral-glow: rgba(255, 107, 90, 0.45);
+  --accent-coral-ring: rgba(255, 107, 90, 0.12);
+  --accent-color: var(--accent-blue);
+
+  /* ===== 状态语义色 ===== */
+  --state-success-bg: rgba(16, 185, 129, 0.1);
+  --state-success-border: rgba(16, 185, 129, 0.22);
+  --state-success-text: #0f766e;
+  --state-success-muted: rgba(4, 120, 87, 0.82);
+  --state-warning-bg: rgba(245, 158, 11, 0.12);
+  --state-warning-border: rgba(245, 158, 11, 0.24);
+  --state-warning-text: #b45309;
+  --state-warning-muted: rgba(180, 83, 9, 0.82);
+  --state-danger-bg: rgba(239, 68, 68, 0.08);
+  --state-danger-border: rgba(239, 68, 68, 0.22);
+  --state-danger-text: #b91c1c;
+  --state-danger-muted: rgba(185, 28, 28, 0.82);
+  --error: var(--state-danger-text);
+  --state-info-bg: rgba(59, 130, 246, 0.08);
+  --state-info-border: rgba(59, 130, 246, 0.22);
+  --state-info-text: #2563eb;
+  --state-info-muted: rgba(29, 78, 216, 0.82);
+
+  /* ===== 选中高亮 - 淡蓝色扩散光 ===== */
+  --glow-blue: 0 0 18px rgba(59, 130, 246, 0.18);
+  --glow-blue-strong: 0 0 26px rgba(59, 130, 246, 0.24);
+  --glow-indigo: 0 0 18px rgba(99, 102, 241, 0.18);
+  /* Draft 模式 */
+  --glow-green: 0 0 20px rgba(34, 197, 94, 0.3);
+  --glow-gold: 0 0 20px rgba(245, 158, 11, 0.3);
+  --glow-red: 0 0 20px rgba(239, 68, 68, 0.3);
+  --selected-bg: rgb(255 77 139 / 0.14);
+  --selected-border: rgb(255 77 139 / 0.32);
+
+
+  /* ===== 渐变 ===== */
+  --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #4f46e5 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+  --floating-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+  --floating-shell-bg-supported: rgba(255, 255, 255, 0.84);
+  --floating-shell-border: rgba(15, 23, 42, 0.08);
+  --floating-shell-border-strong: rgba(15, 23, 42, 0.12);
+  --floating-shell-shadow: 0 16px 36px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+
+  /* ===== Prompt Bar 专用白色系表?===== */
+  --prompt-bar-glass-bg: rgba(248, 250, 252, 0.88);
+  --prompt-bar-glass-bg-supported: rgba(248, 250, 252, 0.72);
+  --prompt-bar-shell-bg: rgba(248, 250, 252, 0.98);
+  --prompt-bar-shell-border: rgba(15, 23, 42, 0.08);
+  --prompt-bar-shell-border-strong: rgba(15, 23, 42, 0.12);
+  --prompt-bar-shell-hover: rgba(15, 23, 42, 0.05);
+  --prompt-bar-shell-shadow: none;
+  --prompt-bar-glass-shadow: 0 18px 44px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --prompt-bar-footer-frost-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(248, 250, 252, 0.26) 36%, rgba(248, 250, 252, 0.4) 100%);
+  --prompt-bar-footer-frost-border: rgba(15, 23, 42, 0.08);
+  --prompt-bar-footer-frost-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  --prompt-bar-liquid-bg: rgba(255, 255, 255, 0.58);
+  --prompt-bar-liquid-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.7) 100%);
+  --prompt-bar-liquid-group-bg: rgba(255, 255, 255, 0.36);
+  --prompt-bar-liquid-group-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.66) 0%, rgba(248, 250, 252, 0.42) 100%);
+  --prompt-bar-liquid-border: rgba(255, 255, 255, 0.62);
+  --prompt-bar-liquid-border-strong: rgba(15, 23, 42, 0.14);
+  --prompt-bar-liquid-shadow: none;
+  --prompt-bar-liquid-send-shadow: none;
+  --prompt-bar-toggle-active-bg: linear-gradient(135deg, rgb(255 77 139 / 0.22) 0%, rgb(255 176 132 / 0.20) 100%);
+  --prompt-bar-toggle-active-border: rgb(255 77 139 / 0.46);
+  --prompt-bar-toggle-active-text: var(--clay-brand-pink-ink, #8a123f);
+  --prompt-bar-toggle-active-shadow: 0 0 0 1px rgb(255 77 139 / 0.18);
+
+  /* ===== 阴影 ===== */
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 16px 34px rgba(15, 23, 42, 0.08);
+  --shadow-lg: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+  --shadow-xl: 0 34px 72px rgba(15, 23, 42, 0.12);
+  --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --shadow-glow: var(--glow-blue);
+
+  /* ===== 圆角 - 统一规范 ===== */
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ===== 过渡 ===== */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --duration-instant: 50ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+
+  /* 兼容旧变*/
+  --transition-fast: var(--duration-fast) var(--ease-default);
+  --transition-normal: var(--duration-normal) var(--ease-default);
+  --transition-slow: var(--duration-slow) var(--ease-default);
+  --transition-bounce: var(--duration-slow) var(--ease-spring);
+
+  /* ===== 网格 ===== */
+  --grid-dot: rgba(148, 163, 184, 0.18);
+
+  /* ===== 字体系统 - 统一字体?===== */
+  --font-sans: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* ===== 字体大小系统 ===== */
+  /* 标题层级 */
+  --text-h1: 28px;
+  /* 大标题：页面标题、Hero */
+  --text-h2: 22px;
+  /* 中标题：区块标题 */
+  --text-h3: 18px;
+  /* 小标题：卡片标题、列表头 */
+
+  /* 正文层级 */
+  --text-body-lg: 16px;
+  /* 大正文：重要内容 */
+  --text-body-md: 14px;
+  /* 中正文：默认内容（最常用*/
+  --text-body-sm: 13px;
+  /* 小正文：紧凑内容 */
+
+  /* 标注层级 */
+  --text-xs: 12px;
+  /* 大标注：次要信息 */
+  --text-2xs: 11px;
+  /* 中标注：辅助文字 */
+  --text-3xs: 10px;
+  /* 小标注：最小文*/
+
+  /* ===== Premium UI type scale ===== */
+  --ui-text-display: 32px;
+  --ui-text-title-1: 24px;
+  --ui-text-title-2: 20px;
+  --ui-text-title-3: 17px;
+  --ui-text-body-1: 15px;
+  --ui-text-body-2: 14px;
+  --ui-text-caption: 12px;
+  --ui-text-micro: 11px;
+
+  /* ===== Premium UI semantic type aliases ===== */
+  --type-display: var(--ui-text-display);
+  --type-title-1: var(--ui-text-title-1);
+  --type-title-2: var(--ui-text-title-2);
+  --type-title-3: var(--ui-text-title-3);
+  --type-body-1: var(--ui-text-body-1);
+  --type-body-2: var(--ui-text-body-2);
+  --type-caption: var(--ui-text-caption);
+  --type-micro: var(--ui-text-micro);
+
+  /* ===== Premium UI radius scale ===== */
+  --ui-radius-tight: 8px;
+  --ui-radius-control: 12px;
+  --ui-radius-card: 16px;
+  --ui-radius-panel: 20px;
+  --ui-radius-shell: 28px;
+
+  /* ===== Premium UI semantic radius aliases ===== */
+  --radius-control-sm: var(--ui-radius-tight);
+  --radius-control-md: var(--ui-radius-control);
+  --radius-surface-md: var(--ui-radius-card);
+  --radius-surface-lg: var(--ui-radius-panel);
+
+  /* ===== Premium UI density scale ===== */
+  --ui-control-height-compact: 32px;
+  --ui-control-height-default: 40px;
+  --ui-control-height-touch: 44px;
+  --ui-section-gap: 24px;
+  --ui-page-gap: 32px;
+  --radius-control-md: var(--ui-radius-control);
+  --radius-card-lg: var(--ui-radius-card);
+  --radius-panel-xl: var(--ui-radius-panel);
+  --type-display: var(--ui-text-display);
+  --type-title-1: var(--ui-text-title-1);
+  --type-title-2: var(--ui-text-title-2);
+  --type-title-3: var(--ui-text-title-3);
+  --type-body-1: var(--ui-text-body-1);
+  --type-body-2: var(--ui-text-body-2);
+  --type-caption: var(--ui-text-caption);
+  --type-micro: var(--ui-text-micro);
+
+  /* 字重 */
+  --font-normal: 400;
+  /* 正文 */
+  --font-medium: 500;
+  /* 强调正文、按*/
+  --font-semibold: 600;
+  /* 标题、重要文*/
+  --font-bold: 700;
+  /* 特别强调 */
+
+  /* 行高 */
+  --leading-tight: 1.25;
+  /* 标题 */
+  --leading-normal: 1.5;
+  /* 正文 */
+  --leading-relaxed: 1.75;
+  /* 长文阅读 */
+  --ui-line-height-display: 1.15;
+  --ui-line-height-tight: 1.25;
+  --ui-line-height-body: 1.5;
+  --ui-line-height-relaxed: 1.7;
+
+  /* ===== Premium UI motion scale ===== */
+  --ui-duration-hover: 120ms;
+  --ui-duration-toggle: 180ms;
+  --ui-duration-panel: 240ms;
+  --ui-duration-theme: 320ms;
+
+  /* ===== Premium UI semantic motion aliases ===== */
+  --motion-hover: var(--ui-duration-hover);
+  --motion-toggle: var(--ui-duration-toggle);
+  --motion-panel: var(--ui-duration-panel);
+  --motion-theme: var(--ui-duration-theme);
+}

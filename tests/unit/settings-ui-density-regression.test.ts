@@ -6,6 +6,19 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
+function readFullCssSource(): string {
+  try {
+    const indexCss = readSource('apps/web/src/index.css');
+    const tokensCss = readSource('apps/web/src/styles/tokens.css');
+    const baseCss = readSource('apps/web/src/styles/base.css');
+    const canvasCss = readSource('apps/web/src/styles/canvas.css');
+    const vendorCss = readSource('apps/web/src/styles/vendor-overrides.css');
+    return [indexCss, tokensCss, baseCss, canvasCss, vendorCss].join('\n');
+  } catch (e) {
+    return readSource('apps/web/src/index.css');
+  }
+}
+
 
 
 test('shared settings ui primitives use a calmer desktop density scale', () => {
@@ -25,7 +38,7 @@ test('shared settings ui primitives use a calmer desktop density scale', () => {
 });
 
 test('settings workbench compacts mobile surfaces instead of stacking oversized cards', () => {
-  const cssSource = readSource('apps/web/src/index.css') + '\n' + readSource('apps/web/src/styles/settings.css');
+  const cssSource = readFullCssSource() + '\n' + readSource('apps/web/src/styles/settings.css');
   const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(
@@ -166,7 +179,7 @@ test('API workbench overview uses a compact 2x2 mobile card grid', () => {
 });
 
 test('settings workbench uses frosted glass tokens and blur layers', () => {
-  const cssSource = readSource('apps/web/src/index.css') + '\n' + readSource('apps/web/src/styles/settings.css');
+  const cssSource = readFullCssSource() + '\n' + readSource('apps/web/src/styles/settings.css');
 
   assert.match(
     cssSource,

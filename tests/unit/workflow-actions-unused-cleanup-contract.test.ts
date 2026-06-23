@@ -8,9 +8,9 @@ const ROOT_DIR = process.cwd();
 
 
 
-test('workflow actions keep template list ownership in App', () => {
+test('workflow actions keep template list ownership in EmptyCanvasWelcome', () => {
   const hookSource = readSource('apps/web/src/app/useWorkflowActions.ts');
-  const appSource = readSource('apps/web/src/App.tsx');
+  const welcomeSource = readSource('apps/web/src/landing/EmptyCanvasWelcome.tsx');
   const templateSource = readSource('apps/web/src/workflow/templates/workflowTemplates.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
@@ -21,7 +21,7 @@ test('workflow actions keep template list ownership in App', () => {
   assert.match(hookSource, /createSaveWorkflowNode/);
   assert.doesNotMatch(hookSource, /\bWORKFLOW_TEMPLATES\b/);
 
-  assert.match(appSource, /WORKFLOW_TEMPLATES/);
-  assert.match(appSource, /workflowTemplates=\{WORKFLOW_TEMPLATES\}/);
+  assert.match(welcomeSource, /WORKFLOW_TEMPLATES/);
   assert.match(templateSource, /export const WORKFLOW_TEMPLATES/);
 });
+

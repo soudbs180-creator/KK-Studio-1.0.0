@@ -93,7 +93,16 @@ function isAllowedWuyinTargetUrl(targetUrl) {
   if (!raw) return false;
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== 'https:' || !/^api\.wuyinkeji\.com$/i.test(parsed.hostname)) {
+    let allowedHost = 'api.wuyinkeji.com';
+    const envUrl = process.env.SUCHUANG_BASE_URL || '';
+    if (envUrl) {
+      try {
+        allowedHost = new URL(envUrl).hostname;
+      } catch {}
+    }
+
+    const hostnameRegex = new RegExp(`^${allowedHost.replace(/\./g, '\\.')}$`, 'i');
+    if (parsed.protocol !== 'https:' || !hostnameRegex.test(parsed.hostname)) {
       return false;
     }
 
@@ -149,7 +158,10 @@ export default async function handler(req, res) {
   const apiKey = normalizeUserApiSecretForTransport(getHeader(req, 'x-proxy-api-key'));
 
   if (!targetUrl) {
-    const vpsBackend = process.env.VPS_BACKEND_URL || 'https://172-245-156-16.sslip.io';
+    const vpsBackend = process.env.VPS_BACKEND_URL;
+    if (!vpsBackend) {
+      return sendProxyError(res, 500, 'VPS_BACKEND_URL_NOT_CONFIGURED', 'VPS_BACKEND_URL environment variable is not configured.');
+    }
     const dest = `${vpsBackend.replace(/\/+$/, '')}/api/v1/model-proxy/user`;
     const headers = {};
     for (const [key, value] of Object.entries(req.headers || {})) {

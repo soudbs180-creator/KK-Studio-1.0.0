@@ -6,7 +6,8 @@
  * @version 1.5.7
  */
 
-const WUYIN_PRICE_CATALOG_URL = 'https://api.wuyinkeji.com/themes/DigitalBlue/api?action=api_list';
+const WUYIN_BASE_URL = process.env.SUCHUANG_BASE_URL || 'https://api.wuyinkeji.com';
+const WUYIN_PRICE_CATALOG_URL = `${WUYIN_BASE_URL.replace(/\/+$/, '')}/themes/DigitalBlue/api?action=api_list`;
 const FALLBACK_CATALOG = [
   ['video_google_omni', 'google_omni', '/api/async/video_google_omni', 0.1, 'second'],
   ['video_vidu', 'video_vidu', '/api/async/video_vidu', 1, 'second'],
@@ -41,7 +42,7 @@ function getFallbackCatalogItems() {
   return FALLBACK_CATALOG.map(([modelId, modelName, endpointPath, inputPrice, unit], index) => ({
     id: String(index + 1),
     name: modelName,
-    url: `https://api.wuyinkeji.com${endpointPath}`,
+    url: `${WUYIN_BASE_URL.replace(/\/+$/, '')}${endpointPath}`,
     method: endpointPath.includes('/detail') ? 'GET' : 'POST',
     price: `${inputPrice}${unit}`,
     balance_sum: inputPrice,

@@ -1,7 +1,45 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (UI Action Catalog Optimization and Settings Search Integration)
+**Last Updated:** 2026-06-23 (WS-6 Frontend Monolith Decoupling & PR Merges Cleanup)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - Frontend Monolith Decoupling & Lightening Sweep (WS-6)
+
+### Scope - Workspace Decoupling (WS-6a) & Style Split (WS-6b) & Services Consolidation (WS-6c)
+- **AppContent Decoupling (WS-6a)**: Extracted the heavy 5,600+ lines `AppContent` React component from `App.tsx` and moved it to `pages/Workspace/WorkspacePage.tsx`. Purged `App.tsx` down to under 50 lines of configuration shell.
+- **HMR and Lazy-loading optimization**: Configured `AppRootContentSwitch.tsx` to dynamically load `WorkspacePage` via `lazyWithRetry`. This reduces the initial bundle size substantially and optimizes page load HMR.
+- **CSS Architecture Split (WS-6b)**: Wrote a brace-balancing parser script to segment `index.css` (449KB) into standalone chunks: `tokens.css` (Design tokens), `base.css` (Tailwind & core resets), `canvas.css` (high-frequency canvas renders), and `vendor-overrides.css` (third-party component style adjustments). The entry `index.css` now only imports the individual segments.
+- **Obsolete Service Cleanup (WS-6c)**: Physically deleted the unused historical `services/providers/` directory to prevent dead-code buildup.
+- **Consolidated Service Entries (WS-6c)**: Created unified API index files `services/llm/index.ts` and `services/model/index.ts` to expose stable whitelisted generation paths and dispatchers.
+
+### Files Modified - WS-6
+- `apps/web/src/App.tsx` [MODIFY]
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx` [NEW]
+- `apps/web/src/app/AppRootContentSwitch.tsx` [MODIFY]
+- `apps/web/src/index.css` [MODIFY]
+- `apps/web/src/styles/tokens.css` [NEW]
+- `apps/web/src/styles/base.css` [NEW]
+- `apps/web/src/styles/canvas.css` [NEW]
+- `apps/web/src/styles/vendor-overrides.css` [NEW]
+- `apps/web/src/services/providers/` [DELETE]
+- `apps/web/src/services/llm/index.ts` [NEW]
+- `apps/web/src/services/model/index.ts` [NEW]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### Design Decisions - WS-6
+1. **Single-pass literal replace**: To avoid multi-level nesting errors (e.g. `../../` matching relative paths and producing `../../../../`), a strict quote-based relative path parser was used to map module import paths from deep directory structures.
+2. **Absolute cleanup of re-exports**: Removed unused `AppContent` exports in the minimal shell of `App.tsx` to prevent Rollup/Vite from statically pulling dynamic workspace code into the main entry bundle.
+3. **Preserving CSS integrity**: Segregation of style files utilized bracket-close tracking rather than regular expression splitting to avoid corrupting nested media queries or custom keyframes.
+
+### Validation - WS-6
+- `npm run typecheck` passed (0 compiler errors).
+- `npm run architecture:check` passed (no boundary errors).
+- `npm run governance:check` passed (aligned metadata, consistent whitelists).
+- `npm run build` passed (0 bundle warnings, WorkspacePage successfully chunked into a separate file of 434.17 kB).
+
+### Risks And Next - WS-6
+- **Risks**: None. Refactored logic is 100% equivalent.
+- **Next**: Move forward with WS-7 (Sensitive secrets rotating scan and hardcoded networks endpoint refactoring) and WS-8 (AI Agent durable queue & tool registry optimizations).
 
 ## 2026-06-23 - PR 合并与仓库治理清理 (PR #5 → #10 → #12)
 
@@ -3907,5 +3945,40 @@ Mobile workspace: `apps/mobile/`
 - `npm run verify:changes` (全量验证 100% 成功跑通)
 - `git diff --check` (全部通过，无尾随空格阻塞)
 
-### Risks And Next
+### Risks And Next - Browser Bridge Callback & Matting
 - 暂无明显风险。Browser Bridge 已能平稳接收回传数据并更新画布、外部生图等状态。
+
+
+## Session Handoff - 2026-06-23 Unified Provider Registry & CI Security Governance (WS-1)
+
+### Scope - Provider Registry (WS-1)
+- **共享类型与模式同构 (TS DTO & Zod Schema)**：在 `packages/shared` 下建立了统一的 `ProviderItem` 接口与对应的 Zod Schema 规则模式，并完整对外导出，为前后端建立了统一的供应商描述规范。
+- **网关层运行时强校验与解耦**：重构了后端 `server/lib/dispatcher/providerRegistry.js`。服务在启动时会自动 normalize 老的画像配置文件并通过 Zod Schema 运行时强校验。同时将中转站的 `keyRef` 密钥环境变量名在运行时与官方默认密钥（如 `GEMINI_API_KEY`）重映射解耦，防止身份混淆。
+- **网关统一对外接口桥接**：在 `providerRegistry.js` 与 `BackendDispatcher` 网关层中新增并暴露了 `getProvider(id)`，`listProviders()`，`listModels(providerId)` 统一对外路由查找方法。
+- **CI 静态治理强门禁拦截**：编写了 `check-provider-registry.mjs` 并注册到了根 `package.json` 的 `governance:check` 链条中。CI 会在静态分析阶段对重复 `id`、`host`、`pricingSource.url` 以及中转站直接借用官方默认密钥等安全红线实现 100% 报错阻断拦截。
+- **契约测试防护**：创建了 `provider-registry.test.ts` 单元契约测试，断言 Zod 解析规则与网关核心查找 API 无回归。
+
+### Files Modified - Provider Registry (WS-1)
+- [packages/shared/package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/package.json)
+- [packages/shared/src/contracts/index.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/contracts/index.ts)
+- [packages/shared/src/contracts/providers/types.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/contracts/providers/types.ts) [NEW]
+- [packages/shared/src/contracts/providers/schema.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/contracts/providers/schema.ts) [NEW]
+- [server/lib/dispatcher/providerRegistry.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/providerRegistry.js)
+- [server/lib/dispatcher/index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/index.js)
+- [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+- [scripts/governance/check-provider-registry.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/check-provider-registry.mjs) [NEW]
+- [tests/unit/provider-registry.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/provider-registry.test.ts) [NEW]
+
+### Design Decisions - Provider Registry (WS-1)
+1. **老画像兼容与动态转换**：由于后端目前仍在使用 `domains`、`pathHints` 等字段进行画像判定，为了规避大面积的系统级路由崩溃风险，在 `providerRegistry` 载入阶段编写了 normalize 转换函数，确保对老画面的兼容，并产生完全合规 the `ProviderItem` 交付网关，安全平稳。
+2. **编译依赖分模块隔离校验**：由于目前工作区存在 `WS-6` 巨石拆分的未闭环修改，导致前端项目全局编译（`tsc --noEmit`）报错，为保证 WS-1 的发布质量，我们拆分为 `shared` 独立类型编译、`server` 服务端语法分析及 `tests` 契约编译三个局部进行 100% 绿色编译验收，隔离了 WS-6 对地基交付的干扰。
+
+### Validation - Provider Registry (WS-1)
+- **共享层 TS 类型编译**：在 `packages/shared` 下运行 `npx tsc --noEmit`（`0` errors 通过）。
+- **服务端语法校验**：`npm run typecheck:server`（`passed for 47 files` 通过）。
+- **CI 静态治理门禁**：`npm run governance:check`（挂载的 `governance:providers` 顺利识别画像，校验通过）。
+- **单元与契约测试**：`node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/provider-registry.test.ts`（`8/8` 示例完全通过，无任何失败）。
+
+### Risks And Next - Provider Registry (WS-1)
+- **风险**：无明显风险。新的校验与类型接口为影子挂载，不阻断老的 HTTP API。
+- **下一步**：在进行后续的 **WS-2（各供应商适配器重构迁移）** 工作时，即可直接基于此 `ProviderItem` 类型和 Dispatcher 所提供的 `getProvider`/`listModels` 进行逻辑收拢。

@@ -19,6 +19,7 @@ const { getAdapter, normalizeAdapterId } = require('./adapterRegistry');
 const { matchProviderProfile } = require('./providerProfiles');
 const { assertStrictTaskSupported } = require('./strictProviderContracts');
 const metricsCollector = require('./metricsCollector');
+const providerRegistry = require('./providerRegistry');
 
 const httpAgent = new http.Agent({
   keepAlive: true,
@@ -234,6 +235,18 @@ function enforceStrictContractForChannel(channel, unifiedPayload, adapterId) {
 }
 
 class BackendDispatcher {
+  getProvider(providerId) {
+    return providerRegistry.getProvider(providerId);
+  }
+
+  listProviders() {
+    return providerRegistry.listProviders();
+  }
+
+  listModels(providerId) {
+    return providerRegistry.listModels(providerId);
+  }
+
   parseModelRoute(modelId) {
     const rawId = String(modelId || '').trim();
     const separatorIndex = rawId.indexOf('@');

@@ -1,8 +1,9 @@
 import React from 'react';
 import { lazyWithRetry, lazyNamedWithRetry } from '../utils/lazyWithRetry';
 import { createAppRootMode } from '../context/kkaiRuntimeContext';
-import { AppContent } from '../App';
 import { AppStartupScreen } from '../components/common/AppStartupScreen';
+
+const WorkspacePage = lazyWithRetry(() => import('../pages/Workspace/WorkspacePage'));
 
 // 简体中文注释：按需加载管理后台和设置页面根组件
 const SettingsPageRoot = lazyWithRetry(() => import('./SettingsPageRoot'));
@@ -42,7 +43,11 @@ export const AppRootContentSwitch: React.FC = () => {
   if (rootMode === 'settings') {
     return <SettingsPageRootSuspended />;
   }
-  return <AppContent />;
+  return (
+    <React.Suspense fallback={<AppStartupScreen stage="workspace_ready" />}>
+      <WorkspacePage />
+    </React.Suspense>
+  );
 };
 
 export default AppRootContentSwitch;

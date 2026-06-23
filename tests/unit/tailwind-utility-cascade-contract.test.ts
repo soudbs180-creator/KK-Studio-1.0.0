@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('global reset stays in the base layer so Tailwind spacing utilities keep precedence', () => {
-  const source = readSource('apps/web/src/index.css');
+  const source = readSource('apps/web/src/styles/base.css');
   const htmlSource = readSource('apps/web/index.html');
   const resetHeaderIndex = source.indexOf('Reset & Base Styles');
   const layeredResetIndex = source.indexOf('@layer base', resetHeaderIndex);

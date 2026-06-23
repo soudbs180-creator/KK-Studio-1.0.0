@@ -6,8 +6,6 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-
-
 test('desktop settings shell keeps a real inner scroll container and viewport-safe shell sizing', () => {
   const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
@@ -28,7 +26,7 @@ test('desktop settings shell keeps a real inner scroll container and viewport-sa
   assert.match(cssSource, /\.settings-shell-mobile__topbar \{[\s\S]*backdrop-filter: saturate\(180%\) blur\(20px\);/);
   assert.doesNotMatch(
     cssSource,
-    /\.settings-panel \.settings-shell,[\s\S]*\.settings-panel \.settings-shell-page--desktop[\s\S]*border: [12]px solid var\(--settings-shell-border\) !important;/,
+    /\.settings-panel \.settings-shell,\s*\.settings-panel \.settings-shell-page--desktop\s*\{[^}]*border: [12]px solid var\(--settings-shell-border\) !important;/,
   );
   const shellDesktopBlocks = cssSource.match(/(?:\.settings-panel\s+)?\.settings-shell-desktop\s*\{[^}]*\}/g) || [];
   assert.ok(shellDesktopBlocks.length > 0);

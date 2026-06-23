@@ -12,3 +12,5 @@ export * from "./dto/workflow.ts";
 export * from "./enums/status.ts";
 export * from "./events/domain-events.ts";
 export * from "./http/envelope.ts";
+export * from "./providers/types.ts";
+export * from "./providers/schema.ts";
