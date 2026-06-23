@@ -333,7 +333,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   return (
     <div
-      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border py-1.5 px-2 select-none transition-all duration-300 ease-in-out"
+      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-3 select-none transition-all duration-300 ease-in-out"
       style={{
         width: '224px',
         boxShadow: 'var(--frost-card-framework-shadow)',
@@ -344,7 +344,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       }}
     >
       {/* 顶部标题栏 (仅在展开状态下使用) */}
-      <div className="flex items-center justify-between gap-1.5 px-1 h-7 border-b border-[var(--kk-workspace-minimap-border)]/40 pb-1.5 mb-0.5">
+      <div className="flex items-center justify-between gap-1.5 h-7 border-b border-[var(--kk-workspace-minimap-border)]/20 pb-1.5 mb-0.5">
         <div className="flex items-center gap-1.5 select-none">
           <Map size={12} className="text-[var(--accent-coral)]" />
           <span className="text-[10px] font-bold tracking-tight text-[var(--text-secondary)]">导航小地图</span>
@@ -448,7 +448,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         </div>
 
         {/* 缩放控制栏 (移至小地图下方，不再受折叠按钮挤压，使滑块拥有充足的可操作宽度) */}
-        <div className="flex items-center justify-between gap-1.5 px-0.5 h-7 mt-0.5">
+        <div className="flex items-center justify-between gap-1.5 h-7 mt-0.5">
           {/* 缩小按钮 */}
           <button
             onClick={handleZoomOut}

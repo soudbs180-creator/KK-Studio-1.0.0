@@ -124,7 +124,7 @@ const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState =
             ...img,
             generationTime: clampGenerationDurationMs(img.generationTime),
             canvasId: img.canvasId || canvas.id,
-            parentPromptId: img.parentPromptId || 'unknown',
+            parentPromptId: img.parentPromptId || '',
             prompt: img.prompt || '',
             dimensions: img.dimensions || "1024x1024",
             aspectRatio: img.aspectRatio || AspectRatio.SQUARE,
@@ -380,109 +380,115 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
-        // 简体中文注释：生成图加载完成，进度推进至 45%
+        // 简体中文注释：首屏图片加载完成，前台加载任务快速结束，进度推进至 45%
         onProgress?.(45);
 
-        // 简体中文注释：将参考图与首屏之外的其它生成图合并，加入后台批次加载中，确保所有图片被成功捞起与恢复
-        const imageIdsArray = Array.from(referenceImageIds).concat(remainingGeneratedIds);
-
-        if (generatedImageIds.size > MAX_GENERATED_LOAD) {
-            console.log(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading ${MAX_GENERATED_LOAD} nearest to center first, and recovering the remaining ${remainingGeneratedIds.length} in background`);
-        }
-        console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} nearest generated images + ${remainingGeneratedIds.length} background generated images`);
-
-        const imageMap = new Map<string, string>(generatedPreviewMap);
-        const finalHydrationMap = new Map<string, string>();
-        const BATCH_SIZE = 5;
-
-        for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
-            const batch = imageIdsArray.slice(i, i + BATCH_SIZE);
-            const batchPromises = batch.map(id => getImageByQuality(id, ImageQuality.MICRO));
-            const batchResults = await Promise.all(batchPromises);
-
-            batch.forEach((id, index) => {
-                const url = batchResults[index];
-                if (url) {
-                    imageMap.set(id, url);
-                    finalHydrationMap.set(id, url);
+        // 简体中文注释：将非首屏的其它图片及数据迁移等耗时较长、非核心的任务改到后台异步非阻塞执行
+        void (async () => {
+            try {
+                if (generatedImageIds.size > MAX_GENERATED_LOAD) {
+                    console.log(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading ${MAX_GENERATED_LOAD} nearest to center first, and recovering the remaining ${remainingGeneratedIds.length} in background`);
                 }
-            });
+                console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} nearest generated images + ${remainingGeneratedIds.length} background generated images`);
 
-            // 简体中文注释：根据批次计算真实的参考图加载进度百分比（从 45% 爬升至 80%）
-            const batchPct = 45 + Math.round((Math.min(i + BATCH_SIZE, imageIdsArray.length) / Math.max(imageIdsArray.length, 1)) * 35);
-            onProgress?.(batchPct);
+                const imageMap = new Map<string, string>(generatedPreviewMap);
+                const finalHydrationMap = new Map<string, string>();
+                const imageIdsArray = Array.from(referenceImageIds).concat(remainingGeneratedIds);
+                const BATCH_SIZE = 5;
 
-            console.log(`[CanvasContext] Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
-        }
+                for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
+                    const batch = imageIdsArray.slice(i, i + BATCH_SIZE);
+                    const batchPromises = batch.map(id => getImageByQuality(id, ImageQuality.MICRO));
+                    const batchResults = await Promise.all(batchPromises);
 
-        console.log(`[CanvasContext] Successfully loaded ${imageMap.size}/${requiredImageIds.size} required images`);
+                    let batchUpdated = false;
+                    batch.forEach((id, index) => {
+                        const url = batchResults[index];
+                        if (url) {
+                            imageMap.set(id, url);
+                            finalHydrationMap.set(id, url);
+                            batchUpdated = true;
+                        }
+                    });
 
-        if (imageMap.size < requiredImageIds.size) {
-            console.debug(`[CanvasContext] ${requiredImageIds.size - imageMap.size} images not found in IndexedDB`);
-        }
+                    if (batchUpdated) {
+                        applyStartupHydratedImages(finalHydrationMap);
+                    }
 
-        let needsMigration = false;
-        const imagesToMigrate: { id: string; url: string }[] = [];
+                    // 简体中文注释：根据批次计算真实的参考图加载进度百分比（从 45% 爬升至 80%）
+                    const batchPct = 45 + Math.round((Math.min(i + BATCH_SIZE, imageIdsArray.length) / Math.max(imageIdsArray.length, 1)) * 35);
+                    onProgress?.(batchPct);
 
-        startupState.canvases.forEach(c => {
-            c.imageNodes.forEach(img => {
-                if (img.url && img.url.startsWith('data:') && !imageMap.has(img.id)) {
-                    imagesToMigrate.push({ id: img.id, url: img.url });
-                    needsMigration = true;
+                    console.log(`[CanvasContext] Background Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
                 }
-            });
 
-            c.promptNodes.forEach(pn => {
-                if (pn.referenceImages) {
-                    pn.referenceImages.forEach(ref => {
-                        const lookupIds = getReferenceImageLookupIds(ref);
-                        if (ref.data && lookupIds.some((lookupId) => !imageMap.has(lookupId))) {
-                            const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType);
-                            lookupIds.forEach((lookupId) => {
-                                if (!imageMap.has(lookupId)) {
-                                    imagesToMigrate.push({ id: lookupId, url: fullUrl });
-                                    needsMigration = true;
+                console.log(`[CanvasContext] Successfully loaded ${imageMap.size}/${requiredImageIds.size} required images in background`);
+
+                if (imageMap.size < requiredImageIds.size) {
+                    console.debug(`[CanvasContext] ${requiredImageIds.size - imageMap.size} images not found in IndexedDB`);
+                }
+
+                let needsMigration = false;
+                const imagesToMigrate: { id: string; url: string }[] = [];
+
+                startupState.canvases.forEach(c => {
+                    c.imageNodes.forEach(img => {
+                        if (img.url && img.url.startsWith('data:') && !imageMap.has(img.id)) {
+                            imagesToMigrate.push({ id: img.id, url: img.url });
+                            needsMigration = true;
+                        }
+                    });
+
+                    c.promptNodes.forEach(pn => {
+                        if (pn.referenceImages) {
+                            pn.referenceImages.forEach(ref => {
+                                const lookupIds = getReferenceImageLookupIds(ref);
+                                if (ref.data && lookupIds.some((lookupId) => !imageMap.has(lookupId))) {
+                                    const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType);
+                                    lookupIds.forEach((lookupId) => {
+                                        if (!imageMap.has(lookupId)) {
+                                            imagesToMigrate.push({ id: lookupId, url: fullUrl });
+                                            needsMigration = true;
+                                        }
+                                    });
                                 }
                             });
                         }
                     });
-                }
-            });
-        });
+                });
 
-        if (needsMigration) {
-            console.log(`[CanvasContext] Found ${imagesToMigrate.length} images to migrate. Starting background non-blocking migration...`);
-            // 简体中文注释：使用后台异步分批执行迁移，防止串行同步阻塞 IndexedDB 长时间卡死页面加载
-            void (async () => {
-                let migratedCount = 0;
-                const BATCH_SIZE = 5;
-                for (let i = 0; i < imagesToMigrate.length; i += BATCH_SIZE) {
-                    const batch = imagesToMigrate.slice(i, i + BATCH_SIZE);
-                    await Promise.all(batch.map(async (img) => {
-                        try {
-                            await saveImage(img.id, img.url);
-                            imageMap.set(img.id, img.url);
-                            finalHydrationMap.set(img.id, img.url);
-                        } catch (err) {
-                            console.error(`[CanvasContext] Background migration failed for ${img.id}:`, err);
-                        }
-                    }));
-                    migratedCount += batch.length;
-                    const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
-                    onProgress?.(migratePct);
+                if (needsMigration) {
+                    console.log(`[CanvasContext] Found ${imagesToMigrate.length} images to migrate. Starting background non-blocking migration...`);
+                    let migratedCount = 0;
+                    const BATCH_SIZE = 5;
+                    const migrationHydrationMap = new Map<string, string>();
+                    for (let i = 0; i < imagesToMigrate.length; i += BATCH_SIZE) {
+                        const batch = imagesToMigrate.slice(i, i + BATCH_SIZE);
+                        await Promise.all(batch.map(async (img) => {
+                            try {
+                                await saveImage(img.id, img.url);
+                                imageMap.set(img.id, img.url);
+                                migrationHydrationMap.set(img.id, img.url);
+                            } catch (err) {
+                                console.error(`[CanvasContext] Background migration failed for ${img.id}:`, err);
+                            }
+                        }));
+                        migratedCount += batch.length;
+                        const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
+                        onProgress?.(migratePct);
+                    }
+                    if (migrationHydrationMap.size > 0) {
+                        applyStartupHydratedImages(migrationHydrationMap);
+                    }
+                    console.log(`[CanvasContext] Background migration of ${imagesToMigrate.length} images completed.`);
                 }
-                if (finalHydrationMap.size > 0) {
-                    applyStartupHydratedImages(finalHydrationMap);
-                }
-                console.log(`[CanvasContext] Background migration of ${imagesToMigrate.length} images completed.`);
-            })();
-        } else {
-            if (finalHydrationMap.size > 0) {
-                applyStartupHydratedImages(finalHydrationMap);
+            } catch (err) {
+                console.error('[CanvasContext] Background image recovery error:', err);
+            } finally {
+                // 简体中文注释：后台完全收尾，将进度推至 90%
+                onProgress?.(90);
             }
-        }
-        // 简体中文注释：图片载入及迁移全流程完毕，更新至 90%
-        onProgress?.(90);
+        })();
     }, [applyStartupHydratedImages]);
 
     // Load image URLs from IndexedDB AND Restore Folder Handle
