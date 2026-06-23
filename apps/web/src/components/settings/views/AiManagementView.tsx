@@ -9,22 +9,27 @@ import {
   Plus,
   Trash2,
   Edit,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   X,
   Sparkles,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { KK_LAYER } from '@kk/ui';
 import type { CapabilityRole, CapabilityRouteAssignment } from '../../../types';
 import {
   getCapabilityRouteAssignments,
   subscribeCapabilityRouteAssignments,
-  upsertCapabilityRouteAssignment,
 } from '../../../services/api/capabilityRouteAssignments';
 import keyManager, { type KeySlot, type ThirdPartyProvider } from '../../../services/auth/keyManager';
 import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
 import { knowledgeStore, type AgentSkillRecord } from '../../../features/ai-assistant-runtime/knowledge/KnowledgeStore';
+import {
+  AI_MANAGEMENT_ACTIONS,
+  AI_MANAGEMENT_SKILL_TOOL_OPTIONS,
+} from '../../../features/ai-assistant-runtime';
 import {
   SETTINGS_PANEL_STYLE,
   SETTINGS_INPUT_CLASSNAME,
@@ -36,7 +41,7 @@ import {
   SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
-import { SettingToggle, SettingSelect, SettingInput } from '../ui/index';
+import { SettingInput } from '../ui/index';
 
 const PRESETS_STORAGE_KEY = 'kk_capability_presets_v1';
 
@@ -66,16 +71,6 @@ const defaultPresets: LocalPresetsState = {
   },
 };
 
-const SYSTEM_TOOLS_LIST = [
-  { value: 'canvas.getState', label: 'canvas.getState (获取画布及卡片列表状态)' },
-  { value: 'canvas.getSelectedNodes', label: 'canvas.getSelectedNodes (获取当前框选的卡片详情)' },
-  { value: 'canvas.createPromptCards', label: 'canvas.createPromptCards (在画布批量创建提示词卡片)' },
-  { value: 'canvas.createImageCards', label: 'canvas.createImageCards (在画布批量创建图片卡片)' },
-  { value: 'canvas.arrangeNodes', label: 'canvas.arrangeNodes (排版与自动整理所选卡片)' },
-  { value: 'assets.zipOriginals', label: 'assets.zipOriginals (打包下载选中图片的高清原图)' },
-  { value: 'generation.createBatchJob', label: 'generation.createBatchJob (发起并发批量绘图调度任务)' },
-];
-
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
@@ -92,10 +87,9 @@ interface CapabilityCardProps {
   assignment: CapabilityRouteAssignment;
   preset: CapabilityPresetDetail;
   isExpanded: boolean;
-  capabilityRouteOptions: { value: string; label: string }[];
-  getRouteModelOptions: (channelId: string) => { value: string; label: string }[];
+  getRouteLabel: (channelId: string) => string;
   onToggleExpand: () => void;
-  onUpdateCapability: (role: CapabilityRole, patch: Partial<Omit<CapabilityRouteAssignment, 'role' | 'updatedAt'>>) => void;
+  onOpenCapabilityRoutes: () => void;
   onSavePreset: (role: string, updated: CapabilityPresetDetail) => void;
   pick: <T>(zh: T, en: T) => T;
 }
@@ -105,10 +99,9 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
   assignment,
   preset,
   isExpanded,
-  capabilityRouteOptions,
-  getRouteModelOptions,
+  getRouteLabel,
   onToggleExpand,
-  onUpdateCapability,
+  onOpenCapabilityRoutes,
   onSavePreset,
   pick,
 }) => {
@@ -160,8 +153,10 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
   };
 
   const Icon = getRoleIcon(role);
-  const primaryModels = getRouteModelOptions(assignment.primaryRouteId || '');
-  const fallbackModels = getRouteModelOptions(assignment.fallbackRouteId || '');
+  const primaryRouteLabel = getRouteLabel(assignment.primaryRouteId || '');
+  const fallbackRouteLabel = getRouteLabel(assignment.fallbackRouteId || '');
+  const primaryModelLabel = assignment.primaryModelId || pick('自动选择', 'Auto detect');
+  const fallbackModelLabel = assignment.fallbackModelId || pick('自动选择', 'Auto detect');
 
   return (
     <div
@@ -196,34 +191,49 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
         </div>
 
         <div className="flex items-center gap-3">
-          <SettingToggle
-            label={pick('启用该能力', 'Enable')}
-            checked={assignment.enabled}
-            onChange={(checked) => onUpdateCapability(role, { enabled: checked })}
-          />
-          <SettingsActionButton size="sm" onClick={onToggleExpand} icon={isExpanded ? ChevronUp : ChevronDown}>
+          <span
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+              assignment.enabled
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                : 'border-slate-500/20 bg-slate-500/10 text-slate-500'
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${assignment.enabled ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+            {assignment.enabled ? pick('路由已启用', 'Route enabled') : pick('路由已停用', 'Route disabled')}
+          </span>
+          <SettingsActionButton
+            size="sm"
+            onClick={onToggleExpand}
+            icon={isExpanded ? ChevronUp : ChevronDown}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.toggleCapabilitySettings.uiAction}
+          >
             {isExpanded ? pick('折叠设置', 'Collapse') : pick('能力设置', 'Capability settings')}
           </SettingsActionButton>
         </div>
       </div>
 
-      {assignment.enabled && (
-        <div className="grid gap-4 md:grid-cols-2 p-4 rounded-2xl border transition-all duration-300" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
-          <SettingSelect
-            label={pick('主通道', 'Primary Route')}
-            value={assignment.primaryRouteId || ''}
-            options={capabilityRouteOptions}
-            onChange={(val) => onUpdateCapability(role, { primaryRouteId: val, primaryModelId: '' })}
-          />
-          <SettingSelect
-            label={pick('首选模型', 'Primary Model')}
-            value={assignment.primaryModelId || ''}
-            options={[{ value: '', label: pick('自动选择', 'Auto detect') }, ...primaryModels]}
-            onChange={(val) => onUpdateCapability(role, { primaryModelId: val })}
-            disabled={!assignment.primaryRouteId}
-          />
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] p-4 rounded-2xl border transition-all duration-300" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{pick('主路由', 'Primary route')}</div>
+            <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">{primaryRouteLabel}</div>
+            <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{primaryModelLabel}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{pick('后备路由', 'Fallback route')}</div>
+            <div className="mt-1 text-[13px] font-semibold text-[var(--text-primary)]">{fallbackRouteLabel}</div>
+            <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{fallbackModelLabel}</div>
+          </div>
         </div>
-      )}
+        <SettingsActionButton
+          size="sm"
+          icon={ArrowRight}
+          onClick={onOpenCapabilityRoutes}
+          data-ai-management-action={AI_MANAGEMENT_ACTIONS.openCapabilityRoutes.uiAction}
+        >
+          {pick('去 API 管理配置', 'Configure in API Management')}
+        </SettingsActionButton>
+      </div>
 
       {isExpanded && (
         <div className="mt-4 pt-4 border-t space-y-5 animate-in slide-in-from-top-2 duration-200" style={{ borderColor: 'var(--border-light)' }}>
@@ -261,13 +271,28 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
                   className="flex-1 accent-[var(--clay-ink)] h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
                 />
                 <div className="flex gap-1">
-                  <button type="button" onClick={() => handleTempChange(0.2)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleTempChange(0.2)}
+                    data-ai-management-action={AI_MANAGEMENT_ACTIONS.setTemperaturePrecise.uiAction}
+                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
+                  >
                     {pick('精准', 'Precise')}
                   </button>
-                  <button type="button" onClick={() => handleTempChange(0.7)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleTempChange(0.7)}
+                    data-ai-management-action={AI_MANAGEMENT_ACTIONS.setTemperatureBalanced.uiAction}
+                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
+                  >
                     {pick('平衡', 'Balanced')}
                   </button>
-                  <button type="button" onClick={() => handleTempChange(1.3)} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleTempChange(1.3)}
+                    data-ai-management-action={AI_MANAGEMENT_ACTIONS.setTemperatureCreative.uiAction}
+                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] border cursor-pointer hover:bg-slate-200"
+                  >
                     {pick('创造', 'Creative')}
                   </button>
                 </div>
@@ -275,21 +300,6 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
             </div>
 
             <div className="space-y-4">
-              <div className="grid gap-3 grid-cols-2">
-                <SettingSelect
-                  label={pick('后备通道', 'Backup Route')}
-                  value={assignment.fallbackRouteId || ''}
-                  options={capabilityRouteOptions}
-                  onChange={(val) => onUpdateCapability(role, { fallbackRouteId: val, fallbackModelId: '' })}
-                />
-                <SettingSelect
-                  label={pick('后备模型', 'Backup Model')}
-                  value={assignment.fallbackModelId || ''}
-                  options={[{ value: '', label: pick('自动选择', 'Auto detect') }, ...fallbackModels]}
-                  onChange={(val) => onUpdateCapability(role, { fallbackModelId: val })}
-                  disabled={!assignment.fallbackRouteId}
-                />
-              </div>
               <SettingInput
                 label={pick('单次最大词元数', 'Max Tokens')}
                 value={localMaxTokens.toString()}
@@ -297,6 +307,12 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
                 onChange={(val) => handleMaxTokensChange(parseInt(val, 10) || 2048)}
                 placeholder="2048"
               />
+              <div className="rounded-2xl border p-4 text-[12px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
+                <div className="font-semibold text-[var(--text-primary)]">{pick('路由由 API 管理统一维护', 'Routes are owned by API Management')}</div>
+                <p className="mt-1 leading-relaxed">
+                  {pick('这里仅维护 AI 行为预设。供应商、模型、主备路由和开关状态都在 API 管理的能力分配模块中配置。', 'This page only manages AI behavior presets. Providers, models, primary/fallback routes, and route enablement live in API Management capability roles.')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -350,8 +366,23 @@ const SkillCard: React.FC<SkillCardProps> = React.memo(({ skill, onEdit, onDelet
     </div>
 
     <div className="flex gap-2 justify-end pt-4 mt-4 border-t" style={{ borderColor: 'var(--border-light)' }}>
-      <SettingsActionButton size="sm" icon={Edit} onClick={onEdit}>{pick('编辑', 'Edit')}</SettingsActionButton>
-      <SettingsActionButton size="sm" tone="danger" icon={Trash2} onClick={onDelete}>{pick('删除', 'Delete')}</SettingsActionButton>
+      <SettingsActionButton
+        size="sm"
+        icon={Edit}
+        onClick={onEdit}
+        data-ai-management-action={AI_MANAGEMENT_ACTIONS.editSkill.uiAction}
+      >
+        {pick('编辑', 'Edit')}
+      </SettingsActionButton>
+      <SettingsActionButton
+        size="sm"
+        tone="danger"
+        icon={Trash2}
+        onClick={onDelete}
+        data-ai-management-action={AI_MANAGEMENT_ACTIONS.deleteSkill.uiAction}
+      >
+        {pick('删除', 'Delete')}
+      </SettingsActionButton>
     </div>
   </div>
 ));
@@ -404,7 +435,12 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
               {pick('配置触发语、描述、授权工具和执行提示词。', 'Define trigger, description, allowed tools, and instructions.')}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 hover:bg-[var(--toolbar-hover)] rounded-full transition-colors cursor-pointer border-none bg-transparent">
+          <button
+            type="button"
+            onClick={onClose}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.closeSkillModal.uiAction}
+            className="p-1.5 hover:bg-[var(--toolbar-hover)] rounded-full transition-colors cursor-pointer border-none bg-transparent"
+          >
             <X size={18} className="text-[var(--text-secondary)]" />
           </button>
         </div>
@@ -420,9 +456,15 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
           <div className="space-y-2">
             <label className={SETTINGS_LABEL_CLASSNAME}>{pick('授权工具', 'Authorized tools')}</label>
             <div className="rounded-2xl border p-3.5 space-y-2.5 max-h-[160px] overflow-y-auto" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}>
-              {SYSTEM_TOOLS_LIST.map((tool) => (
+              {AI_MANAGEMENT_SKILL_TOOL_OPTIONS.map((tool) => (
                 <label key={tool.value} className="flex items-start gap-2.5 text-xs text-[var(--text-primary)] cursor-pointer select-none">
-                  <input type="checkbox" checked={tools.includes(tool.value)} onChange={() => handleToolToggle(tool.value)} className="mt-0.5 accent-[var(--clay-ink)] cursor-pointer" />
+                  <input
+                    type="checkbox"
+                    checked={tools.includes(tool.value)}
+                    onChange={() => handleToolToggle(tool.value)}
+                    data-ai-management-action={AI_MANAGEMENT_ACTIONS.toggleSkillTool.uiAction}
+                    className="mt-0.5 accent-[var(--clay-ink)] cursor-pointer"
+                  />
                   <span>{tool.label}</span>
                 </label>
               ))}
@@ -439,8 +481,19 @@ const SkillModal: React.FC<SkillModalProps> = React.memo(({ editingSkill, onClos
         </div>
 
         <div className="flex justify-end gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-          <SettingsActionButton onClick={onClose}>{pick('取消', 'Cancel')}</SettingsActionButton>
-          <SettingsActionButton tone="primary" onClick={handleSave}>{pick('保存 Skill', 'Save Skill')}</SettingsActionButton>
+          <SettingsActionButton
+            onClick={onClose}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.cancelSkillModal.uiAction}
+          >
+            {pick('取消', 'Cancel')}
+          </SettingsActionButton>
+          <SettingsActionButton
+            tone="primary"
+            onClick={handleSave}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.saveSkillModal.uiAction}
+          >
+            {pick('保存 Skill', 'Save Skill')}
+          </SettingsActionButton>
         </div>
       </div>
     </div>
@@ -451,6 +504,7 @@ SkillModal.displayName = 'SkillModal';
 
 const AiManagementView: React.FC = () => {
   const { pick } = useLocale();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'capability' | 'skills'>('capability');
   const [capabilityAssignments, setCapabilityAssignments] = useState(() => getCapabilityRouteAssignments());
   const [slots, setSlots] = useState<KeySlot[]>(() => keyManager.getSlots());
@@ -502,28 +556,22 @@ const AiManagementView: React.FC = () => {
     [slots, providers]
   );
 
-  const capabilityRouteOptions = useMemo(
-    () => [
-      { value: '', label: pick('自动选择', 'Automatic') },
-      ...allChannelConfigs.map((channel) => ({
-        value: channel.id,
-        label: channel.id.startsWith('official:') ? `${channel.name} 官方` : `${channel.name} (${channel.baseUrl})`,
-      })),
-    ],
-    [allChannelConfigs, pick]
+  const routeLabelById = useMemo(
+    () => new Map(allChannelConfigs.map((channel) => [
+      channel.id,
+      channel.id.startsWith('official:') ? `${channel.name} 官方` : `${channel.name} (${channel.baseUrl})`,
+    ])),
+    [allChannelConfigs]
   );
 
-  const getRouteModelOptions = useCallback((channelId: string) => {
-    const channel = allChannelConfigs.find((item) => item.id === channelId);
-    if (!channel) return [];
-    return (channel.supportedModels || []).map((model) => ({ value: model, label: model }));
-  }, [allChannelConfigs]);
+  const getRouteLabel = useCallback((channelId: string) => {
+    if (!channelId) return pick('自动选择', 'Automatic');
+    return routeLabelById.get(channelId) || pick('路由已删除或不可用', 'Route deleted or unavailable');
+  }, [pick, routeLabelById]);
 
-  const updateCapability = useCallback((role: CapabilityRole, patch: Partial<Omit<CapabilityRouteAssignment, 'role' | 'updatedAt'>>) => {
-    upsertCapabilityRouteAssignment(role, patch);
-    setCapabilityAssignments(getCapabilityRouteAssignments());
-    notify.success(pick('修改成功', 'Updated'), pick('AI 能力设置已更新。', 'AI capability settings updated.'));
-  }, [pick]);
+  const handleOpenCapabilityRoutes = useCallback(() => {
+    navigate('/settings/api-management');
+  }, [navigate]);
 
   const handleOpenAddSkill = () => {
     setEditingSkill(null);
@@ -580,6 +628,7 @@ const AiManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('capability')}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.switchCapabilitiesTab.uiAction}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-none text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'capability' ? 'bg-[var(--clay-ink)] text-white shadow-md' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
@@ -590,6 +639,7 @@ const AiManagementView: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('skills')}
+            data-ai-management-action={AI_MANAGEMENT_ACTIONS.switchSkillsTab.uiAction}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-none text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'skills' ? 'bg-[var(--clay-ink)] text-white shadow-md' : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
@@ -622,10 +672,9 @@ const AiManagementView: React.FC = () => {
                 assignment={assignment}
                 preset={preset}
                 isExpanded={isExpanded}
-                capabilityRouteOptions={capabilityRouteOptions}
-                getRouteModelOptions={getRouteModelOptions}
+                getRouteLabel={getRouteLabel}
                 onToggleExpand={() => setExpandedRole(isExpanded ? null : role)}
-                onUpdateCapability={updateCapability}
+                onOpenCapabilityRoutes={handleOpenCapabilityRoutes}
                 onSavePreset={handleSavePreset}
                 pick={pick}
               />
@@ -641,7 +690,14 @@ const AiManagementView: React.FC = () => {
                 {pick('配置 AI 助手的触发语、执行提示词和授权工具边界。', 'Configure triggers, instructions, and tool permission boundaries for the AI assistant.')}
               </p>
             </div>
-            <SettingsActionButton tone="primary" icon={Plus} onClick={handleOpenAddSkill}>{pick('新建 Skill', 'Create Skill')}</SettingsActionButton>
+            <SettingsActionButton
+              tone="primary"
+              icon={Plus}
+              onClick={handleOpenAddSkill}
+              data-ai-management-action={AI_MANAGEMENT_ACTIONS.createSkill.uiAction}
+            >
+              {pick('新建 Skill', 'Create Skill')}
+            </SettingsActionButton>
           </div>
 
           {skills.length === 0 ? (

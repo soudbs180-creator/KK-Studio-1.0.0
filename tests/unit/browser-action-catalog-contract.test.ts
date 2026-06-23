@@ -48,6 +48,21 @@ test('Browser local action catalog names station-internal assistant actions and 
   assert.equal(BROWSER_LOCAL_ACTIONS.locateZippedFile.agentToolName, undefined);
   assert.equal(BROWSER_LOCAL_ACTIONS.runPipeline.agentToolName, undefined);
   assert.equal(BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName, 'canvas.createPromptCards');
+  assert.equal(BROWSER_LOCAL_ACTIONS.checkSessionStatus?.agentToolName, 'browser.getStatus');
+  assert.equal(BROWSER_LOCAL_ACTIONS.toggleSessionEnabled?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.addSessionInstance?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.checkSocialChannelStatus?.agentToolName, 'browser.getStatus');
+  assert.equal(BROWSER_LOCAL_ACTIONS.toggleSocialChannelEnabled?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.installPluginPackage?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.toggleClipboardSync?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.readClipboardPayload?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.toggleWasmSandbox?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.translateInspectionToCanvas?.agentToolName, 'canvas.createPromptCards');
+  assert.equal(BROWSER_LOCAL_ACTIONS.previewTakeoverPlan?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.setTakeoverSamplePrompt?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.switchPlaygroundTab?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.setRoutingMode?.agentToolName, undefined);
+  assert.equal(BROWSER_LOCAL_ACTIONS.dismissClipboardPayload?.agentToolName, undefined);
 });
 
 test('Browser tools and Browser Assistant buttons consume the shared browser action catalog', () => {
@@ -84,6 +99,24 @@ test('Browser tools and Browser Assistant buttons consume the shared browser act
   assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.runPipeline\.actionName\}/);
   assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.importClipboardPayload\.actionName\}/);
   assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.importClipboardPayload\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.checkSessionStatus\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.checkSessionStatus\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.toggleSessionEnabled\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.addSessionInstance\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.checkSocialChannelStatus\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.checkSocialChannelStatus\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.toggleSocialChannelEnabled\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.installPluginPackage\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.toggleClipboardSync\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.readClipboardPayload\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.toggleWasmSandbox\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.translateInspectionToCanvas\.actionName\}/);
+  assert.match(viewSource, /data-agent-tool=\{BROWSER_LOCAL_ACTIONS\.translateInspectionToCanvas\.agentToolName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.previewTakeoverPlan\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.setTakeoverSamplePrompt\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.switchPlaygroundTab\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.setRoutingMode\.actionName\}/);
+  assert.match(viewSource, /data-browser-local-action=\{BROWSER_LOCAL_ACTIONS\.dismissClipboardPayload\.actionName\}/);
 });
 
 test('Browser Assistant pipeline button declares the Browser Bridge tool it executes', () => {

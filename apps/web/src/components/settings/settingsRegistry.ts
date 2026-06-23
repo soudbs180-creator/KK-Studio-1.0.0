@@ -47,6 +47,7 @@ export interface SettingsNavItem {
   icon: ComponentType<{ size?: number; className?: string }>;
   section: SettingsNavSectionId;
   path: string;
+  keywords?: string[];
 }
 
 export interface SettingsViewMetaEntry {
@@ -96,6 +97,7 @@ interface SettingsNavItemDefinition {
   descriptionZh: string;
   descriptionEn: string;
   featureFlag?: 'billing';
+  keywords?: string[];
 }
 
 const SHELL_COPY = {
@@ -286,6 +288,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: LayoutDashboard,
     section: 'workspace',
     path: SETTINGS_PATHS.dashboard,
+    keywords: ['总览', '状态', 'overview', 'status'],
   },
   {
     id: 'consumption-records',
@@ -297,6 +300,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     section: 'workspace',
     path: SETTINGS_PATHS['consumption-records'],
     featureFlag: 'billing',
+    keywords: ['计费', '账单', '消费', '消耗', '用量', '积分记录', '充值记录', '消费记录', '积分明细', 'API消耗', '消费明细', '账本明细', 'billing', 'recharge', 'cost', 'spend', 'balance'],
   },
   {
     id: 'api-management',
@@ -307,6 +311,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
+    keywords: ['供应商', '接口', '渠道', '密钥', 'api设置', 'api工作台', '接口设置', '接口管理', '模型配置', '模型设置', '供应商配置', '密钥管理', '模型列表', 'provider', 'api', 'key', 'token'],
   },
   {
     id: 'ai-management',
@@ -317,6 +322,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: Wand2,
     section: 'workspace',
     path: SETTINGS_PATHS['ai-management'],
+    keywords: ['能力预设', '模型管理', 'skill', 'llm', 'ai', 'ai管理', '助手'],
   },
   {
     id: 'storage-settings',
@@ -327,6 +333,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: HardDrive,
     section: 'system',
     path: SETTINGS_PATHS['storage-settings'],
+    keywords: ['存储', '容量', '空间', '资源存储', '清理缓存', '清理', '清空数据', 'storage', 'clean'],
   },
   {
     id: 'appearance-motion',
@@ -337,6 +344,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: Palette,
     section: 'system',
     path: SETTINGS_PATHS['appearance-motion'],
+    keywords: ['外观', '动态', '毛玻璃', '透明', 'appearance', 'theme', 'motion'],
   },
   {
     id: 'system-logs',
@@ -347,6 +355,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: ScrollText,
     section: 'system',
     path: SETTINGS_PATHS['system-logs'],
+    keywords: ['日志', '错误', '告警', '排障', 'logs', 'error', 'warning'],
   },
   {
     id: 'browser-assistant',
@@ -357,6 +366,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: Globe,
     section: 'system',
     path: SETTINGS_PATHS['browser-assistant'],
+    keywords: ['浏览器助手', '多端控制', '插件', '连接', 'browser', 'extension', 'browser assistant', 'browser bridge', 'chrome bridge', '浏览器接管', '网页直通'],
   },
 ];
 
@@ -398,6 +408,9 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
   if (currentPath.startsWith('ai-management')) return 'ai-management';
   if (currentPath.startsWith('appearance-motion')) return 'appearance-motion';
   if (currentPath.startsWith('user-profile')) return 'user-profile';
+  if (currentPath.startsWith('storage-settings')) return 'storage-settings';
+  if (currentPath.startsWith('system-logs')) return 'system-logs';
+  if (currentPath.startsWith('browser-assistant')) return 'browser-assistant';
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
   }
@@ -429,6 +442,7 @@ export function getSettingsNavItems(language: AppLanguage): SettingsNavItem[] {
       icon: item.icon,
       section: item.section,
       path: item.path,
+      keywords: item.keywords,
     }));
 }
 
@@ -469,4 +483,21 @@ export function getSettingsSearchPlaceholder(
 ): string {
   void view;
   return pickByLanguage(language, '筛选设置导航', 'Filter settings navigation');
+}
+
+export function matchSettingsNavItem(
+  item: SettingsNavItem,
+  query: string,
+): boolean {
+  const keyword = query.trim().toLowerCase();
+  if (!keyword) return true;
+
+  const content = [
+    item.label,
+    item.description,
+    item.id,
+    ...(item.keywords || []),
+  ].join(' ').toLowerCase();
+
+  return content.includes(keyword);
 }

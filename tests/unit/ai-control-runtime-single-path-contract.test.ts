@@ -102,6 +102,20 @@ test('Browser Assistant status check buttons read Browser Bridge status through 
   }
 });
 
+test('Browser Assistant Connectivity Doctor reads Browser Bridge status through ToolRegistry', () => {
+  const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
+  const handler = extractBetween(
+    viewSource,
+    'const checkConnectivity =',
+    'const checkPlatformLogin ='
+  );
+
+  assert.match(handler, /toolRegistryInstance\.execute\('browser\.getStatus'/);
+  assert.match(handler, /applyBrowserStatusSnapshot/);
+  assert.doesNotMatch(handler, /window\.setTimeout/);
+  assert.doesNotMatch(handler, /daemonStatus === 'connected'/);
+});
+
 test('Browser Assistant ZIP locate action does not fake local file manager success', () => {
   const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
   const handler = extractBetween(
@@ -121,7 +135,7 @@ test('Browser Assistant pipeline runs through Browser Bridge runtime instead of 
   const handler = extractBetween(
     viewSource,
     'const handleRunPipeline =',
-    'const handleTakeoverSimulate ='
+    'const handlePreviewTakeoverPlan ='
   );
 
   assert.match(handler, /dispatchBrowserCommand\(/);
@@ -140,13 +154,13 @@ test('Browser Assistant clipboard import delegates sensed payloads to canvas pro
   const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
   const handler = extractBetween(
     viewSource,
-    'const handleImportSimulatedClipboard =',
+    'const handleImportClipboardPayload =',
     'const handleScreenInspect ='
   );
 
   assert.match(handler, /window\.dispatchEvent\(new CustomEvent\('takeover-create-prompt-cards'/);
-  assert.match(handler, /simulatedClipboardPayload\.content/);
-  assert.match(handler, /setSimulatedClipboardPayload\(null\)/);
+  assert.match(handler, /clipboardPayload\.content/);
+  assert.match(handler, /setClipboardPayload\(null\)/);
   assert.doesNotMatch(handler, /自动解析/);
   assert.doesNotMatch(handler, /notify\.success\('导入成功'/);
 });
@@ -155,8 +169,8 @@ test('Browser Assistant clipboard capture reads the browser clipboard instead of
   const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
   const handler = extractBetween(
     viewSource,
-    'const handleSimulateClipboard =',
-    'const handleImportSimulatedClipboard ='
+    'const handleReadClipboardPayload =',
+    'const handleImportClipboardPayload ='
   );
 
   assert.match(handler, /navigator\.clipboard\.readText\(\)/);
@@ -204,7 +218,7 @@ test('Browser Assistant local LLM gateway test uses Browser Bridge instead of de
   const handler = extractBetween(
     viewSource,
     'const handleTestLocalLlm =',
-    'const handleSimulateClipboard ='
+    'const handleReadClipboardPayload ='
   );
 
   assert.match(handler, /dispatchBrowserCommand\(/);
@@ -223,6 +237,13 @@ test('Browser Assistant settings surface no longer exposes a dead Dev Fallback t
   assert.doesNotMatch(viewSource, /kk_browser_dev_fallback/);
   assert.doesNotMatch(viewSource, /\[Dev Fallback\]/);
   assert.doesNotMatch(viewSource, />\s*演示数据 \(Dev Fallback\)\s*</);
+});
+
+test('Browser Assistant runtime surface no longer labels live Bridge flows as simulation', () => {
+  const viewSource = readSource('apps/web/src/components/settings/views/BrowserAssistantView.tsx');
+
+  assert.doesNotMatch(viewSource, /仿真/);
+  assert.doesNotMatch(viewSource, /模拟/);
 });
 
 test('Browser Assistant auto clipping worker does not replace product images with a stock demo asset', () => {

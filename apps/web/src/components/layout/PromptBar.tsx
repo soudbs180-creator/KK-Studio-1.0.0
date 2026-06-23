@@ -59,6 +59,7 @@ import {
     type ReferenceMentionAnchor,
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
+import { PROMPT_COMPOSER_ACTIONS } from '../../features/ai-assistant-runtime';
 
 // [FIX] Imports for PPT Outline generation
 import type { PPTOutline, PPTStyleSpec } from '../../utils/pptPrompts';
@@ -478,7 +479,10 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                 {/* 磨砂玻璃呼吸外框按钮 */}
                 <button
+                    type="button"
                     disabled={isDisabled}
+                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                    data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
                     onTouchStart={sendTouchStart}
                     onTouchEnd={sendTouchEnd}
                     onTouchCancel={sendTouchCancel}
@@ -610,7 +614,10 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             <>
                 <style>{arrowAnimStyle}</style>
                 <button
+                    type="button"
                     onClick={onClick}
+                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                    data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
                     onMouseDown={() => setIsPressed(true)}
@@ -663,8 +670,11 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         <>
             <style>{arrowAnimStyle}</style>
             <button
+                type="button"
                 onClick={onClick}
                 disabled={isDisabled}
+                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
                 onMouseDown={() => { if (!isDisabled && !isInsufficient) setIsPressed(true); }}
@@ -898,6 +908,8 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
 
     return (
         <button
+            type="button"
+            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectModel.uiAction}
             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
             ${isExclusive
                     ? (isMobile
@@ -1059,6 +1071,7 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
             {/* 常驻右侧置顶图标 */}
             <button
                 type="button"
+                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleModelPin.uiAction}
                 onClick={(e) => {
                     e.stopPropagation();
                     onTogglePin(modelId);
@@ -3554,6 +3567,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             {groundingSupported && (
                 <button
+                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleGrounding.uiAction}
                     className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableGrounding
                         ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
                         : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
@@ -3572,6 +3586,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             )}
             {imageSearchSupported && (
                 <button
+                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleImageSearch.uiAction}
                     className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableImageSearch
                         ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
                         : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
@@ -3622,6 +3637,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         {['自动', '30s', '60s', '120s', '240s'].map(dur => (
                             <button
                                 key={dur}
+                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectAudioDuration.uiAction}
                                 className={`kk-prompt-bar-deep-audio-option px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(config.audioDuration || '自动') === dur
                                     ? 'kk-prompt-bar-deep-audio-option--active'
                                     : ''
@@ -3713,6 +3729,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         />
                         {modelSearch && (
                             <button
+                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearModelSearch.uiAction}
                                 onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
                                 className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                             >
@@ -3981,6 +3998,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     {/* 返回导航栏 */}
                                     <div className="flex items-center gap-2 border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.closeProviderModels.uiAction}
                                             onClick={() => setDesktopActiveProvider(null)}
                                             className="text-[10px] font-bold px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--prompt-bar-shell-border-strong)] flex items-center gap-1 active:scale-95 transition-all"
                                         >
@@ -4075,6 +4093,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             <>
                 <div
                     id="prompt-bar-container"
+                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.expandMobileComposer.uiAction}
                     className="kk-prompt-bar-mobile-collapse-handle"
                     style={{ zIndex: KK_LAYER.promptComposer }}
                     onClick={(e) => {
@@ -4130,6 +4149,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     return (
                                         <button
                                             key={option.mode}
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectMobileMode.uiAction}
                                             className={`w-full flex items-center justify-center py-1.5 rounded-xl transition-all duration-200 border text-[11px] font-bold ${isSelected ? 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] text-[var(--accent-coral)] shadow-sm' : 'border-transparent text-[var(--text-secondary)] active:text-[var(--text-primary)]'}`}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -4141,6 +4161,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     );
                                 })}
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.collapseMobileComposer.uiAction}
                                     className="flex items-center justify-center py-1.5 rounded-xl border border-transparent text-[var(--text-secondary)] active:scale-95 transition-all duration-200"
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -4170,6 +4191,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-500">从此图继续创作</div>
                                     </div>
                                     <button
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearSource.uiAction}
                                         onClick={onClearSource}
                                         className="flex items-center justify-center w-6 h-6 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-500"
                                     >
@@ -4196,6 +4218,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             onClick={handleReferencePreview}
                                                         />
                                                         <button
+                                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.removeReferenceImage.uiAction}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 removeReferenceImage(img.id);
@@ -4212,6 +4235,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     </div>
                                                 ))}
                                                 <button
+                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] text-[var(--text-secondary)] opacity-60 active:opacity-100"
                                                     onClick={() => fileInputRef.current?.click()}
                                                 >
@@ -4220,6 +4244,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             </div>
                                         ) : (
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-dashed border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] text-[var(--text-secondary)] opacity-70 active:opacity-100 active:scale-95 transition-all duration-200"
                                                 onClick={() => fileInputRef.current?.click()}
                                                 title="上传参考图"
@@ -4319,6 +4344,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 {/* 左侧：模型选择按钮 */}
                                 <div className="flex-1 min-w-0">
                                     <button
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.openModelLibrary.uiAction}
                                         className="flex w-full items-center gap-1.5 px-3 h-10 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] justify-start active:scale-95 transition-all duration-200 overflow-hidden"
                                         style={{
                                             ...(() => {
@@ -4367,6 +4393,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 {/* 中间：高级设置按钮 */}
                                 <div className="flex-shrink-0">
                                     <button
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
                                         className="flex h-10 px-3.5 items-center justify-center rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] shadow-sm active:scale-95 transition-all duration-200"
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -4445,6 +4472,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         />
                                         {modelSearch && (
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearModelSearch.uiAction}
                                                 onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
                                                 onTouchStart={(e) => e.stopPropagation()}
                                                 onTouchMove={(e) => e.stopPropagation()}
@@ -4457,6 +4485,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </div>
                                 </div>
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.closeProviderModels.uiAction}
                                     className="text-xs font-bold px-3.5 h-[34px] shrink-0 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] flex items-center justify-center active:scale-95"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -4789,6 +4818,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 {/* 返回导航栏 */}
                                                 <div className="flex items-center gap-2 border-b border-[var(--frost-card-sub-border)] py-1.5 shrink-0">
                                                     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.closeProviderModels.uiAction}
                                                         onClick={() => setMobileActiveProvider(null)}
                                                         className="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] flex items-center gap-1 active:scale-95"
                                                     >
@@ -4901,6 +4931,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             <div className="flex items-center justify-between border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
                                 <span className="text-xs font-bold text-[var(--text-primary)]">高级设置选项</span>
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.collapseMobileComposer.uiAction}
                                     className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] active:scale-95"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -4920,6 +4951,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             {['自动', '30s', '60s', '120s', '240s'].map(dur => (
                                                 <button
                                                     key={dur}
+                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectAudioDuration.uiAction}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
                                                         ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
                                                         : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
@@ -5050,6 +5082,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className="text-xs text-[var(--text-tertiary)] truncate">{activeSourceImage.prompt}</div>
                             </div>
                             <button
+                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearSource.uiAction}
                                 onClick={onClearSource}
                                 className="
                                     flex items-center justify-center w-7 h-7 rounded-lg
@@ -5077,6 +5110,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             />
                             {isMobile && (
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.collapseMobileComposer.uiAction}
                                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] shadow-sm active:scale-95 transition-all duration-200"
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -5116,6 +5150,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.togglePptStyleLock.uiAction}
                                             className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]' : 'border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)]'}`}
                                             onClick={() => setConfig(prev => ({ ...prev, pptStyleLocked: !(prev.pptStyleLocked !== false) }))}
                                             title="锁定整套PPT视觉风格一致性"
@@ -5125,10 +5160,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <div className="text-[10px] text-[var(--text-tertiary)]">ON 更偏向整套视觉一致，OFF 允许单页变化</div>
                                     </div>
                                     <div className="flex items-center gap-1 mb-2">
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
+                                        <button data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.appendPptTemplateSlide.uiAction} className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
+                                        <button data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.appendPptTemplateSlide.uiAction} className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
+                                        <button data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.appendPptTemplateSlide.uiAction} className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
+                                        <button data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.appendPptTemplateSlide.uiAction} className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
                                     </div>
                                     <textarea
                                         value={pptOutlineDraft}
@@ -5178,24 +5213,28 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     <span className="text-[10px] text-[var(--accent-coral)] w-8 shrink-0">图{idx + 1}</span>
                                                     <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1" title={line}>{line}</span>
                                                     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.movePptSlide.uiAction}
                                                         className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: 'var(--text-secondary)' }}
                                                         onClick={() => movePptSlide(idx, -1)}
                                                         title="上移"
                                                     >↑</button>
                                                     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.movePptSlide.uiAction}
                                                         className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: 'var(--text-secondary)' }}
                                                         onClick={() => movePptSlide(idx, 1)}
                                                         title="下移"
                                                     >↓</button>
                                                     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.removePptSlide.uiAction}
                                                         className="text-[10px] px-1 py-0.5 rounded border border-red-500/30"
                                                         style={{ color: '#fca5a5' }}
                                                         onClick={() => removePptSlide(idx)}
                                                         title="删除此页"
                                                     >删</button>
                                                     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.insertPptSlide.uiAction}
                                                         className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: '#7dd3fc' }}
                                                         onClick={() => insertPptSlideAfter(idx)}
@@ -5214,6 +5253,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             onChange={handlePptOutlineImportFile}
                                         />
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.importPptOutline.uiAction}
                                             className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={openPptOutlineImport}
@@ -5221,6 +5261,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             导入 Markdown / JSON
                                         </button>
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.generatePptOutline.uiAction}
                                             className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={generatePptOutlineByTopic}
@@ -5228,6 +5269,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             按主题拆页
                                         </button>
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.exportPptOutline.uiAction}
                                             className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={exportPptOutlineJson}
@@ -5235,6 +5277,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             导出JSON
                                         </button>
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearPptOutline.uiAction}
                                             className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={() => setPptOutlineDraft('')}
@@ -5242,6 +5285,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             清空
                                         </button>
                                         <button
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.applyPptOutline.uiAction}
                                             className="ml-auto px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
                                             style={{ color: 'var(--accent-coral)' }}
                                             onClick={applyPptOutlineDraft}
@@ -5275,6 +5319,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 }}
                                             />
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.refinePptOutline.uiAction}
                                                 onClick={handleRefinePptOutline}
                                                 disabled={isRefining || !refineQuery.trim()}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
@@ -5418,6 +5463,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     onClick={handleReferencePreview}
                                                 />
                                                 <button
+                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.removeReferenceImage.uiAction}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         removeReferenceImage(img.id);
@@ -5450,6 +5496,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                 {/* Upload Button - At the end of reference images row - 始终显示 */}
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                     className="w-12 h-12 rounded-md transition-all duration-200 border hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100"
                                     style={{
                                         backgroundColor: 'var(--frost-card-sub-bg)',
@@ -5472,6 +5519,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         {shouldRenderStandaloneUploadRow && (
                             <div className="flex items-center p-2 px-3 mt-1">
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                     className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
                                     style={{
                                         color: 'var(--text-secondary)',
@@ -5557,6 +5605,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 onClick={handleReferencePreview}
                                             />
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.removeReferenceImage.uiAction}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     removeReferenceImage(img.id);
@@ -5577,6 +5626,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     ))}
 
                                     <button
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border opacity-70 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                                         style={{
                                             backgroundColor: 'var(--frost-card-sub-bg)',
@@ -5596,6 +5646,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
                             {shouldRenderInlineMobileUploadButton && (
                                 <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
                                     className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                                     style={{
                                         color: 'var(--text-secondary)',
@@ -5660,6 +5711,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 className={isMobile ? 'static min-w-0 flex-1' : `relative inline-flex min-w-0 flex-shrink-0`}
                             >
                                 <button
+                                    type="button"
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.openModelLibrary.uiAction}
                                     className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full min-w-0 justify-start' : 'w-auto max-w-[calc(28ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
@@ -5825,6 +5878,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                           />
                                                           {modelSearch && (
                                                               <button
+                                                                  data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearModelSearch.uiAction}
                                                                   onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
                                                                   onTouchStart={(e) => e.stopPropagation()}
                                                                   onTouchMove={(e) => e.stopPropagation()}
@@ -6027,6 +6081,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             {['自动', '30s', '60s', '120s', '240s'].map(dur => (
                                                 <button
                                                     key={dur}
+                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectAudioDuration.uiAction}
                                                     className={`kk-prompt-bar-deep-audio-option px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(config.audioDuration || '自动') === dur
                                                         ? 'kk-prompt-bar-deep-audio-option--active'
                                                         : ''
@@ -6081,6 +6136,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     >
                                         {groundingSupported && (
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleGrounding.uiAction}
                                                 className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md border transition-all text-[11px] font-medium ${config.enableGrounding
                                                     ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
                                                     : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
@@ -6104,6 +6160,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                         {imageSearchSupported && (
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleImageSearch.uiAction}
                                                 className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md border transition-all text-[11px] font-medium ${config.enableImageSearch
                                                     ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
                                                     : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
@@ -6134,6 +6191,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     {!isMobile && (
                                         <div className="relative h-full w-[58px]">
                                             <button
+                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleParallelCountMenu.uiAction}
                                                 className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
                                                 style={{ color: 'var(--text-secondary)' }}
                                                 onClick={(e) => {
@@ -6155,6 +6213,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             ).map((count) => (
                                                                 <button
                                                                     key={count}
+                                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectParallelCount.uiAction}
                                                                     className={`kk-prompt-bar-deep-count-option justify-between rounded-md px-3 py-2 text-xs font-medium ${config.parallelCount === count ? 'kk-prompt-bar-deep-count-option--active' : ''}`}
                                                                     onClick={() => {
                                                                         updateConfigFields({ parallelCount: count as number });
@@ -6184,6 +6243,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             >
                                                 {!isMobile && (
     <button
+                                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleModelPin.uiAction}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             toggleModelPin(contextMenu.modelId);
@@ -6195,6 +6255,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     </button>
 )}
                                                 <button
+                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.openModelCustomization.uiAction}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         const custom = modelCustomizations[contextMenu.modelId] || {};
@@ -6231,6 +6292,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     <div className="flex justify-between items-center">
                                                         <h3 className="text-lg font-bold text-[var(--text-primary)]">模型设置</h3>
                                                         <button
+                                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.closeModelCustomization.uiAction}
                                                             onClick={() => setModelSettingsModal(null)}
                                                             className="transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
                                                         >
@@ -6259,12 +6321,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     </div>
                                                     <div className="flex justify-end gap-2 pt-2">
                                                         <button
+                                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.cancelModelCustomization.uiAction}
                                                             onClick={() => setModelSettingsModal(null)}
                                                             className="kk-prompt-bar-deep-modal-action px-4 py-2 text-sm transition-colors"
                                                         >
                                                             取消
                                                         </button>
                                                         <button
+                                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.saveModelCustomization.uiAction}
                                                             onClick={() => {
                                                                 saveModelCustomization(
                                                                     modelSettingsModal.modelId,
@@ -6367,6 +6431,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-semibold text-[var(--text-primary)]">选择并发张数</span>
                                 <button 
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleParallelCountMenu.uiAction}
                                     className="kk-prompt-bar-deep-modal-action text-xs font-medium px-3.5 py-1.5 rounded-full active:scale-95 transition-all"
                                     onClick={() => setActiveMenu(null)}
                                 >
@@ -6380,6 +6445,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 ).map((count) => (
                                     <button
                                         key={count}
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectParallelCount.uiAction}
                                         className={`kk-prompt-bar-deep-count-option flex flex-col items-center justify-center py-3 rounded-xl font-semibold transition-all active:scale-95 ${config.parallelCount === count
                                             ? 'kk-prompt-bar-deep-count-option--active'
                                             : ''}`}

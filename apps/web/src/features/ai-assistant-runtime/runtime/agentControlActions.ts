@@ -75,6 +75,22 @@ export const AGENT_CONTROL_ACTIONS = {
     uiAction: 'remove-takeover-file',
     toolName: undefined,
   },
+  runInlineActionLink: {
+    uiAction: 'run-inline-action-link',
+    toolName: undefined,
+  },
+  closeTakeoverMode: {
+    uiAction: 'close-takeover-mode',
+    toolName: undefined,
+  },
+  toggleTakeoverMode: {
+    uiAction: 'toggle-takeover-mode',
+    toolName: undefined,
+  },
+  toggleTakeoverHistory: {
+    uiAction: 'toggle-takeover-history',
+    toolName: undefined,
+  },
 } as const satisfies Record<string, AgentControlActionDefinition>;
 
 export type AgentControlActionKey = keyof typeof AGENT_CONTROL_ACTIONS;

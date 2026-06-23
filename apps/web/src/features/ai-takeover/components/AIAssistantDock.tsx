@@ -435,8 +435,10 @@ export const AIAssistantDock: React.FC = () => {
 
       parts.push(
         <button
+          type="button"
           key={match.index}
           onClick={() => handleActionLink(actionUrl)}
+          data-agent-action={AGENT_CONTROL_ACTIONS.runInlineActionLink.uiAction}
           className="inline-flex items-center gap-1 mx-1 px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_8px_rgba(219,39,119,0.35)] select-none cursor-pointer"
         >
           ✨ {label}
@@ -499,7 +501,9 @@ export const AIAssistantDock: React.FC = () => {
           </div>
 
           <button
+            type="button"
             onClick={() => setAiTakeoverMode(false)}
+            data-agent-action={AGENT_CONTROL_ACTIONS.closeTakeoverMode.uiAction}
             className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
             title="关闭 AI 接管"
           >
@@ -635,7 +639,9 @@ export const AIAssistantDock: React.FC = () => {
             items.push(
               <div key="takeover-archive-fold-toggle" className="flex flex-col items-center my-2 w-full animate-in fade-in duration-300">
                 <button
+                  type="button"
                   onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                  data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverHistory.uiAction}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all select-none cursor-pointer"
                 >
                   <span>{isHistoryExpanded ? '🔼 收起已归档历史' : `🔽 展开已压缩的 ${boundaryIndex} 条历史对话`}</span>

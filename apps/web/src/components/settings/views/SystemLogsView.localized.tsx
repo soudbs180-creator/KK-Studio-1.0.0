@@ -18,6 +18,7 @@ import {
   SettingsViewShell,
 } from '../SettingsScaffold';
 import { EmptyState, SegmentedControlMulti, SettingSelect, StatusBadge } from '../ui/index';
+import { SYSTEM_LOGS_ACTIONS } from '../settingsModuleActions';
 
 type LevelFilter = 'all' | 'error' | 'warning' | 'info';
 
@@ -408,6 +409,7 @@ export const SystemLogsView: React.FC = () => {
                   options={levelOptions}
                   value={levelFilterToLabel(levelFilter)}
                   onChange={(value) => setLevelFilter(parseLevelFilter(value))}
+                  controlAction={SYSTEM_LOGS_ACTIONS.changeLevelFilter.uiAction}
                 />
                 <SettingSelect
                   label=""
@@ -417,6 +419,7 @@ export const SystemLogsView: React.FC = () => {
                     ...sourceOptions.map((source) => ({ value: source, label: source })),
                   ]}
                   onChange={setSourceFilter}
+                  controlAction={SYSTEM_LOGS_ACTIONS.changeSourceFilter.uiAction}
                 />
               </div>
               <div className="settings-log-toolbar__actions">
@@ -424,17 +427,18 @@ export const SystemLogsView: React.FC = () => {
                   type="button"
                   onClick={() => setIsStreamPaused((current) => !current)}
                   className="settings-log-action"
+                  data-system-logs-action={SYSTEM_LOGS_ACTIONS.toggleStream.uiAction}
                   data-variant={isStreamPaused ? 'primary' : 'neutral'}
                 >
                   {isStreamPaused ? <Play size={13} /> : <Pause size={13} />}
                   <span>{isStreamPaused ? pick('恢复流', 'Resume') : pick('暂停流', 'Pause')}</span>
                 </button>
-                <button type="button" onClick={handleDownload} className="settings-log-action" data-variant="primary">
+                <button type="button" onClick={handleDownload} className="settings-log-action" data-system-logs-action={SYSTEM_LOGS_ACTIONS.exportLogs.uiAction} data-variant="primary">
                   <Download size={13} />
                   <span>{pick('导出日志', 'Export')}</span>
                 </button>
                 {hasFilters ? (
-                  <button type="button" onClick={handleClearFilters} className="settings-log-action" data-variant="ghost">
+                  <button type="button" onClick={handleClearFilters} className="settings-log-action" data-system-logs-action={SYSTEM_LOGS_ACTIONS.clearFilters.uiAction} data-variant="ghost">
                     {pick('清空筛选', 'Clear')}
                   </button>
                 ) : null}
@@ -455,6 +459,7 @@ export const SystemLogsView: React.FC = () => {
                 type="button"
                 className="settings-log-switch-option"
                 data-state={option.enabled ? 'on' : 'off'}
+                data-system-logs-action={SYSTEM_LOGS_ACTIONS.toggleConsoleOption.uiAction}
                 aria-pressed={option.enabled}
                 onClick={() => handleToggleOption(option.key)}
               >
@@ -504,7 +509,7 @@ export const SystemLogsView: React.FC = () => {
                   {pick('手动清理缓存在本地内存中的今日日志记录。', "Manually clear today's cache stored in browser memory.")}
                 </p>
               </div>
-              <button type="button" onClick={handleClearLogs} className="settings-log-action" data-variant="danger">
+              <button type="button" onClick={handleClearLogs} className="settings-log-action" data-system-logs-action={SYSTEM_LOGS_ACTIONS.clearLogCache.uiAction} data-variant="danger">
                 <Trash2 size={13} />
                 <span>{pick('清空日志缓存', 'Clear Log Cache')}</span>
               </button>

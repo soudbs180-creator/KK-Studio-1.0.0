@@ -29,6 +29,7 @@ import {
   SettingsViewShell,
 } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
+import { STORAGE_SETTINGS_ACTIONS } from '../settingsModuleActions';
 
 const StorageModeTile: React.FC<{
   title: string;
@@ -549,6 +550,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={!supportsLocal || mode === 'local'}
                   onClick={() => void switchToLocal()}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToLocalMode.uiAction}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
                 >
                   {pick('切换', 'Switch')}
@@ -564,6 +566,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={mode === 'browser'}
                   onClick={() => void switchToBrowser()}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToBrowserMode.uiAction}
                   className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
                 >
                   {pick('切换', 'Switch')}
@@ -610,6 +613,7 @@ export const StorageSettingsView: React.FC = () => {
               type="button"
               disabled={refreshing}
               onClick={() => void refresh()}
+              data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.refreshUsage.uiAction}
               className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 flex items-center gap-1 active:scale-95 transition cursor-pointer"
             >
               <RefreshCw size={10} className={refreshing ? 'animate-spin' : ''} />
@@ -647,6 +651,7 @@ export const StorageSettingsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleQuickCleanupInvalid}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanBrokenCards.uiAction}
                   className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   {pick('立即清理', 'Clean')}
@@ -668,6 +673,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={cleanupType === 30}
                   onClick={() => void handleRetentionCleanup(30)}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention30Days.uiAction}
                   className="bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   {pick('应用策略', 'Apply')}
@@ -689,6 +695,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={cleanupType === 7}
                   onClick={() => void handleRetentionCleanup(7)}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention7Days.uiAction}
                   className="bg-orange-600/80 hover:bg-orange-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   {pick('应用策略', 'Apply')}
@@ -710,6 +717,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={cleanupType === 'compress'}
                   onClick={handleClearAllData}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.clearAllData.uiAction}
                   className="bg-red-600 hover:bg-red-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   {pick('清理全部', 'Wipe All')}
@@ -743,6 +751,7 @@ export const StorageSettingsView: React.FC = () => {
                         : [{ value: '', label: pick('没有其他可用项目', 'No other canvas') }]
                     }
                     onChange={setMergeSourceId}
+                    controlAction={STORAGE_SETTINGS_ACTIONS.selectMergeSource.uiAction}
                   />
                 </div>
               </div>
@@ -752,6 +761,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={!activeCanvas || mergeCandidates.length === 0 || !mergeSourceId}
                   onClick={() => void handleMergeProject()}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.mergeProject.uiAction}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate disabled:opacity-40 cursor-pointer"
                 >
                   {pick('合并到当前项目', 'Merge Into Current')}
@@ -760,6 +770,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={projectAction === 'cleanup' || !activeCanvas}
                   onClick={() => void handleCleanupProjectCards()}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanProjectCards.uiAction}
                   className="flex-1 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
                 >
                   {pick('移除无用卡片', 'Clean Cards')}

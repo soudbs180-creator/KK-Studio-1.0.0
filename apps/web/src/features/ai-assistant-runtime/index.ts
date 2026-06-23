@@ -7,6 +7,12 @@ export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
 export { AGENT_CONTROL_ACTIONS } from './runtime/agentControlActions.ts';
 export type { AgentControlActionKey, AgentControlRuntimeAction, AgentControlToolName, AgentControlUiAction } from './runtime/agentControlActions.ts';
+export { CHAT_SHELL_ACTIONS } from './runtime/chatShellActions.ts';
+export type { ChatShellActionKey, ChatShellToolName, ChatShellUiAction } from './runtime/chatShellActions.ts';
+export { PROMPT_COMPOSER_ACTIONS } from './runtime/promptComposerActions.ts';
+export type { PromptComposerActionKey, PromptComposerToolName, PromptComposerUiAction } from './runtime/promptComposerActions.ts';
+export { AI_MANAGEMENT_ACTIONS, AI_MANAGEMENT_SKILL_TOOL_OPTIONS } from './runtime/aiManagementActions.ts';
+export type { AiManagementActionKey, AiManagementSkillToolOption, AiManagementUiAction } from './runtime/aiManagementActions.ts';
 export { agentPermissionPolicy } from './runtime/AgentPermissionPolicy.ts';
 export { agentAuditLog } from './runtime/AgentAuditLog.ts';
 

@@ -1,25 +1,376 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (Code Inspection, Web Worker Memory Release and Project Push)
+**Last Updated:** 2026-06-23 (UI Action Catalog Optimization and Settings Search Integration)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - UI Action Catalog Optimization and Settings Search Integration
+
+### Catalog Optimization Scope
+- **独立 UI Action Catalog**：为 `UserProfile` (个人中心) 和 `CostEstimation` (Consumption Records，计费账本) 模块独立了 UI action catalog，并且补全了两个对应的 metadata catalog。
+- **统一 Settings 搜索过滤元数据**：在 `settingsRegistry.ts` 中引入并统一定义了 `SettingsNavItem` 匹配和过滤匹配元数据（`keywords`），实现不区分大小写的全属性检索，并在 `SettingsPanel.localized.tsx` 中切换为使用统一的 `matchSettingsNavItem` 进行设置导航过滤。
+- **对接本地 UI Action 与 Planner 映射**：确认并打通了本地 `LocalAssistantBrain` (LocalBrain) 跳转与高亮特定子组件操作按钮 of 微动作链接（如 `copyUserId`, `switchToUsageLogs`, `switchToRechargeLogs`, `switchToApiLedger`, `switchToCreditsLedger`, `refreshLedger`）。
+- **单元测试覆盖**：补全了 `tests/unit/settings-module-action-catalog-contract.test.ts` 中对应的单元测试。
+
+### Catalog Optimization Files Touched
+- `apps/web/src/components/settings/settingsModuleActions.ts` [MODIFY]
+- `apps/web/src/components/settings/settingsRegistry.ts` [MODIFY]
+- `apps/web/src/components/settings/SettingsPanel.localized.tsx` [MODIFY]
+- `apps/web/src/components/settings/views/UserProfileView.tsx` [MODIFY]
+- `tests/unit/settings-module-action-catalog-contract.test.ts` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### Catalog Optimization Design Decisions
+- 将 `USER_PROFILE_ACTIONS` 和 `CONSUMPTION_RECORDS_ACTIONS` 作为 UI 本地元数据收口，与 `settingsModuleActions.ts` 里的其他模块 actions 保持一致。
+- 保证 `localBrain.ts` 中定义的高亮 selector 与实际 UI 组件里的 action 元数据完全一一对应，形成闭环。
+- Settings 导航匹配统一使用 `matchSettingsNavItem` 进行，过滤词包含 `label`、`description`、`id` 以及新增的 `keywords` 集合，从而保证未来 Planner 搜索和侧边栏过滤的一致性。
+
+### Catalog Optimization Validation
+- `tests/unit/settings-module-action-catalog-contract.test.ts` passed (8 tests).
+- `npm run governance:check` passed.
+- `npm run typecheck` passed.
+- `npm run architecture:check` passed.
+
+### Catalog Optimization Not Run
+- `npm run test` / `npm run verify:changes`: 未运行。原因：本轮是动作元数据与搜索过滤收口，已跑对应的 focused suite 与必要验证，完整发布级验证留到 release/full-project pass。
+
+### Catalog Optimization Risks / Next
+- 目前所有核心设置项都已经覆盖了 UI action catalog，接下来可以着手 release 发布准备。
+
+## 2026-06-23 - UI Action Catalogs & Natural Language Planner Mapping Sweep
+
+### Sweep Scope
+- Isolated the `USER_PROFILE_ACTIONS` and `CONSUMPTION_RECORDS_ACTIONS` catalogs in `settingsModuleActions.ts` and tagged the UserProfileView and CostEstimation pages with correct action attributes.
+- Unified settings shell navigation search metadata using `SETTINGS_SHELL_ACTIONS.filterNavigation` in SettingsDesktopSidebar.
+- Completed missing low-priority API Management model list actions (filters, groups, collapsing toggles, search input) in ApiSettingsView.
+- Extended intent-parsing patterns in `intentGate.ts` to capture colloquial cleanup, download, tab-switching, and reset expressions.
+- Mapped settings intents to `openSettings` and targeted `highlightElement` actions inside `localBrain.ts` using stable data-action CSS attribute selectors.
+- Created `user-profile-and-consumption-records-contract.test.ts` and updated shell and API management contract tests.
+
+### Sweep Files
+- `apps/web/src/components/settings/settingsModuleActions.ts`
+- `apps/web/src/components/settings/views/UserProfileView.tsx`
+- `apps/web/src/pages/CostEstimation.tsx`
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `apps/web/src/components/settings/ApiSettingsView.tsx`
+- `apps/web/src/components/settings/apiManagementActions.ts`
+- `apps/web/src/features/ai-takeover/core/intentGate.ts`
+- `apps/web/src/features/ai-takeover/core/localBrain.ts`
+- `tests/unit/user-profile-and-consumption-records-contract.test.ts`
+- `tests/unit/settings-module-action-catalog-contract.test.ts`
+- `tests/unit/api-management-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Sweep Design Decisions
+- Direct DOM click actions are avoided in planner executions. Instead, the local brain maps intentions to `openSettings` tab changes and guides the user via the `highlightElement` action targeting exact `button[data-xxx-action="yyy"]` attribute selectors.
+- Low-priority model filter and group elements share type-level actions instead of multiple distinct actions per list item.
+- Removed duplicate types generated during user code align passes to prevent compile-time type errors.
+
+### Sweep Validation
+- Unit focused tests: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-module-action-catalog-contract.test.ts tests/unit/api-management-action-catalog-contract.test.ts tests/unit/user-profile-and-consumption-records-contract.test.ts` passed, 11 tests.
+- Governance: `npm run governance:check` passed.
+- Architecture check: `npm run architecture:check` passed.
+- Typecheck: `npm run typecheck` passed.
+- Full build: `npm run build` passed.
+
+### Sweep Risks / Next
+- Verify UI highlight overlays directly in staging settings routes.
+- Extend other settings sub-routes with similar element markup when new buttons are added.
+
+## 2026-06-23 - AI Control Action Surface Final Sweep
+
+### Final Sweep Scope
+- Re-audited the current uncommitted AI control action surface around `BrowserAssistantView`, `ChatSidebar`, `PromptBar`, `AiManagementView`, and the latest Project Manager action coverage.
+- Confirmed `BrowserAssistantView` and `AiManagementView` already had button-level action metadata coverage after the earlier passes.
+- Added `CHAT_SHELL_ACTIONS.selectModel` and marked the ChatSidebar model picker rows with `data-chat-shell-action`.
+- Marked the collapsed ChatSidebar edge toggle with `CHAT_SHELL_ACTIONS.toggleSidebar` so both expanded and collapsed sidebar states expose the same stable action.
+- Reconfirmed PromptBar full button coverage against the latest `PROMPT_COMPOSER_ACTIONS`, including the separated `toggleParallelCountMenu` and `selectParallelCount` actions.
+- Reconfirmed button marker coverage with a local JSX opening-tag scan: `BrowserAssistantView` 37/37, `ChatSidebar` 59/59, `PromptBar` 60/60, and `AiManagementView` 6/6 buttons marked.
+
+### Final Sweep Files
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/features/ai-assistant-runtime/runtime/chatShellActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/promptComposerActions.ts`
+- `tests/unit/chat-sidebar-action-catalog-contract.test.ts`
+- `tests/unit/prompt-composer-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### Final Sweep Design Decisions
+- ChatSidebar ordinary shell controls remain separate from AI Takeover actions. The model picker is a local chat shell action and keeps `toolName: undefined`.
+- Prompt composer actions remain local UI actions except `PROMPT_COMPOSER_ACTIONS.submitGeneration`, which is still the only PromptBar action mapped to `generation.submitComposer`.
+- Repeated responsive buttons share semantic action names instead of creating layout-specific variants. For example, all reference image upload buttons use `addReferenceImage`, and all PPT template buttons use `appendPptTemplateSlide`.
+- Browser Assistant external automation still belongs to `BROWSER_ACTIONS` / `BROWSER_LOCAL_ACTIONS`; AI Management settings controls still belong to `AI_MANAGEMENT_ACTIONS`.
+
+### Final Sweep Validation
+- Red pass first: `tests/unit/chat-sidebar-action-catalog-contract.test.ts` failed until `CHAT_SHELL_ACTIONS.selectModel` existed and the collapsed edge toggle/model picker rows were marked.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/chat-sidebar-action-catalog-contract.test.ts` passed, 3 tests.
+- Red pass first: `tests/unit/prompt-composer-action-catalog-contract.test.ts` failed until the expanded PromptBar catalog existed and all previously unmarked PromptBar buttons exposed `data-prompt-composer-action`.
+- Green pass: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-composer-action-catalog-contract.test.ts` passed, 3 tests.
+- Current focused action-surface suite passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/api-management-action-catalog-contract.test.ts tests/unit/settings-module-action-catalog-contract.test.ts tests/unit/project-manager-action-catalog-contract.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts` passed, 78 tests. Expected DurableQueue retry/error logs were emitted by retry-path tests while the command exited 0.
+- `npm run typecheck`: passed.
+- `npm run governance:check`: passed.
+- `npm run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated while the command exits 0.
+- `npm run build`: passed.
+- `git diff --check`: passed with CRLF normalization warnings in four already touched TSX files.
+- `npm run check:encoding`: passed.
+
+### Final Sweep Not Run
+- `npm run test`: not run because this pass used the focused action-surface suite plus typecheck/build/governance/architecture checks; the untouched full integration/contract/e2e groups are outside this action metadata sweep.
+- `npm run verify:changes`: not run because this was not a release/full-project cleanup pass; its broader audit, spec, full test, and smoke checks are reserved for release-level validation after the remaining settings modules are cataloged.
+
+### Final Sweep Risks / Next
+- User Profile and Consumption Records still need module-owned action catalogs.
+- Settings search/filter and lower-priority API Management list-management controls can be audited in a later polish pass.
+- Future PromptBar or ChatSidebar button additions should fail their action-catalog contracts until a matching action entry and marker are added.
+
+## 2026-06-23 - Project Manager And PromptBar Action Coverage
+
+### Project Manager / PromptBar Scope
+- Added `PROJECT_MANAGER_ACTIONS` under `apps/web/src/components/settings/settingsModuleActions.ts` with the `project-manager.*` namespace.
+- Marked Project Manager project-list, CRUD, download, merge, cleanup, clear-data, destructive modal, desktop toolbar, mobile entry, workflow, and theme controls with `data-project-manager-action`.
+- Kept mobile and desktop entries for the same capability on the same action when the behavior is the same, for example opening the project menu or search.
+- Added `tests/unit/project-manager-action-catalog-contract.test.ts` so Project Manager cannot borrow Storage/API/AI action namespaces.
+- Tightened the PromptBar coverage by adding `toggleParallelCountMenu` and ensuring every native PromptBar `<button>` has a `data-prompt-composer-action`.
+- Separated parallel-count menu open/close (`toggleParallelCountMenu`) from actual count selection (`selectParallelCount`) so UI audits do not collapse two different behaviors into one action.
+
+### Project Manager / PromptBar Files
+- `apps/web/src/components/settings/settingsModuleActions.ts`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/features/ai-assistant-runtime/runtime/promptComposerActions.ts`
+- `tests/unit/project-manager-action-catalog-contract.test.ts`
+- `tests/unit/settings-module-action-catalog-contract.test.ts`
+- `tests/unit/prompt-composer-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+- `docs/ai-assistant/tool-registry.md`
+
+### Project Manager / PromptBar Validation
+- Red pass first: `tests/unit/project-manager-action-catalog-contract.test.ts` failed until `PROJECT_MANAGER_ACTIONS` existed.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/project-manager-action-catalog-contract.test.ts`: passed, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-module-action-catalog-contract.test.ts tests/unit/project-manager-action-catalog-contract.test.ts tests/unit/api-management-action-catalog-contract.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 67 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed with CRLF normalization warnings in four touched TSX files.
+
+### Project Manager / PromptBar Risks / Next
+- User Profile and Consumption Records still need module-owned action catalogs.
+- Settings search/filter and any remaining low-priority API Management list-management controls can be audited in a later polish pass.
+- A later planner pass can map natural-language project actions to `project-manager.*` UI actions or to future ToolRegistry tools without simulating ambiguous button clicks.
+
+## 2026-06-23 - Settings Module Action Catalogs And Shell Navigation Metadata
+
+### Settings Module Action Scope
+- Added `SETTINGS_DASHBOARD_ACTIONS`, `STORAGE_SETTINGS_ACTIONS`, `SYSTEM_LOGS_ACTIONS`, and `SETTINGS_SHELL_ACTIONS` as separate local action catalogs for the running settings modules and desktop settings shell.
+- Marked Dashboard module entry points with `data-settings-dashboard-action`: primary module open, consumption records, API Management, Browser Assistant, storage settings, system logs, and AI Management navigation.
+- Marked Storage maintenance controls with `data-storage-settings-action`: local/browser storage mode switches, usage refresh, broken-card cleanup, retention presets, all-data clearing, merge source selection, merge execution, and project-card cleanup.
+- Marked System Logs controls with `data-system-logs-action` or shared `data-settings-control-action`: level/source filters, stream toggle, export, clear filters, console option toggle, and log-cache clearing.
+- Marked the desktop settings shell refresh, close, and sidebar navigation controls with `data-settings-shell-action`.
+- Extended `SegmentedControlMulti` with `controlAction?: string` so segmented settings controls can expose stable metadata like the other shared settings primitives.
+
+### Settings Module Action Files
+- `apps/web/src/components/settings/settingsModuleActions.ts`
+- `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+- `apps/web/src/components/settings/views/StorageSettingsView.localized.tsx`
+- `apps/web/src/components/settings/views/SystemLogsView.localized.tsx`
+- `apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx`
+- `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+- `apps/web/src/components/settings/ui/index.tsx`
+- `tests/unit/settings-module-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+- `docs/ai-assistant/tool-registry.md`
+
+### Settings Module Action Design Decisions
+- Settings module actions are UI/local settings metadata. They are intentionally separate from `ToolRegistry` tools, Browser Bridge tools, AI Takeover actions, ordinary ChatSidebar actions, Prompt Composer actions, AI Management actions, and API Management actions.
+- Dashboard owns settings navigation presentation; API Management still owns capability route writes; AI Management stays read-only for route summaries and links back to API Management.
+- Shared settings primitives should carry `controlAction` for select/toggle/segmented/input-like controls so future audits can verify the action surface without inferring behavior from labels.
+- Project Manager is intentionally separate from Dashboard/Storage/System Logs and is covered in the later `Project Manager And PromptBar Action Coverage` entry.
+
+### Settings Module Action Validation
+- Red pass first: `tests/unit/settings-module-action-catalog-contract.test.ts` failed until `settingsModuleActions.ts` existed.
+- Red pass first: the same test then failed until Dashboard, Storage, System Logs, desktop shell controls, and `SegmentedControlMulti` were marked.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-module-action-catalog-contract.test.ts`: passed, 6 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-module-action-catalog-contract.test.ts tests/unit/api-management-action-catalog-contract.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 62 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed with CRLF normalization warnings in four touched TSX files.
+
+### Settings Module Action Risks / Next
+- User Profile, Consumption Records, and Settings search/filter controls should be audited next so every settings route has a module-owned action namespace.
+- A later runtime planning pass can map natural-language settings requests to these local UI actions or to existing `ui.openSettings` / ToolRegistry commands without collapsing module-specific buttons into one generic action name.
+
+## 2026-06-23 - API Management Action Catalog And Settings Control Metadata
+
+### API Management Action Scope
+- Added `API_MANAGEMENT_ACTIONS` as the local action catalog for API Management settings controls.
+- Marked the model-center provider pool actions: add local API, add provider route, route ID copy, route pause/enable, route refresh, route edit, route delete, preset directory tab switch, and provider preset apply.
+- Marked the Capability roles owner controls under API Management: role enable toggle, primary route/model, fallback route/model, assistant auxiliary route/model, assistant image route/model, assistant image fallback route/model, and PPT OCR config entry.
+- Added `controlAction?: string` to shared settings primitives (`SettingInput`, `SettingToggle`, `SettingSelect`, `PrimaryButton`, `SecondaryButton`, `DangerButton`) so non-button controls and primitive-wrapped buttons can expose stable action metadata without module-specific prop hacks.
+- Marked the API editor operations in `ApiSettingsView`: sync editor models, copy model ID, back to model center, official endpoint save/reset/delete, provider route save/reset/delete, and Wuyin catalog sync.
+
+### API Management Action Files
+- `apps/web/src/components/settings/apiManagementActions.ts`
+- `apps/web/src/components/settings/apiWorkbenchSections.tsx`
+- `apps/web/src/components/settings/ApiSettingsView.tsx`
+- `apps/web/src/components/settings/ui/index.tsx`
+- `tests/unit/api-management-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### API Management Action Design Decisions
+- API Management local actions use the `api-management.*` namespace and remain distinct from `AI_MANAGEMENT_ACTIONS`, `BROWSER_ACTIONS`, `BROWSER_LOCAL_ACTIONS`, `CHAT_SHELL_ACTIONS`, and `PROMPT_COMPOSER_ACTIONS`.
+- Shared settings primitives render `data-settings-control-action`, while raw API Management buttons render `data-api-management-action`. The action values still carry the `api-management.*` namespace.
+- API Management remains the single owner for `CapabilityRouteAssignment` writes. AI Management only reads route summaries and links users back to `/settings/api-management`.
+
+### API Management Action Validation
+- Red pass first: `tests/unit/api-management-action-catalog-contract.test.ts` failed until `apiManagementActions.ts` existed.
+- Red pass first: the same test then failed until API Management buttons and capability controls were marked and shared settings primitives supported `controlAction`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-management-action-catalog-contract.test.ts`: passed, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-management-action-catalog-contract.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 56 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed with CRLF normalization warnings in two previously touched PromptBar child files.
+
+### API Management Action Risks / Next
+- API Management still has lower-priority filter/search/list-management buttons that can receive action names in a later polish pass.
+- Next settings-module passes should add separate catalogs for Dashboard navigation, Storage maintenance, System Logs, and Project Manager, using the shared `controlAction` prop where needed.
+
+## 2026-06-23 - AI Settings Module Boundary And Capability Route Ownership
+
+### AI Settings Boundary Scope
+- Audited the settings module overlap around `CapabilityRouteAssignment` and found that API Management and AI Management were both mutating the same capability route store.
+- Kept API Management as the owner for provider channels, model availability, capability role enablement, and primary/fallback route assignment.
+- Converted AI Management capability cards to read capability route state only, while keeping local assistant behavior presets and Skill/tool authorization editing in AI Management.
+- Added the local UI action `AI_MANAGEMENT_ACTIONS.openCapabilityRoutes` and marked the AI Management button that navigates to `/settings/api-management`.
+- Preserved `subscribeCapabilityRouteAssignments` in AI Management so route summaries stay current after API Management changes.
+
+### AI Settings Boundary Files
+- `apps/web/src/components/settings/views/AiManagementView.tsx`
+- `apps/web/src/features/ai-assistant-runtime/runtime/aiManagementActions.ts`
+- `tests/unit/ai-management-action-catalog-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+### AI Settings Boundary Design Decisions
+- `ToolRegistry` is reserved for AI-executable capabilities that need permission, execution, verification, and audit.
+- Settings page buttons are local UI actions unless they explicitly dispatch an existing ToolRegistry tool.
+- API Management owns capability route writes. AI Management can display route summaries and deep-link to API Management, but must not call `upsertCapabilityRouteAssignment`.
+- Next optimization passes should add module-specific settings action catalogs for API Management, Storage, System Logs, Project Manager, and Dashboard navigation without reusing AI runtime action names.
+
+### AI Settings Boundary Validation
+- Red pass first: `tests/unit/ai-management-action-catalog-contract.test.ts` failed until `AI_MANAGEMENT_ACTIONS.openCapabilityRoutes` existed and `AiManagementView.tsx` stopped importing/calling `upsertCapabilityRouteAssignment`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-management-action-catalog-contract.test.ts`: passed, 3 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 53 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed with CRLF normalization warnings in two previously touched PromptBar child files.
+
+### AI Settings Boundary Risks / Next
+- API Management still needs its own stable action catalog and button-marker contract; current audit found many API settings buttons without module-specific action metadata.
+- Shared settings primitives (`SettingToggle`, `SettingSelect`, `SettingInput`, `PrimaryButton`, `SecondaryButton`, `DangerButton`) should accept action metadata so setting-level controls can be audited without ad hoc button props.
+- Dashboard, Storage, System Logs, and Project Manager still need distinct module action catalogs so their buttons do not get mixed into AI runtime or Browser Assistant action names.
+
+## 2026-06-23 - AI Control, Chat Shell, Prompt Composer, And AI Management Action Surface Completion
+
+### AI Control Action Surface Scope
+- Extended `BROWSER_LOCAL_ACTIONS` to cover the remaining Browser Assistant local controls: session checks/toggles, social channel checks/toggles, session creation, offline plugin package guidance, clipboard read/toggle/dismiss, WASM toggle, screen-inspect-to-canvas translation, AgentRuntime preview, sample prompt fill, Playground tab switching, and routing mode switching.
+- Converted the Browser Assistant screen-inspect result button from a success-only toast into a `takeover-create-prompt-cards` event that flows through `ToolRegistry.execute('canvas.createPromptCards')`.
+- Converted the Connectivity Doctor manual check from a timer/stale-state read into a direct `ToolRegistry.execute('browser.getStatus')` call that applies the returned Browser Bridge snapshot.
+- Renamed the clipboard and Takeover preview handlers/state from `Simulate/Simulated` terminology to runtime names (`clipboardPayload`, `handleReadClipboardPayload`, `handleImportClipboardPayload`, `handlePreviewTakeoverPlan`).
+- Extended `AGENT_CONTROL_ACTIONS` to cover AI Takeover shell controls: inline `action://` link execution, Dock close, Sidebar takeover toggle, and archived-history expand/collapse.
+- Updated `AIAssistantDock` and `ChatSidebar` so these shell controls expose stable `data-agent-action` values.
+- Added `CHAT_SHELL_ACTIONS` for ordinary ChatSidebar controls so session, message, attachment, Agent toggle, stop, send, and import-preview buttons expose stable `data-chat-shell-action` values instead of borrowing AI Takeover action names.
+- Moved the shared ChatSidebar composer send button to `CHAT_SHELL_ACTIONS.sendComposerMessage`; `AGENT_CONTROL_ACTIONS.sendTakeoverMessage` remains scoped to the AI Takeover Dock.
+- Added `PROMPT_COMPOSER_ACTIONS` for PromptBar generation composer controls so mobile expansion, model library, model selection, mode switching, advanced options, prompt optimization, PPT outline, and generation submission expose stable `data-prompt-composer-action` values.
+- Moved PromptBar generation submit buttons to `PROMPT_COMPOSER_ACTIONS.submitGeneration` with `data-agent-tool="generation.submitComposer"`, keeping them distinct from ordinary chat send and AI Takeover Dock send actions.
+- Added `AI_MANAGEMENT_ACTIONS` for AI Management settings controls so capability/Skill tabs, capability setting expansion, temperature presets, Skill create/edit/delete, Skill modal controls, and tool checkbox toggles expose stable `data-ai-management-action` values.
+- Replaced the AI Management static Skill authorized-tool list with `AI_MANAGEMENT_SKILL_TOOL_OPTIONS`, a canonical ToolRegistry projection that excludes forbidden tools, legacy aliases, and the obsolete unregistered `canvas.createImageCards` entry.
+- Cleaned Browser Assistant runtime copy and comments so live Browser Bridge flows are described as diagnostics, plan previews, or runtime state handling rather than simulation/test flows.
+
+### AI Control Action Surface Files
+- `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+- `apps/web/src/components/settings/views/AiManagementView.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx`
+- `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/chatShellActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/promptComposerActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/aiManagementActions.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `tests/unit/browser-action-catalog-contract.test.ts`
+- `tests/unit/ai-control-runtime-single-path-contract.test.ts`
+- `tests/unit/ai-takeover-control-buttons-contract.test.ts`
+- `tests/unit/chat-sidebar-action-catalog-contract.test.ts`
+- `tests/unit/prompt-composer-action-catalog-contract.test.ts`
+- `tests/unit/ai-management-action-catalog-contract.test.ts`
+- `docs/ai-assistant/tool-registry.md`
+- `docs/development/session-handoff.md`
+
+### AI Control Action Surface Design Decisions
+- Browser Assistant external automation remains represented by `BROWSER_ACTIONS` and `browser.*` ToolRegistry tools; station-internal controls remain represented by unique `browser.local.*` action names.
+- Local Browser Assistant actions only expose `data-agent-tool` when they are backed by an existing ToolRegistry tool, such as `browser.getStatus`, `canvas.createPromptCards`, or `assets.zipOriginals`.
+- AI Takeover shell controls are local UI actions, not LLM tools, so their `AGENT_CONTROL_ACTIONS` entries intentionally keep `toolName: undefined`.
+- ChatSidebar shell controls are separate local UI actions under `CHAT_SHELL_ACTIONS`, preventing ordinary chat send/session actions from sharing the same audit identity as AI Takeover actions.
+- Chat shell actions currently keep `toolName: undefined`; future ToolRegistry-backed chat operations should be introduced explicitly rather than inferred from button labels.
+- Prompt composer controls are separate local UI actions under `PROMPT_COMPOSER_ACTIONS`, preventing generation composer submit from sharing an audit identity with ordinary chat send or AI Takeover Dock send.
+- `PROMPT_COMPOSER_ACTIONS.submitGeneration` is the only Prompt composer action mapped to ToolRegistry, and it uses `generation.submitComposer`; model picking, mode toggles, and panel reveals remain local UI state actions.
+- AI Management controls are separate local UI actions under `AI_MANAGEMENT_ACTIONS`; they do not expose ToolRegistry names because they edit settings and Skill records rather than executing tools.
+- AI Management Skill authorization must offer canonical registered ToolRegistry tool names only. Legacy aliases and forbidden tools remain callable only through their governed compatibility paths, not as new Skill-authoring choices.
+- The offline extension package button no longer claims a successful package download when no package URL is configured.
+
+### AI Control Action Surface Validation
+- Red pass first: `tests/unit/browser-action-catalog-contract.test.ts` failed until the remaining Browser Assistant local controls were added to `BROWSER_LOCAL_ACTIONS` and marked in `BrowserAssistantView.tsx`.
+- Red pass first: `tests/unit/ai-takeover-control-buttons-contract.test.ts` failed until AI Takeover shell actions were added to `AGENT_CONTROL_ACTIONS` and marked in Dock/Sidebar.
+- Red pass first: `tests/unit/ai-control-runtime-single-path-contract.test.ts` failed until Connectivity Doctor executed `browser.getStatus` through ToolRegistry instead of using a timer.
+- Red pass first: `tests/unit/chat-sidebar-action-catalog-contract.test.ts` failed until `CHAT_SHELL_ACTIONS` existed, was exported, and ChatSidebar ordinary controls exposed `data-chat-shell-action`.
+- Red pass first: `tests/unit/prompt-composer-action-catalog-contract.test.ts` failed until `PROMPT_COMPOSER_ACTIONS` existed, was exported, and PromptBar / extracted prompt-bar controls exposed `data-prompt-composer-action`.
+- Red pass first: `tests/unit/ai-management-action-catalog-contract.test.ts` failed until `AI_MANAGEMENT_ACTIONS` / `AI_MANAGEMENT_SKILL_TOOL_OPTIONS` existed, were exported, and `AiManagementView` stopped using the static `SYSTEM_TOOLS_LIST`.
+- Red pass first: `tests/unit/ai-control-runtime-single-path-contract.test.ts` failed until Browser Assistant runtime copy no longer labeled Bridge-backed flows with simulation wording.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts`: passed, 49 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts`: passed, 52 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-composer-action-catalog-contract.test.ts tests/unit/prompt-bar-adaptive-composer-structure.test.ts tests/unit/prompt-bar-layout-regression.test.ts tests/unit/prompt-bar-ecommerce-footer-controls.test.ts tests/unit/prompt-bar-ecommerce-panel-regression.test.ts`: passed, 18 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/browser-action-catalog-contract.test.ts tests/unit/browser-assistant-settings-rows-ui-system-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts`: passed again, 52 tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-management-action-catalog-contract.test.ts tests/unit/settings-modal-ui-system-contract.test.ts tests/unit/ai-assistant-tool-registry.test.ts tests/unit/ai-control-runtime-single-path-contract.test.ts tests/unit/ai-takeover-control-buttons-contract.test.ts tests/unit/chat-sidebar-action-catalog-contract.test.ts tests/unit/prompt-composer-action-catalog-contract.test.ts`: passed, 51 tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run governance:check`: passed after making the new and adjacent handoff headings unique.
+- `npm.cmd run architecture:check`: passed. Existing UI token literal warnings remain informational and unrelated.
+- `npm.cmd run build`: passed.
+- `git diff --check`: passed.
+- After the naming cleanup, re-ran the same 49-test focused suite, `npm.cmd run typecheck`, and `npm.cmd run build`: all passed.
+- After the Chat shell action and Browser Assistant copy cleanup passes, re-ran the 52-test focused suite, `npm.cmd run typecheck`, `npm.cmd run governance:check`, `npm.cmd run architecture:check`, `npm.cmd run build`, and `git diff --check`: all passed. `architecture:check` still reports pre-existing UI token literal warnings as informational output while exiting 0.
+
+### AI Control Action Surface Risks / Next
+- Remaining AI control optimization should focus on canvas/settings surfaces and any generation controls outside the PromptBar composer slice.
+- Real external Browser Bridge automation still depends on the operator installing/connecting the daemon or Chrome extension.
 
 ## 2026-06-23 - Code Inspection, Web Worker Memory Release and Project Push
 
-### Scope
+### Code Inspection Scope
 - **代码规范与质量审查**：对本地工作区共 27 个被修改文件（涉及 Browser Bridge WebSocket 连接、WASM 透明度抠图、样式改良、契约测试补齐等）进行了代码质量与规范审查，无逻辑越界或逻辑死锁风险。
 - **排查并修复 Web Worker 内存遗留问题**：在 `BrowserAssistantView.tsx` 初始化 inline Web Worker 的逻辑中，由于之前调用 `URL.createObjectURL(blob)` 传入 Worker 但未在销毁时回收，导致有极轻微的句柄残留。已修改为在 `useEffect` 中暂存并调用 `URL.revokeObjectURL(workerUrl)` 实施 100% 内存回收。
 - **全量测试与校验通过**：运行了项目的全套治理检查，包括 `architecture:check`（架构校验）、`governance:check`（治理校验）、`typecheck`（类型检查）、`build`（构建检查）和 `verify:changes`（全量变更测试），所有检查以 exit code 0 顺利通过。
 - **代码提交与推送**：将本地所有修改通过 git 暂存（git add）、编写提交信息（git commit）、成功推送至远端主分支 `main`（git push origin main）。
 
-### Files Touched
+### Code Inspection Files Touched
 - `apps/web/src/components/settings/views/BrowserAssistantView.tsx` [MODIFY]
 - `docs/development/session-handoff.md` [MODIFY]
 
-### Design Decisions
+### Code Inspection Design Decisions
 - 严格遵循 `AGENTS.md` 规范。在将修改推送回远端之前，确保本地运行了全量的 `verify:changes` 且构建 100% 绿色无报错。
 - 引入 `workerUrl` 清理逻辑以确保零内存遗留（No leak）。
 
-### Verification
+### Code Inspection Verification
 - 运行 `npm run typecheck` 验证了 workerUrl 改动类型安全无编译错误。
 - 本地 `git commit` 时，通过 Husky 成功触发了 `check:encoding`（Mojibake 检查）及 `governance:version` 检查，顺利合入主分支。
 
@@ -382,9 +733,9 @@
 - `git diff --check`: passed with CRLF normalization warnings in unrelated Turnstile files.
 
 ### Browser Assistant Local Action Risks / Next
-- This pass only adds the stable local action contract; the underlying local handlers still need a later adapter pass to call real `canvas.createPromptCards` / `assets.zipOriginals` execution paths instead of any remaining simulated UI-side success flow.
+- Superseded by the 2026-06-23 AI Control Action Surface Completion pass: Browser Assistant canvas import, ZIP export, status checks, pipeline, clipboard, screen inspect, desktop IDE, local LLM, and related local controls now route through ToolRegistry or Browser Bridge runtime adapters.
 - Full `npm.cmd run verify:changes` was not run for this slice.
-- Continue auditing normal chat controls, favorites/@ references, canvas sync, download, and generation composer buttons.
+- Superseded for normal chat controls by the 2026-06-23 Chat shell action pass. Favorites/@ references, canvas sync, download, and generation composer surfaces can be audited separately if the broader UI-control catalog is extended beyond the assistant surfaces.
 
 ## 2026-06-17 - Simplify Login Card UI & Glassmorphism Styling
 

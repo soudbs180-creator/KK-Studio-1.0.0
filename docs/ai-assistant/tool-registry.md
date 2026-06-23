@@ -128,7 +128,8 @@
 - Durable generation queue buttons expose `data-agent-action` on both surfaces. Pause, resume, retry, and cancel also expose `data-agent-tool` mapped to `generation.pauseJob`, `generation.resumeJob`, `generation.retryJob`, and `generation.cancelJob`.
 - Queue archive and output locate are local UI actions with `toolName: undefined`; they are intentionally not advertised as LLM tools because they do not go through `ToolRegistry`.
 - `AIAssistantDock` and `ChatSidebar` now both show retry and locate controls for durable queue jobs, preventing one AI control surface from having a different queue capability set than the other.
-- Composer and resource controls also use `AGENT_CONTROL_ACTIONS`: context compression, send message, image import, folder import, file connect, resource panel toggle/close, and resource removal are local UI actions with stable `data-agent-action` values and no `ToolRegistry` tool name.
+- AI Takeover composer and resource controls also use `AGENT_CONTROL_ACTIONS`: context compression, Dock takeover send, image import, folder import, file connect, resource panel toggle/close, and resource removal are local UI actions with stable `data-agent-action` values and no `ToolRegistry` tool name.
+- AI Takeover shell controls also use `AGENT_CONTROL_ACTIONS`: inline `action://` link execution, Dock close, Sidebar AI Takeover toggle, and archived-history expand/collapse all expose stable local `data-agent-action` values with no `ToolRegistry` tool name.
 
 ## 7. Implementation update - Browser Assistant local actions - 2026-06-22
 
@@ -143,11 +144,54 @@
 - Browser Assistant ZIP buttons dispatch the runtime ZIP event directly; they do not gate on Browser Bridge daemon status or run dev fallback ZIP progress simulation.
 - Browser Assistant ZIP locate actions must not fake OS file-manager success or expose full local filesystem paths; they only provide download-location guidance unless a real bridge result is available.
 - Browser Assistant platform, social channel, and multi-account session status buttons read `browser.getStatus` through `ToolRegistry`; they do not use local random login simulation or dev fallback status results.
+- Browser Assistant Connectivity Doctor also executes `browser.getStatus` through `ToolRegistry` on demand and applies the returned snapshot, instead of waiting on a local timer and re-reading stale component state.
 - Pipeline run keeps a stable `data-browser-local-action` identity for Browser Assistant UI/audit grouping, and also declares `data-browser-tool="browser.generateExternal"` plus the shared `generate_external` command kind because execution now runs through the Browser Bridge runtime adapter.
 - Pipeline run no longer posts a `pipeline` task to the inline Web Worker, no longer emits simulated `pipeline_step` / `pipeline_done` results, and no longer reports Dev Fallback success. `setup_required` and `queued` states are surfaced as real Browser Bridge outcomes, while result cards appear only after a Bridge `success` response includes a usable image URL.
 - Sensed clipboard import exposes `data-browser-local-action` plus `data-agent-tool="canvas.createPromptCards"` because it creates a KK Studio Prompt card through the same runtime event bridge as Browser Assistant product/card imports.
 - Clipboard capture reads `navigator.clipboard.readText()` from a user gesture instead of injecting a fixed demo product URL; URL content is imported as a prompt-card payload unless the user explicitly asks for Browser Bridge product extraction.
 - Screen inspect / design translation buttons declare `data-browser-tool="browser.inspectPage"` plus the shared `inspect_page` command kind and call the Browser Bridge runtime adapter; they no longer use local timers, fixed color palettes, canned OCR text, or Dev Fallback success paths.
+- Screen inspect result-to-canvas now exposes `BROWSER_LOCAL_ACTIONS.translateInspectionToCanvas` plus `data-agent-tool="canvas.createPromptCards"` and dispatches the shared canvas prompt-card event instead of showing a success-only toast.
 - Desktop IDE launch declares `data-browser-tool="browser.openDesktopProject"` plus the shared `open_desktop_project` command kind and uses Browser Bridge runtime outcomes instead of Dev Fallback success.
 - Local LLM gateway diagnostics declare `data-browser-tool="browser.checkLocalLlm"` plus the shared `check_local_llm` command kind and use Browser Bridge runtime outcomes instead of direct browser fetch probes or Dev Fallback success.
 - Exported ZIP locate exposes a stable `data-browser-local-action` value with no ToolRegistry tool name because it remains local Browser Assistant UI guidance.
+- Browser Assistant session, social-channel, clipboard, WASM, Takeover preview, sample prompt, Playground tab, routing segment, offline plugin guidance, and clipboard dismiss controls now have distinct `BROWSER_LOCAL_ACTIONS` entries so UI audits do not infer behavior from button text or scattered handlers.
+
+## 8. Implementation update - ChatSidebar shell actions - 2026-06-23
+
+- ChatSidebar ordinary chat controls use `CHAT_SHELL_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/runtime/chatShellActions.ts` as their shared local action contract.
+- `CHAT_SHELL_ACTIONS` covers sidebar open/close, current-session controls, history panel controls, session tree actions, context menu actions, message edit/regenerate/branch/copy controls, attachment removal, attachment menu open, Agent mode toggle, stop generation, composer send, and session import preview decisions.
+- Chat shell actions expose `data-chat-shell-action`; they intentionally do not expose `data-agent-action` or `data-agent-tool` unless a future ToolRegistry-backed chat action is added.
+- The shared ChatSidebar composer send button now exposes `data-chat-shell-action={CHAT_SHELL_ACTIONS.sendComposerMessage.uiAction}`. `AGENT_CONTROL_ACTIONS.sendTakeoverMessage` remains scoped to the AI Takeover Dock so ordinary chat send and takeover send do not collapse into one audit identity.
+- `CHAT_SHELL_ACTIONS` entries keep `toolName: undefined` because they are station-local UI operations, not LLM-callable ToolRegistry tools.
+
+## 9. Implementation update - Prompt composer shell actions - 2026-06-23
+
+- PromptBar and extracted prompt-bar controls use `PROMPT_COMPOSER_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/runtime/promptComposerActions.ts` as the shared local action contract for generation composer controls.
+- `PROMPT_COMPOSER_ACTIONS` covers mobile composer expansion, model library open, model selection, mode switching, advanced option reveal, prompt optimization toggle, optimizer archetype selection, PPT outline toggle, and generation submission.
+- Prompt composer controls expose `data-prompt-composer-action`. They do not borrow `data-agent-action` or `data-chat-shell-action`, keeping generation composer actions separate from AI Takeover and ordinary ChatSidebar actions.
+- Every native `PromptBar.tsx` button now carries a prompt composer action marker. `toggleParallelCountMenu` identifies opening/closing the count picker, while `selectParallelCount` identifies choosing a count.
+- `submitGeneration` is the only Prompt composer action that exposes a ToolRegistry mapping: `data-agent-tool="generation.submitComposer"`. The other entries keep `toolName: undefined` because they only update local composer UI state.
+- `generation.submitComposer` remains the canonical runtime tool for submitting the current canvas generation composer. AI-controlled generation must call this tool or higher-level generation tools instead of simulating PromptBar clicks.
+
+## 10. Implementation update - AI Management action and Skill tool catalog - 2026-06-23
+
+- AI Management settings controls use `AI_MANAGEMENT_ACTIONS` from `apps/web/src/features/ai-assistant-runtime/runtime/aiManagementActions.ts` as their shared local action contract.
+- `AI_MANAGEMENT_ACTIONS` covers capability/Skill tab switching, capability settings expansion, temperature preset buttons, Skill create/edit/delete, Skill tool checkbox toggles, and Skill modal close/cancel/save buttons.
+- AI Management controls expose `data-ai-management-action`; they intentionally keep `toolName: undefined` because they mutate settings or local Skill records rather than executing an LLM-callable ToolRegistry action directly.
+- AI Management reads `CapabilityRouteAssignment` summaries but no longer writes provider/model route assignments. `AI_MANAGEMENT_ACTIONS.openCapabilityRoutes` deep-links users to `/settings/api-management`, which remains the owner for capability route changes.
+- The Skill authorized-tool picker now uses `AI_MANAGEMENT_SKILL_TOOL_OPTIONS`, a canonical projection of registered ToolRegistry tools. It excludes forbidden tools and legacy aliases such as `fillPrompt`, `zipOutputs`, `startBatchGeneration`, and `submitPromptComposer`.
+- The obsolete `canvas.createImageCards` option was removed from AI Management because it is not a registered ToolRegistry tool. Image/card creation flows should use existing registered tools such as `canvas.createPromptCards` plus runtime image node attachment where applicable.
+
+## 11. Implementation update - API Management local action catalog - 2026-06-23
+
+- API Management settings controls use `API_MANAGEMENT_ACTIONS` from `apps/web/src/components/settings/apiManagementActions.ts` as their shared local action contract.
+- These actions are settings-surface metadata only. They must not be advertised as LLM-callable ToolRegistry tools unless a future command intentionally routes through `ToolRegistry`.
+- Raw API Management buttons expose `data-api-management-action`; shared settings primitives expose `data-settings-control-action` through the `controlAction` prop.
+
+## 12. Implementation update - Settings module local action catalogs - 2026-06-23
+
+- Dashboard, Storage Settings, System Logs, Project Manager, and the desktop settings shell use `SETTINGS_DASHBOARD_ACTIONS`, `STORAGE_SETTINGS_ACTIONS`, `SYSTEM_LOGS_ACTIONS`, `PROJECT_MANAGER_ACTIONS`, and `SETTINGS_SHELL_ACTIONS` from `apps/web/src/components/settings/settingsModuleActions.ts`.
+- These catalogs keep settings-page controls separated by module: dashboard navigation exposes `data-settings-dashboard-action`, storage maintenance exposes `data-storage-settings-action`, system log controls expose `data-system-logs-action`, project controls expose `data-project-manager-action`, and settings shell controls expose `data-settings-shell-action`.
+- Shared settings primitives, including segmented controls, expose `data-settings-control-action` through `controlAction` when a control is rendered by a reusable primitive instead of a module-owned raw button.
+- These settings-module actions are local UI metadata, not LLM-callable ToolRegistry tools. AI plans should use existing runtime tools such as `ui.openSettings` for route navigation, or a future explicit settings executor, rather than simulating arbitrary button clicks.
+- API Management remains the sole owner for provider/model capability route writes. AI Management links to `/settings/api-management` instead of writing `CapabilityRouteAssignment`.

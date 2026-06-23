@@ -3,6 +3,7 @@ import { RefreshCw, X, ScrollText } from 'lucide-react';
 
 import { useLocale } from '../../../context/LocaleContext';
 import { SettingsActionButton } from '../SettingsScaffold';
+import { SETTINGS_SHELL_ACTIONS } from '../settingsModuleActions';
 import { type CanonicalSettingsViewId as DesktopSettingsViewId } from '../settingsRegistry';
 
 interface SettingsDesktopWorkbenchHeaderProps {
@@ -30,10 +31,10 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
     >
       <div className="flex w-full items-center justify-end gap-4">
         <div className="settings-desktop-quick-actions ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <SettingsActionButton icon={RefreshCw} tone="secondary" size="sm" onClick={onRefreshCurrentView}>
+          <SettingsActionButton icon={RefreshCw} tone="secondary" size="sm" onClick={onRefreshCurrentView} data-settings-shell-action={SETTINGS_SHELL_ACTIONS.refreshCurrentView.uiAction}>
             {pick('刷新', 'Refresh')}
           </SettingsActionButton>
-          <SettingsActionButton icon={X} tone="secondary" size="sm" onClick={onClose}>
+          <SettingsActionButton icon={X} tone="secondary" size="sm" onClick={onClose} data-settings-shell-action={SETTINGS_SHELL_ACTIONS.closeWorkbench.uiAction}>
             {pick('关闭', 'Close')}
           </SettingsActionButton>
         </div>

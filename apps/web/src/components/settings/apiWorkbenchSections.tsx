@@ -21,6 +21,7 @@ import {
   SettingSelect,
   SettingToggle,
 } from './ui/index';
+import { API_MANAGEMENT_ACTIONS } from './apiManagementActions';
 import type { ApiSettingsWorkbenchStage, ApiSettingsWorkbenchTone } from './apiWorkbenchState';
 
 type LocalePick = (zhText: string, enText: string) => string;
@@ -852,6 +853,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             <button
               type="button"
               data-testid="api-official-provider-add"
+              data-api-management-action={API_MANAGEMENT_ACTIONS.addOfficialApi.uiAction}
               className="settings-model-center-toolbar__button settings-model-center-toolbar__button--primary"
               disabled={addOfficialDisabled}
               onClick={onAddOfficial}
@@ -862,6 +864,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             <button
               type="button"
               data-testid="api-proxy-provider-add"
+              data-api-management-action={API_MANAGEMENT_ACTIONS.addProviderRoute.uiAction}
               className="settings-model-center-toolbar__button"
               disabled={addProviderDisabled}
               onClick={onAddProvider}
@@ -940,6 +943,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                           <button
                             type="button"
                             title={pick('复制 ID', 'Copy ID')}
+                            data-api-management-action={API_MANAGEMENT_ACTIONS.copyRouteId.uiAction}
                             className="hover:text-white transition-colors duration-150 p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1011,6 +1015,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                       onClick={route.onToggle}
                       title={toggleLabel}
                       aria-label={toggleLabel}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.toggleRoute.uiAction}
                       className={`settings-model-center-route__btn-action ${
                         isReadonlyGhost && route.toggleDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
                       }`}
@@ -1027,6 +1032,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                       onClick={route.onRefresh}
                       title={refreshLabel}
                       aria-label={refreshLabel}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.refreshRoute.uiAction}
                       className={`settings-model-center-route__btn-action ${
                         isReadonlyGhost && route.refreshDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
                       }`}
@@ -1042,6 +1048,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                       onClick={route.onSelect}
                       title={editLabel}
                       aria-label={editLabel}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.editRoute.uiAction}
                       className="settings-model-center-route__btn-action"
                     >
                       <span>
@@ -1056,6 +1063,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                       onClick={route.onDelete}
                       title={deleteLabel}
                       aria-label={deleteLabel}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.deleteRoute.uiAction}
                       className={`settings-model-center-route__btn-action settings-model-center-route__btn-action--danger ${
                         isReadonlyGhost && route.deleteDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
                       }`}
@@ -1096,6 +1104,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             <button
               key={tab.value}
               type="button"
+              data-api-management-action={API_MANAGEMENT_ACTIONS.switchPresetDirectoryTab.uiAction}
               className={[
                 'settings-model-center-directory__tab',
                 presetTab === tab.value ? 'settings-model-center-directory__tab--active' : '',
@@ -1112,6 +1121,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             <button
               key={preset.id}
               type="button"
+              data-api-management-action={API_MANAGEMENT_ACTIONS.applyProviderPreset.uiAction}
               className="settings-model-center-preset settings-model-center-preset-row"
               onClick={preset.onApply}
             >
@@ -1272,6 +1282,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   role="switch"
                   aria-checked={item.enabled}
                   onClick={() => item.onEnabledChange(!item.enabled)}
+                  data-api-management-action={API_MANAGEMENT_ACTIONS.toggleCapabilityRole.uiAction}
                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 active:scale-95 cursor-pointer border ${
                     item.enabled
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
@@ -1298,6 +1309,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     value={item.primaryRouteId}
                     options={item.routeOptions}
                     onChange={item.onPrimaryRouteChange}
+                    controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityPrimaryRoute.uiAction}
                     disabled={!item.enabled}
                   />
                 </div>
@@ -1309,6 +1321,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     value={item.primaryModelId}
                     options={item.modelOptions}
                     onChange={item.onPrimaryModelChange}
+                    controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityPrimaryModel.uiAction}
                     disabled={!item.enabled}
                   />
                 </div>
@@ -1320,6 +1333,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     value={item.role === 'assistant' ? item.auxiliaryRouteId || '' : item.fallbackRouteId || ''}
                     options={item.routeOptions}
                     onChange={item.role === 'assistant' ? item.onAuxiliaryRouteChange || noop : item.onFallbackRouteChange || noop}
+                    controlAction={item.role === 'assistant' ? API_MANAGEMENT_ACTIONS.updateCapabilityAuxiliaryRoute.uiAction : API_MANAGEMENT_ACTIONS.updateCapabilityFallbackRoute.uiAction}
                     disabled={!item.enabled}
                   />
                   <SettingSelect
@@ -1327,6 +1341,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     value={item.role === 'assistant' ? item.auxiliaryModelId || '' : item.fallbackModelId || ''}
                     options={item.role === 'assistant' ? item.auxiliaryModelOptions || [] : item.fallbackModelOptions || []}
                     onChange={item.role === 'assistant' ? item.onAuxiliaryModelChange || noop : item.onFallbackModelChange || noop}
+                    controlAction={item.role === 'assistant' ? API_MANAGEMENT_ACTIONS.updateCapabilityAuxiliaryModel.uiAction : API_MANAGEMENT_ACTIONS.updateCapabilityFallbackModel.uiAction}
                     disabled={!item.enabled}
                   />
                 </div>
@@ -1340,6 +1355,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         value={item.imageRouteId || ''}
                         options={item.routeOptions}
                         onChange={item.onImageRouteChange || noop}
+                        controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityImageRoute.uiAction}
                         disabled={!item.enabled}
                       />
                       <SettingSelect
@@ -1347,6 +1363,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         value={item.imageModelId || ''}
                         options={item.imageModelOptions || []}
                         onChange={item.onImageModelChange || noop}
+                        controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityImageModel.uiAction}
                         disabled={!item.enabled}
                       />
                     </div>
@@ -1356,6 +1373,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     <button
                       type="button"
                       onClick={item.onOcrClick}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.openCapabilityOcrConfig.uiAction}
                       className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
                       style={{ background: 'var(--bg-secondary)', height: '40px', marginTop: '12px' }}
                       disabled={!item.enabled}
@@ -1377,6 +1395,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         value={item.imageFallbackRouteId || ''}
                         options={item.routeOptions}
                         onChange={item.onImageFallbackRouteChange || noop}
+                        controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityImageFallbackRoute.uiAction}
                         disabled={!item.enabled}
                       />
                       <SettingSelect
@@ -1384,6 +1403,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         value={item.imageFallbackModelId || ''}
                         options={item.imageFallbackModelOptions || []}
                         onChange={item.onImageFallbackModelChange || noop}
+                        controlAction={API_MANAGEMENT_ACTIONS.updateCapabilityImageFallbackModel.uiAction}
                         disabled={!item.enabled}
                       />
                     </div>

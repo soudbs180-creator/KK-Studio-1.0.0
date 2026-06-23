@@ -44,6 +44,7 @@ import {
   getSettingsStatusSummaryLabel,
   getSettingsViewMeta,
 } from '../settingsRegistry';
+import { SETTINGS_DASHBOARD_ACTIONS } from '../settingsModuleActions';
 import { ProgressBar, StatusBadge } from '../ui/index';
 
 interface DashboardViewProps {
@@ -160,9 +161,10 @@ const DashboardPanel: React.FC<{
   children: React.ReactNode;
   action?: React.ReactNode;
   onClick?: () => void;
+  uiAction?: string;
   className?: string;
   tone?: HealthTone;
-}> = ({ title, eyebrow, icon, children, action, onClick, className = '', tone = 'indigo' }) => {
+}> = ({ title, eyebrow, icon, children, action, onClick, uiAction, className = '', tone = 'indigo' }) => {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (!onClick) return;
     if (event.key === 'Enter' || event.key === ' ') {
@@ -176,6 +178,7 @@ const DashboardPanel: React.FC<{
       className={`dashboard-panel dashboard-grid-card ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
       data-clickable={onClick ? 'true' : 'false'}
       data-tone={tone}
+      data-settings-dashboard-action={uiAction}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
@@ -1471,7 +1474,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           'Overview is now a visual command center for spend, provider routing, browser assistant, storage, logs, and ledger health.',
         )}
         actions={(
-          <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate(dashboardPrimaryAction.target)}>
+          <SettingsActionButton
+            icon={ArrowRight}
+            tone="primary"
+            onClick={() => onNavigate(dashboardPrimaryAction.target)}
+            data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openPrimaryModule.uiAction}
+          >
             {dashboardPrimaryAction.label}
           </SettingsActionButton>
         )}
@@ -1514,6 +1522,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('今日累计消耗趋势', 'Today cumulative spend trend')}
           action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
         >
           <div className="dashboard-chart-shell">
             <div className="dashboard-chart" aria-label={pick('今日累计消耗曲线图', 'Today cumulative spend curve chart')}>
@@ -1609,6 +1618,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('供应商配置与能力路由', 'Provider settings and capability routing')}
           action={<SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'amber'}>{hasAvailableRoute ? pick('可用', 'Ready') : pick('待配置', 'Setup')}</SettingsBadge>}
           onClick={() => onNavigate('api-management')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openApiManagement.uiAction}
         >
           <div className="dashboard-module-stack">
             <ModuleMeter
@@ -1664,6 +1674,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('本地守护、插件与网页自动化链路', 'Daemon, extension, and web automation pipeline')}
           action={<SettingsBadge tone={browserReadiness >= 75 ? 'emerald' : 'indigo'}>{`${browserReadiness}%`}</SettingsBadge>}
           onClick={() => onNavigate('browser-assistant')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openBrowserAssistant.uiAction}
         >
           <div className="dashboard-module-stack">
             <ModuleMeter
@@ -1707,6 +1718,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('画布资源与容量', 'Canvas assets and capacity')}
           action={<SettingsBadge tone={storageMode ? 'emerald' : 'amber'}>{storageModeLabel}</SettingsBadge>}
           onClick={() => onNavigate('storage-settings')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openStorageSettings.uiAction}
         >
           <div className="dashboard-module-stack">
             <div className="dashboard-inline-list">
@@ -1740,6 +1752,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             />
           )}
           onClick={() => onNavigate('system-logs')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openSystemLogs.uiAction}
         >
           <div className="dashboard-module-stack">
             <div className="dashboard-inline-list">
@@ -1764,6 +1777,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('账户交易记录', 'Transaction History')}
           action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{dashboardBalanceCard.title}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
         >
           <div className="dashboard-module-stack">
             <div className="dashboard-inline-list">
@@ -1786,6 +1800,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           title={pick('模型调用与素材闭环', 'Model calls and assets loop')}
           action={<SettingsBadge tone="indigo">{pick('闭环', 'Loop')}</SettingsBadge>}
           onClick={() => onNavigate('ai-management')}
+          uiAction={SETTINGS_DASHBOARD_ACTIONS.openAiManagement.uiAction}
         >
           <div className="dashboard-module-stack">
             <div className="dashboard-inline-list">

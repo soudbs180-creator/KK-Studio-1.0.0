@@ -17,7 +17,7 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   assert.match(source, /return pick\('请重新输入真实 API Key。', 'Re-enter the real API key before saving\.'\);/);
   assert.match(source, /<PrimaryButton disabled=\{userApiActionsDisabled \|\| Boolean\(officialEditorValidationMessage\)\}/);
   assert.match(source, /const resetOfficialDraft = \(\) => \{[\s\S]*setOfficialForm\(buildOfficialDraft\(officialForm\.provider\)\);[\s\S]*\};/);
-  assert.match(source, /<SecondaryButton onClick=\{editingOfficialId \? cancelEdit : resetOfficialDraft\}>/);
+  assert.match(source, /<SecondaryButton onClick=\{editingOfficialId \? cancelEdit : resetOfficialDraft\}(?:\s+controlAction=\{[^}]+\})?>/);
   assert.match(
     source,
     /\{officialEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{officialEditorValidationMessage\}/s,
@@ -30,7 +30,7 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   );
   assert.match(source, /<PrimaryButton disabled=\{providerActionsDisabled \|\| Boolean\(providerEditorValidationMessage\)\}/);
   assert.match(source, /const resetProviderDraft = \(\) => \{[\s\S]*setProviderForm\(providerDefaults\);[\s\S]*\};/);
-  assert.match(source, /<SecondaryButton onClick=\{editingProviderId \? cancelEdit : resetProviderDraft\}>/);
+  assert.match(source, /<SecondaryButton onClick=\{editingProviderId \? cancelEdit : resetProviderDraft\}(?:\s+controlAction=\{[^}]+\})?>/);
   assert.match(
     source,
     /\{providerEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{providerEditorValidationMessage\}/s,

@@ -96,7 +96,7 @@ const normalizeBrowserLoginStatus = (status?: string): BrowserLoginStatus => {
 // 生产级 WebSocket 控制器 (自适应 HTTPS/WSS 以及指数避退重连)
 // -------------------------------------------------------------
 // -------------------------------------------------------------
-// Web Worker 核心计算解耦代码 (WASM抠图/OCR计算/多账号轮询分发仿真)
+// Web Worker 核心计算解耦代码 (WASM抠图/OCR计算/多账号轮询分发状态处理)
 // -------------------------------------------------------------
 const workerCode = `
   self.onmessage = async function(e) {
@@ -233,7 +233,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 演示区 Tab
   const [playgroundTab, setPlaygroundTab] = useState<'extract' | 'generate' | 'pipeline'>('extract');
 
-  // 商品提取测试状态
+  // 商品提取状态
   const [targetUrl, setTargetUrl] = useState('');
   const [extractLoading, setExtractLoading] = useState(false);
   const [extractStep, setExtractStep] = useState<string>('');
@@ -250,7 +250,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [autoClip, setAutoClip] = useState(true);
   const [clippingProgress, setClippingProgress] = useState(false);
 
-  // 外部生图测试状态
+  // 外部生图状态
   const [promptText, setPromptText] = useState('一间充满蒸汽朋克风的未来科技感机械加工坊，充满黄色暖光和铜锈质感，高清画质');
   const [genPlatform, setGenPlatform] = useState('leonardo');
   const [genLoading, setGenLoading] = useState(false);
@@ -258,14 +258,14 @@ export const BrowserAssistantView: React.FC = () => {
   const [genStep, setGenStep] = useState('');
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   
-  // 社交分发模拟状态
+  // 社交分发状态
   const [publishingLoading, setPublishingLoading] = useState(false);
   const [publishingStep, setPublishingStep] = useState('');
 
   // --- 阶段四：极客级高级功能融合状态 ---
   // 1. 智能剪贴板多模态感知状态
   const [clipboardSyncEnabled, setClipboardSyncEnabled] = useState(true);
-  const [simulatedClipboardPayload, setSimulatedClipboardPayload] = useState<{
+  const [clipboardPayload, setClipboardPayload] = useState<{
     type: 'text' | 'image' | 'url';
     content: string;
     showNotification: boolean;
@@ -338,7 +338,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [editedPrice, setEditedPrice] = useState('');
   const [writeBackLoading, setWriteBackLoading] = useState(false);
 
-  // AI Takeover 自然语言模拟输入
+  // AI Takeover 自然语言预览输入
   const [takeoverInput, setTakeoverInput] = useState('用网页直通代理多开 2 个号并发跑 3 张商品海报图');
   const [takeoverOutput, setTakeoverOutput] = useState<{
     intent: string;
@@ -359,7 +359,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [zipStep, setZipStep] = useState('');
   const [zippedFileLoc, setZippedFileLoc] = useState<string | null>(null);
 
-  // 桌面通道测试
+  // 桌面通道诊断
   const handleTestIde = async () => {
     setTestingDesktop(true);
     setDesktopStatus('connecting');
@@ -710,7 +710,7 @@ export const BrowserAssistantView: React.FC = () => {
     localStorage.setItem('kk_browser_selected_sessions', JSON.stringify(selectedSessionsForGen));
   }, [selectedSessionsForGen]);
 
-  // 2. WASM 内存数据仿真定时器，安全卸载防内存泄漏
+  // 2. WASM 内存数据采样定时器，安全卸载防内存泄漏
   useEffect(() => {
     if (!wasmEnabled) {
       setWasmMemoryUsage('0 MB');
@@ -730,25 +730,35 @@ export const BrowserAssistantView: React.FC = () => {
     };
   }, [wasmEnabled]);
 
-  // 3. 通用连通性测试 (自适应连接)
+  // 3. 通用连通性诊断 (自适应连接)
   const checkConnectivity = async (isManual = false) => {
     if (testingConnection) return;
     setTestingConnection(true);
 
-    // 自动重连由全局 RobustWebSocket 托管，无需在此手动连接
+    try {
+      const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
+        browserAssistantSnapshot: getBrowserBridgeSnapshot()
+      }) as BrowserBridgeStatusSnapshot;
 
-    window.setTimeout(() => {
-      if (isMountedRef.current) {
-        setTestingConnection(false);
-        if (isManual) {
-          if (daemonStatus === 'connected') {
-            notify.success('多端测试成功', 'Web 画布已成功连接至本地守护进程与 Chrome 插件');
-          } else {
-            notify.error('检测失败', '未能在端口 9099 检测到守护进程，已开始自适应指数避退重试');
-          }
+      if (!isMountedRef.current) return;
+      applyBrowserStatusSnapshot(status);
+
+      if (isManual) {
+        if (!status.setupRequired) {
+          notify.success('多端连接正常', 'Web 画布已成功连接至本地守护进程与 Chrome 插件');
+        } else {
+          notify.warning('Browser Bridge 未连接', status.setupHint || SETUP_HINT);
         }
       }
-    }, 800);
+    } catch (error: any) {
+      if (isMountedRef.current && isManual) {
+        notify.error('检测失败', error?.message || 'browser.getStatus 执行失败');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setTestingConnection(false);
+      }
+    }
   };
 
   // 4. 检测外部平台登录状态 (安全脱敏校验)
@@ -920,7 +930,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 6. 商品提取核心流程
   const handleExtractTest = async () => {
     if (!targetUrl) {
-      notify.warning('请输入 URL', '提取测试需要有效的电商或网页链接');
+      notify.warning('请输入 URL', '提取需要有效的电商或网页链接');
       return;
     }
 
@@ -1025,7 +1035,7 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
-  // 7b. 双向 DOM 实时篡改与回写仿真
+  // 7b. 双向 DOM 实时编辑与 Browser Bridge 回写
   const handleWriteBackDom = async () => {
     if (!extractedData) return;
     setWriteBackLoading(true);
@@ -1078,7 +1088,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 8. 外部网页直通网站生图 (Web Worker 计算隔离)
   const handleGenTest = async () => {
     if (!promptText) {
-      notify.warning('请输入 Prompt', '生图测试需要有效的提示词');
+      notify.warning('请输入 Prompt', '生图需要有效的提示词');
       return;
     }
 
@@ -1202,7 +1212,7 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
-  // 10. 阶段四：本地 LLM 网关连通性测试
+  // 10. 阶段四：本地 LLM 网关连通性诊断
   const handleTestLocalLlm = async () => {
     setTestingLlm(true);
     setLocalLlmStatus('connecting');
@@ -1237,16 +1247,16 @@ export const BrowserAssistantView: React.FC = () => {
       if (result.status === 'success') {
         setLocalLlmStatus('connected');
         const activeModel = String(result.data?.activeModel || result.data?.model || localLlmModel);
-        notify.success('Ollama 网关测试就绪', `Browser Bridge 已确认本地网关可用，活跃模型：${activeModel}`);
+        notify.success('Ollama 网关诊断就绪', `Browser Bridge 已确认本地网关可用，活跃模型：${activeModel}`);
         return;
       }
 
       setLocalLlmStatus('error');
-      notify.error('Ollama 网关测试失败', result.error || result.summary);
+      notify.error('Ollama 网关诊断失败', result.error || result.summary);
     } catch (err: any) {
       if (!isMountedRef.current) return;
       setLocalLlmStatus('error');
-      notify.error('Ollama 网关测试失败', `Browser Bridge 本地网关诊断失败: ${err?.message || String(err)}`);
+      notify.error('Ollama 网关诊断失败', `Browser Bridge 本地网关诊断失败: ${err?.message || String(err)}`);
     } finally {
       if (isMountedRef.current) {
         setTestingLlm(false);
@@ -1254,8 +1264,8 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
-  // 11. 阶段四：智能剪贴板流入模拟
-  const handleSimulateClipboard = async () => {
+  // 11. 阶段四：智能剪贴板流入
+  const handleReadClipboardPayload = async () => {
     if (!clipboardSyncEnabled) {
       notify.warning('监听未开启', '请先开启智能剪贴板监听开关');
       return;
@@ -1273,7 +1283,7 @@ export const BrowserAssistantView: React.FC = () => {
         return;
       }
 
-      setSimulatedClipboardPayload({
+      setClipboardPayload({
         type: /^https?:\/\//i.test(content) ? 'url' : 'text',
         content,
         showNotification: true,
@@ -1284,20 +1294,20 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
-  const handleImportSimulatedClipboard = () => {
-    if (!simulatedClipboardPayload) return;
+  const handleImportClipboardPayload = () => {
+    if (!clipboardPayload) return;
     window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
       detail: {
         prompts: [
-          `剪贴板感知内容 (${simulatedClipboardPayload.type}): ${simulatedClipboardPayload.content}`
+          `剪贴板感知内容 (${clipboardPayload.type}): ${clipboardPayload.content}`
         ]
       }
     }));
     notify.info('已提交导入', '剪贴板内容已交给 KK Studio 画布工具创建 Prompt 卡片。');
-    setSimulatedClipboardPayload(null);
+    setClipboardPayload(null);
   };
 
-  // 12. 阶段四：模拟屏幕捕捉设计转译
+  // 12. 阶段四：Browser Bridge 屏幕感知设计转译
   const handleScreenInspect = async () => {
     if (screenInspectStatus === 'capturing' || screenInspectStatus === 'parsing') return;
 
@@ -1352,6 +1362,22 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
+  const handleTranslateInspectionToCanvas = () => {
+    if (!inspectData) return;
+
+    const palette = inspectData.palette.length > 0 ? inspectData.palette.join(', ') : 'no palette returned';
+    window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
+      detail: {
+        prompts: [
+          `Browser viewport translation\nLayout: ${inspectData.layoutType}\nPalette: ${palette}\nVisible text: ${inspectData.ocrText || 'none'}`
+        ]
+      }
+    }));
+    notify.info('已提交转译', '网页可见视口摘要已交给 KK Studio 画布工具创建 Prompt 卡片。');
+    setInspectData(null);
+    setScreenInspectStatus('idle');
+  };
+
   // 13. Browser Bridge runtime pipeline: no local success simulation.
   const handleRunPipeline = async () => {
     if (pipelineRunning) return;
@@ -1386,7 +1412,7 @@ export const BrowserAssistantView: React.FC = () => {
     appendPipelineLog(
       routingMode === 'proxy'
         ? `[2/5] 网页直通会话池：${activeSessions.map((session) => session.username).join(', ')}`
-        : '[2/5] 官方 API 通道将由 Browser Bridge runtime 统一调度，不在前端模拟扣费。'
+        : '[2/5] 官方 API 通道将由 Browser Bridge runtime 统一调度，不在前端本地扣费。'
     );
     setPipelineStatusText('正在通过 Browser Bridge adapter 下发网页直通生图流水线指令...');
 
@@ -1485,8 +1511,8 @@ export const BrowserAssistantView: React.FC = () => {
     }
   };
 
-  // 14. 阶段五：AI Takeover 自然语言解析仿真与真实回注驱动
-  const handleTakeoverSimulate = async () => {
+  // 14. 阶段五：AI Takeover 自然语言解析预览与真实回注驱动
+  const handlePreviewTakeoverPlan = async () => {
     if (!takeoverInput) return;
     
     setTakeoverLoading(true);
@@ -1655,13 +1681,13 @@ export const BrowserAssistantView: React.FC = () => {
           </div>
         </div>
 
-        {/* 连通性测试 Doctor 控制台 */}
+        {/* 连通性诊断 Doctor 控制台 */}
         <div className="dashboard-grid-card settings-browser-diagnostic-card a-card-span-2-col">
           <div>
             <div className="settings-browser-status-card__kicker">多端连通诊断</div>
             <h3 className="settings-browser-status-card__title">Connectivity Doctor</h3>
             <p className="settings-browser-status-card__note">
-              通过对本地 9099 端口与 Chrome Web Socket 进行实时测试，诊断链路健康状况。
+              通过对本地 9099 端口与 Chrome Web Socket 进行实时诊断，确认链路健康状况。
             </p>
           </div>
           <div className="settings-browser-diagnostic-card__footer">
@@ -1681,7 +1707,7 @@ export const BrowserAssistantView: React.FC = () => {
               ) : (
                 <>
                   <RefreshCw size={13} />
-                  <span>一键连通性测试</span>
+                  <span>一键连通性诊断</span>
                 </>
               )}
             </button>
@@ -1738,6 +1764,8 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => checkSessionLogin(sess.id)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.checkSessionStatus.actionName}
+                    data-agent-tool={BROWSER_LOCAL_ACTIONS.checkSessionStatus.agentToolName}
                     className="settings-browser-subtle-action"
                   >
                     检测
@@ -1745,6 +1773,7 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => toggleSession(sess.id)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.toggleSessionEnabled.actionName}
                     className="settings-browser-toggle"
                     data-state={sess.enabled ? 'enabled' : 'disabled'}
                     aria-pressed={sess.enabled}
@@ -1765,6 +1794,7 @@ export const BrowserAssistantView: React.FC = () => {
             <button
               type="button"
               onClick={() => handleAddSession('leonardo')}
+              data-browser-local-action={BROWSER_LOCAL_ACTIONS.addSessionInstance.actionName}
               className="settings-browser-subtle-action settings-browser-subtle-action--grow"
             >
               <UserPlus size={11} />
@@ -1773,6 +1803,7 @@ export const BrowserAssistantView: React.FC = () => {
             <button
               type="button"
               onClick={() => handleAddSession('midjourney')}
+              data-browser-local-action={BROWSER_LOCAL_ACTIONS.addSessionInstance.actionName}
               className="settings-browser-subtle-action settings-browser-subtle-action--grow"
             >
               <UserPlus size={11} />
@@ -1822,6 +1853,8 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => checkSocialLogin(channel.id)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.checkSocialChannelStatus.actionName}
+                    data-agent-tool={BROWSER_LOCAL_ACTIONS.checkSocialChannelStatus.agentToolName}
                     className="settings-browser-subtle-action"
                   >
                     检测通道
@@ -1829,6 +1862,7 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => toggleSocialChannel(channel.id)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.toggleSocialChannelEnabled.actionName}
                     className="settings-browser-toggle"
                     data-state={channel.enabled ? 'enabled' : 'disabled'}
                     aria-pressed={channel.enabled}
@@ -1884,8 +1918,9 @@ export const BrowserAssistantView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  notify.success('开始下载', 'OpenCLI 插件安装包已成功准备，正在开始下载...');
+                  notify.info('离线包未配置', '请从 Browser Bridge 发布包或后台配置离线扩展包下载地址后再启用此入口。');
                 }}
+                data-browser-local-action={BROWSER_LOCAL_ACTIONS.installPluginPackage.actionName}
                 className="settings-browser-action settings-browser-action--neutral"
               >
                 <span>下载离线扩展包 (.zip)</span>
@@ -2000,6 +2035,7 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setClipboardSyncEnabled(!clipboardSyncEnabled)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.toggleClipboardSync.actionName}
                     className="settings-browser-toggle"
                     data-state={clipboardSyncEnabled ? 'enabled' : 'disabled'}
                     aria-pressed={clipboardSyncEnabled}
@@ -2025,8 +2061,9 @@ export const BrowserAssistantView: React.FC = () => {
                 </span>
                 <button
                   type="button"
-                  onClick={handleSimulateClipboard}
+                  onClick={handleReadClipboardPayload}
                   disabled={!clipboardSyncEnabled}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.readClipboardPayload.actionName}
                   className="settings-browser-subtle-action"
                 >
                   读取剪贴板
@@ -2066,7 +2103,7 @@ export const BrowserAssistantView: React.FC = () => {
 
               <div className="settings-browser-meta-row">
                 <span className="settings-browser-inline-status" data-status={localLlmStatus}>
-                  {localLlmStatus === 'connected' ? '连接成功' : localLlmStatus === 'connecting' ? '正在检测...' : '未测试'}
+                  {localLlmStatus === 'connected' ? '连接成功' : localLlmStatus === 'connecting' ? '正在检测...' : '未检测'}
                 </span>
                 <button
                   type="button"
@@ -2076,7 +2113,7 @@ export const BrowserAssistantView: React.FC = () => {
                   data-browser-tool={BROWSER_ACTIONS.checkLocalLlm.toolName}
                   data-browser-command-kind={BROWSER_ACTIONS.checkLocalLlm.commandKind}
                 >
-                  测试连接
+                  诊断连接
                 </button>
               </div>
             </div>
@@ -2129,6 +2166,7 @@ export const BrowserAssistantView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setWasmEnabled(!wasmEnabled)}
+                    data-browser-local-action={BROWSER_LOCAL_ACTIONS.toggleWasmSandbox.actionName}
                     className="settings-browser-toggle"
                     data-state={wasmEnabled ? 'enabled' : 'disabled'}
                     aria-pressed={wasmEnabled}
@@ -2197,11 +2235,9 @@ export const BrowserAssistantView: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  notify.success('生成成功', '已成功将提取的色板和线框布局转译生成至画布中央！');
-                  setInspectData(null);
-                  setScreenInspectStatus('idle');
-                }}
+                onClick={handleTranslateInspectionToCanvas}
+                data-browser-local-action={BROWSER_LOCAL_ACTIONS.translateInspectionToCanvas.actionName}
+                data-agent-tool={BROWSER_LOCAL_ACTIONS.translateInspectionToCanvas.agentToolName}
                 className="settings-browser-action settings-browser-action--primary"
               >
                 生成到画布
@@ -2210,7 +2246,7 @@ export const BrowserAssistantView: React.FC = () => {
           )}
         </div>
 
-        {/* 阶段五优化：AI Takeover 智能接管集成与自然语言仿真解析器 */}
+        {/* 阶段五优化：AI Takeover 智能接管集成与自然语言计划预览器 */}
         <div className="dashboard-grid-card a-card-span-4-col settings-browser-section-card settings-browser-section-card--wide">
           <div className="settings-browser-section-card__header">
             <div>
@@ -2242,8 +2278,9 @@ export const BrowserAssistantView: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  onClick={handleTakeoverSimulate}
+                  onClick={handlePreviewTakeoverPlan}
                   disabled={takeoverLoading}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.previewTakeoverPlan.actionName}
                   className="settings-browser-action settings-browser-action--primary"
                 >
                   {takeoverLoading ? (
@@ -2254,7 +2291,7 @@ export const BrowserAssistantView: React.FC = () => {
                   ) : (
                     <>
                       <Sparkles size={13} />
-                      <span>AI 接管解析测试</span>
+                      <span>AI 接管计划预览</span>
                     </>
                   )}
                 </button>
@@ -2265,6 +2302,7 @@ export const BrowserAssistantView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setTakeoverInput('用网页直通代理多开 2 个号并发跑 3 张商品海报图')}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.setTakeoverSamplePrompt.actionName}
                   className="settings-browser-subtle-action"
                 >
                   快捷指令 A (网页直通多开并发)
@@ -2272,6 +2310,7 @@ export const BrowserAssistantView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setTakeoverInput('用 Leonardo 官方 API 扣减 10 积分生成一张蒸汽朋克海报')}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.setTakeoverSamplePrompt.actionName}
                   className="settings-browser-subtle-action"
                 >
                   快捷指令 B (官方付费 API)
@@ -2331,6 +2370,7 @@ export const BrowserAssistantView: React.FC = () => {
                   role="tab"
                   aria-selected={playgroundTab === 'extract'}
                   onClick={() => setPlaygroundTab('extract')}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.switchPlaygroundTab.actionName}
                   className="settings-browser-tab"
                 >
                   <ShoppingBag size={12} />
@@ -2341,6 +2381,7 @@ export const BrowserAssistantView: React.FC = () => {
                   role="tab"
                   aria-selected={playgroundTab === 'generate'}
                   onClick={() => setPlaygroundTab('generate')}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.switchPlaygroundTab.actionName}
                   className="settings-browser-tab"
                 >
                   <Sparkles size={12} />
@@ -2351,6 +2392,7 @@ export const BrowserAssistantView: React.FC = () => {
                   role="tab"
                   aria-selected={playgroundTab === 'pipeline'}
                   onClick={() => setPlaygroundTab('pipeline')}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.switchPlaygroundTab.actionName}
                   className="settings-browser-tab"
                 >
                   <Cpu size={12} />
@@ -2395,7 +2437,7 @@ export const BrowserAssistantView: React.FC = () => {
                     ) : (
                       <>
                         <Play size={13} />
-                        <span>一键提取测试</span>
+                        <span>一键提取</span>
                       </>
                     )}
                   </button>
@@ -2578,7 +2620,7 @@ export const BrowserAssistantView: React.FC = () => {
                         ) : (
                           <>
                             <Sparkles size={13} />
-                            <span>网页直通批量生图测试</span>
+                            <span>网页直通批量生图</span>
                           </>
                         )}
                       </button>
@@ -2685,6 +2727,7 @@ export const BrowserAssistantView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setRoutingMode('api')}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.setRoutingMode.actionName}
                         className="settings-browser-segment"
                         aria-pressed={routingMode === 'api'}
                       >
@@ -2693,6 +2736,7 @@ export const BrowserAssistantView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setRoutingMode('proxy')}
+                        data-browser-local-action={BROWSER_LOCAL_ACTIONS.setRoutingMode.actionName}
                         className="settings-browser-segment"
                         aria-pressed={routingMode === 'proxy'}
                       >
@@ -2934,21 +2978,21 @@ export const BrowserAssistantView: React.FC = () => {
             <span>自动分发功能要求在上方保持目标渠道通道处于开启且已登录状态。</span>
           </div>
 
-          {/* 智能剪贴板流入悬浮提示（当模拟了剪贴板数据时展示） */}
-          {simulatedClipboardPayload && (
+          {/* 智能剪贴板流入悬浮提示（当读取到剪贴板数据时展示） */}
+          {clipboardPayload && (
             <div className="settings-browser-notice" data-tone="warning">
               <div className="settings-browser-notice__content">
                 <Clipboard size={16} className="settings-browser-feature-card__icon" data-tone="warning" />
                 <div className="settings-browser-notice__text">
                   <span className="settings-browser-notice__title">智能感知器：</span>
                   <span>检测到您复制了天猫 URL: </span>
-                  <code className="settings-browser-code settings-browser-code--inline">{simulatedClipboardPayload.content}</code>
+                  <code className="settings-browser-code settings-browser-code--inline">{clipboardPayload.content}</code>
                 </div>
               </div>
               <div className="settings-browser-notice__actions">
                 <button
                   type="button"
-                  onClick={handleImportSimulatedClipboard}
+                  onClick={handleImportClipboardPayload}
                   data-browser-local-action={BROWSER_LOCAL_ACTIONS.importClipboardPayload.actionName}
                   data-agent-tool={BROWSER_LOCAL_ACTIONS.importClipboardPayload.agentToolName}
                   className="settings-browser-subtle-action"
@@ -2957,7 +3001,8 @@ export const BrowserAssistantView: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSimulatedClipboardPayload(null)}
+                  onClick={() => setClipboardPayload(null)}
+                  data-browser-local-action={BROWSER_LOCAL_ACTIONS.dismissClipboardPayload.actionName}
                   className="settings-browser-toggle"
                   aria-label="关闭智能感知器"
                 >

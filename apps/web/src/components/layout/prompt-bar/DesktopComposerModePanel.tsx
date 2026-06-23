@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { KK_LAYER } from '@kk/ui';
 import { AspectRatio, type GenerationConfig, GenerationMode } from '../../../types';
+import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
 
 interface DesktopComposerModePanelProps {
   isMobile: boolean;
@@ -145,6 +146,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
       <div className={`relative inline-flex ${isMobile ? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'}`}>
         <button
           data-options-toggle
+          data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
           className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[42vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[40vw] min-w-0 overflow-hidden') : 'px-3.5 flex-shrink-0'}`}
           style={{
             background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',

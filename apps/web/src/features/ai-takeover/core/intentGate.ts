@@ -15,12 +15,12 @@ const quickSettingsRoutes = [
   {
     view: 'user-profile',
     label: '个人中心',
-    pattern: /个人中心|用户中心|个人资料|个人信息|账户中心|账号中心|我的账户|我的账号|profile/
+    pattern: /个人中心|用户中心|个人资料|个人信息|账户中心|账号中心|我的账户|我的账号|检查账号|profile/
   },
   {
     view: 'api-management',
     label: 'API 工作台',
-    pattern: /\bapi\b|api\s*设置|api工作台|api\s*工作台|接口设置|接口管理|模型配置|模型设置|供应商|密钥管理/
+    pattern: /\bapi\b|api\s*设置|api工作台|api\s*工作台|接口设置|接口管理|模型配置|模型设置|供应商|密钥管理|模型列表|按类型筛选/
   },
   {
     view: 'browser-assistant',
@@ -30,12 +30,17 @@ const quickSettingsRoutes = [
   {
     view: 'consumption-records',
     label: '计费账本',
-    pattern: /计费|账单|消费|消耗|用量|积分记录|充值记录|消费记录/
+    pattern: /计费|账单|消费|消耗|用量|积分记录|充值记录|消费记录|积分明细|API消耗|消费明细|账本明细/
   },
   {
     view: 'storage-settings',
     label: '存储设置',
-    pattern: /存储|容量|空间|资源存储|清理缓存/
+    pattern: /存储|容量|空间|资源存储|清理缓存|清理|清空数据/
+  },
+  {
+    view: 'project-manager',
+    label: '工程管理',
+    pattern: /项目|工程|备份|原图下载|下载项目/
   },
   {
     view: 'dashboard',
@@ -45,7 +50,7 @@ const quickSettingsRoutes = [
 ] as const;
 
 function resolveQuickSettingsRoute(input: string): { view: string; label: string } | null {
-  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去/.test(input);
+  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去|清理|清空|重置|切换|切换到|下载/.test(input);
   if (!isNavigationRequest) return null;
 
   const matched = quickSettingsRoutes.find(route => route.pattern.test(input));

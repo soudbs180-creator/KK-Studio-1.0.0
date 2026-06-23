@@ -54,7 +54,7 @@ import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
-import { AGENT_CONTROL_ACTIONS, durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
+import { AGENT_CONTROL_ACTIONS, CHAT_SHELL_ACTIONS, durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
 import { useAssetStore } from '../../features/assets/assetStore';
 import {
     ReferenceMentionPanel,
@@ -110,6 +110,7 @@ const ChatSidebarModelMenuButton = React.memo(function ChatSidebarModelMenuButto
         <button
             onClick={() => onSelect(model)}
             onContextMenu={(event) => onOpenContextMenu(event, model.id)}
+            data-chat-shell-action={CHAT_SHELL_ACTIONS.selectModel.uiAction}
             className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg border text-sm text-left transition-all ${selected ? 'border-[var(--frost-card-sub-border)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
             style={selected ? {
                 background: 'var(--frost-card-sub-bg)',
@@ -1089,8 +1090,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
             parts.push(
                 <button
+                    type="button"
                     key={match.index}
                     onClick={() => handleActionClick(actionUrl)}
+                    data-agent-action={AGENT_CONTROL_ACTIONS.runInlineActionLink.uiAction}
                     className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-[#6366f1] via-[#a855f7] to-pink-500 hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_8px_rgba(99,102,241,0.3)] select-none cursor-pointer"
                 >
                     ✨ {label}
@@ -2947,9 +2950,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         <>
             {/* 侧边栏折叠时吸附在最右侧的展开按钮 */}
             {!isOpen && !isMobile && (!workspaceSurface || workspaceSurface === 'workspace') && (
-                <button
-                    onClick={onToggle}
-                    className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
+            <button
+                onClick={onToggle}
+                data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
+                className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                     style={{
                         zIndex: KK_LAYER.drawer,
                         borderWidth: '1px 0 1px 1px',
@@ -3021,7 +3025,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     {/* 侧边栏展开时吸附在最左侧外边缘的收缩按钮 */}
                     {!isMobile && (
                         <button
+                            type="button"
                             onClick={onToggle}
+                            data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
                             className="kk-workspace-edge-toggle absolute -left-6 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                             style={{
                                 zIndex: KK_LAYER.drawer + 1,
@@ -3062,7 +3068,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             {/* 左侧：返回/关闭（仅移动端显示，高原生体验） */}
                             {isMobile ? (
                                 <button
+                                    type="button"
                                     onClick={onClose || onToggle}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.closeMobileSidebar.uiAction}
                                     className="kk-workspace-icon-control -ml-2 rounded-full flex items-center justify-center shrink-0"
                                     title="返回"
                                 >
@@ -3073,7 +3081,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             {/* 中间：会话标题重命名 */}
                             <div className={`flex-1 min-w-0 flex items-center ${isMobile ? 'justify-center px-2' : 'gap-2'}`}>
                                 <button
+                                    type="button"
                                     onClick={() => handleRenameSession(activeSessionId)}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.renameCurrentSession.uiAction}
                                     className={`flex items-center max-w-full group hover:bg-[var(--toolbar-hover)] px-2.5 py-1 rounded-lg transition-colors cursor-text ${isMobile ? 'justify-center gap-1.5' : 'gap-2'}`}
                                     title="点击重命名"
                                 >
@@ -3088,28 +3098,36 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             {/* 右侧：控制动作组 */}
                             <div className="flex items-center gap-1 shrink-0">
                                 <button
+                                    type="button"
                                     onClick={handleClearCurrentSession}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.clearCurrentSession.uiAction}
                                     className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="清除当前对话（清空）"
                                 >
                                     <Broom size={18} />
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleNewTempSession}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.createTemporarySession.uiAction}
                                     className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="开启临时对话（不保存，关闭或切换后清理）"
                                 >
                                     <Ghost size={18} />
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleNewSession}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.createSession.uiAction}
                                     className="kk-workspace-icon-control flex items-center justify-center rounded-md"
                                     title="新建对话（保留历史）"
                                 >
                                     <Plus size={18} />
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleHistoryPanel.uiAction}
                                     className={`kk-workspace-icon-control flex items-center justify-center rounded-md ${showHistoryPanel ? 'text-[var(--primary)] bg-[var(--primary-light)]' : ''}`}
                                     title="历史记录与分支"
                                 >
@@ -3205,21 +3223,27 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button
+                                            type="button"
                                             onClick={handleExportSessions}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.exportSessions.uiAction}
                                             className="p-1.5 rounded-md hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                             title="导出全部会话"
                                         >
                                             <Download size={14} />
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => sessionImportRef.current?.click()}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.importSessions.uiAction}
                                             className="p-1.5 rounded-md hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                             title="导入会话"
                                         >
                                             <Upload size={14} />
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setShowArchived(prev => !prev)}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleArchivedSessions.uiAction}
                                             className={`p-1.5 rounded-md transition-colors ${showArchived ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                                             title={showArchived ? "隐藏已归档" : "显示已归档"}
                                         >
@@ -3240,7 +3264,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             <div className="w-5 flex justify-center shrink-0">
                                                 {row.hasChildren ? (
                                                     <button
+                                                        type="button"
                                                         onClick={() => toggleSessionExpand(row.session.id)}
+                                                        data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSessionExpand.uiAction}
                                                         className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-0.5 rounded transition-colors"
                                                     >
                                                         {(expandedNodes[row.session.id] ?? (row.depth === 0 || activeBranchTrail.some(p => p.id === row.session.id))) ? (
@@ -3256,7 +3282,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                                             {/* Item Content */}
                                             <button
+                                                type="button"
                                                 onClick={() => handleSwitchSession(row.session.id)}
+                                                data-chat-shell-action={CHAT_SHELL_ACTIONS.switchSession.uiAction}
                                                 onContextMenu={(e) => {
                                                     e.preventDefault();
                                                     setSessionContextMenu({ x: e.clientX, y: e.clientY, sessionId: row.session.id });
@@ -3279,21 +3307,27 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             {/* Quick Actions (Hover overlay) */}
                                             <div className="hidden group-hover:flex items-center gap-0.5 px-1 shrink-0 ml-1">
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleRenameSession(row.session.id)}
+                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.renameSession.uiAction}
                                                     className="p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] transition-colors"
                                                     title="重命名"
                                                 >
                                                     <Edit2 size={12} />
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleToggleArchiveSession(row.session.id)}
+                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.archiveSession.uiAction}
                                                     className="p-1 rounded text-[var(--text-tertiary)] hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
                                                     title={row.session.archived ? '取消归档' : '归档'}
                                                 >
                                                     <Archive size={12} />
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleDeleteSession(row.session.id)}
+                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.deleteSession.uiAction}
                                                     className="p-1 rounded text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                                     title="删除"
                                                 >
@@ -3329,7 +3363,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 items.push(
                                     <div key="archive-fold-toggle" className="flex flex-col items-center my-3 w-full animate-in fade-in duration-300">
                                         <button
+                                            type="button"
                                             onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                                            data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverHistory.uiAction}
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary)] transition-all select-none cursor-pointer"
                                         >
                                             <span>{isHistoryExpanded ? '🔼 收起已归档历史' : `🔽 展开已压缩的 ${boundaryIndex} 条历史对话`}</span>
@@ -3418,7 +3454,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                             } ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                                             {msg.role === 'user' && (
                                                                 <button
+                                                                    type="button"
                                                                     onClick={() => handleEditResend(msg)}
+                                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.editUserMessage.uiAction}
                                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                                     title="编辑后重发"
                                                                 >
@@ -3428,7 +3466,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                             )}
                                                             {msg.role === 'assistant' && idx === lastAssistantIndex && (
                                                                 <button
+                                                                    type="button"
                                                                     onClick={() => handleRegenerateAssistant(msg.id)}
+                                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.regenerateAssistantMessage.uiAction}
                                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)] disabled:opacity-50"
                                                                     disabled={isThinking}
                                                                     title="重试这一轮回答"
@@ -3439,7 +3479,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                             )}
                                                             {msg.role === 'assistant' && (
                                                                 <button
+                                                                    type="button"
                                                                     onClick={() => handleEditFromAssistant(msg.id)}
+                                                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.editPreviousUserMessage.uiAction}
                                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                                     title="编辑上一条提问"
                                                                 >
@@ -3448,7 +3490,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                                 </button>
                                                             )}
                                                             <button
+                                                                type="button"
                                                                 onClick={() => handleBranchFrom(idx)}
+                                                                data-chat-shell-action={CHAT_SHELL_ACTIONS.branchFromMessage.uiAction}
                                                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                                 title="从当前消息创建分支"
                                                             >
@@ -3456,7 +3500,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                                 {!isMobile && <span>分支</span>}
                                                             </button>
                                                             <button
+                                                                type="button"
                                                                 onClick={() => handleCopyMessage(msg)}
+                                                                data-chat-shell-action={CHAT_SHELL_ACTIONS.copyMessage.uiAction}
                                                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                                 title="复制消息文本"
                                                             >
@@ -3790,7 +3836,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <span>AI接管：当前已开启本地规则驱动与隐私安全沙箱保护。</span>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => handleActionClick('action://open-settings-api')}
+                                    data-agent-action={AGENT_CONTROL_ACTIONS.runInlineActionLink.uiAction}
                                     className="shrink-0 px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-[9px] font-bold text-white hover:bg-purple-500/30 transition-all active:scale-95"
                                 >
                                     配置密钥
@@ -3901,7 +3949,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                 </div>
                                             )}
                                             <button
+                                                type="button"
                                                 onClick={() => removeAttachment(att.id)}
+                                                data-chat-shell-action={CHAT_SHELL_ACTIONS.removeAttachment.uiAction}
                                                 className={`absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-all ${isMobile ? 'opacity-95 scale-110' : 'opacity-0 group-hover:opacity-100 scale-100 hover:scale-110'}`}
                                             >
                                                 <X size={9} />
@@ -3955,6 +4005,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <div className="relative shrink-0">
                                         <button
                                             id="btn-takeover-plus-button"
+                                            type="button"
                                             onClick={() => {
                                                 if (aiTakeoverMode) {
                                                     setShowTakeoverMenu(prev => !prev);
@@ -3962,6 +4013,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                     fileInputRef.current?.click();
                                                 }
                                             }}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.openAttachmentMenu.uiAction}
                                             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-90 flex items-center justify-center"
                                             title={aiTakeoverMode ? "打开接管选项" : "添加附件 (图片/视频/文档)"}
                                         >
@@ -4025,6 +4077,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                                     {/* Agent 药丸切换按钮 */}
                                     <button
+                                        type="button"
                                         onClick={() => {
                                             setAgentMode(!agentMode);
                                             registerActivity();
@@ -4032,6 +4085,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                 setCurrentAgent(agentService.getActive());
                                             }
                                         }}
+                                        data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleAgentMode.uiAction}
                                         className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             agentMode
                                                 ? 'agent-active-btn'
@@ -4047,10 +4101,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     {/* 简体中文：AI接管药丸切换按钮 */}
                                     <button
                                         id="btn-ai-takeover-toggle"
+                                        type="button"
                                         onClick={() => {
                                             setAiTakeoverMode(!aiTakeoverMode);
                                             registerActivity();
                                         }}
+                                        data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverMode.uiAction}
                                         className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             aiTakeoverMode
                                                 ? 'ai-takeover-active-btn'
@@ -4068,7 +4124,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <div className="kk-chat-sidebar-send-control shrink-0">
                                     {isThinking ? (
                                         <button
+                                            type="button"
                                             onClick={handleStopGeneration}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.stopGeneration.uiAction}
                                             className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-rose-600 text-white hover:brightness-110 active:scale-90 transition-all shadow-[0_2px_8px_rgba(239,68,68,0.25)]"
                                             title="停止生成"
                                         >
@@ -4076,13 +4134,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         </button>
                                     ) : (
                                         <button
+                                            type="button"
                                             onClick={() => {
                                                 if (input.trim() || attachments.length > 0) {
                                                     handleSend();
                                                 }
                                             }}
                                             disabled={!input.trim() && attachments.length === 0}
-                                            data-agent-action={AGENT_CONTROL_ACTIONS.sendTakeoverMessage.uiAction}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.sendComposerMessage.uiAction}
                                             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                                                 input.trim() || attachments.length > 0
                                                     ? 'bg-gradient-to-br from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white hover:brightness-110 active:scale-90 shadow-[0_2px_8px_rgba(244,63,94,0.25)] cursor-pointer'
@@ -4110,40 +4169,48 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     }}
                 >
                     <button
+                        type="button"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleRenameSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
+                        data-chat-shell-action={CHAT_SHELL_ACTIONS.renameSession.uiAction}
                         className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         重命名
                     </button>
                     <button
+                        type="button"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleDuplicateSession(sessionContextMenu.sessionId);
                         }}
+                        data-chat-shell-action={CHAT_SHELL_ACTIONS.duplicateSession.uiAction}
                         className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         复制分支
                     </button>
                     <button
+                        type="button"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleToggleArchiveSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
+                        data-chat-shell-action={CHAT_SHELL_ACTIONS.archiveSession.uiAction}
                         className="kk-chat-sidebar-menu-item w-full text-left px-3 py-2 text-sm"
                     >
                         归档/取消归档
                     </button>
                     <button
+                        type="button"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
+                        data-chat-shell-action={CHAT_SHELL_ACTIONS.deleteSession.uiAction}
                         className="kk-chat-sidebar-menu-item kk-chat-sidebar-menu-item--danger w-full text-left px-3 py-2 text-sm"
                     >
                         删除会话
@@ -4172,13 +4239,17 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             />
                             <div className="flex gap-2">
                                 <button
+                                    type="button"
                                     onClick={() => setImportPreviewShowAll(prev => !prev)}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleImportPreviewAll.uiAction}
                                     className="flex-1 sm:flex-none h-8 px-2 rounded-lg border border-[var(--frost-card-sub-border)] text-[11px] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] whitespace-nowrap"
                                 >
                                     {importPreviewShowAll ? '收起' : '查看全部'}
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => setImportPreviewOnlyExcluded(prev => !prev)}
+                                    data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleImportPreviewExcluded.uiAction}
                                     className={`kk-chat-sidebar-filter-toggle flex-1 sm:flex-none h-8 px-2 rounded-lg border text-[11px] whitespace-nowrap ${importPreviewOnlyExcluded
                                         ? 'kk-chat-sidebar-filter-toggle--active'
                                         : ''
@@ -4204,11 +4275,15 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <div className="text-[10px] text-[var(--text-tertiary)] mb-2">排除项（勾选后不导入）</div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <button
+                                            type="button"
                                             onClick={() => setImportExcludedIds(visible.map(s => s.id))}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.excludeVisibleImportSessions.uiAction}
                                             className="text-[10px] px-2 py-1 rounded border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                         >全选可见</button>
                                         <button
+                                            type="button"
                                             onClick={() => setImportExcludedIds([])}
+                                            data-chat-shell-action={CHAT_SHELL_ACTIONS.clearImportExcludedSessions.uiAction}
                                             className="text-[10px] px-2 py-1 rounded border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                         >清空排除</button>
                                         <span className="text-[10px] text-[var(--text-tertiary)]">已排除 {importExcludedIds.length} 条</span>
@@ -4298,25 +4373,32 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         </div>
                         <div className="grid grid-cols-1 gap-2 mb-3">
                             <button
+                                type="button"
                                 onClick={() => applyImportMode('smart')}
+                                data-chat-shell-action={CHAT_SHELL_ACTIONS.importSessionsSmartMerge.uiAction}
                                 className="w-full py-2 rounded-lg bg-[var(--accent-coral)]/15 border border-[var(--accent-coral)]/40 text-[var(--accent-coral)] text-sm hover:bg-[var(--accent-coral)]/25"
                             >
                                 智能合并（推荐）
                             </button>
                             <button
+                                type="button"
                                 onClick={() => applyImportMode('append')}
+                                data-chat-shell-action={CHAT_SHELL_ACTIONS.importSessionsAppend.uiAction}
                                 className="w-full py-2 rounded-lg bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-sm hover:bg-emerald-500/25"
                             >
                                 追加保留当前
                             </button>
                             <button
+                                type="button"
                                 onClick={() => applyImportMode('replace')}
+                                data-chat-shell-action={CHAT_SHELL_ACTIONS.importSessionsReplace.uiAction}
                                 className="w-full py-2 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-200 text-sm hover:bg-amber-500/25"
                             >
                                 覆盖当前
                             </button>
                         </div>
                         <button
+                            type="button"
                             onClick={() => {
                                 setImportPreview(null);
                                 setImportPreviewSearch('');
@@ -4324,6 +4406,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 setImportExcludedIds([]);
                                 setImportPreviewOnlyExcluded(false);
                             }}
+                            data-chat-shell-action={CHAT_SHELL_ACTIONS.cancelSessionImportPreview.uiAction}
                             className="w-full py-2 rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] text-sm hover:bg-[var(--toolbar-hover)]"
                         >
                             取消

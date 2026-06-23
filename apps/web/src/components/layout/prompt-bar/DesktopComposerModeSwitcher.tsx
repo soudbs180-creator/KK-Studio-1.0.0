@@ -1,6 +1,7 @@
 import React from 'react';
 import { GenerationMode } from '../../../types';
 import type { PromptBarModeOption } from './composerModeRegistry';
+import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
 
 interface DesktopComposerModeSwitcherProps {
   isMobile: boolean;
@@ -68,6 +69,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
             <div key={item.mode} className="relative z-10">
               <button
                 type="button"
+                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleMode.uiAction}
                 className={`rounded-lg px-2.5 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-[82px] text-sm'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
                 style={{ color: isActive ? item.color : 'var(--text-secondary)' }}
                 onMouseDown={(event) => {

@@ -16,7 +16,8 @@ const SETTINGS_VIEW_LABELS: Record<string, string> = {
   'storage-settings': '存储设置',
   'system-logs': '系统日志',
   'user-profile': '个人中心',
-  'browser-assistant': '浏览器助手'
+  'browser-assistant': '浏览器助手',
+  'project-manager': '工程管理'
 };
 
 export class LocalAssistantBrain {
@@ -226,6 +227,63 @@ ${optResult.optimizedPromptZh}
           type: 'openSettings',
           payload: { tab: settingsView }
         });
+
+        // 针对不同页面的自然语言微动作映射 (高亮特定的按钮)
+        const lowerInput = userInput.toLowerCase();
+        if (settingsView === 'storage-settings') {
+          if (/缓存|碎片|失效|清理/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-storage-settings-action="storage-settings.cleanBrokenCards"]' }
+            });
+          } else if (/清空|全部/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-storage-settings-action="storage-settings.clearAllData"]' }
+            });
+          }
+        } else if (settingsView === 'consumption-records') {
+          if (/api|接口|开发/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-consumption-records-action="consumption-records.switchToApiLedger"]' }
+            });
+          } else if (/积分|额度|用户/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-consumption-records-action="consumption-records.switchToCreditsLedger"]' }
+            });
+          } else if (/刷新/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-consumption-records-action="consumption-records.refreshLedger"]' }
+            });
+          }
+        } else if (settingsView === 'user-profile') {
+          if (/消费|使用|明细|记录|日志/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-user-profile-action="user-profile.switchToUsageLogs"]' }
+            });
+          } else if (/充值|交易|入账/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-user-profile-action="user-profile.switchToRechargeLogs"]' }
+            });
+          } else if (/复制|id/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-user-profile-action="user-profile.copyUserId"]' }
+            });
+          }
+        } else if (settingsView === 'project-manager') {
+          if (/下载|备份|导出|原图/.test(lowerInput)) {
+            actions.push({
+              type: 'highlightElement',
+              payload: { selector: 'button[data-project-manager-action="project-manager.downloadProjectOriginals"]' }
+            });
+          }
+        }
         break;
       }
 

@@ -57,6 +57,7 @@ import {
     SETTINGS_MODAL_BACKDROP_CLASSNAME,
     SETTINGS_MODAL_PANEL_CLASSNAME,
 } from './SettingsScaffold';
+import { PROJECT_MANAGER_ACTIONS } from './settingsModuleActions';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -553,6 +554,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         return (
                             <div
                                 key={canvas.id}
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.selectProject.uiAction}
                                 className="flex items-center gap-2 px-3 py-2.5 transition-colors"
                                 style={{
                                     backgroundColor: isActive ? 'var(--toolbar-active)' : 'transparent',
@@ -599,6 +601,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                                 <div className="flex items-center gap-1">
                                     <button
+                                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.renameProject.uiAction}
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             startEditing(canvas);
@@ -613,6 +616,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                                     {state.canvases.length > 1 && (
                                         <button
+                                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.requestDeleteProject.uiAction}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 setShowDeleteConfirm(canvas.id);
@@ -638,6 +642,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 >
                     <button
                         id="btn-create-canvas"
+                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.createProject.uiAction}
                         onClick={(event) => {
                             event.stopPropagation();
                             handleCreateProject();
@@ -655,6 +660,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
 
                     <button
+                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.downloadProjectOriginals.uiAction}
                         onClick={(event) => {
                             event.stopPropagation();
                             void handleDownloadAll();
@@ -671,6 +677,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </button>
 
                     <button
+                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.openMergeModal.uiAction}
                         onClick={(event) => {
                             event.stopPropagation();
                             setShowMergeModal(true);
@@ -683,6 +690,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </button>
 
                     <button
+                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.cleanupInvalidCards.uiAction}
                         onClick={(event) => {
                             event.stopPropagation();
                             handleCleanupInvalidCards();
@@ -695,6 +703,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </button>
 
                     <button
+                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.clearCurrentProjectData.uiAction}
                         onClick={(event) => {
                             event.stopPropagation();
                             handleClearAll();
@@ -746,6 +755,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowPreviewCard.uiAction}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 handleAddUtilityCardWithSafety('preview');
@@ -757,6 +767,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             <span className="text-[11px] font-medium">预览卡</span>
                         </button>
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowSaveCard.uiAction}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 handleAddUtilityCardWithSafety('save');
@@ -768,6 +779,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             <span className="text-[11px] font-medium">保存卡</span>
                         </button>
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowAgentCard.uiAction}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 handleAddUtilityCardWithSafety('agent');
@@ -792,6 +804,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         workflowTemplates.map((template) => (
                             <button
                                 key={template.id}
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.applyWorkflowTemplate.uiAction}
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     handleApplyTemplateWithSafety(template.id, template.title);
@@ -849,12 +862,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                     <div className="flex justify-end gap-3">
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.cancelDeleteProject.uiAction}
                             onClick={() => setShowDeleteConfirm(null)}
                             className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)]"
                         >
                             取消
                         </button>
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.confirmDeleteProject.uiAction}
                             onClick={() => {
                                 if (showDeleteConfirm) {
                                     deleteCanvas(showDeleteConfirm);
@@ -896,6 +911,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             </p>
                         </div>
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.closeMergeModal.uiAction}
                             onClick={() => setShowMergeModal(false)}
                             disabled={!!mergingCanvasId}
                             className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -913,6 +929,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             mergeCandidates.map((canvas) => (
                                 <button
                                     key={canvas.id}
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.mergeIntoCurrentProject.uiAction}
                                     onClick={() => handleMergeIntoCurrent(canvas.id)}
                                     disabled={!!mergingCanvasId}
                                     className="flex w-full items-center justify-between rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-4 py-3 text-left transition-colors hover:bg-[var(--frost-card-main-bg)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -945,6 +962,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             <div className="relative min-w-0">
                                 <button
                                 id="project-manager-trigger"
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.openProjectMenu.uiAction}
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     setShowDropdown((prev) => !prev);
@@ -964,6 +982,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             </div>
 
                         <button
+                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.openSearch.uiAction}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onSearch();
@@ -992,6 +1011,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
+                data-project-manager-action={PROJECT_MANAGER_ACTIONS.expandToolbar.uiAction}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => {
@@ -1033,6 +1053,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <>
                             {/* 顶部指示条：点击它可以收起，且形状和 collapsed 有过渡的动态 */}
                             <button
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.collapseToolbar.uiAction}
                                 onClick={(event) => {
                                     event.stopPropagation();
                                     setIsCollapsed(true);
@@ -1047,6 +1068,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 <div className="relative">
                                     <button
                                         id="project-manager-trigger"
+                                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.openProjectMenu.uiAction}
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             setShowDropdown((prev) => !prev);
@@ -1062,6 +1084,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </div>
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.openSearch.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onSearch();
@@ -1077,6 +1100,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     <button
                                         id="project-manager-favorites"
                                         data-testid="project-manager-favorites"
+                                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.openFavorites.uiAction}
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             onFavorites();
@@ -1092,6 +1116,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onFitToAll();
@@ -1104,6 +1129,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </button>
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onResetView();
@@ -1116,6 +1142,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </button>
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onToggleCanvasMode();
@@ -1128,6 +1155,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </button>
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleSnapToGrid.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onToggleSnapToGrid();
@@ -1142,6 +1170,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </button>
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onAutoArrange();
@@ -1160,6 +1189,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         onMouseLeave={closeWorkflowMenuDelayed}
                                     >
                                         <button
+                                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleWorkflowMenu.uiAction}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 setShowWorkflowDropdown((prev) => !prev);
@@ -1177,6 +1207,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 
                                 <button
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleTheme.uiAction}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         toggleTheme();

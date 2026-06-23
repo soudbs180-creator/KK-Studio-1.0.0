@@ -22,6 +22,7 @@ import {
   getSettingsSearchPlaceholder,
   getSettingsShellCopy,
   resolveCanonicalSettingsViewId,
+  matchSettingsNavItem,
   type CanonicalSettingsViewId,
   type SettingsNavItem,
   type SettingsViewId,
@@ -233,13 +234,7 @@ const SettingsDesktopShell: React.FC<{
   const shellCopy = getSettingsShellCopy(language);
   const sections = getSettingsNavSections(language);
 
-  const filteredItems = items.filter((item) => {
-    const keyword = navQuery.trim().toLowerCase();
-    if (!keyword) {
-      return true;
-    }
-    return `${item.label} ${item.description}`.toLowerCase().includes(keyword);
-  });
+  const filteredItems = items.filter((item) => matchSettingsNavItem(item, navQuery));
 
   const accountName = user?.email || user?.phone || pick('当前账户', 'Current account');
   const accountMeta = !authLoading && !checkingAdmin && isAdmin

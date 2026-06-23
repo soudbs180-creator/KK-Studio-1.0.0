@@ -25,6 +25,7 @@ import {
   SettingsSection,
   SettingsViewShell,
 } from '../components/settings/SettingsScaffold';
+import { CONSUMPTION_RECORDS_ACTIONS } from '../components/settings/settingsModuleActions';
 import {
   getHistorySummary,
   getRecentEntries,
@@ -744,6 +745,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_4px_12px_rgba(245,158,11,0.15)]'
                     : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
                 }`}
+                data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.switchToApiLedger.uiAction}
               >
                 {pick('API 消耗', 'API Spend')}
               </button>
@@ -755,6 +757,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_4px_12px_rgba(16,185,129,0.15)]'
                     : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
                 }`}
+                data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.switchToCreditsLedger.uiAction}
               >
                 {pick('积分消耗', 'Credits')}
               </button>
@@ -776,6 +779,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
               disabled={refreshing}
               onClick={() => void refreshAll()}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1.5 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-1 cursor-pointer"
+              data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.refreshLedger.uiAction}
             >
               <RefreshCw size={10} className={refreshing ? 'animate-spin' : ''} />
               {pick('立即刷新', 'Refresh')}
@@ -861,6 +865,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                       onClick={() => void loadAdminRechargeSubmission()}
                       disabled={adminLookupLoading || adminReviewLoading !== null}
                       className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 text-xs font-bold transition active:scale-95 cursor-pointer"
+                      data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.loadAdminRecharge.uiAction}
                     >
                       {adminLookupLoading ? pick('查询中...', '...') : pick('查询', 'Search')}
                     </button>
@@ -906,6 +911,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                     onClick={() => void reviewAdminRechargeSubmission('credit')}
                     disabled={adminReviewLoading !== null || adminLookupResult.submission.status === 'credited' || adminLookupResult.submission.status === 'rejected'}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                    data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.approveRecharge.uiAction}
                   >
                     {pick('核销', 'Approve')}
                   </button>
@@ -914,6 +920,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                     onClick={() => void reviewAdminRechargeSubmission('reject')}
                     disabled={adminReviewLoading !== null || adminLookupResult.submission.status === 'credited' || adminLookupResult.submission.status === 'rejected'}
                     className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg px-2.5 py-1 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                    data-consumption-records-action={CONSUMPTION_RECORDS_ACTIONS.rejectRecharge.uiAction}
                   >
                     {pick('驳回', 'Reject')}
                   </button>

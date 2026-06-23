@@ -152,6 +152,7 @@ import {
   type CostMode,
   type OfficialProvider,
 } from './apiSettingsFormatters';
+import { API_MANAGEMENT_ACTIONS } from './apiManagementActions';
 type TabType = ApiManagementTab;
 const suspiciousLocaleCharSet = new Set('\u9359\u95c2\u59ab\u7487\u6dc7\u93c2\u8930\u7f02\u95b9\u93c6\u95b2\u68f0\u6e1a\u6d98\u7c32\u9350\u5a34\u7039\u95ab\u7ed7\u9422\u6d63');
 
@@ -868,12 +869,14 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={pick('搜索模型名称或ID...', 'Search model name or ID...')}
                 className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg pl-9 pr-8 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500 transition-colors"
+                data-api-management-action={API_MANAGEMENT_ACTIONS.searchModels.uiAction}
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 p-0.5 bg-transparent border-none text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
+                  data-api-management-action={API_MANAGEMENT_ACTIONS.clearSearchQuery.uiAction}
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -896,6 +899,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                         ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
                         : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
                     }`}
+                    data-api-management-action={API_MANAGEMENT_ACTIONS.clearAllFilters.uiAction}
                   >
                     {pick('全部类型', 'All Types')}
                   </button>
@@ -911,6 +915,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                             ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-sm'
                             : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
                         }`}
+                        data-api-management-action={API_MANAGEMENT_ACTIONS.toggleTypeFilter.uiAction}
                       >
                         {getTypeLabel(type, pick)}
                       </button>
@@ -936,6 +941,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                         ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
                         : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
                     }`}
+                    data-api-management-action={API_MANAGEMENT_ACTIONS.clearAllFilters.uiAction}
                   >
                     {pick('全部品牌', 'All Brands')}
                   </button>
@@ -951,6 +957,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                             ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-sm'
                             : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
                         }`}
+                        data-api-management-action={API_MANAGEMENT_ACTIONS.toggleBrandFilter.uiAction}
                       >
                         {getBrandLabel(brand, pick)}
                       </button>
@@ -973,6 +980,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                         ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold shadow-sm'
                         : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                     }`}
+                    data-api-management-action={API_MANAGEMENT_ACTIONS.changeGroupBy.uiAction}
                   >
                     {pick('类型', 'Type')}
                   </button>
@@ -984,6 +992,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                         ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold shadow-sm'
                         : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                     }`}
+                    data-api-management-action={API_MANAGEMENT_ACTIONS.changeGroupBy.uiAction}
                   >
                     {pick('品牌', 'Brand')}
                   </button>
@@ -995,6 +1004,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                   type="button"
                   onClick={clearFilters}
                   className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer bg-transparent border-none p-0 flex items-center gap-0.5"
+                  data-api-management-action={API_MANAGEMENT_ACTIONS.clearAllFilters.uiAction}
                 >
                   <X className="w-3.5 h-3.5" />
                   {pick('清空筛选', 'Clear filters')}
@@ -1027,6 +1037,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                     <div
                       onClick={() => toggleGroup(groupKey)}
                       className="flex items-center justify-between px-4 py-3 bg-[var(--bg-secondary)]/30 hover:bg-[var(--bg-secondary)]/50 cursor-pointer select-none transition-all duration-200"
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.toggleGroupCollapse.uiAction}
                     >
                       <div className="flex items-center gap-2.5">
                         <span className="text-sm font-bold text-[var(--text-primary)]">{titleText}</span>
@@ -3715,6 +3726,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             icon={RefreshCw}
             loading={syncLoading}
             onClick={onSync}
+            data-api-management-action={API_MANAGEMENT_ACTIONS.syncEditorModels.uiAction}
           >
             {pick('同步模型列表', 'Sync models')}
           </SettingsActionButton>
@@ -3741,6 +3753,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     <button
                       type="button"
                       className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.copyModelId.uiAction}
                       onClick={() => {
                         navigator.clipboard.writeText(modelId);
                         notify.success(pick('复制成功', 'Copied'), modelId);
@@ -3775,7 +3788,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Shield}
           tone="amber"
           actions={
-            <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction} icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回接口列表', 'Back to endpoints')}
             </SettingsActionButton>
           }
@@ -3789,7 +3802,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               'Return to API Management and choose another endpoint to edit.'
             )}
             action={
-              <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction} icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回接口列表', 'Back to endpoints')}
               </SettingsActionButton>
             }
@@ -3812,7 +3825,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Globe}
           tone="amber"
           actions={
-            <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction} icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回供应商列表', 'Back to providers')}
             </SettingsActionButton>
           }
@@ -3826,7 +3839,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               'Return to API Management and choose another provider to edit.'
             )}
             action={
-              <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction} icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回供应商列表', 'Back to providers')}
               </SettingsActionButton>
             }
@@ -3867,6 +3880,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <SettingsActionButton
               data-testid={activeEditorMode === 'official' ? 'api-official-editor-back' : 'api-provider-editor-back'}
               data-content-back-button="true"
+              data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction}
               icon={ArrowLeft}
               onClick={cancelEdit}
             >
@@ -3988,15 +4002,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton disabled={userApiActionsDisabled || Boolean(officialEditorValidationMessage)} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
+              <PrimaryButton disabled={userApiActionsDisabled || Boolean(officialEditorValidationMessage)} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`} controlAction={API_MANAGEMENT_ACTIONS.saveOfficialEndpoint.uiAction}>
                 <Save size={16} className="mr-1" />
                 {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增本地 API', 'Add local API')}
               </PrimaryButton>
-              <SecondaryButton onClick={editingOfficialId ? cancelEdit : resetOfficialDraft}>
+              <SecondaryButton onClick={editingOfficialId ? cancelEdit : resetOfficialDraft} controlAction={API_MANAGEMENT_ACTIONS.resetOfficialDraft.uiAction}>
                 {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingOfficialId ? (
-                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto">
+                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto" controlAction={API_MANAGEMENT_ACTIONS.deleteOfficialEndpoint.uiAction}>
                   <Trash2 size={16} className="mr-1" />
                   {pick('删除接口', 'Delete endpoint')}
                 </DangerButton>
@@ -4105,6 +4119,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       type="button"
                       onClick={syncWuyinCatalog}
                       disabled={busy === 'sync-wuyin'}
+                      data-api-management-action={API_MANAGEMENT_ACTIONS.syncWuyinCatalog.uiAction}
                       className="settings-provider-editor-link cursor-pointer border-none bg-transparent hover:text-[var(--primary)] flex items-center gap-1 text-[13px] text-[var(--text-secondary)] transition-colors"
                       style={{ padding: '6px 12px', maxWidth: 'none', minWidth: '120px', outline: 'none' }}
                     >
@@ -4225,15 +4240,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             </div>
 
             <div className="settings-provider-editor-actions">
-              <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
+              <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`} controlAction={API_MANAGEMENT_ACTIONS.saveProviderRoute.uiAction}>
                 <Save size={16} className="mr-1" />
                 {editingProviderId ? pick('保存变更', 'Save changes') : pick('保存模型通道', 'Save model route')}
               </PrimaryButton>
-              <SecondaryButton onClick={editingProviderId ? cancelEdit : resetProviderDraft}>
+              <SecondaryButton onClick={editingProviderId ? cancelEdit : resetProviderDraft} controlAction={API_MANAGEMENT_ACTIONS.resetProviderDraft.uiAction}>
                 {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingProviderId ? (
-                <DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
+                <DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto" controlAction={API_MANAGEMENT_ACTIONS.deleteProviderRoute.uiAction}>
                   <Trash2 size={16} className="mr-1" />
                   {pick('删除供应商', 'Delete provider')}
                 </DangerButton>

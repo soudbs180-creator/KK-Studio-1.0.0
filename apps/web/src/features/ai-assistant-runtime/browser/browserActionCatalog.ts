@@ -106,7 +106,7 @@ export const getBrowserActionByCommandKind = (
 ): BrowserActionDefinition | undefined =>
   BROWSER_ACTION_LIST.find(action => action.commandKind === commandKind);
 
-export type BrowserLocalAgentToolName = 'canvas.createPromptCards' | 'assets.zipOriginals';
+export type BrowserLocalAgentToolName = 'canvas.createPromptCards' | 'assets.zipOriginals' | 'browser.getStatus';
 
 export interface BrowserLocalActionDefinition {
   key: string;
@@ -157,6 +157,111 @@ export const BROWSER_LOCAL_ACTIONS = {
     actionName: 'browser.local.importClipboardPayload',
     agentToolName: 'canvas.createPromptCards',
     label: 'Import sensed clipboard payload into the canvas',
+    requiresUserGesture: true
+  },
+  checkSessionStatus: {
+    key: 'checkSessionStatus',
+    actionName: 'browser.local.checkSessionStatus',
+    agentToolName: 'browser.getStatus',
+    label: 'Check Browser Bridge account session status',
+    requiresUserGesture: true
+  },
+  toggleSessionEnabled: {
+    key: 'toggleSessionEnabled',
+    actionName: 'browser.local.toggleSessionEnabled',
+    agentToolName: undefined,
+    label: 'Toggle Browser Bridge account session scheduling',
+    requiresUserGesture: true
+  },
+  addSessionInstance: {
+    key: 'addSessionInstance',
+    actionName: 'browser.local.addSessionInstance',
+    agentToolName: undefined,
+    label: 'Add a Browser Bridge account session instance',
+    requiresUserGesture: true
+  },
+  checkSocialChannelStatus: {
+    key: 'checkSocialChannelStatus',
+    actionName: 'browser.local.checkSocialChannelStatus',
+    agentToolName: 'browser.getStatus',
+    label: 'Check Browser Bridge social draft channel status',
+    requiresUserGesture: true
+  },
+  toggleSocialChannelEnabled: {
+    key: 'toggleSocialChannelEnabled',
+    actionName: 'browser.local.toggleSocialChannelEnabled',
+    agentToolName: undefined,
+    label: 'Toggle Browser Bridge social draft channel',
+    requiresUserGesture: true
+  },
+  installPluginPackage: {
+    key: 'installPluginPackage',
+    actionName: 'browser.local.installPluginPackage',
+    agentToolName: undefined,
+    label: 'Open Browser Bridge offline extension install guidance',
+    requiresUserGesture: true
+  },
+  toggleClipboardSync: {
+    key: 'toggleClipboardSync',
+    actionName: 'browser.local.toggleClipboardSync',
+    agentToolName: undefined,
+    label: 'Toggle Browser Assistant clipboard sensing',
+    requiresUserGesture: true
+  },
+  readClipboardPayload: {
+    key: 'readClipboardPayload',
+    actionName: 'browser.local.readClipboardPayload',
+    agentToolName: undefined,
+    label: 'Read browser clipboard payload for canvas import',
+    requiresUserGesture: true
+  },
+  toggleWasmSandbox: {
+    key: 'toggleWasmSandbox',
+    actionName: 'browser.local.toggleWasmSandbox',
+    agentToolName: undefined,
+    label: 'Toggle local WASM sandbox features',
+    requiresUserGesture: true
+  },
+  translateInspectionToCanvas: {
+    key: 'translateInspectionToCanvas',
+    actionName: 'browser.local.translateInspectionToCanvas',
+    agentToolName: 'canvas.createPromptCards',
+    label: 'Translate Browser Bridge inspection summary into canvas prompt cards',
+    requiresUserGesture: true
+  },
+  previewTakeoverPlan: {
+    key: 'previewTakeoverPlan',
+    actionName: 'browser.local.previewTakeoverPlan',
+    agentToolName: undefined,
+    label: 'Preview Browser Assistant routing through AgentRuntime',
+    requiresUserGesture: true
+  },
+  setTakeoverSamplePrompt: {
+    key: 'setTakeoverSamplePrompt',
+    actionName: 'browser.local.setTakeoverSamplePrompt',
+    agentToolName: undefined,
+    label: 'Fill a Browser Assistant takeover sample prompt',
+    requiresUserGesture: true
+  },
+  switchPlaygroundTab: {
+    key: 'switchPlaygroundTab',
+    actionName: 'browser.local.switchPlaygroundTab',
+    agentToolName: undefined,
+    label: 'Switch Browser Assistant runtime playground tab',
+    requiresUserGesture: true
+  },
+  setRoutingMode: {
+    key: 'setRoutingMode',
+    actionName: 'browser.local.setRoutingMode',
+    agentToolName: undefined,
+    label: 'Set Browser Assistant model routing mode',
+    requiresUserGesture: true
+  },
+  dismissClipboardPayload: {
+    key: 'dismissClipboardPayload',
+    actionName: 'browser.local.dismissClipboardPayload',
+    agentToolName: undefined,
+    label: 'Dismiss sensed clipboard payload',
     requiresUserGesture: true
   }
 } as const satisfies Record<string, BrowserLocalActionDefinition>;

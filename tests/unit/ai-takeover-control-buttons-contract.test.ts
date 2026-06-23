@@ -69,7 +69,6 @@ test('AI Takeover composer and resource buttons share stable local action names'
 
   for (const source of [dockSource, sidebarSource]) {
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.compressContext\.uiAction\}/);
-    assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.importTakeoverImage\.uiAction\}/);
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.importTakeoverFolder\.uiAction\}/);
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.connectTakeoverFile\.uiAction\}/);
@@ -78,4 +77,30 @@ test('AI Takeover composer and resource buttons share stable local action names'
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.removeTakeoverImage\.uiAction\}/);
     assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.removeTakeoverFile\.uiAction\}/);
   }
+
+  assert.match(dockSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
+  assert.doesNotMatch(sidebarSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
+});
+
+test('AI Takeover shell controls share stable local action names', () => {
+  const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
+  const sidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+
+  for (const key of [
+    'runInlineActionLink',
+    'closeTakeoverMode',
+    'toggleTakeoverMode',
+    'toggleTakeoverHistory',
+  ] as const) {
+    assert.ok(AGENT_CONTROL_ACTIONS[key]);
+    assert.equal(AGENT_CONTROL_ACTIONS[key]?.toolName, undefined);
+  }
+
+  for (const source of [dockSource, sidebarSource]) {
+    assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.runInlineActionLink\.uiAction\}/);
+    assert.match(source, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.toggleTakeoverHistory\.uiAction\}/);
+  }
+
+  assert.match(dockSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.closeTakeoverMode\.uiAction\}/);
+  assert.match(sidebarSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.toggleTakeoverMode\.uiAction\}/);
 });

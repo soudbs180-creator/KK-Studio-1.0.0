@@ -13,6 +13,7 @@ import keyManager from '../../../services/auth/keyManager';
 import { getStorageUsage, getAllImageIds } from '../../../services/storage/imageStorage';
 import { getTodayLogs, subscribeToLogs, LogLevel } from '../../../services/system/systemLogService';
 import { formatRemainingCredits } from '../../../services/billing/remainingBalance';
+import { SETTINGS_SHELL_ACTIONS } from '../settingsModuleActions';
 
 type SettingsDesktopSidebarViewId = CanonicalSettingsViewId;
 
@@ -203,6 +204,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={searchPlaceholder}
           className="w-full min-w-0 bg-transparent text-sm outline-none"
+          data-settings-shell-action={SETTINGS_SHELL_ACTIONS.filterNavigation.uiAction}
         />
       </label>
 
@@ -253,6 +255,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                           aria-current={isActive ? 'page' : undefined}
                           data-state={isActive ? 'active' : 'idle'}
                           data-accent={accent}
+                          data-settings-shell-action={SETTINGS_SHELL_ACTIONS.navigateModule.uiAction}
                         >
                           <div className="flex w-full items-center gap-3 min-w-0 pr-6">
                             <span className="card-avatar-icon shrink-0">

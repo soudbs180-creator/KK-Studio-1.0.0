@@ -2,6 +2,7 @@ import React from 'react';
 import { Wand2 } from 'lucide-react';
 
 import { type GenerationConfig, GenerationMode } from '../../../types';
+import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
 
 export const OPTIMIZER_ARCHETYPES = [
   { id: 'auto', label_zh: '自动路由', label_en: 'Auto' },
@@ -43,6 +44,8 @@ export default function DesktopComposerPromptTools({
     <div className={`relative flex items-center gap-1.5 ${isMobile ? 'flex-wrap' : ''}`}>
       {config.mode === GenerationMode.PPT ? (
         <button
+          type="button"
+          data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.togglePptOutline.uiAction}
           className="flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0"
           style={{
             background: showPptOutlinePanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
@@ -62,6 +65,8 @@ export default function DesktopComposerPromptTools({
 
       <div className="flex items-center gap-1 bg-[var(--prompt-bar-shell-bg)] rounded-lg border border-[var(--prompt-bar-shell-border)] p-[2px] transition-all">
         <button
+          type="button"
+          data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.togglePromptOptimization.uiAction}
           className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${
             config.enablePromptOptimization
               ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] font-bold'
@@ -92,6 +97,7 @@ export default function DesktopComposerPromptTools({
             <span className="h-3.5 w-px bg-[var(--prompt-bar-shell-border)] opacity-60" />
             <select
               value={config.promptOptimizerArchetype || 'auto'}
+              data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectPromptOptimizerArchetype.uiAction}
               onChange={(e) => onSelectPromptOptimizerArchetype?.(e.target.value)}
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}

@@ -25,6 +25,7 @@ import {
   SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
+import { USER_PROFILE_ACTIONS } from '../settingsModuleActions';
 import { EmptyState, StatusBadge } from '../ui/index';
 import { collectLinkedAuthProviders, listLinkedAuthProviders } from '../../../services/auth/identityLinking';
 import { notify } from '../../../services/system/notificationService';
@@ -317,6 +318,7 @@ export const UserProfileView: React.FC = () => {
                       onClick={() => handleCopyId(user.id)}
                       className="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
                       title="复制用户 ID"
+                      data-user-profile-action={USER_PROFILE_ACTIONS.copyUserId.uiAction}
                     >
                       {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                     </button>
@@ -392,6 +394,7 @@ export const UserProfileView: React.FC = () => {
                     ? 'border-blue-500 text-slate-900 dark:text-white'
                     : 'border-transparent text-slate-400 hover:text-slate-300'
                 }`}
+                data-user-profile-action={USER_PROFILE_ACTIONS.switchToUsageLogs.uiAction}
               >
                 消费历史明细
               </button>
@@ -402,6 +405,7 @@ export const UserProfileView: React.FC = () => {
                     ? 'border-blue-500 text-slate-900 dark:text-white'
                     : 'border-transparent text-slate-400 hover:text-slate-300'
                 }`}
+                data-user-profile-action={USER_PROFILE_ACTIONS.switchToRechargeLogs.uiAction}
               >
                 充值交易记录
               </button>

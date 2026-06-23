@@ -86,7 +86,8 @@ export const SegmentedControlMulti: React.FC<{
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-}> = ({ options, value, onChange, disabled = false }) => {
+  controlAction?: string;
+}> = ({ options, value, onChange, disabled = false, controlAction }) => {
   const activeIndex = options.indexOf(value);
   const slideWidth = `${100 / options.length}%`;
   const slideLeft = `${activeIndex * (100 / options.length)}%`;
@@ -123,6 +124,7 @@ export const SegmentedControlMulti: React.FC<{
             }
           }}
           disabled={disabled}
+          data-settings-control-action={controlAction}
           className={`relative z-10 min-w-0 flex-1 overflow-hidden px-2 py-2.5 text-ellipsis whitespace-nowrap font-medium disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
           style={{
             color: value === option ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -221,7 +223,8 @@ export const SettingInput: React.FC<{
   autoComplete?: string;
   onReveal?: () => void | Promise<void>;
   revealLoading?: boolean;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete, onReveal, revealLoading = false }) => {
+  controlAction?: string;
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete, onReveal, revealLoading = false, controlAction }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
   const isPassword = type === 'password';
@@ -296,6 +299,7 @@ export const SettingInput: React.FC<{
           placeholder={placeholder}
           disabled={disabled}
           autoComplete={resolvedAutoComplete}
+          data-settings-control-action={controlAction}
           className={`${SETTINGS_INPUT_CLASSNAME} ${isPassword ? 'pl-4 pr-10' : 'px-4'}`.trim()}
           style={{ boxShadow: 'var(--settings-input-shadow)' }}
         />
@@ -304,6 +308,7 @@ export const SettingInput: React.FC<{
             type="button"
             onClick={() => void handlePasswordToggle()}
             disabled={disabled || revealLoading || isRevealing}
+            data-settings-control-action={controlAction ? `${controlAction}.reveal` : undefined}
             className="absolute inset-y-0 right-0 flex items-center pr-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none outline-none disabled:cursor-not-allowed disabled:opacity-50"
             title={showPassword ? '隐藏密钥' : (isRevealing || revealLoading ? '正在查看密钥' : '查看密钥')}
           >
@@ -327,7 +332,8 @@ export const SettingToggle: React.FC<{
   onChange: (checked: boolean) => void;
   helper?: string;
   disabled?: boolean;
-}> = ({ label, checked, onChange, helper, disabled = false }) => {
+  controlAction?: string;
+}> = ({ label, checked, onChange, helper, disabled = false, controlAction }) => {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
@@ -354,6 +360,7 @@ export const SettingToggle: React.FC<{
           }
         }}
         disabled={disabled}
+        data-settings-control-action={controlAction}
         className={`settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-[var(--radius-control-md)] border disabled:cursor-not-allowed disabled:opacity-60 transition-[background-color] duration-200 cursor-pointer ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
         style={{
           background: checked ? 'rgb(var(--settings-accent-rgb))' : 'rgba(120, 120, 128, 0.32)',
@@ -380,7 +387,8 @@ export const SettingSelect: React.FC<{
   onChange: (value: string) => void;
   helper?: string;
   disabled?: boolean;
-}> = ({ label, value, options, onChange, helper, disabled = false }) => {
+  controlAction?: string;
+}> = ({ label, value, options, onChange, helper, disabled = false, controlAction }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -409,6 +417,7 @@ export const SettingSelect: React.FC<{
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         onClick={() => setIsOpen(!isOpen)}
+        data-settings-control-action={controlAction}
         className={`${SETTINGS_INPUT_CLASSNAME} ${SETTINGS_CONTROL_MENU_TRIGGER_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60 min-w-0`.trim()}
         style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
@@ -436,6 +445,7 @@ export const SettingSelect: React.FC<{
               role="option"
               aria-selected={option.value === value}
               data-state={option.value === value ? 'selected' : 'idle'}
+              data-settings-control-action={controlAction}
               onClick={() => {
                 onChange(option.value);
                 setIsOpen(false);
@@ -465,7 +475,8 @@ export const PrimaryButton: React.FC<{
   loading?: boolean;
   disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, loading, disabled = false, className = '' }) => {
+  controlAction?: string;
+}> = ({ children, onClick, loading, disabled = false, className = '', controlAction }) => {
   // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
   const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
   
@@ -498,6 +509,7 @@ export const PrimaryButton: React.FC<{
       type="button"
       onClick={handleInterceptClick}
       disabled={loading || shouldApplyNativeDisabled}
+      data-settings-control-action={controlAction}
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'transparent',
@@ -521,7 +533,8 @@ export const SecondaryButton: React.FC<{
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, disabled = false, className = '' }) => {
+  controlAction?: string;
+}> = ({ children, onClick, disabled = false, className = '', controlAction }) => {
   // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
   const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
   const shouldApplyNativeDisabled = disabled && !isReadonlyGhost;
@@ -547,6 +560,7 @@ export const SecondaryButton: React.FC<{
       type="button"
       onClick={handleInterceptClick}
       disabled={shouldApplyNativeDisabled}
+      data-settings-control-action={controlAction}
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
@@ -567,7 +581,8 @@ export const DangerButton: React.FC<{
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, disabled = false, className = '' }) => {
+  controlAction?: string;
+}> = ({ children, onClick, disabled = false, className = '', controlAction }) => {
   // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
   const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
   const shouldApplyNativeDisabled = disabled && !isReadonlyGhost;
@@ -593,6 +608,7 @@ export const DangerButton: React.FC<{
       type="button"
       onClick={handleInterceptClick}
       disabled={shouldApplyNativeDisabled}
+      data-settings-control-action={controlAction}
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
