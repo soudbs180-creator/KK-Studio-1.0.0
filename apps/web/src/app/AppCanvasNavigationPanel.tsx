@@ -94,18 +94,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const viewportMaxX = (safeContainerWidth - canvasTransform.x) / safeScale;
   const viewportMaxY = (safeContainerHeight - canvasTransform.y) / safeScale;
 
-  // 监听大画布变化，当没有处于手动编辑（待确认）状态时同步目标中心点 and 缩放比
-  useEffect(() => {
-    if (!isEdited) {
-      const realCenterX = viewportMinX + (viewportMaxX - viewportMinX) / 2;
-      const realCenterY = viewportMinY + (viewportMaxY - viewportMinY) / 2;
-      setTargetCenter({
-        x: isNaN(realCenterX) ? 0 : realCenterX,
-        y: isNaN(realCenterY) ? 0 : realCenterY,
-      });
-      setTargetScale(scale);
-    }
-  }, [canvasTransform, safeContainerWidth, safeContainerHeight, isEdited, scale, viewportMinX, viewportMaxX, viewportMinY, viewportMaxY]);
 
   const currentTargetScale = isEdited ? targetScale : scale;
   const displayZoomPercent = Math.round(currentTargetScale * 100);
@@ -236,7 +224,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const miniActualViewportH = (viewportMaxY - viewportMinY) * scaleMini;
 
   // 9.2 目标定位视口位置（橙红实线框）
-  const effectiveCenter = targetCenter || {
+  const effectiveCenter = isEdited && targetCenter ? targetCenter : {
     x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
     y: viewportMinY + (viewportMaxY - viewportMinY) / 2
   };
@@ -283,9 +271,13 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   // 确认定位
   const handleConfirmLocation = () => {
-    if (targetCenter && canvasRef.current) {
-      const newX = safeContainerWidth / 2 - targetCenter.x * currentTargetScale;
-      const newY = safeContainerHeight / 2 - targetCenter.y * currentTargetScale;
+    const center = targetCenter || {
+      x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
+      y: viewportMinY + (viewportMaxY - viewportMinY) / 2
+    };
+    if (canvasRef.current) {
+      const newX = safeContainerWidth / 2 - center.x * currentTargetScale;
+      const newY = safeContainerHeight / 2 - center.y * currentTargetScale;
       
       const finalX = isNaN(newX) ? 0 : newX;
       const finalY = isNaN(newY) ? 0 : newY;

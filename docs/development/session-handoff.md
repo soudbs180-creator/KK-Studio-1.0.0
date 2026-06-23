@@ -1,25 +1,96 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (Circular Subscription Hotfix)
+**Last Updated:** 2026-06-23 (Canvas & Minimap Layout Optimization)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - 优化画布渲染性能、修复一键整理卡片重叠与小地图按钮错位
+
+### 修改范围 (Canvas & Minimap Layout Optimization)
+- **小地图渲染性能优化**：移除了大画布拖拽或缩放时在 `useEffect` 中实时同步小地图目标定位状态的冗余逻辑，优化为在未编辑时直接派生自最新视口 props，彻底消除了每次移动时高频触发多余 `setState` 带来的极度卡顿。
+- **一键整理卡片重叠修复**：为 `CanvasContext.tsx` 中 `arrangeAllNodes` 的 `useCallback` 添加了缺失的依赖项 `state.canvases`, `state.activeCanvasId`, `state.selectedNodeIds`，切断了陈旧的闭包引力，解决了排列卡片发生相互堆叠的 Bug。
+- **小地图控制栏按钮对齐修复**：针对小地图控制面板中的 `.kk-workspace-icon-control` 样式加入了覆盖声明，重置 `min-width`/`min-height` 为 0，使其重新符合 `28px` 紧凑尺寸，完全解决被全局触摸目标配置拉伸错位的问题。
+
+### 修改文件 (Canvas & Minimap Layout Optimization)
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx` [MODIFY]
+- `apps/web/src/context/CanvasContext.tsx` [MODIFY]
+- `apps/web/src/styles/kk-ui-tokens.css` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Canvas & Minimap Layout Optimization)
+- `npm run typecheck` (类型安全全绿通过)
+- `npm run build` (生产环境下 Vite 编译打包顺利完成，无任何错误或警告)
+
+### 未运行验证及原因 (Canvas & Minimap Layout Optimization)
+- 无
+
+### 风险与下一步 (Canvas & Minimap Layout Optimization)
+- **风险**：无。此更改为小地图渲染层性能提效与纯依赖项、CSS 对齐修复。
+- **下一步**：推送修改并进行验收。
+
+## 2026-06-23 - 修复暗色模式登录卡片可读性与精简头像模块
+
+### 修改范围 (UI Visual & Layout Refinement)
+- **删除多余 AI 按钮**：移除左上角 `AppDesktopChrome` 中多余的 AI 助手切换按钮，仅保留头像、积分、充值模块，精简卡片布局。
+- **修复登录卡片暗色模式颜色看不清**：将原本被强制覆盖为白色半透明的登录面板（`.auth-page--dark.auth-page--landing .auth-modal-content .auth-panel`）背景重构为深色毛玻璃磨砂（`rgba(18, 22, 30, 0.85)`），并应用 `blur(32px)`，完美烘托淡色文字 `#fffaf0`，提供高对比度的绝佳可读性。
+- **升级二级弹出人机验证遮罩**：亮色模式下使用更为透亮的 `rgba(255, 255, 255, 0.65)` 磨砂层；暗色模式下使用融为一体的暗色毛玻璃遮罩（`rgba(20, 24, 33, 0.88)` 并应用 `blur(32px)`），配以高对比度的淡色文字，提升整体视觉体验。
+
+### 修改文件 (UI Visual & Layout Refinement)
+- `apps/web/src/app/AppDesktopChrome.tsx` [MODIFY]
+- `apps/web/src/components/auth/LoginScreen.css` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (UI Visual & Layout Refinement)
+- `npm run typecheck` (类型检查全绿通过)
+- `npm run build` (生产包打包构建通过，没有任何警告或错误)
+
+### 未运行验证及原因 (UI Visual & Layout Refinement)
+- 无
+
+### 风险与下一步 (UI Visual & Layout Refinement)
+- **风险**：无风险。此为纯前端 UI 及 CSS 适配性调整。
+- **下一步**：已就绪，可提给用户查验实际界面展示效果。
+
+## 2026-06-23 - 统一登录界面和卡片底色为亮色调风格 (UI Fix)
+
+### 修改范围 (Login Light Theme UI Fix)
+- **登录页面及卡片全部亮色化**：将登录屏在 `resolvedTheme` 为 `dark` 时的深色模式样式全部重写为对应的亮色样式。确保不论系统或者浏览器当前处于何种主题配置，登录背景和登录输入面板 (`.auth-panel`)、按钮、分割线以及 Turnstile 安全验证遮罩都始终呈现优雅高档的白色毛玻璃亮色风格。
+- **修复治理检查标题冲突**：解决了 `session-handoff.md` 中两个历史 Hotfix 均使用同名三级标题 `(Hotfix)` 导致的 `governance:check` (具体为 `governance:agent-docs`) 校验失败问题。
+
+### 修改文件 (Login Light Theme UI Fix)
+- `apps/web/src/components/auth/LoginScreen.css` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Login Light Theme UI Fix)
+- `npm run architecture:check` (边界与依赖约束全部通过)
+- `npm run governance:check` (标题去重与规范检测全部通过)
+- `npm run typecheck` (无任何编译和类型声明错误)
+- `npm run build` (项目在生产环境下成功构建打包，无 Warn 或 Error)
+- `npm run test:unit` (1573 个单元和契约断言全绿通过，包括对 `LoginScreen.tsx` 源码正则检测的验证)
+
+### 未运行验证及原因 (Login Light Theme UI Fix)
+- 无
+
+### 风险与下一步 (Login Light Theme UI Fix)
+- **风险**：无风险。所有修改仅作用于登录屏的 CSS 覆盖及文档校验修复，且完美保持了单元测试契约的匹配规则。
+- **下一步**：已跑通所有本地验证逻辑。可供用户部署至测试/生产环境并进行实际的视觉验收。
 
 ## 2026-06-23 - 修复 adminModelService 与 keyManager 循环订阅引发的页面卡死 Bug (Hotfix)
 
-### 修改范围 (Hotfix)
-- **切断同步循环订阅死循环**：在 `adminModelService` 订阅 `keyManager` 后刷新统一模型列表的 `refreshUnifiedModels` 过程中，引入了 `isRefreshingUnified` 防重入锁和 `JSON.stringify` 变更深比较。这使得只有当最终合并的模型列表发生实质性变化时才会发起二次通知，彻底终结了页面初始化挂载时因两个单例服务相互通知而陷入的 CPU 100% 同步死循环。
+### 修改范围 (Circular Subscription Hotfix)
+- **切断同步循环订阅死循环**：在 `adminModelService` 订阅 `keyManager` 后刷新统一模型列表的 `refreshUnifiedModels` 过程中，引入了 `isRefreshingUnified` 防重入锁 and `JSON.stringify` 变更深比较。这使得只有当最终合并的模型列表发生实质性变化时才会发起二次通知，彻底终结了页面初始化挂载时因两个单例服务相互通知而陷入的 CPU 100% 同步死循环。
 
-### 修改文件 (Hotfix)
+### 修改文件 (Circular Subscription Hotfix)
 - `apps/web/src/services/model/adminModelService.ts` [MODIFY]
 
-### 已运行验证 (Hotfix)
+### 已运行验证 (Circular Subscription Hotfix)
 - `npm run typecheck` (全项目 0 错误、0 警告通过)
 - `npm run test` (1573 个单元、集成与 E2E 测试全绿通过)
 - 重启开发环境后通过 `Invoke-WebRequest` 模拟请求本地 `http://127.0.0.1:3000` 响应 200 OK
 
-### 未运行验证及原因 (Hotfix)
+### 未运行验证及原因 (Circular Subscription Hotfix)
 - 无
 
-### 风险与下一步 (Hotfix)
+### 风险与下一步 (Circular Subscription Hotfix)
 - **风险**：无风险。该修改为局部加固且带有数据深比较，能够有效规避不必要的频繁组件刷新。
 - **下一步**：交付并由用户进行实际测试。
 
@@ -77,22 +148,22 @@
 
 ## 2026-06-23 - 修复 WorkspacePage 部署打包 unresolved import 错误 (Hotfix)
 
-### 修改范围 (Hotfix)
+### 修改范围 (WorkspacePage Hotfix)
 - **.gitignore 规则收紧**：将原本全局递归忽略的 `workspace/` 修改为仅忽略根目录下的 `/workspace/`，避免误伤 `apps/web/src/pages/Workspace` 目录下的源代码文件。
 - **文件重新追踪与暂存**：将之前因 `.gitignore` 误忽略而未能提交至远程仓库的 `apps/web/src/pages/Workspace/WorkspacePage.tsx` 重新添加至 Git 追踪范围并完成 `git add` 暂存。
 
-### 修改文件 (Hotfix)
+### 修改文件 (WorkspacePage Hotfix)
 - `.gitignore` [MODIFY]
 - `apps/web/src/pages/Workspace/WorkspacePage.tsx` [NEW - 恢复追踪]
 
-### 已运行验证 (Hotfix)
+### 已运行验证 (WorkspacePage Hotfix)
 - 本地 `npm run build` 顺利通过（2482 modules transformed，成功输出打包产物）
 - `npm run verify:changes` 通过
 
-### 未运行验证及原因 (Hotfix)
+### 未运行验证及原因 (WorkspacePage Hotfix)
 - 无
 
-### 风险与下一步 (Hotfix)
+### 风险与下一步 (WorkspacePage Hotfix)
 - 无风险。请合并修改并提交推送至远程仓库以触发 Vercel 重新构建部署。
 
 ## 2026-06-23 - 前端巨石拆分与 Services 目录收敛合并 (WS-6)

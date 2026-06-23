@@ -1995,7 +1995,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return { ...prev, canvases: updatedCanvases };
         });
 
-    }, [pushToHistory]); // Removed the direct state dependency; use functional updates instead.
+    }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds]);
 
     // --- File System Implementation ---
 

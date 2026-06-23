@@ -3,7 +3,7 @@ body.auth-screen-active.auth-screen-active--dark,
 html.auth-screen-active.auth-screen-active--dark,
 html.auth-screen-active.auth-screen-active--dark body,
 body.auth-screen-active.auth-screen-active--dark #root {
-  --app-startup-bg: var(--clay-dark-canvas);
+  --app-startup-bg: var(--clay-canvas);
   --auth-system-bg: var(--app-startup-bg);
   background: var(--auth-system-bg) !important;
 }
@@ -90,129 +90,132 @@ body.auth-screen-active--landing.auth-modal-open #root {
 }
 
 .auth-page--dark {
-  --auth-system-primary: #fffaf0;
-  --auth-system-primary-text: #0a0a0a;
+  --app-startup-bg: var(--clay-canvas);
+  --auth-system-primary: var(--clay-ink);
+  --auth-system-primary-text: #ffffff;
 }
 
-/* 简体中文：暗色模式面板 — 高对比度背景，确保文字清晰可读 */
+/* 简体中文：暗色模式面板已覆盖为亮色风格 */
 .auth-page--dark .auth-panel {
-  background: rgba(22, 26, 34, 0.88);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.4);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  color: #fffaf0;
+    0 1px 2px rgba(12, 16, 24, 0.02),
+    0 18px 54px rgba(12, 16, 24, 0.13),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-header h2 {
-  color: #fffaf0;
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-header p,
 .auth-page--dark .auth-field > span {
-  color: rgba(255, 250, 240, 0.6);
+  color: var(--ng-muted);
 }
 
 .auth-page--dark .auth-input-wrap {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #fffaf0;
+  border-color: rgba(12, 16, 24, 0.12);
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-input-wrap:focus-within {
-  border-color: rgba(255, 250, 240, 0.5);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 1px rgba(255, 250, 240, 0.3);
+  border-color: rgba(12, 16, 24, 0.9);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(12, 16, 24, 0.9);
 }
 
 .auth-page--dark .auth-input-wrap input {
-  color: #fffaf0;
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-input-wrap input::placeholder {
-  color: rgba(255, 250, 240, 0.35);
+  color: #535a65;
 }
 
 .auth-page--dark .auth-input-wrap svg,
 .auth-page--dark .auth-eye-btn {
-  color: rgba(255, 250, 240, 0.5);
+  color: rgba(83, 90, 101, 0.78);
 }
 
 .auth-page--dark .auth-input-wrap input:-webkit-autofill,
 .auth-page--dark .auth-input-wrap input:-webkit-autofill:hover,
 .auth-page--dark .auth-input-wrap input:-webkit-autofill:focus,
 .auth-page--dark .auth-input-wrap input:-webkit-autofill:active {
-  -webkit-text-fill-color: #fffaf0 !important;
-  caret-color: #fffaf0;
+  -webkit-text-fill-color: var(--input-autofill-text) !important;
+  caret-color: var(--input-autofill-text);
 }
 
 .auth-page--dark .auth-field-help {
-  color: rgba(255, 250, 240, 0.45);
+  color: #535a65;
 }
 
 .auth-page--dark .auth-remember {
-  color: rgba(255, 250, 240, 0.55);
+  color: var(--ng-muted);
 }
 
 .auth-page--dark .auth-remember input[type="checkbox"] {
-  accent-color: #fffaf0;
+  accent-color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-btn-main {
-  background: #fffaf0;
-  color: #0a0a0a;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  background: #0c1018 !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(12, 16, 24, 0.16);
 }
 
 .auth-page--dark .auth-btn-main:hover:not(:disabled) {
-  background: #fff5e6;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  background: #192029 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 15px 34px rgba(12, 16, 24, 0.2);
 }
 
 .auth-page--dark .auth-social-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #fffaf0;
+  background: rgba(255, 255, 255, 0.56);
+  border-color: rgba(12, 16, 24, 0.12);
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-social-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  border-color: rgba(12, 16, 24, 0.22);
 }
 
 .auth-page--dark .auth-divider {
-  color: rgba(255, 250, 240, 0.35);
+  color: var(--ng-muted);
 }
 
 .auth-page--dark .auth-divider::before,
 .auth-page--dark .auth-divider::after {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(12, 16, 24, 0.12);
 }
 
 .auth-page--dark .auth-text-btn {
-  color: rgba(255, 250, 240, 0.75);
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-text-btn:hover {
-  color: #fffaf0;
+  color: var(--ng-ink);
 }
 
 .auth-page--dark .auth-footer-sep {
-  color: rgba(255, 255, 255, 0.15);
+  color: rgba(12, 16, 24, 0.2);
 }
 
 .auth-page--dark .auth-version {
-  color: rgba(255, 250, 240, 0.35);
+  color: var(--ng-muted);
 }
 
 .auth-page--dark .auth-link-back {
-  color: rgba(255, 250, 240, 0.5);
+  color: var(--ng-muted);
 }
 
 .auth-page--dark .auth-link-back:hover {
-  color: #fffaf0;
+  color: var(--ng-ink);
 }
 
 .auth-side-form {
@@ -288,15 +291,14 @@ body.auth-screen-active--landing.auth-modal-open #root {
 }
 
 .auth-page--dark.auth-page--landing .auth-modal-content .auth-panel {
-  background: rgba(18, 22, 30, 0.55);
+  background: rgba(18, 22, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #fffaf0;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 18px 54px rgba(0, 0, 0, 0.45),
-    inset 0 1px 1px rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(32px) saturate(1.4);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
 }
 
 .auth-modal-close {
@@ -323,6 +325,16 @@ body.auth-screen-active--landing.auth-modal-open #root {
   transform: rotate(90deg);
   background: #ffffff;
   border-color: rgba(12, 16, 24, 0.2);
+}
+
+.auth-page--dark .auth-modal-close {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #fffaf0;
+}
+.auth-page--dark .auth-modal-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .auth-link-back {
@@ -954,28 +966,33 @@ body.auth-screen-active--landing.auth-modal-open #root {
   justify-content: center;
   padding: 28px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(32px) saturate(1.6);
   -webkit-backdrop-filter: blur(32px) saturate(1.6);
 }
 
 /* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高可读性 */
 .auth-page--dark .auth-captcha-overlay {
-  background: rgba(18, 22, 30, 0.75);
-  backdrop-filter: blur(32px) saturate(1.6);
-  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  background: rgba(20, 24, 33, 0.88) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(32px) saturate(1.4);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
 }
 
 .auth-page--dark .auth-captcha-title {
-  color: #fffaf0;
+  color: #fffaf0 !important;
 }
 
 .auth-page--dark .auth-captcha-desc {
-  color: rgba(255, 250, 240, 0.6);
+  color: rgba(255, 250, 240, 0.6) !important;
 }
 
 .auth-page--dark .auth-captcha-cancel {
-  color: rgba(255, 250, 240, 0.5);
+  color: rgba(255, 250, 240, 0.5) !important;
+}
+
+.auth-page--dark .auth-captcha-cancel:hover {
+  color: #fffaf0 !important;
 }
 
 .auth-captcha-container {

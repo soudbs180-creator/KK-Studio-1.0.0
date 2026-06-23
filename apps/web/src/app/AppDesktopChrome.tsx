@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutDashboard, LogOut, Sparkles, User, Zap, Shield } from 'lucide-react';
+import { LayoutDashboard, LogOut, User, Zap, Shield } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
@@ -146,19 +146,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         </div>
       )}
 
-      <button
-        id="btn-desktop-ai-assistant"
-        type="button"
-        aria-pressed={isChatOpen}
-        aria-label={isChatOpen ? 'Close AI assistant' : 'Open AI assistant'}
-        title={isChatOpen ? 'AI assistant is open' : 'Open AI assistant'}
-        onClick={onToggleChat}
-        className={`kk-workspace-ai-assistant-toggle ${isChatOpen ? 'kk-workspace-primary-action' : 'kk-workspace-control'} inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black leading-none active:scale-95`}
-      >
-        <Sparkles size={15} />
-        <span>AI</span>
-        <span className={`h-1.5 w-1.5 rounded-full ${isChatOpen ? 'bg-current opacity-95' : 'bg-current opacity-35'}`} />
-      </button>
+
 
       {/* 简体中文：用户下拉菜单弹出容器 - 改为 left-0 并向下平移，完美配合左侧等宽面板 */}
       {showUserMenu ? (
