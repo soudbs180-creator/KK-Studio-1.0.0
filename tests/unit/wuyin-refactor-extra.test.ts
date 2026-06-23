@@ -3,8 +3,8 @@ import { describe, test, before, after } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const crawler = require("../../server/lib/wuyinCatalogCrawler.js");
-const executor = require("../../server/lib/wuyinModelExecutor.js");
+const crawler = require("../../server/lib/dispatcher/adapters/wuyin/wuyinCatalogCrawler.js");
+const executor = require("../../server/lib/dispatcher/adapters/wuyin/wuyinModelExecutor.js");
 
 describe("速创 API 重构专项单元测试", () => {
   let originalFetch: typeof globalThis.fetch;

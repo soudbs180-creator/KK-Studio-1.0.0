@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const serverWuyinProxy = require("../../server/lib/wuyinAsyncVideoProxy.js") as {
+const serverWuyinProxy = require("../../server/lib/dispatcher/adapters/wuyin/wuyinAsyncVideoProxy.js") as {
   extractWuyinTaskId: (payload: any) => string;
   mapWuyinStatus: (statusCode: any) => string;
   extractWuyinOutputUrls: (payload: any) => string[];
@@ -211,7 +211,7 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
       } as any;
     };
 
-    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+    const executor = require("../../server/lib/dispatcher/adapters/wuyin/wuyinModelExecutor.js") as {
       submitWuyinTask: (options: any) => Promise<any>;
     };
 
@@ -254,7 +254,7 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
       } as any;
     }) as typeof fetch;
 
-    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+    const executor = require("../../server/lib/dispatcher/adapters/wuyin/wuyinModelExecutor.js") as {
       submitWuyinTask: (options: any) => Promise<any>;
     };
 
@@ -299,7 +299,7 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
       } as any;
     }) as typeof fetch;
 
-    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+    const executor = require("../../server/lib/dispatcher/adapters/wuyin/wuyinModelExecutor.js") as {
       checkWuyinTaskStatus: (options: any) => Promise<any>;
     };
 

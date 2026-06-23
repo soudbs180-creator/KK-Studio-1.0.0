@@ -19,7 +19,7 @@ import {
 } from "../../apps/web/src/services/llm/wuyinAsyncVideoRoute.ts";
 
 const require = createRequire(import.meta.url);
-const serverWuyinVideoProxy = require("../../server/lib/wuyinAsyncVideoProxy.js") as {
+const serverWuyinVideoProxy = require("../../server/lib/dispatcher/adapters/wuyin/wuyinAsyncVideoProxy.js") as {
   encodeLocalProxyTaskId: (routeId: string, providerTaskId: string) => string;
   decodeLocalProxyTaskId: (localTaskId: string) => { routeId: string; providerTaskId: string };
   isWuyinAsyncVideoTargetUrl: (targetUrl: string) => boolean;
@@ -147,7 +147,7 @@ describe("Wuyin async-video route helpers", () => {
   test("keeps Wuyin Google Omni out of the OpenAI /v1/videos adapter path", () => {
     const adapterSource = readSource("apps/web/src/services/llm/VideoCompatibleAdapter.ts");
     const serverRouteSource = readSource("server/routes/user.js");
-    const serverHelperSource = readSource("server/lib/wuyinAsyncVideoProxy.js");
+    const serverHelperSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinAsyncVideoProxy.js");
 
     assert.match(adapterSource, /runtime\.videoApiStyle === 'wuyin-async-video'/);
     assert.match(adapterSource, /generateVideoViaWuyinAsync/);
