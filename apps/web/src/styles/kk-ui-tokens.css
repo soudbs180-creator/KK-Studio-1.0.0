@@ -365,7 +365,7 @@
   --kk-workspace-startup-warning-bg: rgb(120 53 15 / 0.24);
   --kk-workspace-startup-warning-border: rgb(245 158 11 / 0.26);
   --kk-workspace-startup-warning-text: rgb(253 230 138 / 1);
-  --kk-toast-card-bg: rgb(255 255 255 / var(--kk-ui-glass-opacity));
+  --kk-toast-card-bg: rgb(255 255 255 / calc(var(--kk-ui-glass-opacity) * 0.55));
   --kk-toast-card-border: rgb(17 24 39 / 0.12);
   --kk-toast-card-shadow: var(--kk-shadow-floating);
   --kk-toast-card-text: var(--kk-color-text-primary);
@@ -534,7 +534,7 @@
   --kk-workspace-startup-warning-bg: rgb(120 53 15 / 0.24);
   --kk-workspace-startup-warning-border: rgb(245 158 11 / 0.26);
   --kk-workspace-startup-warning-text: rgb(253 230 138 / 1);
-  --kk-toast-card-bg: rgb(18 18 22 / var(--kk-ui-glass-opacity));
+  --kk-toast-card-bg: rgb(18 18 22 / calc(var(--kk-ui-glass-opacity) * 0.55));
   --kk-toast-card-border: rgb(255 250 240 / 0.12);
   --kk-toast-card-shadow: 0 18px 44px rgb(0 0 0 / 0.44);
   --kk-toast-card-text: rgb(255 255 255 / 0.94);
@@ -1680,8 +1680,8 @@
     var(--kk-toast-card-bg);
   color: var(--kk-toast-card-text);
   box-shadow: var(--kk-toast-card-shadow);
-  backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.6);
   transition:
     transform var(--kk-motion-panel) var(--kk-motion-ease-standard),
     opacity var(--kk-motion-panel) var(--kk-motion-ease-standard),

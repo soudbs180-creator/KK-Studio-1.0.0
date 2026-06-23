@@ -5297,8 +5297,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       {!isMobile && (
         <div className="desktop-version-badge fixed bottom-4 z-50 py-1.5 px-3 flex items-center justify-center rounded-xl border select-none pointer-events-auto"
           style={{
-            left: isSidebarOpen ? '292px' : '16px',
-            transition: 'left 0.3s ease-out',
+            left: '16px',
             background: 'var(--frost-card-framework-bg)',
             border: '1px solid var(--frost-card-framework-border)',
             boxShadow: 'var(--frost-card-framework-shadow)',

@@ -27,16 +27,18 @@
 - **风险**：无。此更改为小地图渲染层性能提效与纯依赖项、CSS 对齐修复。
 - **下一步**：推送修改并进行验收。
 
-## 2026-06-23 - 修复暗色模式登录卡片可读性与精简头像模块
+## 2026-06-23 - 修复暗色模式登录卡片、精简头像模块并对齐版本号
 
 ### 修改范围 (UI Visual & Layout Refinement)
 - **删除多余 AI 按钮**：移除左上角 `AppDesktopChrome` 中多余的 AI 助手切换按钮，仅保留头像、积分、充值模块，精简卡片布局。
 - **修复登录卡片暗色模式颜色看不清**：将原本被强制覆盖为白色半透明的登录面板（`.auth-page--dark.auth-page--landing .auth-modal-content .auth-panel`）背景重构为深色毛玻璃磨砂（`rgba(18, 22, 30, 0.85)`），并应用 `blur(32px)`，完美烘托淡色文字 `#fffaf0`，提供高对比度的绝佳可读性。
 - **升级二级弹出人机验证遮罩**：亮色模式下使用更为透亮的 `rgba(255, 255, 255, 0.65)` 磨砂层；暗色模式下使用融为一体的暗色毛玻璃遮罩（`rgba(20, 24, 33, 0.88)` 并应用 `blur(32px)`），配以高对比度的淡色文字，提升整体视觉体验。
+- **固定版本号与头像对齐位置**：修改 `WorkspacePage.tsx`，将左上角头像容器与左下角版本号均固定在最左边（`left: 16px`）不变，不再响应侧边栏开启的平移偏移。这样它们依然在视觉轴线（左边界）上完美对齐，且版本号始终保持在最左下角不变。
 
 ### 修改文件 (UI Visual & Layout Refinement)
 - `apps/web/src/app/AppDesktopChrome.tsx` [MODIFY]
 - `apps/web/src/components/auth/LoginScreen.css` [MODIFY]
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx` [MODIFY]
 - `docs/development/session-handoff.md` [MODIFY]
 
 ### 已运行验证 (UI Visual & Layout Refinement)
@@ -4227,3 +4229,25 @@ Mobile workspace: `apps/mobile/`
 ### Risks And Next - Provider Registry (WS-1)
 - **风险**：无明显风险。新的校验与类型接口为影子挂载，不阻断老的 HTTP API。
 - **下一步**：在进行后续的 **WS-2（各供应商适配器重构迁移）** 工作时，即可直接基于此 `ProviderItem` 类型和 Dispatcher 所提供的 `getProvider`/`listModels` 进行逻辑收拢。
+
+
+## Session Handoff - 2026-06-23 Notification Glassmorphism Polish
+
+### Scope - Notification Glassmorphism
+- **通知卡片磨砂玻璃升级**：对系统版本热重载通知以及所有的 Toast 通知卡片进行毛玻璃磨砂（Glassmorphism）质感优化，调低卡片背景的不透明度以增加通透感，并配合 backdrop-filter 实现明显的磨砂效果。
+
+### Files Modified - Notification Glassmorphism
+- [kk-ui-tokens.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/styles/kk-ui-tokens.css)
+
+### Design Decisions - Notification Glassmorphism
+1. **磨砂通透度计算**：将 `--kk-toast-card-bg` 从默认的 `var(--kk-ui-glass-opacity)` 降低为 `calc(var(--kk-ui-glass-opacity) * 0.55)`（即默认从 0.76 降至 0.418）。这能在保证文本可读性的前提下，让后面的画布及底图内容更清晰地穿透出来，并在模糊背景后呈现极佳的玻璃质感。
+2. **滤镜饱和度微调**：将 `.kk-toast-card` 处的 `backdrop-filter` 饱和度由 `saturate(1.4)` 提升至 `saturate(1.6)`，让透出的颜色更加丰富、充满生机，极大提高了视觉高级感。
+3. **回退完整性**：对于 `solid-fallback`（由于硬件性能或用户偏好导致关闭模糊和透明度的情况），CSS 具有专门的 `:root[data-kk-ui-solid-fallback='true']` 和 `prefers-reduced-transparency` 覆盖机制，背景会自动安全回退为不透明的 `var(--kk-color-bg-surface-solid)`，无需改动 JavaScript 状态，逻辑非常优雅健壮。
+
+### Validation - Notification Glassmorphism
+- **Toast UI 系统契约测试**：`node --test tests/unit/notification-toast-ui-system-contract.test.ts` (所有测试全部通过)。
+- **架构静态门禁检查**：`npm run architecture:check` (检查无新增违规，顺利通过)。
+
+### Risks And Next - Notification Glassmorphism
+- **风险**：无明显风险。
+- **下一步**：用户可预览当前版本就绪通知卡片或触发任何 toast 通知，观察磨砂效果。
