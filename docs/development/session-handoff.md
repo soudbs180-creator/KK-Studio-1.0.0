@@ -3,6 +3,48 @@
 **Last Updated:** 2026-06-23 (UI Action Catalog Optimization and Settings Search Integration)
 **Version:** KK Studio v1.5.7
 
+## 2026-06-23 - PR 合并与仓库治理清理 (PR #5 → #10 → #12)
+
+### 变更范围
+- **PR 合并**: 审阅合并了 PR #5 (WS-1 预设校验)、PR #10 (WS-7 忽略忽略目录) 和 PR #12 (WS-2 注册 vodeshop)。
+- **仓库卫生清理 (WS-7 & WS-2)**:
+  - 手动使用 `git rm --cached` 将已经被误跟踪但属于被忽略规则的 `brain/` 下的临时记忆、`apps/web/__create` 和 `apps/web/src/__create` 移出 Git 缓存。
+  - 清除了 `apps/web/src/app/root.tsx` 中对这三个已被忽略的脚手架残留模块 (`@/__create/fetch`, `useDevServerHeartbeat`, `design-mode`) 的引用，彻底消除了 clone 或 CI 干净编译下的 TS 类型和引用错误。
+  - 将被误从 Git 移出的移动端必需目录 (`apps/mobile/__create`, `apps/mobile/src/__create`) 以及 Web 端部分辅助目录 (`apps/web/src/app/__create`, `apps/web/src/app/api/__create`) 重新从 `origin/main` 检出恢复并回写进 Git 跟踪。
+  - 执行 `git rm config/model_service_config.json` 彻底移除了已废弃且密钥命名违规的旁路预设配置文件。
+- **密钥重命名 (WS-2)**:
+  - 在 `server/.env.local` 写入 `VODESHOP_RELAY_API_KEY=mock-local-gemini-key`，沿用原 mock vodeshop 密钥。
+  - 并在 VPS 部署文件模板 `scripts/vps/kk-api.env.example` 和 `scripts/vps/kk-vps.env.example` 中新增对应的 `VODESHOP_RELAY_API_KEY=CHANGE_ME_SERVER_ONLY` 环境变量占位。
+
+### 修改文件
+- `server/lib/dispatcher/providerProfiles.js` [MODIFY]
+- `docs/governance/PROVIDER_PRESET_RULES.md` [NEW]
+- `scripts/governance/check-provider-presets.mjs` [NEW]
+- `.gitignore` [MODIFY]
+- `apps/web/src/app/root.tsx` [MODIFY]
+- `server/.env.local` [MODIFY]
+- `scripts/vps/kk-api.env.example` [MODIFY]
+- `scripts/vps/kk-vps.env.example` [MODIFY]
+- `config/model_service_config.json` [DELETE]
+
+### 当前设计决策
+- **按 PR 要求清理**: 保证了 WS-7 (忽略忽略目录) 和 WS-2 (废弃预设) 要求的 git rm 清理落地，并使 `check-provider-presets.mjs` 的 R5 vodeshop 警告完全归零。
+- **防止误伤依赖**: 鉴于移动端及 Web 根 App 下的 `__create` 文件对当前版本是必需的依赖（仍被大量文件显式 import），因此将它们从 untrack 清单中剔除并恢复跟踪，仅移出并解耦了无用处的脚手架残留 `apps/web/__create` 和 `apps/web/src/__create` 依赖。
+
+### 已运行验证
+- `node scripts/governance/check-provider-presets.mjs` passed (0 违规，旧预设警告成功清空)
+- `npm run governance:check` passed
+- `npm run architecture:check` passed
+- `npm run typecheck` passed (tsc 零编译类型错误)
+- `npm run build` passed (生产打包编译顺利通过)
+- `npm run verify:changes` passed (含 Playwright E2E 降级契约校验)
+
+### 未运行验证及原因
+- 无。全部全量校验均已跑完。
+
+### 风险与下一步
+- 注意在 VPS 部署环境中正式配置 `VODESHOP_RELAY_API_KEY`（沿用原 `GEMINI_API_KEY` 里的中转密钥值）。
+
 ## 2026-06-23 - UI Action Catalog Optimization and Settings Search Integration
 
 ### Catalog Optimization Scope
