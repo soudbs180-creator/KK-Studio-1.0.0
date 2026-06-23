@@ -11,6 +11,7 @@
  *     R2 profile.id（含 aliases）全局唯一
  *     R3 一个 host(domain) 只能归属一个 profile —— “一个中转站 = 一个预设”
  *     R4 relay 必须提供 strictDocs.source（按运营商文档执行的依据）
+ *     R6 relay 不得借用官方品牌密钥名（GEMINI/OPENAI/..._API_KEY）——官方/中转命名隔离
  *     R5 检测绕过注册表的遗留散装预设（仅告警，不阻断 CI；待后续工作流清理）
  *
  *   退出码：硬性违规(R1~R3) 非零；R4/R5 仅告警，保持 main 绿色。
@@ -90,6 +91,15 @@ for (const profile of PROVIDER_PROFILES) {
     && !(profile.strictDocs && profile.strictDocs.source)
   ) {
     warnings.push(`R4 relay "${id}" 未声明 strictDocs.source（无法保证严格按运营商文档执行，存在“没按文档”的错误行为风险）。`);
+  }
+
+  // R6 relay 不得借用官方品牌密钥名（官方/中转命名隔离，硬性）
+  if (
+    profile.providerKind === 'relay'
+    && typeof profile.authKeyEnv === 'string'
+    && /(GEMINI|OPENAI|ANTHROPIC|CLAUDE|AZURE)_API_KEY/i.test(profile.authKeyEnv)
+  ) {
+    errors.push(`R6 relay "${id}" 不得借用官方品牌密钥名 "${profile.authKeyEnv}"（官方/中转命名必须隔离）。`);
   }
 }
 
