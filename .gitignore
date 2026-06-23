@@ -97,7 +97,7 @@ release/publish/stable/*
 !release/publish/stable/manifest.json
 !scripts/release/
 !scripts/release/**
-workspace/
+/workspace/
 
 # Server local files
 server/.env

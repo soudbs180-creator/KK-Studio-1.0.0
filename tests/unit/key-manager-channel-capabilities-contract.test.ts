@@ -34,7 +34,7 @@ test('keyManager channel capabilities boundary lives outside the monolithic key 
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-channel-capabilities-contract\.test\.ts/);
-  assert.match(keyManagerSource, /import \{ buildChannelCapabilities \} from '\.\/keyManagerChannelCapabilities';/);
+  assert.match(keyManagerSource, /import \{ buildChannelCapabilities \} from '\.\/keyManagerChannelCapabilities(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /private buildChannelCapabilities/);
   assert.match(keyManagerSource, /capabilities: buildChannelCapabilities\(effectiveSlotModels, pricingSupport, managementSupport\)/);
   assert.match(keyManagerSource, /capabilities: buildChannelCapabilities\(effectiveProviderModels, pricingSupport, managementSupport\)/);

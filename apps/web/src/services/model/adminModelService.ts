@@ -1,5 +1,6 @@
 import type { ApiError } from '../../../../../packages/shared/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
+import { keyManager } from '../auth/keyManager.ts';
 
 
 import { isStartupStageReady, type AppStartupStage } from '../system/appStartup.ts';
@@ -862,7 +863,143 @@ class AdminModelService {
   private notifyListeners() {
     this.listeners.forEach((listener) => listener());
   }
+
+  // === Unified Model Service Logic ===
+  private unifiedModels: UnifiedModel[] = [];
+  private unifiedInitialized = false;
+
+  async initializeUnifiedModels(): Promise<void> {
+    if (this.unifiedInitialized) return;
+
+    keyManager.subscribe(() => {
+      void this.refreshUnifiedModels();
+    });
+
+    this.loadUnifiedFromLocalCache();
+    setTimeout(() => {
+      void this.refreshUnifiedModels();
+    }, 0);
+
+    this.unifiedInitialized = true;
+  }
+
+  private loadUnifiedFromLocalCache(): void {
+    try {
+      this.unifiedModels = this.mapGlobalModels(keyManager.getGlobalModelList());
+      this.notifyListeners();
+      console.log('[AdminModelService] Loaded unified models from global cache:', this.unifiedModels.length);
+    } catch (error) {
+      console.error('[AdminModelService] Failed to load local cache for unified models:', error);
+    }
+  }
+
+  async refreshUnifiedModels(): Promise<void> {
+    await this.loadAdminModels();
+    this.unifiedModels = this.mapGlobalModels(keyManager.getGlobalModelList());
+    this.notifyListeners();
+  }
+
+  getUnifiedModels(): UnifiedModel[] {
+    return this.unifiedModels;
+  }
+
+  getUnifiedModelsByType(type: ModelType): UnifiedModel[] {
+    return this.unifiedModels.filter((model) => model.type === type);
+  }
+
+  getUnifiedModel(id: string): UnifiedModel | undefined {
+    return this.unifiedModels.find((model) => model.id === id);
+  }
+
+  isCreditBasedModel(id: string): boolean {
+    const model = this.getUnifiedModel(id);
+    if (model) {
+      return model.isSystemInternal === true || model.isAdminModel === true;
+    }
+
+    return hasSystemRouteSuffix(id) && this.isAdminModel(id);
+  }
+
+  getUnifiedCreditCost(id: string): number {
+    const model = this.getUnifiedModel(id);
+    if (model?.isSystemInternal === true || hasSystemRouteSuffix(id)) {
+      return Number(this.getModelCreditCost(id) || model?.creditCost || 0);
+    }
+
+    return Number(model?.creditCost || 0);
+  }
+
+  getUnifiedModelColors(id: string): { start: string; end: string } | null {
+    const adminModel = this.getModel(id);
+    if (adminModel) {
+      return {
+        start: adminModel.colorStart,
+        end: adminModel.colorEnd,
+      };
+    }
+    return null;
+  }
+
+  private mapGlobalModels(models: Array<ReturnType<typeof keyManager.getGlobalModelList>[number]>): UnifiedModel[] {
+    const modelMap = new Map<string, UnifiedModel>();
+
+    models.forEach((model) => {
+      if (!modelMap.has(model.id)) {
+        modelMap.set(model.id, this.convertGlobalModel(model));
+      }
+    });
+
+    return Array.from(modelMap.values());
+  }
+
+  private convertGlobalModel(model: Array<ReturnType<typeof keyManager.getGlobalModelList>[number]>[number]): UnifiedModel {
+    const adminModel = model.isSystemInternal ? this.getModel(model.id) : undefined;
+
+    return {
+      id: model.id,
+      name: model.name,
+      provider: model.provider,
+      type: model.type as ModelType,
+      isCustom: model.isCustom ?? false,
+      isSystemInternal: model.isSystemInternal === true,
+      isAdminModel: model.isSystemInternal === true,
+      description: model.description,
+      icon: model.icon,
+      colorStart: model.colorStart ?? adminModel?.colorStart,
+      colorEnd: model.colorEnd ?? adminModel?.colorEnd,
+      creditCost: model.creditCost ?? adminModel?.creditCost,
+      billingType: adminModel?.billingType,
+      advantages: adminModel?.advantages,
+      endpoint: adminModel?.endpoint,
+    };
+  }
 }
+
+export type ModelType = 'chat' | 'image' | 'video' | 'audio' | 'image+chat';
+
+export interface UnifiedModel {
+  id: string;
+  name: string;
+  provider: string;
+  type: ModelType;
+  isCustom: boolean;
+  isSystemInternal?: boolean;
+  isAdminModel?: boolean;
+  description?: string;
+  icon?: string;
+  colorStart?: string;
+  colorEnd?: string;
+  creditCost?: number;
+  billingType?: 'token' | 'per_request' | 'multiplier';
+  advantages?: string;
+  endpoint?: string;
+}
+
+const hasSystemRouteSuffix = (id: string): boolean => {
+  const normalized = String(id || '').trim().toLowerCase();
+  const suffix = normalized.includes('@') ? normalized.split('@')[1] : '';
+  return suffix.startsWith('system') || suffix === 'systemproxy';
+};
 
 export const adminModelService = new AdminModelService();
 

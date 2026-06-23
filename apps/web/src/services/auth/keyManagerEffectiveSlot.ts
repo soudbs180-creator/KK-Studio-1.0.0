@@ -1,8 +1,8 @@
-import { normalizeApiProtocolFormat, type ApiProtocolFormat, type AuthMethod } from "../api/apiConfig";
-import { determineKeyType } from "./keyManagerKeyType";
-import { parseModelString } from "./keyManagerModelHelpers";
-import { type ProviderLinkProvider} from './keyManagerProviderLinks';
-import type { Provider } from "../../types";
+import { normalizeApiProtocolFormat, type ApiProtocolFormat, type AuthMethod } from "../api/apiConfig.ts";
+import { determineKeyType } from "./keyManagerKeyType.ts";
+import { parseModelString } from "./keyManagerModelHelpers.ts";
+import { type ProviderLinkProvider} from './keyManagerProviderLinks.ts';
+import type { Provider } from "../../types.ts";
 
 export interface EffectiveKeySlot {
     id: string;

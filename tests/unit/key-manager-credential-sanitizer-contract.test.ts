@@ -25,7 +25,7 @@ test('credential sanitizer lives outside the monolithic key manager', () => {
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-credential-sanitizer-contract\.test\.ts/);
   assert.match(helperSource, /export function sanitizeAsciiApiKey/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerCredentialSanitizer';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerCredentialSanitizer(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /replace\(\s*\/\[\^\\x00-\\x7F\]\/g,\s*["']["']\s*\)\.trim\(\)/);
   assert.match(keyManagerSource, /const cleanKey = sanitizeAsciiApiKey\(key\);/);
   assert.match(keyManagerSource, /const trimmedKey = sanitizeAsciiApiKey\(key\);/);

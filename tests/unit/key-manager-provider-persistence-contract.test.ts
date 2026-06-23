@@ -36,7 +36,7 @@ test('provider runtime-state merge lives with provider persistence helpers', () 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-persistence-contract\.test\.ts/);
   assert.match(providerSource, /export function mergeCloudProvidersWithLocalRuntimeState/);
   assert.match(keyManagerSource, /mergeCloudProvidersWithLocalRuntimeState,/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerProviders';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerProviders(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /private mergeCloudProvidersWithLocalRuntimeState/);
   assert.match(
     keyManagerSource,

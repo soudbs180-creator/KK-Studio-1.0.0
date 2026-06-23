@@ -10,7 +10,7 @@ function readServerRoute(relativePath: string): string {
 }
 
 test('password auth requires configured salt and uses timing-safe hash comparison', () => {
-  const source = readServerRoute('routes/user.js');
+  const source = readServerRoute('routes/user/auth.js');
 
   assert.match(source, /function getRequiredPasswordSalt/);
   assert.match(source, /PASSWORD_SALT 未配置/);

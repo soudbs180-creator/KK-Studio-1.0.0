@@ -29,10 +29,10 @@ test("keyManager effective provider model boundary lives outside the monolithic 
   const testConfigSource = readSource("tsconfig.tests.json");
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-effective-provider-models-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerEffectiveProviderModels';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerEffectiveProviderModels(?:\.ts)?';/);
   assert.match(
     keyManagerSource,
-    /export \{[\s\S]*resolveEffectiveProviderModels[\s\S]*\} from '\.\/keyManagerEffectiveProviderModels';/,
+    /export \{[\s\S]*resolveEffectiveProviderModels[\s\S]*\} from '\.\/keyManagerEffectiveProviderModels(?:\.ts)?';/,
   );
   assert.doesNotMatch(keyManagerSource, /export function resolveEffectiveProviderModels/);
   assert.doesNotMatch(keyManagerSource, /function getDefaultOfficialModelsForRuntime/);

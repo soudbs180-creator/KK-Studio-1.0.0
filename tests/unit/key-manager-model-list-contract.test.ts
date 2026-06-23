@@ -25,9 +25,9 @@ test('keyManager model-list normalization lives outside the monolithic key manag
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-model-list-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerModelList';/);
-  assert.match(keyManagerSource, /import \{[\s\S]*normalizeModelList[\s\S]*\} from '\.\/keyManagerModelList';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*BLACKLIST_MODELS[\s\S]*normalizeModelList[\s\S]*\} from '\.\/keyManagerModelList';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerModelList(?:\.ts)?';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*normalizeModelList[\s\S]*\} from '\.\/keyManagerModelList(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*BLACKLIST_MODELS[\s\S]*normalizeModelList[\s\S]*\} from '\.\/keyManagerModelList(?:\.ts)?';/);
   assert.match(modelListSource, /export const BLACKLIST_MODELS = \[/);
   assert.match(modelListSource, /function shouldFilterModel\(modelId: string\): boolean/);
   assert.match(modelListSource, /export function normalizeModelList\(models: string\[], provider\?: string, baseUrl\?: string\): string\[]/);

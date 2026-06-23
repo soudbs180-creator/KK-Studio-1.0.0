@@ -125,16 +125,15 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         />
       </div>
 
-      {/* 简体中文：右侧资产展示 & 充值模块 (高度与左侧头像一致，均为 40px 水平居中对齐) */}
+      {/* 简体中文：积分展示 & 充值模块（精简布局：⚡积分 + 充值） */}
       {billingUiEnabled && (
-        <div className="flex-1 flex items-center justify-between gap-1.5 h-10 shrink-0">
-          <div className="flex flex-col items-start leading-none justify-center shrink-0">
-            <div className="flex items-center gap-0.5 select-none shrink-0">
-              <span className="text-[16px] font-mono font-black tracking-tight shrink-0" style={{ color: 'var(--text-primary)' }}>
-                {remainingBalanceDisplay}
-              </span>
-              <span className="text-[10px] font-bold text-[var(--accent-coral)] shrink-0">积分</span>
-            </div>
+        <div className="flex items-center gap-1.5 h-10 shrink-0">
+          <div className="flex items-center gap-1 select-none shrink-0">
+            <Zap size={13} className="text-[var(--accent-coral)]" />
+            <span className="text-[13px] font-mono font-black tracking-tight shrink-0" style={{ color: 'var(--text-primary)' }}>
+              {remainingBalanceDisplay}
+            </span>
+            <span className="text-[10px] font-bold text-[var(--accent-coral)] shrink-0">积分</span>
           </div>
 
           <button

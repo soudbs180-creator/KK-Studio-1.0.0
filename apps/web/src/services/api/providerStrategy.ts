@@ -1,4 +1,4 @@
-import type { Provider } from '../../types';
+import type { Provider } from '../../types.ts';
 import type {
     ChannelEndpointStyle,
     ChannelManagementSupport,

@@ -1,12 +1,13 @@
 /**
  * @file generate-v1.js
  * @module server/routes
- * @description 新增的同步与异步生成影子入口路由模块。
- *              作为统一入口的前哨，在 S0/S1 增量阶段，采用内部路由重定向技术透明桥接现有对话、画图、自带 Key 等所有端点。
+ * @description 统一的同步与异步生成网关路由模块。
+ *              整合原有分散路由，实现零直连前端、BYOK 安全域名白名单、统一派发与直接执行。
  */
 
 const express = require('express');
 const { verifyJWT } = require('../lib/jwt');
+const { listProviders } = require('../lib/dispatcher/providerRegistry');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
 
 const router = express.Router();
@@ -20,57 +21,136 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// 影子同步生成收口端点
-router.post('/v1/generate', requireAuth, (req, res, next) => {
+/**
+ * 安全过滤：校验自带 Key API 路由目标地址是否属于系统供应商白名单域名 (WS-5)
+ */
+function validateProxyTargetHost(baseUrl) {
+  if (!baseUrl) return false;
+  try {
+    const url = new URL(baseUrl);
+    const hostname = url.hostname.toLowerCase();
+    
+    // 本地开发回环地址允许放行
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+
+    const providers = listProviders();
+    const allowedHosts = providers.map(p => p.host.toLowerCase());
+    
+    // 精准匹配或子域名匹配
+    return allowedHosts.some(allowed => {
+      return hostname === allowed || hostname.endsWith('.' + allowed);
+    });
+  } catch {
+    return false;
+  }
+}
+
+// 统一同步生成端点 (WS-3)
+router.post('/v1/generate', requireAuth, async (req, res) => {
   const startTime = Date.now();
+  const routeId = req.body?.routeId || req.headers['x-key-slot-id'];
   const taskType = req.body?.task_type || req.body?.taskType;
   const isChat = taskType === 'chat' || Array.isArray(req.body?.messages);
-  const routeId = req.body?.routeId || req.headers['x-key-slot-id'];
 
-  // 重写 json 响应以注入埋点统计
-  const oldJson = res.json;
-  res.json = function(data) {
-    const success = res.statusCode >= 200 && res.statusCode < 300 && !(data && data.success === false);
-    metricsCollector.recordRouteCall({
-      routePath: '/api/v1/generate',
-      success,
-      latency: Date.now() - startTime
-    });
-    return oldJson.apply(res, arguments);
-  };
-
+  // 1. 用户自带 Key (BYOK) 派发路径
   if (routeId) {
-    // 1. 自带 Key 模式，重定向到通用自带 Key 代理端点
-    req.url = '/v1/model-proxy/user';
-  } else if (isChat) {
-    // 2. 平台积分对话，重定向到 /chat
-    req.url = '/chat';
-  } else {
-    // 3. 平台积分生图，重定向到 /generate-image
-    req.url = '/generate-image';
+    const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
+    const route = await resolveLocalUserRoute(req.userId, routeId);
+    if (!route) {
+      return res.status(404).json({ error: 'User API route not found.', code: 'USER_ROUTE_NOT_FOUND' });
+    }
+
+    // 域名白名单安全过滤
+    if (!validateProxyTargetHost(route.baseUrl)) {
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate', success: false, latency: Date.now() - startTime });
+      return res.status(403).json({
+        error: `访问被拒绝。该 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`,
+        code: 'FORBIDDEN_PROXY_TARGET'
+      });
+    }
+
+    if (isChat) {
+      const userAiRouteHandler = require('../lib/dispatcher/userAiRouteHandler');
+      return userAiRouteHandler.handleUnifiedUserChatMode(req, res, req.userId);
+    } else {
+      const wuyinRouteHandler = require('../lib/dispatcher/adapters/wuyin/wuyinRouteHandler');
+      const handled = await wuyinRouteHandler.handleSubmitMode(req, res, req.userId, taskType || 'image');
+      if (handled) return handled;
+
+      return res.status(400).json({ error: 'Unsupported task type for this user route.', code: 'UNSUPPORTED_TASK' });
+    }
   }
 
-  next();
+  // 2. 系统积分模型派发路径
+  if (isChat) {
+    const BackendDispatcher = require('../lib/dispatcher');
+    try {
+      const unifiedPayload = {
+        task_type: 'chat',
+        model: req.body?.model || 'gpt-4o-mini',
+        messages: req.body?.messages,
+        temperature: req.body?.temperature || 0.7,
+        requestId: req.headers['x-client-request-id'] || req.body?.requestId
+      };
+      const result = await BackendDispatcher.dispatch(req.userId, unifiedPayload);
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate', success: true, latency: Date.now() - startTime });
+      return res.json(result);
+    } catch (err) {
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate', success: false, latency: Date.now() - startTime });
+      return res.status(err.statusCode || 500).json({
+        error: err.message || 'Chat failed.',
+        code: err.code || 'AI_CHAT_FAILED'
+      });
+    }
+  } else {
+    const generationController = require('../lib/generation/generationController');
+    return generationController.handleGenerate(req, res);
+  }
 });
 
-// 影子异步生成与轮询状态收口端点
-router.post('/v1/generate/async', requireAuth, (req, res, next) => {
+// 统一异步与轮询状态端点 (WS-3)
+router.post('/v1/generate/async', requireAuth, async (req, res) => {
   const startTime = Date.now();
+  const mode = req.body?.mode;
+  let routeId = req.body?.routeId || req.headers['x-key-slot-id'];
 
-  const oldJson = res.json;
-  res.json = function(data) {
-    const success = res.statusCode >= 200 && res.statusCode < 300 && !(data && data.success === false);
-    metricsCollector.recordRouteCall({
-      routePath: '/api/v1/generate/async',
-      success,
-      latency: Date.now() - startTime
-    });
-    return oldJson.apply(res, arguments);
-  };
+  // 状态轮询时自动解析 taskId 中内嵌的 routeId
+  if (mode === 'task_status') {
+    const localTaskId = req.body?.localTaskId || req.body?.taskId;
+    const { decodeLocalProxyTaskId } = require('../lib/dispatcher/adapters/wuyin/wuyinModelExecutor');
+    const parsed = decodeLocalProxyTaskId(localTaskId);
+    if (parsed.routeId) {
+      routeId = parsed.routeId;
+    }
+  }
 
-  // 异步影子入口，直接重定向到自带 Key 代理路由执行（因为视频/音频/异步任务均由自带 Key 路由承载）
-  req.url = '/v1/model-proxy/user';
-  next();
+  if (routeId) {
+    const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
+    const route = await resolveLocalUserRoute(req.userId, routeId);
+    if (!route) {
+      return res.status(404).json({ error: 'User API route not found.', code: 'USER_ROUTE_NOT_FOUND' });
+    }
+
+    // 域名白名单安全过滤
+    if (!validateProxyTargetHost(route.baseUrl)) {
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate/async', success: false, latency: Date.now() - startTime });
+      return res.status(403).json({
+        error: `访问被拒绝。该任务 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`,
+        code: 'FORBIDDEN_PROXY_TARGET'
+      });
+    }
+  }
+
+  const wuyinRouteHandler = require('../lib/dispatcher/adapters/wuyin/wuyinRouteHandler');
+  if (mode === 'task_status') {
+    return wuyinRouteHandler.handleStatusMode(req, res, req.userId);
+  } else if (mode === 'video' || mode === 'audio' || mode === 'image') {
+    return wuyinRouteHandler.handleSubmitMode(req, res, req.userId, mode);
+  }
+
+  return res.status(400).json({ error: 'Unsupported async mode.', code: 'UNSUPPORTED_MODE' });
 });
 
 module.exports = router;

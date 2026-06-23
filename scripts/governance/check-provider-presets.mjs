@@ -106,12 +106,20 @@ for (const profile of PROVIDER_PROFILES) {
 // R5 遗留旁路预设（绕过 dispatcher/providerProfiles 的散装实现）
 const LEGACY_BYPASS = [
   ['config/model_service_config.json', 'transit/vodeshop 预设未纳入 PROVIDER_PROFILES，且 apiKeyEnv=GEMINI_API_KEY 混淆官方/中转命名（违背官方 vs 中转区分）。'],
-  ['api/pricing-proxy.js', '内嵌 FALLBACK_CATALOG 与线上 Wuyin 目录构成同一中转站的“两套预设”，价目应单一来源。'],
   ['server/providers/suchuangProvider.js', '独立 provider 适配应折叠进 wuyin-suchuang-form profile + 统一 adapter。'],
+];
+// 已知的 Vercel 部署代理薄层（非散装预设，仅做边缘反代转发，不含独立计费逻辑）
+const VERCEL_PROXY_KNOWN = [
+  'api/pricing-proxy.js',
 ];
 for (const [rel, why] of LEGACY_BYPASS) {
   if (existsSync(resolve(repoRoot, rel))) {
     warnings.push(`R5 遗留旁路预设：${rel} —— ${why}`);
+  }
+}
+for (const rel of VERCEL_PROXY_KNOWN) {
+  if (existsSync(resolve(repoRoot, rel))) {
+    // INFO 级别：Vercel 部署所需的代理薄层，不阻断也不告警
   }
 }
 

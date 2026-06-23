@@ -1,10 +1,14 @@
 /**
  * @file user-model-proxy.js
  * @module api
- * @description Vercel serverless proxy for user-owned Wuyin async model requests.
+ * @description Vercel serverless 通用用户模型反代网关。基于 Provider 注册表（providerProfiles）
+ *              动态白名单校验域名，转发用户自有密钥的模型请求至已注册的上游 Provider API。
  * @author KK-Studio Team
  * @version 1.5.7
  */
+
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 function sendJson(res, status, payload) {
   res.status(status);
@@ -72,41 +76,71 @@ function normalizeUserApiSecretForTransport(value) {
   return token;
 }
 
-function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
+/**
+ * 对需要通过 query param 传递 API Key 的异步任务查询端点追加鉴权参数。
+ * 仅对已知的异步状态查询端点 (detail) 追加 key=... 参数，
+ * 其他端点保持原始 URL 不变，鉴权通过 Authorization header 传递。
+ */
+function appendApiKeyQueryParamIfNeeded(targetUrl, apiKey) {
   const token = String(apiKey || '').trim();
   if (!token) return targetUrl;
   const parsed = new URL(targetUrl);
   const pathname = parsed.pathname.replace(/\/+$/, '');
-  const isDetailQuery =
+  // 异步任务状态查询端点需要 query param 鉴权（部分中转站 API 要求）
+  const isAsyncDetailQuery =
     pathname === '/api/async/detail'
     || pathname === '/api/sora2/detail'
     || pathname === '/api/img/drawDetail';
-  if (!isDetailQuery) {
+  if (!isAsyncDetailQuery) {
     return parsed.toString();
   }
   parsed.searchParams.set('key', token);
   return parsed.toString();
 }
 
-function isAllowedWuyinTargetUrl(targetUrl) {
+const { PROVIDER_PROFILES } = require('../server/lib/dispatcher/providerProfiles.js');
+
+function isAllowedProxyTargetUrl(targetUrl) {
   const raw = String(targetUrl || '').trim();
   if (!raw) return false;
   try {
     const parsed = new URL(raw);
-    let allowedHost = 'api.wuyinkeji.com';
+    const hostname = parsed.hostname.toLowerCase();
+
+    // 允许本地开发回环地址
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+
+    // 动态获取注册的所有中转站 (relay) 画像的域名
+    const allowedHosts = PROVIDER_PROFILES
+      .filter((p) => p.providerKind === 'relay')
+      .flatMap((p) => p.domains || [])
+      .map((d) => d.toLowerCase());
+
     const envUrl = process.env.SUCHUANG_BASE_URL || '';
     if (envUrl) {
       try {
-        allowedHost = new URL(envUrl).hostname;
+        allowedHosts.push(new URL(envUrl).hostname.toLowerCase());
       } catch {}
     }
 
-    const hostnameRegex = new RegExp(`^${allowedHost.replace(/\./g, '\\.')}$`, 'i');
-    if (parsed.protocol !== 'https:' || !hostnameRegex.test(parsed.hostname)) {
+    // 判断目标域名是否符合白名单域名或其子域名
+    const isDomainAllowed = allowedHosts.some((allowed) => {
+      return hostname === allowed || hostname.endsWith('.' + allowed);
+    });
+
+    if (parsed.protocol !== 'https:' && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return false;
+    }
+
+    if (!isDomainAllowed) {
       return false;
     }
 
     const pathname = parsed.pathname.replace(/\/+$/, '');
+    
+    // 严格限制只允许以下核心 API 的反代请求（精确匹配，杜绝包含敏感的 admin, recharge 等后台和计费接口）
     const allowedExactPaths = [
       '/api/async/detail',
       '/api/chat/index',
@@ -116,13 +150,15 @@ function isAllowedWuyinTargetUrl(targetUrl) {
       '/api/sora2/detail',
       '/api/img/split',
       '/api/img/nanoBanana',
-      '/api/img/drawDetail'
+      '/api/img/drawDetail',
+      '/type/all'
     ];
 
     if (allowedExactPaths.includes(pathname)) {
       return true;
     }
 
+    // 仅允许安全的异步状态查询前缀匹配
     return /^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(pathname);
   } catch {
     return false;
@@ -143,7 +179,7 @@ function buildForwardBody(req) {
 }
 
 /**
- * Forwards a same-origin user model proxy request to the documented Wuyin async API.
+ * 通用用户模型代理请求处理器。将同源代理请求转发到注册表中的上游 Provider API。
  * @param {import('http').IncomingMessage & { body?: unknown; method?: string; headers?: Record<string, string> }} req
  * @param {{ status: (code: number) => unknown; setHeader: (name: string, value: string) => unknown; json: (body: unknown) => unknown; send: (body: string) => unknown; end: () => unknown }} res
  * @returns {Promise<unknown>}
@@ -185,11 +221,11 @@ export default async function handler(req, res) {
       return sendProxyError(res, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
     }
   }
-  if (!isAllowedWuyinTargetUrl(targetUrl)) {
-    return sendProxyError(res, 404, 'USER_ROUTE_NOT_FOUND', 'User model proxy only handles Wuyin async requests.');
+  if (!isAllowedProxyTargetUrl(targetUrl)) {
+    return sendProxyError(res, 404, 'USER_ROUTE_NOT_FOUND', 'User model proxy only handles registered provider API requests.');
   }
   if (!apiKey) {
-    return sendProxyError(res, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+    return sendProxyError(res, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Provider API key is required.');
   }
 
   const headers = {
@@ -202,7 +238,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch(appendWuyinApiKeyToTargetUrl(targetUrl, apiKey), {
+    const upstream = await fetch(appendApiKeyQueryParamIfNeeded(targetUrl, apiKey), {
       method: req.method || 'GET',
       headers,
       body,
@@ -212,7 +248,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8');
     return res.send(responseText);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || 'Wuyin proxy failed.');
+    const message = error instanceof Error ? error.message : String(error || 'User model proxy upstream failed.');
     return sendProxyError(res, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }
 }

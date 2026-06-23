@@ -24,10 +24,10 @@ test('keyManager provider presets live outside the monolithic key manager', () =
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-presets-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerProviderPresets';/);
-  assert.match(keyManagerSource, /import \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerProviderPresets(?:\.ts)?';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /export const PROVIDER_PRESETS: Record<[\s\S]*= \{/);
   assert.doesNotMatch(keyManagerSource, /export function getDocumentedStaticModelsForProvider\(strategyId: string\)/);
   assert.match(helperSource, /export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = \{/);

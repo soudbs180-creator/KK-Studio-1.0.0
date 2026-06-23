@@ -25,12 +25,12 @@ test('keyManager key type boundary removes the effective-slot back edge', () => 
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-key-type-contract\.test\.ts/);
-  assert.match(keyManagerSource, /import \{ determineKeyType \} from '\.\/keyManagerKeyType';/);
-  assert.match(keyManagerSource, /export \{ determineKeyType \} from '\.\/keyManagerKeyType';/);
+  assert.match(keyManagerSource, /import \{ determineKeyType \} from '\.\/keyManagerKeyType(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{ determineKeyType \} from '\.\/keyManagerKeyType(?:\.ts)?';/);
   assert.match(helperSource, /import \{ resolveProviderKeyType \} from '\.\.\/api\/providerStrategy\.ts';/);
   assert.match(helperSource, /export function determineKeyType/);
   assert.doesNotMatch(keyManagerSource, /export function determineKeyType/);
-  assert.match(effectiveSlotSource, /import \{ determineKeyType \} from "\.\/keyManagerKeyType";/);
+  assert.match(effectiveSlotSource, /import \{ determineKeyType \} from "\.\/keyManagerKeyType(?:\.ts)?";/);
   assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
 });
 

@@ -54,7 +54,7 @@ test('keyManager blocks browser-side provider diagnostics and browser-side secre
 });
 
 test('LLMService uses the local user-route proxy first, falls back to cloud secure proxy, and blocks browser direct calls', () => {
-  const source = readSource('apps/web/src/services/llm/LLMService.ts');
+  const source = readSource('apps/web/src/services/llm/generationService.ts');
 
   assert.match(source, /buildSecureProxyUserRouteFromSlotId/);
   assert.match(source, /callLocalUserRouteProxyChat/);

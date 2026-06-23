@@ -14,7 +14,7 @@ test('keyManager shared pricing helpers live outside the monolithic key manager'
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-shared-pricing-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerSharedPricing';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerSharedPricing(?:\.ts)?';/);
   assert.match(helperSource, /export function buildSharedPricingItemsFromRawCatalog/);
   assert.match(helperSource, /export function buildPricingSnapshotFromSharedCache/);
   assert.doesNotMatch(keyManagerSource, /function buildSharedPricingItemsFromRawCatalog/);

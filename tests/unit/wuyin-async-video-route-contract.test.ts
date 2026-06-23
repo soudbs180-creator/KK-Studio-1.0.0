@@ -146,7 +146,7 @@ describe("Wuyin async-video route helpers", () => {
 
   test("keeps Wuyin Google Omni out of the OpenAI /v1/videos adapter path", () => {
     const adapterSource = readSource("apps/web/src/services/llm/VideoCompatibleAdapter.ts");
-    const serverRouteSource = readSource("server/routes/user.js");
+    const serverRouteSource = readSource("server/routes/user/profile.js");
     const serverHelperSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinAsyncVideoProxy.js");
 
     assert.match(adapterSource, /runtime\.videoApiStyle === 'wuyin-async-video'/);

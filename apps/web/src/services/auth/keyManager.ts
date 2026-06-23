@@ -5,7 +5,7 @@
  * Similar to Gemini Balance but runs entirely on frontend.
  * NOW SUPPORTS: Cloud-backed Sync & Third-Party API Proxies
  */
-import { subscribeAuthSessionChange } from './authSessionEvents';
+import { subscribeAuthSessionChange } from './authSessionEvents.ts';
 import {
     clearCloudSyncPendingFlagsOnRevisionMatch,
     clearPendingCloudRetry,
@@ -15,7 +15,7 @@ import {
     markPendingStateCloudSync,
     resetCloudSyncState,
     schedulePendingCloudRetry,
-} from './keyManagerCloudSync';
+} from './keyManagerCloudSync.ts';
 import {
     BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
     createBrowserDirectProviderChecksDisabledError,
@@ -25,27 +25,27 @@ import {
     shouldAllowSessionlessLocalUserApiStorage,
     type ProviderStorageScope,
     USER_API_LOGIN_REQUIRED_MESSAGE,
-} from './keyManagerStorage';
+} from './keyManagerStorage.ts';
 import {
     loadProvidersFromLocal,
     mergeCloudProvidersWithLocalRuntimeState,
     persistProvidersLocal,
-} from './keyManagerProviders';
+} from './keyManagerProviders.ts';
 import {
     findLinkedProviderForSlot,
     findProviderLinkedSlots,
     normalizeProviderLinkValue,
     normalizeStoredProviders,
-} from './keyManagerProviderLinks';
+} from './keyManagerProviderLinks.ts';
 import {
     buildEffectiveSlotFromProvider,
     resolveProviderBudgetLimit,
     resolveProviderTokenLimit,
-} from './keyManagerEffectiveSlot';
+} from './keyManagerEffectiveSlot.ts';
 import {
     applyProviderUsageDeltaToProvider,
     isUsageLimitExceeded,
-} from './keyManagerProviderUsage';
+} from './keyManagerProviderUsage.ts';
 import {
     buildProviderRouteId,
     buildStableSystemRouteId,
@@ -54,39 +54,39 @@ import {
     extractSlotRouteTarget,
     matchesProviderRouteSuffix,
     matchesSlotRouteSuffix,
-} from './keyManagerRouteIds';
+} from './keyManagerRouteIds.ts';
 import {
     buildCanonicalApiRecordId,
     canonicalizeApiRecordsForLatestRequirements,
-} from './keyManagerCanonicalIds';
-import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
-import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
-import { buildKeyUpdateDiagnosticPayload } from './keyManagerUpdateDiagnostics';
-import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
-import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
-import { detectApiType } from './keyManagerApiType';
+} from './keyManagerCanonicalIds.ts';
+import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer.ts';
+import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets.ts';
+import { buildKeyUpdateDiagnosticPayload } from './keyManagerUpdateDiagnostics.ts';
+import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl.ts';
+import { buildChannelCapabilities } from './keyManagerChannelCapabilities.ts';
+import { detectApiType } from './keyManagerApiType.ts';
 import {
     DEFAULT_OPENAI_MODELS,
-} from './keyManagerDefaultModels';
+} from './keyManagerDefaultModels.ts';
 import {
     normalizeModelList,
-} from './keyManagerModelList';
+} from './keyManagerModelList.ts';
 import {
     getDefaultOfficialModelsForRuntime,
     resolveEffectiveProviderModels,
-} from './keyManagerEffectiveProviderModels';
-import { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
+} from './keyManagerEffectiveProviderModels.ts';
+import { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets.ts';
 import {
     buildPricingSnapshotFromSharedCache,
     buildSharedPricingItemsFromRawCatalog,
-} from './keyManagerSharedPricing';
+} from './keyManagerSharedPricing.ts';
 import {
     buildGoogleModelDiscoveryResult,
     buildOpenAICompatModelDiscoveryResult,
     type OpenAICompatModelDiscoveryMetadata,
     extractGeminiCompatModelIds,
-} from './keyManagerRemoteModelDiscovery';
-import { registerCapabilityRouteKeyManager } from '../api/capabilityRouteAssignments';
+} from './keyManagerRemoteModelDiscovery.ts';
+import { registerCapabilityRouteKeyManager } from '../api/capabilityRouteAssignments.ts';
 export {
     DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
@@ -94,13 +94,13 @@ export {
     VIDEO_MODEL_WHITELIST,
     ADVANCED_IMAGE_MODEL_WHITELIST,
     AUDIO_MODEL_WHITELIST,
-} from './keyManagerDefaultModels';
+} from './keyManagerDefaultModels.ts';
 export {
     BLACKLIST_MODELS,
     normalizeModelList,
-} from './keyManagerModelList';
-export { resolveEffectiveProviderModels } from './keyManagerEffectiveProviderModels';
-export { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
+} from './keyManagerModelList.ts';
+export { resolveEffectiveProviderModels } from './keyManagerEffectiveProviderModels.ts';
+export { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets.ts';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -114,43 +114,43 @@ import {
     getDefaultAuthMethod,
     normalizeApiProtocolFormat,
     resolveApiProtocolFormat,
-} from '../api/apiConfig';
-import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
-import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
-import type { ChannelConfig } from '../api/channelConfig';
+} from '../api/apiConfig.ts';
+import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification.ts';
+import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy.ts';
+import type { ChannelConfig } from '../api/channelConfig.ts';
 import { buildChannelSurfaceView } from '../api/providerChannelSurfaceView.ts';
 import {
     compactUserApisPayloadForTransport,
     extractKeyManagerCloudSlots,
     extractUserApiProvidersFromPayload,
     isUserApisEnvelope,
-} from '../api/userApiPayload';
+} from '../api/userApiPayload.ts';
 import {
     getUserApisPayloadDensity,
-} from '../api/userApiCloudRecordStorage';
+} from '../api/userApiCloudRecordStorage.ts';
 import {
     isKkApiPersistenceUnavailableError,
-} from '../api/kkApiServerHealth';
-import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
-import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
-import type { Provider } from '../../types';
-import { getLatestRuntimeAuthState } from './runtimeAuthState';
-import { MODEL_REGISTRY } from '../model/modelRegistry';
-import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
-import { requestCostSync } from '../billing/costSyncBridge';
-import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot';
+} from '../api/kkApiServerHealth.ts';
+import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient.ts';
+import { getPreferredKkApiAccessToken } from '../api/authAccessToken.ts';
+import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets.ts';
+import type { Provider } from '../../types.ts';
+import { getLatestRuntimeAuthState } from './runtimeAuthState.ts';
+import { MODEL_REGISTRY } from '../model/modelRegistry.ts';
+import { adminModelService } from '../model/adminModelService.ts'; // 完成 [API Key 轮换历史记录清理]
+import { requestCostSync } from '../billing/costSyncBridge.ts';
+import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot.ts';
 import {
     cacheProviderPricingByBaseUrl,
     fetchRawPricingCatalog,
     fetchWuyinPricingCatalog,
     getCachedPricingByBaseUrl,
     selectWuyinGeneratableCatalogModels,
-} from '../billing/newApiPricingService';
-import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
-import { notify } from '../system/notificationService';
-import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
-import { resolveModelDisplayName } from '../../utils/modelDisplayName';
+} from '../billing/newApiPricingService.ts';
+import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge.ts';
+import { notify } from '../system/notificationService.ts';
+import { isStartupStageReady, type AppStartupStage } from '../system/appStartup.ts';
+import { resolveModelDisplayName } from '../../utils/modelDisplayName.ts';
 import {
     categorizeModels,
     extractModelIdsFromPricingData,
@@ -158,9 +158,9 @@ import {
     isGoogleOfficialModelId,
     MODEL_MIGRATION_MAP,
     parseModelString,
-} from './keyManagerModelHelpers';
-import type { GlobalModelType } from './keyManagerModelHelpers';
-import { determineKeyType } from './keyManagerKeyType';
+} from './keyManagerModelHelpers.ts';
+import type { GlobalModelType } from './keyManagerModelHelpers.ts';
+import { determineKeyType } from './keyManagerKeyType.ts';
 export {
     parseModelString,
     MODEL_MIGRATION_MAP,
@@ -171,10 +171,10 @@ export {
     categorizeModels,
     isDeprecatedModel,
     isGoogleOfficialModelId,
-} from './keyManagerModelHelpers';
-export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
-export { determineKeyType } from './keyManagerKeyType';
-export { detectApiType } from './keyManagerApiType';
+} from './keyManagerModelHelpers.ts';
+export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers.ts';
+export { determineKeyType } from './keyManagerKeyType.ts';
+export { detectApiType } from './keyManagerApiType.ts';
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
@@ -506,10 +506,12 @@ export class KeyManager {
         });
 
         // Keep downstream UI in sync when admin model routes change.
-        adminModelService.subscribe(() => {
-            console.log('[KeyManager] Admin models updated, notifying listeners');
-            this.notifyListeners();
-        });
+        setTimeout(() => {
+            adminModelService.subscribe(() => {
+                console.log('[KeyManager] Admin models updated, notifying listeners');
+                this.notifyListeners();
+            });
+        }, 0);
 
         subscribeAuthSessionChange((detail) => {
             this.authIsTempUser = detail.isTempUser;
@@ -3967,10 +3969,12 @@ export class KeyManager {
 // Singleton instance
 export const keyManager = new KeyManager();
 registerCapabilityRouteKeyManager(keyManager);
-adminModelService.registerModelRefreshHandler(() => {
-    keyManager.clearGlobalModelListCache();
-    keyManager.forceNotify();
-});
+setTimeout(() => {
+    adminModelService.registerModelRefreshHandler(() => {
+        keyManager.clearGlobalModelListCache();
+        keyManager.forceNotify();
+    });
+}, 0);
 // Force Vite HMR Cache Invalidation: 2026-03-02-03-05
 
 export default keyManager;

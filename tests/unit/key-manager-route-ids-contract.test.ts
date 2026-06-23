@@ -39,7 +39,7 @@ test('key manager route id helpers live outside the monolithic key manager', () 
   assert.match(helperSource, /export function decodeRouteSuffix/);
   assert.match(helperSource, /export function matchesSlotRouteSuffix/);
   assert.match(helperSource, /export function buildProviderRouteId/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerRouteIds';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerRouteIds(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /function extractSlotRouteTarget/);
   assert.doesNotMatch(keyManagerSource, /function buildStableSystemRouteId/);
 });

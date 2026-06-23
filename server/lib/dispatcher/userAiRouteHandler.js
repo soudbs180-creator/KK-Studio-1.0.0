@@ -1,39 +1,18 @@
 /**
- * @file user-ai-router.js
- * @module server/routes
- * @description 用户自带 Key 的统一 AI Router。该路由不做系统积分扣费，只复用通用 Provider Profile + Adapter
- *              执行用户自己的接口。命中已知厂商强预设时，必须通过 strictProviderContracts 校验，禁止回落旧逻辑。
+ * @file userAiRouteHandler.js
+ * @module server/lib/dispatcher
+ * @description 用户自带 Key 的统一 AI 对话处理函数。
+ *              从旧路由模块 user-ai-router.js 剥离，以插件方式在统一影子路由中执行。
  */
 
-const http = require('http');
-const https = require('https');
-const express = require('express');
-const { fetchWithRetries } = require('../lib/fetchClient');
-const { verifyJWT, signJWT } = require('../lib/jwt');
-const { getAdapter, normalizeAdapterId } = require('../lib/dispatcher/adapterRegistry');
-const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
-const localUserRouteStore = require('../lib/dispatcher/localUserRouteStore');
-const { resolveLocalUserRoute, readLocalStorage, writeLocalStorage, readProfileState, writeProfileState } = localUserRouteStore;
-const metricsCollector = require('../lib/dispatcher/metricsCollector');
+const { getAdapter, normalizeAdapterId } = require('./adapterRegistry');
+const { assertStrictTaskSupported } = require('./strictProviderContracts');
+const { resolveLocalUserRoute, readLocalStorage, writeLocalStorage, readProfileState, writeProfileState } = require('./localUserRouteStore');
+const metricsCollector = require('./metricsCollector');
+const { fetchWithRetries } = require('../fetchClient');
+const { verifyJWT, signJWT } = require('../jwt');
 
-const router = express.Router();
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
-
-const httpAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: 80,
-  maxFreeSockets: 10,
-  timeout: 60000,
-  freeSocketTimeout: 30000,
-});
-
-const httpsAgent = new https.Agent({
-  keepAlive: true,
-  maxSockets: 80,
-  maxFreeSockets: 10,
-  timeout: 60000,
-  freeSocketTimeout: 30000,
-});
 
 function buildMeta(req) {
   return {
@@ -60,29 +39,6 @@ function errorEnvelope(req, code, message, extra = {}) {
 
 function sendUserRouterError(res, req, status, code, message, extra = {}) {
   return res.status(status).json(errorEnvelope(req, code, message, extra));
-}
-
-function verifyRequestJwt(req) {
-  const authHeader = req.headers.authorization || '';
-  return verifyJWT(authHeader);
-}
-
-function resolveProfileUserId(req) {
-  const verifiedUserId = verifyRequestJwt(req);
-  if (verifiedUserId) {
-    return {
-      userId: verifiedUserId,
-      refreshToken: signJWT({ userId: verifiedUserId }),
-    };
-  }
-
-  const tempUserId = String(req.headers[TEMP_USER_ID_HEADER] || '').trim();
-  const allowLocalTempUser = process.env.KKAI_LOCAL_ONLY === 'true' || process.env.NODE_ENV !== 'production';
-  if (allowLocalTempUser && /^temp-[a-zA-Z0-9_.-]{4,128}$/.test(tempUserId)) {
-    return { userId: tempUserId, refreshToken: null };
-  }
-
-  return null;
 }
 
 function mapLegacyFormatToEndpointType(format) {
@@ -170,8 +126,6 @@ async function updateLocalUserSlotStatus(userId, routeId, status) {
       writeProfileState(data, userId, profileState);
       await writeLocalStorage(data);
       console.log(`[UserAiRouter] 成功将用户 ${userId} 的 slot ${routeId} 状态变更为 ${status}`);
-    } else {
-      console.warn(`[UserAiRouter] 未能找到用户 ${userId} 对应的 slot ${routeId} 进行状态变更`);
     }
   } catch (err) {
     console.error(`[UserAiRouter] 变更用户 ${userId} 的 slot ${routeId} 状态时出错:`, err);
@@ -357,21 +311,6 @@ async function handleUnifiedUserChatMode(req, res, userId) {
   }
 }
 
-router.all('/v1/model-proxy/user', async (req, res, next) => {
-  const mode = String(req.body?.mode || '').trim();
-  if (mode !== 'chat') {
-    return next();
-  }
-
-  const authState = resolveProfileUserId(req);
-  if (!authState) {
-    return sendUserRouterError(res, req, 401, 'UNAUTHORIZED', 'Authentication is required for user-owned AI routing.');
-  }
-  if (authState.refreshToken) {
-    res.setHeader('X-Refresh-Token', authState.refreshToken);
-  }
-
-  return handleUnifiedUserChatMode(req, res, authState.userId);
-});
-
-module.exports = router;
+module.exports = {
+  handleUnifiedUserChatMode
+};

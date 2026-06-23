@@ -24,7 +24,7 @@ test('keyManager silent pricing URL builder lives outside the monolithic key man
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-pricing-url-contract\.test\.ts/);
-  assert.match(keyManagerSource, /import \{ buildSilentProviderPricingUrl \} from '\.\/keyManagerPricingUrl';/);
+  assert.match(keyManagerSource, /import \{ buildSilentProviderPricingUrl \} from '\.\/keyManagerPricingUrl(?:\.ts)?';/);
   assert.match(keyManagerSource, /const pricingUrl = buildSilentProviderPricingUrl\(cleanUrl\);/);
   assert.match(helperSource, /const PROVIDER_MARKETING_SUFFIX_RE/);
   assert.match(helperSource, /export function buildSilentProviderPricingUrl/);

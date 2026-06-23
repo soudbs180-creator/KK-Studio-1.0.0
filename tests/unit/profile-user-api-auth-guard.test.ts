@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("profile API key storage routes require authenticated user context and keep local payloads user-scoped", () => {
-  const source = readFileSync(path.join(process.cwd(), "server/routes/user.js"), "utf8");
+  const source = readFileSync(path.join(process.cwd(), "server/routes/user/profile.js"), "utf8");
 
   assert.match(source, /function requireProfileAuth/);
   assert.match(source, /verifyJWT\(req\.headers\.authorization\)/);

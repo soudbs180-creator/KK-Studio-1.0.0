@@ -35,21 +35,17 @@ loadServerEnvFiles();
 const express = require('express');
 const cors = require('cors');
 const webhookRouter = require('./routes/webhook');
-const generateImageRouter = require('./routes/generate-image');
 const creditProviderRouter = require('./routes/credit-provider-router');
 const userApiPayloadRouter = require('./routes/user-api-payload-router');
-const userWuyinStrictRouter = require('./routes/user-wuyin-strict-router');
-const userAiRouter = require('./routes/user-ai-router');
 const adminRouter = require('./routes/admin');
+const generateV1Router = require('./routes/generate-v1');
 const userRouter = require('./routes/user');
-const chatRouter = require('./routes/chat');
 const ocrRouter = require('./routes/ocr');
 const aiAssistantRouter = require('./routes/ai-assistant');
 const configRouter = require('./routes/config');
 const providerProbeRouter = require('./routes/provider-probe');
 const telemetryRouter = require('./routes/telemetry');
 const contractCompatRouter = require('./routes/contract-compat');
-const generateV1Router = require('./routes/generate-v1');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -225,8 +221,9 @@ function createApp() {
     res.json(buildHealthPayload());
   });
 
-  // 简体中文注释：限制图像生成与编辑路由（含大 base64 数据）的请求体最大为 10mb
-  app.use('/api/generate-image', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+  // 简体中文注释：限制图像生成、影子生成与编辑路由（含大 base64 数据）的请求体最大为 10mb
+  app.use('/api/v1/generate', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+  app.use('/api/v1/generate/async', express.json({ limit: '10mb', verify: captureRawJsonBody }));
   app.use('/api/generate/image', express.json({ limit: '10mb', verify: captureRawJsonBody }));
   app.use('/api/generate/edit', express.json({ limit: '10mb', verify: captureRawJsonBody }));
 
@@ -247,17 +244,11 @@ function createApp() {
 
   // 简体中文注释：用户 API 配置保存增强层必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据。
   app.use('/api', userApiPayloadRouter);
-  // 简体中文注释：Wuyin/速创 image/video/status 必须先走严格文档路由，禁止 generic proxy 或 legacy catalog 猜测。
-  app.use('/api', userWuyinStrictRouter);
-  // 简体中文注释：用户自带 Key 的新 AI Router 必须挂在 legacy userRouter 前；只接管 mode=chat，其它模式 next() 回落旧逻辑。
-  app.use('/api', userAiRouter);
   app.use('/api', userRouter);
   // 简体中文注释：AI Router 新保存入口必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。
   app.use('/api', creditProviderRouter);
   app.use('/api', adminRouter);
   app.use('/api', providerProbeRouter);
-  app.use('/api', chatRouter);
-  app.use('/api', generateImageRouter);
   app.use('/api', ocrRouter);
   app.use('/api', aiAssistantRouter);
   app.use('/api', configRouter);

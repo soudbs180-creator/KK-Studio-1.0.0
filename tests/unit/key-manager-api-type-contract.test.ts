@@ -22,8 +22,8 @@ test('keyManager API type detection boundary lives outside the monolithic key ma
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-api-type-contract\.test\.ts/);
-  assert.match(keyManagerSource, /import \{ detectApiType \} from '\.\/keyManagerApiType';/);
-  assert.match(keyManagerSource, /export \{ detectApiType \} from '\.\/keyManagerApiType';/);
+  assert.match(keyManagerSource, /import \{ detectApiType \} from '\.\/keyManagerApiType(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{ detectApiType \} from '\.\/keyManagerApiType(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /export function detectApiType/);
   assert.match(keyManagerSource, /const apiType = detectApiType\(apiKey, baseUrl\);/);
   assert.match(helperSource, /export function detectApiType/);

@@ -41,11 +41,10 @@ describe('credit route classification', () => {
     const appSource = readSource('apps/web/src/App.tsx');
     const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const resolveBillingStateSource = readSource('apps/web/src/app/resolveGenerationBillingState.ts');
-    const geminiServiceSource = readSource('apps/web/src/services/llm/geminiService.ts');
     const llmAdapterSource = readSource('apps/web/src/services/llm/LLMAdapter.ts');
-    const llmServiceSource = readSource('apps/web/src/services/llm/LLMService.ts');
+    const llmServiceSource = readSource('apps/web/src/services/llm/generationService.ts');
     const secureProxySource = readSource('apps/web/src/services/model/secureModelProxy.ts');
-    const typesSource = readSource('apps/web/src/types.ts');
+    const typesSource = readSource('apps/web/src/types/index.ts');
     const adminModelServiceSource = readSource('apps/web/src/services/model/adminModelService.ts');
 
     assert.match(generationRuntimeSource, /import \{ resolveGenerationBillingState \} from '\.\/resolveGenerationBillingState';/);
@@ -61,14 +60,14 @@ describe('credit route classification', () => {
     assert.doesNotMatch(appSource, /const executionLane = initialSubmissionContext\.executionLane;/);
     assert.match(generationRuntimeSource, /creditRouteSpecId: params\.resolvedCreditSpecId,/);
     assert.match(generationRuntimeSource, /creditRouteUnitId: params\.resolvedCreditRoute\?\.routeUnitId,/);
-    assert.match(geminiServiceSource, /executionLane: options\?\.executionLane,/);
-    assert.match(geminiServiceSource, /creditRouteSpecId: options\?\.creditRouteSpecId,/);
-    assert.match(geminiServiceSource, /creditRouteUnitId: options\?\.creditRouteUnitId,/);
+    assert.match(llmServiceSource, /executionLane: options\?\.executionLane,/);
+    assert.match(llmServiceSource, /creditRouteSpecId: options\?\.creditRouteSpecId,/);
+    assert.match(llmServiceSource, /creditRouteUnitId: options\?\.creditRouteUnitId,/);
     assert.match(llmAdapterSource, /executionLane\?: 'local-user-api' \| 'cloud-credit-model';/);
     assert.match(llmAdapterSource, /creditRouteSpecId\?: string;/);
     assert.match(llmAdapterSource, /creditRouteUnitId\?: string;/);
-    assert.match(llmServiceSource, /creditRouteSpecId: options\.creditRouteSpecId,/);
-    assert.match(llmServiceSource, /creditRouteUnitId: options\.creditRouteUnitId,/);
+    assert.match(llmServiceSource, /creditRouteSpecId: options\?\.creditRouteSpecId,/);
+    assert.match(llmServiceSource, /creditRouteUnitId: options\?\.creditRouteUnitId,/);
     assert.match(secureProxySource, /creditRouteSpecId\?: string;/);
     assert.match(secureProxySource, /creditRouteUnitId\?: string;/);
     assert.match(typesSource, /executionLane\?: 'local-user-api' \| 'cloud-credit-model';/);

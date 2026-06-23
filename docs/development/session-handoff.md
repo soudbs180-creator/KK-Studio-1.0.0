@@ -1,7 +1,90 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (PR #14 Merge & Heading Conflicts Fix)
+**Last Updated:** 2026-06-23 (Fix KeyManager Test Contract Assertions)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - 修复测试套件中的 key-manager 模块路径契约断言 (WS-8)
+
+### 修改范围 (WS-8)
+- **单元测试正则适配**：为了适配 Node.js 24 运行时对严格的 TypeScript 导入后缀要求，将 `tests/unit/key-manager-*.test.ts` 中针对 `keyManager` 辅助模块导入/导出语句的硬编码断言正则修改为兼容可选的 `(?:\.ts)?` 模块路径后缀。这解决了原本断言与补全后的 `.ts` 后缀路径不匹配的问题。
+- **清除 SyntaxError 并跑通全量测试**：解决了 `tests/unit/payment-webhook-raw-body.test.ts` 与 `tests/unit/server-auth-session-routes-contract.test.ts` 在共享进程运行模式下加载 `admin.js` 时的编译错误和缓存污染，成功跑通包含 1573 个用例的完整测试套件以及治理与安全门禁校验。
+
+### 修改文件 (WS-8)
+- `tests/unit/key-manager-default-models-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-api-type-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-channel-capabilities-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-channel-config-secrets-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-credential-sanitizer-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-key-type-contract.test.ts` [MODIFY]
+
+### 已运行验证 (WS-8)
+- `npm run test` (全量测试套件全绿，单元、集成、契约、E2E 100% 通过)
+- `npm run governance:check` (项目治理与安全门禁通过)
+- `npm run build` (生产环境打包通过)
+
+### 未运行验证及原因 (WS-8)
+- 无
+
+### 风险与下一步 (WS-8)
+- **风险**：无风险。修改仅限于测试文件的断言正则适配，对生产环境无任何副作用。
+- **下一步**：继续进行 WS-8 下的职责收口与 AI 助手能力优化。
+
+## 2026-06-23 - 修复 WorkspacePage 部署打包 unresolved import 错误 (Hotfix)
+
+### 修改范围 (Hotfix)
+- **.gitignore 规则收紧**：将原本全局递归忽略的 `workspace/` 修改为仅忽略根目录下的 `/workspace/`，避免误伤 `apps/web/src/pages/Workspace` 目录下的源代码文件。
+- **文件重新追踪与暂存**：将之前因 `.gitignore` 误忽略而未能提交至远程仓库的 `apps/web/src/pages/Workspace/WorkspacePage.tsx` 重新添加至 Git 追踪范围并完成 `git add` 暂存。
+
+### 修改文件 (Hotfix)
+- `.gitignore` [MODIFY]
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx` [NEW - 恢复追踪]
+
+### 已运行验证 (Hotfix)
+- 本地 `npm run build` 顺利通过（2482 modules transformed，成功输出打包产物）
+- `npm run verify:changes` 通过
+
+### 未运行验证及原因 (Hotfix)
+- 无
+
+### 风险与下一步 (Hotfix)
+- 无风险。请合并修改并提交推送至远程仓库以触发 Vercel 重新构建部署。
+
+## 2026-06-23 - 前端巨石拆分与 Services 目录收敛合并 (WS-6)
+
+### 修改范围 (WS-6a / WS-6c)
+- **画布视口与交互状态拆分 (WS-6a)**：
+  - 新建了 `apps/web/src/hooks/useCanvasViewport.ts`，成功把 `canvasTransform`、`isCanvasTransforming` 与 `canvasInteractionPhase` 状态、平移/缩放、视口重置 (`handleResetView`)、自适应全屏 (`handleFitToAll`) 以及平滑定位 (`handleNavigateToNode`) 逻辑及 AI接管定位事件监听抽离解耦。
+  - 新建了 `apps/web/src/hooks/useCanvasInteractionState.ts`，聚合了框选 (`useCanvasSelectionBox`) 与拉线 (`useCanvasDragConnection`) 两个底层 Hooks 的实例化和拖拽激活状态，对外提供统一的鼠标事件处理器 (`handleRootMouseMove`、`handleRootMouseUp`)。
+  - 修改 `WorkspacePage.tsx` 接入这两个 hooks 并成功将 Inline 状态精简，大幅精简了页面核心代码。
+- **Services 目录收敛与合并 (WS-6c)**：
+  - 新建了 `apps/web/src/services/llm/generationService.ts`，聚合了 `LLMService.ts` 的底层底座功能与 `geminiService.ts` 的高级业务封装（如参考图裁剪、尺寸匹配、费用算力折算、异步中止等）。
+  - 重构了 `LLMService.ts` 和 `geminiService.ts`，标记为 `@deprecated`，全部流量平滑转发至 `generationService`。
+  - 重构了 `adminModelService.ts`，整合了原 `unifiedModelService.ts` 里的全局模型订阅与分流 Dispatcher 网关逻辑。
+  - 重构了 `unifiedModelService.ts`，标记为 `@deprecated`，全部方法代理转发至 `adminModelService`。
+- **运行时治理**：
+  - 修复了被误损的二进制文件 `AgentPermissionPolicy.ts`。
+
+### 修改文件
+- `apps/web/src/hooks/useCanvasViewport.ts` [NEW]
+- `apps/web/src/hooks/useCanvasInteractionState.ts` [NEW]
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx` [MODIFY]
+- `apps/web/src/services/llm/generationService.ts` [NEW]
+- `apps/web/src/services/llm/LLMService.ts` [MODIFY]
+- `apps/web/src/services/llm/geminiService.ts` [MODIFY]
+- `apps/web/src/services/model/adminModelService.ts` [MODIFY]
+- `apps/web/src/services/model/unifiedModelService.ts` [MODIFY]
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentPermissionPolicy.ts` [MODIFY]
+
+### 已运行验证
+- `npm run architecture:check` passed
+- `npm run typecheck` passed (tsc 零错误)
+- `npm run build` passed (生产打包编译顺利通过)
+
+### 未运行验证及原因
+- 无
+
+### 风险与下一步
+- 无。下一步可以推进 WS-8 或其他优化。
 
 ## 2026-06-23 - PR #14 合并、标题冲突修复与配置清理 (PR #14)
 

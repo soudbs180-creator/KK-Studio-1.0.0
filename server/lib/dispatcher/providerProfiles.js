@@ -153,6 +153,10 @@ const PROVIDER_PROFILES = [
     domains: ['api.siliconflow.cn'],
     defaultBaseUrl: 'https://api.siliconflow.cn/v1',
     modelDiscovery: 'openai-models',
+    strictDocs: {
+      source: 'https://docs.siliconflow.cn/cn/userguide/introduction',
+      notes: 'SiliconFlow 为 OpenAI 兼容中转站：chat 走 /v1/chat/completions，模型列表走 /v1/models。不要与官方 OpenAI profile 混用。',
+    },
   },
   {
     id: 'openrouter-openai-compatible',
@@ -163,6 +167,10 @@ const PROVIDER_PROFILES = [
     domains: ['openrouter.ai'],
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     modelDiscovery: 'openai-models',
+    strictDocs: {
+      source: 'https://openrouter.ai/docs/quickstart',
+      notes: 'OpenRouter 为 OpenAI 兼容聚合中转：chat 走 /api/v1/chat/completions，模型列表走 /api/v1/models。支持额外 HTTP-Referer / X-Title 头。不要与官方 OpenAI profile 混用。',
+    },
   },
   {
     id: 'moonshot-openai-compatible',

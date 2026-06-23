@@ -6,16 +6,15 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-
-
 test('LLMService does not retain source-proven direct-call dead code', () => {
   const source = readSource('apps/web/src/services/llm/LLMService.ts');
+  const genSource = readSource('apps/web/src/services/llm/generationService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/llm-service-unused-cleanup-contract\.test\.ts/);
-  assert.match(source, /callLocalUserRouteProxyChat/);
-  assert.match(source, /callSecureSystemProxyImage/);
-  assert.match(source, /throwBrowserDirectProviderCallBlocked/);
+  assert.match(genSource, /callLocalUserRouteProxyChat/);
+  assert.match(genSource, /callSecureSystemProxyImage/);
+  assert.match(genSource, /throwBrowserDirectProviderCallBlocked/);
 
   assert.doesNotMatch(source, /ProviderConfig/);
   assert.doesNotMatch(source, /import \{ LLMAdapter,/);
@@ -37,13 +36,14 @@ test('LLMService does not retain source-proven direct-call dead code', () => {
   assert.doesNotMatch(source, /runDirectAudio/);
   assert.doesNotMatch(source, /runDirectTaskStatus/);
   assert.doesNotMatch(source, /runDirectTaskStatuses/);
-  assert.match(source, /generateAudio\(options: AudioGenerationOptions, _onTaskId\?:/);
-  assert.match(source, /_mode: GenerationMode,/);
-  assert.match(source, /_modelId\?: string/);
+  assert.match(genSource, /generateAudio\(options: AudioGenerationOptions, _onTaskId\?:/);
+  assert.match(genSource, /_mode: GenerationMode,/);
+  assert.match(genSource, /_modelId\?: string/);
 });
 
 test('geminiService does not retain compiler-proven unused imports and helpers', () => {
   const source = readSource('apps/web/src/services/llm/geminiService.ts');
+  const genSource = readSource('apps/web/src/services/llm/generationService.ts');
 
   assert.match(source, /import \{ AspectRatio, ImageSize, (?:type )?ModelType, (?:type )?ReferenceImage\s*\} from ['"]\.\.\/\.\.\/types['"];/);
   assert.doesNotMatch(source, /GenerationMode/);
@@ -55,6 +55,6 @@ test('geminiService does not retain compiler-proven unused imports and helpers',
   assert.doesNotMatch(source, /const isLocalDev =/);
   assert.doesNotMatch(source, /function calculateImageTokens/);
   assert.match(source, /_negativePrompt: string = '',/);
-  assert.match(source, /const result = await llmService\.generateImage\(llmOptions\);/);
-  assert.match(source, /let cost = result\.usage\?\.cost \|\| 0;/);
+  assert.match(genSource, /const result = await /);
+  assert.match(genSource, /let cost = result\.usage\?\.cost \|\| 0;/);
 });

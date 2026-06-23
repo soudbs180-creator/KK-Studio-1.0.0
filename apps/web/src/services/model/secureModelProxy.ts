@@ -222,18 +222,22 @@ const MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS = 2;
 const TRANSIENT_PROXY_RETRY_BASE_DELAY_MS = 250;
 let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = null;
 
-function getLocalUserRouteApiEndpoint(useVpsFallback = false): string {
+function getLocalUserRouteApiEndpoint(body: Record<string, unknown>, useVpsFallback = false): string {
   const baseUrl = useVpsFallback
     ? 'https://172-245-156-16.sslip.io'
     : resolveKkApiModelProxyBaseUrl();
-  return `${baseUrl.replace(/\/+$/, '')}/api/v1/model-proxy/user`;
+  const isAsync = body.mode === 'task_status' || body.mode === 'video' || body.mode === 'audio';
+  const path = isAsync ? '/api/v1/generate/async' : '/api/v1/generate';
+  return `${baseUrl.replace(/\/+$/, '')}${path}`;
 }
 
-function getLocalSystemProxyEndpoint(useVpsFallback = false): string {
+function getLocalSystemProxyEndpoint(body: Record<string, unknown>, useVpsFallback = false): string {
   const baseUrl = useVpsFallback
     ? 'https://172-245-156-16.sslip.io'
     : resolveKkApiModelProxyBaseUrl();
-  return `${baseUrl.replace(/\/+$/, '')}/api/v1/model-proxy/system`;
+  const isAsync = body.mode === 'task_status' || body.mode === 'video' || body.mode === 'audio';
+  const path = isAsync ? '/api/v1/generate/async' : '/api/v1/generate';
+  return `${baseUrl.replace(/\/+$/, '')}${path}`;
 }
 
 function buildSecureProxyBoundaryError(
@@ -487,11 +491,11 @@ async function invokeModelProxy(
   let result: ProxyHttpResult;
 
   try {
-    result = await invokeProxyHttp(endpointResolver(false), session.accessToken, body, proxyName);
+    result = await invokeProxyHttp(endpointResolver(body, false), session.accessToken, body, proxyName);
   } catch (error) {
     console.warn(`[secureModelProxy] ${proxyName} unavailable, trying VPS fallback...`, error);
     try {
-      result = await invokeProxyHttp(endpointResolver(true), session.accessToken, body, `${proxyName}-vps`);
+      result = await invokeProxyHttp(endpointResolver(body, true), session.accessToken, body, `${proxyName}-vps`);
     } catch (fallbackError: any) {
       throw buildSecureProxyBoundaryError(
         isRetryableProxyFetchError(fallbackError)
@@ -509,7 +513,7 @@ async function invokeModelProxy(
   if (result.response.status === 401 || result.response.status === 403) {
     const recovered = await recoverCloudSession(feature);
     if (recovered?.accessToken) {
-      result = await invokeProxyHttp(endpointResolver(false), recovered.accessToken, body, proxyName);
+      result = await invokeProxyHttp(endpointResolver(body, false), recovered.accessToken, body, proxyName);
     }
   }
 
@@ -963,7 +967,22 @@ export async function forwardUserRouteGenericRequest(
   if (token) proxyHeaders.Authorization = `Bearer ${token}`;
   if (targetApiKey) proxyHeaders['X-Proxy-Api-Key'] = targetApiKey;
 
-  return kernelFetch(getLocalUserRouteApiEndpoint(), {
+  let parsedBody: Record<string, any> = {};
+  if (typeof optionsOrUrl !== 'string') {
+    if (optionsOrUrl.rawBody && typeof optionsOrUrl.rawBody === 'object') {
+      parsedBody = optionsOrUrl.rawBody;
+    } else if (optionsOrUrl.body && typeof optionsOrUrl.body === 'string') {
+      try {
+        parsedBody = JSON.parse(optionsOrUrl.body);
+      } catch {}
+    }
+  } else if (body && typeof body === 'string') {
+    try {
+      parsedBody = JSON.parse(body);
+    } catch {}
+  }
+
+  return kernelFetch(getLocalUserRouteApiEndpoint(parsedBody), {
     method: targetMethod,
     headers: proxyHeaders,
     body: targetBody,

@@ -45,7 +45,7 @@ test('channel config api key redaction lives outside the monolithic key manager'
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-channel-config-secrets-contract\.test\.ts/);
   assert.match(helperSource, /export function getRedactedChannelConfigApiKey/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerChannelConfigSecrets';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerChannelConfigSecrets(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /apiKey:\s*'',/);
   assert.equal((keyManagerSource.match(/apiKey: getRedactedChannelConfigApiKey\(\),/g) || []).length, 2);
 });
@@ -99,7 +99,7 @@ test('updateKey logs only the redacted diagnostic payload', () => {
   const updateKeyBodyMatch = keyManagerSource.match(/async updateKey\(id: string, updates: Partial<KeySlot>\): Promise<void> \{[\s\S]*?const slot = this\.state\.slots\.find/);
 
   assert.ok(updateKeyBodyMatch, 'updateKey body must remain source-contractable');
-  assert.match(keyManagerSource, /from '\.\/keyManagerUpdateDiagnostics';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerUpdateDiagnostics(?:\.ts)?';/);
   assert.match(updateKeyBodyMatch[0], /buildKeyUpdateDiagnosticPayload\(/);
   assert.doesNotMatch(updateKeyBodyMatch[0], /updates,\s*[\r\n]+\s*supportedModelsBefore/);
 });

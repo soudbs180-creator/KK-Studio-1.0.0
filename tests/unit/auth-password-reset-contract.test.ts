@@ -6,7 +6,7 @@ test('password reset request is a typed KK API flow instead of a login placehold
   const dtoSource = readSource('packages/shared/src/contracts/dto/auth.ts');
   const clientSource = readSource('packages/shared/src/contracts/client/kk-api-client.ts');
   const loginSource = readSource('apps/web/src/components/auth/LoginScreen.tsx');
-  const serverSource = readSource('server/routes/user.js');
+  const serverSource = readSource('server/routes/user/auth.js');
   const migrationSource = readSource('migrations/013_password_reset_tokens.sql');
 
   assert.match(dtoSource, /export interface PasswordResetRequestDto/);

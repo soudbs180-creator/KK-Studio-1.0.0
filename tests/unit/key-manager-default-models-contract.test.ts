@@ -27,8 +27,8 @@ test('keyManager default model constants live outside the monolithic key manager
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-default-models-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerDefaultModels';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*DEFAULT_GOOGLE_MODELS[\s\S]*GOOGLE_IMAGE_WHITELIST[\s\S]*\} from '\.\/keyManagerDefaultModels';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerDefaultModels(?:\.ts)?';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*DEFAULT_GOOGLE_MODELS[\s\S]*GOOGLE_IMAGE_WHITELIST[\s\S]*\} from '\.\/keyManagerDefaultModels(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /export const GOOGLE_IMAGE_WHITELIST = \[/);
   assert.doesNotMatch(keyManagerSource, /export const DEFAULT_GOOGLE_MODELS = \[/);
   assert.doesNotMatch(keyManagerSource, /const DEFAULT_OPENAI_MODELS = \[/);

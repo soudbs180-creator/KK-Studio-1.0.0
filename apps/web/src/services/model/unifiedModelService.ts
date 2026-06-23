@@ -1,162 +1,46 @@
 /**
- * Unified Model Service
- *
- * Mirrors the source-aware model list produced by keyManager so
- * admin credit models and user-owned models can coexist even when
- * they share the same base provider/model id.
+ * @deprecated 建议直接使用 './adminModelService' 中的相关方法。
+ * 本文件仅为了向前兼容，将所有调用代理分流至 adminModelService 对应的 Unified 方法。
  */
+import { adminModelService, type ModelType, type UnifiedModel } from './adminModelService';
 
-import { keyManager } from '../auth/keyManager';
-import { adminModelService } from './adminModelService';
-
-export type ModelType = 'chat' | 'image' | 'video' | 'audio' | 'image+chat';
-
-export interface UnifiedModel {
-  id: string;
-  name: string;
-  provider: string;
-  type: ModelType;
-  isCustom: boolean;
-  isSystemInternal?: boolean;
-  isAdminModel?: boolean;
-  description?: string;
-  icon?: string;
-  colorStart?: string;
-  colorEnd?: string;
-  creditCost?: number;
-  billingType?: 'token' | 'per_request' | 'multiplier';
-  advantages?: string;
-  endpoint?: string;
-}
-
-type GlobalModelEntry = ReturnType<typeof keyManager.getGlobalModelList>[number];
-
-const hasSystemRouteSuffix = (id: string): boolean => {
-  const normalized = String(id || '').trim().toLowerCase();
-  const suffix = normalized.includes('@') ? normalized.split('@')[1] : '';
-  return suffix.startsWith('system') || suffix === 'systemproxy';
-};
+export type { ModelType, UnifiedModel };
 
 class UnifiedModelService {
-  private models: UnifiedModel[] = [];
-  private listeners: Array<() => void> = [];
-  private initialized = false;
-
   async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    keyManager.subscribe(() => {
-      void this.refreshModels();
-    });
-
-    this.loadFromLocalCache();
-    setTimeout(() => {
-      void this.refreshModels();
-    }, 0);
-
-    this.initialized = true;
-  }
-
-  private loadFromLocalCache(): void {
-    try {
-      this.models = this.mapGlobalModels(keyManager.getGlobalModelList());
-      this.notifyListeners();
-      console.log('[UnifiedModelService] Loaded models from global cache:', this.models.length);
-    } catch (error) {
-      console.error('[UnifiedModelService] Failed to load local cache:', error);
-    }
+    return adminModelService.initializeUnifiedModels();
   }
 
   async refreshModels(): Promise<void> {
-    await adminModelService.loadAdminModels();
-    this.models = this.mapGlobalModels(keyManager.getGlobalModelList());
-    this.notifyListeners();
+    return adminModelService.refreshUnifiedModels();
   }
 
   getModels(): UnifiedModel[] {
-    return this.models;
+    return adminModelService.getUnifiedModels();
   }
 
   getModelsByType(type: ModelType): UnifiedModel[] {
-    return this.models.filter((model) => model.type === type);
+    return adminModelService.getUnifiedModelsByType(type);
   }
 
   getModel(id: string): UnifiedModel | undefined {
-    return this.models.find((model) => model.id === id);
+    return adminModelService.getUnifiedModel(id);
   }
 
   isCreditBasedModel(id: string): boolean {
-    const model = this.getModel(id);
-    if (model) {
-      return model.isSystemInternal === true || model.isAdminModel === true;
-    }
-
-    return hasSystemRouteSuffix(id) && adminModelService.isAdminModel(id);
+    return adminModelService.isCreditBasedModel(id);
   }
 
   getCreditCost(id: string): number {
-    const model = this.getModel(id);
-    if (model?.isSystemInternal === true || hasSystemRouteSuffix(id)) {
-      return Number(adminModelService.getModelCreditCost(id) || model?.creditCost || 0);
-    }
-
-    return Number(model?.creditCost || 0);
+    return adminModelService.getUnifiedCreditCost(id);
   }
 
   getModelColors(id: string): { start: string; end: string } | null {
-    const adminModel = adminModelService.getModel(id);
-    if (adminModel) {
-      return {
-        start: adminModel.colorStart,
-        end: adminModel.colorEnd,
-      };
-    }
-    return null;
+    return adminModelService.getUnifiedModelColors(id);
   }
 
   subscribe(callback: () => void): () => void {
-    this.listeners.push(callback);
-    return () => {
-      this.listeners = this.listeners.filter((listener) => listener !== callback);
-    };
-  }
-
-  private mapGlobalModels(models: GlobalModelEntry[]): UnifiedModel[] {
-    const modelMap = new Map<string, UnifiedModel>();
-
-    models.forEach((model) => {
-      if (!modelMap.has(model.id)) {
-        modelMap.set(model.id, this.convertGlobalModel(model));
-      }
-    });
-
-    return Array.from(modelMap.values());
-  }
-
-  private convertGlobalModel(model: GlobalModelEntry): UnifiedModel {
-    const adminModel = model.isSystemInternal ? adminModelService.getModel(model.id) : undefined;
-
-    return {
-      id: model.id,
-      name: model.name,
-      provider: model.provider,
-      type: model.type as ModelType,
-      isCustom: model.isCustom ?? false,
-      isSystemInternal: model.isSystemInternal === true,
-      isAdminModel: model.isSystemInternal === true,
-      description: model.description,
-      icon: model.icon,
-      colorStart: model.colorStart ?? adminModel?.colorStart,
-      colorEnd: model.colorEnd ?? adminModel?.colorEnd,
-      creditCost: model.creditCost ?? adminModel?.creditCost,
-      billingType: adminModel?.billingType,
-      advantages: adminModel?.advantages,
-      endpoint: adminModel?.endpoint,
-    };
-  }
-
-  private notifyListeners(): void {
-    this.listeners.forEach((callback) => callback());
+    return adminModelService.subscribe(callback);
   }
 }
 

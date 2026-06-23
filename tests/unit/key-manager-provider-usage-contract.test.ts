@@ -50,7 +50,7 @@ test('provider usage math lives outside the monolithic key manager', () => {
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-usage-contract\.test\.ts/);
   assert.match(helperSource, /export function isUsageLimitExceeded/);
   assert.match(helperSource, /export function applyProviderUsageDeltaToProvider/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerProviderUsage';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerProviderUsage(?:\.ts)?';/);
   assert.doesNotMatch(keyManagerSource, /private isUsageLimitExceeded/);
   assert.doesNotMatch(keyManagerSource, /private resolveProviderBudgetLimit/);
   assert.doesNotMatch(keyManagerSource, /private resolveProviderTokenLimit/);

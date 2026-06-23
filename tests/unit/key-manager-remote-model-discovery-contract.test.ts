@@ -39,7 +39,7 @@ test('keyManager remote model discovery parsing lives outside the monolithic key
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-remote-model-discovery-contract\.test\.ts/);
-  assert.match(keyManagerSource, /from '\.\/keyManagerRemoteModelDiscovery';/);
+  assert.match(keyManagerSource, /from '\.\/keyManagerRemoteModelDiscovery(?:\.ts)?';/);
   assert.match(helperSource, /export function buildGoogleModelDiscoveryResult/);
   assert.match(helperSource, /export function extractGeminiCompatModelIds/);
   assert.match(helperSource, /export function buildOpenAICompatModelDiscoveryResult/);

@@ -13,7 +13,7 @@ test("keyManager keeps built-in defaults for official Google routes when saved m
   const effectiveModelsSource = readSource("apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
   const defaultsSource = readSource("apps/web/src/services/auth/keyManagerDefaultModels.ts");
 
-  assert.match(source, /from '\.\/keyManagerEffectiveProviderModels';/);
+  assert.match(source, /from '\.\/keyManagerEffectiveProviderModels(?:\.ts)?';/);
   assert.match(defaultsSource, /export const DEFAULT_GOOGLE_MODELS = \[/);
   assert.match(
     effectiveModelsSource,

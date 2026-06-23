@@ -8,23 +8,28 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 const require = createRequire(import.meta.url);
 
-function readServerUserRoute(): string {
-  return readFileSync(path.join(ROOT_DIR, 'server/routes/user.js'), 'utf8');
+function readServerAuthRoute(): string {
+  return readFileSync(path.join(ROOT_DIR, 'server/routes/user/auth.js'), 'utf8');
+}
+
+function readServerProfileRoute(): string {
+  return readFileSync(path.join(ROOT_DIR, 'server/routes/user/profile.js'), 'utf8');
 }
 
 test('server exposes the typed profile and session routes used by mobile browser auth recovery', () => {
-  const source = readServerUserRoute();
+  const authSource = readServerAuthRoute();
+  const profileSource = readServerProfileRoute();
 
-  assert.match(source, /router\.get\('\/v1\/profile'/);
-  assert.match(source, /router\.get\('\/v1\/auth\/session'/);
-  assert.match(source, /router\.post\('\/v1\/auth\/refresh'/);
-  assert.match(source, /router\.post\('\/v1\/auth\/logout'/);
-  assert.match(source, /return sendAuthSession\(req, res, profile\)/);
-  assert.match(source, /kk\.api\.access_token/);
+  assert.match(profileSource, /router\.get\('\/v1\/profile'/);
+  assert.match(authSource, /router\.get\('\/v1\/auth\/session'/);
+  assert.match(authSource, /router\.post\('\/v1\/auth\/refresh'/);
+  assert.match(authSource, /router\.post\('\/v1\/auth\/logout'/);
+  assert.match(authSource, /return sendAuthSession\(req, res, profile\)/);
+  assert.match(authSource, /kk\.api\.access_token/);
 });
 
 test('profile recovery accepts authorization headers, refresh tokens, and browser cookie tokens', () => {
-  const source = readServerUserRoute();
+  const source = readServerAuthRoute();
 
   assert.match(source, /function verifyRequestJwt\(req, tokenOverride = ''\)/);
   assert.match(source, /verifyJWT\(req\.headers\.authorization\)/);
@@ -35,7 +40,7 @@ test('profile recovery accepts authorization headers, refresh tokens, and browse
 });
 
 test('password login writes cookie fallback and keeps timing-safe password verification active', () => {
-  const source = readServerUserRoute();
+  const source = readServerAuthRoute();
 
   assert.match(source, /function setAuthSessionCookies\(req, res, session\)/);
   assert.match(source, /buildAuthCookie\(req, ACCESS_TOKEN_COOKIE_NAME, session\.accessToken/);

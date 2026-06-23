@@ -5,26 +5,26 @@ import { readSource } from "../support/workspacePaths.js";
 describe("Wuyin / Suchuang documented API routing", () => {
   test("strict Wuyin router is mounted before the legacy user router", () => {
     const indexSource = readSource("server/index.js");
-    const strictRouterIndex = indexSource.indexOf("userWuyinStrictRouter");
+    const strictRouterIndex = indexSource.indexOf("generateV1Router");
     const legacyRouterIndex = indexSource.indexOf("userRouter");
 
-    assert.ok(strictRouterIndex >= 0, "expected userWuyinStrictRouter to be mounted");
+    assert.ok(strictRouterIndex >= 0, "expected generateV1Router to be mounted");
     assert.ok(legacyRouterIndex >= 0, "expected legacy userRouter to remain mounted after strict routers");
     assert.ok(
       strictRouterIndex < legacyRouterIndex,
-      "Wuyin strict router must intercept before legacy userRouter can guess or proxy old requests",
+      "Wuyin strict router (via generateV1Router) must intercept before legacy userRouter can guess or proxy old requests",
     );
   });
 
   test("legacy target-url Wuyin proxy is converted into the documented strict contract", () => {
-    const strictSource = readSource("server/routes/user-wuyin-strict-router.js");
+    const strictSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
 
     assert.match(strictSource, /parseWuyinTargetUrl/);
     assert.match(strictSource, /handleGenericWuyinProxy/);
     assert.match(strictSource, /getWuyinProduct\(asyncMatch\[1\]\)/);
     assert.match(strictSource, /buildDocumentedBody\(product, readGenericProxyInputBody\(req\)\)/);
     assert.match(strictSource, /WUYIN_MODEL_NOT_DOCUMENTED/);
-    assert.match(strictSource, /WUYIN_GENERIC_PROXY_DISABLED/);
+    assert.match(strictSource, /WUYIN_ROUTE_NOT_RECOGNIZED/);
     assert.match(strictSource, /\/api\/sora2-new\/submit/);
     assert.match(strictSource, /\/api\/voice\/composite/);
     assert.match(strictSource, /\/api\/img\/split/);
@@ -32,7 +32,7 @@ describe("Wuyin / Suchuang documented API routing", () => {
   });
 
   test("strict status routing requires model-bearing task ids and documented detail endpoints", () => {
-    const strictSource = readSource("server/routes/user-wuyin-strict-router.js");
+    const strictSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
 
     assert.match(strictSource, /decodeLocalProxyTaskId/);
     assert.match(strictSource, /getWuyinProduct\(parsed\.modelId\)/);

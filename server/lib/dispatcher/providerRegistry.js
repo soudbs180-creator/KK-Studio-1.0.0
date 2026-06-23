@@ -7,34 +7,8 @@ const wuyinImageAdapter = require('./adapters/wuyinImageAdapter');
 const { OpenAICompatibleImageAdapter } = require('./adapters/openAICompatibleImageAdapter');
 const { PROVIDER_PROFILES, safeHostname } = require('./providerProfiles');
 
-// 后端同构的 Zod Schema 校验，确保与 packages/shared 规范 100% 对齐
-const ProviderAuthSchema = z.object({
-  method: z.enum(['bearer', 'header', 'query_param', 'custom']),
-  headerName: z.string().optional(),
-  keyRef: z.string().min(1)
-});
-
-const ProviderItemSchema = z.object({
-  id: z.string().min(1),
-  kind: z.enum(['official', 'relay', 'byok-reverse-proxy']),
-  displayName: z.string().min(1),
-  host: z.string().min(1),
-  apiFormat: z.enum(['openai', 'gemini', 'anthropic', 'custom']),
-  auth: ProviderAuthSchema,
-  endpoints: z.object({
-    base: z.string().min(1),
-    chat: z.string().optional(),
-    image: z.string().optional(),
-    video: z.string().optional(),
-    models: z.string().optional()
-  }),
-  pricingSource: z.object({
-    sourceType: z.enum(['online', 'local_fallback']),
-    url: z.string().url().optional(),
-    fallbackFile: z.string().optional()
-  }),
-  capabilities: z.array(z.string()).default([])
-});
+// 后端直接引入 @kk/shared 共享的 Zod Schema 规范进行强验证，取代局部的冗余同构定义
+const { ProviderItemSchema, ProviderAuthSchema } = require('@kk/shared');
 
 const adapterRegistry = {
   google: googleImageAdapter,
@@ -79,8 +53,11 @@ function normalizeProfileToProviderItem(profile) {
     keyRef = 'ANTHROPIC_API_KEY';
   }
 
-  // 针对中转站 (relay) 的密钥重命名以解耦官方密钥命名歧义，完美适配 CI 安全门禁
-  if (profile.providerKind === 'relay' || profile.kind === 'relay') {
+  // 优先采用 profile 显式声明的 authKeyEnv
+  if (profile.authKeyEnv) {
+    keyRef = profile.authKeyEnv;
+  } else if (profile.providerKind === 'relay' || profile.kind === 'relay') {
+    // 针对中转站 (relay) 的密钥重命名以解耦官方密钥命名歧义，完美适配 CI 安全门禁
     if (profile.id.includes('wuyin')) {
       keyRef = 'WUYIN_API_KEY';
     } else if (profile.id.includes('gpt-best')) {
