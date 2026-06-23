@@ -116,3 +116,11 @@ supabase/.temp/
 temp/
 !temp/README.md
 /tools/
+
+# === WS-7 仓库卫生（优化计划新增；阻止运行期/记忆产物再次入库）===
+# AI 记忆/会话目录不入库（历史已跟踪文件需开发者执行 git rm 清理，见 PR 说明）
+brain/
+# create.xyz 脚手架残留
+**/__create/
+# 供应商目录运行期缓存（应运行时生成，不入库）
+**/*CatalogCache.json
