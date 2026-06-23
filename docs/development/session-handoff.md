@@ -1,7 +1,33 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (Fix KeyManager Test Contract Assertions)
+**Last Updated:** 2026-06-23 (Complete WS-1 to WS-5 Handoff)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - 完成 WS-1 到 WS-5 最终收口与 ESM 导入修复 (WS-1~WS-5)
+
+### 修改范围 (WS-1~WS-5)
+- **物理删除冗余 DELETE 路由**：彻底物理删除了 `server/routes/admin.js` 中与 `credit-provider-router.js` 冲突的冗余 DELETE `/v1/admin/credit-providers/:providerId` 路由（原第 440-449 行）。
+- **单元测试正则及路由验证适配**：修改了 `tests/unit/admin-credit-provider-routes-contract.test.ts` 的断言，将其针对 `PUT` 的测试改为面向 `server/routes/credit-provider-router.js`，保证服务拆分后的合约校验正确；同时在 `tests/unit/key-manager-model-helpers-contract.test.ts` 中修正了 `keyManagerModelHelpers` 导入的正则断言，使其能兼容可选的 `.ts` 扩展名。
+- **补全 ESM 导入后缀以解决 ERR_MODULE_NOT_FOUND**：修复了 `apps/web/src/services/api/providerStrategy.ts` 中的 `import type { Provider } from '../../types';` 为带后缀的 `import type { Provider } from '../../types.ts';`。这消灭了原生 Node.js ESM 环境在测试中因链接依赖发生模块找不到报错的问题。
+- **全量门禁校验与测试通过**：成功通过了 `npm run verify:changes` 全部静态与治理校验，单元测试 100% 绿灯（1573 个测试通过）。
+
+### 修改文件 (WS-1~WS-5)
+- `server/routes/admin.js` [MODIFY]
+- `apps/web/src/services/api/providerStrategy.ts` [MODIFY]
+- `tests/unit/admin-credit-provider-routes-contract.test.ts` [MODIFY]
+- `tests/unit/key-manager-model-helpers-contract.test.ts` [MODIFY]
+
+### 已运行验证 (WS-1~WS-5)
+- `npm run test:unit` (1573个单元测试全绿通过)
+- `npm run verify:changes` (通过了所有的静态检测、mojibake 检查、类型检测、OpenAPI 校验等)
+- `npm run build` (生产环境构建打包通过)
+
+### 未运行验证及原因 (WS-1~WS-5)
+- 无
+
+### 风险与下一步 (WS-1~WS-5)
+- **风险**：无风险。修改进一步加固了系统的静态边界，保证了运行期性能与校验安全。
+- **下一步**：WS-1 至 WS-5 的收口工作已完美完成。下一步可以根据最高优先级优化计划，对 AI 画布的其他高优项进行迭代。
 
 ## 2026-06-23 - 修复测试套件中的 key-manager 模块路径契约断言 (WS-8)
 
