@@ -3,6 +3,30 @@
 **Last Updated:** 2026-06-23 (WS-6 Frontend Monolith Decoupling & PR Merges Cleanup)
 **Version:** KK Studio v1.5.7
 
+## 2026-06-23 - PR #13 合并与 WS-6 终结提交 (PR #13)
+
+### 修改范围
+- **PR #13 合并**：合并了 `optimize/ws1-enforce-provider-guard` 分支。在 `package.json` 中解决了冲突，重命名本地注册表校验脚本为 `governance:registry` 并与 PR 引入的 `governance:providers` 共存运行，两脚本均链入 `governance:check`。
+- **配置清理**：确认 `config/model_service_config.json` 已在历史提交 `8c1fe1f6` 中被物理删除（D），检测无残留。#7 任务项顺利关闭。
+- **WS-6 大重构终结提交**：找回了意外被 stash/reset 的 WS-6 (单体 `App.tsx` 解耦与 CSS 拆分) 的 41 个文件并正式 commit 提交。
+- **测试兼容适配**：在 `workspacePaths.js` 和 `verify-prompt-group-drag.mjs` 中添加针对 `App.tsx` 和 `AppRootContentSwitch.tsx` 的读取 Mock 重定向与相对路径翻译，使所有原有的单元测试和集成烟雾测试契约保持通过。
+
+### 修改文件
+- `package.json` [MODIFY]
+- `tests/support/workspacePaths.js` [MODIFY]
+- `scripts/test/verify-prompt-group-drag.mjs` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证
+- `npm run verify:changes` passed (全量单元测试与集成烟雾测试全绿，1569个单测通过)
+- `npm run build` passed
+
+### 未运行验证及原因
+- 无
+
+### 风险与下一步
+- 无。主干已推送到远程 origin/main。
+
 ## 2026-06-23 - Frontend Monolith Decoupling & Lightening Sweep (WS-6)
 
 ### Scope - Workspace Decoupling (WS-6a) & Style Split (WS-6b) & Services Consolidation (WS-6c)
