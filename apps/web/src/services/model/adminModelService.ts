@@ -867,6 +867,7 @@ class AdminModelService {
   // === Unified Model Service Logic ===
   private unifiedModels: UnifiedModel[] = [];
   private unifiedInitialized = false;
+  private isRefreshingUnified = false;
 
   async initializeUnifiedModels(): Promise<void> {
     if (this.unifiedInitialized) return;
@@ -894,9 +895,18 @@ class AdminModelService {
   }
 
   async refreshUnifiedModels(): Promise<void> {
-    await this.loadAdminModels();
-    this.unifiedModels = this.mapGlobalModels(keyManager.getGlobalModelList());
-    this.notifyListeners();
+    if (this.isRefreshingUnified) return;
+    this.isRefreshingUnified = true;
+    try {
+      await this.loadAdminModels();
+      const nextModels = this.mapGlobalModels(keyManager.getGlobalModelList());
+      if (JSON.stringify(this.unifiedModels) !== JSON.stringify(nextModels)) {
+        this.unifiedModels = nextModels;
+        this.notifyListeners();
+      }
+    } finally {
+      this.isRefreshingUnified = false;
+    }
   }
 
   getUnifiedModels(): UnifiedModel[] {

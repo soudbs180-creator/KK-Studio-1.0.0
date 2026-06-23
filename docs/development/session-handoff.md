@@ -1,7 +1,27 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (Complete WS-1 to WS-5 Handoff)
+**Last Updated:** 2026-06-23 (Circular Subscription Hotfix)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - 修复 adminModelService 与 keyManager 循环订阅引发的页面卡死 Bug (Hotfix)
+
+### 修改范围 (Hotfix)
+- **切断同步循环订阅死循环**：在 `adminModelService` 订阅 `keyManager` 后刷新统一模型列表的 `refreshUnifiedModels` 过程中，引入了 `isRefreshingUnified` 防重入锁和 `JSON.stringify` 变更深比较。这使得只有当最终合并的模型列表发生实质性变化时才会发起二次通知，彻底终结了页面初始化挂载时因两个单例服务相互通知而陷入的 CPU 100% 同步死循环。
+
+### 修改文件 (Hotfix)
+- `apps/web/src/services/model/adminModelService.ts` [MODIFY]
+
+### 已运行验证 (Hotfix)
+- `npm run typecheck` (全项目 0 错误、0 警告通过)
+- `npm run test` (1573 个单元、集成与 E2E 测试全绿通过)
+- 重启开发环境后通过 `Invoke-WebRequest` 模拟请求本地 `http://127.0.0.1:3000` 响应 200 OK
+
+### 未运行验证及原因 (Hotfix)
+- 无
+
+### 风险与下一步 (Hotfix)
+- **风险**：无风险。该修改为局部加固且带有数据深比较，能够有效规避不必要的频繁组件刷新。
+- **下一步**：交付并由用户进行实际测试。
 
 ## 2026-06-23 - 完成 WS-1 到 WS-5 最终收口与 ESM 导入修复 (WS-1~WS-5)
 
