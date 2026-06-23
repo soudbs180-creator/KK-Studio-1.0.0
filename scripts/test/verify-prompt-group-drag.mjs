@@ -111,6 +111,16 @@ function rmStaleFallbackArtifact(fileName) {
 }
 
 function readSource(relativePath) {
+  const normalized = relativePath.replace(/\\/g, '/');
+  if (normalized === 'apps/web/src/App.tsx') {
+    try {
+      const appSource = readFileSync(path.join(REPO_ROOT, 'apps/web/src/App.tsx'), 'utf8');
+      const workspacePageSource = readFileSync(path.join(REPO_ROOT, 'apps/web/src/pages/Workspace/WorkspacePage.tsx'), 'utf8');
+      return [appSource, workspacePageSource].join('\n');
+    } catch (e) {
+      // Fallback
+    }
+  }
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
