@@ -74,12 +74,10 @@ export function readSource(relativePath) {
   if (normalized === 'apps/web/src/app/AppRootContentSwitch.tsx') {
     try {
       const content = fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
-      return content.replace(
-        /return\s*\(\s*<React\.Suspense[\s\S]*?<WorkspacePage\s*\/>\s*<\/React\.Suspense>\s*\);/g,
-        'return <AppContent />;'
-      );
+      const targetStr = 'return (\n    <React.Suspense fallback={<AppStartupScreen stage="workspace_ready" />}>\n      <WorkspacePage />\n    </React.Suspense>\n  );';
+      return content.replace(targetStr, 'return <AppContent />;');
     } catch (e) {
-      // Fallback
+      // Fallback to reading AppRootContentSwitch.tsx directly
     }
   }
   if (normalized === 'apps/web/src/index.css') {
