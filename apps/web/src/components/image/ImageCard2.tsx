@@ -331,12 +331,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
                 const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
 
-                containerRef.current.style.left = `${renderLeft - originX}px`;
-                containerRef.current.style.top = `${renderTop - originY}px`;
+                containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
 
                 // 🚀 如果存在 parentPromptId，同时更新连线！
                 if (image.parentPromptId) {
-                    updateConnectorDom(image.parentPromptId, image.id);
+                    updateConnectorDom(image.parentPromptId, image.id, false);
                 }
             }
         });
@@ -1383,14 +1382,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
-                    left: renderLeft - originX,
-                    top: renderTop - originY,
+                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    left: 0,
+                    top: 0,
                     zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
-                    willChange: isDragging ? 'left, top' : 'auto',
+                    willChange: isDragging ? 'transform' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'
                 }}
@@ -1516,14 +1516,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
-                    left: renderLeft - originX,
-                    top: renderTop - originY,
+                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    left: 0,
+                    top: 0,
                     zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
-                    willChange: isDragging ? 'left, top' : 'auto',
+                    willChange: isDragging ? 'transform' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'
                 }}

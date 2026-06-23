@@ -753,13 +753,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 const renderLeft = snapCanvasCoordinate(pos.x - cardWidth / 2, zoomScale || 1);
                 const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
 
-                containerRef.current.style.left = `${renderLeft - originX}px`;
-                containerRef.current.style.top = `${renderTop - originY}px`;
+                containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
 
                 // 🚀 同时更新这组下属所有子图像节点的局部连接线！
                 if (node.childImageIds && node.childImageIds.length > 0) {
                     node.childImageIds.forEach((childImageId) => {
-                        updateConnectorDom(node.id, childImageId);
+                        updateConnectorDom(node.id, childImageId, false);
                     });
                 }
             }
@@ -1298,11 +1297,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 style={isChatMode ? {
                     opacity: 1,
                 } : {
-                    left: renderLeft - originX,
-                    top: renderTop - originY,
+                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    left: 0,
+                    top: 0,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    willChange: isDragging ? 'left, top' : 'auto',
+                    willChange: isDragging ? 'transform' : 'auto',
                     transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                     pointerEvents: 'auto',
                     touchAction: 'none'
@@ -1466,12 +1466,13 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             style={isChatMode ? {
                 opacity: 1,
             } : {
-                left: renderLeft - originX,
-                top: renderTop - originY,
+                transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                left: 0,
+                top: 0,
                 zIndex: effectiveStackZIndex,
                 opacity: 1,
                 cursor: isDragging ? 'grabbing' : 'grab',
-                willChange: isDragging ? 'left, top' : 'auto',
+                willChange: isDragging ? 'transform' : 'auto',
                 transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                 pointerEvents: 'auto',
                 touchAction: 'none'
@@ -2549,6 +2550,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 }, (prev, next) => {
     // 🚀 [Fix] Only compare state/data props to avoid rendering on inline function identity changes
     if (prev.node.isGenerating !== next.node.isGenerating) return false;
+
+    // 🚀 [性能优化]：如果在拖拽/缩放交互期间，我们忽略 zoomScale 的频繁刷新，完全依靠 Viewport GPU 缩放
+    const isTransforming = prev.isCanvasTransforming && next.isCanvasTransforming;
+
     return (
         prev.node === next.node &&
         prev.groupLayerZIndex === next.groupLayerZIndex &&
@@ -2560,7 +2565,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.detailLevel === next.detailLevel &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.snapToGrid === next.snapToGrid &&
-        prev.zoomScale === next.zoomScale &&
+        (isTransforming ? true : prev.zoomScale === next.zoomScale) &&
         prev.isMobile === next.isMobile &&
         prev.activeEcommerceTaskState === next.activeEcommerceTaskState &&
         prev.ecommerceFrameworkStatus === next.ecommerceFrameworkStatus &&

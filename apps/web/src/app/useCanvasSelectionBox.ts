@@ -68,7 +68,8 @@ export function useCanvasSelectionBox({
   const [selectionBox, setSelectionBox] = React.useState<SelectionBoxState>(null);
   const selectionBoxRef = React.useRef<SelectionBoxState>(null);
   const selectionBoxFrameRef = React.useRef<number | null>(null);
-  const pendingSelectionPointRef = React.useRef<Point | null>(null);
+  const pendingSelectionPointRef = React.useRef<Point>({ x: 0, y: 0 });
+  const hasPendingSelectionPointRef = React.useRef<boolean>(false);
 
   React.useEffect(() => {
     selectionBoxRef.current = selectionBox;
@@ -88,15 +89,29 @@ export function useCanvasSelectionBox({
       selectionBoxFrameRef.current = null;
     }
 
-    const pendingPoint = pendingSelectionPointRef.current;
     const currentSelection = selectionBoxRef.current;
-    if (!pendingPoint || !currentSelection) return currentSelection;
+    if (!currentSelection || !hasPendingSelectionPointRef.current) return currentSelection;
 
-    const nextSelection = { ...currentSelection, current: pendingPoint };
-    selectionBoxRef.current = nextSelection;
-    pendingSelectionPointRef.current = null;
-    setSelectionBox(nextSelection);
-    return nextSelection;
+    const pendingPoint = pendingSelectionPointRef.current;
+    currentSelection.current.x = pendingPoint.x;
+    currentSelection.current.y = pendingPoint.y;
+    hasPendingSelectionPointRef.current = false;
+
+    // 原生 DOM 层面同步更新样式，以确保 flush 时位置正确
+    const boxEl = document.getElementById('canvas-selection-box');
+    if (boxEl) {
+      const left = Math.min(currentSelection.start.x, currentSelection.current.x);
+      const top = Math.min(currentSelection.start.y, currentSelection.current.y);
+      const width = Math.abs(currentSelection.current.x - currentSelection.start.x);
+      const height = Math.abs(currentSelection.current.y - currentSelection.start.y);
+
+      boxEl.style.left = `${left}px`;
+      boxEl.style.top = `${top}px`;
+      boxEl.style.width = `${width}px`;
+      boxEl.style.height = `${height}px`;
+    }
+
+    return currentSelection;
   }, []);
 
   const resolveSelectionMenuPosition = React.useCallback((nodeIds: string[]) => {
@@ -161,26 +176,44 @@ export function useCanvasSelectionBox({
         active: true,
       };
       selectionBoxRef.current = nextSelectionBox;
-      pendingSelectionPointRef.current = null;
+      hasPendingSelectionPointRef.current = false;
       setSelectionBox(nextSelectionBox);
     }
   }, [closeSelectionMenu]);
 
   const handleSelectionMouseMove = React.useCallback((event: React.MouseEvent) => {
-    if (!selectionBoxRef.current?.active) return;
+    const currentSelection = selectionBoxRef.current;
+    if (!currentSelection || !currentSelection.active) return;
 
-    pendingSelectionPointRef.current = { x: event.clientX, y: event.clientY };
+    pendingSelectionPointRef.current.x = event.clientX;
+    pendingSelectionPointRef.current.y = event.clientY;
+    hasPendingSelectionPointRef.current = true;
     if (selectionBoxFrameRef.current !== null) return;
 
     selectionBoxFrameRef.current = window.requestAnimationFrame(() => {
       selectionBoxFrameRef.current = null;
+      if (!hasPendingSelectionPointRef.current) return;
+      hasPendingSelectionPointRef.current = false;
       const pendingPoint = pendingSelectionPointRef.current;
       const currentSelection = selectionBoxRef.current;
-      if (!pendingPoint || !currentSelection) return;
+      if (!currentSelection) return;
 
-      const nextSelection = { ...currentSelection, current: pendingPoint };
-      selectionBoxRef.current = nextSelection;
-      setSelectionBox(nextSelection);
+      currentSelection.current.x = pendingPoint.x;
+      currentSelection.current.y = pendingPoint.y;
+
+      // 0-Rerender 性能优化：直接操纵原生 DOM 元素，绕过 React Rerender 阻碍
+      const boxEl = document.getElementById('canvas-selection-box');
+      if (boxEl) {
+        const left = Math.min(currentSelection.start.x, currentSelection.current.x);
+        const top = Math.min(currentSelection.start.y, currentSelection.current.y);
+        const width = Math.abs(currentSelection.current.x - currentSelection.start.x);
+        const height = Math.abs(currentSelection.current.y - currentSelection.start.y);
+
+        boxEl.style.left = `${left}px`;
+        boxEl.style.top = `${top}px`;
+        boxEl.style.width = `${width}px`;
+        boxEl.style.height = `${height}px`;
+      }
     });
   }, []);
 
@@ -276,7 +309,7 @@ export function useCanvasSelectionBox({
     }
 
     selectionBoxRef.current = null;
-    pendingSelectionPointRef.current = null;
+    hasPendingSelectionPointRef.current = false;
     setSelectionBox(null);
   }, [
     flushPendingSelectionBox,

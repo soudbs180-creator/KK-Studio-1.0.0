@@ -106,8 +106,6 @@ export function arrangeSingleSelectedPromptChildren(
 
     const targetMode: CanvasSubCardLayout = prompt.mode === GenerationMode.PPT ? 'column' : mode;
     const imageDims = childImages.map(image => getImageDims(image.aspectRatio));
-    const avgWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) / imageDims.length;
-    const avgHeight = imageDims.reduce((sum, dims) => sum + dims.h, 0) / imageDims.length;
     const newImagePositions: Record<string, { x: number; y: number }> = {};
     const promptCenterX = prompt.position.x;
     const promptBottom = prompt.position.y;
@@ -115,36 +113,64 @@ export function arrangeSingleSelectedPromptChildren(
     if (targetMode === 'row') {
         const totalWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) + (childImages.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
         let currentLeft = promptCenterX - totalWidth / 2;
-        const y = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + avgHeight;
+        const subCardsTopY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
 
         childImages.forEach((image, index) => {
             const dims = imageDims[index];
-            newImagePositions[image.id] = { x: currentLeft + dims.w / 2, y };
+            newImagePositions[image.id] = {
+                x: currentLeft + dims.w / 2,
+                y: subCardsTopY + dims.h,
+            };
             currentLeft += dims.w + AUTO_ARRANGE_SUB_IMAGE_GAP;
         });
     } else if (targetMode === 'grid') {
         const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, childImages.length);
         const maxWidth = Math.max(...imageDims.map(dims => dims.w));
-        const maxHeight = Math.max(...imageDims.map(dims => dims.h));
         const totalWidth = columns * maxWidth + (columns - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
         const startX = promptCenterX - totalWidth / 2 + maxWidth / 2;
-        const startY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + maxHeight;
+
+        // 动态计算网格中每一行的最大高度
+        const rowCount = Math.ceil(childImages.length / columns);
+        const rowMaxHeights: number[] = [];
+        for (let r = 0; r < rowCount; r++) {
+            let maxH = 0;
+            for (let c = 0; c < columns; c++) {
+                const idx = r * columns + c;
+                if (idx < childImages.length) {
+                    maxH = Math.max(maxH, imageDims[idx].h);
+                }
+            }
+            rowMaxHeights.push(maxH);
+        }
+
+        // 计算每一行的顶部 Y 坐标
+        const rowTopYs: number[] = [];
+        let currentTopY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
+        for (let r = 0; r < rowCount; r++) {
+            rowTopYs.push(currentTopY);
+            currentTopY += rowMaxHeights[r] + AUTO_ARRANGE_SUB_IMAGE_GAP;
+        }
 
         childImages.forEach((image, index) => {
             const col = index % columns;
             const row = Math.floor(index / columns);
+            const dims = imageDims[index];
             newImagePositions[image.id] = {
                 x: startX + col * (maxWidth + AUTO_ARRANGE_SUB_IMAGE_GAP),
-                y: startY + row * (maxHeight + AUTO_ARRANGE_SUB_IMAGE_GAP),
+                y: rowTopYs[row] + dims.h,
             };
         });
     } else {
-        let currentY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + avgHeight;
+        // column 模式：垂直向下排列，首张图顶部到父卡片底部间距为 AUTO_ARRANGE_PROMPT_TO_SUB_GAP
+        let currentTop = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
 
         childImages.forEach((image, index) => {
             const dims = imageDims[index];
-            newImagePositions[image.id] = { x: promptCenterX, y: currentY };
-            currentY += dims.h + AUTO_ARRANGE_SUB_IMAGE_GAP;
+            newImagePositions[image.id] = {
+                x: promptCenterX,
+                y: currentTop + dims.h,
+            };
+            currentTop += dims.h + AUTO_ARRANGE_SUB_IMAGE_GAP;
         });
     }
 
@@ -207,10 +233,32 @@ function buildSelectionImageLayout(
     }
 
     const maxWidth = Math.max(...imageDims.map(dim => dim.w));
-    const maxHeight = Math.max(...imageDims.map(dim => dim.h));
     const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, imageDims.length);
     const totalWidth = columns * maxWidth + (columns - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
-    const totalHeight = Math.ceil(imageDims.length / columns) * maxHeight + (Math.ceil(imageDims.length / columns) - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+
+    // 动态计算网格中每一行的最大高度
+    const rowCount = Math.ceil(imageDims.length / columns);
+    const rowMaxHeights: number[] = [];
+    for (let r = 0; r < rowCount; r++) {
+        let maxH = 0;
+        for (let c = 0; c < columns; c++) {
+            const idx = r * columns + c;
+            if (idx < imageDims.length) {
+                maxH = Math.max(maxH, imageDims[idx].h);
+            }
+        }
+        rowMaxHeights.push(maxH);
+    }
+
+    // 计算每一行的顶部偏移 (相对于组的顶部)
+    const rowTopOffsets: number[] = [];
+    let currentTopOffset = 0;
+    for (let r = 0; r < rowCount; r++) {
+        rowTopOffsets.push(currentTopOffset);
+        currentTopOffset += rowMaxHeights[r] + AUTO_ARRANGE_SUB_IMAGE_GAP;
+    }
+    const totalHeight = currentTopOffset > 0 ? currentTopOffset - AUTO_ARRANGE_SUB_IMAGE_GAP : 0;
+
     const startOffsetX = -totalWidth / 2;
     const placements = images.map((image, index) => {
         const dims = imageDims[index];
@@ -219,7 +267,7 @@ function buildSelectionImageLayout(
         return {
             id: image.id,
             xOffset: startOffsetX + col * (maxWidth + AUTO_ARRANGE_SUB_IMAGE_GAP) + maxWidth / 2,
-            bottomOffset: row * (maxHeight + AUTO_ARRANGE_SUB_IMAGE_GAP) + dims.h,
+            bottomOffset: rowTopOffsets[row] + dims.h,
         };
     });
 

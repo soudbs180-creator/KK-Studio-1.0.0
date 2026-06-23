@@ -948,7 +948,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             可用积分
                           </div>
                           <div 
-                            className="mt-1 text-3xl font-black tracking-tight select-all animate-in fade-in slide-in-from-bottom-2 duration-300"
+                            className="mt-1 text-4xl font-black tracking-tight select-all animate-in fade-in slide-in-from-bottom-2 duration-300"
                             style={{
                               fontVariantNumeric: 'tabular-nums',
                               background: 'linear-gradient(135deg, #FFE3A8 0%, #FFB084 100%)',
@@ -970,7 +970,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             setShowRechargeModal(true);
                             resetAndClose();
                           }}
-                          className="inline-flex h-9.5 items-center justify-center rounded-xl bg-[var(--clay-brand-ochre)] hover:brightness-105 active:brightness-95 px-5 text-xs font-bold text-white transition-all active:scale-95 shadow-[0_2px_8px_rgba(217,119,6,0.15)] shrink-0"
+                          className="inline-flex h-8.5 items-center justify-center rounded-xl bg-[var(--clay-brand-ochre)] hover:brightness-105 active:brightness-95 px-4 text-xs font-bold text-white transition-all active:scale-95 shadow-[0_2px_8px_rgba(217,119,6,0.15)] shrink-0"
                         >
                           立即充值
                         </button>

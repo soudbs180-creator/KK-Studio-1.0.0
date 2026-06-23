@@ -16,6 +16,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   isMobile,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const lastTargetCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const activeDragFrameRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -144,7 +146,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   };
 
   // 9. 小地图鼠标定位处理函数（点击或拖拽仅修改目标虚拟中心）
-  const handleMapAction = useCallback((clientX: number, clientY: number) => {
+  const handleMapAction = useCallback((clientX: number, clientY: number, forceStateSync = false) => {
     const svg = svgRef.current;
     if (!svg) return;
 
@@ -156,12 +158,37 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     const canvasX = (mx - safeDx) / scaleMini + minX;
     const canvasY = (my - safeDy) / scaleMini + minY;
 
-    setTargetCenter({
-      x: isNaN(canvasX) ? 0 : canvasX,
-      y: isNaN(canvasY) ? 0 : canvasY,
-    });
-    setIsEdited(true);
-  }, [safeDx, scaleMini, minX, minY]);
+    const targetX = isNaN(canvasX) ? 0 : canvasX;
+    const targetY = isNaN(canvasY) ? 0 : canvasY;
+
+    lastTargetCenterRef.current = { x: targetX, y: targetY };
+
+    if (forceStateSync) {
+      setTargetCenter({ x: targetX, y: targetY });
+      setIsEdited(true);
+    } else {
+      // 🚀 0-Rerender DOM 优化：通过 RAF 原生修改聚焦框属性
+      if (activeDragFrameRef.current !== null) {
+        cancelAnimationFrame(activeDragFrameRef.current);
+      }
+      activeDragFrameRef.current = requestAnimationFrame(() => {
+        activeDragFrameRef.current = null;
+        const targetViewportEl = document.getElementById('minimap-target-viewport');
+        if (targetViewportEl) {
+          const targetViewportW = safeContainerWidth / currentTargetScale;
+          const targetViewportH = safeContainerHeight / currentTargetScale;
+          const miniTargetViewportPos = mapToMini(targetX - targetViewportW / 2, targetY - targetViewportH / 2);
+          const miniTargetViewportW = targetViewportW * scaleMini;
+          const miniTargetViewportH = targetViewportH * scaleMini;
+
+          targetViewportEl.setAttribute('x', String(miniTargetViewportPos.x));
+          targetViewportEl.setAttribute('y', String(miniTargetViewportPos.y));
+          targetViewportEl.setAttribute('width', String(Math.max(6, miniTargetViewportW)));
+          targetViewportEl.setAttribute('height', String(Math.max(6, miniTargetViewportH)));
+        }
+      });
+    }
+  }, [safeDx, scaleMini, minX, minY, safeContainerWidth, safeContainerHeight, currentTargetScale, mapToMini]);
 
   // 10. 拖动小地图视口框 of 交互处理
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -179,6 +206,14 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    if (activeDragFrameRef.current !== null) {
+      cancelAnimationFrame(activeDragFrameRef.current);
+      activeDragFrameRef.current = null;
+    }
+    if (lastTargetCenterRef.current) {
+      setTargetCenter(lastTargetCenterRef.current);
+      setIsEdited(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -189,6 +224,10 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (activeDragFrameRef.current !== null) {
+        cancelAnimationFrame(activeDragFrameRef.current);
+        activeDragFrameRef.current = null;
+      }
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
@@ -304,186 +343,194 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
       }}
     >
-      {/* 简体中文：常驻极窄高度横向缩放及折叠控制栏（与顶栏头像按钮高度 32px 保持视觉一致） */}
-      <div className="flex items-center justify-between gap-1.5 px-0.5 h-7">
-        {/* 折叠切换按钮 (自定义 28px 精致圆角微标) */}
+      {/* 顶部标题栏 (仅在展开状态下使用) */}
+      <div className="flex items-center justify-between gap-1.5 px-1 h-7 border-b border-[var(--kk-workspace-minimap-border)]/40 pb-1.5 mb-0.5">
+        <div className="flex items-center gap-1.5 select-none">
+          <Map size={12} className="text-[var(--accent-coral)]" />
+          <span className="text-[10px] font-bold tracking-tight text-[var(--text-secondary)]">导航小地图</span>
+        </div>
         <button
           onClick={toggleCollapsed}
-          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
-          title={isCollapsed ? "展开小地图" : "收起小地图"}
+          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          title="收起小地图"
         >
-          {isCollapsed ? (
-            <Map size={13} className="text-[var(--accent-coral)]" />
-          ) : (
-            <Minimize2 size={13} />
-          )}
+          <Minimize2 size={13} className="text-[var(--text-secondary)]" />
         </button>
-
-        {/* 缩小按钮 */}
-        <button
-          onClick={handleZoomOut}
-          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
-          title="缩小"
-        >
-          <Minus size={13} />
-        </button>
-
-        {/* 横向滑块 */}
-        <div className="flex-1 flex items-center justify-center relative">
-          <input
-            type="range"
-            min="10"
-            max="300"
-            value={displayZoomPercent}
-            onChange={handleSliderChange}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="zoom-slider cursor-pointer w-full h-1"
-            style={{
-              '--zoom-slider-progress': `${zoomProgress}%`,
-            } as React.CSSProperties}
-          />
-        </div>
-
-        {/* 放大按钮 */}
-        <button
-          onClick={handleZoomIn}
-          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
-          title="放大"
-        >
-          <Plus size={13} />
-        </button>
-
-        {/* 缩放百分比数值 */}
-        <span
-          className={`text-[10px] font-black tracking-tighter text-right select-none min-w-[36px] transition-colors ${
-            isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
-          }`}
-          title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
-        >
-          {displayZoomPercent}%{isEdited && '*'}
-        </span>
       </div>
 
-      {/* 简体中文：小地图 SVG 画面层 — 展开状态下在下方打开 */}
-      {!isCollapsed && (
-        <div className="flex flex-col gap-1.5 transition-all">
-          <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
-            <svg
-              ref={svgRef}
-              width={miniWidth}
-              height={miniHeight}
-              onMouseDown={handleMouseDown}
-              onWheel={handleSvgWheel}
-              className="kk-workspace-canvas-minimap cursor-crosshair overflow-hidden"
-            >
-              {/* 背景网格装饰 */}
-              <defs>
-                <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--kk-workspace-minimap-grid-stroke)" strokeWidth="1" />
-                </pattern>
-              </defs>
-              <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
+      <div className="flex flex-col gap-1.5 transition-all">
+        <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
+          <svg
+            ref={svgRef}
+            width={miniWidth}
+            height={miniHeight}
+            onMouseDown={handleMouseDown}
+            onWheel={handleSvgWheel}
+            className="kk-workspace-canvas-minimap cursor-crosshair overflow-hidden"
+          >
+            {/* 背景网格装饰 */}
+            <defs>
+              <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--kk-workspace-minimap-grid-stroke)" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
 
-              {/* 渲染视口范围内的卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
-              {visibleNodes
-                .filter((node: any) => {
-                  const isImage = node.url || node.storageId;
-                  const w = isImage ? 380 : 500;
-                  const h = isImage ? 380 : 300;
-                  return (
-                    node.position.x + w >= minX &&
-                    node.position.x <= maxX &&
-                    node.position.y + h >= minY &&
-                    node.position.y <= maxY
-                  );
-                })
-                .map((node: any) => {
-                  const isImage = node.url || node.storageId;
-                  const w = isImage ? 380 : 500;
-                  const h = isImage ? 380 : 300;
+            {/* 渲染视口范围内的卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
+            {visibleNodes
+              .filter((node: any) => {
+                const isImage = node.url || node.storageId;
+                const w = isImage ? 380 : 500;
+                const h = isImage ? 380 : 300;
+                return (
+                  node.position.x + w >= minX &&
+                  node.position.x <= maxX &&
+                  node.position.y + h >= minY &&
+                  node.position.y <= maxY
+                );
+              })
+              .map((node: any) => {
+                const isImage = node.url || node.storageId;
+                const w = isImage ? 380 : 500;
+                const h = isImage ? 380 : 300;
 
-                  const pos = mapToMini(node.position.x, node.position.y);
-                  const rw = w * scaleMini;
-                  const rh = h * scaleMini;
+                const pos = mapToMini(node.position.x, node.position.y);
+                const rw = w * scaleMini;
+                const rh = h * scaleMini;
 
-                  return (
-                    <rect
-                      key={node.id}
-                      x={pos.x}
-                      y={pos.y}
-                      width={Math.max(2, rw)}
-                      height={Math.max(2, rh)}
-                      rx={Math.max(1, scaleMini * 24)}
-                      fill={isImage ? 'var(--kk-workspace-minimap-image-bg)' : 'var(--kk-workspace-minimap-node-bg)'}
-                      stroke={isImage ? 'var(--kk-workspace-minimap-image-stroke)' : 'var(--kk-workspace-minimap-node-stroke)'}
-                      strokeWidth="0.5"
-                    />
-                  );
-                })}
+                return (
+                  <rect
+                    key={node.id}
+                    x={pos.x}
+                    y={pos.y}
+                    width={Math.max(2, rw)}
+                    height={Math.max(2, rh)}
+                    rx={Math.max(1, scaleMini * 24)}
+                    fill={isImage ? 'var(--kk-workspace-minimap-image-bg)' : 'var(--kk-workspace-minimap-node-bg)'}
+                    stroke={isImage ? 'var(--kk-workspace-minimap-image-stroke)' : 'var(--kk-workspace-minimap-node-stroke)'}
+                    strokeWidth="0.5"
+                  />
+                );
+              })}
 
-              {/* 渲染当前大画布的实际位置框（仅在待确认编辑状态下显示，灰色虚线框表示） */}
-              {isEdited && (
-                <rect
-                  x={miniActualViewportPos.x}
-                  y={miniActualViewportPos.y}
-                  width={Math.max(6, miniActualViewportW)}
-                  height={Math.max(6, miniActualViewportH)}
-                  rx="2"
-                  fill="none"
-                  stroke="rgba(156, 163, 175, 0.6)"
-                  strokeWidth="1.2"
-                  strokeDasharray="2,2"
-                />
-              )}
-
-              {/* 渲染目标定位聚焦框（珊瑚色实线框，可以拖拽移动） */}
+            {/* 渲染当前大画布的实际位置框（仅在待确认编辑状态下显示，灰色虚线框表示） */}
+            {isEdited && (
               <rect
-                x={miniTargetViewportPos.x}
-                y={miniTargetViewportPos.y}
-                width={Math.max(6, miniTargetViewportW)}
-                height={Math.max(6, miniTargetViewportH)}
+                x={miniActualViewportPos.x}
+                y={miniActualViewportPos.y}
+                width={Math.max(6, miniActualViewportW)}
+                height={Math.max(6, miniActualViewportH)}
                 rx="2"
-                fill="var(--kk-workspace-minimap-viewport-bg)"
-                stroke="var(--accent-coral)"
-                strokeWidth="1.5"
-                style={{
-                  cursor: isDragging ? 'grabbing' : 'grab',
-                  transition: isDragging ? 'none' : 'x 0.1s ease-out, y 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out',
-                }}
+                fill="none"
+                stroke="rgba(156, 163, 175, 0.6)"
+                strokeWidth="1.2"
+                strokeDasharray="2,2"
               />
-            </svg>
+            )}
+
+            {/* 渲染目标定位聚焦框（珊瑚色实线框，可以拖拽移动） */}
+            <rect
+              id="minimap-target-viewport"
+              x={miniTargetViewportPos.x}
+              y={miniTargetViewportPos.y}
+              width={Math.max(6, miniTargetViewportW)}
+              height={Math.max(6, miniTargetViewportH)}
+              rx="2"
+              fill="var(--kk-workspace-minimap-viewport-bg)"
+              stroke="var(--accent-coral)"
+              strokeWidth="1.5"
+              style={{
+                cursor: isDragging ? 'grabbing' : 'grab',
+                transition: isDragging ? 'none' : 'x 0.1s ease-out, y 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out',
+              }}
+            />
+          </svg>
+        </div>
+
+        {/* 缩放控制栏 (移至小地图下方，不再受折叠按钮挤压，使滑块拥有充足的可操作宽度) */}
+        <div className="flex items-center justify-between gap-1.5 px-0.5 h-7 mt-0.5">
+          {/* 缩小按钮 */}
+          <button
+            onClick={handleZoomOut}
+            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+            title="缩小"
+          >
+            <Minus size={13} />
+          </button>
+
+          {/* 横向滑块 */}
+          <div className="flex-1 flex items-center justify-center relative">
+            <input
+              type="range"
+              min="10"
+              max="300"
+              value={displayZoomPercent}
+              onChange={handleSliderChange}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="zoom-slider cursor-pointer w-full h-1"
+              style={{
+                '--zoom-slider-progress': `${zoomProgress}%`,
+              } as React.CSSProperties}
+            />
           </div>
 
-          {/* 确认与重置按钮栏，展开状态下始终常驻，由 disabled 状态平滑过渡 */}
-          <div className="flex gap-1.5 mt-0.5">
-            <button
-              disabled={!isEdited}
-              onClick={handleConfirmLocation}
-              className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg text-center outline-none transition-all shadow-sm ${
-                isEdited
-                  ? 'bg-[var(--accent-coral)] text-white hover:opacity-90 active:scale-95 cursor-pointer'
-                  : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
-              }`}
-            >
-              确认定位
-            </button>
-            <button
-              disabled={!isEdited}
-              onClick={handleCancelLocation}
-              className={`px-2.5 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
-                isEdited
-                  ? 'bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] hover:opacity-90 active:scale-95 cursor-pointer'
-                  : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
-              }`}
-              title="取消更改，回到当前位置"
-            >
-              重置
-            </button>
-          </div>
+          {/* 放大按钮 */}
+          <button
+            onClick={handleZoomIn}
+            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+            title="放大"
+          >
+            <Plus size={13} />
+          </button>
+
+          {/* 缩放百分比数值 */}
+          <span
+            className={`text-[10px] font-black tracking-tighter text-right select-none min-w-[36px] transition-colors ${
+              isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
+            }`}
+            title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
+          >
+            {displayZoomPercent}%{isEdited && '*'}
+          </span>
         </div>
-      )}
+
+        {/* 确认与重置按钮栏，展开状态下始终常驻，由 disabled 状态平滑过渡 */}
+        <div className="flex gap-1.5 mt-0.5">
+          <button
+            disabled={!isEdited}
+            onClick={handleConfirmLocation}
+            className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg text-center outline-none transition-all shadow-sm ${
+              isEdited
+                ? 'bg-[var(--accent-coral)] text-white hover:opacity-90 active:scale-95 cursor-pointer'
+                : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
+            }`}
+          >
+            确认定位
+          </button>
+          <button
+            disabled={!isEdited}
+            onClick={handleCancelLocation}
+            className={`px-2.5 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
+              isEdited
+                ? 'bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] hover:opacity-90 active:scale-95 cursor-pointer'
+                : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
+            }`}
+            title="取消更改，回到当前位置"
+          >
+            重置
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default AppCanvasNavigationPanel;
+export default React.memo(AppCanvasNavigationPanel, (prev, next) => {
+  return (
+    prev.isMobile === next.isMobile &&
+    prev.canvasTransform.x === next.canvasTransform.x &&
+    prev.canvasTransform.y === next.canvasTransform.y &&
+    prev.canvasTransform.scale === next.canvasTransform.scale &&
+    prev.activeCanvas === next.activeCanvas
+  );
+});

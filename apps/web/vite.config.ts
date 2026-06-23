@@ -158,6 +158,14 @@ const ROOT_WATCH_FILES = new Set([
 
 const APP_MANUAL_CHUNK_GROUPS: Array<{ name: string; patterns: string[] }> = [
     {
+        name: 'canvas-node-components',
+        patterns: [
+            '/src/components/canvas/PromptNodeComponent',
+            '/src/components/canvas/CanvasGroupComponent',
+            '/src/components/canvas/PendingNode',
+        ],
+    },
+    {
         name: 'canvas-core',
         patterns: [
             '/src/components/canvas/',

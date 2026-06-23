@@ -129,8 +129,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
       {billingUiEnabled && (
         <div className="flex items-center gap-1.5 h-10 shrink-0">
           <div className="flex items-center gap-1 select-none shrink-0">
-            <Zap size={13} className="text-[var(--accent-coral)]" />
-            <span className="text-[13px] font-mono font-black tracking-tight shrink-0" style={{ color: 'var(--text-primary)' }}>
+            <Zap size={14} className="text-[var(--accent-coral)]" />
+            <span className="text-[15px] font-mono font-black tracking-tight shrink-0" style={{ color: 'var(--text-primary)' }}>
               {remainingBalanceDisplay}
             </span>
             <span className="text-[10px] font-bold text-[var(--accent-coral)] shrink-0">积分</span>
@@ -139,7 +139,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           <button
             id="btn-desktop-recharge"
             onClick={onRecharge}
-            className="kk-workspace-primary-action inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-black leading-none active:scale-95 shrink-0"
+            className="kk-workspace-primary-action inline-flex h-7.5 items-center justify-center rounded-xl px-2.5 text-[11px] font-black leading-none active:scale-95 shrink-0"
+            style={{ minHeight: '30px', height: '30px' }}
           >
             充值
           </button>

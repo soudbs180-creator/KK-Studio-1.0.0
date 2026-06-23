@@ -118,6 +118,9 @@ function performUpdateConnectorDom(promptId: string, imageId: string) {
       if (imageCardEl) {
         const hAttr = imageCardEl.getAttribute('data-card-height');
         imageCardHeight = hAttr ? Number(hAttr) : imageCardEl.offsetHeight;
+        if (!hAttr && imageCardHeight > 0) {
+          imageCardEl.setAttribute('data-card-height', String(imageCardHeight));
+        }
       }
       if (!imageCardHeight) {
         imageCardHeight = Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0);

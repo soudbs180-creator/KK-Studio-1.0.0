@@ -55,18 +55,22 @@ export function useCanvasDragConnection({
 
   const handleDragConnectionMouseMove = React.useCallback((event: React.MouseEvent) => {
     const currentDragConnection = dragConnectionRef.current;
-    if (!currentDragConnection?.active) {
+    if (!currentDragConnection || !currentDragConnection.active) {
       return;
     }
 
-    updateDragConnection({
-      ...currentDragConnection,
-      currentPos: {
-        x: (event.clientX - canvasTransform.x) / canvasTransform.scale,
-        y: (event.clientY - canvasTransform.y) / canvasTransform.scale,
-      },
-    });
-  }, [canvasTransform, updateDragConnection]);
+    currentDragConnection.currentPos.x = (event.clientX - canvasTransform.x) / canvasTransform.scale;
+    currentDragConnection.currentPos.y = (event.clientY - canvasTransform.y) / canvasTransform.scale;
+
+    // 0-Rerender 性能优化：直接通过 DOM API 更新 SVG 连接线 path，避免触发 React Rerender
+    const pathEl = document.getElementById('active-drag-connector-path');
+    if (pathEl) {
+      pathEl.setAttribute(
+        'd',
+        `M${currentDragConnection.startPos.x},${currentDragConnection.startPos.y} L${currentDragConnection.currentPos.x},${currentDragConnection.currentPos.y}`
+      );
+    }
+  }, [canvasTransform]);
 
   const handleDragConnectionMouseUp = React.useCallback(() => {
     if (!dragConnectionRef.current?.active) {

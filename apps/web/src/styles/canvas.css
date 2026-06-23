@@ -157,6 +157,11 @@ body.dark-mode .zoom-slider {
   opacity: var(--grid-glow-opacity);
 }
 
+.canvas-container.is-transforming .canvas-grid::before,
+.canvas-container.is-transforming .canvas-grid::after {
+  display: none !important;
+}
+
 .canvas-grid::before {
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 1) 0, rgba(255, 255, 255, 1) 1.05px, rgba(255, 255, 255, 0.96) 1.38px, rgba(232, 245, 255, 0.42) 1.78px, transparent 2.45px);

@@ -12,6 +12,15 @@
       ]
     },
     {
+      "source": "/(logo.png|icon.svg|newgenre_static/:path*|landing/:path*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {

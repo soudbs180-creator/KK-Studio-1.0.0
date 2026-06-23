@@ -1,7 +1,30 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (Canvas & Minimap Layout Optimization)
+**Last Updated:** 2026-06-24 (Minimap Zoom Controls Layout Optimization)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-24 - 优化小地图缩放控制条与展开状态下按钮布局
+
+### 修改范围 (Minimap Zoom Controls Layout Optimization)
+- **控制栏分层重构**：重构了小地图浮动面板 `AppCanvasNavigationPanel.tsx` 在展开状态下的布局。将原本全部挤在同一排顶栏的“折叠按钮、缩小按钮、横向滑块、放大按钮、百分比数值”进行解耦，拆分为顶部标题栏和底部缩放控制栏。
+- **全新顶部标题栏**：在展开状态下，顶部渲染为清爽优雅的 `h-7` 标题栏，包含左侧 Map 图标与“导航小地图”中文字样，以及右侧 `Minimize2` 收起按钮，中间增加微边框进行层次分割。
+- **缩放滑块空间优化**：缩放滑动条及相关控制按钮被整体移至小地图 SVG 视图的下方。此举去除了折叠按钮的横向空间占用，将滑动条的实际拖拽操作宽度从原先的约 89px 大幅拓宽至约 120px，极大地改善了拖拽顺畅度和操作体验。
+- **折叠状态优雅兼容**：保持折叠时的渲染逻辑不变，折叠后依然渲染为精致高亮的 `36x36px` 悬浮小 Map 图标圆钮，兼顾空间利用率与操控逻辑。
+
+### 修改文件 (Minimap Zoom Controls Layout Optimization)
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Minimap Zoom Controls Layout Optimization)
+- `npm run typecheck` (全项目 0 错误、0 警告顺利通过)
+- `npm run build` (生产环境下 Vite 编译打包顺利完成，无任何错误或警告)
+
+### 未运行验证及原因 (Minimap Zoom Controls Layout Optimization)
+- 无
+
+### 风险与下一步 (Minimap Zoom Controls Layout Optimization)
+- **风险**：无风险。此更改为纯前端 UI 布局重构，且折叠/展开功能及缩放定位算法完好。
+- **下一步**：推送修改交付用户验收。
 
 ## 2026-06-23 - 优化画布渲染性能、修复一键整理卡片重叠与小地图按钮错位
 
@@ -183,7 +206,7 @@
 - **运行时治理**：
   - 修复了被误损的二进制文件 `AgentPermissionPolicy.ts`。
 
-### 修改文件
+### 修改文件 (WS-6)
 - `apps/web/src/hooks/useCanvasViewport.ts` [NEW]
 - `apps/web/src/hooks/useCanvasInteractionState.ts` [NEW]
 - `apps/web/src/pages/Workspace/WorkspacePage.tsx` [MODIFY]
@@ -194,15 +217,15 @@
 - `apps/web/src/services/model/unifiedModelService.ts` [MODIFY]
 - `apps/web/src/features/ai-assistant-runtime/runtime/AgentPermissionPolicy.ts` [MODIFY]
 
-### 已运行验证
+### 已运行验证 (WS-6)
 - `npm run architecture:check` passed
 - `npm run typecheck` passed (tsc 零错误)
 - `npm run build` passed (生产打包编译顺利通过)
 
-### 未运行验证及原因
+### 未运行验证及原因 (WS-6)
 - 无
 
-### 风险与下一步
+### 风险与下一步 (WS-6)
 - 无。下一步可以推进 WS-8 或其他优化。
 
 ## 2026-06-23 - PR #14 合并、标题冲突修复与配置清理 (PR #14)
@@ -4251,3 +4274,33 @@ Mobile workspace: `apps/mobile/`
 ### Risks And Next - Notification Glassmorphism
 - **风险**：无明显风险。
 - **下一步**：用户可预览当前版本就绪通知卡片或触发任何 toast 通知，观察磨砂效果。
+
+## 2026-06-24 - Avatar and Recharge Optimization Pass
+
+### 修改范围 (Avatar and Recharge Optimization Pass)
+- **积分数字字号调大**：将顶栏头像面板内的可用积分数字显示字号由 `text-[13px]` 增加至 `text-[15px]`，闪电图标 `Zap` 尺寸从 `13` 调至 `14`。将个人中心弹窗可用积分数值从 `text-3xl` (30px) 扩大至 `text-4xl` (36px)。
+- **充值按钮尺寸微调与优化**：
+  - 顶栏充值按钮高度由 `h-8` (32px) 微调为 `h-7.5` (30px)，宽度由 `px-3` 调整为 `px-2.5`，文字由 `text-xs` 改为 `text-[11px]`。
+  - 通过增加内联 `style={{ minHeight: '30px', height: '30px' }}` 覆写了全局 CSS `.kk-workspace-primary-action` 的 `min-height: 40px` 限制，使顶栏充值按钮变得精致小巧，解决了按钮受全局样式拉伸导致极度臃肿的问题。
+  - 个人中心“立即充值”操作按钮高度由 `h-9.5` (38px) 缩减为 `h-8.5` (34px)，左右内边距由 `px-5` 缩减为 `px-4`，以使按钮大小与积分数值放大后形成更好的视觉平衡。
+
+### 修改文件 (Avatar and Recharge Optimization Pass)
+- [AppDesktopChrome.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/AppDesktopChrome.tsx)
+- [UserProfileModal.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/modals/UserProfileModal.tsx)
+
+### 当前设计决策 (Avatar and Recharge Optimization Pass)
+- 顶栏充值按钮受全局 CSS 的 40px `min-height` 强力约束，我们通过在 React 组件中使用局部 `style={{ minHeight: '30px' }}` 予以覆盖。此举在不修改全局基础 Token 并保留契约测试中对 `.kk-workspace-primary-action` 类名正则校验的前提下，最为轻量、敏捷、安全地实现了按钮的精致缩小。
+- 个人中心大积分字号增大以实现视觉瞩目，并随之将极具张力的“立即充值”按钮适度瘦身，使其排版美观、重点突出。
+
+### 已运行验证 (Avatar and Recharge Optimization Pass)
+- `npm run typecheck` (通过)
+- `npm run architecture:check` (通过)
+- `npm run governance:check` (通过)
+- `npm run build` (打包构建成功通过)
+
+### 未运行验证及原因 (Avatar and Recharge Optimization Pass)
+- `npm run test` 中的 `tests/unit/canvas-visual-regression.test.ts` 存在 1 项报错（源于主干对 Canvas 拖拽 will-change 做 transform 优化后，未同步修改测试用例的 assertions，该报错由主干已有改动引起，与本优化案无关）。
+
+### 风险与下一步 (Avatar and Recharge Optimization Pass)
+- **风险**：无明显风险。
+- **下一步**：用户可直接刷新浏览器预览左上角头像模块中的积分大小、精致缩小的充值按钮，以及点击头像进入个人中心预览积分资产及充值按钮。

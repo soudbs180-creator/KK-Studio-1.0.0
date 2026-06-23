@@ -3408,6 +3408,43 @@ export const AppContent: React.FC<AppContentProps> = () => {
     [activeCanvas?.groups],
   );
 
+  const cardPositionsVal = React.useMemo(() => {
+    return [
+      ...(activeCanvas?.promptNodes
+        .filter((n: any) => !collapsedCanvasGroupNodeIds.has(n.id))
+        .filter((n: any) => !n.hiddenInCanvas)
+        .filter((n: any) => !(
+          n.mode === GenerationMode.ECOMMERCE
+          && n.ecommerce?.frameworkId
+          && n.ecommerce.kind === 'a-plus-group'
+        ))
+        .map((n: any) => n.position) || []),
+      ...(activeCanvas?.imageNodes
+        .filter((n: any) => !collapsedCanvasGroupNodeIds.has(n.id))
+        .map((n: any) => n.position) || [])
+    ];
+  }, [activeCanvas, collapsedCanvasGroupNodeIds]);
+
+  const handleCanvasClick = React.useCallback(() => {
+    clearSelection();
+    setFocusedGroupId(null);
+    setSelectionMenuPosition(null);
+  }, [clearSelection, setFocusedGroupId, setSelectionMenuPosition]);
+
+  const handleCanvasDoubleClick = React.useCallback(() => {
+    if (!isGenerating) {
+      setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
+      setActiveSourceImage(null);
+      clearSelection();
+      setFocusedGroupId(null);
+      setSelectionMenuPosition(null);
+      if (draftNodeId) {
+        deletePromptNode(draftNodeId);
+        setDraftNodeId(null);
+      }
+    }
+  }, [isGenerating, setConfig, setActiveSourceImage, clearSelection, setFocusedGroupId, setSelectionMenuPosition, draftNodeId, deletePromptNode, setDraftNodeId]);
+
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
   const stableVisibleCanvasSceneRef = useRef<{
@@ -5366,54 +5403,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
         showGrid={canvasMode === 'board' ? false : showGrid}
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
-        cardPositions={[
-          ...(activeCanvas?.promptNodes
-            .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
-            .filter((n) => !n.hiddenInCanvas)
-            .filter((n) => !(
-              n.mode === GenerationMode.ECOMMERCE
-              && n.ecommerce?.frameworkId
-              && n.ecommerce.kind === 'a-plus-group'
-            ))
-            .map(n => n.position) || []),
-          ...(activeCanvas?.imageNodes
-            .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
-            .map(n => n.position) || [])
-        ]}
-        onCanvasClick={() => {
-          // [Draft Logic] Detach from draft when clicking background
-          // if (draftNodeId) setDraftNodeId(null); // 🎨 [FIX] Prevent detaching draft on background click to avoid "Lonely Main Card" orphans
-
-          // Clear input when clicking empty canvas, but NOT during generation
-          // and NOT when in "continue from image" mode
-          // Clear input when clicking empty canvas? NO, user reported this is annoying.
-          // Keep the prompt draft even if deselected.
-          /*
-          if (!isGenerating && !activeSourceImage) {
-            setConfig(prev => ({ ...prev, prompt: '' }));
-          }
-          */
-          // Always clear selection on empty click
-          clearSelection();
-          setFocusedGroupId(null);
-          setSelectionMenuPosition(null);
-        }}
-        onCanvasDoubleClick={() => {
-          // [NEW] Double click to clear EVERYTHING (Prompt + Images)
-          if (!isGenerating) {
-            setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
-            setActiveSourceImage(null);
-            // Also clear selection
-            clearSelection();
-            setFocusedGroupId(null);
-            setSelectionMenuPosition(null);
-            // 🎨 [Fix] Explicitly remove draft node so preview disappears
-            if (draftNodeId) {
-              deletePromptNode(draftNodeId);
-              setDraftNodeId(null);
-            }
-          }
-        }}
+        cardPositions={cardPositionsVal}
+        onCanvasClick={handleCanvasClick}
+        onCanvasDoubleClick={handleCanvasDoubleClick}
         onAutoArrange={handleAutoArrange}
         onResetView={() => {
           // Focus the most recently generated card
@@ -5511,6 +5503,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
           {/* Active Drag Line */}
           {dragConnection?.active && (
             <path
+              id="active-drag-connector-path"
               d={`M${dragConnection.startPos.x},${dragConnection.startPos.y} L${dragConnection.currentPos.x},${dragConnection.currentPos.y}`}
               fill="none"
               stroke="#6366f1"
@@ -5520,6 +5513,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
               strokeLinecap="round"
               strokeLinejoin="round"
               className="opacity-80 animate-pulse"
+              style={{ willChange: 'd' }}
             />
           )}
 
