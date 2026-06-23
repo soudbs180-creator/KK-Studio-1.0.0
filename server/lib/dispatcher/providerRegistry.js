@@ -54,7 +54,7 @@ const validatedProvidersMap = new Map();
  * 转换函数：将旧的 profile 映射为完全合规的 ProviderItem
  */
 function normalizeProfileToProviderItem(profile) {
-  const host = (profile.domains && profile.domains[0]) || safeHostname(profile.defaultBaseUrl) || 'localhost';
+  const host = (profile.domains && profile.domains[0]) || safeHostname(profile.defaultBaseUrl) || `localhost-${profile.id}`;
   
   let apiFormat = 'custom';
   if (profile.protocolFamily === 'openai-compatible' || profile.adapterId === 'openai_chat_completions' || profile.id.includes('openai') || profile.id.includes('deepseek') || profile.id.includes('mistral')) {

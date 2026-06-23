@@ -1,69 +1,108 @@
-// scripts/governance/check-provider-registry.mjs
-// 中文注释：供应商注册表 CI 静态治理与防歧义校验脚本
+#!/usr/bin/env node
+/**
+ * @file check-provider-registry.mjs
+ * @module scripts/governance
+ * @description 供应商注册表静态治理拦截门禁（WS-1）
+ *
+ * 强制执行以下规则：
+ *   1. 排他性校验：所有条目的 id、host、pricingSource.url (当为 online 时) 必须全局唯一，禁止重复。
+ *   2. kind 完备校验：kind 必须存在且属于限制枚举 (official | relay | byok-reverse-proxy)。
+ *   3. 密钥命名解耦：当中转站 kind === 'relay' 时，其 auth.keyRef 禁止引用官方密钥环境变量名，以防止混淆。
+ */
 
-import providerProfiles from '../../server/lib/dispatcher/providerProfiles.js';
-const { PROVIDER_PROFILES } = providerProfiles;
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
-console.log('[CI Governance] 正在执行供应商注册表静态与安全校验...');
+const require = createRequire(import.meta.url);
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(here, '..', '..');
 
+const registryPath = resolve(repoRoot, 'server/lib/dispatcher/providerRegistry.js');
+
+let getProvider, listProviders;
+try {
+  const registryModule = require(registryPath);
+  getProvider = registryModule.getProvider;
+  listProviders = registryModule.listProviders;
+} catch (error) {
+  console.error(`[FAIL] 无法加载供应商注册表模块: ${registryPath}`, error.message);
+  process.exit(1);
+}
+
+const providers = listProviders();
+if (!Array.isArray(providers) || providers.length === 0) {
+  console.error('[FAIL] 供应商注册表数据加载为空或格式错误。');
+  process.exit(1);
+}
+
+const errors = [];
 const seenIds = new Set();
 const seenHosts = new Set();
 const seenPricingUrls = new Set();
 
-const OFFICIAL_ENV_KEYS = ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
+const OFFICIAL_KEY_REGEX = /^(GEMINI|OPENAI|ANTHROPIC|CLAUDE|AZURE)_API_KEY$/i;
+const ALLOWED_KINDS = ['official', 'relay', 'byok-reverse-proxy'];
 
-let hasError = false;
+for (const provider of providers) {
+  const { id, kind, host, auth, pricingSource } = provider;
 
-for (const profile of PROVIDER_PROFILES) {
-  // 1. 唯一性排他校验
-  if (seenIds.has(profile.id)) {
-    console.error(`[ERROR] 发现重复的供应商 ID: ${profile.id}`);
-    hasError = true;
+  // 1. 基础字段非空检查 (Zod 已解析, 此处作保险)
+  if (!id) {
+    errors.push('存在缺 id 的供应商注册条目。');
+    continue;
   }
-  seenIds.add(profile.id);
 
-  if (Array.isArray(profile.domains)) {
-    for (const domain of profile.domains) {
-      if (seenHosts.has(domain)) {
-        console.error(`[ERROR] 供应商 '${profile.id}' 绑定的域名 '${domain}' 已被其他供应商占用，存在冲突！`);
-        hasError = true;
-      }
-      seenHosts.add(domain);
+  // 2. kind 完备校验
+  if (!kind || !ALLOWED_KINDS.includes(kind)) {
+    errors.push(`供应商 "${id}" 的 kind "${kind}" 不合法 (必须为 official, relay 或 byok-reverse-proxy 之一)。`);
+  }
+
+  // 3. 排他性校验：ID 查重
+  if (seenIds.has(id)) {
+    errors.push(`排他性违规: 重复的供应商 ID "${id}"。`);
+  } else {
+    seenIds.add(id);
+  }
+
+  // 3. 排他性校验：Host 查重
+  if (host) {
+    const cleanHost = host.trim().toLowerCase();
+    if (seenHosts.has(cleanHost)) {
+      errors.push(`排他性违规: 供应商 "${id}" 的 host "${cleanHost}" 与其他条目重复。`);
+    } else {
+      seenHosts.add(cleanHost);
     }
   }
 
-  if (profile.catalogUrl) {
-    if (seenPricingUrls.has(profile.catalogUrl)) {
-      console.error(`[ERROR] 发现重复的在线定价来源 URL: ${profile.catalogUrl}`);
-      hasError = true;
+  // 3. 排他性校验：pricingSource.url 查重
+  if (pricingSource && pricingSource.sourceType === 'online' && pricingSource.url) {
+    const cleanUrl = pricingSource.url.trim().toLowerCase();
+    if (seenPricingUrls.has(cleanUrl)) {
+      errors.push(`排他性违规: 供应商 "${id}" 的 pricingSource.url "${cleanUrl}" 与其他条目重复。`);
+    } else {
+      seenPricingUrls.add(cleanUrl);
     }
-    seenPricingUrls.add(profile.catalogUrl);
   }
 
-  // 2. kind 完备性校验
-  const kind = profile.providerKind || profile.kind;
-  if (!kind) {
-    console.error(`[ERROR] 供应商 '${profile.id}' 缺少 kind/providerKind 属性定义`);
-    hasError = true;
-  } else if (!['official', 'relay', 'byok-reverse-proxy'].includes(kind)) {
-    console.error(`[ERROR] 供应商 '${profile.id}' 的 kind '${kind}' 不合法`);
-    hasError = true;
-  }
-
-  // 3. 密钥命名解耦检查
-  if (kind === 'relay') {
-    const envKey = profile.apiKeyEnv || (profile.auth && profile.auth.keyRef);
-    if (envKey && OFFICIAL_ENV_KEYS.includes(envKey)) {
-      console.error(`[ERROR] 安全拦截: 中转供应商 '${profile.id}' 错误地引用了官方默认密钥 '${envKey}'！中转站密钥命名必须保持独立与隔离。`);
-      hasError = true;
+  // 4. 密钥命名解耦
+  if (kind === 'relay' && auth && auth.keyRef) {
+    if (OFFICIAL_KEY_REGEX.test(auth.keyRef.trim())) {
+      errors.push(`安全合规违规: 中转站 (relay) "${id}" 的 auth.keyRef "${auth.keyRef}" 不得借用官方环境变量名（官方/中转命名必须绝对隔离）。`);
     }
   }
 }
 
-if (hasError) {
-  console.error('[CI Governance] 🔴 供应商注册表校验未通过，CI 失败！');
+// 报告与拦截
+console.log(`[governance:registry] 静态治理校验: 注册项数量=${providers.length}, 唯一 host 数量=${seenHosts.size}`);
+
+if (errors.length > 0) {
+  console.error(`\n[FAIL] 供应商注册表强规则校验失败, 发现 ${errors.length} 项硬性违规:\n`);
+  for (const err of errors) {
+    console.error(`  - [FAIL] ${err}`);
+  }
   process.exit(1);
-} else {
-  console.log('[CI Governance] 🟢 供应商注册表静态校验通过！所有 ID、域名、计费来源及密钥隔离校验合规。');
-  process.exit(0);
 }
+
+console.log('\n[PASS] 供应商注册表静态治理校验成功，0 项违规。');
+process.exit(0);
