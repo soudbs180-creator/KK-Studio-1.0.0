@@ -1184,6 +1184,22 @@ router.post('/payment/v1/callbacks/alipay', async (req, res) => {
   return res.json(okEnvelope({ accepted: true, paymentOrderStatus: order?.status || 'pending' }, req));
 });
 
+router.use(['/api/v1/model-proxy/system', '/api/secure-proxy'], (req, res, next) => {
+  const startTime = Date.now();
+  const oldJson = res.json;
+  res.json = function(data) {
+    const metricsCollector = require('../lib/dispatcher/metricsCollector');
+    const success = res.statusCode >= 200 && res.statusCode < 300 && !(data && data.success === false);
+    metricsCollector.recordRouteCall({
+      routePath: req.baseUrl ? (req.baseUrl + req.path) : req.path,
+      success,
+      latency: Date.now() - startTime
+    });
+    return oldJson.apply(res, arguments);
+  };
+  next();
+});
+
 router.post('/api/v1/model-proxy/system', requireUser, async (req, res) => {
   const mode = String(req.body?.mode || 'chat').trim();
   if (['task_status', 'cancel_task', 'delete_task', 'download_task'].includes(mode)) {

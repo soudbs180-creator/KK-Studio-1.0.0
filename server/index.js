@@ -49,6 +49,7 @@ const configRouter = require('./routes/config');
 const providerProbeRouter = require('./routes/provider-probe');
 const telemetryRouter = require('./routes/telemetry');
 const contractCompatRouter = require('./routes/contract-compat');
+const generateV1Router = require('./routes/generate-v1');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -241,6 +242,9 @@ function createApp() {
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
   app.use('/webhook', webhookRouter);
+  // 简体中文注释：新增的影子生成路由，必须挂在其它生成和反代路由之前，以便进行请求委派和埋点
+  app.use('/api', generateV1Router);
+
   // 简体中文注释：用户 API 配置保存增强层必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据。
   app.use('/api', userApiPayloadRouter);
   // 简体中文注释：Wuyin/速创 image/video/status 必须先走严格文档路由，禁止 generic proxy 或 legacy catalog 猜测。

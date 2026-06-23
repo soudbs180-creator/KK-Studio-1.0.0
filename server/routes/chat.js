@@ -12,6 +12,7 @@ const { getPool } = require('../lib/db');
 const credits = require('../lib/credits');
 const { createFixedWindowRateLimiter } = require('../lib/fixedWindowRateLimiter');
 const BackendDispatcher = require('../lib/dispatcher'); // 引入统一派发器
+const metricsCollector = require('../lib/dispatcher/metricsCollector');
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ const chatLimiter = createFixedWindowRateLimiter({
 });
 
 router.post('/chat', async (req, res) => {
+  const startTime = Date.now();
   const requestId = resolveRequestId(req);
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
@@ -135,6 +137,7 @@ router.post('/chat', async (req, res) => {
       res.setHeader('X-Refresh-Token', signJWT({ userId }));
       res.setHeader('X-Client-Request-Id', requestId);
 
+      metricsCollector.recordRouteCall({ routePath: '/api/chat', success: true, latency: Date.now() - startTime });
       return res.json({
         role: 'assistant',
         content: result.text,
@@ -161,8 +164,10 @@ router.post('/chat', async (req, res) => {
     res.setHeader('X-Refresh-Token', signJWT({ userId }));
     res.setHeader('X-Client-Request-Id', requestId);
 
+    metricsCollector.recordRouteCall({ routePath: '/api/chat', success: true, latency: Date.now() - startTime });
     return res.json(result);
   } catch (err) {
+    metricsCollector.recordRouteCall({ routePath: '/api/chat', success: false, latency: Date.now() - startTime });
     if (err.statusCode === 402) {
       return sendInsufficientCredits(res, err.credits, err.creditsCost, requestId);
     }

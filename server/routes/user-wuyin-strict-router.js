@@ -39,6 +39,9 @@ function buildMeta(req) {
 }
 
 function okEnvelope(data, req) {
+  const metricsCollector = require('../lib/dispatcher/metricsCollector');
+  const startTime = req._startTime || Date.now();
+  metricsCollector.recordRouteCall({ routePath: '/api/v1/model-proxy/user(wuyin)', success: true, latency: Date.now() - startTime });
   return { success: true, data, meta: buildMeta(req) };
 }
 
@@ -47,6 +50,9 @@ function errorEnvelope(req, code, message, extra = {}) {
 }
 
 function sendError(res, req, status, code, message, extra = {}) {
+  const metricsCollector = require('../lib/dispatcher/metricsCollector');
+  const startTime = req._startTime || Date.now();
+  metricsCollector.recordRouteCall({ routePath: '/api/v1/model-proxy/user(wuyin)', success: false, latency: Date.now() - startTime });
   return res.status(status).json(errorEnvelope(req, code, message, extra));
 }
 
@@ -528,6 +534,7 @@ async function handleStatusMode(req, res, userId) {
 }
 
 router.all('/v1/model-proxy/user', async (req, res, next) => {
+  req._startTime = Date.now();
   const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
   const genericTarget = parseWuyinTargetUrl(targetUrl);
   if (targetUrl && isWuyinProxyTarget(targetUrl) && !genericTarget) {

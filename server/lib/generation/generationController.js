@@ -13,6 +13,7 @@ const { getActiveGatewayProvider } = require('../../utils/apiGatewayConfig');
  * 核心请求处理入口
  */
 async function handleGenerate(req, res) {
+  const startTime = Date.now();
   const requestId = String(req.headers['x-client-request-id'] || req.headers['x-request-id'] || '').trim() || crypto.randomUUID();
   const authHeader = req.headers.authorization;
   const userId = verifyJWT(authHeader);
@@ -112,6 +113,8 @@ async function handleGenerate(req, res) {
     }
 
     // 5. 返回标准信封响应
+    const metricsCollector = require('../dispatcher/metricsCollector');
+    metricsCollector.recordRouteCall({ routePath: req.path, success: true, latency: Date.now() - startTime });
     return res.json(envelope.wrapSuccess(result, { requestId, providerId, surface: result.surface }));
   } catch (err) {
     console.error('[Generation Controller Error]', err);
@@ -128,6 +131,8 @@ async function handleGenerate(req, res) {
       payload.billing = err.billing;
     }
 
+    const metricsCollector = require('../dispatcher/metricsCollector');
+    metricsCollector.recordRouteCall({ routePath: req.path, success: false, latency: Date.now() - startTime });
     return res.status(err.statusCode || 500).json(payload);
   }
 }

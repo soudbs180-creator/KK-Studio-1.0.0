@@ -2029,6 +2029,22 @@ async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
   }
 }
 
+router.use('/v1/model-proxy/user', (req, res, next) => {
+  const startTime = Date.now();
+  const oldJson = res.json;
+  res.json = function(data) {
+    const metricsCollector = require('../lib/dispatcher/metricsCollector');
+    const success = res.statusCode >= 200 && res.statusCode < 300 && !(data && data.success === false);
+    metricsCollector.recordRouteCall({
+      routePath: '/api/v1/model-proxy/user(legacy)',
+      success,
+      latency: Date.now() - startTime
+    });
+    return oldJson.apply(res, arguments);
+  };
+  next();
+});
+
 router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);

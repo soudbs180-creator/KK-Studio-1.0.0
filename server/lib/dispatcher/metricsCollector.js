@@ -20,6 +20,9 @@ class MetricsCollector {
 
     // 供应商统计：key 为 providerId，值为 { total, success, failed, latencyHistory }
     this.providerMetrics = new Map();
+
+    // 路由统计：key 为 routePath，值为 { total, success, failed, latencyHistory }
+    this.routeMetrics = new Map();
   }
 
   /**
@@ -83,6 +86,34 @@ class MetricsCollector {
   }
 
   /**
+   * 记录一次路由请求的指标
+   * @param {object} param
+   * @param {string} param.routePath 路由路径
+   * @param {boolean} param.success 是否成功
+   * @param {number} param.latency 响应时间 (ms)
+   */
+  recordRouteCall({ routePath, success, latency }) {
+    if (!routePath) return;
+    if (!this.routeMetrics.has(routePath)) {
+      this.routeMetrics.set(routePath, { total: 0, success: 0, failed: 0, latencyHistory: [] });
+    }
+    const stat = this.routeMetrics.get(routePath);
+    stat.total++;
+    if (success) {
+      stat.success++;
+    } else {
+      stat.failed++;
+    }
+
+    if (typeof latency === 'number' && latency >= 0) {
+      stat.latencyHistory.push(latency);
+      if (stat.latencyHistory.length > this.latencyWindowSize) {
+        stat.latencyHistory.shift();
+      }
+    }
+  }
+
+  /**
    * 获取所有性能指标
    */
   getMetrics() {
@@ -118,6 +149,20 @@ class MetricsCollector {
       };
     }
 
+    const routes = {};
+    for (const [routePath, stat] of this.routeMetrics.entries()) {
+      const avg = stat.latencyHistory.length > 0
+        ? Math.round(stat.latencyHistory.reduce((sum, val) => sum + val, 0) / stat.latencyHistory.length)
+        : 0;
+      routes[routePath] = {
+        total: stat.total,
+        success: stat.success,
+        failed: stat.failed,
+        successRate: stat.total > 0 ? parseFloat((stat.success / stat.total).toFixed(4)) : 0,
+        averageLatencyMs: avg,
+      };
+    }
+
     return {
       global: {
         totalRequests: this.totalRequests,
@@ -128,6 +173,7 @@ class MetricsCollector {
       },
       models,
       providers,
+      routes,
     };
   }
 
@@ -141,6 +187,7 @@ class MetricsCollector {
     this.latencyHistory = [];
     this.modelMetrics.clear();
     this.providerMetrics.clear();
+    this.routeMetrics.clear();
   }
 }
 
