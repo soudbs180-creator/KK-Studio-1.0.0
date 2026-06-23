@@ -7,11 +7,11 @@
  * - 模型 endpoint 和参数约束来自 server/lib/dispatcher/wuyinProducts.js
  */
 
-const { buildGatewayUrl, getGatewayBaseUrl } = require('../utils/apiGatewayConfig');
+const { buildGatewayUrl, getGatewayBaseUrl } = require('../../../../utils/apiGatewayConfig');
 const {
   WUYIN_ASYNC_DETAIL_ENDPOINT,
   getWuyinProduct,
-} = require('../lib/dispatcher/wuyinProducts');
+} = require('../../wuyinProducts');
 
 function getApiKey() {
   const apiKey = String(process.env.SUCHUANG_API_KEY || '').trim();

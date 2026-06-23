@@ -4,7 +4,7 @@
  */
 
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
-const { normalizeUserApiSecretForTransport } = require('./userApiSecret');
+const { normalizeUserApiSecretForTransport } = require('../../../userApiSecret');
 
 /**
  * 递归深度寻找并提取 API 响应中所有的有效 HTTP(S) 资源 URL

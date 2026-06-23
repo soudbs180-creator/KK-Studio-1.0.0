@@ -6,24 +6,12 @@
  * @version 1.5.7
  */
 
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { listWuyinProducts } = require('../server/lib/dispatcher/wuyinProducts.js');
+
 const WUYIN_BASE_URL = process.env.SUCHUANG_BASE_URL || 'https://api.wuyinkeji.com';
 const WUYIN_PRICE_CATALOG_URL = `${WUYIN_BASE_URL.replace(/\/+$/, '')}/themes/DigitalBlue/api?action=api_list`;
-const FALLBACK_CATALOG = [
-  ['video_google_omni', 'google_omni', '/api/async/video_google_omni', 0.1, 'second'],
-  ['video_vidu', 'video_vidu', '/api/async/video_vidu', 1, 'second'],
-  ['video_omni', 'video_omni', '/api/async/video_omni', 1, 'second'],
-  ['video_digital_humans', 'Digital_Humans', '/api/async/video_digital_humans', 0.02, 'second'],
-  ['video_veo3.1_fast', 'veo3.1_fast', '/api/async/video_veo3.1_fast', 0.05, 'second'],
-  ['video_grok_imagine', 'grok_imagine', '/api/async/video_grok_imagine', 0.05, 'second'],
-  ['video_wan2.6', 'Wan2.6', '/api/async/video_wan2.6', 0.8, 'second'],
-  ['image_gpt', 'GPT-Image-2', '/api/async/image_gpt', 0.1, 'image'],
-  ['image_nanoBanana2', 'NanoBanana2', '/api/async/image_nanoBanana2', 0.1, 'image'],
-  ['image_grok_imagine', 'grok_imagine', '/api/async/image_grok_imagine', 0.1, 'image'],
-  ['image_nanoBanana_pro', 'NanoBanana_pro', '/api/async/image_nanoBanana_pro', 0.3, 'image'],
-  ['image_nanoBanana', 'NanoBanana', '/api/async/image_nanoBanana', 0.1, 'image'],
-  ['image_wan2.6', 'Wan2.6', '/api/async/image_wan2.6', 0.2, 'image'],
-  ['audio_tts', 'text_to_speech', '/api/async/audio_tts', 0.0006, 'character'],
-];
 
 function isWuyinPricingProxyRequest(baseUrl, provider) {
   if (/wuyin/i.test(String(provider || ''))) return true;
@@ -39,18 +27,25 @@ function isWuyinPricingProxyRequest(baseUrl, provider) {
 }
 
 function getFallbackCatalogItems() {
-  return FALLBACK_CATALOG.map(([modelId, modelName, endpointPath, inputPrice, unit], index) => ({
-    id: String(index + 1),
-    name: modelName,
-    url: `${WUYIN_BASE_URL.replace(/\/+$/, '')}${endpointPath}`,
-    method: endpointPath.includes('/detail') ? 'GET' : 'POST',
-    price: `${inputPrice}${unit}`,
-    balance_sum: inputPrice,
-    pay_unit: unit,
-    api_type: '',
-    the: modelName,
-    modelId,
-  }));
+  return listWuyinProducts().map((product, index) => {
+    const priceUnit = product.price?.unit === 'image'
+      ? '张'
+      : product.price?.unit === 'second'
+        ? '秒'
+        : product.price?.unit || '次';
+    return {
+      id: String(index + 1),
+      name: product.displayName,
+      url: product.endpoint,
+      method: product.method || 'POST',
+      price: product.price?.amount != null ? `${product.price.amount}元/${priceUnit}` : '0元/次',
+      balance_sum: product.price?.amount ?? 0,
+      pay_unit: priceUnit,
+      api_type: '',
+      the: product.displayName,
+      modelId: product.id,
+    };
+  });
 }
 
 async function readJsonBody(req) {

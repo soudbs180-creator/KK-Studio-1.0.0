@@ -3,7 +3,7 @@ const WUYIN_ASYNC_VIDEO_DETAIL_PATH = '/api/async/detail';
 const WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH = '/api/async/video_google_omni';
 const WUYIN_ASYNC_VIDEO_DEFAULT_MODEL = 'video_google_omni';
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
-const { normalizeUserApiSecretForTransport } = require('./userApiSecret');
+const { normalizeUserApiSecretForTransport } = require('../../../userApiSecret');
 
 let wuyinEndpoints = {};
 try {

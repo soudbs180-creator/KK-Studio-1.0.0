@@ -17,21 +17,13 @@ const {
   extractWuyinProviderTaskId,
   extractWuyinVideoUrl,
   fetchWuyinVideoJson,
-  isWuyinAsyncVideoRoute,
-  isWuyinAsyncVideoTargetUrl,
-  mapWuyinVideoStatus,
-  mapWuyinStatus,
-  normalizeWuyinVideoBaseUrl,
-  resolveWuyinImageEndpointPath,
-  resolveWuyinVideoRequestRoute,
-  inferWuyinEndpointTypeFromProviderTaskId,
-} = require('../lib/wuyinAsyncVideoProxy');
+} = require('../lib/dispatcher/adapters/wuyin/wuyinAsyncVideoProxy');
 
 const {
   refreshWuyinCatalog,
   getCachedWuyinCatalog,
   WUYIN_FALLBACK_CATALOG
-} = require('../lib/wuyinCatalogCrawler');
+} = require('../lib/dispatcher/adapters/wuyin/wuyinCatalogCrawler');
 
 const {
   submitWuyinTask,
@@ -39,7 +31,7 @@ const {
   decodeLocalProxyTaskId,
   encodeLocalProxyTaskId,
   extractWuyinOutputUrls
-} = require('../lib/wuyinModelExecutor');
+} = require('../lib/dispatcher/adapters/wuyin/wuyinModelExecutor');
 const {
   isSendableUserApiSecret,
   normalizeUserApiSecretForTransport,

@@ -3,7 +3,7 @@
 
 const assetStore = require('../../generation/generationAssetStore');
 const { toStandardError } = require('../providerErrors');
-const { SuchuangProvider } = require('../../../providers/suchuangProvider');
+const { SuchuangProvider } = require('./wuyin/suchuangProvider');
 
 class WuyinImageAdapter {
   constructor() {

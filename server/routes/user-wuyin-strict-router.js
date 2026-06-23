@@ -19,7 +19,7 @@ const {
 const {
   decodeLocalProxyTaskId,
   encodeLocalProxyTaskId,
-} = require('../lib/wuyinModelExecutor');
+} = require('../lib/dispatcher/adapters/wuyin/wuyinModelExecutor');
 const { normalizeUserApiSecretForTransport } = require('../lib/userApiSecret');
 const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
 const { fetchWithRetries } = require('../lib/fetchClient');

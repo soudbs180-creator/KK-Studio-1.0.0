@@ -11,7 +11,7 @@ const {
   WUYIN_CATALOG_URL,
   WUYIN_DETAIL_PRODUCT,
   listWuyinProducts,
-} = require('./dispatcher/wuyinProducts');
+} = require('../../wuyinProducts');
 
 const CACHE_FILE_PATH = path.join(__dirname, 'wuyinCatalogCache.json');
 
