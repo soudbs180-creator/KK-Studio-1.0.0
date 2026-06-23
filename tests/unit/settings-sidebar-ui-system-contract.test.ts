@@ -28,7 +28,7 @@ test('desktop settings sidebar primitives are tokenized in the settings system s
 test('desktop settings sidebar keeps Chinese status copy readable', () => {
   const source = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
-  assert.doesNotMatch(source, /宸ヤ|寮犲|鐘舵|璁\uFFFD|鏃ュ|瀛樺|鑾峰/);
+  assert.doesNotMatch(source, /\u5bb8\u30e4|\u5bee\u72b2|\u9418\u8235|\u7481\uFFFD|\u93c3\u30e5|\u701b\u6a3a|\u947e\u5cf0/);
   assert.match(source, /工作区健康和总览面板就绪/);
   assert.match(source, /张图 ·/);
 });

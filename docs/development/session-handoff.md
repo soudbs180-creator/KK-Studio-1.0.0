@@ -3,24 +3,24 @@
 **Last Updated:** 2026-06-24 (Fix Test File Garbled Characters)
 **Version:** KK Studio v1.5.7
 
-## 2026-06-24 - 修复测试文件物理乱码字符
+## 2026-06-24 - 修复测试文件物理乱码与繁体字符
 
-### 修改范围 (Fix Test File Garbled Characters)
-- **消除物理乱码字符**：将 `tests/unit/settings-sidebar-ui-system-contract.test.ts` 中防退化契约断言里的物理 Unicode 替换字符（``）替换为正则表达式中的转义序列 `\uFFFD`。
-- **防止编辑器显示异常**：此举彻底解决了此文件在各类编辑器/IDE中被识别为包含不可见或乱码字符的问题，同时保持防退化断言的原有匹配精度不变。
+### 修改范围 (Fix Test File Garbled and Traditional Characters)
+- **消除物理乱码与繁体字符**：将 `tests/unit/settings-sidebar-ui-system-contract.test.ts` 中防退化契约断言里的物理乱码与繁体字符（如 `鐘`、`樺`、`鑾` 等）全部替换为正则表达式中的 Unicode 转义序列（如 `\u9418` 等）。
+- **防止编辑器与审查机制异常**：此举彻底解决了此文件在编辑器中被识别为包含乱码字符以及在代码审查中可能出现的繁体字警告，同时完美保持防退化断言的逻辑与匹配精度一致。
 
-### 修改文件 (Fix Test File Garbled Characters)
+### 修改文件 (Fix Test File Garbled and Traditional Characters)
 - `tests/unit/settings-sidebar-ui-system-contract.test.ts` [MODIFY]
 
-### 已运行验证 (Fix Test File Garbled Characters)
+### 已运行验证 (Fix Test File Garbled and Traditional Characters)
 - 单独运行契约测试 `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-sidebar-ui-system-contract.test.ts` 完美绿灯通过。
 - 运行 `npm run check:encoding`（全项目 0 个潜在编码/乱码问题，100% 通过）。
 
-### 未运行验证及原因 (Fix Test File Garbled Characters)
+### 未运行验证及原因 (Fix Test File Garbled and Traditional Characters)
 - 无
 
-### 风险与下一步 (Fix Test File Garbled Characters)
-- 无风险。修改仅为测试文件中的字符串表达形式替换，已由专门 the 单元测试校验其正则表达行为一致。
+### 风险与下一步 (Fix Test File Garbled and Traditional Characters)
+- 无风险。修改仅为测试文件中的字符串表达形式替换，已由专门的单元测试校验其正则表达行为一致。
 
 ## 2026-06-24 - 优化小地图缩放控制条与展开状态下按钮布局
 
