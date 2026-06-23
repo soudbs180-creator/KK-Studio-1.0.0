@@ -1,7 +1,28 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-23 (WS-6 Frontend Monolith Decoupling & PR Merges Cleanup)
+**Last Updated:** 2026-06-23 (PR #14 Merge & Heading Conflicts Fix)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-23 - PR #14 合并、标题冲突修复与配置清理 (PR #14)
+
+### 修改范围 (PR #14)
+- **PR #14 合并**：合并了 `optimize/ws3-route-topology-analysis` 分支，成功将只读分析文档 `ROUTE_TOPOLOGY_AND_CONSOLIDATION.md` 收入 `docs/architecture/`。
+- **配置清理与检测**：检测并确认死配置 `config/model_service_config.json` 物理上已被彻底删除，无任何 Git 索引和残留，关闭 Issue #7。
+- **治理规则修复**：修复了 `docs/development/session-handoff.md` 之前两段中出现的同名三级标题导致 `npm run verify:changes` 在 `governance:agent-docs` 阶段校验失败的问题。
+
+### 修改文件 (PR #14)
+- `docs/architecture/ROUTE_TOPOLOGY_AND_CONSOLIDATION.md` [NEW]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (PR #14)
+- `npm run verify:changes` passed (全量单元测试与集成烟雾测试全绿，1569个单测通过)
+- `npm run build` passed
+
+### 未运行验证及原因 (PR #14)
+- 无
+
+### 风险与下一步 (PR #14)
+- 无。下一步主攻建议：优先主攻 WS-3 的 S0/S1，进行加路由调用计数埋点与影子入口建设，属于只读与无损影子流量，风险为 0，易于回滚，符合稳定优先的治理策略。
 
 ## 2026-06-23 - PR #13 合并与 WS-6 终结提交 (PR #13)
 
@@ -11,20 +32,20 @@
 - **WS-6 大重构终结提交**：找回了意外被 stash/reset 的 WS-6 (单体 `App.tsx` 解耦与 CSS 拆分) 的 41 个文件并正式 commit 提交。
 - **测试兼容适配**：在 `workspacePaths.js` 和 `verify-prompt-group-drag.mjs` 中添加针对 `App.tsx` 和 `AppRootContentSwitch.tsx` 的读取 Mock 重定向与相对路径翻译，使所有原有的单元测试和集成烟雾测试契约保持通过。
 
-### 修改文件
+### 修改文件 (PR #13)
 - `package.json` [MODIFY]
 - `tests/support/workspacePaths.js` [MODIFY]
 - `scripts/test/verify-prompt-group-drag.mjs` [MODIFY]
 - `docs/development/session-handoff.md` [MODIFY]
 
-### 已运行验证
+### 已运行验证 (PR #13)
 - `npm run verify:changes` passed (全量单元测试与集成烟雾测试全绿，1569个单测通过)
 - `npm run build` passed
 
-### 未运行验证及原因
+### 未运行验证及原因 (PR #13)
 - 无
 
-### 风险与下一步
+### 风险与下一步 (PR #13)
 - 无。主干已推送到远程 origin/main。
 
 ## 2026-06-23 - Frontend Monolith Decoupling & Lightening Sweep (WS-6)
@@ -78,7 +99,7 @@
   - 在 `server/.env.local` 写入 `VODESHOP_RELAY_API_KEY=mock-local-gemini-key`，沿用原 mock vodeshop 密钥。
   - 并在 VPS 部署文件模板 `scripts/vps/kk-api.env.example` 和 `scripts/vps/kk-vps.env.example` 中新增对应的 `VODESHOP_RELAY_API_KEY=CHANGE_ME_SERVER_ONLY` 环境变量占位。
 
-### 修改文件
+### 修改文件 (PR #5/10/12)
 - `server/lib/dispatcher/providerProfiles.js` [MODIFY]
 - `docs/governance/PROVIDER_PRESET_RULES.md` [NEW]
 - `scripts/governance/check-provider-presets.mjs` [NEW]
@@ -89,11 +110,11 @@
 - `scripts/vps/kk-vps.env.example` [MODIFY]
 - `config/model_service_config.json` [DELETE]
 
-### 当前设计决策
+### 当前设计决策 (PR #5/10/12)
 - **按 PR 要求清理**: 保证了 WS-7 (忽略忽略目录) 和 WS-2 (废弃预设) 要求的 git rm 清理落地，并使 `check-provider-presets.mjs` 的 R5 vodeshop 警告完全归零。
-- **防止误伤依赖**: 鉴于移动端及 Web 根 App 下的 `__create` 文件对当前版本是必需的依赖（仍被大量文件显式 import），因此将它们从 untrack 清单中剔除并恢复跟踪，仅移出并解耦了无用处的脚手架残留 `apps/web/__create` 和 `apps/web/src/__create` 依赖。
+- **防止误伤依赖**: 鉴于移动端及 Web 根 App 下的 `__create` 文件对当前版本是必需 of 依赖（仍被大量文件显式 import），因此将它们从 untrack 清单中剔除并恢复跟踪，仅移出并解耦了无用处的脚手架残留 `apps/web/__create` 和 `apps/web/src/__create` 依赖。
 
-### 已运行验证
+### 已运行验证 (PR #5/10/12)
 - `node scripts/governance/check-provider-presets.mjs` passed (0 违规，旧预设警告成功清空)
 - `npm run governance:check` passed
 - `npm run architecture:check` passed
@@ -101,10 +122,10 @@
 - `npm run build` passed (生产打包编译顺利通过)
 - `npm run verify:changes` passed (含 Playwright E2E 降级契约校验)
 
-### 未运行验证及原因
+### 未运行验证及原因 (PR #5/10/12)
 - 无。全部全量校验均已跑完。
 
-### 风险与下一步
+### 风险与下一步 (PR #5/10/12)
 - 注意在 VPS 部署环境中正式配置 `VODESHOP_RELAY_API_KEY`（沿用原 `GEMINI_API_KEY` 里的中转密钥值）。
 
 ## 2026-06-23 - UI Action Catalog Optimization and Settings Search Integration
