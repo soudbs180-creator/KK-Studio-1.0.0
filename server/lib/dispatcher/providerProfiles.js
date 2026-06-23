@@ -244,6 +244,24 @@ const PROVIDER_PROFILES = [
     },
   },
   {
+    id: 'vodeshop-relay',
+    label: 'Vodeshop Relay (future-api.vodeshop.com)',
+    providerKind: 'relay',
+    protocolFamily: 'openai-compatible',
+    adapterId: 'openai_chat_completions',
+    domains: ['future-api.vodeshop.com'],
+    providerHints: ['vodeshop', 'future-api'],
+    defaultBaseUrl: 'https://future-api.vodeshop.com/v1',
+    modelDiscovery: 'manual-or-openai-compatible',
+    fallbackModels: ['gemini-2.5-flash-image'],
+    // 中转站(relay)：密钥使用 VODESHOP_RELAY_API_KEY，禁止借用官方 GEMINI_API_KEY 命名。
+    authKeyEnv: 'VODESHOP_RELAY_API_KEY',
+    strictDocs: {
+      source: 'https://future-api.vodeshop.com',
+      notes: 'Vodeshop 为 OpenAI 兼容中转站：chat 走 /v1/chat/completions，模型列表 /v1beta/models（按其文档）。不要与官方 Gemini profile 混用，密钥用 VODESHOP_RELAY_API_KEY。',
+    },
+  },
+  {
     id: 'generic-openai-compatible',
     label: 'Generic OpenAI-Compatible Relay',
     providerKind: 'relay',
