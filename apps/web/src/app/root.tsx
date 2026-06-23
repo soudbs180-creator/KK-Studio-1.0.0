@@ -24,21 +24,18 @@ import './global.css';
 
 import { LoadFonts } from 'virtual:load-fonts.jsx';
 import { getDocumentLanguage } from '../utils/localeText';
-import fetch from '@/__create/fetch';
+
 import { SessionProvider } from '@auth/create/react';
 import { toPng } from 'html-to-image';
 import { useNavigate } from 'react-router';
 import { serializeError } from 'serialize-error';
 import { Toaster, toast } from 'sonner';
-import { useDevServerHeartbeat } from '../__create/useDevServerHeartbeat';
-import '../__create/design-mode';
+
 import type { Route } from './+types/root';
 
 export const links = () => [];
 
-if (globalThis.window && globalThis.window !== undefined) {
-  globalThis.window.fetch = fetch;
-}
+
 
 const LoadFontsSSR = import.meta.env.SSR ? LoadFonts : null;
 if (import.meta.hot) {
@@ -404,7 +401,7 @@ export const useHandleScreenshotRequest = () => {
 export function Layout({ children }: { children: ReactNode }) {
   useHandshakeParent();
   useHandleScreenshotRequest();
-  useDevServerHeartbeat();
+
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location?.pathname;
