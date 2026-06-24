@@ -7,14 +7,15 @@
  *   变成 CI 可强制的红线，并自动揪出绕过 dispatcher/providerProfiles 的遗留旁路预设。
  *
  *   规则（详见 docs/governance/PROVIDER_PRESET_RULES.md）：
- *     R1 每个 profile 必须声明 providerKind ∈ {official, relay}
+ *     R1 每个 profile 必须声明 providerKind ∈ {official, relay, byok-reverse-proxy}
  *     R2 profile.id（含 aliases）全局唯一
  *     R3 一个 host(domain) 只能归属一个 profile —— “一个中转站 = 一个预设”
  *     R4 relay 必须提供 strictDocs.source（按运营商文档执行的依据）
  *     R6 relay 不得借用官方品牌密钥名（GEMINI/OPENAI/..._API_KEY）——官方/中转命名隔离
+ *     R7 已知 relay 的 authKeyEnv 必须与 provider 身份一致，不得串用其它中转站密钥名
  *     R5 检测绕过注册表的遗留散装预设（仅告警，不阻断 CI；待后续工作流清理）
  *
- *   退出码：硬性违规(R1~R3) 非零；R4/R5 仅告警，保持 main 绿色。
+ *   退出码：硬性违规(R1~R3/R6/R7) 非零；R4/R5 仅告警，保持 main 绿色。
  */
 
 import { createRequire } from 'node:module';
@@ -46,6 +47,14 @@ const DOCS_EXEMPT_RELAY_IDS = new Set([
   'ollama-openai-compatible',
 ]);
 
+const ALLOWED_PROVIDER_KINDS = new Set(['official', 'relay', 'byok-reverse-proxy']);
+const RELAY_AUTHKEY_EXPECTATIONS = [
+  { idPattern: /vodeshop/i, expected: 'VODESHOP_RELAY_API_KEY' },
+  { idPattern: /apimart/i, expected: 'APIMART_API_KEY' },
+  { idPattern: /12ai/i, expected: 'TWELVEAI_API_KEY' },
+  { idPattern: /wuyin|suchuang/i, expected: 'WUYIN_API_KEY' },
+];
+
 const errors = [];
 const warnings = [];
 
@@ -69,8 +78,8 @@ for (const profile of PROVIDER_PROFILES) {
   }
 
   // R1 providerKind 合法
-  if (!['official', 'relay'].includes(profile.providerKind)) {
-    errors.push(`R1 profile "${id}" 缺少合法 providerKind（应为 official 或 relay）。`);
+  if (!ALLOWED_PROVIDER_KINDS.has(profile.providerKind)) {
+    errors.push(`R1 profile "${id}" 缺少合法 providerKind（应为 official、relay 或 byok-reverse-proxy）。`);
   }
 
   // R3 一个 host 只能归属一个 profile —— 一个中转站 = 一个预设
@@ -101,6 +110,14 @@ for (const profile of PROVIDER_PROFILES) {
   ) {
     errors.push(`R6 relay "${id}" 不得借用官方品牌密钥名 "${profile.authKeyEnv}"（官方/中转命名必须隔离）。`);
   }
+
+  // R7 已知 relay 的显式密钥名不得串用其它中转站身份。
+  if (profile.providerKind === 'relay' && typeof profile.authKeyEnv === 'string') {
+    const expectation = RELAY_AUTHKEY_EXPECTATIONS.find((item) => item.idPattern.test(id));
+    if (expectation && profile.authKeyEnv !== expectation.expected) {
+      errors.push(`R7 relay "${id}" 的 authKeyEnv 必须为 "${expectation.expected}"，当前为 "${profile.authKeyEnv}"。`);
+    }
+  }
 }
 
 // R5 遗留旁路预设（绕过 dispatcher/providerProfiles 的散装实现）
@@ -127,12 +144,13 @@ for (const rel of VERCEL_PROXY_KNOWN) {
 console.log(`供应商预设校验：profiles=${PROVIDER_PROFILES.length}，唯一 host=${domainOwners.size}`);
 const officialCount = PROVIDER_PROFILES.filter((p) => p.providerKind === 'official').length;
 const relayCount = PROVIDER_PROFILES.filter((p) => p.providerKind === 'relay').length;
-console.log(`  官方(official)=${officialCount}，中转(relay)=${relayCount}`);
+const browserSessionCount = PROVIDER_PROFILES.filter((p) => p.providerKind === 'byok-reverse-proxy').length;
+console.log(`  官方(official)=${officialCount}，中转(relay)=${relayCount}，浏览器会话/反代(byok-reverse-proxy)=${browserSessionCount}`);
 for (const w of warnings) console.log(`  [WARN] ${w}`);
 for (const e of errors) console.error(`  [FAIL] ${e}`);
 
 if (errors.length > 0) {
-  console.error(`\n校验未通过：${errors.length} 项硬性违规（R1~R3）。`);
+  console.error(`\n校验未通过：${errors.length} 项硬性违规（R1~R3/R6/R7）。`);
   process.exit(1);
 }
 console.log(`\n校验通过：0 项硬性违规，${warnings.length} 项告警（需在后续工作流清理遗留旁路预设）。`);
