@@ -1,4 +1,4 @@
-import { type Provider} from '../../types';
+import { type Provider} from '../../types/index.ts';
 
 export interface ProviderMetadata {
     id: Provider | string;
