@@ -512,7 +512,7 @@ knowledge.recordChange
 
 - 已读取 `docs/governance/SECURITY_AND_BACKLOG.md`。
 - 已确认当前事实是 `server/` Express / VPS。
-- 已确认旧 Netlify / payment-server 描述是否只是历史。
+- 严禁引入已废弃的旧部署与支付逻辑，仅以当前 `server/` 后端为准。
 
 ### Steps
 

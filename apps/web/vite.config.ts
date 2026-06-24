@@ -283,7 +283,6 @@ const DEFERRED_HTML_MODULE_PRELOAD_PREFIXES = [
     'ecommerce-document-tools-',
     'ecommerce-export-tools-',
     'zip-vendor-',
-    'AdminLayout-',
     'MarkdownToCardsModal-',
     'MermaidRenderer-',
 ];
@@ -328,7 +327,6 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
     if (
         normalized.includes('/src/') ||
         normalized.includes('/public/') ||
-        normalized.includes('/api/') ||
         normalized.includes('/server/') ||
         normalized.includes('/tests/')
     ) {
@@ -421,8 +419,6 @@ function buildVersionManifestPlugin(): Plugin {
                 releaseNotes: [...APP_RELEASE_NOTES],
                 channel: process.env.KK_STUDIO_RELEASE_CHANNEL || 'stable',
                 deploymentTarget: process.env.VERCEL_ENV
-                    || process.env.CONTEXT
-                    || process.env.NETLIFY_CONTEXT
                     || process.env.NODE_ENV
                     || 'production',
                 commitSha,
