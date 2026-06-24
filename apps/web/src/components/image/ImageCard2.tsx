@@ -343,35 +343,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return () => unsubscribe();
     }, [image.id, image.parentPromptId, nodeWidth, cardHeight, zoomScale, originX, originY, isChatMode]);
 
-    useLayoutEffect(() => {
-        if (detailLevel !== 'full') {
-            return;
-        }
 
-        const updateHeight = () => {
-            const surface = cardSurfaceRef.current;
-            if (!surface) return;
-
-            const measuredHeight = surface.offsetHeight;
-            if (!(measuredHeight > 0)) return;
-
-            setCardHeight((prev) => (Math.abs(prev - measuredHeight) > 1 ? measuredHeight : prev));
-            onHeightChange?.(image.id, measuredHeight);
-        };
-
-        updateHeight();
-
-        if (typeof ResizeObserver === 'undefined') {
-            return;
-        }
-
-        const observer = new ResizeObserver(() => updateHeight());
-        if (cardSurfaceRef.current) {
-            observer.observe(cardSurfaceRef.current);
-        }
-
-        return () => observer.disconnect();
-    }, [detailLevel, footerDensity, image.id, onHeightChange]);
 
     const dragStartPos = useRef({ x: 0, y: 0 });
     const dragStartCanvasPos = useRef({ x: 0, y: 0 });
@@ -595,15 +567,27 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const footerSeparatorClass = isTightFooter ? 'mx-px text-[var(--border-medium)]' : 'text-[var(--border-medium)]';
     const metaActionMarginClass = isCompactFooter ? 'ml-1' : 'ml-2';
 
-    useLayoutEffect(() => {
-        if (detailLevel !== 'full') {
+    useEffect(() => {
+        // 只在 idle + visible + full detail 时测量
+        if (detailLevel !== 'full' || isCanvasTransforming || !isVisible) {
             return;
         }
 
-        const hasHorizontalOverflow = (element: HTMLDivElement | null) => Boolean(element && element.scrollWidth > element.clientWidth + 1);
         let frameId: number | null = null;
 
-        const measureDensity = () => {
+        const updateHeightAndDensity = () => {
+            // 1. 测量高度
+            const surface = cardSurfaceRef.current;
+            if (surface) {
+                const measuredHeight = surface.offsetHeight;
+                if (measuredHeight > 0) {
+                    setCardHeight((prev) => (Math.abs(prev - measuredHeight) > 1 ? measuredHeight : prev));
+                    onHeightChange?.(image.id, measuredHeight);
+                }
+            }
+
+            // 2. 测量自适应密度
+            const hasHorizontalOverflow = (element: HTMLDivElement | null) => Boolean(element && element.scrollWidth > element.clientWidth + 1);
             const overflowDetected = hasHorizontalOverflow(topMetaRowRef.current) || hasHorizontalOverflow(footerInfoRowRef.current);
             setFooterDensity((current) => {
                 let nextDensity: FooterDensity = minimumFooterDensity;
@@ -613,7 +597,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         ? (current === 'normal' ? 'compact' : 'tight')
                         : 'tight';
                 } else if (current === 'tight' && minimumFooterDensity === 'compact') {
-                     // Prevent compact/tight oscillation on narrow subcards.
+                    // Prevent compact/tight oscillation on narrow subcards.
                     nextDensity = 'tight';
                 }
 
@@ -623,24 +607,54 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         const scheduleMeasure = () => {
             if (frameId !== null) cancelAnimationFrame(frameId);
-            frameId = requestAnimationFrame(measureDensity);
+            frameId = requestAnimationFrame(updateHeightAndDensity);
         };
 
+        // 初始执行测量
         scheduleMeasure();
 
-        const resizeObserver = typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(() => scheduleMeasure())
-            : null;
-        const observerTargets = [containerRef.current, topMetaRowRef.current, footerInfoRowRef.current].filter(Boolean) as Element[];
-        observerTargets.forEach((target) => resizeObserver?.observe(target));
+        if (typeof ResizeObserver === 'undefined') {
+            return;
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (isCanvasTransforming) return;
+            scheduleMeasure();
+        });
+
+        // 统一监听所有相关元素 (高度 + 密度相关)
+        const observerTargets = [
+            cardSurfaceRef.current,
+            containerRef.current,
+            topMetaRowRef.current,
+            footerInfoRowRef.current
+        ].filter(Boolean) as Element[];
+        observerTargets.forEach((target) => resizeObserver.observe(target));
+
         window.addEventListener('resize', scheduleMeasure);
 
         return () => {
             if (frameId !== null) cancelAnimationFrame(frameId);
-            resizeObserver?.disconnect();
+            resizeObserver.disconnect();
             window.removeEventListener('resize', scheduleMeasure);
         };
-    }, [detailLevel, displayCost, image.generationTime, image.id, image.isGenerating, image.model, image.modelLabel, image.orphaned, image.provider, image.providerLabel, image.tokens, minimumFooterDensity]);
+    }, [
+        detailLevel,
+        isCanvasTransforming,
+        isVisible,
+        minimumFooterDensity,
+        image.id,
+        onHeightChange,
+        displayCost,
+        image.generationTime,
+        image.isGenerating,
+        image.model,
+        image.modelLabel,
+        image.orphaned,
+        image.provider,
+        image.providerLabel,
+        image.tokens
+    ]);
 
     const creditFooterLabel = resolvedCreditCost > 0
         ? `消耗 ${resolvedCreditCost} 积分`

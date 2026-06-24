@@ -687,6 +687,28 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        if (typeof IntersectionObserver === 'undefined') {
+            setIsVisible(true);
+            return;
+        }
+        if (!cardRef.current) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    setIsVisible(entry.isIntersecting);
+                }
+            },
+            { rootMargin: '200px' }
+        );
+
+        observer.observe(cardRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     const localPosRef = useRef(node.position);
     const hasAnimatedRef = useRef<string | null>(null);
     const onDragDeltaRef = useRef(onDragDelta);
@@ -983,48 +1005,43 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     }, [node.id, node.isNew, onUpdateNode]);
 
 
-    // Height reporting
+    // 合并后的高度测量与上报调度逻辑
     useEffect(() => {
-        if (detailLevel !== 'full') return;
-        if (!cardRef.current || !onHeightChange) return;
+        // 只在 idle + visible + full detail 时测量
+        if (detailLevel !== 'full' || isCanvasTransforming || !isVisible) {
+            return;
+        }
 
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                // Actually offsetHeight is safer for visual boundaries
-                const offsetHeight = (entry.target as HTMLElement).offsetHeight;
-                if (offsetHeight && Math.abs(offsetHeight - (node.height || 0)) > 2) {
-                    onHeightChange(node.id, offsetHeight);
-                }
-            }
-        });
-        observer.observe(cardRef.current);
-        return () => observer.disconnect();
-    }, [node.id, onHeightChange, node.height, detailLevel]); // Depend on node.height to prevent loop if stable
-
-    // 动态更新cardHeight用于连接线起点
-    useEffect(() => {
-        if (detailLevel !== 'full') return;
         const updateHeight = () => {
             if (cardRef.current) {
                 const height = cardRef.current.offsetHeight;
-                // 🚀 [Fix] Only update if height actually changed to prevent infinite loop
                 if (height > 0) {
+                    // 1. 内部同步状态（用于连线起点）
                     setCardHeight(prev => (Math.abs(prev - height) > 2 ? height : prev));
+                    // 2. 外部上报高度
+                    if (onHeightChange && Math.abs(height - (node.height || 0)) > 2) {
+                        onHeightChange(node.id, height);
+                    }
                 }
             }
         };
 
-        // 初始更新
+        // 当变为 idle + visible + full detail 时，立即进行一次同步高度测量
         updateHeight();
 
-        // 利用已有的ResizeObserver来监听高度变化
-        const observer = new ResizeObserver(updateHeight);
+        if (typeof ResizeObserver === 'undefined') return;
+
+        const observer = new ResizeObserver((entries) => {
+            // 在回调中再次双重验证，如果处于 transforming，忽略回调以防止卡顿
+            if (isCanvasTransforming) return;
+            updateHeight();
+        });
+
         if (cardRef.current) {
             observer.observe(cardRef.current);
         }
-
         return () => observer.disconnect();
-    }, [node.prompt, node.referenceImages, detailLevel]);
+    }, [node.id, node.height, detailLevel, isCanvasTransforming, isVisible, onHeightChange]);
 
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {

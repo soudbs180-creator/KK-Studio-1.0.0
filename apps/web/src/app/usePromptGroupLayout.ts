@@ -602,11 +602,9 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   }, [selectNodes, setFocusedGroupId]);
 
   const handlePromptGroupNodeHeightChange = useCallback((fallbackNode: PromptNode, id: string, height: number) => {
-    const targetNode = currentPromptNodesById.get(id) ?? fallbackNode;
-    if (targetNode.height !== height) {
-      void updatePromptNode({ ...targetNode, height });
-    }
-  }, [currentPromptNodesById, updatePromptNode]);
+    if (!(height > 0)) return;
+    CanvasMeasurementScheduler.requestHeightUpdate(id, height);
+  }, []);
 
   const handlePromptGroupTagRemove = useCallback((id: string, tag: string) => {
     const promptNode = currentPromptNodesById.get(id);

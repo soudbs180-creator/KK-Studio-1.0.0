@@ -371,28 +371,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const nodeDragReleaseFrameRef = useRef<number | null>(null);
   const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
 
-  useEffect(() => {
-    const handleBatchHeightUpdates = (updates: Record<string, number>) => {
-      setImageCardHeightById((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [id, h] of Object.entries(updates)) {
-          const prevH = prev[id];
-          if (prevH !== h && (!prevH || Math.abs(prevH - h) > 1)) {
-            next[id] = h;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
 
-    CanvasMeasurementScheduler.registerCallback(handleBatchHeightUpdates);
-    return () => {
-      CanvasMeasurementScheduler.unregisterCallback(handleBatchHeightUpdates);
-      CanvasMeasurementScheduler.cancel();
-    };
-  }, []);
   const loadFavorites = useFavoritesStore(state => state.load);
 
   useEffect(() => {
@@ -442,6 +421,57 @@ export const AppContent: React.FC<AppContentProps> = () => {
     clearCanvasDrawings,
     unlinkNodes
   } = useCanvas();
+
+  const updatePromptNodeRef = useRef(updatePromptNode);
+  useLayoutEffect(() => {
+    updatePromptNodeRef.current = updatePromptNode;
+  });
+
+  useEffect(() => {
+    const handleBatchHeightUpdates = (updates: Record<string, number>) => {
+      const imageUpdates: Record<string, number> = {};
+      const promptUpdates: Record<string, number> = {};
+
+      for (const [id, h] of Object.entries(updates)) {
+        const isPrompt = activeCanvasRef.current?.promptNodes?.some((n: any) => n.id === id);
+        if (isPrompt) {
+          promptUpdates[id] = h;
+        } else {
+          imageUpdates[id] = h;
+        }
+      }
+
+      if (Object.keys(imageUpdates).length > 0) {
+        setImageCardHeightById((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [id, h] of Object.entries(imageUpdates)) {
+            const prevH = prev[id];
+            if (prevH !== h && (!prevH || Math.abs(prevH - h) > 1)) {
+              next[id] = h;
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      }
+
+      if (Object.keys(promptUpdates).length > 0) {
+        for (const [id, h] of Object.entries(promptUpdates)) {
+          const targetNode = activeCanvasRef.current?.promptNodes?.find((n: any) => n.id === id);
+          if (targetNode && targetNode.height !== h) {
+            void updatePromptNodeRef.current({ ...targetNode, height: h });
+          }
+        }
+      }
+    };
+
+    CanvasMeasurementScheduler.registerCallback(handleBatchHeightUpdates);
+    return () => {
+      CanvasMeasurementScheduler.unregisterCallback(handleBatchHeightUpdates);
+      CanvasMeasurementScheduler.cancel();
+    };
+  }, []);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -3970,6 +4000,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         })()}
         onLivePositionChange={handleLiveNodePositionChange}
         onHeightChange={handleImageCardHeightChange}
+        isCanvasTransforming={isCanvasTransforming}
         highlighted={highlightedIdVal === node.id}
         onBringToFront={() => bringNodesToFront([node.id])}
         isSelected={selectedNodeIds.includes(node.id)}
@@ -4183,6 +4214,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
               position={childLayout.visualPosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}
+              isCanvasTransforming={isCanvasTransforming}
               highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
               onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
               isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
