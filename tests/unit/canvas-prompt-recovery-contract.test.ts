@@ -132,6 +132,38 @@ test('interrupted sync prompts are marked before risky unload persistence', () =
   assert.match(helperSource, /export const hasUnrecoverableSyncGenerationInFlight = \(state\?: CanvasState \| null\): boolean/);
 });
 
+test('recovered child image positions are preserved from load-time auto repair', () => {
+  const { normalizeCanvasPromptRecovery } = loadPromptRecoveryModuleForBehaviorTest();
+  const result = normalizeCanvasPromptRecovery({
+    id: 'canvas-1',
+    name: 'Canvas',
+    promptNodes: [
+      {
+        id: 'prompt-1',
+        prompt: 'existing flower scene',
+        position: { x: 100, y: 100 },
+        childImageIds: ['image-1'],
+        parallelCount: 1,
+        isGenerating: false,
+      },
+    ],
+    imageNodes: [
+      {
+        id: 'image-1',
+        prompt: 'existing flower scene',
+        url: 'https://cdn.example.com/image-1.png',
+        parentPromptId: 'prompt-1',
+        position: { x: 640, y: 480 },
+      },
+    ],
+    groups: [],
+    drawings: [],
+  } as never);
+
+  assert.equal(result.imageNodes[0].userMoved, true);
+  assert.deepEqual(result.imageNodes[0].position, { x: 640, y: 480 });
+});
+
 test('completed recovered prompt behavior clears stale generation state', () => {
   const { normalizeCanvasPromptRecovery } = loadPromptRecoveryModuleForBehaviorTest();
   const result = normalizeCanvasPromptRecovery({
