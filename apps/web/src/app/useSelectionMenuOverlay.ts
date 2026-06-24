@@ -38,6 +38,88 @@ interface UseSelectionMenuOverlayArgs {
   onOpenMigrate: () => void;
 }
 
+type FavoriteLookup = {
+  promptIdBySourceId: Map<string, string>;
+  promptIdByText: Map<string, string>;
+  imageIdBySourceId: Map<string, string>;
+  imageIdByStorageId: Map<string, string>;
+  imageIdByOriginalUrl: Map<string, string>;
+  imageIdByApiResultUrl: Map<string, string>;
+  imageIdByUrl: Map<string, string>;
+};
+
+const buildFavoriteLookup = (items: unknown[]): FavoriteLookup => {
+  const lookup: FavoriteLookup = {
+    promptIdBySourceId: new Map(),
+    promptIdByText: new Map(),
+    imageIdBySourceId: new Map(),
+    imageIdByStorageId: new Map(),
+    imageIdByOriginalUrl: new Map(),
+    imageIdByApiResultUrl: new Map(),
+    imageIdByUrl: new Map(),
+  };
+
+  items.forEach((rawItem) => {
+    const item = rawItem as Record<string, unknown>;
+    const id = typeof item.id === 'string' ? item.id : '';
+    if (!id) return;
+
+    if (item.kind === 'favorite-prompt') {
+      if (typeof item.sourcePromptId === 'string' && item.sourcePromptId) {
+        lookup.promptIdBySourceId.set(item.sourcePromptId, id);
+      }
+      if (typeof item.prompt === 'string') {
+        const promptText = item.prompt.trim();
+        if (promptText) {
+          lookup.promptIdByText.set(promptText, id);
+        }
+      }
+      return;
+    }
+
+    if (item.kind === 'favorite-image') {
+      if (typeof item.sourceImageId === 'string' && item.sourceImageId) {
+        lookup.imageIdBySourceId.set(item.sourceImageId, id);
+      }
+      if (typeof item.storageId === 'string' && item.storageId) {
+        lookup.imageIdByStorageId.set(item.storageId, id);
+      }
+      if (typeof item.originalUrl === 'string' && item.originalUrl) {
+        lookup.imageIdByOriginalUrl.set(item.originalUrl, id);
+      }
+      if (typeof item.apiResultUrl === 'string' && item.apiResultUrl) {
+        lookup.imageIdByApiResultUrl.set(item.apiResultUrl, id);
+      }
+      if (typeof item.url === 'string' && item.url) {
+        lookup.imageIdByUrl.set(item.url, id);
+      }
+    }
+  });
+
+  return lookup;
+};
+
+const getPromptFavoriteId = (lookup: FavoriteLookup, prompt: { id: string; prompt: string }) => (
+  lookup.promptIdBySourceId.get(prompt.id)
+  || lookup.promptIdByText.get(prompt.prompt.trim())
+  || null
+);
+
+const getImageFavoriteId = (lookup: FavoriteLookup, image: {
+  id: string;
+  storageId?: string | null;
+  originalUrl?: string | null;
+  apiResultUrl?: string | null;
+  url?: string | null;
+}) => (
+  lookup.imageIdBySourceId.get(image.id)
+  || (image.storageId ? lookup.imageIdByStorageId.get(image.storageId) : undefined)
+  || (image.originalUrl ? lookup.imageIdByOriginalUrl.get(image.originalUrl) : undefined)
+  || (image.apiResultUrl ? lookup.imageIdByApiResultUrl.get(image.apiResultUrl) : undefined)
+  || (image.url ? lookup.imageIdByUrl.get(image.url) : undefined)
+  || null
+);
+
 export function useSelectionMenuOverlay({
   activeCanvas,
   canvasTransform,
@@ -65,6 +147,7 @@ export function useSelectionMenuOverlay({
   const removeFavorite = useFavoritesStore((state) => state.removeFavorite);
 
   const selectedNodeIdSet = React.useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+  const favoriteLookup = React.useMemo(() => buildFavoriteLookup(favoriteItems), [favoriteItems]);
 
   React.useEffect(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || favoritesLoaded) {
@@ -211,38 +294,23 @@ export function useSelectionMenuOverlay({
     }
 
     const currentFavoriteItems = useFavoritesStore.getState().items;
+    const currentFavoriteLookup = buildFavoriteLookup(currentFavoriteItems);
     const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
     const images = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
 
-    // 计算哪些已被收藏
     const itemsToRemoveFavoriteIds: string[] = [];
 
-    prompts.forEach(p => {
-      const fav = currentFavoriteItems.find(item => (
-        item.kind === 'favorite-prompt'
-        && (
-          item.sourcePromptId === p.id
-          || item.prompt.trim() === p.prompt.trim()
-        )
-      ));
-      if (fav) {
-        itemsToRemoveFavoriteIds.push(fav.id);
+    prompts.forEach((prompt) => {
+      const favId = getPromptFavoriteId(currentFavoriteLookup, prompt);
+      if (favId) {
+        itemsToRemoveFavoriteIds.push(favId);
       }
     });
 
-    images.forEach(img => {
-      const fav = currentFavoriteItems.find(item => (
-        item.kind === 'favorite-image'
-        && (
-          item.sourceImageId === img.id
-          || (!!img.storageId && item.storageId === img.storageId)
-          || (!!img.originalUrl && item.originalUrl === img.originalUrl)
-          || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
-          || (!!img.url && item.url === img.url)
-        )
-      ));
-      if (fav) {
-        itemsToRemoveFavoriteIds.push(fav.id);
+    images.forEach((image) => {
+      const favId = getImageFavoriteId(currentFavoriteLookup, image);
+      if (favId) {
+        itemsToRemoveFavoriteIds.push(favId);
       }
     });
 
@@ -257,31 +325,14 @@ export function useSelectionMenuOverlay({
         notify.success('取消收藏成功', '已取消收藏选中节点');
       } else {
         // 收藏未收藏的
-        for (const p of prompts) {
-          const fav = currentFavoriteItems.find(item => (
-            item.kind === 'favorite-prompt'
-            && (
-              item.sourcePromptId === p.id
-              || item.prompt.trim() === p.prompt.trim()
-            )
-          ));
-          if (!fav) {
-            await addPromptFavorite(p);
+        for (const prompt of prompts) {
+          if (!getPromptFavoriteId(currentFavoriteLookup, prompt)) {
+            await addPromptFavorite(prompt);
           }
         }
-        for (const img of images) {
-          const fav = currentFavoriteItems.find(item => (
-            item.kind === 'favorite-image'
-            && (
-              item.sourceImageId === img.id
-              || (!!img.storageId && item.storageId === img.storageId)
-              || (!!img.originalUrl && item.originalUrl === img.originalUrl)
-              || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
-              || (!!img.url && item.url === img.url)
-            )
-          ));
-          if (!fav) {
-            await addImageFavorite(img);
+        for (const image of images) {
+          if (!getImageFavoriteId(currentFavoriteLookup, image)) {
+            await addImageFavorite(image);
           }
         }
         notify.success('收藏成功', '已将选中节点添加至收藏');
@@ -373,27 +424,8 @@ export function useSelectionMenuOverlay({
     const isolatedResultCount = isolatedImages.length;
 
     // 计算是否全部已收藏
-    const promptFavCount = selectedPrompts.filter(p => {
-      return favoriteItems.some(item => (
-        item.kind === 'favorite-prompt'
-        && (
-          item.sourcePromptId === p.id
-          || item.prompt.trim() === p.prompt.trim()
-        )
-      ));
-    }).length;
-    const imageFavCount = selectedImages.filter(img => {
-      return favoriteItems.some(item => (
-        item.kind === 'favorite-image'
-        && (
-          item.sourceImageId === img.id
-          || (!!img.storageId && item.storageId === img.storageId)
-          || (!!img.originalUrl && item.originalUrl === img.originalUrl)
-          || (!!img.apiResultUrl && item.apiResultUrl === img.apiResultUrl)
-          || (!!img.url && item.url === img.url)
-        )
-      ));
-    }).length;
+    const promptFavCount = selectedPrompts.filter((prompt) => Boolean(getPromptFavoriteId(favoriteLookup, prompt))).length;
+    const imageFavCount = selectedImages.filter((image) => Boolean(getImageFavoriteId(favoriteLookup, image))).length;
     const totalSelected = selectedPrompts.length + selectedImages.length;
     const isAllFavorite = totalSelected > 0 && (promptFavCount + imageFavCount === totalSelected);
 
@@ -451,7 +483,7 @@ export function useSelectionMenuOverlay({
     selectedNodeIds,
     selectedNodeIdSet,
     activeCanvas,
-    favoriteItems,
+    favoriteLookup,
     handleDeleteSelectionMenuNodes,
     handleGroupSelectionMenuNodes,
     onTag,
