@@ -302,7 +302,7 @@ function startServer(port = Number(process.env.PORT || DEFAULT_PORT), options = 
   const { startReconciliationDaemon } = require('./lib/dispatcher/reconciliation');
   startReconciliationDaemon();
   const runtimeApp = options.app || app;
-  return runtimeApp.listen(port, () => {
+  return runtimeApp.listen(port, '0.0.0.0', () => {
     console.log(`[server] 后端主服务已启动，正在运行在端口 :${port}`);
   });
 }
