@@ -43,7 +43,6 @@ Database migrations: migrations/
 - `apps/payment-sidecar/`
 - 根 `billing/`
 - `payment-server/`
-- `netlify/functions/`
 - 旧版本说明、旧部署说明和旧迁移计划
 
 如果必须读取历史实现，只能通过明确的 adapter/service 隔离，并写明替代方案和删除条件。
