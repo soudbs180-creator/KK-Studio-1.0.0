@@ -4,7 +4,7 @@
  * @description Vercel serverless 通用用户模型反代网关。基于 Provider 注册表（providerProfiles）
  *              动态白名单校验域名，转发用户自有密钥的模型请求至已注册的上游 Provider API。
  * @author KK-Studio Team
- * @version 1.5.7
+ * @version 1.5.8
  */
 
 import { createRequire } from 'node:module';

@@ -1,6 +1,6 @@
 # UI 映射表 (UI Map)
 
-本文件维护 KK Studio v1.5.7 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
+本文件维护 KK Studio v1.5.8 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
 
 ---
 
@@ -29,7 +29,7 @@
 
 AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、提交生成、整理卡片、批量生成等操作应优先调用 ToolRegistry 或 Context API。按钮移动到别的位置时，需要更新本 UI Map 和对应 Skill/Runbook，但不应改变 `ui.openSettings`、`generation.submitComposer` 等工具语义。
 
-Current AI ?? selector source of truth for KK Studio v1.5.7.
+Current AI ?? selector source of truth for KK Studio v1.5.8.
 
 ## 3. Canvas Group Controls - 2026-06-05
 

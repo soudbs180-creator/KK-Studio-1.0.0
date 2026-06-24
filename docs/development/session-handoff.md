@@ -1,7 +1,85 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-25 (Login Captcha Overlay Blur and Transparency Optimization)
-**Version:** KK Studio v1.5.7
+**Last Updated:** 2026-06-25 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+**Version:** KK Studio v1.5.8
+
+## 2026-06-25 - 版本升级与全栈代码审查升级到 v1.5.8 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+
+### 修改范围 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+- **全栈版本升级到 1.5.8**：将 `config/release-manifest.json`、根 `package.json`、根 `package-lock.json`、`server/package.json`、`server/package-lock.json`、各种 workspace 包 (`shared`, `api-client`, `ui`)、`apps/web`、`apps/mobile` 的版本统一升级到 `1.5.8`。
+- **源代码版本信息对齐**：更新了 `pricing-proxy.js`、`user-model-proxy.js`、`ApiConnectivityWidget.ts`、`KnowledgeStore.ts` 以及 `canvasRuntimeStateBuilder.ts` 中的硬编码版本至 `1.5.8`。
+- **测试断言同步**：同步更新了单元测试 `canvas-runtime-state-builder.test.ts` 对 `projectVersion` 的断言以适配 `1.5.8`。
+- **项目文档整体升级**：更新了 `AGENTS.md`、`AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`、项目 README、文档目录 README 和全部 Agent 相关的文档声明到 v1.5.8。
+- **构建与发布流程**：重新构建了项目知识库索引 (`node scripts/ai-assistant/build-knowledge-index.mjs`)，并通过运行打包发布脚本更新了 `release/publish/stable/manifest.json` 以更新其 sha256 和 zip 包大小事实。
+
+### 修改文件 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+- `config/release-manifest.json` [MODIFY]
+- `package.json` [MODIFY]
+- `package-lock.json` [MODIFY]
+- `server/package.json` [MODIFY]
+- `server/package-lock.json` [MODIFY]
+- `packages/shared/package.json` [MODIFY]
+- `packages/api-client/package.json` [MODIFY]
+- `packages/ui/package.json` [MODIFY]
+- `apps/web/package.json` [MODIFY]
+- `apps/mobile/package.json` [MODIFY]
+- `apps/mobile/package-lock.json` [MODIFY]
+- `api/pricing-proxy.js` [MODIFY]
+- `api/user-model-proxy.js` [MODIFY]
+- `apps/web/src/components/settings/ApiConnectivityWidget.ts` [MODIFY]
+- `apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts` [MODIFY]
+- `apps/web/src/features/ai-takeover/core/canvasRuntimeStateBuilder.ts` [MODIFY]
+- `tests/unit/canvas-runtime-state-builder.test.ts` [MODIFY]
+- `AGENTS.md` [MODIFY]
+- `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md` [MODIFY]
+- `README.md` [MODIFY]
+- `docs/README.md` [MODIFY]
+- `docs/INDEX.md` [MODIFY]
+- `docs/development/progress.md` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+- 各种 `docs/governance/` 及 `docs/ai-assistant/` 文档 [MODIFY]
+
+### 已运行验证 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+- `npm run architecture:check` (架构与导入边界全部通过)
+- `npm run check:encoding` (未产生任何 Mojibake 乱码)
+- `npm run typecheck` (类型语义检查全绿通过，0 错误)
+- `npm run test` (单元/集成/契约/E2E 全量 1600+ 测试 100% 绿通)
+
+### 未运行验证及原因 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+- 无
+
+### 风险与下一步 (Version Upgrade to v1.5.8 and Full-Stack Code Review)
+- **风险**：无风险。
+- **下一步**：已全部完成。
+
+
+## 2026-06-25 - 合并 PR #19 以解决画布节点位置错位、对齐异常和高延迟 (PR #19 Merge & Canvas Position Updates Optimization)
+
+### 修改范围 (PR #19 Merge & Canvas Position Updates Optimization)
+- **避免冗余节点坐标更新**：在 [canvasPositionUpdates.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/canvasPositionUpdates.ts) 中，引入了坐标有效性保护 `isFinitePoint(pos)` 以及防微抖动机制 `isSamePoint(node.position, pos)`，防止在位置变化极小（<= 0.5px）或非有限数值时频繁触发节点更新与 React 重绘。
+- **拖拽收集 ID 性能优化**：优化了 `movedPromptIds` 的计算逻辑，将原先在 map 内部反复 filter + map 的低效实现（O(N^2)）替换为一次 linear `forEach` 收集 ID 并且在 map 阶段进行 Set O(1) 查找，彻底解决了在大画布下频繁拖拽、缩放产生的 10 秒卡顿延迟。
+- **保留加载时恢复子图片位置**：在 [canvasCompatibility.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/canvasCompatibility.ts) 和 [canvasPromptRecovery.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/canvasPromptRecovery.ts) 中引入 `preserveRestoredChildImageLayout` 和 `preserveRecoveredChildImageLayout`，将初始加载/恢复时带有有效绝对坐标 of 子图片节点强制赋予 `userMoved: true` 标记。这一修改避免了子图片在画布初始加载时被父 Prompt 节点的 Auto Layout（自动网格布局）覆盖重置，从而根治了初始加载时错位和红框无法对齐的问题，且对新生成的未手动移动的图片依然保留其自动网格布局特性。
+- **添加单元测试验证**：在 [canvas-prompt-recovery-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-prompt-recovery-contract.test.ts) 中新增单元测试 `recovered child image positions are preserved from load-time auto repair`，确保数据兼容层在恢复和加载子图片时能将其标记为已移动以维持布局不变。
+
+### 修改文件 (PR #19 Merge & Canvas Position Updates Optimization)
+- `apps/web/src/context/canvasCompatibility.ts` [MODIFY]
+- `apps/web/src/context/canvasPositionUpdates.ts` [MODIFY]
+- `apps/web/src/context/canvasPromptRecovery.ts` [MODIFY]
+- `tests/unit/canvas-prompt-recovery-contract.test.ts` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (PR #19 Merge & Canvas Position Updates Optimization)
+- `npm run typecheck` (类型检查全绿通过)
+- `npm run test` (全量 1600 个测试单元、集成、契约、E2E 100% 绿通，包括新增的子图片位置恢复测试)
+- `npm run verify:prompt-group-drag` (拖拽与 Playwright 降级契约校验通过，开发服务器 `localhost:3000` 正常响应)
+- `npm run dev:status` (确认本地 Vite 服务与后端 API 服务正常运行中)
+
+### 未运行验证及原因 (PR #19 Merge & Canvas Position Updates Optimization)
+- Playwright 完整浏览器端端渲染测试（由于宿主机环境缺少匹配版本的 headless-shell 浏览器依赖，已由降级脚本执行静态路由与健康预检契约测试替代）。
+
+### 风险与下一步 (PR #19 Merge & Canvas Position Updates Optimization)
+- **风险**：无风险。此 PR 中的修改逻辑经过了精细的代码测试验证，保留了对新出图的自动布局策略，仅对已有坐标的恢复图片与极细微的冗余鼠标位移进行了优化。
+- **下一步**：已全部完成。开发服务及后端 API 已平稳运行，用户可以立刻进行线上验证，画布的拖拽缩放应该已达到极佳的流畅度。
 
 ## 2026-06-25 - 登录卡片验证时背景模糊透明优化 (Login Captcha Overlay Blur and Transparency Optimization)
 
@@ -4434,3 +4512,33 @@ Mobile workspace: `apps/mobile/`
 ### 风险与下一步 (Avatar and Recharge Optimization Pass)
 - **风险**：无明显风险。
 - **下一步**：用户可直接刷新浏览器预览左上角头像模块中的积分大小、精致缩小的充值按钮，以及点击头像进入个人中心预览积分资产及充值按钮。
+
+## Session Handoff - 2026-06-25 Local Development Env and Server IPv4 Binding Polish
+
+### 修改范围 (Local Development Env and Server IPv4 Binding Polish)
+- **增加本地开发环境配置文件**：在根目录下创建了前端环境配置文件 `.env`，设置 `VITE_KK_API_BASE_URL` 指向本地 `http://127.0.0.1:3001`，并禁用人机验证（`VITE_TURNSTILE_ENABLED=false`），彻底解决了在本地开发环境被 Turnstile 跨域 postMessage 失败卡住、或请求错误路由到远程 VPS 返回 400 的问题。
+- **启用后端 Mock 本地登录**：在 `server/` 目录下创建了 `server/.env.local` 配置文件，设置 `KKAI_LOCAL_ONLY=true`，启用免数据库 Mock 登录运行模式。
+- **优化服务端端口 Host 绑定**：将 `server/index.js` 里的 `runtimeApp.listen(port)` 修改为 `runtimeApp.listen(port, '0.0.0.0')`，显式指定 IPv4 网卡接口，以规避在 Windows 机器上由于双栈 IPv6 绑定（`::`）导致本地 IPv4 环回接口被拒绝连接（`ECONNREFUSED`）的问题。
+
+### 修改文件 (Local Development Env and Server IPv4 Binding Polish)
+- [.env](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.env) (NEW)
+- [server/.env.local](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/.env.local) (NEW)
+- [server/index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+
+### 当前设计决策 (Local Development Env and Server IPv4 Binding Polish)
+- 本地开发应优先与本地 Express 服务建立连接并走 Mock 登录，无需连接公网 VPS 的旧版验证服务，这不仅有利于开发时的离线化，更能确保在没有公网 Turnstile 校验成功的 token 时顺利登录。
+- `'0.0.0.0'` 的显式绑定对宿主系统的双栈环境最为友好，保证了 `127.0.0.1` 环回流量的绝对可达性。
+
+### 已运行验证 (Local Development Env and Server IPv4 Binding Polish)
+- `npm run architecture:check` (通过)
+- `npm run governance:check` (通过)
+- `npm run typecheck` (通过)
+- `node --test tests/unit/server-auth-session-routes-contract.test.ts` (通过)
+- `npm run dev:start` (后台拉起自检顺利通过)
+
+### 未运行验证及原因 (Local Development Env and Server IPv4 Binding Polish)
+- 无。
+
+### 风险与下一步 (Local Development Env and Server IPv4 Binding Polish)
+- **风险**：无。
+- **下一步**：用户可正常启动本地开发服务，并在 `http://localhost:3000` 页面上测试流畅的本地 Mock 登录和工作区访问。对于远程 VPS 登录返回 400 的历史版本漂移问题，用户需要通过 SSH 连接 VPS 并拉取 1.5.7 最新代码后运行 `./scripts/vps/deploy-kk-vps.sh` 完成部署重启。

@@ -3,7 +3,7 @@
  * @description 生产级高性能、防重排、零依赖的原生 API 连通性测试微组件。
  *              采用 CSS3 硬件加速与磨砂玻璃（Glassmorphism）极简质感，提供无阻塞的异步视觉反馈。
  * @author KK-Studio Team
- * @version 1.5.7
+ * @version 1.5.8
  */
 
 // 动态注入微组件所需的极致轻量级现代 CSS 样式

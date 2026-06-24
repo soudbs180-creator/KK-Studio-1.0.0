@@ -3,7 +3,7 @@
  * @module api
  * @description Vercel serverless proxy for the public Wuyin model and pricing catalog.
  * @author KK-Studio Team
- * @version 1.5.7
+ * @version 1.5.8
  */
 
 import { createRequire } from 'node:module';

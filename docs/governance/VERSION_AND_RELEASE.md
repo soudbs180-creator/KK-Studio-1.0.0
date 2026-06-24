@@ -7,7 +7,7 @@
 
 ## 1. 版本事实控制
 
-- **发布真理源**：以根目录 `config/release-manifest.json` 的版本号 `v1.5.7` 为全项目 Workspace 版本的唯一最高事实。
+- **发布真理源**：以根目录 `config/release-manifest.json` 的版本号 `v1.5.8` 为全项目 Workspace 版本的唯一最高事实。
 - **投影同步**：各 Workspace 的 `package.json` 中的 `version` 字段仅作为发布打包时的脚手架自动投影，手动修改无效且会被 CI 拦截。
 
 ---

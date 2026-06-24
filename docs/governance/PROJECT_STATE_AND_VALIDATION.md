@@ -1,12 +1,12 @@
 <!-- AI_ROUTING_KEY: state, validation, verification, milestone, handoff -->
-# Project State and Validation — KK Studio v1.5.7
+# Project State and Validation — KK Studio v1.5.8
 
 Last updated: 2026-06-09
 
 ## 0. 当前验证基线
 
 ```text
-Project version: KK Studio v1.5.7
+Project version: KK Studio v1.5.8
 Version source of truth: config/release-manifest.json
 Node / package manager: root package.json engines.node and packageManager
 AI rules entry: AGENTS.md
@@ -84,7 +84,7 @@ npm run build
 ### Scope
 
 - 将 Agent 入口文档重写为当前事实和修改边界，移除旧版本主动口径。
-- 将项目状态文档收敛到 KK Studio v1.5.7。
+- 将项目状态文档收敛到 KK Studio v1.5.8。
 - 增加 `governance:current`，阻止旧版本、旧入口和旧后端描述重新成为当前事实。
 
 ### Files touched
