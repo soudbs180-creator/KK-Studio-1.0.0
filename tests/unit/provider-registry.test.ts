@@ -120,6 +120,14 @@ describe("Provider Registry & Zod Schema Tests", () => {
       assert.equal(geminiOfficial.auth.keyRef, "GEMINI_API_KEY");
     });
 
+    test("keeps relay key references isolated by relay identity", () => {
+      const gptBest = getProvider("gpt-best-openai-compatible");
+      assert.ok(gptBest, "应当能检索到 GPT-Best relay 供应商");
+      assert.equal(gptBest.kind, "relay");
+      assert.equal(gptBest.auth.keyRef, "GPT_BEST_API_KEY");
+      assert.notEqual(gptBest.auth.keyRef, "VODESHOP_API_KEY");
+    });
+
     test("returns null for non-existent provider", () => {
       const none = getProvider("non-existent-provider-id");
       assert.equal(none, null);
