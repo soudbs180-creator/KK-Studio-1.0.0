@@ -89,11 +89,16 @@ export function moveSelectedCanvasNodes(input: {
         }
         : canvas.workflow;
 
+    const parentPromptIdByImageId = new Map<string, string | undefined>();
+    imageNodes.forEach((imageNode) => {
+        parentPromptIdByImageId.set(imageNode.id, imageNode.parentPromptId);
+    });
+
     const drawings = (canvas.drawings || []).map((drawing) => {
         const isBoundToMovedNode = drawing.bindingNodeId && selectedSet.has(drawing.bindingNodeId);
         const isBoundToMovedGroup = drawing.bindingGroupId && selectedSet.has(drawing.bindingGroupId);
         const parentPromptId = drawing.bindingNodeId
-            ? imageNodes.find((img) => img.id === drawing.bindingNodeId)?.parentPromptId
+            ? parentPromptIdByImageId.get(drawing.bindingNodeId)
             : undefined;
         const isMovingWithParentPrompt = parentPromptId && movedPromptIds.has(parentPromptId);
 
