@@ -19,6 +19,7 @@ const keyManagerPresetPath = resolve(repoRoot, 'apps/web/src/services/auth/keyMa
 const apiSettingsPresetPath = resolve(repoRoot, 'apps/web/src/components/settings/apiProviderPresets.ts');
 const frontendProviderRegistryPath = resolve(repoRoot, 'apps/web/src/services/api/providerRegistry.ts');
 const providerDisplayPath = resolve(repoRoot, 'apps/web/src/utils/providerDisplay.ts');
+const providerStrategyPath = resolve(repoRoot, 'apps/web/src/services/api/providerStrategy.ts');
 
 const errors = [];
 const warnings = [];
@@ -34,6 +35,17 @@ const REQUIRED_RELAY_HOST_PATTERNS = [
   'gpt-best\\.com',
   'wuyinkeji\\.com',
   '12ai\\.org',
+];
+
+const EXPECTED_RUNTIME_STRATEGIES = [
+  { id: 'openrouter', label: 'OpenRouter' },
+  { id: '12ai', label: '12AI' },
+  { id: 'wuyinkeji', label: 'Wuyin / Suchuang' },
+  { id: 'gpt-best', label: 'GPT-Best' },
+];
+
+const EXPECTED_RUNTIME_STRATEGY_GAPS = [
+  { id: 'apimart', label: 'APIMart', reason: 'APIMart exists in RequestProfile/API Settings metadata but still needs a dedicated providerStrategy mapping.' },
 ];
 
 function readSource(filePath) {
@@ -141,10 +153,24 @@ function checkDisplayIdentityGovernance(frontendRegistrySource, providerDisplayS
   }
 }
 
+function checkRuntimeStrategyCoverage(providerStrategySource) {
+  for (const strategy of EXPECTED_RUNTIME_STRATEGIES) {
+    if (!providerStrategySource.includes(`id: '${strategy.id}'`)) {
+      errors.push(`R9 providerStrategy.ts 缺少运行时策略: ${strategy.label} (${strategy.id})。`);
+    }
+  }
+  for (const gap of EXPECTED_RUNTIME_STRATEGY_GAPS) {
+    if (!providerStrategySource.includes(`id: '${gap.id}'`)) {
+      warnings.push(`R9 运行时策略待补齐: ${gap.label} (${gap.id})。${gap.reason}`);
+    }
+  }
+}
+
 const keyManagerSource = readSource(keyManagerPresetPath);
 const apiSettingsSource = readSource(apiSettingsPresetPath);
 const frontendProviderRegistrySource = readSource(frontendProviderRegistryPath);
 const providerDisplaySource = readSource(providerDisplayPath);
+const providerStrategySource = readSource(providerStrategyPath);
 
 const keyManagerEntries = collectKeyManagerPresets(keyManagerSource);
 const apiSettingsEntries = collectApiSettingsPresets(apiSettingsSource);
@@ -159,6 +185,7 @@ if (apiSettingsEntries.length === 0) {
 checkDuplicateHosts(keyManagerEntries);
 checkDuplicateHosts(apiSettingsEntries);
 checkDisplayIdentityGovernance(frontendProviderRegistrySource, providerDisplaySource);
+checkRuntimeStrategyCoverage(providerStrategySource);
 
 console.log(`[governance:frontend-providers] keyManager presets=${keyManagerEntries.length}, api settings relay presets=${apiSettingsEntries.length}`);
 for (const warning of warnings) console.log(`  [WARN] ${warning}`);
@@ -169,4 +196,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`\n[PASS] 前端 Provider 预设治理通过，${warnings.length} 项历史别名告警。`);
+console.log(`\n[PASS] 前端 Provider 预设治理通过，${warnings.length} 项历史别名/运行时缺口告警。`);
