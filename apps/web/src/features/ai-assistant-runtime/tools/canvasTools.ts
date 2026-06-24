@@ -84,7 +84,8 @@ export const canvasTools: AgentToolDefinition[] = [
       const matched = nodes.find((n: any) =>
         (n.prompt || '').toLowerCase().includes(keyword.toLowerCase()) ||
         (n.optimizedPromptEn || '').toLowerCase().includes(keyword.toLowerCase()) ||
-        (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase())
+        (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase()) ||
+        (n.tags || []).some((t: string) => t.toLowerCase().includes(keyword.toLowerCase()))
       );
 
       if (matched) {
@@ -96,7 +97,10 @@ export const canvasTools: AgentToolDefinition[] = [
           }
         });
         window.dispatchEvent(locateEvent);
-        notify.success('卡片定位成功', `已为您平滑定位至包含“${keyword}”的卡片。`);
+        if (typeof ctx.selectNodes === 'function') {
+          ctx.selectNodes([matched.id], 'replace');
+        }
+        notify.success('卡片定位成功', `已为您平滑定位至包含“${keyword}”的卡片并选中。`);
       } else {
         notify.warning('定位失败', `在当前画布上未找到包含“${keyword}”的卡片。`);
       }

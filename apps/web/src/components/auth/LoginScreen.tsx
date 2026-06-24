@@ -232,7 +232,9 @@ const LoginScreen: React.FC = () => {
 
 
 
-  const handleTurnstileVerify = useCallback((token: string) => { setCaptchaRequiredByBackend(false); handleVerify(token); }, [handleVerify]);
+  const handleTurnstileVerify = useCallback((token: string) => {
+    handleVerify(token);
+  }, [handleVerify]);
   const handleTurnstileError = useCallback((nextError: string) => { handleError(nextError); if (captchaRequiredByBackend) setError(nextError); }, [captchaRequiredByBackend, handleError]);
   const handleTurnstileExpire = useCallback(() => { handleExpire(); setCaptchaRequiredByBackend(true); }, [handleExpire]);
   const handleTurnstileStatusChange = useCallback((status: TurnstileStatus) => { setTurnstileWidgetStatus(status); }, []);
@@ -339,7 +341,10 @@ const LoginScreen: React.FC = () => {
         return;
       } catch (authError) {
         lastError = authError;
-        if (isCaptchaError(authError)) setCaptchaRequiredByBackend(true);
+        if (isCaptchaError(authError)) {
+          setCaptchaRequiredByBackend(true);
+          if (turnstileAvailable) resetTurnstile();
+        }
         if (isNetworkError(authError) && index < MAX_RETRY - 1) {
           setError(t(`网络连接不稳定，正在重试（${index + 1}/${MAX_RETRY}）...`, `Network looks unstable. Retrying (${index + 1}/${MAX_RETRY})...`));
           await sleep(900);

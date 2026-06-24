@@ -1302,7 +1302,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     top: 0,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    willChange: isDragging ? 'transform' : 'auto',
+                    willChange: isDragging ? 'left, top' : 'auto',
                     transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                     pointerEvents: 'auto',
                     touchAction: 'none'
@@ -1472,7 +1472,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 zIndex: effectiveStackZIndex,
                 opacity: 1,
                 cursor: isDragging ? 'grabbing' : 'grab',
-                willChange: isDragging ? 'transform' : 'auto',
+                willChange: isDragging ? 'left, top' : 'auto',
                 transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                 pointerEvents: 'auto',
                 touchAction: 'none'

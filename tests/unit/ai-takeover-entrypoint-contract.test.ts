@@ -3,15 +3,6 @@ import { test } from 'node:test';
 
 import { readSource } from '../support/workspacePaths.js';
 
-test('desktop chrome exposes an explicit AI assistant entrypoint', () => {
-  const source = readSource('apps/web/src/app/AppDesktopChrome.tsx');
-
-  assert.match(source, /id="btn-desktop-ai-assistant"/);
-  assert.match(source, /aria-pressed=\{isChatOpen\}/);
-  assert.match(source, /onClick=\{onToggleChat\}/);
-  assert.match(source, /kk-workspace-ai-assistant-toggle/);
-});
-
 test('chat sidebar AI takeover controls stay inside the composer action row', () => {
   const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 

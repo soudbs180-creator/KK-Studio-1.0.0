@@ -14,11 +14,11 @@ import {
   type AgentRunTimelineStep,
 } from '../../ai-assistant-runtime';
 
-type LlmChat = typeof import('../../../services/llm/LLMService')['llmService']['chat'];
+type LlmChat = typeof import('../../../services/llm/generationService')['generationService']['chat'];
 
 const chatWithLlm: LlmChat = async (...args) => {
-  const { llmService } = await import('../../../services/llm/LLMService');
-  return llmService.chat(...args);
+  const { generationService } = await import('../../../services/llm/generationService');
+  return generationService.chat(...args);
 };
 
 interface Message {
@@ -51,6 +51,7 @@ interface AITakeoverContextType {
   onOpenSettings?: (view?: any) => void;
   notify?: any;
   activeCanvas?: any;
+  selectNodes?: (ids: string[], mode?: any) => void;
 }
 
 const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
@@ -69,6 +70,7 @@ interface AITakeoverProviderProps {
   addGroup?: (group: any) => void;
   updateGroup?: (group: any) => void;
   setNodeTags?: (ids: string[], tags: string[]) => void;
+  selectNodes?: (ids: string[], mode?: any) => void;
   setConfig: React.Dispatch<React.SetStateAction<any>>;
   onOpenSettings?: (view?: any) => void;
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
@@ -95,6 +97,7 @@ export function AITakeoverProvider({
   addGroup,
   updateGroup,
   setNodeTags,
+  selectNodes,
   setConfig,
   onOpenSettings,
   apiKeyStatus,
@@ -240,6 +243,7 @@ export function AITakeoverProvider({
       addGroup,
       updateGroup,
       setNodeTags,
+      selectNodes: selectNodesRef.current,
       setConfig,
       onOpenSettings,
       notify,
@@ -254,7 +258,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
 
 
   // 发送消息
@@ -374,6 +378,7 @@ export function AITakeoverProvider({
   const addGroupRef = useRef(addGroup);
   const updateGroupRef = useRef(updateGroup);
   const setNodeTagsRef = useRef(setNodeTags);
+  const selectNodesRef = useRef(selectNodes);
 
   useEffect(() => {
     activeCanvasRef.current = activeCanvas;
@@ -387,6 +392,7 @@ export function AITakeoverProvider({
     addGroupRef.current = addGroup;
     updateGroupRef.current = updateGroup;
     setNodeTagsRef.current = setNodeTags;
+    selectNodesRef.current = selectNodes;
   });
 
   useEffect(() => {
@@ -603,7 +609,8 @@ export function AITakeoverProvider({
         isCompressing,
         onOpenSettings,
         notify,
-        activeCanvas
+        activeCanvas,
+        selectNodes
       }}
     >
       {children}

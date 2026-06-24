@@ -1,7 +1,31 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-24 (Fix Test File Garbled Characters)
+**Last Updated:** 2026-06-24 (Optimize Login Design & Security Verification)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-24 - 优化登录框外观设计与安全验证自动提交逻辑
+
+### 修改范围 (Login Modal Design & Security Auto-Submit Logic Optimization)
+- **卡片全部亮色化**：彻底移除了暗色模式下将登录面板覆盖为深灰色背景的样式声明。现在，无论系统或浏览器处于何种明暗模式下，登录卡片（Modal）都会始终呈现优雅亮丽的玻璃磨砂半透明高对比度设计，且叉号关闭按钮也保持亮色高清晰设计。
+- **修复浏览器自动填充颜色条**：修复了暗色模式样式声明的特异性选择器中由于漏写 `transition` 延迟和 `box-shadow` 重置，导致 Chrome 等浏览器在记住并自动填充账号密码时，在输入框内部渲染出生硬的灰蓝色默认背景条块的缺陷。
+- **极致安全验证遮罩模糊**：对安全人机验证（Turnstile）弹出时的 `.auth-captcha-overlay` 遮罩进行了升级。将圆角从 `18px` 拓宽为 `24px` 以完美贴合面板；去除了暗色模式下不透光（`0.88`）的深灰遮罩，统一呈现为低透明度（`0.62`）、高模糊（`blur(32px)`）的透亮玻璃，让底下的登录表单完美隐约透出，保证质感与标题/描述高对比度可读。
+- **修复验证通过自动登录逻辑**：修复了 Turnstile 完成验证回调 `handleTurnstileVerify` 中提前调用 `setCaptchaRequiredByBackend(false)` 导致自动登录 `useEffect` 的触发条件失效、进而无法自动提交表单的缺陷。现在，用户完成安全验证后，浮层会自动隐藏并直接帮用户提交登录，无缝进入工作区。
+
+### 修改文件 (Login Modal Design & Security Auto-Submit Logic Optimization)
+- `apps/web/src/components/auth/LoginScreen.tsx` [MODIFY]
+- `apps/web/src/components/auth/LoginScreen.css` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Login Modal Design & Security Auto-Submit Logic Optimization)
+- `npm run typecheck` (类型检查全绿通过，0 错误)
+- `npm run build` (生产环境下 Vite 编译打包顺利完成，各模块构建包均成功生成)
+
+### 未运行验证及原因 (Login Modal Design & Security Auto-Submit Logic Optimization)
+- 无
+
+### 风险与下一步 (Login Modal Design & Security Auto-Submit Logic Optimization)
+- **风险**：无风险。所有样式和逻辑调整均在登录屏幕内部且保持原有 API 契约一致。
+- **下一步**：已跑通所有本地类型检查与打包构建，可交付用户部署和查验最终的高级视觉体验。
 
 ## 2026-06-24 - 修复测试文件物理乱码与繁体字符
 

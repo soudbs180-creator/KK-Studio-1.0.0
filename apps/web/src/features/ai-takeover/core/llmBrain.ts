@@ -1,10 +1,10 @@
 // 简体中文：云端大模型接管规划器 (LLM Brain)
 import type { AssistantPlan, SanitizedProjectContext } from '../types';
-type LlmChat = typeof import('../../../services/llm/LLMService')['llmService']['chat'];
+type LlmChat = typeof import('../../../services/llm/generationService')['generationService']['chat'];
 
 const chatWithLlm: LlmChat = async (...args) => {
-  const { llmService } = await import('../../../services/llm/LLMService');
-  return llmService.chat(...args);
+  const { generationService } = await import('../../../services/llm/generationService');
+  return generationService.chat(...args);
 };
 
 export class LLMBrain {

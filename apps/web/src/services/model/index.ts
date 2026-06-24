@@ -1,5 +1,4 @@
 export { adminModelService, type AdminModelConfig, type AdminProvider, type AdminModelRouteSelectionContext } from './adminModelService';
-export { unifiedModelService } from './unifiedModelService';
 export {
   type SecureProxyChatMessage,
   type SecureProxyUserRoute,

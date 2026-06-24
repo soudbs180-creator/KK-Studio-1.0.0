@@ -7,7 +7,7 @@ import {
   buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
-import type { GenerateImageResult } from '../services/llm/geminiService';
+import type { GenerateImageResult } from '../services/llm/generationService';
 import type { VideoGenerationResult } from '../services/llm/LLMAdapter';
 import { adminModelService } from '../services/model/adminModelService';
 import { getModelCapabilities } from '../services/model/modelCapabilities';

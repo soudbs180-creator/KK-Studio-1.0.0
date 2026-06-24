@@ -131,6 +131,34 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   const hasRetryGenerationCommand = /重试|重新跑|再试|retry|rerun/i.test(cleanInput);
   const hasFailedBatchTarget = Boolean(retryJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
 
+  // 简体中文：支持直接输入画布中已有卡片的提示词或标签进行快速智能跳转定位（防抢占保护）
+  if (context?.canvas) {
+    const promptNodes = context.canvas.promptNodes || [];
+    const imageNodes = context.canvas.imageNodes || [];
+    const hasMatchedNodeInCanvas = promptNodes.some((n: any) =>
+      (n.prompt || '').toLowerCase().includes(lowerInput) ||
+      (n.optimizedPromptEn || '').toLowerCase().includes(lowerInput) ||
+      (n.optimizedPromptZh || '').toLowerCase().includes(lowerInput) ||
+      (n.tags || []).some((t: string) => t.toLowerCase() === lowerInput)
+    ) || imageNodes.some((img: any) =>
+      (img.name || '').toLowerCase().includes(lowerInput) ||
+      (img.tags || []).some((t: string) => t.toLowerCase() === lowerInput)
+    );
+
+    if (hasMatchedNodeInCanvas && !shouldTreatAsGeneration(cleanInput) && !/切换|优化提示词|打开日志|日志|api|密钥|设置|下载|导出|打包|上传|导入|重试|重新跑/i.test(lowerInput)) {
+      return {
+        intent: 'search_card',
+        confidence: 0.95,
+        extracted: {
+          cardQuery: cleanInput
+        },
+        risk: 'none',
+        needsConfirmation: false,
+        reason: '检测到输入的文字与画布中已有卡片的提示词或标签匹配，自动快速执行跳转定位。'
+      };
+    }
+  }
+
   if (
     hasRetryGenerationCommand &&
     hasFailedBatchTarget

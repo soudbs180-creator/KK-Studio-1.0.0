@@ -227,16 +227,17 @@ const MODEL_MENU_SKELETON_COUNT = 3;
 
 type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
 type ChatOptions = import('../../services/llm/LLMAdapter').ChatOptions;
-type GenerateImageFn = typeof import('../../services/llm/geminiService').generateImage;
+type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerateImageFn = GenerationServiceClass['generateImage'];
 
 const chatWithLlm = async (options: ChatOptions): Promise<string> => {
-    const { llmService } = await import('../../services/llm/LLMService');
-    return llmService.chat(options);
+    const { generationService } = await import('../../services/llm/generationService');
+    return generationService.chat(options);
 };
 
-const generateImageOnDemand: GenerateImageFn = async (...args) => {
-    const { generateImage } = await import('../../services/llm/geminiService');
-    return generateImage(...args);
+const generateImageOnDemand = async (...args: Parameters<GenerateImageFn>): Promise<ReturnType<GenerateImageFn>> => {
+    const { generationService } = await import('../../services/llm/generationService');
+    return generationService.generateImage(...args);
 };
 
 const createWelcomeMessage = (): Message => ({
@@ -4469,6 +4470,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
         addGroup,
         updateGroup,
         setNodeTags,
+        selectNodes,
     } = useCanvas();
     const { executeGeneration } = useImageGeneration({
         isMobile: props.isMobile,
@@ -4497,6 +4499,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             addGroup={addGroup}
             updateGroup={updateGroup}
             setNodeTags={setNodeTags}
+            selectNodes={selectNodes}
             setConfig={props.setConfig || (() => {})}
             onOpenSettings={props.onOpenSettings}
             apiKeyStatus={apiKeyStatus}

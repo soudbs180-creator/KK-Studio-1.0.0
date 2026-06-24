@@ -15,12 +15,11 @@ test('App does not retain compiler-proven unused imports and locals', () => {
   assert.match(testConfigSource, /tests\/unit\/app-unused-cleanup-contract\.test\.ts/);
   assert.doesNotMatch(source, /import PendingNode from '\.\/components\/canvas\/PendingNode';/);
   assert.doesNotMatch(source, /import ChatSidebar from '\.\/components\/layout\/ChatSidebar';/);
-  assert.doesNotMatch(source, /import \{ generateImage, cancelGeneration \} from '\.\/services\/llm\/geminiService';/);
-  assert.doesNotMatch(source, /import \{ llmService \} from '\.\/services\/llm\/LLMService';/);
+  assert.doesNotMatch(source, /import \{ generateImage, cancelGeneration \} from '\.\/services\/llm\/generationService';/);
+  assert.doesNotMatch(source, /import \{ generationService \} from '\.\/services\/llm\/generationService';/);
   assert.doesNotMatch(source, /import \{ analyzeEcommerceRequirementFile \} from '\.\/services\/ecommerce\/ecommerceAnalysisClient\.ts';/);
   assert.doesNotMatch(source, /import \{ cancelSecureSystemProxyTask \} from '\.\/services\/model\/secureModelProxy';/);
-  assert.match(source, /await import\('\.\/services\/llm\/geminiService'\)/);
-  assert.match(source, /await import\('\.\/services\/llm\/LLMService'\)/);
+  assert.match(source, /await import\('\.\/services\/llm\/generationService'\)/);
   assert.match(source, /await import\('\.\/services\/ecommerce\/ecommerceAnalysisClient\.ts'\)/);
   assert.match(source, /await import\('\.\/services\/model\/secureModelProxy'\)/);
   assert.doesNotMatch(source, /import \{ SelectionMenu \} from '\.\/components\/canvas\/SelectionMenu';/);

@@ -44,8 +44,11 @@ import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
 import { normalizeModelId } from '../utils/modelIdNormalization';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
-type LlmServiceModule = typeof import('../services/llm/LLMService');
-type GeminiServiceModule = typeof import('../services/llm/geminiService');
+type GenerationServiceClass = import('../services/llm/generationService').GenerationService;
+type CheckTaskStatusFn = GenerationServiceClass['checkTaskStatus'];
+type GenerateAudioFn = GenerationServiceClass['generateAudio'];
+type GenerateVideoFn = GenerationServiceClass['generateVideo'];
+type GenerateImageFn = GenerationServiceClass['generateImage'];
 type PartialRedrawModule = typeof import('../services/image/partialRedraw');
 
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -58,29 +61,29 @@ const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
 const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
 const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
 
-const checkTaskStatus: LlmServiceModule['llmService']['checkTaskStatus'] = async (...args) => {
-  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+const checkTaskStatus = async (...args: Parameters<CheckTaskStatusFn>) => {
+  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
   return runtimeLlmService.checkTaskStatus(...args);
 };
 
-const generateAudio: LlmServiceModule['llmService']['generateAudio'] = async (...args) => {
-  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+const generateAudio = async (...args: Parameters<GenerateAudioFn>) => {
+  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
   return runtimeLlmService.generateAudio(...args);
 };
 
-const generateVideo: LlmServiceModule['llmService']['generateVideo'] = async (...args) => {
-  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+const generateVideo = async (...args: Parameters<GenerateVideoFn>) => {
+  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
   return runtimeLlmService.generateVideo(...args);
 };
 
-const generateImage: GeminiServiceModule['generateImage'] = async (...args) => {
-  const { generateImage: runGenerateImage } = await import('../services/llm/geminiService');
-  return runGenerateImage(...args);
+const generateImage = async (...args: Parameters<GenerateImageFn>) => {
+  const { generationService: runGenerationService } = await import('../services/llm/generationService');
+  return runGenerationService.generateImage(...args);
 };
 
-const cancelGeneration: GeminiServiceModule['cancelGeneration'] = (id) => {
-  void import('../services/llm/geminiService').then(({ cancelGeneration: runCancelGeneration }) => {
-    runCancelGeneration(id);
+const cancelGeneration = (id: string): void => {
+  void import('../services/llm/generationService').then(({ generationService: runGenerationService }) => {
+    runGenerationService.cancelGeneration(id);
   });
 };
 

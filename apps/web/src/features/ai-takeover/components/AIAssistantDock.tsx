@@ -73,7 +73,8 @@ export const AIAssistantDock: React.FC = () => {
     notify,
     activeCanvas,
     currentRun,
-    agentRunTimeline
+    agentRunTimeline,
+    selectNodes
   } = useAITakeover();
 
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
@@ -381,7 +382,8 @@ export const AIAssistantDock: React.FC = () => {
       const matchedNode = nodes.find((n: any) =>
         (n.prompt || '').toLowerCase().includes(keyword.toLowerCase()) ||
         (n.optimizedPromptEn || '').toLowerCase().includes(keyword.toLowerCase()) ||
-        (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase())
+        (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase()) ||
+        (n.tags || []).some((t: string) => t.toLowerCase().includes(keyword.toLowerCase()))
       );
 
       if (matchedNode) {
@@ -393,7 +395,10 @@ export const AIAssistantDock: React.FC = () => {
           }
         });
         window.dispatchEvent(locateEvent);
-        if (notify) notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片`, '');
+        if (typeof selectNodes === 'function') {
+          selectNodes([matchedNode.id], 'replace');
+        }
+        if (notify) notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片并选中`, '');
       } else {
         if (notify) notify.warning('AI接管定位', `未在当前画布上找到包含“${keyword}”的卡片`);
       }

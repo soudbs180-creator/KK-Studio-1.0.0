@@ -15,7 +15,7 @@ import {
     type PromptOptimizationRulebookOptions,
     type PromptOptimizationStrategy,
 } from './promptOptimizerRulebook.ts';
-import { llmService } from './LLMService';
+import { generationService as llmService } from './generationService';
 
 type PromptOptimizationOptions = PromptOptimizationRulebookOptions;
 type PromptOptimizerRouteMeta = PromptOptimizerResult['meta'] & {

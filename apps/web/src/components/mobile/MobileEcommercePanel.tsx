@@ -8,16 +8,17 @@ import {
 import { AspectRatio, ImageSize } from '../../types';
 import { notify } from '../../services/system/notificationService';
 
-type GeminiServiceModule = typeof import('../../services/llm/geminiService');
-type LlmServiceModule = typeof import('../../services/llm/LLMService');
+type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerateImageFn = GenerationServiceClass['generateImage'];
+type ChatFn = GenerationServiceClass['chat'];
 
-const generateMobileEcommerceImage: GeminiServiceModule['generateImage'] = async (...args) => {
-  const { generateImage: runGenerateImage } = await import('../../services/llm/geminiService');
-  return runGenerateImage(...args);
+const generateMobileEcommerceImage = async (...args: Parameters<GenerateImageFn>) => {
+  const { generationService: runGenerationService } = await import('../../services/llm/generationService');
+  return runGenerationService.generateImage(...args);
 };
 
-const chatWithMobileEcommerceLlm: LlmServiceModule['llmService']['chat'] = async (...args) => {
-  const { llmService: runtimeLlmService } = await import('../../services/llm/LLMService');
+const chatWithMobileEcommerceLlm = async (...args: Parameters<ChatFn>) => {
+  const { generationService: runtimeLlmService } = await import('../../services/llm/generationService');
   return runtimeLlmService.chat(...args);
 };
 

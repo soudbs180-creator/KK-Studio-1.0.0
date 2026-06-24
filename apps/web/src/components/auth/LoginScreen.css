@@ -148,6 +148,9 @@ body.auth-screen-active--landing.auth-modal-open #root {
 .auth-page--dark .auth-input-wrap input:-webkit-autofill:active {
   -webkit-text-fill-color: var(--input-autofill-text) !important;
   caret-color: var(--input-autofill-text);
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  transition: background-color 5000000s ease-in-out 0s, color 5000000s ease-in-out 0s;
 }
 
 .auth-page--dark .auth-field-help {
@@ -290,16 +293,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   -webkit-backdrop-filter: blur(32px) saturate(1.8);
 }
 
-.auth-page--dark.auth-page--landing .auth-modal-content .auth-panel {
-  background: rgba(18, 22, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #fffaf0;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
-}
+/* 彻底删除暗色模式登录卡片深色覆盖 */
 
 .auth-modal-close {
   position: absolute;
@@ -327,15 +321,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   border-color: rgba(12, 16, 24, 0.2);
 }
 
-.auth-page--dark .auth-modal-close {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #fffaf0;
-}
-.auth-page--dark .auth-modal-close:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.2);
-}
+/* 彻底删除暗色模式关闭按钮深色覆盖 */
 
 .auth-link-back {
   width: fit-content;
@@ -965,34 +951,34 @@ body.auth-screen-active--landing.auth-modal-open #root {
   align-items: center;
   justify-content: center;
   padding: 28px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(32px) saturate(1.6);
-  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
 }
 
-/* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高可读性 */
+/* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高透光高可读性 */
 .auth-page--dark .auth-captcha-overlay {
-  background: rgba(20, 24, 33, 0.88) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  background: rgba(255, 255, 255, 0.62) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(32px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(1.8) !important;
 }
 
 .auth-page--dark .auth-captcha-title {
-  color: #fffaf0 !important;
+  color: var(--ng-ink) !important;
 }
 
 .auth-page--dark .auth-captcha-desc {
-  color: rgba(255, 250, 240, 0.6) !important;
+  color: var(--ng-muted) !important;
 }
 
 .auth-page--dark .auth-captcha-cancel {
-  color: rgba(255, 250, 240, 0.5) !important;
+  color: var(--ng-muted) !important;
 }
 
 .auth-page--dark .auth-captcha-cancel:hover {
-  color: #fffaf0 !important;
+  color: var(--ng-ink) !important;
 }
 
 .auth-captcha-container {

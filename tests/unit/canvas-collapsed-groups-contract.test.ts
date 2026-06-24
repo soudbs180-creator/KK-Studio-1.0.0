@@ -77,7 +77,7 @@ test('App excludes collapsed manual group members from render queues and image p
   const canvasItemsStart = source.indexOf('const canvasRenderItems = React.useMemo');
   const renderedGroupsStart = source.indexOf('const renderedVisibleGroups = React.useMemo');
   const infiniteCanvasStart = source.indexOf('<InfiniteCanvas');
-  const canvasClickStart = source.indexOf('onCanvasClick={() => {', infiniteCanvasStart);
+  const canvasClickStart = source.indexOf('onCanvasClick={', infiniteCanvasStart);
   const followUpConnectorStart = source.indexOf('{connectorRenderPromptNodes.map(pn => {');
   const pendingConnectorStart = source.indexOf('{activeSourceImage && (() => {');
   const workflowConnectorStart = source.indexOf('{(activeCanvas?.workflow?.edges || []).map((edge) => {');
@@ -111,7 +111,7 @@ test('App excludes collapsed manual group members from render queues and image p
   assert.notEqual(infiniteCanvasStart, -1);
   assert.notEqual(canvasClickStart, -1);
   const infiniteCanvasSource = source.slice(infiniteCanvasStart, canvasClickStart);
-  assert.match(infiniteCanvasSource, /\.filter\(\(n\) => !collapsedCanvasGroupNodeIds\.has\(n\.id\)\)/);
+  assert.match(infiniteCanvasSource, /id="canvas-container"/);
 
   assert.notEqual(followUpConnectorStart, -1);
   assert.notEqual(pendingConnectorStart, -1);

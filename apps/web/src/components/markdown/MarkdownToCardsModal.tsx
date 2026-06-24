@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { parseMarkdownToCards, type ParsedCardData } from '../../utils/markdownToCards';
-import { LLMService } from '../../services/llm/LLMService';
+import { generationService } from '../../services/llm/generationService';
 import { keyManager } from '../../services/auth/keyManager';
 import { notify } from '../../services/system/notificationService';
 
@@ -90,7 +90,7 @@ export const MarkdownToCardsModal: React.FC<MarkdownToCardsModalProps> = ({
       const userPrompt = `主题是：“${aiTopic.trim()}”
 请围绕该主题展开脑暴，要求结构严密，至少包含 3 到 4 个二级分支，每个二级分支下包含 3 到 5 个具体列表要点。`;
 
-      const content = await LLMService.getInstance().chat({
+      const content = await generationService.chat({
         modelId: selectedModelId,
         messages: [
           { role: 'system', content: systemPrompt },

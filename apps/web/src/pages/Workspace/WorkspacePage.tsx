@@ -12,7 +12,6 @@ import { CanvasGroupComponent } from '../../components/canvas/CanvasGroupCompone
 import { getModelCredits } from '../../services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from '../../services/auth/keyManager';
 import { adminModelService } from '../../services/model/adminModelService';
-import { unifiedModelService } from '../../services/model/unifiedModelService';
 import { buildRedrawReferenceImage } from '../../services/image/partialRedraw';
 import type { EcommerceAnalysisResult } from '../../services/ecommerce/types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
@@ -121,19 +120,20 @@ import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../../util
 
 const GENERATE_TIMEOUT_MS = 600000;
 
-type GeminiServiceModule = typeof import('../../services/llm/geminiService');
+type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerateImageFn = GenerationServiceClass['generateImage'];
+type GenerateVideoFn = GenerationServiceClass['generateVideo'];
 type EcommerceAnalysisModule = typeof import('../../services/ecommerce/ecommerceAnalysisClient.ts');
-type LlmServiceModule = typeof import('../../services/llm/LLMService');
 type SecureModelProxyModule = typeof import('../../services/model/secureModelProxy');
 
-const generateImage: GeminiServiceModule['generateImage'] = async (...args) => {
-  const { generateImage: runGenerateImage } = await import('../../services/llm/geminiService');
-  return runGenerateImage(...args);
+const generateImage = async (...args: Parameters<GenerateImageFn>) => {
+  const { generationService: runGenerationService } = await import('../../services/llm/generationService');
+  return runGenerationService.generateImage(...args);
 };
 
-const cancelGeneration: GeminiServiceModule['cancelGeneration'] = (id) => {
-  void import('../../services/llm/geminiService').then(({ cancelGeneration: runCancelGeneration }) => {
-    runCancelGeneration(id);
+const cancelGeneration = (id: string): void => {
+  void import('../../services/llm/generationService').then(({ generationService: runGenerationService }) => {
+    runGenerationService.cancelGeneration(id);
   });
 };
 
@@ -142,8 +142,8 @@ const analyzeEcommerceRequirementFile: EcommerceAnalysisModule['analyzeEcommerce
   return runAnalyzeEcommerceRequirementFile(...args);
 };
 
-const generateVideo: LlmServiceModule['llmService']['generateVideo'] = async (...args) => {
-  const { llmService: runtimeLlmService } = await import('../../services/llm/LLMService');
+const generateVideo = async (...args: Parameters<GenerateVideoFn>) => {
+  const { generationService: runtimeLlmService } = await import('../../services/llm/generationService');
   return runtimeLlmService.generateVideo(...args);
 };
 
@@ -1002,7 +1002,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       try {
         // 0. Initialize the local model surface first. Hosted catalog refreshes
         // stay deferred until the startup coordinator reaches background_ready.
-        await unifiedModelService.initialize();
+        await adminModelService.initializeUnifiedModels();
         if (!active) return;
 
         // 1. Sync User ID

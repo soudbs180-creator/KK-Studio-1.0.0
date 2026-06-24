@@ -126,25 +126,23 @@ test('mobile ecommerce and ecommerce analysis services load LLM execution only o
   const aiTakeoverLlmBrainSource = readSource('apps/web/src/features/ai-takeover/core/llmBrain.ts');
   const archiveRuntimeSource = readSource('apps/web/src/utils/archiveRuntime.ts');
 
-  assert.doesNotMatch(chatSidebarSource, /import \{ generateImage \} from '\.\.\/\.\.\/services\/llm\/geminiService';/);
-  assert.doesNotMatch(chatSidebarSource, /import \{ llmService \} from '\.\.\/\.\.\/services\/llm\/LLMService';/);
-  assert.match(chatSidebarSource, /await import\('\.\.\/\.\.\/services\/llm\/geminiService'\)/);
-  assert.match(chatSidebarSource, /await import\('\.\.\/\.\.\/services\/llm\/LLMService'\)/);
+  assert.doesNotMatch(chatSidebarSource, /import \{ generateImage \} from '\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.doesNotMatch(chatSidebarSource, /import \{ generationService \} from '\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.match(chatSidebarSource, /await import\('\.\.\/\.\.\/services\/llm\/generationService'\)/);
 
   assert.doesNotMatch(canvasContextSource, /import \{ syncService \} from '\.\.\/services\/system\/syncService';/);
   assert.match(canvasContextSource, /await import\('\.\.\/services\/system\/syncService'\)/);
   assert.doesNotMatch(canvasCloudSyncSource, /import \{ syncService \} from '\.\.\/services\/system\/syncService';/);
   assert.match(canvasCloudSyncSource, /import\('\.\.\/services\/system\/syncService'\)/);
 
-  assert.doesNotMatch(aiTakeoverContextSource, /import \{ llmService \} from '\.\.\/\.\.\/\.\.\/services\/llm\/LLMService';/);
-  assert.match(aiTakeoverContextSource, /await import\('\.\.\/\.\.\/\.\.\/services\/llm\/LLMService'\)/);
-  assert.doesNotMatch(aiTakeoverLlmBrainSource, /import \{ llmService \} from '\.\.\/\.\.\/\.\.\/services\/llm\/LLMService';/);
-  assert.match(aiTakeoverLlmBrainSource, /await import\('\.\.\/\.\.\/\.\.\/services\/llm\/LLMService'\)/);
+  assert.doesNotMatch(aiTakeoverContextSource, /import \{ generationService \} from '\.\.\/\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.match(aiTakeoverContextSource, /await import\('\.\.\/\.\.\/\.\.\/services\/llm\/generationService'\)/);
+  assert.doesNotMatch(aiTakeoverLlmBrainSource, /import \{ generationService \} from '\.\.\/\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.match(aiTakeoverLlmBrainSource, /await import\('\.\.\/\.\.\/\.\.\/services\/llm\/generationService'\)/);
 
-  assert.doesNotMatch(mobilePanelSource, /import \{ generateImage \} from '\.\.\/\.\.\/services\/llm\/geminiService';/);
-  assert.doesNotMatch(mobilePanelSource, /import \{ llmService \} from '\.\.\/\.\.\/services\/llm\/LLMService';/);
-  assert.match(mobilePanelSource, /await import\('\.\.\/\.\.\/services\/llm\/geminiService'\)/);
-  assert.match(mobilePanelSource, /await import\('\.\.\/\.\.\/services\/llm\/LLMService'\)/);
+  assert.doesNotMatch(mobilePanelSource, /import \{ generateImage \} from '\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.doesNotMatch(mobilePanelSource, /import \{ generationService \} from '\.\.\/\.\.\/services\/llm\/generationService';/);
+  assert.match(mobilePanelSource, /await import\('\.\.\/\.\.\/services\/llm\/generationService'\)/);
 
   const mobileFeedSource = readSource('apps/web/src/components/MobileChatFeed.tsx');
   assert.doesNotMatch(mobileFeedSource, /import JSZip from 'jszip';/);
@@ -158,8 +156,8 @@ test('mobile ecommerce and ecommerce analysis services load LLM execution only o
   assert.match(archiveRuntimeSource, /await import\('jszip'\)/);
   assert.match(archiveRuntimeSource, /await import\('file-saver'\)/);
 
-  assert.doesNotMatch(ecommerceEnhancerSource, /import \{ llmService \} from '\.\.\/llm\/LLMService';/);
-  assert.match(ecommerceEnhancerSource, /await import\('\.\.\/llm\/LLMService'\)/);
+  assert.doesNotMatch(ecommerceEnhancerSource, /import \{ generationService \} from '\.\.\/llm\/generationService';/);
+  assert.match(ecommerceEnhancerSource, /await import\('\.\.\/llm\/generationService'\)/);
 
   assert.doesNotMatch(ecommerceTaskEditorSource, /import \{ optimizePromptForImage \} from '\.\.\/\.\.\/services\/llm\/promptOptimizerService';/);
   assert.match(ecommerceTaskEditorSource, /await import\('\.\.\/\.\.\/services\/llm\/promptOptimizerService'\)/);
