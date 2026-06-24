@@ -17,6 +17,8 @@ const repoRoot = resolve(here, '..', '..');
 
 const keyManagerPresetPath = resolve(repoRoot, 'apps/web/src/services/auth/keyManagerProviderPresets.ts');
 const apiSettingsPresetPath = resolve(repoRoot, 'apps/web/src/components/settings/apiProviderPresets.ts');
+const frontendProviderRegistryPath = resolve(repoRoot, 'apps/web/src/services/api/providerRegistry.ts');
+const providerDisplayPath = resolve(repoRoot, 'apps/web/src/utils/providerDisplay.ts');
 
 const errors = [];
 const warnings = [];
@@ -25,6 +27,14 @@ const ALLOWED_LEGACY_ALIAS_IDS = new Map([
   ['12ai-nanobanana', '12ai'],
   ['wuyinkeji-nanobanana2', 'wuyinkeji-google-omni'],
 ]);
+
+const REQUIRED_RELAY_HOST_PATTERNS = [
+  'openrouter\\.ai',
+  'apimart\\.ai',
+  'gpt-best\\.com',
+  'wuyinkeji\\.com',
+  '12ai\\.org',
+];
 
 function readSource(filePath) {
   if (!existsSync(filePath)) {
@@ -111,8 +121,30 @@ function checkDuplicateHosts(entries) {
   }
 }
 
+function checkDisplayIdentityGovernance(frontendRegistrySource, providerDisplaySource) {
+  if (!/PROVIDER_HOST_ALIAS_RULES/.test(frontendRegistrySource)) {
+    errors.push('R8 前端 providerRegistry.ts 必须集中声明 PROVIDER_HOST_ALIAS_RULES。');
+  }
+  if (!/resolveProviderAliasFromBaseUrl/.test(frontendRegistrySource)) {
+    errors.push('R8 前端 providerRegistry.ts 必须导出 resolveProviderAliasFromBaseUrl。');
+  }
+  for (const requiredPattern of REQUIRED_RELAY_HOST_PATTERNS) {
+    if (!frontendRegistrySource.includes(requiredPattern)) {
+      errors.push(`R8 前端 providerRegistry.ts 缺少已知 relay host 规则: ${requiredPattern}`);
+    }
+  }
+  if (!/resolveProviderAliasFromBaseUrl\(target\.baseUrl\)/.test(providerDisplaySource)) {
+    errors.push('R8 providerDisplay.ts 必须优先通过 resolveProviderAliasFromBaseUrl(target.baseUrl) 修正 relay 平台身份。');
+  }
+  if (/RELAY_HOST_PROVIDER_ALIASES/.test(providerDisplaySource)) {
+    errors.push('R8 providerDisplay.ts 不得维护第二份 relay host map；必须复用 providerRegistry.ts。');
+  }
+}
+
 const keyManagerSource = readSource(keyManagerPresetPath);
 const apiSettingsSource = readSource(apiSettingsPresetPath);
+const frontendProviderRegistrySource = readSource(frontendProviderRegistryPath);
+const providerDisplaySource = readSource(providerDisplayPath);
 
 const keyManagerEntries = collectKeyManagerPresets(keyManagerSource);
 const apiSettingsEntries = collectApiSettingsPresets(apiSettingsSource);
@@ -126,6 +158,7 @@ if (apiSettingsEntries.length === 0) {
 
 checkDuplicateHosts(keyManagerEntries);
 checkDuplicateHosts(apiSettingsEntries);
+checkDisplayIdentityGovernance(frontendProviderRegistrySource, providerDisplaySource);
 
 console.log(`[governance:frontend-providers] keyManager presets=${keyManagerEntries.length}, api settings relay presets=${apiSettingsEntries.length}`);
 for (const warning of warnings) console.log(`  [WARN] ${warning}`);
