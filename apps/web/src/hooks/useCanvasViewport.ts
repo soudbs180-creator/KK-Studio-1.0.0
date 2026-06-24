@@ -98,17 +98,19 @@ export function useCanvasViewport({
 
     // 1. 如果有选中，先将视图居中于选中的组/节点
     if (selectedNodeIds.length > 0) {
-      const selectedPrompts = activeCanvas.promptNodes.filter((p: any) => selectedNodeIds.includes(p.id));
-      const selectedImages = activeCanvas.imageNodes.filter((img: any) => selectedNodeIds.includes(img.id));
-      const selectedWorkflowNodes = (activeCanvas.workflow?.nodes || []).filter(
-        (node: any): node is WorkflowUtilityCanvasNode =>
-          selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
-      );
-
+      const selectedNodeIdSet = new Set(selectedNodeIds);
       const allPositions = [
-        ...selectedPrompts.map((p: any) => p.position),
-        ...selectedImages.map((img: any) => img.position),
-        ...selectedWorkflowNodes.map((node: any) => node.position),
+        ...activeCanvas.promptNodes
+          .filter((p: any) => selectedNodeIdSet.has(p.id))
+          .map((p: any) => p.position),
+        ...activeCanvas.imageNodes
+          .filter((img: any) => selectedNodeIdSet.has(img.id))
+          .map((img: any) => img.position),
+        ...(activeCanvas.workflow?.nodes || [])
+          .filter((node: any): node is WorkflowUtilityCanvasNode => (
+            selectedNodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)
+          ))
+          .map((node: WorkflowUtilityCanvasNode) => node.position),
       ];
 
       if (allPositions.length > 0) {
@@ -122,9 +124,13 @@ export function useCanvasViewport({
     // 2. 如果没有提示词卡片，跳转到最新的生成图片卡片。
     const prompts = activeCanvas.promptNodes;
     if (prompts.length === 0) {
-      const latestImage = [...activeCanvas.imageNodes].sort(
-        (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
-      )[0];
+      let latestImage: any | null = null;
+      activeCanvas.imageNodes.forEach((image: any) => {
+        if (!latestImage || (image.timestamp || 0) > (latestImage.timestamp || 0)) {
+          latestImage = image;
+        }
+      });
+
       if (latestImage) {
         handleNavigateToNode(latestImage.position.x, latestImage.position.y);
         return;
@@ -132,8 +138,13 @@ export function useCanvasViewport({
       handleNavigateToNode(0, 0);
       return;
     }
-    // 按时间戳降序排序
-    const latestPrompt = [...prompts].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+
+    let latestPrompt: any | null = null;
+    prompts.forEach((prompt: any) => {
+      if (!latestPrompt || (prompt.timestamp || 0) > (latestPrompt.timestamp || 0)) {
+        latestPrompt = prompt;
+      }
+    });
 
     if (latestPrompt) {
       // 查找关联图片以计算包围盒
