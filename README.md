@@ -35,7 +35,7 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 * **数据库迁移目录**：`migrations/`
 
 > [!IMPORTANT]
-> 历史文档中可能仍残留 `1.4.x`、`1.5.0`、`1.5.1`、`netlify/functions` 或旧部署口径。当前开发必须严格以源码类型、[config/release-manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/config/release-manifest.json)、[package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)、[AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 及治理校验脚本为准。
+> 历史文档中可能仍残留 `1.4.x`、`1.5.0`、`1.5.1` 或旧部署口径。当前开发必须严格以源码类型、[config/release-manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/config/release-manifest.json)、[package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)、[AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 及治理校验脚本为准。
 
 ---
 
