@@ -357,7 +357,6 @@ body.dark-mode .zoom-slider {
 .prompt-bar-liquid-send:disabled {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: none;
 }
 
 /* Add Node Button */
