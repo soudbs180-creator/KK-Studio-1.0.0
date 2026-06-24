@@ -1,5 +1,5 @@
 import { keyManager } from '../services/auth/keyManager';
-import { getProviderMetadata } from '../services/api/providerRegistry';
+import { getProviderMetadata, resolveProviderAliasFromBaseUrl } from '../services/api/providerRegistry';
 
 type ProviderDisplayTarget = {
   keySlotId?: string;
@@ -36,14 +36,6 @@ const OFFICIAL_PROVIDER_ALIASES: Record<string, string[]> = {
   ],
 };
 
-const RELAY_HOST_PROVIDER_ALIASES: Array<{ pattern: RegExp; provider: string }> = [
-  { pattern: /(^|\.)openrouter\.ai$/i, provider: 'OpenRouter' },
-  { pattern: /(^|\.)apimart\.ai$/i, provider: 'APIMart' },
-  { pattern: /(^|\.)gpt-best\.com$/i, provider: 'GPTBest' },
-  { pattern: /(^|\.)12ai\.org$/i, provider: '12AI' },
-  { pattern: /(^|\.)wuyinkeji\.com$/i, provider: 'Wuyin' },
-];
-
 function normalizeValue(value?: string | null): string {
   return String(value || '').trim();
 }
@@ -60,33 +52,6 @@ function getCurrentLanguage(): 'zh-CN' | 'en-US' {
   const resolved = stored || documentLanguage;
 
   return resolved.toLowerCase().startsWith('en') ? 'en-US' : 'zh-CN';
-}
-
-function normalizeHost(baseUrl?: string): string {
-  const raw = normalizeValue(baseUrl).replace(/\/+$/, '');
-  if (!raw) {
-    return '';
-  }
-
-  const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`, `http://${raw}`];
-  for (const candidate of candidates) {
-    try {
-      return new URL(candidate).hostname.toLowerCase();
-    } catch {
-      continue;
-    }
-  }
-
-  return '';
-}
-
-function resolveRelayProviderFromBaseUrl(baseUrl?: string): string {
-  const host = normalizeHost(baseUrl);
-  if (!host) {
-    return '';
-  }
-
-  return RELAY_HOST_PROVIDER_ALIASES.find((entry) => entry.pattern.test(host))?.provider || '';
 }
 
 function isOfficialSlot(target: ProviderDisplayTarget): boolean {
@@ -141,7 +106,7 @@ export function resolveProviderIdentity(target: ProviderDisplayTarget): {
   providerLabel?: string;
 } {
   const currentLabel = String(target.providerLabel || '').trim();
-  const relayProviderFromBaseUrl = resolveRelayProviderFromBaseUrl(target.baseUrl);
+  const relayProviderFromBaseUrl = resolveProviderAliasFromBaseUrl(target.baseUrl);
   const currentProvider = relayProviderFromBaseUrl || String(target.provider || '').trim();
   const linkedProvider = target.keySlotId ? keyManager.getProviderForKeySlot(target.keySlotId) : undefined;
   const keySlot = target.keySlotId ? keyManager.getKey(target.keySlotId) : undefined;
