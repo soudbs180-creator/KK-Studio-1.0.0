@@ -146,8 +146,48 @@ const PROVIDER_ALIAS_MAP: Record<string, string> = {
     '12 ai': '12AI',
 };
 
+const PROVIDER_HOST_ALIAS_RULES: Array<{ pattern: RegExp; provider: string }> = [
+    { pattern: /(^|\.)openrouter\.ai$/i, provider: 'OpenRouter' },
+    { pattern: /(^|\.)apimart\.ai$/i, provider: 'APIMart' },
+    { pattern: /(^|\.)gpt-best\.com$/i, provider: 'GPTBest' },
+    { pattern: /(^|\.)12ai\.org$/i, provider: '12AI' },
+    { pattern: /(^|\.)wuyinkeji\.com$/i, provider: 'Wuyin' },
+    { pattern: /(^|\.)siliconflow\.cn$/i, provider: 'SiliconFlow' },
+];
+
+function normalizeHost(baseUrl?: string): string {
+    const raw = String(baseUrl || '').trim().replace(/\/+$/, '');
+    if (!raw) {
+        return '';
+    }
+
+    const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`, `http://${raw}`];
+    for (const candidate of candidates) {
+        try {
+            return new URL(candidate).hostname.toLowerCase();
+        } catch {
+            continue;
+        }
+    }
+
+    return '';
+}
+
+export const resolveProviderAliasFromBaseUrl = (baseUrl?: string): string => {
+    const host = normalizeHost(baseUrl);
+    if (!host) {
+        return '';
+    }
+    return PROVIDER_HOST_ALIAS_RULES.find((entry) => entry.pattern.test(host))?.provider || '';
+};
+
 export const getProviderMetadata = (provider: Provider | string): ProviderMetadata => {
     const raw = String(provider || '').trim();
     const alias = PROVIDER_ALIAS_MAP[raw.toLowerCase()];
     return PROVIDER_REGISTRY[alias || raw] || PROVIDER_REGISTRY.Custom;
+};
+
+export const getProviderMetadataFromBaseUrl = (baseUrl?: string): ProviderMetadata | null => {
+    const providerAlias = resolveProviderAliasFromBaseUrl(baseUrl);
+    return providerAlias ? getProviderMetadata(providerAlias) : null;
 };
