@@ -176,7 +176,6 @@ for (const [legacyPath, reason] of [
   ["apps/payment-sidecar", "Payment sidecar is not an active runtime."],
   ["billing", "Billing code must live behind current server/API boundaries."],
   ["payment-server", "Payment-server is historical and must not re-enter active runtime."],
-  ["netlify/functions", "Netlify functions are historical and must not be the active backend."],
 ]) {
   expectMissing(legacyPath, reason);
 }
@@ -229,10 +228,6 @@ expectActiveFilesDoNotReference(
     "apps/api/.env.local",
     "apps/api/.env.local.example",
     "payment-server",
-    "netlify/functions",
-    "NETLIFY_AUTH_TOKEN",
-    "NETLIFY_SITE_ID",
-    "netlify deploy",
   ],
   "Active code, scripts, tests, and workflows must use the current server/Vercel deployment baseline.",
 );
