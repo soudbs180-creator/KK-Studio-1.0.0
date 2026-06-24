@@ -129,17 +129,7 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         format: 'openai',
         icon: '\u{1F300}'
     },
-    '12ai-nanobanana': {
-        name: '12AI NanoBanana',
-        baseUrl: 'https://cdn.12ai.org',
-        models: [
-            'gemini-3.1-flash-image-preview',
-            'gemini-2.5-flash-image', 'gemini-2.5-flash-image-c',
-            'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-c'
-        ],
-        format: 'gemini',
-        icon: '\u{1F34C}'
-    },
+
     'flow2api': {
         name: 'Flow2API',
         baseUrl: 'http://127.0.0.1:8000',
@@ -152,13 +142,7 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         format: 'openai',
         icon: '\u{1F30A}'
     },
-    'wuyinkeji-nanobanana2': {
-        name: 'Wuyin Keji NanoBanana2',
-        baseUrl: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2',
-        models: ['image_nanoBanana2'],
-        format: 'openai',
-        icon: '\u{1F96D}'
-    },
+
     'wuyinkeji-google-omni': {
         name: '速创 API',
         baseUrl: 'https://api.wuyinkeji.com',
@@ -190,12 +174,6 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
 };
 
 export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
-    if (strategyId === '12ai') {
-        return Array.from(new Set([
-            ...(PROVIDER_PRESETS['12ai']?.models || []),
-            ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
-        ]));
-    }
     const preset = PROVIDER_PRESETS[strategyId];
     if (preset) {
         return preset.models;

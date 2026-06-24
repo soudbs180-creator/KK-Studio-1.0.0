@@ -400,6 +400,7 @@ export type Provider =
   | 'Google'
   | 'OpenAI'
   | 'Anthropic'
+  | 'DeepSeek'    // DeepSeek 官方
   | 'Volcengine' // 火山引擎
   | 'Aliyun'     // 阿里云
   | 'Tencent'    // 腾讯云

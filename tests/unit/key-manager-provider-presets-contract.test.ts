@@ -51,9 +51,7 @@ test('provider presets preserve documented built-in routes and defaults', async 
     'siliconflow',
     '12ai',
     'antigravity',
-    '12ai-nanobanana',
     'flow2api',
-    'wuyinkeji-nanobanana2',
     'wuyinkeji-google-omni',
     'gpt-best',
     'apimart',
@@ -64,9 +62,6 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.equal(PROVIDER_PRESETS['12ai'].baseUrl, 'https://cdn.12ai.org');
   assert.equal(PROVIDER_PRESETS['12ai'].format, 'gemini');
   assert.equal(PROVIDER_PRESETS['12ai'].models.includes('gemini-3.1-flash-image-preview'), true);
-  assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].format, 'gemini');
-  assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].models.includes('gemini-3.1-flash-image-preview'), true);
-  assert.equal(PROVIDER_PRESETS['wuyinkeji-nanobanana2'].models[0], 'image_nanoBanana2');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].baseUrl, 'https://api.wuyinkeji.com');
   assert.equal(WUYIN_PRESET_LOGO_URL, 'https://api.wuyinkeji.com/assets/img/%E6%9C%AA%E5%91%BD%E5%90%8D-2.png');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].icon, WUYIN_PRESET_LOGO_URL);
@@ -84,9 +79,6 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.deepEqual(getDocumentedStaticModelsForProvider('openai'), []);
   assert.deepEqual(
     getDocumentedStaticModelsForProvider('12ai'),
-    Array.from(new Set([
-      ...PROVIDER_PRESETS['12ai'].models,
-      ...PROVIDER_PRESETS['12ai-nanobanana'].models,
-    ])),
+    PROVIDER_PRESETS['12ai'].models,
   );
 });

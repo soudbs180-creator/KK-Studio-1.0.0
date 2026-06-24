@@ -1,7 +1,36 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-24 (Optimize Login Design & Security Verification)
+**Last Updated:** 2026-06-24 (Canonical Provider Catalog & Full-Stack Alignment)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-24 - 完成 Phase P5 架构现代化、供应商 Catalog 统一与全栈对齐
+
+### 修改范围 (Canonical Provider Catalog & Full-Stack Alignment)
+- **大模型供应商统一事实目录定义**：在共享包 `@kk/shared` 的 [providerCatalog.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/generation/providerCatalog.ts) 中建立并导出了统一大模型提供商事实目录 `CANONICAL_PROVIDER_CATALOG`，统一维护前端和后端所需的提供商属性、主机名、类别和鉴权密钥变量。
+- **编写并挂载 Catalog 比对校验脚本**：在 [check-provider-catalog.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/check-provider-catalog.mjs) 中实现强一致性比对脚本，用以检测前端 `providerRegistry.ts` 以及后端 `providerProfiles.js` 与统一 Catalog 的不一致性，并将其无缝接入 package.json 的 `governance:check` 验证流程。
+- **消除前端配置漂移**：前端 [providerRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/api/providerRegistry.ts) 补齐了官方 `DeepSeek` 提供商，并在类型定义、域名匹配以及别名中全部补全，使其完全适配 Catalog 映射。
+- **消除后端画像漂移**：后端 [providerProfiles.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/providerProfiles.js) 中为官方提供商 `DeepSeek`、`DashScope (aliyun)` 和 `Volcengine` 画像显式加入了独立的 `authKeyEnv` 密钥名称，消除了原本 fallback 至 `OPENAI_API_KEY` 的隐患；并且补齐了 Catalog 要求的 `tencent` 官方供应商画像。
+
+### 修改文件 (Canonical Provider Catalog & Full-Stack Alignment)
+- `packages/shared/src/generation/providerCatalog.ts` [NEW]
+- `packages/shared/src/index.ts` [MODIFY]
+- `scripts/governance/check-provider-catalog.mjs` [NEW]
+- `package.json` [MODIFY]
+- `apps/web/src/types/index.ts` [MODIFY]
+- `apps/web/src/services/api/providerRegistry.ts` [MODIFY]
+- `server/lib/dispatcher/providerProfiles.js` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Canonical Provider Catalog & Full-Stack Alignment)
+- `node scripts/governance/check-provider-catalog.mjs` (目录比对强一致性校验通过，0 漂移)
+- `npm run verify:changes` (架构校验、类型编译、API 规约、全量测试以及编码检测 100% 绿通)
+
+### 未运行验证及原因 (Canonical Provider Catalog & Full-Stack Alignment)
+- 无
+
+### 风险与下一步 (Canonical Provider Catalog & Full-Stack Alignment)
+- **风险**：无风险。所有前后端适配性调整均经过比对脚本与类型工具验证。
+- **下一步**：所有优化任务（P0-P5 阶段）已全部彻底结束。项目静态治理、模型预设整合和全栈质量硬化已达成 100% DONE。
 
 ## 2026-06-24 - 优化登录框外观设计与安全验证自动提交逻辑
 

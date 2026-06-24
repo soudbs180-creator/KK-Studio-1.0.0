@@ -12,3 +12,4 @@ export * from "./generation/types.ts";
 export * from "./generation/provider.ts";
 export * from "./generation/capabilities.ts";
 export * from "./generation/errors.ts";
+export * from "./generation/providerCatalog.ts";

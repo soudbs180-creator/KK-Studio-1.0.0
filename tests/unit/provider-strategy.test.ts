@@ -292,4 +292,30 @@ describe("provider strategy", () => {
       /Flow2API/,
     );
   });
+
+  test("recognizes APIMart by provider and baseUrl", () => {
+    const runtimeByProvider = resolveProviderRuntime({
+      provider: "apimart",
+      format: "openai",
+    });
+    assert.equal(runtimeByProvider.strategyId, "apimart");
+    assert.equal(runtimeByProvider.requestProfileId, "apimart");
+    assert.equal(runtimeByProvider.uiProvider, "Custom");
+    assert.equal(runtimeByProvider.protocolFamily, "openai-compatible");
+
+    const runtimeByBaseUrl = resolveProviderRuntime({
+      baseUrl: "https://api.apimart.ai/v1",
+    });
+    assert.equal(runtimeByBaseUrl.strategyId, "apimart");
+    assert.equal(runtimeByBaseUrl.uiProvider, "Custom");
+  });
+
+  test("corrects OpenRouter uiProvider to Custom", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "OpenRouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+    });
+    assert.equal(runtime.strategyId, "openrouter");
+    assert.equal(runtime.uiProvider, "Custom");
+  });
 });

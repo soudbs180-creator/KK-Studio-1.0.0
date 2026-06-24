@@ -25,8 +25,6 @@ const errors = [];
 const warnings = [];
 
 const ALLOWED_LEGACY_ALIAS_IDS = new Map([
-  ['12ai-nanobanana', '12ai'],
-  ['wuyinkeji-nanobanana2', 'wuyinkeji-google-omni'],
 ]);
 
 const REQUIRED_RELAY_HOST_PATTERNS = [
@@ -42,10 +40,10 @@ const EXPECTED_RUNTIME_STRATEGIES = [
   { id: '12ai', label: '12AI' },
   { id: 'wuyinkeji', label: 'Wuyin / Suchuang' },
   { id: 'gpt-best', label: 'GPT-Best' },
+  { id: 'apimart', label: 'APIMart' },
 ];
 
 const EXPECTED_RUNTIME_STRATEGY_GAPS = [
-  { id: 'apimart', label: 'APIMart', reason: 'APIMart exists in RequestProfile/API Settings metadata but still needs a dedicated providerStrategy mapping.' },
 ];
 
 function readSource(filePath) {

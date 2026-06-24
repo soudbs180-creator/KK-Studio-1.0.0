@@ -45,7 +45,7 @@
     "governance:providers": "node scripts/governance/check-provider-presets.mjs",
     "governance:frontend-providers": "node scripts/governance/check-frontend-provider-presets.mjs",
     "governance:security": "node scripts/governance/check-sensitive-boundaries.mjs",
-    "governance:check": "npm run governance:version && npm run governance:current && npm run governance:agent-docs && npm run governance:skills && npm run governance:compat && npm run governance:registry && npm run governance:providers && npm run governance:frontend-providers && npm run governance:security",
+    "governance:check": "npm run governance:version && npm run governance:current && npm run governance:agent-docs && npm run governance:skills && npm run governance:compat && npm run governance:registry && npm run governance:providers && npm run governance:frontend-providers && npm run governance:security && node scripts/governance/check-provider-catalog.mjs",
     "audit:dependencies": "npm audit --omit=dev --audit-level=moderate || (echo 'Audit warning' && exit 0)",
     "typecheck:tests": "node scripts/ci/check-tests-types.mjs tsconfig.tests.json",
     "typecheck:server": "node scripts/ci/check-server.mjs",

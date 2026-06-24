@@ -35,6 +35,14 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
         docsUrl: 'https://docs.anthropic.com/',
         kind: 'official'
     },
+    DeepSeek: {
+        id: 'DeepSeek',
+        label: 'DeepSeek',
+        defaultBaseUrl: 'https://api.deepseek.com',
+        description: 'Official DeepSeek API',
+        docsUrl: 'https://api-docs.deepseek.com/',
+        kind: 'official'
+    },
     Volcengine: {
         id: 'Volcengine',
         label: 'Volcengine (Doubao)',
@@ -144,6 +152,7 @@ const PROVIDER_ALIAS_MAP: Record<string, string> = {
     '速创': 'Wuyin',
     '12ai': '12AI',
     '12 ai': '12AI',
+    deepseek: 'DeepSeek',
 };
 
 const PROVIDER_HOST_ALIAS_RULES: Array<{ pattern: RegExp; provider: string }> = [
@@ -153,6 +162,7 @@ const PROVIDER_HOST_ALIAS_RULES: Array<{ pattern: RegExp; provider: string }> = 
     { pattern: /(^|\.)12ai\.org$/i, provider: '12AI' },
     { pattern: /(^|\.)wuyinkeji\.com$/i, provider: 'Wuyin' },
     { pattern: /(^|\.)siliconflow\.cn$/i, provider: 'SiliconFlow' },
+    { pattern: /(^|\.)deepseek\.com$/i, provider: 'DeepSeek' },
 ];
 
 function normalizeHost(baseUrl?: string): string {
