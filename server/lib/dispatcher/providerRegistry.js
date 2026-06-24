@@ -57,11 +57,12 @@ function normalizeProfileToProviderItem(profile) {
   if (profile.authKeyEnv) {
     keyRef = profile.authKeyEnv;
   } else if (profile.providerKind === 'relay' || profile.kind === 'relay') {
-    // 针对中转站 (relay) 的密钥重命名以解耦官方密钥命名歧义，完美适配 CI 安全门禁
+    // 针对中转站 (relay) 的密钥重命名以解耦官方密钥命名歧义，完美适配 CI 安全门禁。
+    // 注意：中转站不能因为兼容 OpenAI/Gemini 协议就借用官方或其它中转站的密钥名。
     if (profile.id.includes('wuyin')) {
       keyRef = 'WUYIN_API_KEY';
     } else if (profile.id.includes('gpt-best')) {
-      keyRef = 'VODESHOP_API_KEY';
+      keyRef = 'GPT_BEST_API_KEY';
     } else if (profile.id.includes('apimart')) {
       keyRef = 'APIMART_API_KEY';
     } else if (profile.id.includes('12ai')) {

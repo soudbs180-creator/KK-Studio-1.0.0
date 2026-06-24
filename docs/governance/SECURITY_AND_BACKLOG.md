@@ -14,7 +14,7 @@ Primary rules: `AGENTS.md`
 当前项目版本：KK Studio v1.5.7
 当前后端事实：server/ Express / VPS
 当前 Web 入口：apps/web/
-历史 Netlify / payment-server 描述：只作迁移追溯，不作为当前开发入口
+旧独立支付后端描述：只作迁移追溯，不作为当前开发入口
 ```
 
 Agent 处理安全敏感任务时必须先读 `AGENTS.md`，再读本文件。
@@ -27,7 +27,7 @@ Agent 处理安全敏感任务时必须先读 `AGENTS.md`，再读本文件。
 
 目标：
 
-- 全仓不再把 `netlify/functions` 作为当前后端入口。
+- 全仓不再把旧无服务器函数目录作为当前后端入口。
 - 全仓不再把 `payment-server` 作为主要后端入口。
 - `packages/api-client` baseURL 指向当前后端配置。
 - 文档明确当前事实是 `server/` Express / VPS。
@@ -35,11 +35,10 @@ Agent 处理安全敏感任务时必须先读 `AGENTS.md`，再读本文件。
 检查关键词：
 
 ```text
-netlify/functions
-/.netlify/
-@netlify/functions
-netlify.toml
 payment-server
+apps/api
+apps/payment-sidecar
+billing
 ```
 
 执行规则：
@@ -227,7 +226,6 @@ wechatpay-node-v3
 @modelcontextprotocol/sdk
 node-fetch
 eventsource
-@netlify/functions
 ```
 
 规则：
@@ -238,192 +236,3 @@ eventsource
 4. 运行 build / test。
 
 ---
-
-### P1-04：显式导入 crypto randomUUID
-
-规则：
-
-```js
-const { randomUUID } = require('crypto');
-```
-
-禁用隐式：
-
-```js
-crypto.randomUUID()
-```
-
-验收：
-
-- 使用 randomUUID 的文件顶部显式导入。
-- `X-Client-Request-Id` 正常注入。
-
----
-
-## 3. P2：架构迁移与后端统一
-
-### P2-01：统一后端路由到 server/
-
-目标：
-
-```text
-server/ 是唯一后端运行时
-payment-server/ 只作历史，不作当前入口
-```
-
-步骤：
-
-1. 核对旧 `payment-server` 路由与当前 `server/routes`。
-2. 对仍缺失能力做最小迁移。
-3. 统一积分、JWT、CORS、日志、错误格式。
-4. 更新 package workspaces 与 scripts。
-5. 删除旧目录前必须验证 server 可启动并响应所有接口。
-
----
-
-### P2-02：统一 JWT 实现
-
-目标：
-
-```text
-server/lib/jwt.js 是 JWT 签发与验证唯一实现
-```
-
-验收：
-
-- `createHmac` 只在 `server/lib/jwt.js` 或明确测试中出现。
-- 路由统一引用 `require('../lib/jwt')`。
-- 无多套 JWT_SECRET。
-
----
-
-### P2-03：数据库积分流水与 generations 字段统一
-
-建议迁移：
-
-```sql
-CREATE TABLE IF NOT EXISTS public.credit_transactions (
-  id BIGSERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  amount INTEGER NOT NULL,
-  reason TEXT NOT NULL,
-  reference_id TEXT,
-  balance_after INTEGER NOT NULL,
-  request_id TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-ALTER TABLE public.generations
-  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'done',
-  ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'image_generation',
-  ADD COLUMN IF NOT EXISTS credits_cost INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS request_id TEXT,
-  ADD COLUMN IF NOT EXISTS error_message TEXT,
-  ADD COLUMN IF NOT EXISTS usage_metadata JSONB;
-```
-
-验收：
-
-- 每次扣 / 退 / 充值都有流水。
-- 客服可通过 `user_id + request_id + created_at` 查账。
-- `users.credits` 与流水可对账。
-
----
-
-## 4. P3：工程质量
-
-### P3-01：积分测试
-
-覆盖：
-
-- 用户存在 / 不存在。
-- 积分充足扣减。
-- 积分不足抛错。
-- 参数化查询。
-- 正常退款。
-- 退款失败抛错或告警。
-- AI 成功扣款不退款。
-- AI 失败扣后退回。
-- AI 失败且退款失败有错误日志。
-
----
-
-### P3-02：统一后端日志
-
-目标文件：
-
-```text
-server/lib/logger.js
-```
-
-格式：
-
-```text
-[ISO_TIME] [LEVEL] [MODULE] message {context}
-```
-
-规则：
-
-- 后端当前运行代码不使用裸 `console.log`。
-- 错误用 `logger.error`。
-- 日志上下文脱敏。
-
----
-
-### P3-03：环境变量与开发文档
-
-目标：
-
-- 根 `.env.example` 只放前端 Vite 变量。
-- `server/.env.example` 放后端变量。
-- 文档说明本地启动、数据库迁移、后端启动、前端启动。
-- 示例密钥只写生成命令，不写真实值。
-
----
-
-## 5. 安全任务执行模板
-
-```md
-## Task: <name>
-
-### Risk
-- 风险等级：P0 / P1 / P2 / P3
-
-### Current facts checked
-- 读取文件：
-- 当前代码路径：
-
-### Change plan
-1.
-2.
-3.
-
-### Files touched
--
-
-### Validation
-- Passed:
-- Not run:
-- Reason:
-
-### Rollback
--
-
-### Knowledge updates
--
-```
-
----
-
-## 6. 禁止事项
-
-```text
-不使用硬编码密钥 fallback
-不使用 CORS * 搭配 Authorization
-不在前端直连受保护 Provider
-不绕过积分扣减 / 退款 / 审计
-不复制第二套 JWT / CORS / credits 实现
-不把旧 Netlify / payment-server 文档当当前事实
-不在 migrations 之外改 Schema
-不为通过测试删除安全检查
-```

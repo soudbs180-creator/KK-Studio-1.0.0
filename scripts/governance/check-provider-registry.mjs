@@ -8,6 +8,7 @@
  *   1. 排他性校验：所有条目的 id、host、pricingSource.url (当为 online 时) 必须全局唯一，禁止重复。
  *   2. kind 完备校验：kind 必须存在且属于限制枚举 (official | relay | byok-reverse-proxy)。
  *   3. 密钥命名解耦：当中转站 kind === 'relay' 时，其 auth.keyRef 禁止引用官方密钥环境变量名，以防止混淆。
+ *   4. 中转站语义隔离：已知 relay 的 auth.keyRef 必须与 provider 身份一致，不得串用其它中转站密钥名。
  */
 
 import { createRequire } from 'node:module';
@@ -43,6 +44,13 @@ const seenPricingUrls = new Set();
 
 const OFFICIAL_KEY_REGEX = /^(GEMINI|OPENAI|ANTHROPIC|CLAUDE|AZURE)_API_KEY$/i;
 const ALLOWED_KINDS = ['official', 'relay', 'byok-reverse-proxy'];
+const RELAY_KEYREF_EXPECTATIONS = [
+  { idPattern: /gpt-best/i, expected: 'GPT_BEST_API_KEY' },
+  { idPattern: /vodeshop/i, expected: 'VODESHOP_RELAY_API_KEY' },
+  { idPattern: /apimart/i, expected: 'APIMART_API_KEY' },
+  { idPattern: /12ai/i, expected: 'TWELVEAI_API_KEY' },
+  { idPattern: /wuyin|suchuang/i, expected: 'WUYIN_API_KEY' },
+];
 
 for (const provider of providers) {
   const { id, kind, host, auth, pricingSource } = provider;
@@ -87,8 +95,14 @@ for (const provider of providers) {
 
   // 4. 密钥命名解耦
   if (kind === 'relay' && auth && auth.keyRef) {
-    if (OFFICIAL_KEY_REGEX.test(auth.keyRef.trim())) {
+    const keyRef = auth.keyRef.trim();
+    if (OFFICIAL_KEY_REGEX.test(keyRef)) {
       errors.push(`安全合规违规: 中转站 (relay) "${id}" 的 auth.keyRef "${auth.keyRef}" 不得借用官方环境变量名（官方/中转命名必须绝对隔离）。`);
+    }
+
+    const expectation = RELAY_KEYREF_EXPECTATIONS.find((item) => item.idPattern.test(id));
+    if (expectation && keyRef !== expectation.expected) {
+      errors.push(`安全合规违规: 中转站 (relay) "${id}" 的 auth.keyRef 必须为 "${expectation.expected}"，当前为 "${keyRef}"。`);
     }
   }
 }

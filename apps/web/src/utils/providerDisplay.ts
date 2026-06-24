@@ -1,4 +1,5 @@
 import { keyManager } from '../services/auth/keyManager';
+import { getProviderMetadata, resolveProviderAliasFromBaseUrl } from '../services/api/providerRegistry';
 
 type ProviderDisplayTarget = {
   keySlotId?: string;
@@ -83,6 +84,11 @@ function isOfficialAlias(provider: string, providerLabel?: string): boolean {
 
 export function getCanonicalProviderDisplayName(provider?: string): string {
   const normalizedProvider = normalizeValue(provider);
+  const metadata = getProviderMetadata(normalizedProvider);
+
+  if (metadata.kind === 'relay' && metadata.label) {
+    return metadata.label;
+  }
 
   if (normalizedProvider === 'Google') {
     return getCurrentLanguage() === 'en-US' ? 'Google' : '谷歌';
@@ -92,7 +98,7 @@ export function getCanonicalProviderDisplayName(provider?: string): string {
     return 'OpenAI';
   }
 
-  return normalizedProvider;
+  return metadata.label && metadata.kind !== 'custom' ? metadata.label : normalizedProvider;
 }
 
 export function resolveProviderIdentity(target: ProviderDisplayTarget): {
@@ -100,11 +106,20 @@ export function resolveProviderIdentity(target: ProviderDisplayTarget): {
   providerLabel?: string;
 } {
   const currentLabel = String(target.providerLabel || '').trim();
-  const currentProvider = String(target.provider || '').trim();
+  const relayProviderFromBaseUrl = resolveProviderAliasFromBaseUrl(target.baseUrl);
+  const currentProvider = relayProviderFromBaseUrl || String(target.provider || '').trim();
   const linkedProvider = target.keySlotId ? keyManager.getProviderForKeySlot(target.keySlotId) : undefined;
   const keySlot = target.keySlotId ? keyManager.getKey(target.keySlotId) : undefined;
   const routeLabel = String(linkedProvider?.name || keySlot?.name || '').trim();
-  const resolvedProvider = normalizeValue(linkedProvider?.name || keySlot?.provider || currentProvider);
+  const resolvedProvider = normalizeValue(relayProviderFromBaseUrl || linkedProvider?.name || keySlot?.provider || currentProvider);
+
+  if (relayProviderFromBaseUrl) {
+    const metadata = getProviderMetadata(relayProviderFromBaseUrl);
+    return {
+      provider: relayProviderFromBaseUrl,
+      providerLabel: metadata.label || relayProviderFromBaseUrl,
+    };
+  }
 
   if (shouldUseCanonicalOfficialLabel(target, resolvedProvider || currentProvider)) {
     const canonical = getCanonicalProviderDisplayName(resolvedProvider || currentProvider);
@@ -143,7 +158,7 @@ export function resolveProviderIdentity(target: ProviderDisplayTarget): {
 
   return {
     provider: currentProvider,
-    providerLabel: currentProvider,
+    providerLabel: getCanonicalProviderDisplayName(currentProvider) || currentProvider,
   };
 }
 

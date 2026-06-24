@@ -79,7 +79,6 @@ AI 助手和画布 Agent 必须通过 `IntentGate -> Planner -> ToolRegistry -> 
 - `apps/payment-sidecar/`
 - 根 `billing/`
 - `payment-server/`
-- `netlify/functions/`
 
 历史内容只能放在 `docs/archive/` 或明确标记为 archive 的文件中。新功能不得引用旧入口；需要兼容旧数据时，必须通过 adapter/service 隔离，并注明删除条件。
 
