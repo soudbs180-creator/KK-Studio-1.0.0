@@ -64,6 +64,8 @@ export function useSelectionMenuOverlay({
   const addPromptFavorite = useFavoritesStore((state) => state.addPromptFavorite);
   const removeFavorite = useFavoritesStore((state) => state.removeFavorite);
 
+  const selectedNodeIdSet = React.useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+
   React.useEffect(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || favoritesLoaded) {
       return;
@@ -77,10 +79,10 @@ export function useSelectionMenuOverlay({
       return;
     }
 
-    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
-    const images = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
+    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const images = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
     const workflowNodes = (activeCanvas.workflow?.nodes || []).filter((node) => (
-      selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
+      selectedNodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)
     ));
 
     prompts.forEach((node) => deletePromptNode(node.id));
@@ -90,7 +92,7 @@ export function useSelectionMenuOverlay({
     closeSelectionMenu();
   }, [
     activeCanvas,
-    selectedNodeIds,
+    selectedNodeIdSet,
     deletePromptNode,
     deleteImageNode,
     deleteWorkflowNode,
@@ -103,10 +105,10 @@ export function useSelectionMenuOverlay({
       return;
     }
 
-    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
-    const childImageIds = prompts.flatMap((promptNode) => actualChildImageIdsByPromptId.get(promptNode.id) || []);
+    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const childImageIdSet = new Set(prompts.flatMap((promptNode) => actualChildImageIdsByPromptId.get(promptNode.id) || []));
     const images = activeCanvas.imageNodes.filter((node) => (
-      selectedNodeIds.includes(node.id) || childImageIds.includes(node.id)
+      selectedNodeIdSet.has(node.id) || childImageIdSet.has(node.id)
     ));
 
     const selectedNodeSet = new Set([...prompts.map((node) => node.id), ...images.map((node) => node.id)]);
@@ -182,7 +184,7 @@ export function useSelectionMenuOverlay({
     closeSelectionMenu();
   }, [
     activeCanvas,
-    selectedNodeIds,
+    selectedNodeIdSet,
     actualChildImageIdsByPromptId,
     removeGroup,
     getCardDimensions,
@@ -209,8 +211,8 @@ export function useSelectionMenuOverlay({
     }
 
     const currentFavoriteItems = useFavoritesStore.getState().items;
-    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
-    const images = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
+    const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const images = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
 
     // 计算哪些已被收藏
     const itemsToRemoveFavoriteIds: string[] = [];
@@ -288,7 +290,7 @@ export function useSelectionMenuOverlay({
       console.error('[useSelectionMenuOverlay] 收藏操作失败:', e);
       notify.error('操作失败', '无法更新节点收藏状态');
     }
-  }, [activeCanvas, selectedNodeIds, addPromptFavorite, addImageFavorite, removeFavorite]);
+  }, [activeCanvas, selectedNodeIdSet, addPromptFavorite, addImageFavorite, removeFavorite]);
 
   const dynamicPosition = React.useMemo(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
@@ -302,7 +304,7 @@ export function useSelectionMenuOverlay({
     let hasNodes = false;
 
     activeCanvas.promptNodes
-      .filter((node) => selectedNodeIds.includes(node.id))
+      .filter((node) => selectedNodeIdSet.has(node.id))
       .forEach((node) => {
         const width = getPromptNodeBoundsWidth(node, isMobile);
         const height = node.height || 200;
@@ -314,7 +316,7 @@ export function useSelectionMenuOverlay({
       });
 
     activeCanvas.imageNodes
-      .filter((node) => selectedNodeIds.includes(node.id))
+      .filter((node) => selectedNodeIdSet.has(node.id))
       .forEach((node) => {
         const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
         minX = Math.min(minX, node.position.x - width / 2);
@@ -326,7 +328,7 @@ export function useSelectionMenuOverlay({
 
     const workflowNodes = activeCanvas.workflow?.nodes || [];
     workflowNodes
-      .filter((node) => selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind))
+      .filter((node) => selectedNodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind))
       .forEach((node) => {
         const width = node.width || 284;
         const height = node.height || 176;
@@ -348,24 +350,26 @@ export function useSelectionMenuOverlay({
       x: centerX * canvasTransform.scale + canvasTransform.x,
       y: topY * canvasTransform.scale + canvasTransform.y,
     };
-  }, [selectionMenuPosition, selectedNodeIds, activeCanvas, canvasTransform, isMobile, getCardDimensions]);
+  }, [selectionMenuPosition, selectedNodeIds.length, activeCanvas, canvasTransform, isMobile, getCardDimensions, selectedNodeIdSet]);
 
   return React.useMemo(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
       return null;
     }
 
-    const selectedPrompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
-    const selectedImages = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
+    const selectedPrompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const selectedImages = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const selectedImageParentPromptIdSet = new Set(selectedImages.map((image) => image.parentPromptId).filter(Boolean));
+    const selectedPromptIdSet = new Set(selectedPrompts.map((prompt) => prompt.id));
 
     // 计算卡组、提示词和结果数量
-    const groupPrompts = selectedPrompts.filter(p => selectedImages.some(img => img.parentPromptId === p.id));
+    const groupPrompts = selectedPrompts.filter((prompt) => selectedImageParentPromptIdSet.has(prompt.id));
     const cardGroupCount = groupPrompts.length;
 
-    const isolatedPrompts = selectedPrompts.filter(p => !selectedImages.some(img => img.parentPromptId === p.id));
+    const isolatedPrompts = selectedPrompts.filter((prompt) => !selectedImageParentPromptIdSet.has(prompt.id));
     const isolatedPromptCount = isolatedPrompts.length;
 
-    const isolatedImages = selectedImages.filter(img => !img.parentPromptId || !selectedPrompts.some(p => p.id === img.parentPromptId));
+    const isolatedImages = selectedImages.filter((image) => !image.parentPromptId || !selectedPromptIdSet.has(image.parentPromptId));
     const isolatedResultCount = isolatedImages.length;
 
     // 计算是否全部已收藏
@@ -403,19 +407,20 @@ export function useSelectionMenuOverlay({
       }
 
       // 情况 2：计算独立的“根”节点总数。
-      const promptIdsSet = new Set(selectedPrompts.map((n) => n.id));
+      const promptById = new Map(activeCanvas.promptNodes.map((node) => [node.id, node]));
+      const imageById = new Map(activeCanvas.imageNodes.map((node) => [node.id, node]));
       const uniqueRoots = new Set<string>();
 
       selectedNodeIds.forEach((id) => {
-        const prompt = activeCanvas.promptNodes.find((n) => n.id === id);
+        const prompt = promptById.get(id);
         if (prompt) {
           uniqueRoots.add(prompt.id);
           return;
         }
-        const image = activeCanvas.imageNodes.find((n) => n.id === id);
+        const image = imageById.get(id);
         if (!image) return;
         // 如果图片的 parentPromptId 也在选区中，它们同属于一个 root 组
-        if (image.parentPromptId && promptIdsSet.has(image.parentPromptId)) {
+        if (image.parentPromptId && selectedPromptIdSet.has(image.parentPromptId)) {
           uniqueRoots.add(image.parentPromptId);
         } else {
           uniqueRoots.add(image.id);
@@ -444,6 +449,7 @@ export function useSelectionMenuOverlay({
     selectionMenuPosition,
     dynamicPosition,
     selectedNodeIds,
+    selectedNodeIdSet,
     activeCanvas,
     favoriteItems,
     handleDeleteSelectionMenuNodes,
