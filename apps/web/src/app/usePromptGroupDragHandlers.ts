@@ -53,6 +53,7 @@ export function usePromptGroupDragHandlers({
   snapToGrid = false,
   commitPromptGroupDrag,
 }: UsePromptGroupDragHandlersArgs) {
+  const selectedNodeIdSet = React.useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const handlePromptGroupDragDelta = React.useCallback(({
     node,
     childImages,
@@ -73,7 +74,7 @@ export function usePromptGroupDragHandlers({
       clearPromptGroupRegroup(node.id);
     }
 
-    if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
+    if (selectedNodeIdSet.has(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
       applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
       return;
     }
@@ -84,7 +85,8 @@ export function usePromptGroupDragHandlers({
     beginPromptGroupRegroup,
     clearPromptGroupRegroup,
     expandedSelectedNodeIds,
-    selectedNodeIds,
+    selectedNodeIdSet,
+    selectedNodeIds.length,
     shouldAutoRegroupPromptGroup,
   ]);
 
@@ -99,7 +101,7 @@ export function usePromptGroupDragHandlers({
       return;
     }
 
-    if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
+    if (selectedNodeIdSet.has(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
       clearPromptGroupRegroup(node.id);
       moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
       return;
@@ -116,7 +118,8 @@ export function usePromptGroupDragHandlers({
     commitPromptGroupDrag,
     expandedSelectedNodeIds,
     moveSelectedNodesImmediate,
-    selectedNodeIds,
+    selectedNodeIdSet,
+    selectedNodeIds.length,
     shouldAutoRegroupPromptGroup,
     snapToGrid,
   ]);
@@ -132,14 +135,14 @@ export function usePromptGroupDragHandlers({
 
     clearPromptGroupRegroup(groupId);
 
-    if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+    if (selectedNodeIdSet.has(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
       applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
     }
   }, [
     applyLiveNodeDeltaToDraggedSet,
     clearPromptGroupRegroup,
     expandedSelectedNodeIds,
-    selectedNodeIds,
+    selectedNodeIdSet,
   ]);
 
   const handlePromptGroupChildDragCommit = React.useCallback(({
@@ -153,7 +156,7 @@ export function usePromptGroupDragHandlers({
 
     clearPromptGroupRegroup(groupId);
 
-    if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+    if (selectedNodeIdSet.has(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
       moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
       return;
     }
@@ -163,7 +166,7 @@ export function usePromptGroupDragHandlers({
     clearPromptGroupRegroup,
     expandedSelectedNodeIds,
     moveSelectedNodesImmediate,
-    selectedNodeIds,
+    selectedNodeIdSet,
     snapToGrid,
   ]);
 
