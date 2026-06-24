@@ -416,8 +416,10 @@ iframe,
   will-change: transform !important;
 }
 
+.canvas-container.is-dragging [data-canvas-surface],
 .canvas-container.is-zooming [data-canvas-surface] {
   filter: none !important;
+  -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
 
