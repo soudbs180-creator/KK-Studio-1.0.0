@@ -39,16 +39,19 @@ export function moveSelectedCanvasNodes(input: {
     snapToGrid?: boolean;
 }): Canvas {
     const { canvas, delta, sourceNodeIdOrIds } = input;
+    if (delta.x === 0 && delta.y === 0) return canvas;
+
     const options = input.options ?? { snapToGrid: input.snapToGrid };
     const selectedIds = resolveMoveSelectedCanvasNodeIds(input.selectedNodeIds, sourceNodeIdOrIds);
     if (selectedIds.length === 0) return canvas;
 
     const selectedSet = new Set(selectedIds);
-    const movedPromptIds = new Set(
-        canvas.promptNodes
-            .filter((node) => selectedSet.has(node.id))
-            .map((node) => node.id)
-    );
+    const movedPromptIds = new Set<string>();
+    canvas.promptNodes.forEach((node) => {
+        if (selectedSet.has(node.id)) {
+            movedPromptIds.add(node.id);
+        }
+    });
 
     const promptNodes = canvas.promptNodes.map(node => {
         if (selectedSet.has(node.id)) {
@@ -89,12 +92,23 @@ export function moveSelectedCanvasNodes(input: {
         }
         : canvas.workflow;
 
+    const currentDrawings = canvas.drawings || [];
+    if (currentDrawings.length === 0) {
+        return {
+            ...canvas,
+            promptNodes,
+            imageNodes,
+            workflow,
+            drawings: currentDrawings,
+        };
+    }
+
     const parentPromptIdByImageId = new Map<string, string | undefined>();
     imageNodes.forEach((imageNode) => {
         parentPromptIdByImageId.set(imageNode.id, imageNode.parentPromptId);
     });
 
-    const drawings = (canvas.drawings || []).map((drawing) => {
+    const drawings = currentDrawings.map((drawing) => {
         const isBoundToMovedNode = drawing.bindingNodeId && selectedSet.has(drawing.bindingNodeId);
         const isBoundToMovedGroup = drawing.bindingGroupId && selectedSet.has(drawing.bindingGroupId);
         const parentPromptId = drawing.bindingNodeId
