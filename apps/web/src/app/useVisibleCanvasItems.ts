@@ -37,6 +37,7 @@ export interface UseVisibleCanvasItemsDeps {
   imageCardHeightById: Record<string, number>;
   selectedNodeIds: string[];
   draftNodeId: string | null;
+  isCanvasTransforming: boolean;
 }
 
 export interface VisibleCanvasItemsResult {
@@ -63,6 +64,7 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
+    isCanvasTransforming,
   } = deps;
 
   // 简体中文：缓存上一次计算出来的可视场景，拖动中不触发可见性集重新生成以防节点 unmount 闪烁
@@ -121,6 +123,10 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
   // 简体中文：2. 视口裁剪逻辑
   return React.useMemo(() => {
     if (isNodeDragActive) {
+      return stableVisibleCanvasSceneRef.current;
+    }
+
+    if (isCanvasTransforming) {
       return stableVisibleCanvasSceneRef.current;
     }
 
@@ -281,5 +287,6 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     selectedNodeIds,
     draftNodeId,
     spatialIndex,
+    isCanvasTransforming,
   ]);
 }

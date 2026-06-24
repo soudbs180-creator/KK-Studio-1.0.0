@@ -238,11 +238,28 @@ export const markInterruptedSyncPromptGenerations = (state: CanvasState): Canvas
 export const hasUnrecoverableSyncGenerationInFlight = (state?: CanvasState | null): boolean => {
     if (!state?.canvases?.length) return false;
 
-    return state.canvases.some((canvas) =>
-        (canvas.promptNodes || []).some((node) =>
+    return state.canvases.some((canvas) => {
+        const imageNodes = canvas.imageNodes || [];
+        const imageNodeById = new Map<string, GeneratedImage>();
+        const strongOwnedImagesByParentPromptId = new Map<string, GeneratedImage[]>();
+        imageNodes.forEach((img) => {
+            imageNodeById.set(img.id, img);
+            if (img.parentPromptId) {
+                const list = strongOwnedImagesByParentPromptId.get(img.parentPromptId) || [];
+                list.push(img);
+                strongOwnedImagesByParentPromptId.set(img.parentPromptId, list);
+            }
+        });
+
+        return (canvas.promptNodes || []).some((node) =>
             Boolean(node?.isGenerating)
-            && resolvePromptChildImageIds(node, canvas.imageNodes || []).length === 0
+            && resolvePromptChildImageIds(
+                node,
+                imageNodes,
+                imageNodeById,
+                strongOwnedImagesByParentPromptId
+            ).length === 0
             && !hasRecoverablePendingTask(node)
-        )
-    );
+        );
+    });
 };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import handler from "../../api/user-model-proxy.js";
+import handler from "../../docs/archive/user-model-proxy.js";
 
 function createResponse() {
   return {

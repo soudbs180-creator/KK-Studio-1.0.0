@@ -3524,6 +3524,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
+    isCanvasTransforming,
   });
 
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({

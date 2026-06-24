@@ -65,3 +65,15 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 成功通过。
   - 运行 `npm run build` 打包完全通过。
 
+
+## 9. 2026-06-25 - 启动与恢复流程中 O(n²) 图片查找深层清理 (本次追加)
+- **修改范围**：深度清理了启动和恢复大循环中因高频重复调用 `resolvePromptChildImageIds` 且无 Map 缓存导致的隐式 $O(n²)$ 性能盲区。
+- **修改文件**：
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/context/canvasPromptRecovery.ts`
+- **当前设计决策**：
+  - 在 `hasUnrecoverableSyncGenerationInFlight` (在 `canvasPromptRecovery.ts` 中) 针对 `canvas.promptNodes` 的 `some` 高频遍历前，在最外层对 `canvas.imageNodes` 提取一次建立 `imageNodeById` Map 与 `strongOwnedImagesByParentPromptId` Map 并做参数下传，消除隐式的 $O(N \times M)$ 循环复杂度。
+  - 在 `hydratePersistedImageSources` (在 `CanvasContext.tsx` 中) 对 `canvas.promptNodes` 遍历进行持久化图片恢复大循环前，同样在外层构建 Map 并传入 `resolvePromptChildImageIds` 调用。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` 1.32s 内成功通过。

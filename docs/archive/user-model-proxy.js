@@ -98,7 +98,7 @@ function appendApiKeyQueryParamIfNeeded(targetUrl, apiKey) {
   return parsed.toString();
 }
 
-const { PROVIDER_PROFILES } = require('../server/lib/dispatcher/providerProfiles.js');
+const { PROVIDER_PROFILES } = require('../../server/lib/dispatcher/providerProfiles.js');
 
 function isAllowedProxyTargetUrl(targetUrl) {
   const raw = String(targetUrl || '').trim();

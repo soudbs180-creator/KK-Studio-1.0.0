@@ -1527,7 +1527,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             for (const canvas of currentState.canvases) {
                 const promptById = new Map((canvas.promptNodes || []).map((promptNode) => [promptNode.id, promptNode] as const));
 
-                for (const imageNode of canvas.imageNodes || []) {
+                // 简体中文注释：提前构建查找 Map 缓存，供后续 resolvePromptChildImageIds 循环调用，消除 O(n²) 复杂度
+                const imageNodes = canvas.imageNodes || [];
+                const imageNodeById = new Map<string, GeneratedImage>();
+                const strongOwnedImagesByParentPromptId = new Map<string, GeneratedImage[]>();
+                imageNodes.forEach((img) => {
+                    imageNodeById.set(img.id, img);
+                    if (img.parentPromptId) {
+                        const list = strongOwnedImagesByParentPromptId.get(img.parentPromptId) || [];
+                        list.push(img);
+                        strongOwnedImagesByParentPromptId.set(img.parentPromptId, list);
+                    }
+                });
+
+                for (const imageNode of imageNodes) {
                     if (imageNode.url && imageNode.originalUrl) continue;
 
                     const parentPrompt = imageNode.parentPromptId ? promptById.get(imageNode.parentPromptId) : undefined;
@@ -1651,7 +1664,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                     recoveredNodes.push(...nextRecoveredNodes);
                     const nextChildImageIds = Array.from(new Set([
-                        ...resolvePromptChildImageIds(promptNode, canvas.imageNodes || []),
+                        ...resolvePromptChildImageIds(promptNode, imageNodes, imageNodeById, strongOwnedImagesByParentPromptId),
                         ...nextRecoveredNodes.map((imageNode) => imageNode.id),
                     ]));
                     parentUpdates[promptNode.id] = {

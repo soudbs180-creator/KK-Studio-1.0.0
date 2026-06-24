@@ -577,21 +577,8 @@ function pricingProxyPlugin(): Plugin {
                 let body = '';
                 for await (const chunk of req) body += chunk;
 
-                try {
-                    const { default: pricingProxyHandler } = await import('./api/pricing-proxy.ts');
-                    const response = await pricingProxyHandler(new Request('http://localhost/api/pricing-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body,
-                    }));
+                // 简体中文注释：直接使用开发调试的回退代理，爬取供应商的实时价格数据
 
-                    res.statusCode = response.status;
-                    response.headers.forEach((value, key) => res.setHeader(key, value));
-                    res.end(await response.text());
-                    return;
-                } catch (e: any) {
-                    console.warn('[pricing-proxy] Falling back to legacy dev proxy:', e?.message);
-                }
 
                 res.setHeader('Content-Type', 'application/json');
                 res.setHeader('Access-Control-Allow-Origin', '*');
