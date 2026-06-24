@@ -1,7 +1,33 @@
 # Session Handoff - UI System Optimization and Runtime Governance
 
-**Last Updated:** 2026-06-24 (Canvas Performance Refactor & LOD Adaptation)
+**Last Updated:** 2026-06-25 (Login Captcha Overlay Blur and Transparency Optimization)
 **Version:** KK Studio v1.5.7
+
+## 2026-06-25 - 登录卡片验证时背景模糊透明优化 (Login Captcha Overlay Blur and Transparency Optimization)
+
+### 修改范围 (Login Captcha Overlay Blur and Transparency Optimization)
+- **动态验证状态激活**：在 [LoginScreen.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/auth/LoginScreen.tsx) 的 `auth-panel` 容器上，当 `captchaRequiredByBackend` 为 `true` 时，动态添加类名 `is-captcha-active`。
+- **卡片背景模糊与不透明度降低**：在 [LoginScreen.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/auth/LoginScreen.css) 中定义当 `is-captcha-active` 激活时，卡片内除验证浮层之外的其他所有子元素高斯模糊化（`blur(12px)`）并降低透明度至 `3%`，同时禁用其交互事件与文本选择。
+- **验证浮层轻量化**：去除 `.auth-captcha-overlay` 原本的白色惨白遮罩底色及重复的 `backdrop-filter`，将其底色设为 `transparent`，直接透出底层卡片的磨砂效果，保证亮色与暗色模式的视觉纯粹，避免了双重遮罩造成的视觉杂乱。
+- **淡入与微缩放动画**：为验证浮层引入了平滑的转场动画（`scale(0.96) -> scale(1.0)` 和淡入），提升系统的微交互质感。
+
+### 修改文件 (Login Captcha Overlay Blur and Transparency Optimization)
+- `apps/web/src/components/auth/LoginScreen.tsx` [MODIFY]
+- `apps/web/src/components/auth/LoginScreen.css` [MODIFY]
+- `docs/development/session-handoff.md` [MODIFY]
+
+### 已运行验证 (Login Captcha Overlay Blur and Transparency Optimization)
+- `npm run typecheck` (类型检查全绿通过)
+- `npm run build` (Vite 生产打包顺利完成)
+- `npm run test:unit` (全量 1576 个单元测试 100% 绿通，无功能退化)
+- `npm run architecture:check` (架构与模块边界校验通过)
+
+### 未运行验证及原因 (Login Captcha Overlay Blur and Transparency Optimization)
+- 无
+
+### 风险与下一步 (Login Captcha Overlay Blur and Transparency Optimization)
+- **风险**：无风险。变更局限在登录页面人机验证状态的 CSS 效果控制内，未破坏原有的安全验证交互与自动登录表单流程。
+- **下一步**：已全部完成。可交付用户直接体验极致高端的磨砂模糊人机验证流程。
 
 ## 2026-06-24 - 完成无限画布性能重构与精细度 LOD 渲染分级适配 (Canvas Performance Refactor & LOD Adaptation)
 

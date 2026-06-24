@@ -458,7 +458,7 @@ const LoginScreen: React.FC = () => {
             >
               <X size={20} />
             </button>
-            <div className="auth-panel">
+            <div className={`auth-panel ${captchaRequiredByBackend ? 'is-captcha-active' : ''}`}>
               {view !== 'login' && (
                 <button
                   type="button"

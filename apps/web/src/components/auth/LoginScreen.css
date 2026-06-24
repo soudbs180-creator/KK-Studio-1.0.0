@@ -943,6 +943,19 @@ body.auth-screen-active--landing.auth-modal-open #root {
   gap: 10px;
 }
 
+/* 登录卡片子元素过渡效果 */
+.auth-panel > * {
+  transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 激活验证码时，卡片内其他所有内容模糊且接近完全透明，并禁用交互 */
+.auth-panel.is-captcha-active > :not(.auth-captcha-overlay) {
+  filter: blur(12px);
+  opacity: 0.03;
+  pointer-events: none;
+  user-select: none;
+}
+
 .auth-captcha-overlay {
   position: absolute;
   inset: 0;
@@ -952,17 +965,30 @@ body.auth-screen-active--landing.auth-modal-open #root {
   justify-content: center;
   padding: 28px;
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation: auth-captcha-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高透光高可读性 */
+/* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高透光高可读性 (优化为完全透明底) */
 .auth-page--dark .auth-captcha-overlay {
-  background: rgba(255, 255, 255, 0.62) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(32px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(1.8) !important;
+  background: transparent !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 验证组件淡入和轻微放大动画 */
+@keyframes auth-captcha-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .auth-page--dark .auth-captcha-title {
