@@ -6,7 +6,7 @@ import { syncCanvasCompatibility } from './canvasCompatibility';
 import { resolvePromptChildImageIds } from './canvasPromptChildImages';
 import { type CanvasState } from './canvasContextState';
 
-const SYNC_GENERATION_INTERRUPTED_ERROR = '\u9875\u9762\u5237\u65b0\u6216\u79bb\u5f00\u65f6\u4e2d\u65ad\u4e86\u540c\u6b65\u751f\u6210\u8bf7\u6c42\uff0c\u4f9b\u5e94\u5546\u53ef\u80fd\u5df2\u5b8c\u6210\u51fa\u56fe\uff0c\u4f46\u5f53\u524d\u9879\u76ee\u6ca1\u6709\u6536\u5230\u6700\u7ec8\u54cd\u5e94\u3002';
+const SYNC_GENERATION_INTERRUPTED_ERROR = '页面刷新或离开时中断了同步生成请求，供应商可能已完成出图，但当前项目没有收到最终响应。';
 
 const getExpectedPromptImageCount = (node?: Partial<PromptNode> | null): number => (
     Math.max(1, Number(node?.lastGenerationTotalCount || node?.parallelCount || 1) || 1)
@@ -67,6 +67,34 @@ const hasRecoverablePendingTask = (node?: Partial<PromptNode> | null): boolean =
     return typeof node.jobId === 'string' && node.jobId.trim().length > 0;
 };
 
+const hasFiniteImagePosition = (imageNode: GeneratedImage): boolean => (
+    Number.isFinite(imageNode.position?.x) && Number.isFinite(imageNode.position?.y)
+);
+
+const preserveRecoveredChildImageLayout = (canvas: Canvas): Canvas => {
+    const imageNodes = canvas.imageNodes || [];
+    if (imageNodes.length === 0) return canvas;
+
+    let hasChanges = false;
+    const nextImageNodes = imageNodes.map((imageNode) => {
+        if (
+            imageNode.userMoved !== undefined
+            || !imageNode.parentPromptId
+            || !hasFiniteImagePosition(imageNode)
+        ) {
+            return imageNode;
+        }
+
+        hasChanges = true;
+        return {
+            ...imageNode,
+            userMoved: true,
+        };
+    });
+
+    return hasChanges ? { ...canvas, imageNodes: nextImageNodes } : canvas;
+};
+
 const normalizeRecoveredPromptNode = (
     node: PromptNode,
     imageNodes: GeneratedImage[] = []
@@ -123,13 +151,14 @@ const normalizeRecoveredPromptNode = (
 
 export const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => {
     const legacyReadyCanvas = workflowToLegacyCanvas(canvas);
-
-    return syncCanvasCompatibility({
+    const recoveredCanvas = {
         ...legacyReadyCanvas,
         promptNodes: (legacyReadyCanvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, legacyReadyCanvas.imageNodes || [])),
         groups: legacyReadyCanvas.groups || [],
         drawings: legacyReadyCanvas.drawings || []
-    });
+    };
+
+    return syncCanvasCompatibility(preserveRecoveredChildImageLayout(recoveredCanvas));
 };
 
 export const markInterruptedSyncPromptGenerations = (state: CanvasState): CanvasState => ({
