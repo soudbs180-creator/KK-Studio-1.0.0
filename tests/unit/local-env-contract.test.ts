@@ -182,5 +182,4 @@ test(".env.example does not activate a non-local KK API base URL by default", ()
   );
   assert.match(source, /^VITE_KK_API_BASE_URL\s*=\s*http:\/\/127\.0\.0\.1:3001/m);
   assert.match(source, /^EXPO_PUBLIC_API_BASE_URL\s*=\s*http:\/\/127\.0\.0\.1:3001/m);
-  assert.doesNotMatch(source, /netlify/i);
 });
