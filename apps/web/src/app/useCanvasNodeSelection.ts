@@ -56,6 +56,7 @@ export function useCanvasNodeSelection({
   const getSelectionScreenCenter = React.useCallback((nodeIds: string[]) => {
     if (!activeCanvas || nodeIds.length === 0) return null;
 
+    const nodeIdSet = new Set(nodeIds);
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -63,7 +64,7 @@ export function useCanvasNodeSelection({
     let hasNodes = false;
 
     activeCanvas.promptNodes
-      .filter((node) => nodeIds.includes(node.id))
+      .filter((node) => nodeIdSet.has(node.id))
       .forEach((node) => {
         const width = getPromptNodeBoundsWidth(node, isMobile);
         const height = node.height || 200;
@@ -75,7 +76,7 @@ export function useCanvasNodeSelection({
       });
 
     activeCanvas.imageNodes
-      .filter((node) => nodeIds.includes(node.id))
+      .filter((node) => nodeIdSet.has(node.id))
       .forEach((node) => {
         const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
         minX = Math.min(minX, node.position.x - width / 2);
@@ -86,7 +87,7 @@ export function useCanvasNodeSelection({
       });
 
     (activeCanvas.workflow?.nodes || [])
-      .filter((node) => nodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind))
+      .filter((node) => nodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind))
       .forEach((node) => {
         const width = node.width || 284;
         const height = node.height || 176;
@@ -106,7 +107,7 @@ export function useCanvasNodeSelection({
       x: centerX * canvasTransform.scale + canvasTransform.x,
       y: topY * canvasTransform.scale + canvasTransform.y,
     };
-  }, [activeCanvas, canvasTransform, getCardDimensions, isMobile]);
+  }, [activeCanvas, canvasTransform.scale, canvasTransform.x, canvasTransform.y, getCardDimensions, isMobile]);
 
   const openSelectionMenuForNodeIds = React.useCallback((nodeIds: string[]) => {
     const position = getSelectionScreenCenter(nodeIds);
