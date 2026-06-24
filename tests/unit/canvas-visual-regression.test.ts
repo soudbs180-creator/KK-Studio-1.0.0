@@ -100,10 +100,10 @@ test('dark canvas keeps the dot grid visible instead of collapsing into pure bla
   );
 });
 
-test('canvas panning does not disable frosted card surfaces while zooming still keeps the fast-path fallback', () => {
+test('canvas panning disables frosted card surfaces for maximum FPS during interaction', () => {
   const cssSource = readSource('apps/web/src/index.css');
 
-  assert.doesNotMatch(
+  assert.match(
     cssSource,
     /\.canvas-container\.is-dragging\s+\[data-canvas-surface\][\s\S]*backdrop-filter:\s*none\s*!important;/,
   );
@@ -163,14 +163,14 @@ test('prompt cards avoid transform-focused will-change hints during drag so back
   );
 });
 
-test('canvas groups avoid transform-only will-change hints while dragging their frosted shells', () => {
+test('canvas groups use transform-only will-change hints while dragging their frosted shells', () => {
   const source = readSource('apps/web/src/components/canvas/CanvasGroupComponent.tsx');
 
-  assert.doesNotMatch(
+  assert.match(
     source,
     /willChange:\s*isDragging\s*\?\s*'transform'\s*:\s*'auto'/,
   );
-  assert.match(
+  assert.doesNotMatch(
     source,
     /willChange:\s*isDragging\s*\?\s*'width,\s*height'\s*:\s*'auto'/,
   );

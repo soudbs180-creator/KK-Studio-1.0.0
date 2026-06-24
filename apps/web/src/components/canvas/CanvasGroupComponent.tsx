@@ -31,6 +31,7 @@ export interface CanvasGroupProps {
     onUngroup: (id: string) => void;
     onDragStart: (id: string, e: React.MouseEvent) => void;
     onGroupDrag?: (delta: { x: number; y: number }, sourceNodeIds?: string[]) => void;
+    onGroupDragCommit?: (delta: { x: number; y: number }, sourceNodeIds?: string[]) => void;
     onDragStateChange?: (dragging: boolean) => void;
     onUpdateGroup?: (group: CanvasGroup) => void;
     highlighted?: boolean;
@@ -44,6 +45,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     onUngroup,
     onDragStart,
     onGroupDrag,
+    onGroupDragCommit,
     onDragStateChange,
     onUpdateGroup,
     highlighted,
@@ -53,6 +55,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const lastPos = useRef<{ x: number; y: number } | null>(null);
     const rafRef = useRef<number | null>(null);
     const pendingDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const accumulatedDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const isCollapsed = Boolean(group.collapsed);
     const isHidden = Boolean(group.hidden);
@@ -276,6 +279,11 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             containerRef.current.style.transform = `translate(${newX}px, ${newY}px)`;
         }
 
+        accumulatedDelta.current = {
+            x: accumulatedDelta.current.x + x,
+            y: accumulatedDelta.current.y + y
+        };
+
         onGroupDrag({ x, y }, group.nodeIds);
         pendingDelta.current = { x: 0, y: 0 };
     }, [group.nodeIds, onGroupDrag]);
@@ -303,6 +311,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         lastPos.current = { x: e.clientX, y: e.clientY };
         setIsDragging(true);
         onDragStateChange?.(true);
+        accumulatedDelta.current = { x: 0, y: 0 };
 
         const handleMouseMove = (ev: MouseEvent) => {
             if (!lastPos.current) return;
@@ -330,6 +339,13 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             onDragStateChange?.(false);
             lastPos.current = null;
             pendingDelta.current = { x: 0, y: 0 };
+            
+            const finalDelta = accumulatedDelta.current;
+            if (finalDelta.x !== 0 || finalDelta.y !== 0) {
+                onGroupDragCommit?.(finalDelta, group.nodeIds);
+            }
+            accumulatedDelta.current = { x: 0, y: 0 };
+
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };

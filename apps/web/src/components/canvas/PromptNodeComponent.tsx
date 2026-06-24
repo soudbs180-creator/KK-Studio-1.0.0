@@ -985,6 +985,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     // Height reporting
     useEffect(() => {
+        if (detailLevel !== 'full') return;
         if (!cardRef.current || !onHeightChange) return;
 
         const observer = new ResizeObserver((entries) => {
@@ -998,10 +999,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         });
         observer.observe(cardRef.current);
         return () => observer.disconnect();
-    }, [node.id, onHeightChange, node.height]); // Depend on node.height to prevent loop if stable
+    }, [node.id, onHeightChange, node.height, detailLevel]); // Depend on node.height to prevent loop if stable
 
-    // 动态更新cardHeight用于连接线起??
+    // 动态更新cardHeight用于连接线起点
     useEffect(() => {
+        if (detailLevel !== 'full') return;
         const updateHeight = () => {
             if (cardRef.current) {
                 const height = cardRef.current.offsetHeight;
@@ -1015,14 +1017,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         // 初始更新
         updateHeight();
 
-        // 利用已有的ResizeObserver来监听高度变??
+        // 利用已有的ResizeObserver来监听高度变化
         const observer = new ResizeObserver(updateHeight);
         if (cardRef.current) {
             observer.observe(cardRef.current);
         }
 
         return () => observer.disconnect();
-    }, [node.prompt, node.referenceImages]);
+    }, [node.prompt, node.referenceImages, detailLevel]);
 
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {

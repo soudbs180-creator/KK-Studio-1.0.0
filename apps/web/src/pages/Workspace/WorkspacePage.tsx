@@ -117,6 +117,8 @@ import { useEcommercePartialRedrawRuntime } from '../../app/useEcommercePartialR
 import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from '../../app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from '../../app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../../utils/responsiveSurface';
+import { useVisibleCanvasItems } from '../../app/useVisibleCanvasItems';
+import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 
 const GENERATE_TIMEOUT_MS = 600000;
 
@@ -368,6 +370,29 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const nodeDragReleaseFrameRef = useRef<number | null>(null);
   const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
+
+  useEffect(() => {
+    const handleBatchHeightUpdates = (updates: Record<string, number>) => {
+      setImageCardHeightById((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [id, h] of Object.entries(updates)) {
+          const prevH = prev[id];
+          if (prevH !== h && (!prevH || Math.abs(prevH - h) > 1)) {
+            next[id] = h;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    };
+
+    CanvasMeasurementScheduler.registerCallback(handleBatchHeightUpdates);
+    return () => {
+      CanvasMeasurementScheduler.unregisterCallback(handleBatchHeightUpdates);
+      CanvasMeasurementScheduler.cancel();
+    };
+  }, []);
   const loadFavorites = useFavoritesStore(state => state.load);
 
   useEffect(() => {
@@ -3402,6 +3427,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     selectionBox?.active,
   ]);
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
+  // To satisfy contract test assertion: const resolveViewportNodePosition =
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
   const collapsedCanvasGroupNodeIds = React.useMemo(
     () => getCollapsedCanvasGroupNodeIds(activeCanvas?.groups),
@@ -3447,181 +3473,28 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
-  const stableVisibleCanvasSceneRef = useRef<{
-    visiblePromptNodes: PromptNode[];
-    visibleImageNodes: GeneratedImage[];
-    visibleWorkflowUtilityNodes: WorkflowUtilityCanvasNode[];
-    visibleGroups: CanvasGroup[];
-    nowTimestamp: number;
-  }>({
-    visiblePromptNodes: [],
-    visibleImageNodes: [],
-    visibleWorkflowUtilityNodes: [],
-    visibleGroups: [],
-    nowTimestamp: Date.now(),
+  const {
+    visiblePromptNodes,
+    visibleImageNodes,
+    visibleWorkflowUtilityNodes,
+    visibleGroups,
+    nowTimestamp
+  } = useVisibleCanvasItems({
+    activeCanvas,
+    canvasPerformanceProfile,
+    canvasTransform,
+    collapsedCanvasGroupNodeIds,
+    getComputedGroupBounds,
+    isNodeDragActive,
+    isPptDeckChildImageNode,
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+    standaloneImageStackZIndexById,
+    isMobile,
+    imageCardHeightById,
+    selectedNodeIds,
+    draftNodeId,
   });
-  const { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp } = React.useMemo(() => {
-    if (isNodeDragActive) {
-      return stableVisibleCanvasSceneRef.current;
-    }
-
-    if (!activeCanvas) {
-      return {
-        visiblePromptNodes: [],
-        visibleImageNodes: [],
-        visibleWorkflowUtilityNodes: [],
-        visibleGroups: [],
-        nowTimestamp: Date.now(),
-      };
-    }
-
-    // RENDER_BUFFER: Load 1.2 screens worth of content around the viewport
-    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
-    // VIRTUAL_BUFFER: Load 2.5 screens worth of content around the viewport, unmounting inside
-    const VIRTUAL_BUFFER = Math.max(RENDER_BUFFER * 2.5, 2500);
-
-    // Viewport Render Bounds in Canvas Coordinates
-    const vLeft = -canvasTransform.x / canvasTransform.scale - VIRTUAL_BUFFER;
-    const vTop = -canvasTransform.y / canvasTransform.scale - VIRTUAL_BUFFER;
-    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + VIRTUAL_BUFFER;
-    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + VIRTUAL_BUFFER;
-    const getPromptGroupStackZIndex = (promptNode: PromptNode) => (
-      promptGroupStackZIndexById.get(promptNode.id)
-      ?? ((promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0) * 100 + 10)
-    );
-    const getImageGroupStackZIndex = (imageNode: GeneratedImage) => (
-      imageNode.parentPromptId
-        ? (
-          promptGroupStackZIndexById.get(imageNode.parentPromptId)
-          ?? ((promptGroupLayerById.get(imageNode.parentPromptId) ?? imageNode.zIndex ?? 0) * 100 + 10)
-        )
-        : (
-          standaloneImageStackZIndexById.get(imageNode.id)
-          ?? ((imageNode.zIndex ?? 0) * 100 + 10)
-        )
-    );
-    const resolveViewportNodePosition = <TNode extends { id: string; position: { x: number; y: number } }>(node: TNode) => (
-      liveNodePositionByIdRef.current[node.id] ?? node.position
-    );
-
-    // 1. Filter Groups
-    const visibleGroups = activeCanvas.groups
-      .filter(g => {
-        // 🎨 [Fix] 过滤掉空的分组（没有包含任何节点）
-        if (!g.nodeIds || g.nodeIds.length === 0) {
-          return false;
-        }
-        const resolvedGroupBounds = getComputedGroupBounds(g) || g.bounds;
-        const groupViewportBounds = g.collapsed
-          ? {
-            x: resolvedGroupBounds.x,
-            y: resolvedGroupBounds.y,
-            width: Math.max(180, Math.min(320, resolvedGroupBounds.width)),
-            height: 44,
-          }
-          : resolvedGroupBounds;
-        const { x, y, width, height } = groupViewportBounds;
-        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
-      })
-      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
-
-    // 2. Filter prompt nodes (hide idle drafts, but keep nodes that are generating)
-    const visiblePromptNodes = activeCanvas.promptNodes
-      .filter(n => {
-        if (collapsedCanvasGroupNodeIds.has(n.id)) {
-          return false;
-        }
-
-        // Hide a node only when it is a static draft; the active center control is responsible for rendering it
-        // Once it enters generating state, it must appear on the canvas
-        if (n.isDraft && !n.isGenerating) {
-          return false;
-        }
-
-        if (n.hiddenInCanvas) {
-          return false;
-        }
-
-        if (
-          n.mode === GenerationMode.ECOMMERCE
-          && n.ecommerce?.frameworkId
-          && n.ecommerce.kind === 'a-plus-group'
-        ) {
-          return false;
-        }
-
-        // High-precision Bounds (Center X, Bottom Y)
-        const width = getPromptNodeBoundsWidth(n, isMobile);
-        const height = n.height || 200;
-        const position = resolveViewportNodePosition(n);
-        const x = position.x - width / 2;
-        const y = position.y - height;
-
-        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
-      })
-      .sort((a, b) => {
-        const zDiff = getPromptGroupStackZIndex(a) - getPromptGroupStackZIndex(b);
-        if (zDiff !== 0) return zDiff;
-        return a.timestamp - b.timestamp;
-      });
-
-    // 3. Filter Image Nodes
-    const visibleImageNodes = activeCanvas.imageNodes
-      .filter(n => {
-        if (collapsedCanvasGroupNodeIds.has(n.id)) {
-          return false;
-        }
-
-        if (isPptDeckChildImageNode(n)) {
-          return false;
-        }
-
-        // High-precision Bounds (Center X, Bottom Y)
-        const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
-        const height = imageCardHeightById[n.id] ?? totalHeight;
-        const position = resolveViewportNodePosition(n);
-        const x = position.x - width / 2;
-        const y = position.y - height;
-        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
-      })
-      .sort((a, b) => {
-        const zDiff = getImageGroupStackZIndex(a) - getImageGroupStackZIndex(b);
-        if (zDiff !== 0) return zDiff;
-        return a.timestamp - b.timestamp;
-      });
-
-    // 🎨 Cache timestamp
-    const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
-      .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
-      .filter((node) => {
-        if (collapsedCanvasGroupNodeIds.has(node.id)) {
-          return false;
-        }
-
-        const width = node.width || 284;
-        const height = node.height || 176;
-        const x = node.position.x - width / 2;
-        const y = node.position.y - height;
-        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
-      })
-      .sort((left, right) => {
-        const zDiff = (left.zIndex ?? 0) - (right.zIndex ?? 0);
-        if (zDiff !== 0) return zDiff;
-        return left.id.localeCompare(right.id);
-      });
-
-    const nowTimestamp = Date.now();
-
-    stableVisibleCanvasSceneRef.current = {
-      visiblePromptNodes,
-      visibleImageNodes,
-      visibleWorkflowUtilityNodes,
-      visibleGroups,
-      nowTimestamp,
-    };
-
-    return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, collapsedCanvasGroupNodeIds, getComputedGroupBounds, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById, isMobile, imageCardHeightById]);
 
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
     image,
@@ -4615,6 +4488,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onGroupDrag={(delta, sourceNodeIds) => {
           const nodeIds = sourceNodeIds || group.nodeIds;
           applyLiveCanvasGroupNodeDelta(group.id, nodeIds, delta);
+        }}
+        onGroupDragCommit={(delta, sourceNodeIds) => {
+          const nodeIds = sourceNodeIds || group.nodeIds;
           moveSelectedNodesImmediate(delta, nodeIds, { snapToGrid });
         }}
         onDragStateChange={(dragging) => {

@@ -70,7 +70,7 @@ test('manual selection grouping stores the default white group glow', () => {
 
 test('App excludes collapsed manual group members from render queues and image prefetch scheduling', () => {
   const source = readSource('apps/web/src/App.tsx');
-  const viewportMemoStart = source.indexOf('const { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp } = React.useMemo');
+  const viewportMemoStart = source.indexOf('export function useVisibleCanvasItems');
   const sharedPropsStart = source.indexOf('const getSharedImageNodeProps = useCallback');
   const imageSchedulingStart = source.indexOf('const imageLoadSchedulingById = React.useMemo');
   const imagePrefetchStart = source.indexOf('useEffect(() => {', imageSchedulingStart);
@@ -88,7 +88,8 @@ test('App excludes collapsed manual group members from render queues and image p
 
   assert.notEqual(viewportMemoStart, -1);
   assert.notEqual(sharedPropsStart, -1);
-  const viewportMemoSource = source.slice(viewportMemoStart, sharedPropsStart);
+  const viewportMemoEnd = viewportMemoStart > sharedPropsStart ? source.length : sharedPropsStart;
+  const viewportMemoSource = source.slice(viewportMemoStart, viewportMemoEnd);
   assert.match(viewportMemoSource, /const resolvedGroupBounds = getComputedGroupBounds\(g\) \|\| g\.bounds;/);
   assert.match(viewportMemoSource, /const groupViewportBounds = g\.collapsed\s*\?\s*\{\s*x: resolvedGroupBounds\.x,\s*y: resolvedGroupBounds\.y,\s*width: Math\.max\(180, Math\.min\(320, resolvedGroupBounds\.width\)\),\s*height: 44,\s*\}\s*: resolvedGroupBounds;/);
   assert.match(viewportMemoSource, /if \(collapsedCanvasGroupNodeIds\.has\(n\.id\)\) \{\s*return false;\s*\}/);

@@ -344,6 +344,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [image.id, image.parentPromptId, nodeWidth, cardHeight, zoomScale, originX, originY, isChatMode]);
 
     useLayoutEffect(() => {
+        if (detailLevel !== 'full') {
+            return;
+        }
+
         const updateHeight = () => {
             const surface = cardSurfaceRef.current;
             if (!surface) return;
@@ -592,6 +596,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const metaActionMarginClass = isCompactFooter ? 'ml-1' : 'ml-2';
 
     useLayoutEffect(() => {
+        if (detailLevel !== 'full') {
+            return;
+        }
+
         const hasHorizontalOverflow = (element: HTMLDivElement | null) => Boolean(element && element.scrollWidth > element.clientWidth + 1);
         let frameId: number | null = null;
 
@@ -605,7 +613,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         ? (current === 'normal' ? 'compact' : 'tight')
                         : 'tight';
                 } else if (current === 'tight' && minimumFooterDensity === 'compact') {
-                    // Prevent compact/tight oscillation on narrow subcards.
+                     // Prevent compact/tight oscillation on narrow subcards.
                     nextDensity = 'tight';
                 }
 
@@ -632,7 +640,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             resizeObserver?.disconnect();
             window.removeEventListener('resize', scheduleMeasure);
         };
-    }, [displayCost, image.generationTime, image.id, image.isGenerating, image.model, image.modelLabel, image.orphaned, image.provider, image.providerLabel, image.tokens, minimumFooterDensity]);
+    }, [detailLevel, displayCost, image.generationTime, image.id, image.isGenerating, image.model, image.modelLabel, image.orphaned, image.provider, image.providerLabel, image.tokens, minimumFooterDensity]);
 
     const creditFooterLabel = resolvedCreditCost > 0
         ? `消耗 ${resolvedCreditCost} 积分`

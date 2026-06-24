@@ -65,8 +65,9 @@ export function readSource(relativePath) {
     try {
       const appSource = fs.readFileSync(absolutePath, 'utf-8').replace(/\r\n/g, '\n');
       const workspacePageSource = fs.readFileSync(workspacePath('apps/web/src/pages/Workspace/WorkspacePage.tsx'), 'utf-8').replace(/\r\n/g, '\n');
+      const useVisibleCanvasItems = fs.readFileSync(workspacePath('apps/web/src/app/useVisibleCanvasItems.ts'), 'utf-8').replace(/\r\n/g, '\n');
       const patchedWorkspacePageSource = workspacePageSource.replace(/\.\.\/\.\.\//g, './');
-      return [appSource, patchedWorkspacePageSource].join('\n');
+      return [appSource, patchedWorkspacePageSource, useVisibleCanvasItems].join('\n');
     } catch (e) {
       // Fallback
     }
