@@ -92,4 +92,4 @@ It will:
 - run the configured VPS API deploy command when `KK_VPS_DEPLOY_COMMAND` is configured
 - deploy to Vercel if `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` are configured
 
-The current hosted frontend baseline is Vercel plus the VPS `server/` backend. Do not restore Netlify Functions as a backend entry.
+The current hosted frontend baseline is Vercel plus the VPS `server/` backend.
