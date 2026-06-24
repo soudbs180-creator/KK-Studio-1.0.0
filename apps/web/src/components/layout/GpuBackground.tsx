@@ -26,16 +26,16 @@ let isGpuSupportedCache: boolean | null = null;
 let recommendedCountCache: number | null = null;
 
 function getRecommendedParticleCount(): number {
-    if (typeof window === 'undefined') return 20;
+    if (typeof window === 'undefined') return 16;
     if (recommendedCountCache !== null) return recommendedCountCache;
 
     const canvas = document.createElement('canvas');
     const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
 
     if (!gl) {
-        recommendedCountCache = 20;
+        recommendedCountCache = 12;
         isGpuSupportedCache = false;
-        return 20;
+        return 12;
     }
 
     // 显式释放临时 WebGL 上下文，防止内存泄露与 context 堆积警告
@@ -47,11 +47,12 @@ function getRecommendedParticleCount(): number {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
 
-    let count = 60;
+    // 这个背景长期运行在工作区底层，不能与画布交互抢主线程帧预算。
+    let count = 28;
     if (isMobile) {
-        count = 25;
+        count = 12;
     } else if (isLowEndDevice) {
-        count = 40;
+        count = 18;
     }
 
     recommendedCountCache = count;
@@ -117,18 +118,19 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
 
     const effectiveParticleCount = useMemo(() => {
         if (runtimeMode === 'paused') {
-            return Math.max(10, Math.floor(baseParticleCount * 0.25));
+            return Math.max(6, Math.floor(baseParticleCount * 0.2));
         }
 
         if (runtimeMode === 'interactive-throttled') {
-            return Math.max(12, Math.floor(baseParticleCount * 0.35));
+            return Math.max(8, Math.floor(baseParticleCount * 0.3));
         }
 
         return baseParticleCount;
     }, [baseParticleCount, runtimeMode]);
 
-    const effectiveShowConnections = runtimeMode === 'normal' && showConnections;
-    const targetFrameInterval = runtimeMode === 'interactive-throttled' ? 50 : 1000 / 60;
+    // 粒子连线是 O(n²) 热点；桌面工作区默认禁用，避免和画布拖拽、缩放竞争主线程。
+    const effectiveShowConnections = runtimeMode === 'normal' && showConnections && effectiveParticleCount <= 18;
+    const targetFrameInterval = runtimeMode === 'interactive-throttled' ? 80 : 1000 / 30;
 
     useEffect(() => {
         if (!enabled) return;
@@ -157,6 +159,7 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
         const drawFrame = (stepMultiplier: number, shouldAdvance: boolean) => {
             const width = window.innerWidth;
             const height = window.innerHeight;
+            const connectionDistanceSq = connectionDistance * connectionDistance;
 
             ctx.clearRect(0, 0, width, height);
 
@@ -186,10 +189,11 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
                     const nextParticle = particles[nextIndex];
                     const dx = particle.x - nextParticle.x;
                     const dy = particle.y - nextParticle.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const distSq = dx * dx + dy * dy;
 
-                    if (dist >= connectionDistance) continue;
+                    if (distSq >= connectionDistanceSq) continue;
 
+                    const dist = Math.sqrt(distSq);
                     ctx.beginPath();
                     ctx.moveTo(particle.x, particle.y);
                     ctx.lineTo(nextParticle.x, nextParticle.y);
