@@ -10,13 +10,21 @@ class CanvasLivePositionStore {
   private globalListeners = new Set<GlobalPositionListener>();
 
   setPosition(id: string, position: Point | null) {
+    const previous = this.positions.get(id) || null;
+
     if (position === null) {
+      if (previous === null) {
+        return;
+      }
       this.positions.delete(id);
     } else {
+      if (previous && previous.x === position.x && previous.y === position.y) {
+        return;
+      }
       this.positions.set(id, position);
     }
 
-    // 简体中文：通知单个节点的订阅者
+    // 简体中文：通知单个节点的订阅者。历史订阅签名不接受 null，因此清理时继续发送零点兜底值。
     const nodeListeners = this.listeners.get(id);
     if (nodeListeners) {
       nodeListeners.forEach((listener) => listener(position || { x: 0, y: 0 }));
@@ -54,9 +62,19 @@ class CanvasLivePositionStore {
   }
 
   clear() {
+    if (this.positions.size === 0) {
+      return;
+    }
+
+    const clearedIds = Array.from(this.positions.keys());
     this.positions.clear();
-    this.globalListeners.forEach((listener) => {
-      this.positions.forEach((_pos, id) => listener(id, null));
+
+    clearedIds.forEach((id) => {
+      const nodeListeners = this.listeners.get(id);
+      if (nodeListeners) {
+        nodeListeners.forEach((listener) => listener({ x: 0, y: 0 }));
+      }
+      this.globalListeners.forEach((listener) => listener(id, null));
     });
   }
 }
