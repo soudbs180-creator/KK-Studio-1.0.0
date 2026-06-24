@@ -202,6 +202,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
 
     useEffect(() => {
         return () => {
+            if (rafRef.current !== null) {
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
             onDragStateChange?.(false);
         };
     }, [onDragStateChange]);
@@ -276,6 +280,17 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         pendingDelta.current = { x: 0, y: 0 };
     }, [group.nodeIds, onGroupDrag]);
 
+    const scheduleDragFlush = useCallback(() => {
+        if (rafRef.current !== null) {
+            return;
+        }
+
+        rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null;
+            flushPendingDrag();
+        });
+    }, [flushPendingDrag]);
+
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button === 1) {
             return;
@@ -296,17 +311,17 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             const dy = (ev.clientY - lastPos.current.y) / zoom;
             lastPos.current = { x: ev.clientX, y: ev.clientY };
 
-            // Accumulate deltas (even if RAF is pending)
+            // Accumulate deltas and flush once per animation frame.
             pendingDelta.current = {
                 x: pendingDelta.current.x + dx,
                 y: pendingDelta.current.y + dy
             };
 
-            flushPendingDrag();
+            scheduleDragFlush();
         };
 
         const handleMouseUp = () => {
-            if (rafRef.current) {
+            if (rafRef.current !== null) {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
             }
@@ -319,7 +334,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             window.removeEventListener('mouseup', handleMouseUp);
         };
 
-        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mousemove', handleMouseMove, { passive: true });
         window.addEventListener('mouseup', handleMouseUp);
     };
 
@@ -339,9 +354,9 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     zIndex: effectiveStackZIndex,
                     pointerEvents: 'auto',
                     ...(isCollapsed ? groupCollapsedCardStyle : groupSurfaceStyle),
-                    willChange: isDragging ? 'width, height' : 'auto',
-                    // Disable transition during drag to prevent rubber-banding
-                    transition: isDragging ? 'none' : 'box-shadow 0.3s ease, transform 0.1s linear, width 0.1s linear, height 0.1s linear',
+                    willChange: isDragging ? 'transform' : 'auto',
+                    // Disable transition during drag to prevent rubber-banding and compositor stalls.
+                    transition: isDragging ? 'none' : 'box-shadow 0.3s ease',
                     contain: 'layout style'
                 }}
                 onMouseDown={handleMouseDown} // Allow dragging from anywhere in the group box
