@@ -568,8 +568,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const metaActionMarginClass = isCompactFooter ? 'ml-1' : 'ml-2';
 
     useEffect(() => {
-        // 只在 idle + visible + full detail 时测量
-        if (detailLevel !== 'full' || isCanvasTransforming || !isVisible) {
+        // 只在 idle + visible + full detail + 且非拖拽非缩放状态下测量
+        if (detailLevel !== 'full' || isCanvasTransforming || isDragging || !isVisible) {
             return;
         }
 
@@ -618,7 +618,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         }
 
         const resizeObserver = new ResizeObserver(() => {
-            if (isCanvasTransforming) return;
+            if (isCanvasTransforming || isDragging) return;
             scheduleMeasure();
         });
 
@@ -641,6 +641,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [
         detailLevel,
         isCanvasTransforming,
+        isDragging,
         isVisible,
         minimumFooterDensity,
         image.id,

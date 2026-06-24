@@ -343,17 +343,26 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const viewportX = startupState.viewportCenter.x;
         const viewportY = startupState.viewportCenter.y;
-        const imagesWithDistance = generatedIdsArray.map(id => {
-            let minDistance = Infinity;
-            startupState.canvases.forEach(c => {
-                const node = c.imageNodes.find(n => (n.storageId || n.id) === id);
-                if (node) {
-                    const dx = node.position.x - viewportX;
-                    const dy = node.position.y - viewportY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    minDistance = Math.min(minDistance, distance);
+
+        // 简体中文注释：通过提前构建 lookupId 到 imageNode 的映射消除嵌套 find 带来的 O(n²) 查找
+        const imageNodeByLookupId = new Map<string, GeneratedImage>();
+        startupState.canvases.forEach(c => {
+            c.imageNodes.forEach(img => {
+                const lookupId = img.storageId || img.id;
+                if (lookupId) {
+                    imageNodeByLookupId.set(lookupId, img);
                 }
             });
+        });
+
+        const imagesWithDistance = generatedIdsArray.map(id => {
+            const node = imageNodeByLookupId.get(id);
+            let minDistance = Infinity;
+            if (node) {
+                const dx = node.position.x - viewportX;
+                const dy = node.position.y - viewportY;
+                minDistance = Math.sqrt(dx * dx + dy * dy);
+            }
             return { id, distance: minDistance };
         });
 
@@ -719,6 +728,56 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Helper: Strip image URLs for storage
 
+    // 简体中文注释：高效对比两个 Canvas 节点列表的辅助函数，避免深度 JSON.stringify 带来主线程卡顿
+    function isCanvasEqual(c1: Canvas, c2: Canvas): boolean {
+        if (c1 === c2) return true;
+        if (!c1 || !c2) return false;
+        if (c1.id !== c2.id || c1.name !== c2.name || c1.folderName !== c2.folderName || c1.lastModified !== c2.lastModified) {
+            return false;
+        }
+        if (c1.promptNodes.length !== c2.promptNodes.length || c1.imageNodes.length !== c2.imageNodes.length) {
+            return false;
+        }
+        if ((c1.groups?.length || 0) !== (c2.groups?.length || 0)) return false;
+        if ((c1.drawings?.length || 0) !== (c2.drawings?.length || 0)) return false;
+
+        for (let i = 0; i < c1.promptNodes.length; i++) {
+            const p1 = c1.promptNodes[i];
+            const p2 = c2.promptNodes[i];
+            if (p1.id !== p2.id || p1.prompt !== p2.prompt || p1.isGenerating !== p2.isGenerating || p1.error !== p2.error) {
+                return false;
+            }
+            if ((p1.childImageIds?.length || 0) !== (p2.childImageIds?.length || 0)) {
+                return false;
+            }
+            if (p1.childImageIds && p2.childImageIds) {
+                for (let j = 0; j < p1.childImageIds.length; j++) {
+                    if (p1.childImageIds[j] !== p2.childImageIds[j]) return false;
+                }
+            }
+        }
+        for (let i = 0; i < c1.imageNodes.length; i++) {
+            const img1 = c1.imageNodes[i];
+            const img2 = c2.imageNodes[i];
+            if (img1.id !== img2.id || img1.url !== img2.url || img1.error !== img2.error || img1.fileName !== img2.fileName) {
+                return false;
+            }
+            if (img1.position?.x !== img2.position?.x || img1.position?.y !== img2.position?.y) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function areCanvasListsEqual(a: Canvas[], b: Canvas[]): boolean {
+        if (a === b) return true;
+        if (!a || !b || a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (!isCanvasEqual(a[i], b[i])) return false;
+        }
+        return true;
+    }
+
 
     const canLoadCloudLayout = Boolean(
         shouldEnableWorkspaceCloudSync()
@@ -747,7 +806,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setState(prev => {
                         const merged = mergeCanvases(prev.canvases, cloudCanvases, normalizeCanvasPromptRecovery);
                         // Check if anything changed
-                        if (JSON.stringify(merged) !== JSON.stringify(prev.canvases)) {
+                        if (!areCanvasListsEqual(merged, prev.canvases)) {
                             console.log('[CanvasContext] Merged cloud layout.', { local: prev.canvases.length, cloud: cloudCanvases.length, merged: merged.length });
 
                             // Hydrate newly added nodes after sync (simulated).

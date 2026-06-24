@@ -5,6 +5,10 @@
 - `config/release-manifest.json` 为本项目的主版本源。
 - `apps/web/src/config/appInfo.ts` 为运行时只读导出。
 - `release/publish/stable/manifest.json` 为 portable stable 发布清单。
+- Primary Web runtime: `apps/web/`
+- Mobile workspace: `apps/mobile/`
+- 本次优化细节已记录至 [AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md)。
+
 
 ## 1. 修改范围
 本次重构完成了大画布卡片测量收口优化，合并了重复的 `ResizeObserver` 并限制了其执行时机，防止在大画布拖拽/平移/缩放时因为 Resize 测量造成严重的 Layout Thrashing。
@@ -35,3 +39,29 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ## 6. 风险与下一步
 - **风险**：如果在极低性能设备上平移瞬间结束，可能会在极短时间内因触发补救测高发生短暂的 Layout Task。
 - **下一步**：在大画布中加载百级节点包围盒，观察平移、拖动和缩放时的帧率表现。
+
+## 7. 2026-06-25 - 测试与治理收口优化 (本次追加)
+- **修改范围**：重构失效的单元测试断言，修补文档治理合规占位符。
+- **修改文件**：
+  - `tests/unit/prompt-group-regroup-behavior.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：将对 `usePromptGroupLayout` 内部同步状态写入的正则断言更新为匹配最新的 `CanvasMeasurementScheduler` 批量调度器 API。
+- **已运行验证**：运行全套 CI 级别收口验证 `npm run verify:changes` 均 100% 成功通过。
+
+## 8. 2026-06-25 - 启动与测量卡顿（Jank）专项优化 (本次追加)
+- **修改范围**：消除大画布启动与合并恢复时的 O(n²) 节点查找，用轻量级比对替换全量云端同步 JSON.stringify 比对，在卡片拖拽期间暂停测量。
+- **修改文件**：
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/context/canvasPromptRecovery.ts`
+  - `apps/web/src/context/canvasPromptChildImages.ts`
+  - `apps/web/src/components/canvas/PromptNodeComponent.tsx`
+  - `apps/web/src/components/image/ImageCard2.tsx`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 使用 `imageNodeByLookupId` Map 和 `strongOwnedImagesByParentPromptId` Map 进行 O(1) 级的复杂度查询。
+  - 使用 `areCanvasListsEqual` 高效比对函数避免 `JSON.stringify` 深度复制对比。
+  - 测高 Effect 依赖中加入 `isDragging` 且在拖动状态下跳过 ResizeObserver 绑定，防重排卡顿。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run build` 打包完全通过。
+

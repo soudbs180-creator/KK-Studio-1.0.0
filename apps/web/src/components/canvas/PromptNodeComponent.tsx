@@ -1007,8 +1007,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     // 合并后的高度测量与上报调度逻辑
     useEffect(() => {
-        // 只在 idle + visible + full detail 时测量
-        if (detailLevel !== 'full' || isCanvasTransforming || !isVisible) {
+        // 只在 idle + visible + full detail + 且非拖拽非缩放状态下测量
+        if (detailLevel !== 'full' || isCanvasTransforming || isDragging || !isVisible) {
             return;
         }
 
@@ -1026,14 +1026,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             }
         };
 
-        // 当变为 idle + visible + full detail 时，立即进行一次同步高度测量
+        // 当变为 idle + visible + full detail 且非交互状态时，立即进行一次同步高度测量
         updateHeight();
 
         if (typeof ResizeObserver === 'undefined') return;
 
         const observer = new ResizeObserver((entries) => {
-            // 在回调中再次双重验证，如果处于 transforming，忽略回调以防止卡顿
-            if (isCanvasTransforming) return;
+            // 在回调中再次双重验证，如果处于 transforming 或 dragging，忽略回调以防止卡顿
+            if (isCanvasTransforming || isDragging) return;
             updateHeight();
         });
 
@@ -1041,7 +1041,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             observer.observe(cardRef.current);
         }
         return () => observer.disconnect();
-    }, [node.id, node.height, detailLevel, isCanvasTransforming, isVisible, onHeightChange]);
+    }, [node.id, node.height, detailLevel, isCanvasTransforming, isDragging, isVisible, onHeightChange]);
 
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {

@@ -97,9 +97,11 @@ const preserveRecoveredChildImageLayout = (canvas: Canvas): Canvas => {
 
 const normalizeRecoveredPromptNode = (
     node: PromptNode,
-    imageNodes: GeneratedImage[] = []
+    imageNodes: GeneratedImage[] = [],
+    imageNodeById?: Map<string, GeneratedImage>,
+    strongOwnedImagesByParentPromptId?: Map<string, GeneratedImage[]>
 ): PromptNode => {
-    const resolvedChildImageIds = resolvePromptChildImageIds(node, imageNodes);
+    const resolvedChildImageIds = resolvePromptChildImageIds(node, imageNodes, imageNodeById, strongOwnedImagesByParentPromptId);
     const pendingTaskIds = getPendingTaskIdsFromPrompt(node);
     const pendingSyncRequests = getPendingSyncRequestsFromPrompt(node);
     const completedTasks = getPromptCompletedTasks(node);
@@ -151,9 +153,25 @@ const normalizeRecoveredPromptNode = (
 
 export const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => {
     const legacyReadyCanvas = workflowToLegacyCanvas(canvas);
+    const imageNodes = legacyReadyCanvas.imageNodes || [];
+
+    // 简体中文注释：提前构建查找 Map 消除多节点下的 O(n²) 恢复查找
+    const imageNodeById = new Map<string, GeneratedImage>();
+    const strongOwnedImagesByParentPromptId = new Map<string, GeneratedImage[]>();
+    imageNodes.forEach((img) => {
+        imageNodeById.set(img.id, img);
+        if (img.parentPromptId) {
+            const list = strongOwnedImagesByParentPromptId.get(img.parentPromptId) || [];
+            list.push(img);
+            strongOwnedImagesByParentPromptId.set(img.parentPromptId, list);
+        }
+    });
+
     const recoveredCanvas = {
         ...legacyReadyCanvas,
-        promptNodes: (legacyReadyCanvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, legacyReadyCanvas.imageNodes || [])),
+        promptNodes: (legacyReadyCanvas.promptNodes || []).map((node) => 
+            normalizeRecoveredPromptNode(node, imageNodes, imageNodeById, strongOwnedImagesByParentPromptId)
+        ),
         groups: legacyReadyCanvas.groups || [],
         drawings: legacyReadyCanvas.drawings || []
     };
@@ -166,8 +184,25 @@ export const markInterruptedSyncPromptGenerations = (state: CanvasState): Canvas
     canvases: (state.canvases || []).map((canvas) => {
         let hasChanges = false;
 
+        const imageNodes = canvas.imageNodes || [];
+        const imageNodeById = new Map<string, GeneratedImage>();
+        const strongOwnedImagesByParentPromptId = new Map<string, GeneratedImage[]>();
+        imageNodes.forEach((img) => {
+            imageNodeById.set(img.id, img);
+            if (img.parentPromptId) {
+                const list = strongOwnedImagesByParentPromptId.get(img.parentPromptId) || [];
+                list.push(img);
+                strongOwnedImagesByParentPromptId.set(img.parentPromptId, list);
+            }
+        });
+
         const promptNodes = (canvas.promptNodes || []).map((node) => {
-            const hasResolvedImages = resolvePromptChildImageIds(node, canvas.imageNodes || []).length > 0;
+            const hasResolvedImages = resolvePromptChildImageIds(
+                node, 
+                imageNodes, 
+                imageNodeById, 
+                strongOwnedImagesByParentPromptId
+            ).length > 0;
             const shouldMarkInterrupted = Boolean(node?.isGenerating)
                 && !hasResolvedImages
                 && !hasRecoverablePendingTask(node);

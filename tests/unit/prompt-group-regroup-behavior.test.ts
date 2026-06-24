@@ -323,8 +323,7 @@ test('usePromptGroupLayout owns prompt-group prompt node edit handlers', () => {
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const handlePromptGroupNodeHeightChange = useCallback/);
-  assert.match(promptGroupLayoutSource, /const targetNode = currentPromptNodesById\.get\(id\) \?\? fallbackNode;/);
-  assert.match(promptGroupLayoutSource, /void updatePromptNode\(\{ \.\.\.targetNode, height \}\);/);
+  assert.match(promptGroupLayoutSource, /CanvasMeasurementScheduler\.requestHeightUpdate\(id,\s*height\);/);
   assert.match(promptGroupLayoutSource, /const handlePromptGroupTagRemove = useCallback/);
   assert.match(promptGroupLayoutSource, /tags: promptNode\.tags\.filter\(\(currentTag\) => currentTag !== tag\),/);
   assert.doesNotMatch(appSource, /const handlePromptGroupNodeHeightChange = useCallback/);
