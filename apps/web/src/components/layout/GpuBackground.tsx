@@ -77,6 +77,10 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
         if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
         return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     });
+    const [isPageVisible, setIsPageVisible] = useState(() => {
+        if (typeof document === 'undefined') return true;
+        return !document.hidden;
+    });
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -93,6 +97,18 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
 
         mediaQuery.addListener(handleChange);
         return () => mediaQuery.removeListener(handleChange);
+    }, []);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const handleVisibilityChange = () => {
+            setIsPageVisible(!document.hidden);
+        };
+
+        handleVisibilityChange();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
     const initParticles = useCallback((width: number, height: number, count: number) => {
@@ -113,7 +129,7 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
         return particles;
     }, [colors]);
 
-    const runtimeMode: GpuBackgroundMode = prefersReducedMotion ? 'paused' : mode;
+    const runtimeMode: GpuBackgroundMode = prefersReducedMotion || !isPageVisible ? 'paused' : mode;
     const baseParticleCount = particleCount ?? getRecommendedParticleCount();
 
     const effectiveParticleCount = useMemo(() => {
@@ -147,9 +163,10 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
         setIsSupported(true);
 
         const resize = () => {
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
+            const rawDpr = window.devicePixelRatio || 1;
+            const dpr = Math.min(rawDpr, runtimeMode === 'normal' ? 1.5 : 1);
+            canvas.width = Math.ceil(window.innerWidth * dpr);
+            canvas.height = Math.ceil(window.innerHeight * dpr);
             canvas.style.width = `${window.innerWidth}px`;
             canvas.style.height = `${window.innerHeight}px`;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -262,7 +279,7 @@ const GpuBackground: React.FC<GpuBackgroundProps> = ({
             className="fixed inset-0 z-0 pointer-events-none gpu-particle"
             style={{
                 opacity,
-                mixBlendMode: 'screen',
+                mixBlendMode: runtimeMode === 'normal' ? 'screen' : 'normal',
             }}
         />
     );
