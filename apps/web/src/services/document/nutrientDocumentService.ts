@@ -1,5 +1,17 @@
 import { getOcrServiceSettings } from './ocrServiceSettings.ts';
 
+export class NutrientServiceError extends Error {
+    constructor(
+        message: string,
+        public code?: string,
+        public details?: any
+    ) {
+        super(message);
+        this.name = 'NutrientServiceError';
+        Object.setPrototypeOf(this, NutrientServiceError.prototype);
+    }
+}
+
 export type NutrientDocumentOperation = 'convert-to-pdf' | 'extract-text' | 'ocr-to-pdf';
 
 export interface NutrientBinaryResult {
@@ -118,19 +130,23 @@ const getFallbackResponseFileName = (
     ? replaceFileExtension(originalFileName, '.txt')
     : replaceFileExtension(originalFileName, '.pdf'));
 
-const readErrorMessage = async (response: Response) => {
+const readErrorPayload = async (response: Response) => {
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
         try {
             const payload = await response.json() as Record<string, unknown>;
-            return String(payload.error || payload.message || 'Document processing failed.');
+            return {
+                message: String(payload.error || payload.message || 'Document processing failed.'),
+                code: typeof payload.code === 'string' ? payload.code : undefined,
+                details: payload.details,
+            };
         } catch {
-            return 'Document processing failed.';
+            return { message: 'Document processing failed.' };
         }
     }
 
     const rawText = (await response.text()).trim();
-    return rawText || 'Document processing failed.';
+    return { message: rawText || 'Document processing failed.' };
 };
 
 class NutrientDocumentService {
@@ -165,17 +181,12 @@ class NutrientDocumentService {
             });
 
             if (!response.ok) {
-                let errMsg = '百度云 OCR 识别文本失败';
-                try {
-                    const errJson = await response.json();
-                    errMsg = errJson.error || errMsg;
-                } catch {
-                    try {
-                        const errText = await response.text();
-                        errMsg = errText || errMsg;
-                    } catch {}
-                }
-                throw new Error(errMsg);
+                const err = await readErrorPayload(response);
+                throw new NutrientServiceError(
+                    err.message,
+                    err.code || 'BAIDU_OCR_FAILED',
+                    err.details
+                );
             }
 
             return {
@@ -199,7 +210,8 @@ class NutrientDocumentService {
         });
 
         if (!response.ok) {
-            throw new Error(await readErrorMessage(response));
+            const err = await readErrorPayload(response);
+            throw new NutrientServiceError(err.message, err.code, err.details);
         }
 
         const contentType = response.headers.get('content-type') || 'application/octet-stream';

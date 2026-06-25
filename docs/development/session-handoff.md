@@ -611,3 +611,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run verify:changes` 全量 100% 成功通过，便携版打包清单及哈希发布完全对齐。
+
+## 40. 2026-06-25 - Standardize Front-end Document Error Extraction and Custom Exception Class (本次追加)
+- **修改范围**：重构了前端 `nutrientDocumentService.ts` 对服务端 HTTP 异常的捕获与解析流程，引入自定义的 `NutrientServiceError` 异常类，打通了前后端错误响应信封 DTO 的解析。
+- **修改文件**：
+  - [nutrientDocumentService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/document/nutrientDocumentService.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **自定义异常与原型保留**：声明了集成自 `Error` 且保留了原型链（通过 `Object.setPrototypeOf`）的 `NutrientServiceError` 类，支持携带后端响应的 `code` 错误码以及 `details` 详细字段，从而允许上层 UI 根据 `code` 做精细化的中文引导（例如提示凭证缺失）。
+  - **结构化错误流解包**：将原先粗粒度提取 error 字符串的 `readErrorMessage` 重构为 `readErrorPayload` 并返回 `{ message, code, details }`，从而在百度 OCR 以及 Nutrient 的 `POST` 请求两个非 `ok` 拦截分支上同时触发 `NutrientServiceError` 抛出，达成了前后端错误的闭环。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run test:unit` 全套 1600 个测试用例均 100% 成功通过。
+

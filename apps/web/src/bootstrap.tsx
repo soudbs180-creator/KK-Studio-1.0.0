@@ -363,3 +363,66 @@ function bootstrap() {
 }
 
 bootstrap();
+
+// 🚀 智能 CDN 测速偏好广播与全局 Service Worker 注册
+const CDN_NODES = [
+  'https://cdn1.kkai.plus',
+  'https://cdn2.kkai.plus',
+  'https://cdn3.kkai.plus'
+];
+
+async function measureCdnLatency(nodeUrl: string): Promise<{ nodeUrl: string; latency: number }> {
+  const start = performance.now();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    
+    await fetch(`${nodeUrl}/logo.png`, {
+      method: 'HEAD',
+      mode: 'cors',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timer);
+    return { nodeUrl, latency: performance.now() - start };
+  } catch {
+    return { nodeUrl, latency: 99999 };
+  }
+}
+
+function registerGlobalServiceWorker() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(async (registration) => {
+        console.log('[SW] Global sw.js registered successfully scope:', registration.scope);
+        
+        const activeWorker = registration.active || registration.waiting || registration.installing;
+        if (activeWorker) {
+          const results = await Promise.all(CDN_NODES.map(measureCdnLatency));
+          const validResults = results.filter(r => r.latency < 99999);
+          
+          if (validResults.length > 0) {
+            validResults.sort((a, b) => a.latency - b.latency);
+            const bestCdn = validResults[0].nodeUrl;
+            console.log('[SW] Speed test completed. Selected best CDN:', bestCdn, 'latency:', validResults[0].latency.toFixed(1), 'ms');
+            
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'SW_CDN_SET_PREFERENCE',
+                preference: bestCdn
+              });
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        console.warn('[SW] Global sw.js registration failed:', error);
+      });
+  });
+}
+
+registerGlobalServiceWorker();

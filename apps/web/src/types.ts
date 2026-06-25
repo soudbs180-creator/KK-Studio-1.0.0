@@ -1197,3 +1197,16 @@ export interface GenerationConfig {
   pptSlides?: string[];
   pptStyleLocked?: boolean;
 }
+
+export interface ToolWindowInstance {
+  instanceId: string;
+  toolId: string;
+  url?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  minimized: boolean;
+  zIndex: number;
+  title?: string;
+}
