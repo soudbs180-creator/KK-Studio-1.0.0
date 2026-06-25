@@ -246,7 +246,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               </div>
             </div>
 
-            <div className="mb-3 grid w-full grid-cols-[1fr_1fr_3fr] gap-2">
+            <div className="mb-3 grid w-full grid-cols-[20fr_20fr_20fr_40fr] gap-2">
               {/* 左侧：主题大主图（点击切换亮/暗，下压 1px 且缩水 4% 阻尼物理回弹） */}
               <button
                 type="button"
@@ -308,22 +308,42 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 </div>
               </button>
 
-              {/* 右侧：当前项目按钮 */}
+              {/* 收藏：扩充为 20% 大小，加了图标和文字以保持跟前两个的视觉对称美 */}
+              <button
+                type="button"
+                onClick={() => runFromMoreSheet(onOpenFavorites)}
+                data-testid="mobile-more-menu-favorites"
+                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-1.5 text-center text-[var(--accent-coral)] active:scale-[0.975] active:translate-y-px cursor-pointer"
+                style={{
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <div className="relative text-[var(--accent-coral)] shrink-0">
+                  <Heart size={18} strokeWidth={2} />
+                </div>
+                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                    {isChinese ? '我的' : 'My'}
+                  </div>
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                    {isChinese ? '收藏' : 'Favs'}
+                  </div>
+                </div>
+              </button>
+
+              {/* 右侧：当前项目按钮，调小了 padding 并去掉了 Collapse/Switch 文本以完美适应 40% 的排版空间 */}
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="flex h-[58px] min-w-0 items-center justify-between gap-2 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 text-left transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]"
+                className="flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-2.5 text-left transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]"
               >
-                <div className="flex items-center gap-2 min-w-0 text-left">
-                  <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
-                  <div className="min-w-0 text-left">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)] leading-none">
-                      {pick('当前项目', 'Current Project')}
-                    </div>
-                    <div className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)] leading-none">{resolvedProjectName}</div>
+                <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary)] leading-none truncate">
+                    {pick('当前项目', 'Project')}
                   </div>
+                  <div className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)] leading-none">{resolvedProjectName}</div>
                 </div>
-                <div className="shrink-0 text-xs text-[var(--text-secondary)] ml-auto pl-1">{showProjectList ? pick('收起', 'Collapse') : pick('切换', 'Switch')}</div>
               </button>
             </div>
 
@@ -443,12 +463,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 <Clock3 size={17} className="mb-2.5" />
                 <div className="text-sm font-semibold">{pick('历史与搜索', 'History & Search')}</div>
                 <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('查找历史提示词和结果', 'Find history prompts and results')}</div>
-              </button>
-              {/* 电商生图独立入口（使用 PackageOpen 呼应电脑端） */}
-              <button type="button" onClick={() => runFromMoreSheet(onOpenFavorites)} className={moreSheetActionClass} data-testid="mobile-more-menu-favorites">
-                <Heart size={17} className="mb-2.5 text-[var(--accent-coral)]" />
-                <div className="text-sm font-semibold">{pick('收藏', 'Favorites')}</div>
-                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('收藏图片和提示词', 'Liked images and prompts')}</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
                 <PackageOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />

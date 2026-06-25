@@ -266,6 +266,32 @@ body.dark-mode .zoom-slider {
   color: var(--text-primary);
 }
 
+.empty-canvas-welcome-layer {
+  z-index: 700;
+  align-items: flex-start;
+  padding-top: clamp(72px, 10vh, 128px);
+  padding-bottom: clamp(220px, 26vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.empty-canvas-welcome-panel {
+  max-height: min(calc(100dvh - 180px), 720px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+@media (max-height: 760px) {
+  .empty-canvas-welcome-layer {
+    padding-top: 64px;
+    padding-bottom: clamp(180px, 24vh, 260px);
+  }
+
+  .empty-canvas-welcome-panel {
+    max-height: min(calc(100dvh - 144px), 640px);
+  }
+}
+
 /* ============================================
    Input Bar Styles (Prompt Bar)
    ============================================ */

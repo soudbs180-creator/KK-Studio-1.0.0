@@ -16,7 +16,15 @@ test('desktop settings shell keeps a real inner scroll container and viewport-sa
   assert.match(sidebarSource, /width: 'var\(--settings-sidebar-width\)'/);
   assert.match(
     cssSource,
-    /\.settings-shell-desktop \{[\s\S]*grid-template-columns: var\(--settings-sidebar-width\) minmax\(0, 1fr\);[\s\S]*width: min\(1480px, calc\(100vw - 48px\)\);[\s\S]*height: min\(calc\(100dvh - 48px\), 920px\);[\s\S]*border-radius: var\(--settings-radius-unified\);[\s\S]*overflow: hidden;/,
+    /\.settings-shell-desktop \{[\s\S]*grid-template-columns: var\(--settings-sidebar-width\) minmax\(0, 1fr\);[\s\S]*--settings-shell-card-grid-2-width: 556px;[\s\S]*--settings-shell-content-width: var\(--settings-shell-card-grid-2-width\);[\s\S]*--settings-shell-adaptive-width: calc\(var\(--settings-sidebar-width\) \+ var\(--settings-shell-page-inline-padding\) \+ var\(--settings-shell-page-inline-padding\) \+ var\(--settings-shell-content-width\)\);[\s\S]*width: min\(var\(--settings-shell-adaptive-width\), calc\(100vw - var\(--chat-sidebar-width, 0px\) - 48px\)\);[\s\S]*height: min\(calc\(100dvh - 48px\), 920px\);[\s\S]*border-radius: var\(--settings-radius-unified\);[\s\S]*overflow: hidden;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 1238px\) \{[\s\S]*\.settings-shell-desktop \{[\s\S]*--settings-shell-content-width: var\(--settings-shell-card-grid-3-width\);/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 1524px\) \{[\s\S]*\.settings-shell-desktop \{[\s\S]*--settings-shell-content-width: var\(--settings-shell-card-grid-4-width\);/,
   );
   assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-sidebar-width: 292px;/);
   assert.match(cssSource, /\.settings-shell-main \{[\s\S]*min-height: 0;/);

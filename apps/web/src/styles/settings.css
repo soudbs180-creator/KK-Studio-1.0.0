@@ -4,6 +4,7 @@
 
 .settings-panel .settings-system-page {
   width: 100%;
+  min-width: 0;
   max-width: min(100%, var(--kk-content-max-width));
   margin-inline: auto;
   padding-inline: 0;
@@ -67,7 +68,7 @@
   font-size: var(--type-title-3);
   font-weight: 650;
   line-height: var(--ui-line-height-tight);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .settings-panel .settings-system-card__description {
@@ -75,7 +76,7 @@
   color: var(--text-secondary);
   font-size: var(--type-body-2);
   line-height: var(--ui-line-height-relaxed);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .settings-panel .settings-system-card__action {
@@ -113,7 +114,7 @@
   font-size: var(--type-body-2);
   font-weight: 600;
   line-height: var(--ui-line-height-body);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .settings-panel .settings-system-field__value {
@@ -128,7 +129,7 @@
   color: var(--text-secondary);
   font-size: var(--type-caption);
   line-height: var(--ui-line-height-relaxed);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .settings-panel .settings-system-field__control {
@@ -2726,7 +2727,11 @@
   }
 
   .settings-panel .settings-system-field {
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-panel .settings-system-field__control {
+    justify-content: stretch;
   }
 }
 
@@ -2746,6 +2751,14 @@
 
   .settings-panel .settings-system-grid > .settings-system-card--wide {
     grid-column: 1 / -1;
+  }
+
+  .settings-panel .settings-system-grid > .settings-system-card--wide .settings-system-field {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  }
+
+  .settings-panel .settings-system-grid > .settings-system-card--wide .settings-system-field__control {
+    justify-content: flex-end;
   }
 }
 
@@ -4836,6 +4849,9 @@ body.light-mode :where(
 }
 
 .settings-panel .settings-shell-page {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--settings-visual-page-bg);
 }
 
@@ -4900,6 +4916,8 @@ body.light-mode :where(
 
 .settings-panel .settings-view-shell,
 .settings-panel .settings-reference-stack {
+  min-width: 0;
+  max-width: 100%;
   gap: var(--kk-space-5);
 }
 
@@ -5029,8 +5047,6 @@ body.light-mode :where(
     left: 0 !important;
     right: 0 !important;
     border-radius: inherit !important;
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
   }
 
   .settings-panel .settings-shell-page--mobile {

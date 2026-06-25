@@ -4898,7 +4898,11 @@ body.dark-mode .settings-panel {
   background: var(--frost-card-framework-bg);
   background: var(--frost-card-framework-bg) !important;
   border: 0 !important;
+  border-radius: 24px !important;
   box-shadow: none !important;
+  overflow: hidden !important;
+  position: relative !important;
+  isolation: isolate;
   -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
   backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
 }
@@ -5799,8 +5803,6 @@ body.dark-mode .storage-selection-modal {
   z-index: 50 !important;
   border-bottom: 1px solid var(--settings-visual-border) !important;
   border-radius: inherit !important;
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
 }
 
 body:not(.dark-mode) .settings-panel .settings-shell-main__topbar,
@@ -5823,6 +5825,11 @@ body.dark-mode .settings-panel .settings-shell-mobile__topbar {
 }
 
 /* 4. 移动端无边框、大热区动作按钮 */
+.settings-panel .settings-shell-page--mobile {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
 .settings-panel .mobile-header-action-btn {
   background: transparent !important;
   border: none !important;

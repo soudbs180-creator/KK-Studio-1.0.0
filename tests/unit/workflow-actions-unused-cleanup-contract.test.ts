@@ -25,3 +25,18 @@ test('workflow actions keep template list ownership in EmptyCanvasWelcome', () =
   assert.match(templateSource, /export const WORKFLOW_TEMPLATES/);
 });
 
+test('empty canvas welcome stays above workspace chrome without being hidden by prompt controls', () => {
+  const welcomeSource = readSource('apps/web/src/landing/EmptyCanvasWelcome.tsx');
+  const canvasCssSource = readSource('apps/web/src/styles/canvas.css');
+
+  assert.match(welcomeSource, /empty-canvas-welcome-layer/);
+  assert.match(welcomeSource, /empty-canvas-welcome-panel/);
+  assert.match(
+    canvasCssSource,
+    /\.empty-canvas-welcome-layer\s*\{[\s\S]*z-index:\s*700;[\s\S]*padding-bottom:\s*clamp\(220px,\s*26vh,\s*320px\);/,
+  );
+  assert.match(
+    canvasCssSource,
+    /\.empty-canvas-welcome-panel\s*\{[\s\S]*max-height:\s*min\(calc\(100dvh - 180px\),\s*720px\);[\s\S]*overflow-y:\s*auto;/,
+  );
+});

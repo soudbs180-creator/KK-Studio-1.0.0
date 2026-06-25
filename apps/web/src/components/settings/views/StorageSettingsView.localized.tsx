@@ -19,6 +19,7 @@ import {
 import { cleanupCompletedTasksOlderThan } from '../../../services/persistence/taskPersistence';
 import { cleanupLogsOlderThan } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
+import { isCompactResponsiveWidth } from '../../../utils/responsiveSurface';
 import {
   SettingsActionButton,
   SettingsBadge,
@@ -68,6 +69,16 @@ export const StorageSettingsView: React.FC = () => {
     cleanupInvalidCards,
     clearAllData,
   } = useCanvas();
+
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
+  ));
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(isCompactResponsiveWidth(window.innerWidth));
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [mode, setMode] = useState<StorageMode | null>(null);
   const [usageMB, setUsageMB] = useState(0);
@@ -466,60 +477,68 @@ export const StorageSettingsView: React.FC = () => {
     }
   };
 
+  const metricCardsContent = (
+    <>
+      {/* 指标卡片 1: 本地授权 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('本地授权', 'Permission')}</span>
+            <HardDrive size={13} />
+          </div>
+          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('是否允许访问本地文件夹。', 'Local folder read/write capability.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 2: 活动项目 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('活动项目', 'Active Project')}</span>
+            <FolderOpen size={13} />
+          </div>
+          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || pick('未选择', 'None')}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前正在编辑的项目。', 'Canvas currently in use.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 3: 缓存占用 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('缓存占用', 'Footprint')}</span>
+            <Activity size={13} />
+          </div>
+          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{formatMb(usageMB)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('图片与文件缓存总计。', 'Total storage consumed locally.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 4: 项目总数 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('项目总数', 'Projects')}</span>
+            <Layers3 size={13} />
+          </div>
+          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} 个</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前工作区内项目总数。', 'Total canvases stored.')}</div>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <SettingsViewShell>
       <SettingsCardGridContainer>
-        {/* 指标卡片 1: 本地授权 (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">{pick('本地授权', 'Permission')}</span>
-              <HardDrive size={13} />
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('是否允许访问本地文件夹。', 'Local folder read/write capability.')}</div>
+        {isMobile ? (
+          <div className="grid grid-cols-2 gap-3 w-full">
+            {metricCardsContent}
           </div>
-        </div>
-
-        {/* 指标卡片 2: 活动项目 (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">{pick('活动项目', 'Active Project')}</span>
-              <FolderOpen size={13} />
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || pick('未选择', 'None')}</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前正在编辑的项目。', 'Canvas currently in use.')}</div>
-          </div>
-        </div>
-
-        {/* 指标卡片 3: 缓存占用 (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">{pick('缓存占用', 'Footprint')}</span>
-              <Activity size={13} />
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{formatMb(usageMB)}</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('图片与文件缓存总计。', 'Total storage consumed locally.')}</div>
-          </div>
-        </div>
-
-        {/* 指标卡片 4: 项目总数 (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">{pick('项目总数', 'Projects')}</span>
-              <Layers3 size={13} />
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} 个</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前工作区内项目总数。', 'Total canvases stored.')}</div>
-          </div>
-        </div>
+        ) : (
+          metricCardsContent
+        )}
 
         {/* 卡片 5: 持久化模式 (2A * 2row) */}
         <div 
@@ -541,7 +560,7 @@ export const StorageSettingsView: React.FC = () => {
             </p>
 
             <div className="mt-3.5 space-y-2">
-              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
                   <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? pick('状态：已授权连接', 'Status: Connected') : pick('支持但未授权', 'Ready to connect')) : pick('当前浏览器不支持', 'Not supported')}</div>
@@ -557,7 +576,7 @@ export const StorageSettingsView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('浏览器缓存模式', 'Browser Cache Mode')}</div>
                   <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{pick('免授权直接使用本地缓存', 'No permission required')}</div>
@@ -638,7 +657,7 @@ export const StorageSettingsView: React.FC = () => {
 
             <div className="space-y-3 mt-3">
               {/* 1. 清理错误卡片 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
                 <div className="min-w-0 flex-1 pr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -659,7 +678,7 @@ export const StorageSettingsView: React.FC = () => {
               </div>
 
               {/* 2. 仅保留 30 天数据 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
                 <div className="min-w-0 flex-1 pr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
@@ -681,7 +700,7 @@ export const StorageSettingsView: React.FC = () => {
               </div>
 
               {/* 3. 仅保留 7 天数据 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
                 <div className="min-w-0 flex-1 pr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
@@ -703,7 +722,7 @@ export const StorageSettingsView: React.FC = () => {
               </div>
 
               {/* 4. 删除全部所有卡片 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-colors">
+              <div className={`flex items-center justify-between p-2 rounded-xl bg-red-500/5 ${isMobile ? 'border border-transparent' : 'border border-red-500/10'} hover:bg-red-500/10 transition-colors`}>
                 <div className="min-w-0 flex-1 pr-2">
                   <div className="text-[11px] font-semibold text-red-400 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>

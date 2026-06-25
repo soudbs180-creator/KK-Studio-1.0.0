@@ -371,21 +371,21 @@
 }
 
 .ng-work-card__image--canvas {
-  --ng-project-image: url("/landing/kk-canvas-flow.webp");
+  --ng-project-image: url("/landing/kk-infinite-canvas-workspace.png");
   --ng-project-position: 50% 44%;
   --ng-project-size: cover;
   background-color: #c1d3e6;
 }
 
 .ng-work-card__image--batch {
-  --ng-project-image: url("/landing/kk-batch-board.webp");
+  --ng-project-image: url("/landing/kk-durable-batch-queue.png");
   --ng-project-position: 50% 50%;
   --ng-project-size: cover;
   background-color: #f1bd7a;
 }
 
 .ng-work-card__image--takeover {
-  --ng-project-image: url("/landing/kk-agent-trail.webp");
+  --ng-project-image: url("/landing/kk-agent-takeover-runtime.png");
   --ng-project-position: 52% 50%;
   --ng-project-size: cover;
   background-color: #182644;
@@ -527,34 +527,54 @@
 .ng-footer {
   position: relative;
   z-index: 3;
-  min-height: 128vh;
+  min-height: 112vh;
   display: grid;
+  grid-template-columns: minmax(0, 0.42fr) minmax(320px, 0.58fr);
   grid-template-rows: 1fr auto;
+  gap: clamp(28px, 5vw, 84px);
+  align-items: center;
   overflow: hidden;
   padding: clamp(110px, 12vw, 190px) var(--ng-gutter) 32px;
-  background: linear-gradient(180deg, rgba(30, 19, 16, 0) 0%, #1e1310 32%, #0c1018 100%);
+  background:
+    radial-gradient(circle at 84% 28%, rgba(135, 161, 196, 0.22), transparent 28%),
+    linear-gradient(180deg, rgba(30, 19, 16, 0) 0%, #14243b 30%, #0c1018 100%);
   color: #f9fafb;
 }
 
 .ng-footer__flower {
-  position: absolute;
-  right: min(-12vw, -90px);
-  bottom: -8vw;
-  width: min(68vw, 920px);
-  aspect-ratio: 1;
-  max-width: none;
-  opacity: 0.7;
-  mix-blend-mode: screen;
-  background-image: url("/landing/kk-agent-trail.webp");
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 360px;
+  align-self: center;
+  border: 1px solid rgba(249, 250, 251, 0.16);
+  border-radius: 20px;
+  opacity: 0.88;
+  background-image: url("/landing/kk-agent-takeover-runtime.png");
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  filter: saturate(0.92) contrast(1.04);
+  box-shadow: 0 40px 120px rgba(3, 7, 18, 0.32);
+  filter: saturate(0.9) contrast(0.98);
   pointer-events: none;
+}
+
+.ng-footer__flower::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(12, 16, 24, 0.1), transparent 34%),
+    linear-gradient(180deg, transparent 48%, rgba(12, 16, 24, 0.32));
 }
 
 .ng-footer__content {
   position: relative;
+  grid-column: 1;
+  grid-row: 1;
   width: min(100%, var(--ng-max));
   margin: 0 auto;
   align-self: center;
@@ -566,7 +586,8 @@
 }
 
 .ng-footer__content h2 {
-  max-width: 9ch;
+  max-width: 11ch;
+  font-size: clamp(52px, 8.2vw, 126px);
 }
 
 .ng-footer__content button {
@@ -588,6 +609,7 @@
 
 .ng-footer__links {
   position: relative;
+  grid-column: 1 / -1;
   width: min(100%, var(--ng-max));
   margin: 0 auto;
   display: flex;
@@ -632,6 +654,30 @@
 
   .ng-work-card {
     min-height: 560px;
+  }
+
+  .ng-footer {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .ng-footer__content,
+  .ng-footer__flower,
+  .ng-footer__links {
+    grid-column: 1;
+  }
+
+  .ng-footer__content {
+    grid-row: 1;
+  }
+
+  .ng-footer__flower {
+    grid-row: 2;
+    min-height: 280px;
+  }
+
+  .ng-footer__links {
+    grid-row: 3;
   }
 
   .ng-services-grid {
@@ -693,9 +739,17 @@
     min-height: 108px;
   }
 
+  .ng-footer {
+    padding-top: 86px;
+  }
+
+  .ng-footer__content h2 {
+    max-width: 9.5ch;
+    font-size: clamp(42px, 13vw, 72px);
+  }
+
   .ng-footer__flower {
-    width: 110vw;
-    right: -40vw;
+    min-height: 220px;
   }
 }
 

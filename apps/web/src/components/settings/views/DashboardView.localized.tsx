@@ -596,12 +596,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-command-center {
           display: grid;
           gap: 14px;
-          grid-template-columns: repeat(1, minmax(0, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        }
+
+        .dashboard-command-center > .dashboard-panel {
+          width: 100%;
+          max-width: 100%;
         }
 
         .dashboard-panel {
           --dashboard-tone-rgb: 99 102 241;
           position: relative;
+          box-sizing: border-box;
           display: flex;
           min-width: 0;
           min-height: 100%;
@@ -1248,7 +1254,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           gap: 8px;
         }
 
-        @media (min-width: 900px) {
+        @media (min-width: 760px) and (max-width: 1179px) {
+          .dashboard-command-center {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .dashboard-card-consumption {
+            grid-column: 1 / -1;
+            grid-row: auto;
+          }
+
+          .dashboard-card-api,
+          .dashboard-card-browser,
+          .dashboard-card-storage,
+          .dashboard-card-logs {
+            grid-column: auto;
+            grid-row: auto;
+          }
+        }
+
+        @media (min-width: 1180px) {
           .dashboard-command-center {
             grid-template-columns: repeat(4, minmax(0, 1fr));
           }
@@ -1269,21 +1294,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           .dashboard-card-storage,
           .dashboard-card-logs {
             grid-column: span 1;
-          }
-        }
-
-        @media (min-width: 1280px) {
-          .dashboard-card-consumption {
-            grid-column: span 2;
-            grid-row: span 2;
-          }
-
-          .dashboard-card-api {
-            grid-row: span 2;
-          }
-
-          .dashboard-card-browser {
-            grid-row: span 2;
           }
         }
 
@@ -1338,8 +1348,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           }
 
           .dashboard-chart-summary,
-          .dashboard-health-grid,
-          .dashboard-topology__rail {
+          .dashboard-health-grid {
             grid-template-columns: 1fr;
           }
 
@@ -1402,22 +1411,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             display: none;
           }
 
+          .dashboard-topology-node {
+            padding: 6px 2px;
+            border-radius: 12px;
+          }
+
+          .dashboard-topology-node span {
+            font-size: 11px;
+          }
+
+          .dashboard-topology-node strong {
+            font-size: 16px;
+          }
+
+          .dashboard-topology-node small {
+            font-size: 9px;
+          }
+
+          .dashboard-flow-map {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+          }
+
           .dashboard-flow-map::before {
-            top: 24px;
-            bottom: 60px;
-            left: 24px;
+            display: none;
           }
 
           .dashboard-flow-step {
-            grid-template-columns: auto minmax(0, 1fr);
-            align-items: flex-start;
-            border-radius: 14px;
-            padding: 9px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-radius: 12px;
+            padding: 8px 4px;
+            gap: 6px;
+            min-height: 90px;
+          }
+
+          .dashboard-flow-step > .min-w-0 {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+
+          .dashboard-flow-step__label {
+            font-size: 11px;
+            font-weight: 700;
+            white-space: normal;
+            word-break: break-all;
+            line-height: 1.25;
+            text-align: center;
+          }
+
+          .dashboard-flow-step__helper {
+            display: none;
           }
 
           .dashboard-flow-step strong {
-            grid-column: 2;
-            justify-self: start;
+            font-size: 11px;
+            margin-top: auto;
+            grid-column: auto;
+            justify-self: auto;
           }
 
           .dashboard-inline-grid {

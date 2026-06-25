@@ -157,6 +157,29 @@ export async function getLocalFolderHandle(): Promise<FileSystemDirectoryHandle 
     }
 }
 
+async function getStoredLocalFolderHandleForPermissionRequest(): Promise<FileSystemDirectoryHandle | null> {
+    if (cachedFolderHandle) {
+        return cachedFolderHandle;
+    }
+
+    try {
+        const db = await openFolderHandleDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction('handles', 'readonly');
+            const store = tx.objectStore('handles');
+            const request = store.get(FOLDER_HANDLE_KEY);
+            request.onsuccess = () => {
+                const handle = request.result?.handle || null;
+                cachedFolderHandle = handle;
+                resolve(handle);
+            };
+            request.onerror = () => resolve(null);
+        });
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Set local folder handle in IndexedDB
  */
@@ -186,7 +209,7 @@ export async function restoreLocalFolderConnection(): Promise<FileSystemDirector
     if (!isFileSystemAccessSupported()) return null;
 
     try {
-        const handle = await getLocalFolderHandle();
+        const handle = await getStoredLocalFolderHandleForPermissionRequest();
         if (!handle) return null;
 
         // "readwrite" permission is required for saving changes.

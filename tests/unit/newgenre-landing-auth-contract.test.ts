@@ -57,13 +57,20 @@ test('landing page keeps KK Studio brand while using the reference structure and
   assert.match(combinedCss, /--ng-page-gradient:/);
   assert.match(combinedCss, /min-height:\s*100%;/);
   assert.doesNotMatch(combinedCss, /\.ng-gradient-stage\s*\{[\s\S]*height:\s*240vh;/);
-  assert.match(combinedCss, /url\("\/landing\/kk-canvas-flow\.webp"\)/);
-  assert.match(combinedCss, /url\("\/landing\/kk-batch-board\.webp"\)/);
-  assert.match(combinedCss, /url\("\/landing\/kk-agent-trail\.webp"\)/);
+  assert.match(combinedCss, /url\("\/landing\/kk-infinite-canvas-workspace\.png"\)/);
+  assert.match(combinedCss, /url\("\/landing\/kk-durable-batch-queue\.png"\)/);
+  assert.match(combinedCss, /url\("\/landing\/kk-agent-takeover-runtime\.png"\)/);
+  assert.match(combinedCss, /\.ng-footer\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*0\.42fr\)\s*minmax\(320px,\s*0\.58fr\);/);
+  assert.match(combinedCss, /\.ng-footer__flower\s*\{[\s\S]*position:\s*relative;[\s\S]*aspect-ratio:\s*16 \/ 10;/);
+  assert.doesNotMatch(combinedCss, /\.ng-footer__flower\s*\{[\s\S]*right:\s*min\(-12vw,\s*-90px\);/);
   assert.match(combinedCss, /\.ng-work-card\s*\{/);
   assert.match(combinedCss, /touch-action:\s*pan-y;/);
 
-  for (const assetName of ['kk-canvas-flow.webp', 'kk-batch-board.webp', 'kk-agent-trail.webp']) {
+  for (const assetName of [
+    'kk-infinite-canvas-workspace.png',
+    'kk-durable-batch-queue.png',
+    'kk-agent-takeover-runtime.png',
+  ]) {
     assert.ok(
       existsSync(workspacePath(`apps/web/public/landing/${assetName}`)),
       `${assetName} should exist as a real landing image asset`,

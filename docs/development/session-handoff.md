@@ -232,4 +232,137 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 让用户重新刷新浏览器测试，验证“工作区已可用”Banner 是否能在 200ms 后自动退去，且之前丢失的卡片与图片数据是否能完整恢复。
 
+## 18. 2026-06-25 - Local Folder Permission Restore Fix
+- **Scope**: Fixed local folder reconnection when a saved File System Access handle is still promptable but not currently granted. This restores the user-click permission prompt so disk-backed images can load from the selected folder again.
+- **Files changed**:
+  - `apps/web/src/services/storage/storagePreference.ts`
+  - `tests/unit/storage-preference-permission-restore.test.ts`
+  - `docs/development/session-handoff.md`
+- **Design decision**: startup restore remains silent and uses permission query only; manual reconnect now reads the saved handle without discarding promptable handles, then calls `requestPermission({ mode: 'readwrite' })` inside the user gesture.
+- **Validation run**:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/storage-preference-permission-restore.test.ts"` passed.
+  - `npm run typecheck:tests` passed.
+  - `npm run typecheck` passed.
+- **Not run yet**: full `npm run verify:changes` because this was a narrow local-folder permission fix.
+- **Risk / next**: after reload, users still need one explicit click on the local-folder reconnect/storage action because browsers do not allow automatic file-system permission prompts during page startup.
 
+## 19. 2026-06-25 - Mobile More Sheet Button Layout
+- **修改范围**：调整手机端“更多操作”抽屉按钮排布，将顶部操作改为主题 20%、语言 20%、收藏 10%、当前项目 50% 同排展示；下方入口改为历史与搜索、电商生图、聊天、设置的 `2x2` 网格。
+- **修改文件**：
+  - `apps/web/src/components/mobile/MobileWorkspaceSurface.tsx`
+  - `tests/unit/mobile-more-sheet-layout-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：收藏入口移动到顶部第三列，并压缩为心形图标按钮，避免 10% 宽度下文字溢出；当前项目保持右侧半行宽度；下方网格移除收藏后自然保留四个常规入口。
+- **已运行验证**：
+  - `node --import ./scripts/test/set-log-level.mjs --test tests/unit/mobile-more-sheet-layout-contract.test.ts` 通过。
+  - `npm run typecheck:tests` 通过。
+  - `npm run verify:mobile-settings-smoke` 通过降级契约校验。
+  - `npm run typecheck` 通过。
+  - `npm run build` 通过。
+- **未运行验证及原因**：`verify:mobile-settings-smoke` 未能执行真实 Playwright 浏览器截图路径，因为本机缺少脚本所需的 Chromium headless shell 二进制；脚本已自动降级为源码契约与路由 HTML 校验并成功退出。
+- **风险与下一步**：极窄屏下收藏按钮按需求保持 10% 紧凑宽度，因此仅显示图标；后续可在真实手机浏览器里确认触控命中面积和视觉间距是否符合预期。
+
+## 20. 2026-06-25 - Settings Desktop Adaptive Shell Width
+- **修改范围**：修复桌面设置页在 2 列 A 卡片布局下仍保持宽屏容器的问题，让设置 shell 随 2/3/4 列卡片目标宽度收缩，减少右侧空白。
+- **修改文件**：
+  - `apps/web/src/styles/base.css`
+  - `tests/unit/settings-shell-scroll-regression.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：桌面 shell 宽度由固定 `1480px` 改为 `sidebar 292px + page inline padding 56px + card grid width` 的公式；2 列为 `556px`、3 列为 `842px`、4 列为 `1128px`，对应 shell 约 `904px / 1190px / 1476px`。A 卡片 grid 的 3/4 列断点同步调整为 `1238px / 1524px`，并让 `a-card-span-4-col` 在 3 列断点先降级跨 3 列，避免撑出横向空白。
+- **已运行验证**：
+  - `node --test --test-isolation=none "tests/unit/settings-shell-scroll-regression.test.ts"` 先失败后通过。
+  - `node --test --test-isolation=none "tests/unit/settings-ui-density-regression.test.ts"` 通过。
+  - `node --test --test-isolation=none "tests/unit/responsive-surface.test.ts"` 通过。
+  - `node --test --test-isolation=none "tests/unit/settings-desktop-workbench-regression.test.ts"` 通过。
+  - `npx playwright install chromium` 补齐本机 Playwright Chromium。
+  - `npm run verify:desktop-settings-smoke` 通过真实浏览器模式并产出设置页截图。
+  - `npm run build` 通过。
+- **未运行验证及原因**：未运行完整 `npm run verify:changes`，本次为设置页桌面布局的窄范围 CSS 修复，已运行相关单测、桌面设置烟测和构建。
+- **风险与下一步**：其它已存在的设置页/样式改动仍在工作区中，未在本次回滚或处理；后续可在真实超宽屏和打开聊天侧栏时再做一次人工视觉确认。
+
+## 21. 2026-06-25 - Settings Dashboard Mobile Topology and Flow Layout
+- **修改范围**：优化移动端（宽小于等于 640px）设置看板页面中“API路由图”与“本地守护、插件与网页自动化链路”两个关键链路图的排版，从垂直单列排列改为紧凑的 3 列横向排列，减少了移动端由于长内容导致的过多容器留白。
+- **修改文件**：
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 对“API路由图”：在移动端媒体查询下，移除 `.dashboard-topology__rail` 的 `grid-template-columns: 1fr` 覆盖，并调小 `.dashboard-topology-node` 的内边距和字号，防止节点内容在窄屏下溢出。
+  - 对“本地守护、插件与网页自动化链路”：将 `.dashboard-flow-map` 从单列改为 `grid-template-columns: repeat(3, minmax(0, 1fr))`，隐藏原本垂直方向的流程连线 `::before`；将 `.dashboard-flow-step` 改为垂直 Flex 布局，在移动端自动隐藏长助手文本 `.dashboard-flow-step__helper`，以极致缩减空间、减少多余留白，使得 3 列布局在窄屏下表现精致大方。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` 打包构建 100% 成功通过。
+- **未运行验证及原因**：未运行完整 `npm run verify:changes`，本次仅针对设置看板移动端 CSS 样式做局部的响应式微调，并已在类型检查与生成构建中通过。
+- **风险与下一步**：移动端横向 3 列排版后，如果节点文字特别长可能会有细微截断，已通过 white-space 和 text-overflow 优雅处理；后续可在真实手机尺寸（如 iPhone SE 等窄屏）下进行人工确认。
+
+## 21. 2026-06-25 - Landing Artwork, Empty Canvas Layer, and Settings Adaptive Layout
+- **Scope**: Replaced the first three landing work-card visuals with KK Studio-specific assets, tightened the landing footer composition, lifted the empty-canvas welcome layer above workspace chrome, and fixed settings overview / appearance grids that were overflowing or squeezing copy.
+- **Files changed**:
+  - `apps/web/src/landing/landingStyles.css`
+  - `apps/web/src/landing/EmptyCanvasWelcome.tsx`
+  - `apps/web/src/styles/canvas.css`
+  - `apps/web/src/styles/settings.css`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/public/landing/kk-infinite-canvas-workspace.png`
+  - `apps/web/public/landing/kk-durable-batch-queue.png`
+  - `apps/web/public/landing/kk-agent-takeover-runtime.png`
+  - `tests/unit/newgenre-landing-auth-contract.test.ts`
+  - `tests/unit/workflow-actions-unused-cleanup-contract.test.ts`
+  - `tests/unit/settings-ui-density-regression.test.ts`
+- **Design decision**: landing cards now map to dedicated subject-matched PNGs; the footer uses a responsive two-column composition instead of an oversized overlapping absolute visual. The empty welcome panel uses a dedicated `empty-canvas-welcome-layer` at `z-index: 700` with bottom safe padding and an internal scroll area. Settings system fields stay stacked in half-width cards, while wide cards may opt back into two-column controls; dashboard cards use 1 / 2 / 4-column breakpoints and `border-box` sizing to prevent masked overflow.
+- **Validation run**:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/workflow-actions-unused-cleanup-contract.test.ts" "tests/unit/settings-ui-density-regression.test.ts" "tests/unit/newgenre-landing-auth-contract.test.ts"` passed.
+  - `npm run typecheck` passed.
+  - Browser DOM check confirmed the empty welcome layer renders with `z-index: 700`, the prompt bar remains at `z-index: 100`, and the welcome card bottom stays above the prompt bar.
+  - Browser DOM check confirmed settings overview page has no shell-level horizontal overflow; the browser shell available during verification used the mobile settings wrapper for deeper view switching, so the appearance desktop visual was covered by source-level regression checks.
+- **Not run yet**: full `npm run verify:changes`; this was a scoped UI/layout fix and the targeted unit tests plus full typecheck were run.
+- **Risk / next**: existing unrelated workspace changes were already present and left untouched. If more visual confidence is needed, rerun the desktop settings smoke flow in a browser session that opens the desktop settings shell.
+
+## 22. 2026-06-25 - Mobile Settings & Billing Layout and Border Tidy
+- **修改范围**：优化手机端“设置”、“存储”和“计费”页面的卡片布局，将指标卡片改为 2x2 网格，去除小条目的多余边框线条，并限制跨行样式的高度拉伸以完美自适应手机屏幕。
+- **修改文件**：
+  - `apps/web/src/styles/base.css`
+  - `apps/web/src/components/settings/views/StorageSettingsView.localized.tsx`
+  - `apps/web/src/pages/CostEstimation.tsx`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 在 `base.css` 中将 `a-card-span-2-row`、`a-card-span-3-row` 和 `a-card-span-4-row` 规则限制在 `min-width: 768px` 媒体查询内。
+  - 在 `StorageSettingsView` 和 `CostEstimation` 中引入 `isMobile` 状态。在 `isMobile` 为 `true` 时，指标卡片用 `grid grid-cols-2 gap-3 w-full` wrapper 进行包裹，在手机端形成 2x2 网格展示。
+  - 在手机端隐藏存储设置列表中各清理选项和模式切换选项的边框线（`border-transparent`），解决密密麻麻线条堆叠的问题，仅保留柔和背景底色。
+- **已运行验证**：
+  - `npm run typecheck` 成功通过。
+  - `npm run test:unit` 共 1601 个用例全部 100% 通过。
+  - `npm run verify:mobile-settings-smoke` 通过降级冒烟校验。
+  - `npm run build` 成功打包生成生产 bundle。
+- **风险与下一步**：
+  - **风险**：无明显回归风险，已由单元测试和编译构建多重校验保证。
+  - **下一步**：推送代码，并收集手机端用户在此类面板布局、排版及可读性上的最新反馈。
+
+## 23. 2026-06-25 - Recharge Modal Logo & Range Slider Style Fix (本次追加)
+- **修改范围**：修复充值积分弹窗中支付宝与微信支付 logo 资产错误和滑动条样式丢失导致大面积遮挡轨道的问题。
+- **修改文件**：
+  - [alipay.svg](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/assets/payment/alipay.svg)
+  - [wechat.svg](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/assets/payment/wechat.svg)
+  - [RechargeModal.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/modals/RechargeModal.tsx)
+- **当前设计决策**：
+  - 将 `alipay.svg` 与 `wechat.svg` 资产分别更新为 Bootstrap Icons 标准版本，并硬编码各品牌的官方填充颜色（支付宝为 `#1677FF`，微信为 `#07C160`），确保组件中使用 `<img>` 能够正确显示单色 Logo。
+  - 在 `RechargeModal` 内部为 range input 元素注入局部的 `<style>` 标签，定义 `.recharge-amount-range-input` 类，为轨道和滑块指定明确的 `height`、`padding: 0 !important`、`border: none !important` 以及 `appearance: none !important` 强制约束，消除了受全局 input 元素布局样式污染而导致滑动条变宽、轨道被遮挡的顽疾。
+  - 滑动条的滑块（thumb）背景色绑定 `activeTheme.color`，实现随所选支付通道（支付宝蓝、微信绿）动态高亮，并添加 hover 轻微放大微交互，提升细节品质。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run build` 成功完成 Vite 生产包的打包构建。
+  - 运行 `npm run architecture:check` 成功通过。
+
+## 24. 2026-06-25 - Mobile Sheet Buttons Layout Adjustment (本次追加)
+- **修改范围**：重新调整手机端“更多设置”底栏面板的按钮排列。将原来“主题偏好(20%)”、“系统语言(20%)”、“收藏(10%)”、“项目(50%)”的布局比例调整为“主题(20%)”、“语言(20%)”、“收藏(20%)”、“项目(40%)”，使其以同一排 4 个按钮排列，同时保留下面的 2*2 格局。
+- **修改文件**：
+  - [MobileWorkspaceSurface.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/mobile/MobileWorkspaceSurface.tsx)
+- **当前设计决策**：
+  - 在 `MobileWorkspaceSurface.tsx` 中，将顶部网格的 CSS 类修改为 `grid-cols-[20fr_20fr_20fr_40fr]`。
+  - 为让收藏按钮在 20% 宽度下更具美感并保持与主题、语言的绝对对称性，给它补充了“我的”、“收藏”两行微小文本描述。
+  - 缩减当前项目按钮的 padding，并去除了右侧“切换/收起”指示文本，以极简模式呈现“项目图标”+“当前项目名称”，从而在 40% 的狭窄宽度内优雅展示，且不发生重叠遮挡或折行。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run build` 成功通过并生成生产环境 bundle 包。
+- **风险与下一步**：
+  - **风险**：无明显回归风险，修改仅限移动端抽屉面板内的局部按钮排列样式。
+  - **下一步**：推送代码，交由用户在真实手机屏幕分辨率下验证“更多设置”面板按钮的视觉排列和使用体验。

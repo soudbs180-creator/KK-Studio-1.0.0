@@ -206,3 +206,45 @@ test('settings workbench uses frosted glass tokens and blur layers', () => {
     /\.settings-panel \.settings-reference-mini-metric,[\s\S]*\.settings-panel \.settings-log-entry \{[\s\S]*backdrop-filter: blur\(18px\) saturate\(1\.12\);/,
   );
 });
+
+test('settings desktop grids adapt before cards and field copy become cramped', () => {
+  const cssSource = readSource('apps/web/src/styles/settings.css');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page \{[\s\S]*min-width:\s*0;[\s\S]*overflow-x:\s*hidden;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-view-shell,[\s\S]*\.settings-panel \.settings-reference-stack \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 768px\) \{[\s\S]*\.settings-panel \.settings-system-field \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 1024px\) \{[\s\S]*\.settings-panel \.settings-system-grid > \.settings-system-card--wide \.settings-system-field \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(180px,\s*240px\);/,
+  );
+  assert.match(
+    dashboardSource,
+    /\.dashboard-command-center \{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*280px\),\s*1fr\)\);/,
+  );
+  assert.match(
+    dashboardSource,
+    /\.dashboard-panel \{[\s\S]*box-sizing:\s*border-box;/,
+  );
+  assert.match(
+    dashboardSource,
+    /@media \(min-width: 760px\) and \(max-width: 1179px\) \{[\s\S]*\.dashboard-command-center \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.match(
+    dashboardSource,
+    /@media \(min-width: 1180px\) \{[\s\S]*\.dashboard-command-center \{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /@media \(min-width: 900px\) \{[\s\S]*\.dashboard-command-center \{[\s\S]*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+  );
+});

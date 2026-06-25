@@ -38,6 +38,7 @@ import { adminModelService } from '../services/model/adminModelService';
 import { kkWebApiClient } from '../services/api/kkApiClient';
 import { notify } from '../services/system/notificationService';
 import useAdminRole from '../hooks/useAdminRole';
+import { isCompactResponsiveWidth } from '../utils/responsiveSurface';
 
 interface CostEstimationProps {
   onBack?: () => void;
@@ -308,6 +309,16 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const canManageRechargeSubmissions = isAdmin && adminSessionActive;
 
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
+  ));
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(isCompactResponsiveWidth(window.innerWidth));
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
   const [summaryRows, setSummaryRows] = useState<CostBreakdownItem[]>([]);
   const [recentRows, setRecentRows] = useState<CostEntry[]>([]);
@@ -562,7 +573,123 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
     </>
   );
 
-    const content = (
+  const apiMetricCards = (
+    <>
+      {/* 指标卡片 1: 30天花费 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('30 天花费', '30-Day Spend')}</span>
+            <DollarSign size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{formatUsd(apiOverview.totalCost, locale)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天 API 成本。', 'API spend in the last 30 days.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 2: 请求次数 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('请求次数', 'Request Count')}</span>
+            <History size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{formatNumber(apiOverview.totalCount, 0, locale)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天计费事件数。', 'Billing events in 30 days.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 3: 词元总量 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#6366f1' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('词元总量', 'Token Volume')}</span>
+            <Layers3 size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{formatNumber(apiOverview.totalTokens, 0, locale)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天词元总量。', 'Token volume in 30 days.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 4: 最近计费 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('最近计费', 'Latest Charge')}</span>
+            <Clock3 size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5 truncate">
+            {latestApiRecord ? formatDateTime(latestApiRecord.timestamp, locale) : pick('暂无记录', 'No record')}
+          </div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近一条 API 计费时间。', 'Most recent API billing.')}</div>
+        </div>
+      </div>
+    </>
+  );
+
+  const creditMetricCards = (
+    <>
+      {/* 指标卡片 1: 当前余额 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('当前余额', 'Current Balance')}</span>
+            <Coins size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{remainingBalanceDisplay}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前可用积分。', 'Credits currently available.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 2: 积分模型数 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#6366f1' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('积分模型数', 'Credit Models')}</span>
+            <Wallet size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{formatNumber(creditModelCount, 0, locale)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前启用积分定价的模型数。', 'Models with credit pricing.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 3: 已消耗积分 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('已消耗积分', 'Credits Consumed')}</span>
+            <History size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5">{formatNumber(creditOverview.totalCredits, 0, locale)}</div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前累计积分消耗。', 'Total recorded credit usage.')}</div>
+        </div>
+      </div>
+
+      {/* 指标卡片 4: 最近扣减 (1A) */}
+      <div className="dashboard-grid-card">
+        <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
+        <div className="flex flex-col justify-between h-full w-full">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('最近扣减', 'Latest Deduction')}</span>
+            <Clock3 size={13} />
+          </div>
+          <div className="text-sm font-bold text-white mt-1.5 truncate">
+            {latestCreditRecord ? formatDateTime(latestCreditRecord.timestamp, locale) : pick('暂无记录', 'No record')}
+          </div>
+          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近一次积分扣减时间。', 'Latest credit deduction.')}</div>
+        </div>
+      </div>
+    </>
+  );
+
+  const content = (
     <SettingsViewShell>
       <style>{`
         .dashboard-grid-card {
@@ -607,117 +734,21 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
       <SettingsCardGridContainer>
         {/* 第一排: 4 个指标卡片 (1A * 4A) */}
         {activeTab === 'api' ? (
-          <>
-            {/* 指标卡片 1: 30天花费 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('30 天花费', '30-Day Spend')}</span>
-                  <DollarSign size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{formatUsd(apiOverview.totalCost, locale)}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天 API 成本。', 'API spend in the last 30 days.')}</div>
-              </div>
+          isMobile ? (
+            <div className="grid grid-cols-2 gap-3 w-full">
+              {apiMetricCards}
             </div>
-
-            {/* 指标卡片 2: 请求次数 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('请求次数', 'Request Count')}</span>
-                  <History size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{formatNumber(apiOverview.totalCount, 0, locale)}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天计费事件数。', 'Billing events in 30 days.')}</div>
-              </div>
-            </div>
-
-            {/* 指标卡片 3: 词元总量 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#6366f1' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('词元总量', 'Token Volume')}</span>
-                  <Layers3 size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{formatNumber(apiOverview.totalTokens, 0, locale)}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近 30 天词元总量。', 'Token volume in 30 days.')}</div>
-              </div>
-            </div>
-
-            {/* 指标卡片 4: 最近计费 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('最近计费', 'Latest Charge')}</span>
-                  <Clock3 size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5 truncate">
-                  {latestApiRecord ? formatDateTime(latestApiRecord.timestamp, locale) : pick('暂无记录', 'No record')}
-                </div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近一条 API 计费时间。', 'Most recent API billing.')}</div>
-              </div>
-            </div>
-          </>
+          ) : (
+            apiMetricCards
+          )
         ) : (
-          <>
-            {/* 指标卡片 1: 当前余额 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('当前余额', 'Current Balance')}</span>
-                  <Coins size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{remainingBalanceDisplay}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前可用积分。', 'Credits currently available.')}</div>
-              </div>
+          isMobile ? (
+            <div className="grid grid-cols-2 gap-3 w-full">
+              {creditMetricCards}
             </div>
-
-            {/* 指标卡片 2: 积分模型数 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#6366f1' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('积分模型数', 'Credit Models')}</span>
-                  <Wallet size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{formatNumber(creditModelCount, 0, locale)}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前启用积分定价的模型数。', 'Models with credit pricing.')}</div>
-              </div>
-            </div>
-
-            {/* 指标卡片 3: 已消耗积分 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('已消耗积分', 'Credits Consumed')}</span>
-                  <History size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5">{formatNumber(creditOverview.totalCredits, 0, locale)}</div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前累计积分消耗。', 'Total recorded credit usage.')}</div>
-              </div>
-            </div>
-
-            {/* 指标卡片 4: 最近扣减 (1A) */}
-            <div className="dashboard-grid-card">
-              <div className="dashboard-card-glow" style={{ background: '#64748b' }} />
-              <div className="flex flex-col justify-between h-full w-full">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('最近扣减', 'Latest Deduction')}</span>
-                  <Clock3 size={13} />
-                </div>
-                <div className="text-sm font-bold text-white mt-1.5 truncate">
-                  {latestCreditRecord ? formatDateTime(latestCreditRecord.timestamp, locale) : pick('暂无记录', 'No record')}
-                </div>
-                <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('最近一次积分扣减时间。', 'Latest credit deduction.')}</div>
-              </div>
-            </div>
-          </>
+          ) : (
+            creditMetricCards
+          )
         )}
 
         {/* 第二排: 模式切换与控制 (2A*2A) + 快照信息 (2A*2A) */}

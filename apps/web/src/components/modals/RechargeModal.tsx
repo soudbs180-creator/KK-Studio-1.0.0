@@ -652,6 +652,46 @@ const RechargeModal: React.FC = () => {
                       </div>
                       
                       <div className="grid gap-3 grid-cols-[1fr_80px] items-center">
+                        <style>{`
+                          .recharge-amount-range-input {
+                            -webkit-appearance: none !important;
+                            appearance: none !important;
+                            width: 100% !important;
+                            height: 6px !important;
+                            border-radius: 999px !important;
+                            background: #334155 !important;
+                            outline: none !important;
+                            padding: 0 !important;
+                            border: none !important;
+                            margin: 0 !important;
+                            box-shadow: none !important;
+                          }
+                          .recharge-amount-range-input::-webkit-slider-thumb {
+                            -webkit-appearance: none !important;
+                            appearance: none !important;
+                            width: 16px !important;
+                            height: 16px !important;
+                            border-radius: 50% !important;
+                            background: ${activeTheme.color} !important;
+                            cursor: pointer !important;
+                            transition: transform 0.1s ease, background-color 0.3s ease !important;
+                            border: 2px solid #ffffff !important;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
+                            margin-top: 0 !important;
+                          }
+                          .recharge-amount-range-input::-webkit-slider-thumb:hover {
+                            transform: scale(1.15) !important;
+                          }
+                          .recharge-amount-range-input::-moz-range-thumb {
+                            width: 12px !important;
+                            height: 12px !important;
+                            border-radius: 50% !important;
+                            background: ${activeTheme.color} !important;
+                            cursor: pointer !important;
+                            border: 2px solid #ffffff !important;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
+                          }
+                        `}</style>
                         <input
                           type="range"
                           min={minAmount}
@@ -659,10 +699,7 @@ const RechargeModal: React.FC = () => {
                           step={currency === 'CNY' ? 5 : 1}
                           value={amount}
                           onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
-                          className="w-full h-1 rounded-lg appearance-none cursor-pointer bg-slate-700 transition-all duration-300"
-                          style={{
-                            accentColor: activeTheme.color,
-                          }}
+                          className="recharge-amount-range-input cursor-pointer"
                         />
                         <input
                           type="number"
