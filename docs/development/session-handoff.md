@@ -704,3 +704,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
   - 运行浏览器仿真测试（Browser Subagent）确认应用不再出现 `ReferenceError: savedActiveCanvasId is not defined` 异常，首屏成功识别并精细渲染出全部本地卡片与画布元素。
 
+## 46. 2026-06-25 - Fix Canvas Card Arrange Overlap and Focus Loss (本次追加)
+- **修改范围**：
+  1. 修复了画布选区整理中，当只选中多个 Prompt 卡片时其下属子图片相互几何重叠与偏移的排版缺陷。
+  2. 解决了画布全局自动整理后卡片对齐到负大坐标轨道，但视口没有跟着聚焦而飞出视野外（被误以为“卡片丢失”）的严重体验硬伤。
+- **修改文件**：
+  - [canvasArrangeSelection.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/canvasArrangeSelection.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **计算包围盒防重叠**：重构 `arrangeSelectedRootNodes` 的 `isPromptOnly` 分支，如果 Prompt 下存在子图片，不再只以 Prompt 节点大小作为包围盒，而是遍历并计算包含其属下所有子图片在内的联合包围盒 (`Bounding Box`)。这能使得排列时留下足够的物理间隙，阻止子图片发生位置挤压和卡片重叠。
+  - **延迟调用视口自适应**：在全局整理 `arrangeAllNodes` 触发后，通过 150ms 的 `setTimeout` 延迟调用 `handleFitToAll` 自动平滑调整焦距，令全部已排布卡片安全、居中呈现在屏幕中央。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
+  - 运行浏览器仿真测试（Browser Subagent）成功获取自动整理后的完美排列并执行了 `10%` 的平滑自适应视口聚焦，截取并保存了无重叠无飞出的最终布局图 `final_perfect_arranged_layout.png`。
+
+

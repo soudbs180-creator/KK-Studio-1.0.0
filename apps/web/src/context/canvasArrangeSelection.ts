@@ -458,14 +458,36 @@ export function arrangeSelectedRootNodes(
 
     if (isPromptOnly) {
         roots = selectedPrompts.map(prompt => {
-            const height = prompt.height || 200;
+            const children = canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+            const promptHeight = prompt.height || 200;
+            let minTop = prompt.position.y - promptHeight;
+            let maxBottom = prompt.position.y;
+            let minLeft = prompt.position.x - PROMPT_WIDTH / 2;
+            let maxRight = prompt.position.x + PROMPT_WIDTH / 2;
+
+            children.forEach(child => {
+                const dims = getImageDims(child.aspectRatio);
+                const childTop = child.position.y - dims.h;
+                const childBottom = child.position.y;
+                const childLeft = child.position.x - dims.w / 2;
+                const childRight = child.position.x + dims.w / 2;
+
+                if (childTop < minTop) minTop = childTop;
+                if (childBottom > maxBottom) maxBottom = childBottom;
+                if (childLeft < minLeft) minLeft = childLeft;
+                if (childRight > maxRight) maxRight = childRight;
+            });
+
+            const width = maxRight - minLeft;
+            const height = maxBottom - minTop;
+
             return {
                 id: prompt.id,
                 type: 'prompt',
                 obj: prompt,
                 x: prompt.position.x,
                 y: prompt.position.y,
-                width: PROMPT_WIDTH,
+                width,
                 height,
                 visualCx: prompt.position.x,
                 visualCy: prompt.position.y - height / 2,

@@ -2766,7 +2766,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
   // Auto arrange is delegated to CanvasContext.
   const handleAutoArrange = useCallback(() => {
     arrangeAllNodes();
-  }, [arrangeAllNodes]);
+    // 简体中文：整理后延迟调用 fitToAll，使得视口平滑对齐卡片，防止“卡片丢失”视觉错觉
+    setTimeout(() => {
+      handleFitToAll();
+    }, 150);
+  }, [arrangeAllNodes, handleFitToAll]);
 
   // --- 连接管理 ---
   // 🎨 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
