@@ -540,7 +540,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit` 全套 1601 个单元测试用例全部 100% 成功通过。
 
 
-## 34. 2026-06-25 - Workflow and Legacy Dual-Model Merge Risk Assessment and Decision (本次追加)
+## 35. 2026-06-25 - Workflow and Legacy Dual-Model Merge Risk Assessment and Decision (本次追加)
 - **修改范围**：完成了新旧 Workflow 数据模型合并与双向 Adapter 废弃的高风险可行性源码检索与依赖树评估。更新并固化了架构实施方案决策。
 - **修改文件**：
   - [implementation_plan.md](file:///C:/Users/Administrator/.gemini/antigravity/brain/951612d7-b434-47bc-ac2e-758074b16479/implementation_plan.md)
