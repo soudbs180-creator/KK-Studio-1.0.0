@@ -24,6 +24,7 @@ import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
+import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
 
 const EcommerceCanvasWorkbenchCard = React.lazy(() => import('../ecommerce/EcommerceCanvasWorkbenchCard'));
 
@@ -781,7 +782,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 // 🚀 同时更新这组下属所有子图像节点的局部连接线！
                 if (node.childImageIds && node.childImageIds.length > 0) {
                     node.childImageIds.forEach((childImageId) => {
-                        updateConnectorDom(node.id, childImageId, false);
+                        CanvasConnectorScheduler.request(node.id, childImageId);
                     });
                 }
             }

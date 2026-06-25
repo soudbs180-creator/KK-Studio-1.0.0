@@ -33,3 +33,28 @@ test('measurement scheduler batches DOM reads behind requestAnimationFrame', () 
   assert.match(source, /if \(this\.isLocked\) return/);
   assert.match(source, /el\.offsetHeight/);
 });
+
+test('card components route connector updates through the shared scheduler', () => {
+  const imageSource = imageCardSource();
+  const promptSource = promptNodeSource();
+
+  assert.match(imageSource, /CanvasConnectorScheduler/);
+  assert.match(imageSource, /CanvasConnectorScheduler\.request\(/);
+  assert.match(promptSource, /CanvasConnectorScheduler/);
+  assert.match(promptSource, /CanvasConnectorScheduler\.request\(/);
+});
+
+test('connector scheduler batches updates behind requestAnimationFrame with deduplication', () => {
+  const source = readSource('apps/web/src/canvas/CanvasConnectorScheduler.ts');
+
+  assert.match(source, /requestAnimationFrame\(\(\) => \{/);
+  assert.match(source, /private static pendingUpdates = new Set/);
+});
+
+test('connector scheduler avoids redundant DOM updates using a path cache', () => {
+  const source = readSource('apps/web/src/canvas/CanvasConnectorScheduler.ts');
+
+  assert.match(source, /private static pathCache = new Map/);
+  assert.match(source, /cachedPath !== newPath/);
+  assert.match(source, /setAttribute\('d', newPath\)/);
+});

@@ -1,4 +1,5 @@
 import { buildDockedVerticalConnectorPath } from '../canvas/connectorGeometry';
+import { CanvasConnectorScheduler } from '../canvas/CanvasConnectorScheduler';
 
 export type Point = { x: number; y: number };
 export type PositionListener = (position: Point) => void;
@@ -99,72 +100,7 @@ export function getImageNodePositionFromDom(id: string): Point | null {
   return x && y ? { x: parseFloat(x), y: parseFloat(y) } : null;
 }
 
-// 简体中文：用来记录需要在下一帧更新的连线
-const pendingConnectorUpdates = new Set<string>();
-let isConnectorUpdateScheduled = false;
-
-function flushConnectorUpdates() {
-  isConnectorUpdateScheduled = false;
-
-  pendingConnectorUpdates.forEach((key) => {
-    const parts = key.split(':');
-    if (parts.length === 2) {
-      performUpdateConnectorDom(parts[0], parts[1]);
-    }
-  });
-  pendingConnectorUpdates.clear();
-}
-
-function performUpdateConnectorDom(promptId: string, imageId: string) {
-  const pathEl = document.getElementById(`connector-${promptId}-${imageId}`) as SVGPathElement | null;
-  if (!pathEl) return;
-
-  const promptPos = canvasLivePositionStore.getPosition(promptId) || getPromptNodePositionFromDom(promptId);
-  const imagePos = canvasLivePositionStore.getPosition(imageId) || getImageNodePositionFromDom(imageId);
-
-  if (promptPos && imagePos) {
-    const svgEl = pathEl.ownerSVGElement;
-    if (svgEl) {
-      const leftAttr = svgEl.getAttribute('data-left');
-      const topAttr = svgEl.getAttribute('data-top');
-      const svgLeft = leftAttr ? parseFloat(leftAttr) : 0;
-      const svgTop = topAttr ? parseFloat(topAttr) : 0;
-      
-      // 🚀 简体中文：优化获取副卡卡片高度的逻辑，优先从子图像卡片自身的 DOM 元素上读取 data-card-height 或 offsetHeight
-      const imageCardEl = document.getElementById(`image-card-${imageId}`);
-      let imageCardHeight = 0;
-      if (imageCardEl) {
-        const hAttr = imageCardEl.getAttribute('data-card-height');
-        imageCardHeight = hAttr ? Number(hAttr) : imageCardEl.offsetHeight;
-        if (!hAttr && imageCardHeight > 0) {
-          imageCardEl.setAttribute('data-card-height', String(imageCardHeight));
-        }
-      }
-      if (!imageCardHeight) {
-        imageCardHeight = Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0);
-      }
-
-      const newPath = buildDockedVerticalConnectorPath(
-        promptPos.x - svgLeft,
-        promptPos.y - svgTop,
-        imagePos.x - svgLeft,
-        (imagePos.y - imageCardHeight) - svgTop
-      );
-      pathEl.setAttribute('d', newPath);
-    }
-  }
-}
-
-// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性。在拖拽的高频场景下，同步执行更新可以消除一帧的延迟，大幅提升跟手性。
+// 简体中文：实时局部重绘 SVG 连接线 DOM 的属性，向下兼容接口，统一转发给批量调度器
 export function updateConnectorDom(promptId: string, imageId: string, sync = true) {
-  if (sync) {
-    performUpdateConnectorDom(promptId, imageId);
-    return;
-  }
-
-  pendingConnectorUpdates.add(`${promptId}:${imageId}`);
-  if (!isConnectorUpdateScheduled) {
-    isConnectorUpdateScheduled = true;
-    requestAnimationFrame(flushConnectorUpdates);
-  }
+  CanvasConnectorScheduler.request(promptId, imageId, sync);
 }

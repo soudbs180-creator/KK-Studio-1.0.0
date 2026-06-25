@@ -98,3 +98,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - **风险**：无明显回归风险，调度器单例与交互锁安全可靠。
   - **下一步**：在复杂的多选卡片或连接线操作时观察 CPU 占用率与 FPS。
+
+## 11. 2026-06-25 - Canvas Connector Scheduler 重构与批量连线更新 (本次追加)
+- **修改范围**：新建了 `CanvasConnectorScheduler`，替换了原先分散的高频同步连接线 SVG 重绘操作。
+- **修改文件**：
+  - `apps/web/src/canvas/CanvasConnectorScheduler.ts`
+  - `apps/web/src/app/canvasLivePositionStore.ts`
+  - `apps/web/src/components/canvas/PromptNodeComponent.tsx`
+  - `apps/web/src/components/image/ImageCard2.tsx`
+  - `tests/unit/canvas-measurement-guards-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 设计并编写了 `CanvasConnectorScheduler`，内部采用 `pendingUpdates` (Set 集合) 收集待重绘连线并在 requestAnimationFrame 中进行批量批处理，一帧内只执行一次批量重绘，且自带 transforming / dragging 时每帧最多 flush 一次的限流守护。
+  - 内部使用 `pathCache` 对路径字符串做属性缓存。只有当路径的 d 属性计算值改变时才调用 `setAttribute`，极大减少 DOM 无谓重绘。
+  - 重构了 `canvasLivePositionStore.ts` 以向下兼容的形式转发至 `CanvasConnectorScheduler` 调度，并在卡片组件中完美对接新式批量调度接口。
+  - 在契约测试中增加了对连接线批量刷新机制（包括禁用组件同步绘制、rAF 批处理去重、重复路径缓存过滤）的正则断言，保证契约稳健。
+- **已运行验证**：
+  - 运行 `npm run test:unit` 100% 通过（1583 个用例全部 Pass，新增的连接线契约测试全部通过）。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+- **风险与下一步**：
+  - **风险**：无回归风险，重构已得到单元与契约测试的严格保障。
+  - **下一步**：大画布长连接线场景下的流畅度复测与下一阶段的空间索引重构。

@@ -27,6 +27,7 @@ import { safeOpenLink } from '../../utils/browserUtils';
 import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
+import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -315,7 +316,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
             // 🚀 [关键修复] 立即同步更新局部连接线，消除一帧延迟，确保绝对不发生漂移
             if (image.parentPromptId) {
-                updateConnectorDom(image.parentPromptId, image.id);
+                CanvasConnectorScheduler.request(image.parentPromptId, image.id, true);
             }
         }
     }, [position.x, position.y, isDragging, nodeWidth, cardHeight, originX, originY, zoomScale, image.id, image.parentPromptId]);
@@ -336,7 +337,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                 // 🚀 如果存在 parentPromptId，同时更新连线！
                 if (image.parentPromptId) {
-                    updateConnectorDom(image.parentPromptId, image.id, false);
+                    CanvasConnectorScheduler.request(image.parentPromptId, image.id);
                 }
             }
         });
