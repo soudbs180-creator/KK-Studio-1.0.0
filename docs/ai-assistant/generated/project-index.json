@@ -77,8 +77,8 @@
     "path": "docs/ai-assistant/skills.md",
     "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.5.8",
     "summary": "本文件是 KK Studio v1.5.8 规范下 AI 助手的可执行技能手册 (Skills) 索引。",
-    "contentHash": "12cca215f9de631ca5822d30e159c832",
-    "updatedAt": "2026-06-24T18:39:39.071Z"
+    "contentHash": "6ce54cdf24c6d3ba09a49e255e82d291",
+    "updatedAt": "2026-06-25T09:23:12.604Z"
   },
   {
     "id": "doc_tool_registry_md",

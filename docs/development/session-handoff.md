@@ -443,4 +443,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 100% 成功通过。
   - 运行 `npm run check:encoding` 100% 成功通过。
 
+## 30. 2026-06-25 - Extract Duplicated Helper Functions in Compat Routes (本次追加)
+- **修改范围**：提取 `server/routes/compat/` 目录下全部四个兼容路由文件中镜像拷贝的冗余身份校验、Cookie 解析与信封包装函数，消除了项目低水平的代码重复，实现轻量化优化。
+- **修改文件**：
+  - [compatHelper.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/compatHelper.js)
+  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/admin.js)
+  - [auth.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/auth.js)
+  - [billing.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/billing.js)
+  - [workspace.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/workspace.js)
+- **当前设计决策**：
+  - 在 `compatHelper.js` 统一存放并导出 `isDbEnabled`, `nowIso`, `requestId`, `meta`, `okEnvelope`, `sendError`, `readCookieValue`, `resolveRequestUserId` 以及相关的路由契约常量。
+  - 在四个兼容子路由中完全删除多余的前 100 行重复逻辑，改由模块化引入 `compatHelper` 的形式重新导出，使各路由文件体积大瘦身且职责更加专一。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 100% 成功通过（1601 个用例全部 Pass）。
+
 
