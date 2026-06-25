@@ -178,6 +178,7 @@ interface ChatModel {
     isCustom: boolean;
     isSystemInternal?: boolean;
     type?: 'chat' | 'image' | 'video' | 'image+chat' | 'audio';  // ✨ 支持多模态
+    isVision?: boolean; // ✨ 是否支持多模态（图片/视频）输入
     icon?: string;
     displayName?: string;
     description?: string;
@@ -496,7 +497,18 @@ const buildAvailableChatModels = (includeSystemCreditModels = true): ChatModel[]
     const uniqueMap = new Map<string, ChatModel>();
     rawModels.forEach(model => {
         if (!uniqueMap.has(model.id)) {
-            uniqueMap.set(model.id, model);
+            const isVision = model.type === 'image+chat' || 
+                model.id.toLowerCase().includes('vision') || 
+                model.id.toLowerCase().includes('gpt-4o') || 
+                model.id.toLowerCase().includes('gemini-2.0') || 
+                model.id.toLowerCase().includes('claude-3-5') ||
+                model.id.toLowerCase().includes('gemini-1.5') ||
+                model.id.toLowerCase().includes('gemini-2.5') ||
+                model.id.toLowerCase().includes('grok-2-vision');
+            uniqueMap.set(model.id, {
+                ...model,
+                isVision
+            });
         }
     });
 
@@ -2399,6 +2411,19 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         const match = userText.match(imageRegex);
 
         const currentAttachments = [...attachments]; // 保存当前附件
+
+        // 🚀 多模态能力预检与拦截
+        const hasMultimodalAttachment = currentAttachments.some(
+            att => att.type === 'image' || att.type === 'video'
+        );
+        if (hasMultimodalAttachment && !selectedModel.isVision) {
+            notify.error(
+                '模型不支持多模态',
+                `当前模型 "${selectedModel.name || selectedModel.id}" 不支持图片或视频输入。请切换至支持 Vision 的模型（如 Gemini 2.0 Flash / GPT-4o / Claude 3.5 Sonnet 等）后再试。`
+            );
+            return;
+        }
+
         const userMsg: Message = {
             id: Date.now().toString(),
             role: 'user',

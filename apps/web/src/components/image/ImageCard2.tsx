@@ -523,7 +523,21 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     // Video Control
     const videoRef = useRef<HTMLVideoElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(true); // Default autoPlay is true
+
+    // Audio Broker Registration & Disposal
+    useEffect(() => {
+        const broker = (window as any).__KK_AUDIO_BROKER__;
+        if (broker && audioRef.current) {
+            broker.register(image.id, audioRef.current);
+        }
+        return () => {
+            if (broker) {
+                broker.unregister(image.id);
+            }
+        };
+    }, [image.id, displaySrc]);
     const resolvedDisplayCost = useMemo(() => resolveImageCost({
         model: image.model || '',
         imageSize: image.imageSize || ImageSize.SIZE_1K,

@@ -593,3 +593,24 @@ test('ToolRegistry: disconnected browser.extractProduct returns setup_required i
   assert.match(result.summary, /Browser Bridge/);
   assert.equal(result.data, undefined);
 });
+
+test('ToolRegistry: provider.getModelCapabilities queries properties correctly', async () => {
+  const getModelCapabilities = toolRegistryInstance.getTool('provider.getModelCapabilities');
+  assert.ok(getModelCapabilities);
+  assert.equal(getModelCapabilities.permission, 'safe');
+
+  const getModelCapabilitiesAlias = toolRegistryInstance.getTool('getModelCapabilities');
+  assert.ok(getModelCapabilitiesAlias);
+
+  const resultGemini = await toolRegistryInstance.execute('provider.getModelCapabilities', {
+    modelId: 'gemini-2.0-flash-exp'
+  }, {});
+  assert.equal(resultGemini.modelId, 'gemini-2.0-flash-exp');
+  assert.equal(resultGemini.multimodal, true);
+
+  const resultNonExist = await toolRegistryInstance.execute('provider.getModelCapabilities', {
+    modelId: 'non-exist-model'
+  }, {});
+  assert.equal(resultNonExist.modelId, 'non-exist-model');
+  assert.equal(resultNonExist.multimodal, false);
+});

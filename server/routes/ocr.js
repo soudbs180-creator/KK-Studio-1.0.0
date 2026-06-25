@@ -46,10 +46,12 @@ async function getBaiduAccessToken(apiKey, secretKey) {
 }
 
 // 辅助方法：发送统一的错误响应信封
-function sendError(res, status, message) {
+function sendError(res, status, code, message, details) {
   return res.status(status).json({
     success: false,
-    error: message
+    error: message,
+    code,
+    ...(details ? { details } : {})
   });
 }
 
@@ -70,15 +72,15 @@ async function handleOcr(req, res) {
 
   // 1. 参数校验
   if (provider !== 'baidu') {
-    return sendError(res, 400, '当前接口仅支持百度 OCR 专属 API 中转。');
+    return sendError(res, 400, 'INVALID_PROVIDER', '当前接口仅支持百度 OCR 专属 API 中转。');
   }
 
   if (!baiduApiKey || !baiduSecretKey) {
-    return sendError(res, 400, '缺少百度的 API Key 或 Secret Key 配置，请在高级分配页面的 OCR 卡片中进行配置。');
+    return sendError(res, 400, 'MISSING_CREDENTIALS', '缺少百度的 API Key 或 Secret Key 配置，请在高级分配页面的 OCR 卡片中进行配置。');
   }
 
   if (!fileBase64) {
-    return sendError(res, 400, '请求体中缺少 fileBase64 文件数据。');
+    return sendError(res, 400, 'MISSING_PAYLOAD', '请求体中缺少 fileBase64 文件数据。');
   }
 
   try {
@@ -115,14 +117,25 @@ async function handleOcr(req, res) {
     if (!ocrResponse.ok) {
       const status = ocrResponse.status;
       const errorText = await ocrResponse.text();
-      return sendError(res, status, `调用百度 OCR 接口失败: HTTP ${status} - ${errorText}`);
+      return sendError(
+        res,
+        status,
+        'BAIDU_API_HTTP_ERROR',
+        `调用百度 OCR 接口失败: HTTP ${status} - ${errorText}`
+      );
     }
 
     const ocrData = await ocrResponse.json();
 
     // 5. 校验百度接口返回的业务错误
     if (ocrData.error_code) {
-      return sendError(res, 400, `百度云 OCR 服务返回错误 [${ocrData.error_code}]: ${ocrData.error_msg}`);
+      return sendError(
+        res,
+        400,
+        'BAIDU_API_BUSINESS_ERROR',
+        `百度云 OCR 服务返回错误 [${ocrData.error_code}]: ${ocrData.error_msg}`,
+        { errorCode: ocrData.error_code }
+      );
     }
 
     // 6. 提取拼接文字并返回
@@ -134,7 +147,7 @@ async function handleOcr(req, res) {
 
   } catch (error) {
     console.error('[ocr-route] 百度 OCR 代理过程出错:', error);
-    return sendError(res, 500, `后端 OCR 中转异常: ${error.message}`);
+    return sendError(res, 500, 'INTERNAL_SERVER_ERROR', `后端 OCR 中转异常: ${error.message}`);
   }
 }
 

@@ -551,7 +551,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run verify:changes` 100% 成功通过。
 
-## 36. 2026-06-25 - Standardize Backend API Error Responses and Fix Route Comments (本次追加)
+
+## 36. 2026-06-25 - Sprint 7: Multimodal Route Protection and Play Exclusivity (本次追加)
+- **修改范围**：
+  1. 多模态路由拦截预警：在 `ChatSidebar.tsx` 对话发送前进行了多模态能力的预检。对于不具备 Vision 特征的模型配合图片或视频附件的发送，进行硬性拦截并 Toast 报错预警，避免了不匹配的 API 调用。
+  2. 注册与测试工具别名：在 `ToolRegistry.ts` 中将系统内置的 `provider.getModelCapabilities` 能力映射为别名 `getModelCapabilities`，并在 `ai-assistant-tool-registry.test.ts` 中补全了完整的对该工具能力校验的单元测试（且对齐了 `multimodal` 属性）。
+  3. 音频排他性播放控制：在 `ImageCard2.tsx` 中新增对 `audioRef` 的绑定，在 React 生命周期（useEffect）中对全局 `__KK_AUDIO_BROKER__` 进行 register/unregister。在原生 `<audio>` 的 `onPlay` 周期触发 `pauseAllExcept`，彻底防止了多音频卡片的并播与叠音问题。
+- **修改文件**：
+  - [ChatSidebar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/ChatSidebar.tsx)
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+  - [ToolRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts)
+  - [ai-assistant-tool-registry.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/ai-assistant-tool-registry.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **拦截机制**：在 React 发送回调前端进行拦截，能最大程度保障积分 credit 不被扣除，同时保留用户已经输入好的提示词及附件，提供优质的改错与引导体验。
+  - **原生 Audio 钩子**：直接利用 HTMLAudioElement 对象的原生 `onPlay` 监听不仅支持用户直接点击触发，还支持 AI 助手或程序自动播放的仲裁，达成高内聚、零旁路的音频状态排他管理。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 成功通过。
+  - 运行原生 Node 测试 `node --import ./scripts/test/set-log-level.mjs --test tests/unit/ai-assistant-tool-registry.test.ts` 所有 20 个测试用例 100% 成功通过。
+
+
+## 37. 2026-06-25 - Standardize Backend API Error Responses and Fix Route Comments (本次追加)
 - **修改范围**：修复了 `generate-v1.js` 中因冲突合并导致的头部注释与模块导入拼写隐患；同时对 `provider-probe.js` 路由的错误抛出模式进行了标准化重构，统一接入 `sendError` 并输出规范化的 API 异常结构。
 - **修改文件**：
   - [generate-v1.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/generate-v1.js)
@@ -559,10 +579,24 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
   - **拼写纠偏**：修复 `generate-v1.js` 开头因拼写错误导致将 `const express = require('express')` 错误混入注释的问题，消除后端的运行期引用崩溃风险。
-  - **DTO 信封收拢**：在 `provider-probe.js` 引入标准化 `sendError` 拦截函数，替代原先散落在路由各处的 `res.status().json({ error: ... })` 的原生表达。这样，报错响应的 DTO 被规范统一，极大地提高了接口返回数据对于前端对接与调试的友好度。
+  - **DTO 信封收拢**：在 `provider-probe.js` 引入标准化 `sendError` 拦截函数，替代原先散落在路由各处的 `res.status().json({ error: ... })` 的原生表达。这样，报错响应 of DTO 被规范统一，极大地提高了接口返回数据对于前端对接与调试的友好度。
 - **已运行验证**：
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run test:unit` 全套 1601 个测试用例均 100% 成功通过。
+
+## 38. 2026-06-25 - Standardize Backend OCR DTO and Resolve ChatSidebar Type Check (本次追加)
+- **修改范围**：重构了 `ocr.js` 错误抛出的格式并统一使用标准的 `sendError`，规范化后端 OCR 中转的 DTO 信封；同时修复并消除了 `ChatSidebar.tsx` 中因 `isVision` 字段缺失导致的编译阻断错误，为模型 Vision 能力检测提供了健壮的推导逻辑与类型支持。
+- **修改文件**：
+  - [ocr.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/ocr.js)
+  - [ChatSidebar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/ChatSidebar.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **OCR 统一错误码**：在 `ocr.js` 的 `sendError` 中增加了 `code` 字段，将原先的参数校验、证书缺失、百度接口异常和内部服务错误映射为专用的错误码（如 `INVALID_PROVIDER`, `MISSING_CREDENTIALS`, `BAIDU_API_HTTP_ERROR`），以便于前后端一致性排障。
+  - **多模态检测增强与自愈**：通过在 `ChatModel` 接口中显式补全可选的 `isVision?: boolean` 定义来修复 TS2339 编译错误；同时在 `buildAvailableChatModels` 迭代中根据模型的 `type === 'image+chat'` 以及常见的大模型特征词（`gpt-4o`, `gemini-2.0`, `claude-3-5`等）动态推导该属性值，彻底闭环了多模态图片/视频附件发送的预检逻辑。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run test:unit` 全套 1602 个单元测试全部 100% 成功通过。
+
 
 
 

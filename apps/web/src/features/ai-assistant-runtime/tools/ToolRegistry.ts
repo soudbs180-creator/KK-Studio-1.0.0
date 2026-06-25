@@ -148,7 +148,6 @@ import { knowledgeTools } from './knowledgeTools.ts';
 import { uiTools } from './uiTools.ts';
 import { skillTools } from './skillTools.ts';
 import { browserTools } from './browserTools.ts';
-
 // 注册所有导入的工具
 [
   ...canvasTools,
@@ -199,6 +198,7 @@ toolRegistryInstance.registerAlias('generation.cancelJob', 'cancelBatchGeneratio
 toolRegistryInstance.registerAlias('generation.submitComposer', 'submitPromptComposer');
 toolRegistryInstance.registerAlias('prompt.fillPrompt', 'fillPrompt');
 toolRegistryInstance.registerAlias('prompt.optimizeInput', 'fillInputPrompt');
+toolRegistryInstance.registerAlias('getModelCapabilities', 'provider.getModelCapabilities');
 
 // 导出兼容旧的大模型工具结构
 export const TOOL_REGISTRY = toolRegistryInstance.getAllTools().map(t => ({
