@@ -195,6 +195,85 @@ export const uiTools: AgentToolDefinition[] = [
     }
   },
 
+  // 2.5. navigateToSurface - 顶级页面表面切换跳转
+  {
+    name: 'ui.navigateToSurface',
+    description: '辅助用户智能跳转切换至不同顶级工作表面，如主画布、素材库、收藏夹、个人中心、后台管理等',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        surface: { 
+          type: 'string', 
+          enum: ['workspace', 'library', 'favorites', 'profile', 'settings', 'admin'],
+          description: '目标切换页面' 
+        }
+      },
+      required: ['surface']
+    },
+    handler: async (input: { surface: string }, ctx) => {
+      const { surface } = input;
+      const { 
+        focusWorkspace, 
+        openLibrarySurface, 
+        openFavoritesSurface, 
+        openProfileSurface, 
+        onOpenSettings,
+        notify 
+      } = ctx;
+
+      switch (surface) {
+        case 'workspace':
+          if (focusWorkspace) {
+            focusWorkspace();
+            notify.success('已为您跳转至主画布工作区', '');
+          } else {
+            notify.warning('无法执行画布跳转');
+          }
+          break;
+        case 'library':
+          if (openLibrarySurface) {
+            openLibrarySurface();
+            notify.success('已为您打开素材库', '');
+          } else {
+            notify.warning('无法执行素材库跳转');
+          }
+          break;
+        case 'favorites':
+          if (openFavoritesSurface) {
+            openFavoritesSurface();
+            notify.success('已为您打开收藏夹', '');
+          } else {
+            notify.warning('无法执行收藏夹跳转');
+          }
+          break;
+        case 'profile':
+          if (openProfileSurface) {
+            openProfileSurface('main');
+            notify.success('已为您打开个人中心', '');
+          } else {
+            notify.warning('无法执行个人中心跳转');
+          }
+          break;
+        case 'settings':
+          if (onOpenSettings) {
+            onOpenSettings('dashboard');
+            notify.success('已为您打开系统设置', '');
+          } else {
+            notify.warning('无法执行设置跳转');
+          }
+          break;
+        case 'admin':
+          window.history.pushState(null, '', '/admin');
+          window.dispatchEvent(new CustomEvent('kk-app-locationchange'));
+          notify.success('已为您跳转到后台管理页面', '');
+          break;
+        default:
+          notify.warning(`未知的跳转表面: ${surface}`);
+      }
+    }
+  },
+
   // 3. fillInputPrompt - 填充提示词输入框
   {
     name: 'fillInputPrompt',

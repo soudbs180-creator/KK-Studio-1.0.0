@@ -191,6 +191,7 @@ toolRegistryInstance.registerAlias('canvas.locateNodes', 'locateCard');
 toolRegistryInstance.registerAlias('ui.highlightElement', 'highlightElement');
 toolRegistryInstance.registerAlias('ui.locateApiCard', 'locateApiCard');
 toolRegistryInstance.registerAlias('ui.openSettings', 'openSettings');
+toolRegistryInstance.registerAlias('navigateToSurface', 'ui.navigateToSurface');
 toolRegistryInstance.registerAlias('assets.zipOriginals', 'zipOutputs');
 toolRegistryInstance.registerAlias('generation.start', 'startGeneration');
 toolRegistryInstance.registerAlias('generation.createBatchJob', 'startBatchGeneration');

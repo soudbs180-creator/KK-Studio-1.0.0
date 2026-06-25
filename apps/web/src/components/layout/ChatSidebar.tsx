@@ -74,6 +74,10 @@ interface ChatSidebarProps {
     onClose?: () => void;
     isMobile: boolean;
     onOpenSettings?: (view?: SettingsSurfaceView) => void;
+    openLibrarySurface?: () => void;
+    openFavoritesSurface?: () => void;
+    openProfileSurface?: (view?: any) => void;
+    focusWorkspace?: () => void;
     onHoverChange?: (isHovered: boolean) => void; // 通知父组件hover状态变化
     onWidthChange?: (width: number) => void;
     config?: any;
@@ -986,6 +990,18 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             }, 100);
         } else if (url === 'action://open-recharge') {
             setShowRechargeModal(true);
+        } else if (url === 'action://open-library') {
+            if (props.openLibrarySurface) props.openLibrarySurface();
+        } else if (url === 'action://open-favorites') {
+            if (props.openFavoritesSurface) props.openFavoritesSurface();
+        } else if (url === 'action://open-profile') {
+            if (props.openProfileSurface) props.openProfileSurface('main');
+        } else if (url === 'action://open-workspace') {
+            if (props.focusWorkspace) props.focusWorkspace();
+        } else if (url === 'action://open-admin') {
+            window.history.pushState(null, '', '/admin');
+            window.dispatchEvent(new CustomEvent('kk-app-locationchange'));
+            notify.success('正在为您跳转到后台管理页面', '');
         } else if (url === 'action://open-settings-logs') {
             if (onOpenSettings) onOpenSettings('system-logs');
         } else if (url === 'action://open-settings-api') {
@@ -4502,6 +4518,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             selectNodes={selectNodes}
             setConfig={props.setConfig || (() => {})}
             onOpenSettings={props.onOpenSettings}
+            openLibrarySurface={props.openLibrarySurface}
+            openFavoritesSurface={props.openFavoritesSurface}
+            openProfileSurface={props.openProfileSurface}
+            focusWorkspace={props.focusWorkspace}
             apiKeyStatus={apiKeyStatus}
             balance={balance}
             notify={notify}

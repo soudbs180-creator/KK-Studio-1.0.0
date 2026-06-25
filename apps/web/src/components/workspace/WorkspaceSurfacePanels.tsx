@@ -16,6 +16,9 @@ interface WorkspaceSurfacePanelsProps {
   setIsChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isMobile: boolean;
   openSettingsSurface: (view?: SettingsSurfaceView) => void;
+  openLibrarySurface: () => void;
+  openFavoritesSurface: () => void;
+  openProfileSurface: (view?: any) => void;
   setIsSidebarHovered: (isHovered: boolean) => void;
   setChatSidebarWidth: (width: number) => void;
   workspaceSurface: Extract<AppSurface, 'workspace' | 'library' | 'favorites'>;
@@ -40,6 +43,9 @@ export function WorkspaceSurfacePanels({
   setIsChatOpen,
   isMobile,
   openSettingsSurface,
+  openLibrarySurface,
+  openFavoritesSurface,
+  openProfileSurface,
   setIsSidebarHovered,
   setChatSidebarWidth,
   workspaceSurface,
@@ -71,6 +77,10 @@ export function WorkspaceSurfacePanels({
               onOpenSettings={(view) => {
                 openSettingsSurface(view || 'api-management');
               }}
+              openLibrarySurface={openLibrarySurface}
+              openFavoritesSurface={openFavoritesSurface}
+              openProfileSurface={openProfileSurface}
+              focusWorkspace={focusWorkspace}
               onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
               onWidthChange={setChatSidebarWidth}
               config={config}

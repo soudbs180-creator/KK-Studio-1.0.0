@@ -90,6 +90,11 @@ export interface UsePptRuntimeDeps {
   updateImageNode: UpdateImageNode;
 }
 
+export interface PptxExportOptions {
+  transitionEnabled?: boolean;
+  transitionEffects?: string[];
+}
+
 export interface UsePptRuntimeResult {
   showNoPptPagesWarning: () => void;
   parsePptOutlineLine: (raw?: string) => PptOutlineLineParts;
@@ -104,8 +109,8 @@ export interface UsePptRuntimeResult {
   resolvePptExportImageAsset: (image: GeneratedImage) => Promise<{ blob: Blob; ext: 'png' | 'jpg'; mime: 'image/png' | 'image/jpeg' }>;
   renderPptEditablePagePreviewBlob: (page: PptEditablePage, imageById: Map<string, GeneratedImage>) => Promise<Blob>;
   handleExportPptPackageEditable: (node: PromptNode) => Promise<void>;
-  handleExportPptxEditable: (node: PromptNode) => Promise<void>;
-  handleExportPptx: (node: PromptNode) => Promise<void>;
+  handleExportPptxEditable: (node: PromptNode, options?: PptxExportOptions) => Promise<void>;
+  handleExportPptx: (node: PromptNode, options?: PptxExportOptions) => Promise<void>;
   handleExportPptPackage: (node: PromptNode) => Promise<void>;
   handleDownloadPptComposite: (imageId: string) => Promise<void>;
   handleExportPptSinglePage: (node: PromptNode, pageIndex: number) => Promise<void>;
@@ -605,9 +610,31 @@ export function usePptRuntime({
     sanitizePptFileSegment,
   ]);
 
-  const handleExportPptxEditable = useCallback(async (node: PromptNode): Promise<void> => {
+  const handleExportPptxEditable = useCallback(async (node: PromptNode, options?: PptxExportOptions): Promise<void> => {
     const exportBundle = requirePptEditableExportBundle(node);
     if (!exportBundle) return;
+
+    const getTransitionXml = (effect: string): string => {
+      const transitions: Record<string, string> = {
+        fade: '<p:fade/>',
+        page_turn: '<p:cover dir="l"/>',
+        push: '<p:push dir="l"/>',
+        wipe: '<p:wipe dir="l"/>',
+        split: '<p:split orient="horz" dir="out"/>',
+        blinds: '<p:blinds dir="vert"/>',
+        checker: '<p:checker dir="horz"/>',
+        wheel: '<p:wheel spokes="1"/>',
+      };
+      const child = transitions[effect];
+      if (!child) return '';
+      return `<p:transition spd="med">${child}</p:transition>`;
+    };
+
+    const validEffects = (options?.transitionEffects || []).filter((e) => [
+      'fade', 'page_turn', 'push', 'wipe', 'split', 'blinds', 'checker', 'wheel'
+    ].includes(e));
+
+    let effectQueue: string[] = [];
 
     const { promptNode, pages, imageById } = exportBundle;
     const slideWidth = 12192000;
@@ -760,8 +787,21 @@ ${paragraphs}
         `<Relationship Id="rId${nextRelationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>`,
       );
 
+      let transitionXml = '';
+      if (options?.transitionEnabled && validEffects.length > 0) {
+        if (effectQueue.length === 0) {
+          effectQueue = [...validEffects];
+          effectQueue.sort(() => Math.random() - 0.5);
+        }
+        const activeEffect = effectQueue.pop();
+        if (activeEffect) {
+          transitionXml = getTransitionXml(activeEffect);
+        }
+      }
+
       zip.file(`ppt/slides/slide${slideIndex + 1}.xml`, buildPptxSlideXml({
         bodyXml: slideLayerXml.join('\n'),
+        transitionXml,
       }));
 
       zip.file(`ppt/slides/_rels/slide${slideIndex + 1}.xml.rels`, buildPptxSlideRelationshipsXml(slideRelationships));
@@ -775,8 +815,30 @@ ${paragraphs}
     });
   }, [requirePptEditableExportBundle, resolvePptExportImageAsset]);
 
-  const handleExportPptx = useCallback(async (node: PromptNode): Promise<void> => {
+  const handleExportPptx = useCallback(async (node: PromptNode, options?: PptxExportOptions): Promise<void> => {
     if (node.mode !== GenerationMode.PPT) return;
+
+    const getTransitionXml = (effect: string): string => {
+      const transitions: Record<string, string> = {
+        fade: '<p:fade/>',
+        page_turn: '<p:cover dir="l"/>',
+        push: '<p:push dir="l"/>',
+        wipe: '<p:wipe dir="l"/>',
+        split: '<p:split orient="horz" dir="out"/>',
+        blinds: '<p:blinds dir="vert"/>',
+        checker: '<p:checker dir="horz"/>',
+        wheel: '<p:wheel spokes="1"/>',
+      };
+      const child = transitions[effect];
+      if (!child) return '';
+      return `<p:transition spd="med">${child}</p:transition>`;
+    };
+
+    const validEffects = (options?.transitionEffects || []).filter((e) => [
+      'fade', 'page_turn', 'push', 'wipe', 'split', 'blinds', 'checker', 'wheel'
+    ].includes(e));
+
+    let effectQueue: string[] = [];
 
     const bundle = getOrderedPptNodeBundle(node);
     const ordered = bundle?.images.slice(0, 20) || [];
@@ -814,6 +876,18 @@ ${paragraphs}
       const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
       const mediaPath = `ppt/media/image${i + 1}.${ext}`;
       zip.file(mediaPath, blob);
+
+      let transitionXml = '';
+      if (options?.transitionEnabled && validEffects.length > 0) {
+        if (effectQueue.length === 0) {
+          effectQueue = [...validEffects];
+          effectQueue.sort(() => Math.random() - 0.5);
+        }
+        const activeEffect = effectQueue.pop();
+        if (activeEffect) {
+          transitionXml = getTransitionXml(activeEffect);
+        }
+      }
 
       zip.file(`ppt/slides/slide${i + 1}.xml`, buildPptxSlideXml({
         bodyXml: `      <p:pic>
@@ -880,6 +954,7 @@ ${paragraphs}
         </p:txBody>
       </p:sp>` : ''}
 `,
+        transitionXml,
       }));
 
       zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, buildPptxSlideRelationshipsXml([

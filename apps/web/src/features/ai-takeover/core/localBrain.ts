@@ -20,6 +20,15 @@ const SETTINGS_VIEW_LABELS: Record<string, string> = {
   'project-manager': '工程管理'
 };
 
+const SURFACE_LABELS: Record<string, string> = {
+  workspace: '主画布工作区',
+  library: '素材库',
+  favorites: '收藏夹',
+  profile: '个人中心',
+  settings: '系统设置',
+  admin: '后台管理页面'
+};
+
 export class LocalAssistantBrain {
   async plan(userInput: string, context: SanitizedProjectContext): Promise<AssistantPlan> {
     const intentResult = analyzeIntent(userInput, context);
@@ -213,6 +222,23 @@ ${optResult.optimizedPromptZh}
         actions.push({
           type: 'openSettings',
           payload: { tab: 'system-logs' }
+        });
+        break;
+      }
+
+      case 'navigate_to_surface': {
+        const surface = intentResult.extracted.surface || 'workspace';
+        const label = SURFACE_LABELS[surface] || '工作区';
+        let actionUrl = `action://open-${surface}`;
+        if (surface === 'workspace') actionUrl = 'action://open-workspace';
+
+        reply = `### 🌐 正在为您跳转至${label}
+这是本地安全跳转，我会直接调用页面导航控制器，不需要先配置模型。
+您也可以手动点击 👉 [立即跳转到${label}](${actionUrl}) 快速切换。`;
+
+        actions.push({
+          type: 'ui.navigateToSurface',
+          payload: { surface }
         });
         break;
       }

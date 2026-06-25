@@ -74,8 +74,8 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   assert.match(hookSource, /resolvePptExportImageAsset: \(image: GeneratedImage\) => Promise<\{ blob: Blob; ext: 'png' \| 'jpg'; mime: 'image\/png' \| 'image\/jpeg' \}>;/);
   assert.match(hookSource, /renderPptEditablePagePreviewBlob: \(page: PptEditablePage, imageById: Map<string, GeneratedImage>\) => Promise<Blob>;/);
   assert.match(hookSource, /handleExportPptPackageEditable: \(node: PromptNode\) => Promise<void>;/);
-  assert.match(hookSource, /handleExportPptxEditable: \(node: PromptNode\) => Promise<void>;/);
-  assert.match(hookSource, /handleExportPptx: \(node: PromptNode\) => Promise<void>;/);
+  assert.match(hookSource, /handleExportPptxEditable: \(node: PromptNode, options\?: PptxExportOptions\) => Promise<void>;/);
+  assert.match(hookSource, /handleExportPptx: \(node: PromptNode, options\?: PptxExportOptions\) => Promise<void>;/);
   assert.match(hookSource, /handleExportPptPackage: \(node: PromptNode\) => Promise<void>;/);
   assert.match(hookSource, /handleSavePptEditablePages: \(nodeId: string, pages: PptEditablePage\[\]\) => void;/);
   assert.match(hookSource, /handleExportPptSinglePage: \(node: PromptNode, pageIndex: number\) => Promise<void>;/);
@@ -138,12 +138,12 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   assert.match(hookSource, /zip\.file\('outline\/slides-preview\.html', slidesHtml\);/);
   assert.match(hookSource, /const slidesHtml = buildPptSlidesPreviewHtml\(\{/);
   assert.match(hookSource, /await saveBlobAs\(blob, `ppt-editable-package-\$\{Date\.now\(\)\}\.zip`\);/);
-  assert.match(hookSource, /const handleExportPptxEditable = useCallback\(async \(node: PromptNode\): Promise<void> => \{/);
+  assert.match(hookSource, /const handleExportPptxEditable = useCallback\(async \(node: PromptNode, options\?: PptxExportOptions\): Promise<void> => \{/);
   assert.match(hookSource, /writePptxPackageSkeleton\(\{/);
   assert.match(hookSource, /buildPptxSlideXml\(\{/);
   assert.match(hookSource, /buildPptxSlideRelationshipsXml\(/);
   assert.match(hookSource, /await saveBlobAs\(pptxBlob, `ppt-layered-\$\{Date\.now\(\)\}\.pptx`\);/);
-  assert.match(hookSource, /const handleExportPptx = useCallback\(async \(node: PromptNode\): Promise<void> => \{/);
+  assert.match(hookSource, /const handleExportPptx = useCallback\(async \(node: PromptNode, options\?: PptxExportOptions\): Promise<void> => \{/);
   assert.match(hookSource, /const bundle = getOrderedPptNodeBundle\(node\);/);
   assert.match(hookSource, /const ordered = bundle\?\.images\.slice\(0, 20\) \|\| \[\];/);
   assert.match(hookSource, /const promptNode = bundle\?\.promptNode \|\| node;/);

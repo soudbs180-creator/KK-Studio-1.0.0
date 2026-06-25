@@ -57,6 +57,38 @@ function resolveQuickSettingsRoute(input: string): { view: string; label: string
   return matched ? { view: matched.view, label: matched.label } : null;
 }
 
+const topSurfaces = [
+  {
+    surface: 'workspace',
+    label: '主画布工作区',
+    pattern: /主页|首页|画布|工作区|主工作区|返回工作区|画板|返回画布|workspace|canvas/
+  },
+  {
+    surface: 'library',
+    label: '素材库',
+    pattern: /素材库|资源库|历史库|我的图片|历史图片|图片库|库|library/
+  },
+  {
+    surface: 'favorites',
+    label: '收藏夹',
+    pattern: /收藏夹|我的收藏|收藏|favorites|favorite/
+  },
+  {
+    surface: 'admin',
+    label: '后台管理',
+    pattern: /后台管理|管理员后台|后台|管理员面板|admin/
+  }
+] as const;
+
+function resolveTopSurfaceRoute(input: string): { surface: string; label: string } | null {
+  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去|切换|切换到/.test(input);
+  if (!isNavigationRequest) return null;
+
+  const matched = topSurfaces.find(route => route.pattern.test(input));
+  return matched ? { surface: matched.surface, label: matched.label } : null;
+}
+
+
 function extractSimpleGeneratePrompt(input: string): string {
   return input
     .replace(/^(请|麻烦|帮我|请帮我|麻烦帮我|给我|我要|我想要)\s*/g, '')
@@ -327,6 +359,21 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       risk: 'none',
       needsConfirmation: false,
       reason: '匹配到查看或打开系统日志的指示。'
+    };
+  }
+
+  // 6.1. 顶级页面/表面快速跳转
+  const topSurfaceRoute = resolveTopSurfaceRoute(lowerInput);
+  if (topSurfaceRoute) {
+    return {
+      intent: 'navigate_to_surface',
+      confidence: 0.95,
+      extracted: {
+        surface: topSurfaceRoute.surface
+      },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: `匹配到快速跳转顶级工作区页面：${topSurfaceRoute.label}。`
     };
   }
 

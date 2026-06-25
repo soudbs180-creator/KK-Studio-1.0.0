@@ -40,6 +40,7 @@ export type AssistantIntent =
   | 'browser_write_back_dom'       // 通过 Browser Bridge 回写外部网页 DOM
   | 'arrange_nodes'                // 整理卡片/排版布局
   | 'retry_generation_job'         // 重试失败的持久化批量生成任务
+  | 'navigate_to_surface'          // 跳转/导航到画板、库或收藏夹页面
   | 'unknown';
 
 // 意图分析结果
@@ -65,6 +66,7 @@ export interface IntentResult {
     aspectRatio?: AspectRatio | string;
     layoutPreset?: AssistantBatchLayoutPreset;
     outputGroup?: AssistantOutputGroupPlan;
+    surface?: 'workspace' | 'library' | 'favorites' | string;
   };
   risk: 'none' | 'low' | 'cost' | 'upload' | 'destructive';
   needsConfirmation: boolean;      // 是否需要强确认卡片
@@ -99,7 +101,8 @@ export type AssistantAction =
   | { type: 'browser.inspectPage'; payload: { target?: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } }
   | { type: 'browser.openDesktopProject'; payload: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string } }
   | { type: 'browser.checkLocalLlm'; payload: { provider?: string; endpoint?: string; model?: string } }
-  | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } };
+  | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } }
+  | { type: 'ui.navigateToSurface'; payload: { surface: string } };
 
 // 执行计划
 export interface AssistantPlan {

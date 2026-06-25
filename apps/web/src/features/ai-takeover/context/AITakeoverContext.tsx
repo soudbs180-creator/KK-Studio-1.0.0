@@ -73,6 +73,10 @@ interface AITakeoverProviderProps {
   selectNodes?: (ids: string[], mode?: any) => void;
   setConfig: React.Dispatch<React.SetStateAction<any>>;
   onOpenSettings?: (view?: any) => void;
+  openLibrarySurface?: () => void;
+  openFavoritesSurface?: () => void;
+  openProfileSurface?: (view?: any) => void;
+  focusWorkspace?: () => void;
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
   balance: number;
   notify: any;
@@ -100,6 +104,10 @@ export function AITakeoverProvider({
   selectNodes,
   setConfig,
   onOpenSettings,
+  openLibrarySurface,
+  openFavoritesSurface,
+  openProfileSurface,
+  focusWorkspace,
   apiKeyStatus,
   balance,
   notify,
@@ -246,6 +254,10 @@ export function AITakeoverProvider({
       selectNodes: selectNodesRef.current,
       setConfig,
       onOpenSettings,
+      openLibrarySurface,
+      openFavoritesSurface,
+      openProfileSurface,
+      focusWorkspace,
       notify,
       config,
       ecommerceState,
@@ -258,7 +270,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate]);
 
 
   // 发送消息

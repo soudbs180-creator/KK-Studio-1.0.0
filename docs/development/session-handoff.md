@@ -491,8 +491,35 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **当前设计决策**：
   - 依照 customizations 的 Skills 定义，重构了排版、下载原图、批量出图、队列恢复等 5 个画布控制和自愈核心技能，使用标准 YAML frontmatter（包含 `name` 和 `description`），供 Agent 自动触发并运行时热插拔加载，实现 AI 交互进化。
 - **已运行验证**：
-  - 运行 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run governance:check` 100% 成功通过.
+  - 运行 `npm run architecture:check` 100% 成功通过.
+
+## 33. 2026-06-25 - Implement Navigation Control and Smart 跳转 for AI Assistant (本次追加)
+- **修改范围**：打通了 AI 助手页面控制与顶级表面切换跳转闭环。当用户通过自然语言提出跳转诉求时，意图层和大脑层能自动映射为顶级导航动作；前端渲染层、接管上下文和工具注册表均完成对接，实现了全自动的“聊天即控制”和富文本 action 链接双向跳转。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [WorkspaceSurfacePanels.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx)
+  - [ChatSidebar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/ChatSidebar.tsx)
+  - [AITakeoverContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx)
+  - [uiTools.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-assistant-runtime/tools/uiTools.ts)
+  - [ToolRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts)
+  - [intentGate.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/core/intentGate.ts)
+  - [localBrain.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/core/localBrain.ts)
+  - [aiTakeover.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/__tests__/aiTakeover.test.ts)
+- **当前设计决策**：
+  - 在 `intentGate.ts` 中新增对素材库、收藏夹、主画布和管理后台等顶级页面的意图正则识别，判定为 `navigate_to_surface` 并提取 surface。
+  - 在 `localBrain.ts` 中将该意图匹配为 `ui.navigateToSurface` 工具动作，同时在聊天中反馈包含 `action://open-library`、`action://open-favorites` 等富文本跳转链接。
+  - 在 `WorkspacePage` 层将 `openLibrarySurface`、`openFavoritesSurface` 等具体 React 切换状态方法逐级通过 props 透传至 `AITakeoverProvider` Context。
+  - 在 `uiTools.ts` 新增 `ui.navigateToSurface` 工具，从 ctx 取出对应的 React 状态切换函数并执行，且为 `/admin` 等页面派发 `kk-app-locationchange` 事件以执行前端路由跳转。
+  - 在 `ToolRegistry.ts` 中注册工具和其对应的别名 `navigateToSurface`。
+  - 在 `aiTakeover.test.ts` 中补齐了对四大顶级表面的自然语言意图判定单元测试。
+- **已运行验证**：
+  - 运行 `npx vitest run apps/web/src/features/ai-takeover/__tests__/aiTakeover.test.ts` 16 个用例 100% 成功通过。
+  - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run architecture:check` 100% 成功通过。
+  - 运行 `npm run governance:check` 100% 成功通过，Skills 规约比对完全对齐。
+  - 运行 `npm run build` 100% 成功通过，前端打包无任何异常。
+
 
 
 

@@ -1,8 +1,9 @@
 interface BuildPptxSlideXmlArgs {
   bodyXml: string;
+  transitionXml?: string;
 }
 
-export function buildPptxSlideXml({ bodyXml }: BuildPptxSlideXmlArgs): string {
+export function buildPptxSlideXml({ bodyXml, transitionXml = '' }: BuildPptxSlideXmlArgs): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
   <p:cSld>
@@ -19,7 +20,7 @@ export function buildPptxSlideXml({ bodyXml }: BuildPptxSlideXmlArgs): string {
 ${bodyXml}
     </p:spTree>
   </p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml ? `\n  ${transitionXml}` : ''}
 </p:sld>`;
 }
 

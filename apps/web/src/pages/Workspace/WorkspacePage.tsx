@@ -278,7 +278,7 @@ import { resolveAppRootMode } from '../../app/navigation/appRootNavigation';
 import { getStorageMode, isMobileDevice } from '../../services/storage/storagePreference';
 import type { UserProfileView } from '../../components/modals/UserProfileModal';
 import { useAuth } from '../../context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { BillingProvider, useBilling } from '../../context/BillingContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import {
@@ -656,6 +656,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [pptStackPreview, setPptStackPreview] = useState<{ images: GeneratedImage[]; initialIndex: number } | null>(null);
   const [pptDeckEditor, setPptDeckEditor] = useState<{ nodeId: string; initialIndex: number } | null>(null);
   const [showMigrateModal, setShowMigrateModal] = useState(false); // 迁移弹窗状态
+  const [exportPptxNode, setExportPptxNode] = useState<PromptNode | null>(null);
+  const [showPptxExportDialog, setShowPptxExportDialog] = useState(false);
+  const [pptxTransitionsEnabled, setPptxTransitionsEnabled] = useState(false);
+  const [pptxTransitionEffects, setPptxTransitionEffects] = useState<string[]>(['fade']);
   const {
     buildPptPageAlias,
     getOrderedPptNodeBundle,
@@ -1917,6 +1921,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     activeAppSurface,
     activeWorkspacePanel,
     focusWorkspace,
+    openLibrarySurface,
     openFavoritesSurface,
     toggleChatPanel,
     openProfileSurface,
@@ -2884,7 +2889,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
     onRetry: handleRetryNode,
     onEditPptDeck: handleOpenPptDeckEditor,
     onExportPpt: handleExportPptPackageEditable,
-    onExportPptx: handleExportPptxEditable,
+    onExportPptx: (targetNode) => {
+      setExportPptxNode(targetNode);
+      setShowPptxExportDialog(true);
+    },
     onRetryPptPage: handleRetryPptSinglePage,
     onExportPptPage: handleExportPptSinglePage,
     onToggleEcommerceSelected: handleToggleEcommerceSelected,
@@ -4889,6 +4897,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
       setIsChatOpen={setIsChatOpen}
       isMobile={isMobile}
       openSettingsSurface={openSettingsSurfaceTracked}
+      openLibrarySurface={openLibrarySurface}
+      openFavoritesSurface={openFavoritesSurface}
+      openProfileSurface={openProfileSurface}
       setIsSidebarHovered={setIsSidebarHovered}
       setChatSidebarWidth={setChatSidebarWidth}
       workspaceSurface={workspaceSurface}
@@ -5777,6 +5788,120 @@ export const AppContent: React.FC<AppContentProps> = () => {
         );
       })()} */}
 
+
+      {showPptxExportDialog && exportPptxNode && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={() => setShowPptxExportDialog(false)}>
+          <div 
+            className="w-full max-w-lg mx-4 rounded-3xl border p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 pointer-events-auto"
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--frost-card-framework-bg)',
+              border: '1px solid var(--frost-card-framework-border)',
+              boxShadow: 'var(--frost-card-framework-shadow)',
+            }}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-white">{pickByDocumentLanguage('PPTX 导出切换动画设置', 'PPTX Export Transition Settings')}</h3>
+              <button 
+                onClick={() => setShowPptxExportDialog(false)} 
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mb-5">
+              {pickByDocumentLanguage('开启过渡切换效果，可以让您导出的 PPTX 幻灯片之间拥有更加动感的视觉过渡。', 'Enable transition effects to give your exported PPTX slides dynamic visual flows.')}
+            </p>
+
+            <div className="space-y-5">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-2xl hover:bg-white/5 transition-colors border border-white/5 bg-white/2">
+                <input
+                  type="checkbox"
+                  checked={pptxTransitionsEnabled}
+                  onChange={e => setPptxTransitionsEnabled(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-white/20 bg-black/40 text-sky-500 focus:ring-sky-500"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-white/90">{pickByDocumentLanguage('启用幻灯片页面切换过渡效果', 'Enable Slide Transition Effects')}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">{pickByDocumentLanguage('开启后，每页幻灯片之间将会自动轮播应用选中的效果', 'Once enabled, selected effects will automatically cycle through slide pages')}</div>
+                </div>
+              </label>
+
+              {pptxTransitionsEnabled && (
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-400 font-medium px-1">{pickByDocumentLanguage('选择允许的效果（多选将随机轮播）：', 'Select enabled effects (multiple will cycle randomly):')}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { value: 'fade', label: pickByDocumentLanguage('渐变淡入', 'Fade') },
+                      { value: 'page_turn', label: pickByDocumentLanguage('翻页效果', 'Page Turn') },
+                      { value: 'push', label: pickByDocumentLanguage('平移推进', 'Push') },
+                      { value: 'wipe', label: pickByDocumentLanguage('擦除过渡', 'Wipe') },
+                      { value: 'split', label: pickByDocumentLanguage('水平分割', 'Split') },
+                      { value: 'blinds', label: pickByDocumentLanguage('百叶窗', 'Blinds') },
+                      { value: 'checker', label: pickByDocumentLanguage('棋盘交错', 'Checker') },
+                      { value: 'wheel', label: pickByDocumentLanguage('时钟轮转', 'Wheel') },
+                    ].map(option => {
+                      const checked = pptxTransitionEffects.includes(option.value);
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition-colors ${
+                            checked
+                              ? 'border-sky-500/50 bg-sky-500/10 text-sky-400 font-medium'
+                              : 'border-white/10 hover:bg-white/5 text-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              setPptxTransitionEffects(prev => {
+                                if (e.target.checked) {
+                                  return prev.includes(option.value) ? prev : [...prev, option.value];
+                                }
+                                return prev.filter(effect => effect !== option.value);
+                              });
+                            }}
+                            className="w-3.5 h-3.5 rounded border-white/20 bg-black/40 text-sky-500 focus:ring-sky-500"
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {pptxTransitionEffects.length === 0 && (
+                    <div className="text-[11px] text-rose-400 px-1 mt-1">
+                      {pickByDocumentLanguage('⚠️ 请至少选择一种过渡动画效果', '⚠️ Please select at least one transition effect')}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-white/5">
+              <button
+                onClick={() => setShowPptxExportDialog(false)}
+                className="px-4 py-2 rounded-xl text-xs text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+              >
+                {pickByDocumentLanguage('取消', 'Cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPptxExportDialog(false);
+                  void handleExportPptxEditable(exportPptxNode, {
+                    transitionEnabled: pptxTransitionsEnabled,
+                    transitionEffects: pptxTransitionEffects,
+                  });
+                }}
+                disabled={pptxTransitionsEnabled && pptxTransitionEffects.length === 0}
+                className="px-5 py-2 rounded-xl text-xs bg-sky-500 text-white font-medium hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {pickByDocumentLanguage('开始导出', 'Start Export')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLoading && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">

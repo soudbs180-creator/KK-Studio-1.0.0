@@ -78,6 +78,24 @@ describe('AI 接管单元测试集', () => {
       expect(result.extracted.browserAction).toBe('publish_draft');
       expect(result.needsConfirmation).toBe(true);
     });
+
+    it('跳转顶级表面工作区、素材库、收藏夹或后台管理应映射到 navigate_to_surface', () => {
+      const result1 = analyzeIntent('帮我打开素材库');
+      expect(result1.intent).toBe('navigate_to_surface');
+      expect(result1.extracted.surface).toBe('library');
+
+      const result2 = analyzeIntent('带我去收藏夹');
+      expect(result2.intent).toBe('navigate_to_surface');
+      expect(result2.extracted.surface).toBe('favorites');
+
+      const result3 = analyzeIntent('切换回主画布工作区');
+      expect(result3.intent).toBe('navigate_to_surface');
+      expect(result3.extracted.surface).toBe('workspace');
+
+      const result4 = analyzeIntent('去管理员后台');
+      expect(result4.intent).toBe('navigate_to_surface');
+      expect(result4.extracted.surface).toBe('admin');
+    });
   });
 
   // 2. 提示词预置模板匹配测试
