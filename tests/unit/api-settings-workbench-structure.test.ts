@@ -100,7 +100,6 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const stageSource = readSource('apps/web/src/components/settings/apiWorkbenchState.ts');
   const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
-  const cardsSource = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
   const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
 
   assert.match(viewSource, /from '\.\/apiWorkbenchState';/);
@@ -126,7 +125,6 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(sectionsSource, /className="min-w-0 flex-1 space-y-2 text-left"/);
   assert.doesNotMatch(sectionsSource, /label=\{pick\('[^']*', 'Stage'\)/);
   assert.doesNotMatch(sectionsSource, /testId="settings-workbench-current-view"[\s\S]*rounded-\[24px\] border p-4/);
-  assert.match(cardsSource, /export const ConsoleEndpointCard/);
 
   assert.doesNotMatch(viewSource, /const InfoCell:/);
   assert.doesNotMatch(viewSource, /const PlatformAssistantEntryCard:/);

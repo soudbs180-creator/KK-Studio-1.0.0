@@ -1,7 +1,6 @@
 
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
-import UpdateNotification from '../common/UpdateNotification';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import {
     getCanvasDeviceTier,
@@ -1121,14 +1120,6 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                     }}
                 >
                     {children}
-                </div>
-            </div>
-
-            {/* UILayer - 承载不受视口变换影响的同级浮动 UI */}
-            <div className="canvas-ui-layer pointer-events-none absolute inset-0 z-10">
-                {/* 简体中文：画布更新通知悬浮框 - 依然保留在左下角绝对定位，向上偏移避开缩放卡片和版本号卡片 */}
-                <div className="absolute bottom-[285px] left-4 z-50 select-none pointer-events-auto">
-                    <UpdateNotification />
                 </div>
             </div>
         </div>

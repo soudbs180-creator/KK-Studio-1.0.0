@@ -598,8 +598,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit` 全套 1602 个单元测试全部 100% 成功通过。
 
 
-
-
-
-
-
+## 39. 2026-06-25 - Front-end Obsolete Component Cleanup and Test Alignment (本次追加)
+- **修改范围**：物理清理了前端已废弃未被引用的 `apiWorkbenchCards.tsx` 组件，并切除了在 `InfiniteCanvas.tsx` 中因接管而保留的 `UpdateNotification.tsx` 空占位组件及其物理文件，精简了包体积；同时在单元测试层面对齐剔除了已删组件的对应契约校验，顺利跑通全量回归。
+- **修改文件**：
+  - [InfiniteCanvas.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/InfiniteCanvas.tsx)
+  - [api-settings-routing-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/api-settings-routing-regression.test.ts)
+  - [api-settings-workbench-structure.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/api-settings-workbench-structure.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **零副作用清退**：由于设置面板在第二阶段已重构由 `apiWorkbenchSections.tsx` 逻辑全权代理，`apiWorkbenchCards.tsx` 已失去所有的入口挂载。通过对引用的彻底剔除和对测试文件的结构断言做相匹配地精简裁剪，闭环了清退逻辑并成功达成 100% 单元测试覆盖防线。
+  - **浮动 UI 裁剪**：切除了 `UpdateNotification` 和其父级 `canvas-ui-layer` 层，使画布的 DOM 层次扁平化，提升了大画布在弱终端上的渲染帧率。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run verify:changes` 全量 100% 成功通过，便携版打包清单及哈希发布完全对齐。

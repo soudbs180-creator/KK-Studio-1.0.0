@@ -31,22 +31,7 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
   assert.ok(createProviderButtonUsages.length >= 1);
 });
 
-test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {
-  const source = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
 
-  assert.match(source, /className="settings-provider-card__header"/);
-  assert.match(source, /className="settings-provider-card__header-main"/);
-  assert.match(source, /className="settings-provider-card__header-side"/);
-});
-
-test('ConsoleEndpointCard keeps the structured metrics layout for scan-friendly cards', () => {
-  const source = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
-
-  assert.match(source, /className="settings-provider-card__metrics"/);
-  assert.ok(source.includes('settings-provider-card__metric'));
-  assert.ok(source.includes('settings-provider-card__metric-value'));
-  assert.ok(source.includes('settings-provider-card__metric-helper'));
-});
 
 test('ApiSettingsView clears stale provider models when the provider connection changes or a refresh returns an empty list', () => {
   const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
