@@ -135,3 +135,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - **风险**：无明显回归风险，交互结束后会自动恢复并刷新，已保证高度一致性。
   - **下一步**：推送代码，并收集用户对本阶段画布在拖拽/缩放时的性能表现反馈。
+
+## 13. 2026-06-25 - Canvas 性能基准测试与 CI 回归防护建设 (本次追加)
+- **修改范围**：构建长效性能防回归机制，在 CI 流程中引入大画布节点下的各项计算耗时预算红线。
+- **修改文件**：
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - [canvas-performance.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/benchmark/canvas-performance.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 编写了专门的性能基准测试 `tests/benchmark/canvas-performance.test.ts`，自动生成含有 20 / 100 / 500 个节点的测试夹具。
+  - 测试了核心空间索引构建与查询、可视区裁剪过滤深度排序、测高和连线批量调度等主要性能热路径在各规模下的计算延迟。
+  - 设置了严格的性能阈值，一旦在 500 节点下超出红线（空间查询 <= 3.0ms，裁剪排序 <= 20.0ms 等），CI 将以 `exit 1` 自动熔断报错。
+  - 在 `package.json` 中定义命令并将其安全接入 `verify:changes` 校验链最末端，完成防回归闭环。
+- **已运行验证**：
+  - 运行 `npm run verify:canvas-performance` 成功通过并打印性能报表。
+  - 运行 `npm run test:unit` 100% 成功通过。
+  - 运行 `npm run typecheck` 100% 成功通过。
+- **风险与下一步**：
+  - **风险**：无回归风险，本基准测试隔离在 `tests/benchmark`，不干扰主代码库和一般单元测试。
+  - **下一步**：推送代码，圆满结束本次画布性能重构。
