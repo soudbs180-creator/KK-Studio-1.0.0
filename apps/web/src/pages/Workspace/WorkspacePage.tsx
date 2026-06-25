@@ -1171,13 +1171,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         if (!active) return;
 
         advanceTo('workspace_ready');
-
-        backgroundReadyTimer = window.setTimeout(() => {
-          if (!active) {
-            return;
-          }
-          advanceTo('background_ready');
-        }, 0);
+        advanceTo('background_ready');
       }
     };
 

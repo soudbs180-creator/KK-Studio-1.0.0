@@ -218,3 +218,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 交付本轮“卡顿优化”与“防回归”闭环成果。
   - 下一步将进入 Phase 4.4 的卡片轻量化与可视降级（Ghost 卡片渲染、高空缩放拦截 ResizeObserver 等）及连接线极致轻量化等体验提升工作。
 
+## 17. 2026-06-25 - 启动预热状态机时序与卡片水合恢复修复
+- **修改范围**：修复画布启动时由于 React 并发重绘触发 useEffect cleanup 导致 `setTimeout` 推进 `background_ready` 被中断的 Bug，杜绝启动状态永久卡在 `workspace_ready`；同步解决因为该状态未就绪导致持久化生成结果水合（canHydratePersistedTaskResults）和后台图片恢复静默失效进而造成卡片数据丢失的隐患。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 在 `WorkspacePage` 的 `init` Effect 里的 `finally` 块中，将推进到 `background_ready` 的逻辑由原来的 `setTimeout` 宏任务异步调用改为与 `workspace_ready` 相同的同步顺序推进，彻底消除 cleanup 执行导致的 timer 取消时序风险。
+  - 维持 `finally` 块中 `if (!active) return;` 前置守护和所有正则匹配契约的完全通过性。
+- **已运行验证**：
+  - 运行 `npm run test`（1596 个用例）100% 成功通过（含 startup coordinator 所有状态转移断言）。
+  - 运行 `npm run build` 打包编译通过。
+- **下一步计划**：
+  - 让用户重新刷新浏览器测试，验证“工作区已可用”Banner 是否能在 200ms 后自动退去，且之前丢失的卡片与图片数据是否能完整恢复。
+
+
