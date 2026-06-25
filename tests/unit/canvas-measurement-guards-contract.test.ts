@@ -67,3 +67,11 @@ test('connector scheduler avoids offsetHeight triggers entirely', () => {
   assert.match(source, /getAttribute\('data-card-height'\)/);
   assert.match(source, /connectorHeightCache/);
 });
+
+test('WorkspacePage short-circuits render items and groups in active transforming/dragging state', () => {
+  const source = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+  assert.match(source, /stableCanvasRenderItemsRef/);
+  assert.match(source, /stableRenderedVisibleGroupsRef/);
+  assert.match(source, /if \(isCanvasTransforming \|\| isNodeDragActive\)/);
+});

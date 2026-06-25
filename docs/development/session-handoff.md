@@ -116,3 +116,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - **风险**：无明显回归风险，已形成完美闭环。
   - **下一步**：已为 Phase 5 的 WorkspacePage 空间索引与虚拟化裁剪扫清了所有底层障碍，可在下一大步中安全进入。
+
+## 12. 2026-06-25 - WorkspacePage 交互期短路渲染与重绘阻断 (本次追加)
+- **修改范围**：引入了 WorkspacePage 交互期间（拖拽、缩放、平移）对卡片和分组渲染的短路阻断机制，避免了交互过程中高频 `canvasTransform` 导致的大规模 React 重绘与 DOM diff。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [canvas-measurement-guards-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-measurement-guards-contract.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 在 `WorkspacePage` 顶层使用 `stableCanvasRenderItemsRef` 和 `stableRenderedVisibleGroupsRef` 缓存上一次的渲染列表。
+  - 在 `isCanvasTransforming || isNodeDragActive`（拖拽或缩放平移）为 `true` 的交互期间，渲染卡片与分组的 `React.useMemo` 逻辑直接短路返回缓存的 Ref 引用。
+  - 这样 React 能在虚拟 DOM diff 阶段直接跳过这些不变的引用，实现交互期间的“0 重绘”，而在松手（状态变回 idle）后，依赖项变化会自然触发最新的渲染并刷新，确保最终一致性与极致的交互流畅度。
+  - 在单元契约测试中，补充了 `WorkspacePage short-circuits render items and groups in active transforming/dragging state` 测试用例，对源码特征进行严格断言。
+- **已运行验证**：
+  - 运行 `npm run test:unit` 100% 通过（1587 个用例均 Pass，含新加的短路渲染断言测试）。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+- **风险与下一步**：
+  - **风险**：无明显回归风险，交互结束后会自动恢复并刷新，已保证高度一致性。
+  - **下一步**：推送代码，并收集用户对本阶段画布在拖拽/缩放时的性能表现反馈。

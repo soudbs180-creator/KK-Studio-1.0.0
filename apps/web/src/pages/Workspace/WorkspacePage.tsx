@@ -4374,14 +4374,20 @@ export const AppContent: React.FC<AppContentProps> = () => {
     ]
   );
 
+  const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
+
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
+    if (isCanvasTransforming || isNodeDragActive) {
+      return stableCanvasRenderItemsRef.current;
+    }
+
     const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
     const rLeft = -canvasTransform.x / canvasTransform.scale - RENDER_BUFFER;
     const rTop = -canvasTransform.y / canvasTransform.scale - RENDER_BUFFER;
     const rRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + RENDER_BUFFER;
     const rBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + RENDER_BUFFER;
 
-    return [
+    const items: CanvasRenderItem[] = [
       ...visiblePromptGroupViews
         .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
         .map((groupView) => {
@@ -4480,6 +4486,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
         return [];
       }),
     ];
+
+    stableCanvasRenderItemsRef.current = items;
+    return items;
   }, [
     collapsedCanvasGroupNodeIds,
     promptGroupLayerById,
@@ -4494,10 +4503,18 @@ export const AppContent: React.FC<AppContentProps> = () => {
     canvasPerformanceProfile.overscanBuffer,
     isMobile,
     imageCardHeightById,
+    isCanvasTransforming,
+    isNodeDragActive,
   ]);
 
-  const renderedVisibleGroups = React.useMemo(() => (
-    visibleGroups.map((group) => (
+  const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
+
+  const renderedVisibleGroups = React.useMemo(() => {
+    if (isCanvasTransforming || isNodeDragActive) {
+      return stableRenderedVisibleGroupsRef.current;
+    }
+
+    const elements = visibleGroups.map((group) => (
       <CanvasGroupComponent
         key={group.id}
         group={group}
@@ -4539,8 +4556,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
       />
-    ))
-  ), [
+    ));
+
+    stableRenderedVisibleGroupsRef.current = elements;
+    return elements;
+  }, [
     canvasGroupStackZIndexById,
     canvasTransform.scale,
     applyLiveCanvasGroupNodeDelta,
@@ -4555,6 +4575,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     snapToGrid,
     updateGroup,
     visibleGroups,
+    isCanvasTransforming,
+    isNodeDragActive,
   ]);
 
   const renderedCanvasItems = React.useMemo(() => (
