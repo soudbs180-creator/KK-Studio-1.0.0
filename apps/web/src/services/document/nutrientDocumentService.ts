@@ -165,8 +165,17 @@ class NutrientDocumentService {
             });
 
             if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(errText || '百度云 OCR 识别文本失败');
+                let errMsg = '百度云 OCR 识别文本失败';
+                try {
+                    const errJson = await response.json();
+                    errMsg = errJson.error || errMsg;
+                } catch {
+                    try {
+                        const errText = await response.text();
+                        errMsg = errText || errMsg;
+                    } catch {}
+                }
+                throw new Error(errMsg);
             }
 
             return {

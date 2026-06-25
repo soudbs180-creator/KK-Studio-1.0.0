@@ -2,20 +2,26 @@
  * @file generate-v1.js
  * @module server/routes
  * @description 统一的同步与异步生成网关路由模块。
- *              整合原有分散路由，实现零直连前端、BYOK 安全域名白名单、统一派发与直接执行。
- */
-
-const express = require('express');
+ *              整合原有const express = require('express');
 const { verifyJWT } = require('../lib/jwt');
 const { listProviders } = require('../lib/dispatcher/providerRegistry');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
 
 const router = express.Router();
 
+// 辅助方法：发送统一的错误响应信封
+function sendError(res, status, code, message) {
+  return res.status(status).json({
+    success: false,
+    error: message,
+    code
+  });
+}
+
 function requireAuth(req, res, next) {
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized.', code: 'UNAUTHORIZED' });
+    return sendError(res, 401, 'UNAUTHORIZED', 'Unauthorized.');
   }
   req.userId = userId;
   next();
@@ -59,16 +65,18 @@ router.post('/v1/generate', requireAuth, async (req, res) => {
     const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
     const route = await resolveLocalUserRoute(req.userId, routeId);
     if (!route) {
-      return res.status(404).json({ error: 'User API route not found.', code: 'USER_ROUTE_NOT_FOUND' });
+      return sendError(res, 404, 'USER_ROUTE_NOT_FOUND', 'User API route not found.');
     }
 
     // 域名白名单安全过滤
     if (!validateProxyTargetHost(route.baseUrl)) {
       metricsCollector.recordRouteCall({ routePath: '/api/v1/generate', success: false, latency: Date.now() - startTime });
-      return res.status(403).json({
-        error: `访问被拒绝。该 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`,
-        code: 'FORBIDDEN_PROXY_TARGET'
-      });
+      return sendError(
+        res,
+        403,
+        'FORBIDDEN_PROXY_TARGET',
+        `访问被拒绝。该 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`
+      );
     }
 
     if (isChat) {
@@ -79,7 +87,7 @@ router.post('/v1/generate', requireAuth, async (req, res) => {
       const handled = await wuyinRouteHandler.handleSubmitMode(req, res, req.userId, taskType || 'image');
       if (handled) return handled;
 
-      return res.status(400).json({ error: 'Unsupported task type for this user route.', code: 'UNSUPPORTED_TASK' });
+      return sendError(res, 400, 'UNSUPPORTED_TASK', 'Unsupported task type for this user route.');
     }
   }
 
@@ -99,10 +107,7 @@ router.post('/v1/generate', requireAuth, async (req, res) => {
       return res.json(result);
     } catch (err) {
       metricsCollector.recordRouteCall({ routePath: '/api/v1/generate', success: false, latency: Date.now() - startTime });
-      return res.status(err.statusCode || 500).json({
-        error: err.message || 'Chat failed.',
-        code: err.code || 'AI_CHAT_FAILED'
-      });
+      return sendError(res, err.statusCode || 500, err.code || 'AI_CHAT_FAILED', err.message || 'Chat failed.');
     }
   } else {
     const generationController = require('../lib/generation/generationController');
@@ -116,7 +121,7 @@ router.post('/v1/generate/async', requireAuth, async (req, res) => {
   const mode = req.body?.mode;
   let routeId = req.body?.routeId || req.headers['x-key-slot-id'];
 
-  // 状态轮询时自动解析 taskId 中内嵌的 routeId
+  // 状态轮询时自动解析 taskId 中内嵌 of routeId
   if (mode === 'task_status') {
     const localTaskId = req.body?.localTaskId || req.body?.taskId;
     const { decodeLocalProxyTaskId } = require('../lib/dispatcher/adapters/wuyin/wuyinModelExecutor');
@@ -130,16 +135,18 @@ router.post('/v1/generate/async', requireAuth, async (req, res) => {
     const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
     const route = await resolveLocalUserRoute(req.userId, routeId);
     if (!route) {
-      return res.status(404).json({ error: 'User API route not found.', code: 'USER_ROUTE_NOT_FOUND' });
+      return sendError(res, 404, 'USER_ROUTE_NOT_FOUND', 'User API route not found.');
     }
 
     // 域名白名单安全过滤
     if (!validateProxyTargetHost(route.baseUrl)) {
       metricsCollector.recordRouteCall({ routePath: '/api/v1/generate/async', success: false, latency: Date.now() - startTime });
-      return res.status(403).json({
-        error: `访问被拒绝。该任务 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`,
-        code: 'FORBIDDEN_PROXY_TARGET'
-      });
+      return sendError(
+        res,
+        403,
+        'FORBIDDEN_PROXY_TARGET',
+        `访问被拒绝。该任务 API 路由目标 '${route.baseUrl || ''}' 未在系统安全白名单域名中。`
+      );
     }
   }
 
@@ -150,7 +157,7 @@ router.post('/v1/generate/async', requireAuth, async (req, res) => {
     return wuyinRouteHandler.handleSubmitMode(req, res, req.userId, mode);
   }
 
-  return res.status(400).json({ error: 'Unsupported async mode.', code: 'UNSUPPORTED_MODE' });
+  return sendError(res, 400, 'UNSUPPORTED_MODE', 'Unsupported async mode.');
 });
 
 module.exports = router;
