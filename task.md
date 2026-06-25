@@ -17,9 +17,9 @@
 - [x] 静态分析与自动化验证
   - [x] 在 `ai-assistant-tool-registry.test.ts` 中补足 `ui.openToolWindow` 和 `ui.updateWindowLayout` 的 Node 单元测试用例并测试通过
   - [x] 运行 `npm run verify:changes` 校验全套 CI 级别静态治理和构建是否通过
-- [/] 阶段 C：整体稳定性回归防护与哈希发布签署
-  - [/] 新建 `sprint-8-cdn-window-regression.test.ts` 补足 CDN 与 WindowManager 白盒契约单元测试
+- [x] 阶段 C：整体稳定性回归防护与哈希发布签署
+  - [x] 新建 `sprint-8-cdn-window-regression.test.ts` 补足 CDN 与 WindowManager 白盒契约单元测试
   - [x] 优化 `publish-portable-release.mjs` 中的 JSZip 压缩率为 level 1 以大幅提速
   - [x] 打包并刷新哈希发布 manifest.json 及版本同步
-  - [/] 运行最终的 `npm run verify:changes` 校验全套 CI 级静态治理和构建通过
-  - [ ] 运行 `npm run agents:commit` 将工作成果固化为本地 Git Commit 并更新交接文档
+  - [x] 运行最终的 `npm run verify:changes` 校验全套 CI 级静态治理和构建通过
+  - [x] 运行 `npm run agents:commit` 将工作成果固化为本地 Git Commit 并更新交接文档
