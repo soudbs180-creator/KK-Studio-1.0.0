@@ -101,10 +101,6 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       return stableVisibleCanvasSceneRef.current;
     }
 
-    if (isCanvasTransforming) {
-      return stableVisibleCanvasSceneRef.current;
-    }
-
     if (!activeCanvas) {
       return {
         visiblePromptNodes: [],

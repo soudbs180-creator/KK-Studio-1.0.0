@@ -720,4 +720,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
   - 运行浏览器仿真测试（Browser Subagent）成功获取自动整理后的完美排列并执行了 `10%` 的平滑自适应视口聚焦，截取并保存了无重叠无飞出的最终布局图 `final_perfect_arranged_layout.png`。
 
+## 47. 2026-06-25 - Fix Canvas Zoom/Pan Card Disappearance and Pos Drift (本次追加)
+- **修改范围**：
+  1. 修复了画布在背景拖拽平移（Panning）与滚轮滚动缩放（Zooming）交互期间，卡片从屏幕上彻底消失，显示为一片漆黑的严重缺陷。
+  2. 修复了缩放/平移停止后，卡片坐标重置对齐引发微小跳动（乱飘）的视觉异常。
+  3. 对齐修复了因改动引起的测试契约与历史本地项目加载解构不匹配。
+- **修改文件**：
+  - [useVisibleCanvasItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/useVisibleCanvasItems.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [canvas-measurement-guards-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-measurement-guards-contract.test.ts)
+  - [canvas-spatial-index-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-spatial-index-contract.test.ts)
+  - [canvas-startup-disk-restore-parallel.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-startup-disk-restore-parallel.test.ts)
+  - [canvas-arrange-selection-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-arrange-selection-contract.test.ts)
+- **当前设计决策**：
+  - **放开 Transforming 期间的短路限制**：移除 `useVisibleCanvasItemsNew`、`canvasRenderItems` 与 `renderedVisibleGroups` 在 `isCanvasTransforming` (变换中) 时的 Ref 缓存短路拦截，仅在拖拽卡片 `isNodeDragActive` 时进行短路。这允许缩放平移交互时根据最新的 `viewportBounds` 重算可视状态（取消原本被冻结的 `isPlaceholder: true`），同时让最新的 `zoomScale` 能够传给每个卡片组件重算内联 `style.left`/`style.top` 的像素像素对齐定位，消除了显示盲区与对齐跳变。
+  - **测试契约与对齐重算**：在测试契约里将 matches 替换为最新的 `isNodeDragActive` 判定；对齐 `loadProjectWithThumbs` 修复后的 `diskActiveCanvasId` 解构测试；根据包围盒防重叠修复算法，校准了局部整理对齐测试用例中最新的非重叠坐标期望值。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run test:unit` 全套 1605 个测试用例 100% 成功通过。
+  - 运行 `npm run verify:canvas-performance` 性能回归测试通过（500 节点可视裁剪耗时 `0.0037ms`）。
+  - 运行 `npm run build` Vite 生产包打包构建完全通过。
+  - 运行浏览器仿真测试（Browser Subagent）滚动缩放与背景拖拽背景，确认在 active transforming 变换交互期间，卡片全程清晰可见，没有任何消失或跳跃现象。
+
+
 

@@ -240,11 +240,11 @@ test('arrangeSelectedRootNodes moves child images with selected prompt roots', a
   const result = arrangeSelectedRootNodes(source, ['prompt-1', 'prompt-2'], 'row', { now: () => 126 });
 
   assert.deepEqual(result?.canvas.promptNodes.map((prompt) => [prompt.id, prompt.position]), [
-    ['prompt-1', { x: 0, y: 200 }],
-    ['prompt-2', { x: 440, y: 200 }],
+    ['prompt-1', { x: 0, y: 100 }],
+    ['prompt-2', { x: 440, y: 300 }],
   ]);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 440, y: 600 }],
+    ['image-1', { x: 440, y: 700 }],
     ['image-2', { x: 1000, y: 600 }],
   ]);
 });

@@ -4511,7 +4511,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
-    if (isCanvasTransforming || isNodeDragActive) {
+    if (isNodeDragActive) {
       return stableCanvasRenderItemsRef.current;
     }
 
@@ -4644,7 +4644,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
   const renderedVisibleGroups = React.useMemo(() => {
-    if (isCanvasTransforming || isNodeDragActive) {
+    if (isNodeDragActive) {
       return stableRenderedVisibleGroupsRef.current;
     }
 

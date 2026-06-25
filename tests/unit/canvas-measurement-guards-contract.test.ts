@@ -73,5 +73,5 @@ test('WorkspacePage short-circuits render items and groups in active transformin
 
   assert.match(source, /stableCanvasRenderItemsRef/);
   assert.match(source, /stableRenderedVisibleGroupsRef/);
-  assert.match(source, /if \(isCanvasTransforming \|\| isNodeDragActive\)/);
+  assert.match(source, /if \(isNodeDragActive\)/);
 });

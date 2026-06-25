@@ -54,7 +54,6 @@ test('visible canvas items preserve interaction state during transforms', () => 
   const source = visibleItemsSource();
 
   assert.match(source, /if \(isNodeDragActive\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
-  assert.match(source, /if \(isCanvasTransforming\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
   assert.match(source, /selectedNodeIds\.forEach\(\(id\) => \{/);
   assert.match(source, /if \(draftNodeId && !visibleIds\.has\(draftNodeId\)\)/);
 });

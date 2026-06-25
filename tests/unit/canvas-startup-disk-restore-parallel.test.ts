@@ -13,5 +13,5 @@ test('Canvas startup begins project and reference-image disk loads in parallel o
 
   assert.match(source, /const projectLoadPromise = traceLocalPerformance\('canvas-startup\.disk-project-load', \(\) => fileSystemService\.loadProjectWithThumbs\(handle\)\);/);
   assert.match(source, /const referenceImageLoadPromise = traceLocalPerformance\('canvas-startup\.reference-image-load', \(\) => fileSystemService\.loadAllReferenceImages\(handle\)\);/);
-  assert.match(source, /const \[\{ canvases, images, activeCanvasId: savedActiveCanvasId \}, refUrls\] = await Promise\.all\(\[\s*projectLoadPromise,\s*referenceImageLoadPromise,\s*\]\);/);
+  assert.match(source, /const \[\{ canvases, images, activeCanvasId: diskActiveCanvasId \}, refUrls\] = await Promise\.all\(\[\s*projectLoadPromise,\s*referenceImageLoadPromise,\s*\]\);/);
 });
