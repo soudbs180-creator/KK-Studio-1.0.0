@@ -3554,6 +3554,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
     draftNodeId,
   });
 
+  // 简体中文：缓存当前视口内可见的图片节点 ID 集合，用于 O(1) 过滤连接线以卸载视口外的 SVG DOM
+  const visibleImageIdSet = React.useMemo(() => {
+    const ids = new Set<string>();
+    visibleImageNodes.forEach((node) => ids.add(node.id));
+    return ids;
+  }, [visibleImageNodes]);
+
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
     image,
     onPositionChange: updateImageNodePosition,
@@ -4160,21 +4167,27 @@ export const AppContent: React.FC<AppContentProps> = () => {
             }}
           >
             <g>
-              {groupConnectorLayouts.map((segment) => (
-                <path
-                  id={`connector-${segment.key}`}
-                  key={segment.key}
-                  d={segment.path}
-                  fill="none"
-                  stroke="var(--connector-color, #6366f1)"
-                  strokeWidth={groupConnectorStroke}
-                  strokeDasharray={groupConnectorDash}
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={connectorOpacity}
-                />
-              ))}
+              {groupConnectorLayouts
+                .filter((segment) => {
+                  const parts = segment.key.split('-');
+                  const imageId = parts[1];
+                  return visibleImageIdSet.has(imageId);
+                })
+                .map((segment) => (
+                  <path
+                    id={`connector-${segment.key}`}
+                    key={segment.key}
+                    d={segment.path}
+                    fill="none"
+                    stroke="var(--connector-color, #6366f1)"
+                    strokeWidth={groupConnectorStroke}
+                    strokeDasharray={groupConnectorDash}
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={connectorOpacity}
+                  />
+                ))}
             </g>
           </svg>
         )}

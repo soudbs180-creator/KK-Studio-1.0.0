@@ -49,3 +49,12 @@ test('prompt and image cards request connector updates through the scheduler', (
   assert.match(imageSource, /CanvasConnectorScheduler\.request\(image\.parentPromptId, image\.id/);
   assert.match(promptSource, /CanvasConnectorScheduler\.request\(node\.id, childImageId\)/);
 });
+
+test('WorkspacePage virtualizes connector lines by viewport visible image ids', () => {
+  const source = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+  assert.match(source, /const visibleImageIdSet = React\.useMemo\(\(\) => \{/);
+  assert.match(source, /visibleImageNodes\.forEach\(\(node\) => ids\.add\(node\.id\)\)/);
+  assert.match(source, /groupConnectorLayouts\s*\.filter\(\(segment\) => \{/);
+  assert.match(source, /return visibleImageIdSet\.has\(imageId\);/);
+});
