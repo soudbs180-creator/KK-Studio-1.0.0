@@ -672,6 +672,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - **无句柄自愈性重选**：重构了 `changeLocalFolder` 逻辑，在 `currentState.fileSystemHandle` 为 null 时，不再直接返回，而是视为全新连接请求弹起系统目录选择器，成功选择后重新建立关联并自动载入及合并数据，实现了连接失效后的主动更换与自愈。
   - **常驻更换配置 UI 策略**：去除了原 UI 渲染更换按钮时对 `mode === 'local'` 的苛刻检测，仅依赖 `supportsLocal` 支持度。使用户即使在连接意外断开或失效时（`mode` 和 `fileSystemHandle` 状态不一致），依旧可以通过点击“更换”按钮来直接重新绑定目录并进行自愈。
 - **已运行验证**：
-  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run typecheck` 100% 成功通过.
   - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
   - 运行浏览器子代理（Browser Subagent）连入本地开发服务器，截图核对显示“更换”与“切换”按钮排版精致整齐、无任何重叠或拥挤。
+
+## 44. 2026-06-25 - Storage Mode Status Label Optimization (本次追加)
+- **修改范围**：
+  1. 优化了“存储设置”面板中“本地文件夹模式”的当前连接与激活状态文字说明。
+  2. 根据当前存储模式（mode）、支持度（supportsLocal）及连接度（isConnectedToLocal）组合出更精确的四个细分状态说明，消除了此前笼统的状态显示，并附带了警告提示以提醒用户在失效时重新授权。
+- **修改文件**：
+  - [StorageSettingsView.localized.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/StorageSettingsView.localized.tsx)
+  - [StorageSettingsView.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/StorageSettingsView.tsx)
+- **当前设计决策**：
+  - **精细化多态文案渲染**：新增了 `getLocalFolderStatusLabel()` 辅助函数，将状态细分为：已启用并授权连接、⚠️已启用但连接断开、本地已授权就绪（当前使用浏览器缓存）以及可用但未授权四种，提供了极佳的自愈指引文案。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
+  - 运行浏览器子代理（Browser Subagent）连入本地开发服务器，在默认浏览器缓存模式下核对本地模式行，状态标签正确渲染为“支持但未授权”，按钮在 Y:550 高度精准水平对齐。

@@ -107,6 +107,20 @@ export const StorageSettingsView: React.FC = () => {
     });
   }, [mergeCandidates]);
 
+  const getLocalFolderStatusLabel = () => {
+    if (!supportsLocal) {
+      return 'Not supported by current browser';
+    }
+    if (mode === 'local') {
+      return isConnectedToLocal
+        ? 'Status: Active & Connected'
+        : '⚠️ Status: Active but Disconnected, click Change to reauthorize';
+    }
+    return isConnectedToLocal
+      ? 'Status: Authorized but Inactive'
+      : 'Status: Supported but Disconnected';
+  };
+
   const refresh = async () => {
     setRefreshing(true);
     setLastActionMessage('Refreshing current storage status...');
@@ -410,7 +424,7 @@ export const StorageSettingsView: React.FC = () => {
               <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                 <div className="min-w-0 flex-1 mr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">Local Folder Mode</div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? 'Status: Connected' : 'Ready to connect') : 'Not supported'}</div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">{getLocalFolderStatusLabel()}</div>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   {supportsLocal && (

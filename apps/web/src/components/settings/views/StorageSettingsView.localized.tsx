@@ -112,6 +112,20 @@ export const StorageSettingsView: React.FC = () => {
     return pick('未指定', 'Unassigned');
   };
 
+  const getLocalFolderStatusLabel = () => {
+    if (!supportsLocal) {
+      return pick('当前浏览器不支持本地存储', 'Not supported by current browser');
+    }
+    if (mode === 'local') {
+      return isConnectedToLocal
+        ? pick('状态：已启用并授权连接', 'Status: Active & Connected')
+        : pick('⚠️ 状态：已启用但连接断开，请点更换或重新授权', '⚠️ Status: Active but Disconnected, click Change to reauthorize');
+    }
+    return isConnectedToLocal
+      ? pick('状态：本地已授权就绪（当前使用浏览器缓存）', 'Status: Authorized but Inactive')
+      : pick('状态：可用但未授权（未连接）', 'Status: Supported but Disconnected');
+  };
+
   useEffect(() => {
     setMergeSourceId((current) => {
       if (current && mergeCandidates.some((canvas) => canvas.id === current)) {
@@ -564,7 +578,7 @@ export const StorageSettingsView: React.FC = () => {
               <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
                 <div className="min-w-0 flex-1 mr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? pick('状态：已授权连接', 'Status: Connected') : pick('支持但未授权', 'Ready to connect')) : pick('当前浏览器不支持', 'Not supported')}</div>
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{getLocalFolderStatusLabel()}</div>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   {supportsLocal && (
