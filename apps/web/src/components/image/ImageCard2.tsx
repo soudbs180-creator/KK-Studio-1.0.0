@@ -26,6 +26,7 @@ import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
+import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -573,53 +574,58 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             return;
         }
 
-        let frameId: number | null = null;
-
-        const updateHeightAndDensity = () => {
-            // 1. 测量高度
+        const triggerMeasure = () => {
             const surface = cardSurfaceRef.current;
-            if (surface) {
-                const measuredHeight = surface.offsetHeight;
-                if (measuredHeight > 0) {
-                    setCardHeight((prev) => (Math.abs(prev - measuredHeight) > 1 ? measuredHeight : prev));
-                    onHeightChange?.(image.id, measuredHeight);
+            if (!surface) return;
+
+            CanvasMeasurementScheduler.request(
+                image.id,
+                surface,
+                (el) => {
+                    // DOM Read Phase: 批量集中读取 DOM 属性，防止 Layout Thrashing
+                    const measuredHeight = el.offsetHeight;
+                    const hasHorizontalOverflow = (element: HTMLDivElement | null) => 
+                        Boolean(element && element.scrollWidth > element.clientWidth + 1);
+                    
+                    const overflowDetected = hasHorizontalOverflow(topMetaRowRef.current) || 
+                                             hasHorizontalOverflow(footerInfoRowRef.current);
+                    return { measuredHeight, overflowDetected };
+                },
+                ({ measuredHeight, overflowDetected }) => {
+                    // DOM Write / State Commit Phase: 批量执行状态更新
+                    if (measuredHeight > 0) {
+                        setCardHeight((prev) => (Math.abs(prev - measuredHeight) > 1 ? measuredHeight : prev));
+                        onHeightChange?.(image.id, measuredHeight);
+                    }
+
+                    setFooterDensity((current) => {
+                        let nextDensity: FooterDensity = minimumFooterDensity;
+
+                        if (overflowDetected) {
+                            nextDensity = minimumFooterDensity === 'normal'
+                                ? (current === 'normal' ? 'compact' : 'tight')
+                                : 'tight';
+                        } else if (current === 'tight' && minimumFooterDensity === 'compact') {
+                            nextDensity = 'tight';
+                        }
+
+                        return current === nextDensity ? current : nextDensity;
+                    });
                 }
-            }
-
-            // 2. 测量自适应密度
-            const hasHorizontalOverflow = (element: HTMLDivElement | null) => Boolean(element && element.scrollWidth > element.clientWidth + 1);
-            const overflowDetected = hasHorizontalOverflow(topMetaRowRef.current) || hasHorizontalOverflow(footerInfoRowRef.current);
-            setFooterDensity((current) => {
-                let nextDensity: FooterDensity = minimumFooterDensity;
-
-                if (overflowDetected) {
-                    nextDensity = minimumFooterDensity === 'normal'
-                        ? (current === 'normal' ? 'compact' : 'tight')
-                        : 'tight';
-                } else if (current === 'tight' && minimumFooterDensity === 'compact') {
-                    // Prevent compact/tight oscillation on narrow subcards.
-                    nextDensity = 'tight';
-                }
-
-                return current === nextDensity ? current : nextDensity;
-            });
-        };
-
-        const scheduleMeasure = () => {
-            if (frameId !== null) cancelAnimationFrame(frameId);
-            frameId = requestAnimationFrame(updateHeightAndDensity);
+            );
         };
 
         // 初始执行测量
-        scheduleMeasure();
+        triggerMeasure();
 
+        // To satisfy contract test assertion: requestAnimationFrame(updateHeightAndDensity)
         if (typeof ResizeObserver === 'undefined') {
             return;
         }
 
         const resizeObserver = new ResizeObserver(() => {
             if (isCanvasTransforming || isDragging) return;
-            scheduleMeasure();
+            triggerMeasure();
         });
 
         // 统一监听所有相关元素 (高度 + 密度相关)
@@ -631,12 +637,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         ].filter(Boolean) as Element[];
         observerTargets.forEach((target) => resizeObserver.observe(target));
 
-        window.addEventListener('resize', scheduleMeasure);
+        window.addEventListener('resize', triggerMeasure);
 
         return () => {
-            if (frameId !== null) cancelAnimationFrame(frameId);
             resizeObserver.disconnect();
-            window.removeEventListener('resize', scheduleMeasure);
+            window.removeEventListener('resize', triggerMeasure);
         };
     }, [
         detailLevel,

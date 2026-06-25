@@ -23,6 +23,7 @@ import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
+import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 
 const EcommerceCanvasWorkbenchCard = React.lazy(() => import('../ecommerce/EcommerceCanvasWorkbenchCard'));
 
@@ -1012,29 +1013,34 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             return;
         }
 
-        const updateHeight = () => {
+        const triggerMeasure = () => {
             if (cardRef.current) {
-                const height = cardRef.current.offsetHeight;
-                if (height > 0) {
-                    // 1. 内部同步状态（用于连线起点）
-                    setCardHeight(prev => (Math.abs(prev - height) > 2 ? height : prev));
-                    // 2. 外部上报高度
-                    if (onHeightChange && Math.abs(height - (node.height || 0)) > 2) {
-                        onHeightChange(node.id, height);
+                CanvasMeasurementScheduler.requestHeight(
+                    node.id,
+                    cardRef.current,
+                    (height) => {
+                        if (height > 0) {
+                            // 1. 内部同步状态（用于连线起点）
+                            setCardHeight(prev => (Math.abs(prev - height) > 2 ? height : prev));
+                            // 2. 外部上报高度
+                            if (onHeightChange && Math.abs(height - (node.height || 0)) > 2) {
+                                onHeightChange(node.id, height);
+                            }
+                        }
                     }
-                }
+                );
             }
         };
 
         // 当变为 idle + visible + full detail 且非交互状态时，立即进行一次同步高度测量
-        updateHeight();
+        triggerMeasure();
 
         if (typeof ResizeObserver === 'undefined') return;
 
         const observer = new ResizeObserver((entries) => {
             // 在回调中再次双重验证，如果处于 transforming 或 dragging，忽略回调以防止卡顿
             if (isCanvasTransforming || isDragging) return;
-            updateHeight();
+            triggerMeasure();
         });
 
         if (cardRef.current) {

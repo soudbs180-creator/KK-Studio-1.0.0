@@ -554,6 +554,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
     setViewportCenter,
   });
 
+  useEffect(() => {
+    CanvasMeasurementScheduler.setLocked(isCanvasTransforming);
+  }, [isCanvasTransforming]);
+
   const handleToggleGrid = () => setShowGrid(prev => !prev);
   const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
 
