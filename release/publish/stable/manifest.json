@@ -2,7 +2,7 @@
   "appName": "KK Studio",
   "version": "1.5.8",
   "displayVersion": "v1.5.8",
-  "buildTime": "2026-06-24T19:14:38.216Z",
+  "buildTime": "2026-06-25T07:33:12.515Z",
   "releaseDate": "2026-06-25",
   "releaseNotes": [
     "推送主要是API调整。",
@@ -11,6 +11,6 @@
   "channel": "stable",
   "packageFile": "KK-Studio-Portable-1.5.8.zip",
   "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.8/KK-Studio-Portable-1.5.8.zip",
-  "sha256": "12d342a0ef47eb41c7aedc83f5c439c505d0a85dc1136ab9fb096a702cd17a7a",
-  "size": 87348672
+  "sha256": "6a72447843e6e6d56af483f1f4b91ed888eef7461d317ce94aaf3e9be1ed73d3",
+  "size": 87349761
 }

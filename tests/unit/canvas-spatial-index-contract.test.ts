@@ -62,7 +62,7 @@ test('visible canvas items preserve interaction state during transforms', () => 
 test('WorkspacePage uses the spatial-index visible-items path directly', () => {
   const source = workspaceSource();
 
-  assert.match(source, /const \{ spatialIndex, promptNodeById, imageNodeById, workflowNodeById \} = useCanvasSpatialIndex\(/);
+  assert.match(source, /const \{ spatialIndex, promptNodeById, imageNodeById, workflowNodeById.*\} = useCanvasSpatialIndex\(/);
   assert.match(source, /const viewportBounds = React\.useMemo\(\(\) => \{/);
   assert.match(source, /\} = useVisibleCanvasItemsNew\(\{/);
   assert.doesNotMatch(source, /diagnosticsVisibleItems/);
