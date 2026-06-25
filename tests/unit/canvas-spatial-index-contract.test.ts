@@ -2,13 +2,38 @@ import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+const spatialIndexSource = () => readSource('apps/web/src/canvas/CanvasSpatialIndex.ts');
+const spatialHookSource = () => readSource('apps/web/src/app/useCanvasSpatialIndex.ts');
+const visibleItemsSource = () => readSource('apps/web/src/app/useVisibleCanvasItems.ts');
+const workspaceSource = () => readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+test('CanvasSpatialIndex uses grid buckets and viewport queries', () => {
+  const source = spatialIndexSource();
+
+  assert.match(source, /class CanvasSpatialIndex/);
+  assert.match(source, /private buckets = new Map<string, Set<string>>/);
+  assert.match(source, /private nodeBounds = new Map<string, CanvasNodeBounds>/);
+  assert.match(source, /const startX = Math\.floor\(vLeft \/ this\.bucketSize\)/);
+  assert.match(source, /const endX = Math\.floor\(vRight \/ this\.bucketSize\)/);
+  assert.match(source, /bucket\.forEach\(\(nodeId\) => result\.add\(nodeId\)\)/);
+});
+
+test('useCanvasSpatialIndex indexes prompt image and workflow nodes with lookup maps', () => {
+  const source = spatialHookSource();
+
+  assert.match(source, /new CanvasSpatialIndex\(1000\)/);
+  assert.match(source, /const promptNodeById = new Map<string, PromptNode>\(\)/);
+  assert.match(source, /const imageNodeById = new Map<string, GeneratedImage>\(\)/);
+  assert.match(source, /const workflowNodeById = new Map<string, WorkflowUtilityCanvasNode>\(\)/);
+  assert.match(source, /activeCanvas\.promptNodes\.forEach/);
+  assert.match(source, /activeCanvas\.imageNodes\.forEach/);
+  assert.match(source, /workflowNodes\.forEach/);
+});
+
 test('useVisibleCanvasItemsNew avoids O(N) culling loops and queries spatial index', () => {
-  const source = readSource('apps/web/src/app/useVisibleCanvasItems.ts');
+  const source = visibleItemsSource();
 
-  // 契约：必须引入新版极速查询 Hook
   assert.match(source, /export function useVisibleCanvasItemsNew/);
-
-  // 契约：空间裁剪必须使用 O(1) 的 Lookup 模式，不得遍历全量 activeCanvas 节点进行可视筛选
   assert.doesNotMatch(
     source,
     /activeCanvas\.promptNodes\.filter\([^)]*visibleIds\.has/,
@@ -19,22 +44,24 @@ test('useVisibleCanvasItemsNew avoids O(N) culling loops and queries spatial ind
     /activeCanvas\.imageNodes\.filter\([^)]*visibleIds\.has/,
     'Should not filter the entire imageNodes list based on visibleIds'
   );
-
-  // 契约：必须基于空间查询得出的 visibleIds 集合进行 forEach Lookup 收集
+  assert.match(source, /const visibleIds = spatialIndex\.query\(vLeft, vTop, vRight, vBottom\)/);
   assert.match(source, /visibleIds\.forEach\(/);
   assert.match(source, /promptNodeById\.get\(/);
   assert.match(source, /imageNodeById\.get\(/);
-
-  // 契约：必须强制保留 selected 节点和正在编辑的 draft 节点以防 unmount 状态丢失
-  assert.match(source, /selectedNodeIds\.forEach\(/);
-  assert.match(source, /draftNodeId/);
 });
 
-test('useCanvasSpatialIndex correctly indexes prompt and image bounds', () => {
-  const source = readSource('apps/web/src/app/useCanvasSpatialIndex.ts');
+test('visible canvas items preserve interaction state during transforms', () => {
+  const source = visibleItemsSource();
 
-  assert.match(source, /export function useCanvasSpatialIndex/);
-  assert.match(source, /index\.updateNode/);
-  assert.match(source, /promptNodeById/);
-  assert.match(source, /imageNodeById/);
+  assert.match(source, /if \(isNodeDragActive\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
+  assert.match(source, /if \(isCanvasTransforming\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
+  assert.match(source, /selectedNodeIds\.forEach\(\(id\) => \{/);
+  assert.match(source, /if \(draftNodeId && !visibleIds\.has\(draftNodeId\)\)/);
+});
+
+test('WorkspacePage still carries temporary spatial-index diagnostics before final cleanup', () => {
+  const source = workspaceSource();
+
+  assert.match(source, /Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel/);
+  assert.match(source, /const diagnosticsVisibleItems = useVisibleCanvasItemsNew\(/);
 });
