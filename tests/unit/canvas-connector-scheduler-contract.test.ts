@@ -25,6 +25,15 @@ test('connector scheduler only writes svg path when the path changes', () => {
   assert.match(source, /this\.pathCache\.set\(cacheKey, newPath\)/);
 });
 
+test('connector scheduler does not read layout while updating paths', () => {
+  const source = connectorSchedulerSource();
+
+  assert.match(source, /connectorHeightCache/);
+  assert.match(source, /getAttribute\('data-card-height'\)/);
+  assert.doesNotMatch(source, /\.offsetHeight/);
+  assert.doesNotMatch(source, /getBoundingClientRect\(/);
+});
+
 test('legacy connector update api forwards to the shared scheduler', () => {
   const source = livePositionStoreSource();
 
