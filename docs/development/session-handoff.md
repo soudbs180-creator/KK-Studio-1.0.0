@@ -169,7 +169,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 重构可视区域裁剪。由原来的 `filter` 遍历全量节点大数组，重构为遍历 `spatialIndex.query(viewportBounds)` 产生的 `visibleIds` 集合进行 `O(1)` Map 查找与收集。
   - 这使大画布可视裁剪的运行开销从 $O(N)$ 降低到最理想的 $O(M)$（$M$ 为视口内可见节点数）。
   - 保证了 selected 与正在编辑的 draft 节点始终强制可见防 unmount。
-  - 在 `WorkspacePage` 引入 `useCanvasSpatialIndex` 和新裁剪逻辑作为只读 diagnostics 并行运行验证稳定性，保证零风险过渡。
+  - 在 `WorkspacePage` 彻底合并并移除 diagnostics 冗余计算链路，使主渲染路径完全切流至新版空间索引驱动的 `useVisibleCanvasItemsNew`。
   - 编写了静态分析测试，对 `useVisibleCanvasItems.ts` 源码结构做严格的正则断言校验。
 - **已运行验证**：
   - 运行 `npm run verify:canvas-performance` 基准测试全部 Pass。
@@ -177,6 +177,5 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run architecture:check` 100% 成功通过。
 - **风险与下一步**：
-  - **风险**：无明显回归风险，老接口桥接极速查询且经过严格一致性断言。
-  - **下一步**：推送代码，圆满结束此阶段重构，等待后续全面切流。
-
+  - **风险**：无明显回归风险，已通过 1594 个单元测试和基准测试。
+  - **下一步**：提交并推送代码，清理临时文件，等待后续优化。

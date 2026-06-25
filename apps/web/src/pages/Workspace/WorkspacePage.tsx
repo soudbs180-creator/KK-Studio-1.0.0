@@ -3506,41 +3506,24 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [isGenerating, setConfig, setActiveSourceImage, clearSelection, setFocusedGroupId, setSelectionMenuPosition, draftNodeId, deletePromptNode, setDraftNodeId]);
 
-  // Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel to verify culling path stability
-  const spatialIndexResult = useCanvasSpatialIndex({
+  // 1. 构建空间索引与查找表
+  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById } = useCanvasSpatialIndex({
     activeCanvas,
     isMobile,
     imageCardHeightById,
   });
 
-  const diagnosticsOverscanBuffer = canvasPerformanceProfile.overscanBuffer;
-  const diagnosticsVirtualBuffer = Math.max(diagnosticsOverscanBuffer * 2.5, 2500);
-  const diagnosticsViewportBounds = React.useMemo(() => {
-    const vLeft = -canvasTransform.x / canvasTransform.scale - diagnosticsVirtualBuffer;
-    const vTop = -canvasTransform.y / canvasTransform.scale - diagnosticsVirtualBuffer;
-    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + diagnosticsVirtualBuffer;
-    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + diagnosticsVirtualBuffer;
-    return { vLeft, vTop, vRight, vBottom };
-  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale, diagnosticsVirtualBuffer]);
+  // 2. 算视口范围与 buffer 缓存边界
+  const cullingOverscanBuffer = canvasPerformanceProfile.overscanBuffer;
+  const cullingVirtualBuffer = Math.max(cullingOverscanBuffer * 2.5, 2500);
 
-  const diagnosticsVisibleItems = useVisibleCanvasItemsNew({
-    spatialIndex: spatialIndexResult.spatialIndex,
-    promptNodeById: spatialIndexResult.promptNodeById,
-    imageNodeById: spatialIndexResult.imageNodeById,
-    workflowNodeById: spatialIndexResult.workflowNodeById,
-    viewportBounds: diagnosticsViewportBounds,
-    activeCanvas,
-    collapsedCanvasGroupNodeIds,
-    getComputedGroupBounds,
-    isNodeDragActive,
-    isCanvasTransforming,
-    isPptDeckChildImageNode,
-    promptGroupLayerById,
-    promptGroupStackZIndexById,
-    standaloneImageStackZIndexById,
-    selectedNodeIds,
-    draftNodeId,
-  });
+  const viewportBounds = React.useMemo(() => {
+    const vLeft = -canvasTransform.x / canvasTransform.scale - cullingVirtualBuffer;
+    const vTop = -canvasTransform.y / canvasTransform.scale - cullingVirtualBuffer;
+    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + cullingVirtualBuffer;
+    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + cullingVirtualBuffer;
+    return { vLeft, vTop, vRight, vBottom };
+  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale, cullingVirtualBuffer]);
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
@@ -3550,22 +3533,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
     visibleWorkflowUtilityNodes,
     visibleGroups,
     nowTimestamp
-  } = useVisibleCanvasItems({
+  } = useVisibleCanvasItemsNew({
+    spatialIndex,
+    promptNodeById,
+    imageNodeById,
+    workflowNodeById,
+    viewportBounds,
     activeCanvas,
-    canvasPerformanceProfile,
-    canvasTransform,
     collapsedCanvasGroupNodeIds,
     getComputedGroupBounds,
     isNodeDragActive,
+    isCanvasTransforming,
     isPptDeckChildImageNode,
     promptGroupLayerById,
     promptGroupStackZIndexById,
     standaloneImageStackZIndexById,
-    isMobile,
-    imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
-    isCanvasTransforming,
   });
 
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
