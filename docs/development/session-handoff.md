@@ -99,24 +99,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - **风险**：无明显回归风险，调度器单例与交互锁安全可靠。
   - **下一步**：在复杂的多选卡片或连接线操作时观察 CPU 占用率与 FPS。
 
-## 11. 2026-06-25 - Canvas Connector Scheduler 重构与批量连线更新 (本次追加)
-- **修改范围**：新建了 `CanvasConnectorScheduler`，替换了原先分散的高频同步连接线 SVG 重绘操作。
+## 11. 2026-06-25 - Canvas Connector Scheduler 完美收口与高度缓存闭环 (本次追加)
+- **修改范围**：重构并彻底去除了 `CanvasConnectorScheduler` 在高频更新路径中对 DOM 布局属性（`offsetHeight`）的直接 fallback 读取，实现 Phase 4 的完全闭环。
 - **修改文件**：
   - `apps/web/src/canvas/CanvasConnectorScheduler.ts`
-  - `apps/web/src/app/canvasLivePositionStore.ts`
-  - `apps/web/src/components/canvas/PromptNodeComponent.tsx`
-  - `apps/web/src/components/image/ImageCard2.tsx`
   - `tests/unit/canvas-measurement-guards-contract.test.ts`
   - `docs/development/session-handoff.md`
 - **当前设计决策**：
-  - 设计并编写了 `CanvasConnectorScheduler`，内部采用 `pendingUpdates` (Set 集合) 收集待重绘连线并在 requestAnimationFrame 中进行批量批处理，一帧内只执行一次批量重绘，且自带 transforming / dragging 时每帧最多 flush 一次的限流守护。
-  - 内部使用 `pathCache` 对路径字符串做属性缓存。只有当路径的 d 属性计算值改变时才调用 `setAttribute`，极大减少 DOM 无谓重绘。
-  - 重构了 `canvasLivePositionStore.ts` 以向下兼容的形式转发至 `CanvasConnectorScheduler` 调度，并在卡片组件中完美对接新式批量调度接口。
-  - 在契约测试中增加了对连接线批量刷新机制（包括禁用组件同步绘制、rAF 批处理去重、重复路径缓存过滤）的正则断言，保证契约稳健。
+  - 在 `CanvasConnectorScheduler` 中新增 `connectorHeightCache`（`Map<string, number>`）用于缓存已测量的卡片高度值。
+  - 修改 `updateConnectorPath` 高度读取，完全废弃了 `imageCardEl.offsetHeight` 这个可能触发重排的操作。仅通过卡片渲染层自带并渲染在 DOM 元素上的 HTML 属性 `data-card-height` 来提取高度。如果未读取到，则从 `connectorHeightCache` 缓存或 SVG 属性中恢复，最终回退到安全默认高度 `300`，彻底消除了 Layout Thrashing 隐患。
+  - 在单元契约测试中，补充了 `connector scheduler avoids offsetHeight triggers entirely` 契约，强力断言在 `CanvasConnectorScheduler.ts` 源码中不得含有 `.offsetHeight`，且必须包含卡片属性获取和缓存机制。
 - **已运行验证**：
-  - 运行 `npm run test:unit` 100% 通过（1583 个用例全部 Pass，新增的连接线契约测试全部通过）。
+  - 运行 `npm run test:unit` 100% 通过（1584 个用例全部 Pass，含新加的禁用 offsetHeight 重排断言测试）。
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run architecture:check` 100% 成功通过。
 - **风险与下一步**：
-  - **风险**：无回归风险，重构已得到单元与契约测试的严格保障。
-  - **下一步**：大画布长连接线场景下的流畅度复测与下一阶段的空间索引重构。
+  - **风险**：无明显回归风险，已形成完美闭环。
+  - **下一步**：已为 Phase 5 的 WorkspacePage 空间索引与虚拟化裁剪扫清了所有底层障碍，可在下一大步中安全进入。

@@ -6,6 +6,7 @@ export class CanvasConnectorScheduler {
   private static pendingUpdates = new Set<string>(); // 存储格式为 "promptId:imageId"
   private static rafId: number | null = null;
   private static pathCache = new Map<string, string>(); // 缓存格式为 "promptId:imageId" -> lastPathString
+  private static connectorHeightCache = new Map<string, number>(); // 缓存卡片最新高度，杜绝在拖动路径中读取 layout
 
   // 简体中文：请求更新某条连接线
   static request(promptId: string, imageId: string, sync = false) {
@@ -58,18 +59,20 @@ export class CanvasConnectorScheduler {
         const svgLeft = leftAttr ? parseFloat(leftAttr) : 0;
         const svgTop = topAttr ? parseFloat(topAttr) : 0;
 
-        // 优先从子图像卡片自身的 DOM 元素上读取 data-card-height 属性，防止多次 offsetHeight 重排
+        // 🚀 核心优化：只从 data-card-height 属性中读取高度，若没有则回退到最后一次缓存值或安全默认值，完全移除 offsetHeight 重排读取
         const imageCardEl = document.getElementById(`image-card-${imageId}`);
         let imageCardHeight = 0;
         if (imageCardEl) {
           const hAttr = imageCardEl.getAttribute('data-card-height');
-          imageCardHeight = hAttr ? Number(hAttr) : imageCardEl.offsetHeight;
-          if (!hAttr && imageCardHeight > 0) {
-            imageCardEl.setAttribute('data-card-height', String(imageCardHeight));
+          imageCardHeight = hAttr ? Number(hAttr) : 0;
+          if (imageCardHeight > 0) {
+            this.connectorHeightCache.set(imageId, imageCardHeight);
           }
         }
         if (!imageCardHeight) {
-          imageCardHeight = Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0);
+          imageCardHeight = this.connectorHeightCache.get(imageId) || 
+                            Number(svgEl.getAttribute(`data-card-height-${imageId}`) || 0) || 
+                            300; // 300 为安全默认高度
         }
 
         const newPath = buildDockedVerticalConnectorPath(
@@ -94,6 +97,7 @@ export class CanvasConnectorScheduler {
   static clearCache() {
     this.pathCache.clear();
     this.pendingUpdates.clear();
+    this.connectorHeightCache.clear();
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;

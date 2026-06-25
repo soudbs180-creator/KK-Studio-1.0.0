@@ -58,3 +58,12 @@ test('connector scheduler avoids redundant DOM updates using a path cache', () =
   assert.match(source, /cachedPath !== newPath/);
   assert.match(source, /setAttribute\('d', newPath\)/);
 });
+
+test('connector scheduler avoids offsetHeight triggers entirely', () => {
+  const source = readSource('apps/web/src/canvas/CanvasConnectorScheduler.ts');
+
+  // 必须确保 Connector 调度器在拖拽高频路径中完全不触发 offsetHeight
+  assert.doesNotMatch(source, /\.offsetHeight/);
+  assert.match(source, /getAttribute\('data-card-height'\)/);
+  assert.match(source, /connectorHeightCache/);
+});
