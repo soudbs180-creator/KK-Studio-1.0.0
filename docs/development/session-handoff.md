@@ -520,6 +520,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run governance:check` 100% 成功通过，Skills 规约比对完全对齐。
   - 运行 `npm run build` 100% 成功通过，前端打包无任何异常。
 
+## 34. 2026-06-25 - Workflow and Legacy Dual-Model Merge Risk Assessment and Decision (本次追加)
+- **修改范围**：完成了新旧 Workflow 数据模型合并与双向 Adapter 废弃的高风险可行性源码检索与依赖树评估。更新并固化了架构实施方案决策。
+- **修改文件**：
+  - [implementation_plan.md](file:///C:/Users/Administrator/.gemini/antigravity/brain/951612d7-b434-47bc-ac2e-758074b16479/implementation_plan.md)
+  - [task.md](file:///C:/Users/Administrator/.gemini/antigravity/brain/951612d7-b434-47bc-ac2e-758074b16479/task.md)
+- **当前设计决策**：
+  - 经检索评估，Legacy 扁平数组（`promptNodes` / `imageNodes`）在前端交互、空间索引、连线绘制和所有电商运行时中含有 368+ 处强耦合，强行废弃并合并将带来摧毁性风险。
+  - 决策并固化：在当前版本周期内继续保持双向 Adapter 的正常工作，将其作为长期架构债务暂缓，以确保项目 100% 稳定运行与零功能损伤。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 100% 成功通过。
+
 
 
 
