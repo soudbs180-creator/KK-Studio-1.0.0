@@ -480,5 +480,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run architecture:check` 100% 成功通过，UI Token 校验完全变绿，架构检查全线 Pass。
 
+## 32. 2026-06-25 - Establish Workspace Custom Skills for Auto Agent Loading (本次追加)
+- **修改范围**：新建了 `.agents/skills/` 技能目录，并重构配置了 5 个带 YAML frontmatter 的标准 Custom Skills 以供外部 AI 自动载入，防止开发偏离主轨道。
+- **修改文件**：
+  - [.agents/skills/download-selected-originals/SKILL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/skills/download-selected-originals/SKILL.md)
+  - [.agents/skills/batch-generate-to-canvas/SKILL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/skills/batch-generate-to-canvas/SKILL.md)
+  - [.agents/skills/arrange-selected-cards/SKILL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/skills/arrange-selected-cards/SKILL.md)
+  - [.agents/skills/recover-interrupted-agent-task/SKILL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/skills/recover-interrupted-agent-task/SKILL.md)
+  - [.agents/skills/diagnostics-and-debugging/SKILL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/skills/diagnostics-and-debugging/SKILL.md)
+- **当前设计决策**：
+  - 依照 customizations 的 Skills 定义，重构了排版、下载原图、批量出图、队列恢复等 5 个画布控制和自愈核心技能，使用标准 YAML frontmatter（包含 `name` 和 `description`），供 Agent 自动触发并运行时热插拔加载，实现 AI 交互进化。
+- **已运行验证**：
+  - 运行 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+
+
 
 

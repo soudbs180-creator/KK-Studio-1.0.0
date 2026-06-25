@@ -1,0 +1,44 @@
+---
+name: batch-generate-to-canvas
+description: 批量生图与队列控制技能，绑定资源池图片或列表发起批量重绘生成，支持电商紧凑排版、自适应网格自动布局并打组，支持基于 DurableGenerationQueue 队列的暂停、恢复、重试失败子项等异步调度。
+---
+
+# 批量重绘生图 Skill (batch-generate-to-canvas)
+
+- **触发词**: “批量生成 30 张商品主图，整理成卡片组” / “帮我把这个文件夹里面的图片全部修改成紧凑的排版布局，比例改成4:5”
+- **前置条件**: 用户已导入包含多张参考图的资源池图片或图片集合；连接本地目录选择器时必须先走文件系统权限确认。
+- **调用工具**:
+  - `generation.createBatchJob`
+  - `ecommerce.createBatchTransformJob`
+  - `canvas.arrangeNodes`
+  - `generation.pauseJob`
+  - `generation.resumeJob`
+  - `generation.retryJob`
+  - `generation.cancelJob`
+- **执行步骤**:
+  1. 获取 `assetsSummary` 中已导入文件夹内的图片列表。
+  2. 生成 `BatchGenerationPlan`，配置参考图连接、生图参数、`taskDomain`、`aspectRatio`、`layoutPreset` 和 `outputGroup`。
+  3. 计算积分估计，将 `requiresConfirmation` 置为 `true`。
+  4. 电商/商品图批量转换调用 `ecommerce.createBatchTransformJob`；通用批量调用 `generation.createBatchJob`。
+  5. 用户确认后，将任务加入持久化队列。
+  6. 轮询并驱动任务，每次生成成功后记录 `promptNodeId`、在画布上建立 ImageNode 并连接至 Prompt 节点。
+  7. 自动调用 `canvas.arrangeNodes({ nodeIds, preset })`，只整理本 job 生成的节点。
+  8. 创建或更新一个 `CanvasGroup`，默认 `color:'#ffffff'`，包含本会话/job 的 Prompt 与 Image 卡片。
+  9. 为这批卡片自动打上 `automation` 和 `batch:<jobId>` 标签。
+
+## ⚙️ 任务控制机制 (Queue Controls)
+- **暂停 (Pause)**: 调用 `generation.pauseJob(jobId)` 挂起任务，重置正在运行的子任务为 `queued`，暂不占用并发配额。
+- **恢复 (Resume)**: 调用 `generation.resumeJob(jobId)` 将任务状态改回 `queued`，自动触发队列调度恢复处理。
+- **重试失败项 (Retry failed)**: 调用 `generation.retryJob(jobId)` 只把失败子项重置为 `queued`，不重复提交已完成的 Prompt/Image 输出；若用户要求“重试最近失败批次”但未提供 ID，调用 `generation.retryJob({ target: 'latest_failed' })`。
+- **取消 (Cancel)**: 调用 `generation.cancelJob(jobId)` 取消任务，处于排队或运行中的子任务全部标记为 `failed` 且原因为用户取消。
+
+## 🛠️ 实现规约与规则
+- **限速与并发**: 批量任务默认并发配额为 `3`，最大并发为 `8`。每个 batch 最大容量限制为 `100`。
+- **幂等防护**: `generation.createBatchJob` 必须支持幂等密钥 `idempotencyKey`，如果用户未传入则根据 `canvasId` 和参数哈希计算稳定 Key，防止网络波动重复提交。
+- **电商紧凑布局**: `compact-grid` 映射为 `layout='grid'`、`columns=min(4,count)`、`gap=24`，比例从用户指令写入 `aspectRatio`，例如 `4:5`。
+- **打组与标签 (Group output)**: 每次批量生成任务完成后，需在画布上创建一个统一的 `CanvasGroup` 包裹住所有的 Prompt/Image 节点，默认边框发光颜色为 `#ffffff`，并为子节点打上 `automation` 标签。
+
+## 🧪 测试覆盖
+- 单元测试: `tests/unit/durable-generation-queue.test.ts`
+- 意图识别: `tests/unit/ai-takeover-intentGate.test.ts`
+- 运行态摘要: `tests/unit/canvas-runtime-state-builder.test.ts`
