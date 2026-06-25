@@ -59,9 +59,12 @@ test('visible canvas items preserve interaction state during transforms', () => 
   assert.match(source, /if \(draftNodeId && !visibleIds\.has\(draftNodeId\)\)/);
 });
 
-test('WorkspacePage still carries temporary spatial-index diagnostics before final cleanup', () => {
+test('WorkspacePage uses the spatial-index visible-items path directly', () => {
   const source = workspaceSource();
 
-  assert.match(source, /Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel/);
-  assert.match(source, /const diagnosticsVisibleItems = useVisibleCanvasItemsNew\(/);
+  assert.match(source, /const \{ spatialIndex, promptNodeById, imageNodeById, workflowNodeById \} = useCanvasSpatialIndex\(/);
+  assert.match(source, /const viewportBounds = React\.useMemo\(\(\) => \{/);
+  assert.match(source, /\} = useVisibleCanvasItemsNew\(\{/);
+  assert.doesNotMatch(source, /diagnosticsVisibleItems/);
+  assert.doesNotMatch(source, /Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel/);
 });
