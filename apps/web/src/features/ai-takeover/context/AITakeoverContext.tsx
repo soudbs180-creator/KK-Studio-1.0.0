@@ -85,6 +85,10 @@ interface AITakeoverProviderProps {
   onGenerate?: () => Promise<void> | void;
   canvasTransform?: { x: number; y: number; scale: number } | null;
   canvasRef?: any;
+  openToolWindowInstance?: (toolId: string, url?: string, options?: any) => void;
+  updateToolWindowLayout?: (instanceId: string, layout: Partial<any>) => void;
+  setPptEditorMode?: (mode: string) => void;
+  togglePinTool?: (toolId: string, pinned: boolean) => void;
 }
 
 export function AITakeoverProvider({
@@ -115,7 +119,11 @@ export function AITakeoverProvider({
   ecommerceState,
   onGenerate,
   canvasTransform,
-  canvasRef
+  canvasRef,
+  openToolWindowInstance,
+  updateToolWindowLayout,
+  setPptEditorMode,
+  togglePinTool
 }: AITakeoverProviderProps) {
 
   const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
@@ -261,7 +269,11 @@ export function AITakeoverProvider({
       notify,
       config,
       ecommerceState,
-      onGenerate
+      onGenerate,
+      openToolWindowInstance,
+      updateToolWindowLayout,
+      setPptEditorMode,
+      togglePinTool
     };
 
     setCurrentRun(agentRunStore.getRun(runId) ?? null);
@@ -270,7 +282,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
 
 
   // 发送消息

@@ -33,6 +33,15 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // 0. 开发与测试环境 Bypass 安全守卫：如果是本地开发或测试环境，直接 bypass，防止干扰 Vite 热更新与 Puppeteer 自动化测试
+  if (
+    self.location.hostname === 'localhost' ||
+    self.location.hostname === '127.0.0.1' ||
+    self.location.hostname.startsWith('192.168.')
+  ) {
+    return;
+  }
+
   // 1. 强同源优先过滤：对于核心入口、SW 自身以及 API 中转路由，坚决不走 CDN 且不作拦截，强同源直接通过
   if (
     url.origin === self.location.origin &&

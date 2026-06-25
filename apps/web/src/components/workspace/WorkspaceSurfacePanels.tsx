@@ -33,6 +33,10 @@ interface WorkspaceSurfacePanelsProps {
   onGenerate?: any;
   canvasTransform?: { x: number; y: number; scale: number } | null;
   canvasRef?: any;
+  openToolWindowInstance?: (toolId: string, url?: string, options?: any) => void;
+  updateToolWindowLayout?: (instanceId: string, layout: Partial<any>) => void;
+  setPptEditorMode?: (mode: string) => void;
+  togglePinTool?: (toolId: string, pinned: boolean) => void;
 }
 
 export function WorkspaceSurfacePanels({
@@ -60,6 +64,10 @@ export function WorkspaceSurfacePanels({
   onGenerate,
   canvasTransform,
   canvasRef,
+  openToolWindowInstance,
+  updateToolWindowLayout,
+  setPptEditorMode,
+  togglePinTool,
 }: WorkspaceSurfacePanelsProps) {
   return (
     <WorkspacePanels
@@ -90,6 +98,10 @@ export function WorkspaceSurfacePanels({
               canvasTransform={canvasTransform}
               canvasRef={canvasRef}
               workspaceSurface={workspaceSurface}
+              openToolWindowInstance={openToolWindowInstance}
+              updateToolWindowLayout={updateToolWindowLayout}
+              setPptEditorMode={setPptEditorMode}
+              togglePinTool={togglePinTool}
             />
           </Suspense>
         </div>

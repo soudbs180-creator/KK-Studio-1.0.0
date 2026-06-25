@@ -87,6 +87,10 @@ interface ChatSidebarProps {
     canvasTransform?: { x: number; y: number; scale: number } | null;
     canvasRef?: any;
     workspaceSurface?: string;
+    openToolWindowInstance?: (toolId: string, url?: string, options?: any) => void;
+    updateToolWindowLayout?: (instanceId: string, layout: Partial<any>) => void;
+    setPptEditorMode?: (mode: string) => void;
+    togglePinTool?: (toolId: string, pinned: boolean) => void;
 }
 
 
@@ -4555,6 +4559,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             onGenerate={props.onGenerate}
             canvasTransform={props.canvasTransform}
             canvasRef={props.canvasRef}
+            openToolWindowInstance={props.openToolWindowInstance}
+            updateToolWindowLayout={props.updateToolWindowLayout}
+            setPptEditorMode={props.setPptEditorMode}
+            togglePinTool={props.togglePinTool}
         >
             <ChatSidebarInner
                 {...props}

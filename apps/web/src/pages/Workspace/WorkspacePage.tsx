@@ -7,7 +7,7 @@ import ImageNode from '../../components/image/ImageCard';
 import PromptNodeComponent from '../../components/canvas/PromptNodeComponent';
 // KeyManagerModal removed - integrated into UserProfileModal
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
-import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type RedrawRequest, type RedrawCropPlan, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from '../../types';
+import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type RedrawRequest, type RedrawCropPlan, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState, type ToolWindowInstance } from '../../types';
 import { CanvasGroupComponent } from '../../components/canvas/CanvasGroupComponent';
 import { getModelCredits } from '../../services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from '../../services/auth/keyManager';
@@ -296,6 +296,7 @@ import { calculateImageHash } from '../../utils/imageUtils';
 import { useImageGeneration } from '../../hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { WorkspaceSurfacePanels } from '../../components/workspace/WorkspaceSurfacePanels';
+import { WindowManager } from '../../components/workspace/WindowManager';
 import {
   appendReferenceMappingToPrompt,
   reorderReferenceImagesByMentions,
@@ -365,6 +366,97 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [generatingGroupIds, setGeneratingGroupIds] = useState<string[]>([]);
   const [groupOverlapMap, setGroupOverlapMap] = useState<Record<string, string[]>>({});
   const [liveNodePositionVersion, setLiveNodePositionVersion] = useState(0);
+
+  // 悬浮窗口实例管理状态
+  const [toolWindows, setToolWindows] = useState<ToolWindowInstance[]>([]);
+
+  const handleCloseWindow = useCallback((instanceId: string) => {
+    setToolWindows((prev) => prev.filter((w) => w.instanceId !== instanceId));
+  }, []);
+
+  const handleMinimizeWindow = useCallback((instanceId: string, minimized: boolean) => {
+    setToolWindows((prev) =>
+      prev.map((w) => (w.instanceId === instanceId ? { ...w, minimized } : w))
+    );
+  }, []);
+
+  const handleFocusWindow = useCallback((instanceId: string) => {
+    setToolWindows((prev) => {
+      const target = prev.find((w) => w.instanceId === instanceId);
+      if (!target) return prev;
+      const maxZIndex = prev.reduce((max, w) => Math.max(max, w.zIndex), 9000);
+      return prev.map((w) =>
+        w.instanceId === instanceId ? { ...w, zIndex: maxZIndex + 1 } : w
+      );
+    });
+  }, []);
+
+  const handleUpdateWindowLayout = useCallback((instanceId: string, layout: Partial<ToolWindowInstance>) => {
+    setToolWindows((prev) =>
+      prev.map((w) => (w.instanceId === instanceId ? { ...w, ...layout } : w))
+    );
+  }, []);
+
+  const openToolWindowInstance = useCallback((toolId: string, url?: string, options?: any) => {
+    const isMultiInstance = options?.multiInstance ?? false;
+    const title = options?.title || toolId;
+
+    setToolWindows((prev) => {
+      if (!isMultiInstance) {
+        const existing = prev.find((w) => w.toolId === toolId);
+        if (existing) {
+          const maxZIndex = prev.reduce((max, w) => Math.max(max, w.zIndex), 9000);
+          return prev.map((w) =>
+            w.toolId === toolId
+              ? { ...w, minimized: false, zIndex: maxZIndex + 1 }
+              : w
+          );
+        }
+      }
+
+      const instanceId = `${toolId}_${Date.now()}`;
+      const existingInstancesCount = prev.filter((w) => w.toolId === toolId).length;
+      const offset = existingInstancesCount * 30;
+      
+      const width = options?.width || 600;
+      const height = options?.height || 450;
+      
+      const defaultX = Math.max(50, Math.min(window.innerWidth - width - 50, 100 + offset));
+      const defaultY = Math.max(50, Math.min(window.innerHeight - height - 50, 100 + offset));
+
+      const x = options?.x !== undefined ? options.x : defaultX;
+      const y = options?.y !== undefined ? options.y : defaultY;
+
+      const maxZ = prev.reduce((max, w) => Math.max(max, w.zIndex), 9000);
+
+      const newWin: ToolWindowInstance = {
+        instanceId,
+        toolId,
+        url,
+        x,
+        y,
+        width,
+        height,
+        minimized: false,
+        zIndex: maxZ + 1,
+        title,
+      };
+
+      return [...prev, newWin];
+    });
+  }, []);
+
+  const setPptEditorMode = useCallback((mode: string) => {
+    import('../../services/system/notificationService').then(({ notify }) => {
+      notify.success('PPT 编辑模式已切换', `已切换至：${mode}`);
+    });
+  }, []);
+
+  const togglePinTool = useCallback((toolId: string, pinned: boolean) => {
+    import('../../services/system/notificationService').then(({ notify }) => {
+      notify.success(pinned ? '工具已固定' : '工具已取消固定', `工具 ID: ${toolId}`);
+    });
+  }, []);
 
   const [promptGroupLayoutVersion, setPromptGroupLayoutVersion] = useState(0);
   const [imageCardHeightById, setImageCardHeightById] = useState<Record<string, number>>({});
@@ -4914,6 +5006,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
       onGenerate={handleGenerate}
       canvasTransform={canvasTransform}
       canvasRef={canvasRef}
+      openToolWindowInstance={openToolWindowInstance}
+      updateToolWindowLayout={handleUpdateWindowLayout}
+      setPptEditorMode={setPptEditorMode}
+      togglePinTool={togglePinTool}
     />
   );
 
@@ -5927,6 +6023,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
         </div>
       )}
 
+      <WindowManager
+        toolWindows={toolWindows}
+        onCloseWindow={handleCloseWindow}
+        onMinimizeWindow={handleMinimizeWindow}
+        onFocusWindow={handleFocusWindow}
+        onUpdateWindowLayout={handleUpdateWindowLayout}
+      />
     </WorkspaceShell>
   );
 };

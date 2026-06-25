@@ -614,3 +614,71 @@ test('ToolRegistry: provider.getModelCapabilities queries properties correctly',
   assert.equal(resultNonExist.modelId, 'non-exist-model');
   assert.equal(resultNonExist.multimodal, false);
 });
+
+test('ToolRegistry: ui.openToolWindow calls openToolWindowInstance in ctx', async () => {
+  let openedToolId = '';
+  let openedUrl = '';
+  let openedOptions: any = null;
+  const mockCtx = {
+    openToolWindowInstance: async (toolId: string, url?: string, options?: any) => {
+      openedToolId = toolId;
+      openedUrl = url || '';
+      openedOptions = options;
+    },
+    notify: {
+      success: () => {}
+    }
+  };
+
+  await toolRegistryInstance.execute('ui.openToolWindow', {
+    toolId: 'stress-lab',
+    url: 'https://test-tool.com',
+    options: { width: 500 }
+  }, mockCtx);
+
+  assert.equal(openedToolId, 'stress-lab');
+  assert.equal(openedUrl, 'https://test-tool.com');
+  assert.deepEqual(openedOptions, { width: 500 });
+});
+
+test('ToolRegistry: ui.updateWindowLayout calls updateToolWindowLayout in ctx', async () => {
+  const originalRaf = (globalThis as any).requestAnimationFrame;
+  (globalThis as any).requestAnimationFrame = (cb: () => void) => {
+    return setTimeout(cb, 1) as any;
+  };
+
+  try {
+    let updatedInstanceId = '';
+    let updatedLayout: any = null;
+    const mockCtx = {
+      updateToolWindowLayout: (instanceId: string, layout: any) => {
+        updatedInstanceId = instanceId;
+        updatedLayout = layout;
+      },
+      notify: {
+        success: () => {}
+      }
+    };
+
+    await toolRegistryInstance.execute('ui.updateWindowLayout', {
+      instanceId: 'win_123',
+      x: 150,
+      y: 250,
+      width: 800,
+      height: 600,
+      minimized: true
+    }, mockCtx);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.equal(updatedInstanceId, 'win_123');
+    assert.equal(updatedLayout.x, 150);
+    assert.equal(updatedLayout.y, 250);
+    assert.equal(updatedLayout.width, 800);
+    assert.equal(updatedLayout.height, 600);
+    assert.equal(updatedLayout.minimized, true);
+  } finally {
+    (globalThis as any).requestAnimationFrame = originalRaf;
+  }
+});
+

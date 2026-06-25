@@ -624,3 +624,24 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run test:unit` 全套 1600 个测试用例均 100% 成功通过。
 
+
+## 41. 2026-06-25 - Sprint 8: Intelligent CDN Fallback and Multi-Instance WindowManager Integration (本次追加)
+- **修改范围**：
+  1. 实现了基于 Service Worker 的离线缓存与 CDN 超时 200ms 超时熔断回退降级防御，并在本地 localhost 开发测试环境下增加了 Bypass 放行防线。
+  2. 研发并集成了 WindowManager 多实例悬浮窗口管理器，支持内置 React 组件（StressLab, BrowserAssistant）以及外部 iframe 页面的拖动、缩放、置顶及最大/最小化逻辑。
+  3. 深度打通了 AI 助手 Takeover 运行期的 `ui.openToolWindow` 和 `ui.updateWindowLayout` 方法路由，并实现了 `setPptEditorMode` 和 `togglePinTool` 的 Mock 通知闭环。
+- **修改文件**：
+  - [sw.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/public/sw.js)
+  - [AITakeoverContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx)
+  - [ChatSidebar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/ChatSidebar.tsx)
+  - [WorkspaceSurfacePanels.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [ai-assistant-tool-registry.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/ai-assistant-tool-registry.test.ts)
+  - [app-version.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/KK-Studio-Portable/app/dist/app-version.json)
+- **当前设计决策**：
+  - **开发环境旁路策略**：在 `sw.js` 的拦截最前端设置本地 localhost 及局域网的 hostname 判断并直接 bypass，彻底隔绝了本地 Puppeteer 自动化测试及热更新与 CDN 缓存降级机制的冲突。
+  - **双缓冲置顶与级联级算**：利用 `toolWindows` 全局 state 自适应计算错位 cascade 偏移量并做 instance 唯一命名；点击悬浮窗或 AI 控制触发 zIndex +1 置顶提升，并使用双缓冲 pending rAF 更新机制处理频繁的 layout 重排。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 成功通过（包括 1600+ 单元测试、空间索引性能基准测试、Puppeteer drag/banner centering smoke 测试、MIME 及 Z-Index 检测）。
+
+
