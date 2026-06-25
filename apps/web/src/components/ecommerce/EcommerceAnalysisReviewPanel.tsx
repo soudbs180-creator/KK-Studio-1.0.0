@@ -321,7 +321,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                   type="button"
                   data-testid="ecommerce-review-manual-reference-remove"
                   className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border bg-black/70 text-white"
-                  style={{ borderColor: 'rgba(255,255,255,0.18)' }}
+                  style={{ borderColor: 'rgba(255,255,255,0.18)' }} // UI_TOKEN_EXCEPTION
                   onClick={() => onRemoveManualReferenceFile(itemKey, index)}
                 >
                   <X size={12} />

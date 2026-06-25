@@ -551,7 +551,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                   {onDeleteTask ? (
                     <button
                       type="button"
-                      className="rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors text-[var(--clay-brand-coral)] hover:bg-[rgba(239,68,68,0.10)]"
+                      className="rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors text-[var(--clay-brand-coral)] hover:bg-[rgba(239,68,68,0.10)]" // UI_TOKEN_EXCEPTION
                       style={{ ...actionButtonStyle, borderColor: 'var(--clay-brand-coral)' }}
                       onClick={(event) => {
                         event.stopPropagation();

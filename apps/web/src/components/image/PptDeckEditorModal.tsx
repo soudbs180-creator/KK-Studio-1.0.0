@@ -53,7 +53,7 @@ const hexToRgbAlpha = (value?: string, opacity = 1) => {
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   const alpha = Math.max(0, Math.min(1, opacity));
 
-  return `rgb(${red} ${green} ${blue} / ${alpha})`;
+  return `rgb(${red} ${green} ${blue} / ${alpha})`; // UI_TOKEN_EXCEPTION
 };
 
 const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({

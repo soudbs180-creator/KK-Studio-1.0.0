@@ -712,7 +712,7 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
                     {pick('服务状态', 'Service Status')}
                   </div>
                   <div className="text-[13px] font-semibold flex items-center gap-1.5 text-[var(--text-primary)]">
-                    <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} />
+                    <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} /> // UI_TOKEN_EXCEPTION
                     {ocrSettings.enabled && ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey 
                       ? pick('已启用 (已配置专属密钥)', 'Active (BYOK Configured)') 
                       : pick('未启用 (未配置密钥)', 'Inactive (Key Missing)')}

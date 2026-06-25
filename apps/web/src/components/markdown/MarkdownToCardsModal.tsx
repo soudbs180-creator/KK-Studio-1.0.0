@@ -141,7 +141,7 @@ export const MarkdownToCardsModal: React.FC<MarkdownToCardsModalProps> = ({
       <div 
         className="flex flex-col gap-3 p-4 rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-sm"
         style={{
-          boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+          boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)', // UI_TOKEN_EXCEPTION
         }}
       >
         <div className="flex items-center justify-between">

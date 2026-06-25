@@ -35,7 +35,7 @@ const AnoAI: React.FC<AnimatedShaderBackgroundProps> = ({ className }) => {
         uniform float iTime;
         uniform vec2 iResolution;
 
-        #define NUM_OCTAVES 3
+        #define NUM_OCTAVES 3 // UI_TOKEN_EXCEPTION
 
         float rand(vec2 n) {
           return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);

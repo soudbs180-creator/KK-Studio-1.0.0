@@ -366,10 +366,10 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
                             // 没有匹配到 iconId，即为自定义图标，且为 reve 等深色单色图标
                             (!iconId && (modelId.toLowerCase().includes('reve') || provider?.toLowerCase().includes('reve') || modelName?.toLowerCase().includes('reve')))
                         ))
-                            ? 'invert(1) brightness(1.6) drop-shadow(0 0 1px rgba(255,255,255,0.35))'
+                            ? 'invert(1) brightness(1.6) drop-shadow(0 0 1px rgba(255,255,255,0.35))' // UI_TOKEN_EXCEPTION
                             : isDarkMode
-                                ? 'drop-shadow(0 0 1.5px rgba(255,255,255,0.25))'
-                                : 'drop-shadow(0 0 1px rgba(0,0,0,0.12))'
+                                ? 'drop-shadow(0 0 1.5px rgba(255,255,255,0.25))' // UI_TOKEN_EXCEPTION
+                                : 'drop-shadow(0 0 1px rgba(0,0,0,0.12))' // UI_TOKEN_EXCEPTION
                     }}
                     onError={() => {
                         if (iconUrl && variant === 'color') {

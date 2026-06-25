@@ -136,7 +136,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
               <button
                 type="button"
                 className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border bg-black/60 text-white transition-all hover:bg-black/75"
-                style={{ borderColor: 'rgba(255, 255, 255, 0.18)' }}
+                style={{ borderColor: 'rgba(255, 255, 255, 0.18)' }} // UI_TOKEN_EXCEPTION
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();

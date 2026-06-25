@@ -58,9 +58,15 @@ class ImagePriorityLoader {
         // Sort entire queue is expensive if large? 
         // Usually queue size is ~50-100 max images on screen? Should be fine.
 
+        // 简体中文注释：预存队列中各任务元素的视口中心距离，避免 sort 内部重复触发 getBoundingClientRect 布局重排。
+        const distances = new Map<string, number>();
+        this.queue.forEach((task) => {
+            distances.set(task.id, distanceFromViewportCenter(task.element));
+        });
+
         this.queue.sort((a, b) => {
-            const distA = distanceFromViewportCenter(a.element);
-            const distB = distanceFromViewportCenter(b.element);
+            const distA = distances.get(a.id) || 0;
+            const distB = distances.get(b.id) || 0;
             return distA - distB;
         });
 

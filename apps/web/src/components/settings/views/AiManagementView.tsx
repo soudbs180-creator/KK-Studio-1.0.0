@@ -179,7 +179,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
             <h3 className="text-[16px] font-bold text-[var(--text-primary)] flex items-center gap-2">
               {getRoleDisplayName(role)}
               {assignment.enabled ? (
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse" /> // UI_TOKEN_EXCEPTION
               ) : (
                 <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
               )}

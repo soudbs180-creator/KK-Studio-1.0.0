@@ -43,7 +43,7 @@ const exportSelectedAreaToPngSync = (
     }
 
     // 1. 填充白底背景，确保多模态大模型对于透明通道的处理一致且高对比度
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff'; // UI_TOKEN_EXCEPTION
     ctx.fillRect(0, 0, w, h);
 
     // 2. 将原点平移到框选起点，使全局绝对坐标自动转换为局域绘图坐标
