@@ -445,6 +445,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   ]);
 
   const syncLiveNodePositionState = useCallback(() => {
+    if (isNodeDragActive) {
+      return;
+    }
+
     const hasActivePromptGroupDragPresentation = isNodeDragActive
       && Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
         state.layoutMode === 'regrouping' || state.layoutMode === 'docked'
@@ -470,6 +474,17 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       setLiveNodePositionVersion((prev) => prev + 1);
     });
   }, [isNodeDragActive, promptGroupLayoutStateByIdRef, setLiveNodePositionVersion]);
+
+  const isFirstDragRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstDragRenderRef.current) {
+      isFirstDragRenderRef.current = false;
+      return;
+    }
+    if (!isNodeDragActive) {
+      setLiveNodePositionVersion((prev) => prev + 1);
+    }
+  }, [isNodeDragActive, setLiveNodePositionVersion]);
 
   const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
     if (!nodeId) {

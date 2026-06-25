@@ -773,17 +773,21 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         if (isChatMode) return;
 
         const unsubscribe = canvasLivePositionStore.subscribe(node.id, (pos) => {
-            if (pos && containerRef.current) {
-                const renderLeft = snapCanvasCoordinate(pos.x - cardWidth / 2, zoomScale || 1);
-                const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+            if (containerRef.current) {
+                if (pos) {
+                    const renderLeft = snapCanvasCoordinate(pos.x - cardWidth / 2, zoomScale || 1);
+                    const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
 
-                containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
+                    containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
 
-                // 🚀 同时更新这组下属所有子图像节点的局部连接线！
-                if (node.childImageIds && node.childImageIds.length > 0) {
-                    node.childImageIds.forEach((childImageId) => {
-                        CanvasConnectorScheduler.request(node.id, childImageId);
-                    });
+                    // 🚀 同时更新这组下属所有子图像节点的局部连接线！
+                    if (node.childImageIds && node.childImageIds.length > 0) {
+                        node.childImageIds.forEach((childImageId) => {
+                            CanvasConnectorScheduler.request(node.id, childImageId);
+                        });
+                    }
+                } else {
+                    containerRef.current.style.transform = '';
                 }
             }
         });

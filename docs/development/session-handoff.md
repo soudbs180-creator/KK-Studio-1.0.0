@@ -177,5 +177,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run architecture:check` 100% 成功通过。
 - **风险与下一步**：
-  - **风险**：无明显回归风险，已通过 1594 个单元测试和基准测试。
-  - **下一步**：提交并推送代码，清理临时文件，等待后续优化。
+  - **风险**：无。
+  - **下一步**：开启 Phase 4.3 的拖拽零重新渲染重构。
+
+## 15. 2026-06-25 - 画布拖拽性能零重新渲染 (Zero-Rerender) 重构
+- **修改范围**：将卡片高频拖动位移的 Live preview 逻辑与低频 React 持久化状态 commit 彻底剥离，阻断拖拽过程中的高频 React 重新渲染，对齐 WorkflowUtility 节点的订阅式移动。
+- **修改文件**：
+  - [usePromptGroupLayout.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/usePromptGroupLayout.ts)
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+  - [PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)
+  - [WorkflowUtilityCard.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 在 `usePromptGroupLayout` 的 `syncLiveNodePositionState` 内部，当拖动激活时直接拦截并阻断 React 状态更新，达成拖动中 0次 React Commit / Rerender，大幅降低 CPU 开销。
+  - 在拖动完全结束时，利用 `useEffect` 进行一次性 version 状态同步，固化坐标至 React 树中。
+  - 优化 `ImageCard2` 与 `PromptNodeComponent` 位置订阅器，当 store 坐标为 `null` 时清空内联 `style.transform` 样式，消除坐标残留微小偏移的隐患。
+  - 改造 `WorkflowUtilityCard` 使其挂载 `containerRef` 并接入 `canvasLivePositionStore.subscribe`，让 Workflow 节点在多卡片被拖动时支持原生高性能样式级位移同步。
+- **已运行验证**：
+  - 运行 `npm run test:unit` 全部 1594 个单元测试 100% Pass。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run verify:canvas-performance` 性能测试成功通过。
+  - 运行 `npm run architecture:check` 架构边界校验通过。
+- **风险与下一步**：
+  - **风险**：无明显回归风险，已由单元测试与基准测试保障功能。
+  - **下一步**：提交并推送代码，继续跟进 Phase 4.4 卡片轻量化与 detail level 降级等交互优化。

@@ -329,15 +329,19 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         if (isChatMode) return;
 
         const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {
-            if (pos && containerRef.current) {
-                const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
-                const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+            if (containerRef.current) {
+                if (pos) {
+                    const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
+                    const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
 
-                containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
+                    containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
 
-                // 🚀 如果存在 parentPromptId，同时更新连线！
-                if (image.parentPromptId) {
-                    CanvasConnectorScheduler.request(image.parentPromptId, image.id);
+                    // 🚀 如果存在 parentPromptId，同时更新连线！
+                    if (image.parentPromptId) {
+                        CanvasConnectorScheduler.request(image.parentPromptId, image.id);
+                    }
+                } else {
+                    containerRef.current.style.transform = '';
                 }
             }
         });

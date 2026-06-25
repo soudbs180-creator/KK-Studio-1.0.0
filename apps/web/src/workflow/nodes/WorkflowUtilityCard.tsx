@@ -5,8 +5,13 @@ import type { WorkflowNode } from '../../types';
 import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
+import { canvasLivePositionStore } from '../../app/canvasLivePositionStore';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
+
+const snapCanvasCoordinate = (value: number, scale: number = 1) => {
+  return Math.round(value * scale) / scale;
+};
 
 interface WorkflowUtilityCardProps<TNode extends UtilityCardNode = UtilityCardNode> {
   node: TNode;
@@ -62,6 +67,24 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   const rafRef = useRef<number | null>(null);
   const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsubscribe = canvasLivePositionStore.subscribe(node.id, (pos) => {
+      if (containerRef.current) {
+        if (pos) {
+          const renderLeft = snapCanvasCoordinate(pos.x - width / 2, zoomScale || 1);
+          const renderTop = snapCanvasCoordinate(pos.y - height, zoomScale || 1);
+          const originalLeft = node.position.x - width / 2;
+          const originalTop = node.position.y - height;
+          containerRef.current.style.transform = `translate3d(${renderLeft - originalLeft}px, ${renderTop - originalTop}px, 0px)`;
+        } else {
+          containerRef.current.style.transform = '';
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [node.id, width, height, zoomScale, node.position.x, node.position.y]);
 
   useEffect(() => {
     return () => {
@@ -149,6 +172,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
 
   return (
     <div
+      ref={containerRef}
       className={`absolute rounded-[22px] border transition-all ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
       style={{
         left: node.position.x - width / 2,
