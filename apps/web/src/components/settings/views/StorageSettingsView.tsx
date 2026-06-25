@@ -403,7 +403,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* Card 5: Persistence Modes (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -471,7 +471,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* Card 6: Usage Distribution (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -613,7 +613,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* Card 8: Workspace Repair Actions (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>

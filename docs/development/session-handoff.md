@@ -689,3 +689,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
   - 运行浏览器子代理（Browser Subagent）连入本地开发服务器，在默认浏览器缓存模式下核对本地模式行，状态标签正确渲染为“支持但未授权”，按钮在 Y:550 高度精准水平对齐。
+
+## 45. 2026-06-25 - Fix Local Storage Card Recognition ReferenceError Crash (本次追加)
+- **修改范围**：
+  1. 修复了应用在选择本地存储并启动/重新加载时，由于 `savedActiveCanvasId` 拼写错误导致的 `ReferenceError` 白屏和渲染崩溃。
+  2. 确保在恢复本地文件夹连接并加载项目数据时，能够无缝地识别并展示本地的原图卡片和画布项目，不再发生初始化流程挂起或中断。
+- **修改文件**：
+  - [CanvasContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/CanvasContext.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **纠正局部变量引用错误**：将 `CanvasContext.tsx` 中从磁盘项目数据 `loadProjectWithThumbs` 中解构重命名出的 `diskActiveCanvasId`，在后续的 `resolvePreferredActiveCanvasId` 调用中正确传递，替换原先错误的 `savedActiveCanvasId`，消除了全局白屏级别的死锁故障。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
+  - 运行浏览器仿真测试（Browser Subagent）确认应用不再出现 `ReferenceError: savedActiveCanvasId is not defined` 异常，首屏成功识别并精细渲染出全部本地卡片与画布元素。
+

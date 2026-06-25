@@ -558,9 +558,7 @@ export const fileSystemService = {
                     const pData = JSON.parse(pText);
 
                     if (pData.canvas) {
-                        if (!pData.metadata?.ownerId || pData.metadata.ownerId === ownerId) {
-                            mergeCanvasList([pData.canvas], !hasRootConfig);
-                        }
+                        mergeCanvasList([pData.canvas], !hasRootConfig);
                     } else if (pData.canvases && Array.isArray(pData.canvases)) {
                         mergeCanvasList(pData.canvases, !hasRootConfig);
                     }

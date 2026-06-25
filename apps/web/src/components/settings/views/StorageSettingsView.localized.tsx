@@ -557,7 +557,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* 卡片 5: 持久化模式 (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -627,7 +627,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* 卡片 6: 容量占用 (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -774,7 +774,7 @@ export const StorageSettingsView: React.FC = () => {
 
         {/* 卡片 8: 工作区修复 (2A * 2row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>

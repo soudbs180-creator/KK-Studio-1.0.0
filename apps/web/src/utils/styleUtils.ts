@@ -93,7 +93,7 @@ export const getCardDimensions = (aspectRatio?: AspectRatio, includeFooter: bool
         case ASPECT_RATIO.PORTRAIT_1_4:
         case ASPECT_RATIO.PORTRAIT_1_8:
             width = CARD_WIDTHS.PORTRAIT;
-            imageHeight = aspectRatio === ASPECT_RATIO.PORTRAIT_1_8 ? 1920 : 960; // Extreme tall cards
+            imageHeight = aspectRatio === ASPECT_RATIO.PORTRAIT_1_8 ? 600 : 560; // Clamped from 1920/960 to prevent giant empty cards and layout distortion
             break;
 
         case ASPECT_RATIO.SQUARE:

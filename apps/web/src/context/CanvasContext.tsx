@@ -600,11 +600,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
                                     const projectLoadPromise = traceLocalPerformance('canvas-startup.disk-project-load', () => fileSystemService.loadProjectWithThumbs(handle));
                                     const referenceImageLoadPromise = traceLocalPerformance('canvas-startup.reference-image-load', () => fileSystemService.loadAllReferenceImages(handle));
-                                    const [{ canvases, images, activeCanvasId: savedActiveCanvasId }, refUrls] = await Promise.all([
+                                    const [{ canvases, images, activeCanvasId: diskActiveCanvasId }, refUrls] = await Promise.all([
                                         projectLoadPromise,
                                         referenceImageLoadPromise,
                                     ]);
-                                    logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
+                                    logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${diskActiveCanvasId}`);
 
                                     // Hydrate the cache without ever letting thumbnails overwrite the original slot.
                                     for (const [id, data] of images.entries()) {
@@ -622,7 +622,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                             const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
                                             const finalActiveId = resolvePreferredActiveCanvasId(
                                                 prev.activeCanvasId,
-                                                savedActiveCanvasId,
+                                                diskActiveCanvasId,
                                                 mergedCanvases
                                             );
 
@@ -2189,7 +2189,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
                     }
 
-                    const { canvases, images } = await fileSystemService.loadProjectWithThumbs(handle);
+                    const { canvases, images, activeCanvasId: diskActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
 
                     // Hydrate caches without collapsing original and thumbnail into the same storage slot.
                     for (const [id, data] of images.entries()) {
@@ -2222,7 +2222,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                             const finalActiveId = resolvePreferredActiveCanvasId(
                                 prev.activeCanvasId,
-                                null,
+                                diskActiveCanvasId,
                                 finalCanvases
                             );
 
@@ -2332,7 +2332,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     await setLocalFolderHandle(newHandle);
 
                     // 重新载入所选目录下的项目并进行合并
-                    const { canvases, images } = await fileSystemService.loadProjectWithThumbs(newHandle);
+                    const { canvases, images, activeCanvasId: diskActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(newHandle);
                     
                     // 预加载恢复的媒体缓存
                     for (const [id, data] of images.entries()) {
@@ -2485,7 +2485,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         try {
             const handle = currentState.fileSystemHandle;
-            const { canvases, images } = await fileSystemService.loadProjectWithThumbs(handle);
+            const { canvases, images, activeCanvasId: diskActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
 
             // Hydrate caches without letting thumbnail reads overwrite original-image storage.
             for (const [id, data] of images.entries()) {
@@ -2547,7 +2547,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     const mergedCanvases = mergeCanvases(prev.canvases, hydratedDiskCanvases, normalizeCanvasPromptRecovery);
                     const finalActiveId = resolvePreferredActiveCanvasId(
                         prev.activeCanvasId,
-                        null,
+                        diskActiveCanvasId,
                         mergedCanvases
                     );
 
