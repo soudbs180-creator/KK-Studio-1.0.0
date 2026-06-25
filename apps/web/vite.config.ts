@@ -324,20 +324,8 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
         return true;
     }
 
-    if (
-        normalized.includes('/src/') ||
-        normalized.includes('/public/') ||
-        normalized.includes('/server/') ||
-        normalized.includes('/tests/')
-    ) {
-        return false;
-    }
-
-    if (ROOT_WATCH_FILES.has(filename)) {
-        return false;
-    }
-
-    return true;
+    // 默认不忽略，允许 chokidar 递归遍历所有目录，以便深度监听具体文件
+    return false;
 }
 
 function resolveManualChunk(id: string): string | undefined {
