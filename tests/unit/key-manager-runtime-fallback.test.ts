@@ -14,8 +14,8 @@ test('keyManager reads and writes user slot/provider state through the local API
   assert.doesNotMatch(source, /loadUserApisPayloadFromCloudRecord/);
   assert.doesNotMatch(source, /mergeUserApisPayloadToCloudRecord/);
   assert.match(source, /const accessToken = await getPreferredKkApiAccessToken\(\);/);
-  assert.match(source, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
-  assert.match(source, /const response = await legacyWebApiClient\.replaceKeyManagerCloudState\(/);
+  assert.match(source, /const response = await kkWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
+  assert.match(source, /const response = await kkWebApiClient\.replaceKeyManagerCloudState\(/);
   assert.doesNotMatch(source, /void getPreferredKkApiAccessToken\(\)\.then\(\(accessToken\) => \(/);
 });
 

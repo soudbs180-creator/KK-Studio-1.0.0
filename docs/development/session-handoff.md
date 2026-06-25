@@ -392,5 +392,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 在 `mobile-more-sheet-layout-contract.test.ts` 中，将断言修改为最新的 `grid-cols-[20fr_20fr_20fr_40fr]` 以使单元测试对齐当前实现。
 - **已运行验证**：
   - 运行 `npm run dev:restart` 重启开发服务，验证服务启动正常，重新生成了健康的 PID。
-  - 运行 `npm run architecture:check` 和 `npm run governance:check` 均 100% 成功通过。
+  - 运行 `npm run architecture:check` and `npm run governance:check` 均 100% 成功通过。
   - 运行 `npm run typecheck` 100% 成功通过。
+
+## 27. 2026-06-25 - Fix Unit Test Contracts for Refactored API Client and Router (本次追加)
+- **修改范围**：修复并对齐因 Legacy API Client 重构收拢以及供应商路由合并到 admin.js 导致的单元测试契约断言失效。
+- **修改文件**：
+  - [tests/unit/runtime-legacy-fallback-guards.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/runtime-legacy-fallback-guards.test.ts)
+  - [tests/unit/key-manager-runtime-fallback.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/key-manager-runtime-fallback.test.ts)
+  - [tests/unit/billing-remaining-balance-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/billing-remaining-balance-contract.test.ts)
+  - [tests/unit/admin-credit-provider-routes-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/admin-credit-provider-routes-contract.test.ts)
+- **当前设计决策**：
+  - 将所有原断言 `legacyWebApiClient` 的地方替换为重构后的 `kkWebApiClient`。
+  - 将 `admin-credit-provider-routes-contract.test.ts` 中原本加载不存在的 `credit-provider-router.js` 改为加载 `admin.js`，并将相关 SQL 参数化和 API 密钥指纹保留断言一并迁移至 `admin.js`。
+- **已运行验证**：
+  - 运行 `npm run test:unit`（1601 个用例）全部 100% 成功通过。

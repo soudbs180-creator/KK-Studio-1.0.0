@@ -187,10 +187,10 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(userApiCloudRecordStorageSource.includes('export async function mergeUserApisPayloadToCloudRecord('));
   assert.doesNotMatch(userApiCloudRecordStorageSource, /ViaSupabase/);
   assert.equal(existsSync(shimPath), false);
-  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApisPayload({'));
-  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
-  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
-  assert.ok(userApiCloudRecordStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));
+  assert.ok(userApiCloudRecordStorageSource.includes('kkWebApiClient.replaceUserApisPayload({'));
+  assert.ok(userApiCloudRecordStorageSource.includes('kkWebApiClient.replaceKeyManagerCloudState({'));
+  assert.ok(userApiCloudRecordStorageSource.includes('kkWebApiClient.replaceUserApiEntries({'));
+  const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000';
   assert.ok(userApiCloudRecordStorageSource.includes('normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER'));
   assert.doesNotMatch(userApiPayloadSource, /const CLIENT_VISIBLE_SECRET_PLACEHOLDER/);
   assert.doesNotMatch(userApiPayloadSource, /const REDACTED_SECRET_PREFIX/);
