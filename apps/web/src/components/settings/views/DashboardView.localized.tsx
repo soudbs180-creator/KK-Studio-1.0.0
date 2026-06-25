@@ -1232,21 +1232,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-inline-row span {
-          min-width: 0;
-          overflow: hidden;
           color: var(--text-secondary);
           font-size: var(--type-caption);
-          text-overflow: ellipsis;
           white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .dashboard-inline-row strong {
+          flex: 1;
           min-width: 0;
           overflow: hidden;
-          color: var(--text-primary);
-          font-size: var(--type-caption);
           text-overflow: ellipsis;
           white-space: nowrap;
+          text-align: right;
+          color: var(--text-primary);
+          font-size: var(--type-caption);
         }
 
         .dashboard-module-stack {
@@ -1484,6 +1484,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             align-items: flex-start;
             flex-direction: column;
             gap: 4px;
+          }
+
+          .dashboard-inline-row strong {
+            text-align: left;
           }
 
           .dashboard-inline-row span,

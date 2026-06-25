@@ -414,7 +414,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     // 当 displaySrc 变化时，重置 media 加载状态
     useEffect(() => {
         if (displaySrc) {
-            setIsMediaLoaded(false);
+            if (displaySrc.startsWith('data:')) {
+                setIsMediaLoaded(true);
+            } else {
+                setIsMediaLoaded(false);
+            }
         }
     }, [displaySrc]);
 
@@ -1488,9 +1492,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         </div>
                                     )}
                                     <img
+                                        ref={(el) => {
+                                            if (el && el.complete && !isMediaLoaded) {
+                                                setIsMediaLoaded(true);
+                                            }
+                                        }}
                                         src={displaySrc}
                                         decoding="async"
-                                        loading="lazy"
                                         referrerPolicy="strict-origin-when-cross-origin"
                                         alt={shellTitle}
                                         className="w-full h-full object-cover block"
@@ -1690,9 +1698,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             </div>
                                         ) : (
                                             <img
+                                                ref={(el) => {
+                                                    if (el && el.complete && !isMediaLoaded) {
+                                                        setIsMediaLoaded(true);
+                                                    }
+                                                }}
                                                 src={displaySrc}
                                                 decoding="async"
-                                                loading="lazy"
                                                 referrerPolicy="strict-origin-when-cross-origin"
                                                 alt={image.prompt}
                                                 style={{

@@ -645,3 +645,19 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run verify:changes` 成功通过（包括 1600+ 单元测试、空间索引性能基准测试、Puppeteer drag/banner centering smoke 测试、MIME 及 Z-Index 检测）。
 
 
+## 42. 2026-06-25 - Canvas Card Loading Recovery and Settings Panel Layout Alignment (本次追加)
+- **修改范围**：
+  1. 修复了画布图片卡片因为 lazy loading 冲突及 React 缓存 onLoad 失效引起的一直处于“正在加载...”的显示 Bug。
+  2. 修复了设置总览面板多个卡片模块在 PC 端因 flex 容器均分导致信息文字被挤压截断的排版 Bug。
+- **修改文件**：
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+  - [DashboardView.localized.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/DashboardView.localized.tsx)
+- **当前设计决策**：
+  - **LOD 懒加载冲突切除与完整度侦测**：去除了 `<img>` 标签的 `loading="lazy"` 以杜绝与我们自定义可视区 LOD 队列加载的冲突；并在图片 `ref` 渲染时增加 `el.complete` 检查，以及对 base64 瞬时图片自动设为已加载，彻底防御了 React 对缓存图片不触发 `onLoad` 的经典 Bug。
+  - **文字自适应布局规整**：重构了 `.dashboard-inline-row` 的 CSS，将左侧标签设为 `flex-shrink: 0; white-space: nowrap` 且不再截断，右侧数值设为 `flex: 1; text-align: right` 并开启 ellipsis 溢出截断，从而使各项卡片模块中的数据信息在 PC 端排版工整漂亮；并在移动端媒体查询 `@media (max-width: 640px)` 下覆盖为 `text-align: left` 以迎合单列上下对齐。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
+
+
+
