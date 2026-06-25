@@ -6,10 +6,10 @@ import { test } from 'node:test';
 const sourcePath = path.join(process.cwd(), 'apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 const source = readFileSync(sourcePath, 'utf8');
 
-test('mobile more sheet keeps theme, language, favorites, and project in a 20/20/10/50 top row', () => {
-  assert.match(source, /grid-cols-\[20fr_20fr_10fr_50fr\]/);
+test('mobile more sheet keeps theme, language, favorites, and project in a 20/20/20/40 top row', () => {
+  assert.match(source, /grid-cols-\[20fr_20fr_20fr_40fr\]/);
 
-  const topRowStart = source.indexOf('grid-cols-[20fr_20fr_10fr_50fr]');
+  const topRowStart = source.indexOf('grid-cols-[20fr_20fr_20fr_40fr]');
   const topRowEnd = source.indexOf('{showProjectList ?', topRowStart);
   assert.notEqual(topRowStart, -1);
   assert.notEqual(topRowEnd, -1);

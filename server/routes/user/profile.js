@@ -2,6 +2,8 @@
 // 职责：提供当前登录用户信息，前端依赖它刷新管理员等级和积分余额。
 
 const express = require('express');
+const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || 'admin@example.com';
+
 const crypto = require('crypto');
 const { getPool } = require('../../lib/db');
 const { verifyJWT, signJWT } = require('../../lib/jwt');
@@ -551,7 +553,7 @@ function buildProfileFromUserRow(user) {
   };
 }
 
-function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com')) {
+function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL)) {
   const now = new Date().toISOString();
   return {
     id: userId || 'local-user',
@@ -568,7 +570,7 @@ function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'l
 
 async function loadProfileForUserId(userId) {
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
-    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com';
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
     return buildLocalProfile(userId, defaultEmail);
   }
 
@@ -580,7 +582,7 @@ async function loadProfileForUserId(userId) {
 
   if (result.rows.length > 0) {
     const user = result.rows[0];
-    if (user.email === '977483863@qq.com' && Number(user.admin_level || 0) !== 1) {
+    if (user.email === INITIAL_ADMIN_EMAIL && Number(user.admin_level || 0) !== 1) {
       user.admin_level = 1;
       await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
     }
@@ -641,7 +643,7 @@ router.get('/user/me', async (req, res) => {
 
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
     // 调试模式下，如果无数据库，直接返回固定的本地用户 mock 数据
-    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com';
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
     return res.json({
       id: userId || 'local-user',
       email: defaultEmail,
@@ -664,7 +666,7 @@ router.get('/user/me', async (req, res) => {
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
   const user = result.rows[0];
   let adminLevel = Number(user.admin_level || 0);
-  if (user.email === '977483863@qq.com' && adminLevel !== 1) {
+  if (user.email === INITIAL_ADMIN_EMAIL && adminLevel !== 1) {
     adminLevel = 1;
     await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
   }

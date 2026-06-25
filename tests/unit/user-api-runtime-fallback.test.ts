@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { legacyWebApiClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+import { kkWebApiClient } from '../../apps/web/src/services/api/kkApiClient.ts';
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
@@ -13,7 +13,7 @@ import {
 } from '../../apps/web/src/services/api/userApiProfileStorage.ts';
 
 // 中文注释：使用 client: any 绕过 mock 函数缺少 meta 属性带来的 TSC 校验报错
-const client: any = legacyWebApiClient;
+const client: any = kkWebApiClient;
 
 const originalGetKeyManagerCloudState = client.getKeyManagerCloudState;
 const originalGetUserApiEntries = client.getUserApiEntries;

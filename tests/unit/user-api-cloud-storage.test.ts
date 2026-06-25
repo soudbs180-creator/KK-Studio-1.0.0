@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 
-import { legacyWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+import { kkWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
 const legacyWebApiClient = originalClient as any;
 import {
   clearPersistedRuntimeAuthState,

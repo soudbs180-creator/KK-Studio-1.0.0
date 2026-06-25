@@ -117,6 +117,8 @@ const getStatusClass = (status?: string | null) => {
   return 'kk-user-profile-modal__status--completed';
 };
 
+const INITIAL_ADMIN_EMAIL = import.meta.env.VITE_INITIAL_ADMIN_EMAIL || 'admin@example.com';
+
 const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isOpen,
   onClose,
@@ -205,7 +207,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const resolvedIdentity = useMemo(() => {
     // 1. 高级管理员 (Level 1)
-    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || (user?.user_metadata as any)?.email === '977483863@qq.com')) {
+    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === INITIAL_ADMIN_EMAIL || (user?.user_metadata as any)?.email === INITIAL_ADMIN_EMAIL)) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',

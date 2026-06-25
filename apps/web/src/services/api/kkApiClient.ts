@@ -143,13 +143,7 @@ export function createKkWebApiClient(): KkApiClient {
     }),
   });
 }
-
-export function createLegacyWebApiClient(): KkApiClient {
-  return createKkWebApiClient();
-}
-
 export const kkWebApiClient = createKkWebApiClient();
-export const legacyWebApiClient = kkWebApiClient;
 
 export {
   isHostedRuntime,

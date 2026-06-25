@@ -382,12 +382,14 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run agents:status` 状态良好，已正确列出修改文件并读取了最近提交历史。
 
 ## 26. 2026-06-25 - Fix Vite Watch Paths for Proper Dev Server HMR (本次追加)
-- **修改范围**：修复 Vite 开发服务的文件系统监听配置漏洞。修正 `shouldIgnoreWatchPath` 逻辑，避免其在 chokidar 递归扫描子目录时错误忽略包含 `src`、`public`、`server` 和 `tests` 的父文件夹（例如 `apps/web` 目录），从而重新激活整个项目的热更新（HMR）。
+- **修改范围**：修复 Vite 开发服务的文件系统监听配置漏洞，重新激活整个项目的热更新（HMR）。另外，同步修复了因历史会话按钮比例调整导致与当前不一致的移动端“更多设置”网格比例单元测试。
 - **修改文件**：
   - [apps/web/vite.config.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/vite.config.ts)
+  - [tests/unit/mobile-more-sheet-layout-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-more-sheet-layout-contract.test.ts)
 - **当前设计决策**：
   - 在 `shouldIgnoreWatchPath` 判定时，保留原有的针对黑名单静态/数据目录（如 `ALWAYS_IGNORE_SEGMENTS`、`docs`、`WORKSPACE_DATA_DIRS` 等）的排除逻辑，但去除“不包含 `/src/` 等特定字样便判定为忽略”的过强前置过滤，默认返回 `false`。
   - 这保证了 chokidar 可以顺畅递归遍历所有父文件夹，顺利抵达并监视具体的目标源码文件，从而修复热更新不触发的问题。
+  - 在 `mobile-more-sheet-layout-contract.test.ts` 中，将断言修改为最新的 `grid-cols-[20fr_20fr_20fr_40fr]` 以使单元测试对齐当前实现。
 - **已运行验证**：
   - 运行 `npm run dev:restart` 重启开发服务，验证服务启动正常，重新生成了健康的 PID。
   - 运行 `npm run architecture:check` 和 `npm run governance:check` 均 100% 成功通过。

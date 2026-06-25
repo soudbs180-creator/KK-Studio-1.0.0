@@ -111,6 +111,8 @@ function getSecondsLeft(expiresAt?: string | null): number {
   return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
 }
 
+const INITIAL_ADMIN_EMAIL = import.meta.env.VITE_INITIAL_ADMIN_EMAIL || 'admin@example.com';
+
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal, refreshBilling, balance } = useBilling();
   const { user, isTempUser, adminLevel } = useAuth();
@@ -144,7 +146,7 @@ const RechargeModal: React.FC = () => {
 
   const resolvedIdentity = useMemo(() => {
     // 1. 高级管理员 (Level 1)
-    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || (user?.user_metadata as any)?.email === '977483863@qq.com')) {
+    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === INITIAL_ADMIN_EMAIL || (user?.user_metadata as any)?.email === INITIAL_ADMIN_EMAIL)) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',

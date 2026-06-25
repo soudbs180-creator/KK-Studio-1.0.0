@@ -131,7 +131,7 @@ import {
 import {
     isKkApiPersistenceUnavailableError,
 } from '../api/kkApiServerHealth.ts';
-import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient.ts';
+import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient.ts';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken.ts';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets.ts';
 import type { Provider } from '../../types.ts';
@@ -1092,7 +1092,7 @@ export class KeyManager {
             const accessToken = await getPreferredKkApiAccessToken();
 
             try {
-                const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
+                const response = await kkWebApiClient.getKeyManagerCloudState({ accessToken });
                 if (response.success) {
                     preferredPayload = response.data;
                 } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
@@ -1208,7 +1208,7 @@ export class KeyManager {
             let localApiPayload: unknown = null;
             let localApiError: Error | null = null;
             const accessToken = await getPreferredKkApiAccessToken();
-            const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+            const response = await kkWebApiClient.replaceKeyManagerCloudState({
                 version: 2,
                 slots: compactSlots,
                 providers: compactProviders,

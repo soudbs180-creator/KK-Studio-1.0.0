@@ -1,7 +1,7 @@
 import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../../../packages/shared/src/index.ts';
 import {
   getLegacyWebApiFallbackState,
-  legacyWebApiClient,
+  kkWebApiClient,
   shouldUseLegacyWebApiFallback,
 } from './kkApiClient.ts';
 import { resolveRuntimeAuthenticatedProfileContext } from '../auth/runtimeSessionProfile.ts';
@@ -512,8 +512,8 @@ async function loadUserApisPayloadViaApi(
   },
 ): Promise<UserApisEnvelope> {
   const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
-    legacyWebApiClient.getKeyManagerCloudState(),
-    legacyWebApiClient.getUserApiEntries(),
+    kkWebApiClient.getKeyManagerCloudState(),
+    kkWebApiClient.getUserApiEntries(),
   ]);
 
   const keyManagerState = unwrapOrUndefined(keyManagerResponse);
@@ -593,7 +593,7 @@ async function persistUserApisPayloadViaApi(
 
   invalidateCachedUserApisPayload(context.userId);
 
-  const unifiedResponse = await legacyWebApiClient.replaceUserApisPayload({
+  const unifiedResponse = await kkWebApiClient.replaceUserApisPayload({
     version: persistablePayload.version,
     slots: persistablePayload.slots as JsonRecord[],
     providers: persistablePayload.providers as JsonRecord[],
@@ -609,7 +609,7 @@ async function persistUserApisPayloadViaApi(
   }
 
   if (slotsChanged) {
-    const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+    const response = await kkWebApiClient.replaceKeyManagerCloudState({
       version: persistablePayload.version,
       slots: persistablePayload.slots as JsonRecord[],
       providers: persistablePayload.providers as JsonRecord[],
@@ -621,7 +621,7 @@ async function persistUserApisPayloadViaApi(
   }
 
   if (entriesChanged) {
-    const response = await legacyWebApiClient.replaceUserApiEntries({
+    const response = await kkWebApiClient.replaceUserApiEntries({
       entries: normalizeUserApiEntryDtos(persistablePayload.entries),
     });
 
@@ -706,7 +706,7 @@ export async function revealUserApiSecretFromCloudRecord(
     throw new Error('An authenticated session is required to reveal saved user API secrets.');
   }
 
-  const response = await legacyWebApiClient.revealUserApiSecret(input);
+  const response = await kkWebApiClient.revealUserApiSecret(input);
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to reveal saved user API secret.');
   }

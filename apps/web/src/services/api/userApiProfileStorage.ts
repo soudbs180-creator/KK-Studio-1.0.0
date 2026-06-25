@@ -1,7 +1,7 @@
 import type { ApiResponse } from '../../../../../packages/shared/src/index.ts';
 import type { ApiProtocolFormat } from './apiConfig.ts';
 import { getStoredKkApiAccessToken } from './authAccessToken.ts';
-import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
+import { kkWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
 import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth.ts';
 import { extractUserApiEntriesFromPayload } from './userApiPayload.ts';
 import {
@@ -300,7 +300,7 @@ async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
     return [];
   }
 
-  const response = await legacyWebApiClient.getUserApiEntries();
+  const response = await kkWebApiClient.getUserApiEntries();
   const data = unwrapOrThrow(response, 'Failed to load local user API entries.');
   return normalizeEntries(data.entries);
 }
@@ -310,7 +310,7 @@ async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Pro
     return;
   }
 
-  const response = await legacyWebApiClient.replaceUserApiEntries({
+  const response = await kkWebApiClient.replaceUserApiEntries({
     entries,
   });
 

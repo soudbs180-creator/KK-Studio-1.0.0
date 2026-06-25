@@ -35,7 +35,6 @@ loadServerEnvFiles();
 const express = require('express');
 const cors = require('cors');
 const webhookRouter = require('./routes/webhook');
-const creditProviderRouter = require('./routes/credit-provider-router');
 const userApiPayloadRouter = require('./routes/user-api-payload-router');
 const adminRouter = require('./routes/admin');
 const generateV1Router = require('./routes/generate-v1');
@@ -245,8 +244,6 @@ function createApp() {
   // 简体中文注释：用户 API 配置保存增强层必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据。
   app.use('/api', userApiPayloadRouter);
   app.use('/api', userRouter);
-  // 简体中文注释：AI Router 新保存入口必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。
-  app.use('/api', creditProviderRouter);
   app.use('/api', adminRouter);
   app.use('/api', providerProbeRouter);
   app.use('/api', ocrRouter);
