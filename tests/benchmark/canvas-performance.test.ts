@@ -3,6 +3,8 @@ import { performance } from 'perf_hooks';
 import { CanvasSpatialIndex } from '../../apps/web/src/canvas/CanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../apps/web/src/canvas/CanvasMeasurementScheduler';
 import { CanvasConnectorScheduler } from '../../apps/web/src/canvas/CanvasConnectorScheduler';
+import { useCanvasSpatialIndex } from '../../apps/web/src/app/useCanvasSpatialIndex';
+import { useVisibleCanvasItemsNew } from '../../apps/web/src/app/useVisibleCanvasItems';
 
 // Mock requestAnimationFrame for Node.js test runtime
 if (typeof global !== 'undefined' && !(global as any).requestAnimationFrame) {
@@ -225,3 +227,28 @@ test('dense canvas performance benchmark and regression check', () => {
   expect(target500.measurementTime).toBeLessThanOrEqual(BUDGET_SCHEDULER_QUEUE_MS);
   expect(target500.connectorTime).toBeLessThanOrEqual(BUDGET_SCHEDULER_QUEUE_MS);
 });
+
+test('CanvasSpatialIndex bucket query and overscan functionality check', () => {
+  const index = new CanvasSpatialIndex(1000);
+  
+  // 1. 模拟插入两个节点
+  // 节点 1 bounds: x=-42, y=-100, w=284, h=200
+  index.updateNode('prompt-1', { x: -42, y: -100, width: 284, height: 200 });
+  // 节点 2 bounds: x=1858, y=1800, w=284, h=200
+  index.updateNode('image-2', { x: 1858, y: 1800, width: 284, height: 200 });
+
+  // 2. 模拟 viewport 在原点 (0, 0)，包含 1000px 的 overscan buffer 缓冲范围
+  // 查询区间为：x 在 -1000 到 2440, y 在 -1000 到 1960
+  const results = index.query(-1000, -1000, 2440, 1960);
+  
+  // 节点 1 应该被正确检索到，而节点 2 也被 overscan 包含
+  expect(results.has('prompt-1')).toBe(true);
+  expect(results.has('image-2')).toBe(true);
+
+  // 3. 如果我们缩小查询范围，无 overscan (仅查询 0 到 100)
+  const tightResults = index.query(0, 0, 100, 100);
+  expect(tightResults.has('prompt-1')).toBe(true);
+  expect(tightResults.has('image-2')).toBe(false);
+});
+
+

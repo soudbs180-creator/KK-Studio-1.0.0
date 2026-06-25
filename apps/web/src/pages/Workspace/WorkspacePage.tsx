@@ -117,7 +117,8 @@ import { useEcommercePartialRedrawRuntime } from '../../app/useEcommercePartialR
 import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from '../../app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from '../../app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../../utils/responsiveSurface';
-import { useVisibleCanvasItems } from '../../app/useVisibleCanvasItems';
+import { useVisibleCanvasItems, useVisibleCanvasItemsNew } from '../../app/useVisibleCanvasItems';
+import { useCanvasSpatialIndex } from '../../app/useCanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -3504,6 +3505,42 @@ export const AppContent: React.FC<AppContentProps> = () => {
       }
     }
   }, [isGenerating, setConfig, setActiveSourceImage, clearSelection, setFocusedGroupId, setSelectionMenuPosition, draftNodeId, deletePromptNode, setDraftNodeId]);
+
+  // Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel to verify culling path stability
+  const spatialIndexResult = useCanvasSpatialIndex({
+    activeCanvas,
+    isMobile,
+    imageCardHeightById,
+  });
+
+  const diagnosticsOverscanBuffer = canvasPerformanceProfile.overscanBuffer;
+  const diagnosticsVirtualBuffer = Math.max(diagnosticsOverscanBuffer * 2.5, 2500);
+  const diagnosticsViewportBounds = React.useMemo(() => {
+    const vLeft = -canvasTransform.x / canvasTransform.scale - diagnosticsVirtualBuffer;
+    const vTop = -canvasTransform.y / canvasTransform.scale - diagnosticsVirtualBuffer;
+    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + diagnosticsVirtualBuffer;
+    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + diagnosticsVirtualBuffer;
+    return { vLeft, vTop, vRight, vBottom };
+  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale, diagnosticsVirtualBuffer]);
+
+  const diagnosticsVisibleItems = useVisibleCanvasItemsNew({
+    spatialIndex: spatialIndexResult.spatialIndex,
+    promptNodeById: spatialIndexResult.promptNodeById,
+    imageNodeById: spatialIndexResult.imageNodeById,
+    workflowNodeById: spatialIndexResult.workflowNodeById,
+    viewportBounds: diagnosticsViewportBounds,
+    activeCanvas,
+    collapsedCanvasGroupNodeIds,
+    getComputedGroupBounds,
+    isNodeDragActive,
+    isCanvasTransforming,
+    isPptDeckChildImageNode,
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+    standaloneImageStackZIndexById,
+    selectedNodeIds,
+    draftNodeId,
+  });
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)

@@ -3,10 +3,8 @@ import type { CanvasGroup, GeneratedImage, PromptNode } from '../types';
 import { GenerationMode } from '../types';
 import type { WorkflowUtilityCanvasNode } from './appCanvasTypes';
 import type { CanvasPerformanceProfile } from '../canvas/performanceProfile';
-import { isWorkflowUtilityNodeKind } from '../workflow/schema';
-import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
-import { getCardDimensions } from '../utils/styleUtils';
-import { CanvasSpatialIndex } from '../canvas/CanvasSpatialIndex';
+import { useCanvasSpatialIndex } from './useCanvasSpatialIndex';
+import type { CanvasSpatialIndex } from '../canvas/CanvasSpatialIndex';
 
 // 简体中文：定义 canvasTransform 的类型
 export interface CanvasTransform {
@@ -48,26 +46,46 @@ export interface VisibleCanvasItemsResult {
   nowTimestamp: number;
 }
 
-export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleCanvasItemsResult {
+export interface UseVisibleCanvasItemsNewDeps {
+  spatialIndex: CanvasSpatialIndex;
+  promptNodeById: Map<string, PromptNode>;
+  imageNodeById: Map<string, GeneratedImage>;
+  workflowNodeById: Map<string, WorkflowUtilityCanvasNode>;
+  viewportBounds: { vLeft: number; vTop: number; vRight: number; vBottom: number };
+  activeCanvas: UseVisibleCanvasItemsDeps['activeCanvas'];
+  collapsedCanvasGroupNodeIds: Set<string>;
+  getComputedGroupBounds: UseVisibleCanvasItemsDeps['getComputedGroupBounds'];
+  isNodeDragActive: boolean;
+  isCanvasTransforming: boolean;
+  isPptDeckChildImageNode: (node: GeneratedImage) => boolean;
+  promptGroupLayerById: Map<string, number>;
+  promptGroupStackZIndexById: Map<string, number>;
+  standaloneImageStackZIndexById: Map<string, number>;
+  selectedNodeIds: string[];
+  draftNodeId: string | null;
+}
+
+// 简体中文：新版解耦可视区过滤 Hook，完全避免了对大数组的 filter 遍历，实现了 O(1) 的空间查询到卡片实例的高效查找。
+export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): VisibleCanvasItemsResult {
   const {
+    spatialIndex,
+    promptNodeById,
+    imageNodeById,
+    workflowNodeById,
+    viewportBounds,
     activeCanvas,
-    canvasPerformanceProfile,
-    canvasTransform,
     collapsedCanvasGroupNodeIds,
     getComputedGroupBounds,
     isNodeDragActive,
+    isCanvasTransforming,
     isPptDeckChildImageNode,
     promptGroupLayerById,
     promptGroupStackZIndexById,
     standaloneImageStackZIndexById,
-    isMobile,
-    imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
-    isCanvasTransforming,
   } = deps;
 
-  // 简体中文：缓存上一次计算出来的可视场景，拖动中不触发可见性集重新生成以防节点 unmount 闪烁
   const stableVisibleCanvasSceneRef = useRef<VisibleCanvasItemsResult>({
     visiblePromptNodes: [],
     visibleImageNodes: [],
@@ -76,51 +94,6 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     nowTimestamp: Date.now(),
   });
 
-  // 简体中文：1. 构建基于网格桶（Grid Bucket）的空间索引，仅在节点数组或高度改变时重新构建
-  const spatialIndex = React.useMemo(() => {
-    const index = new CanvasSpatialIndex(1000);
-    if (!activeCanvas) return index;
-
-    // 简体中文：插入 Prompt 节点
-    activeCanvas.promptNodes.forEach((node) => {
-      const width = getPromptNodeBoundsWidth(node, isMobile);
-      const height = node.height || 200;
-      const x = node.position.x - width / 2;
-      const y = node.position.y - height;
-      index.updateNode(node.id, { x, y, width, height });
-    });
-
-    // 简体中文：插入 Image 节点
-    activeCanvas.imageNodes.forEach((node) => {
-      const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
-      const height = imageCardHeightById[node.id] ?? totalHeight;
-      const x = node.position.x - width / 2;
-      const y = node.position.y - height;
-      index.updateNode(node.id, { x, y, width, height });
-    });
-
-    // 简体中文：插入 Workflow 节点
-    const workflowNodes = activeCanvas.workflow?.nodes || [];
-    workflowNodes.forEach((node) => {
-      if (isWorkflowUtilityNodeKind(node.kind)) {
-        const width = node.width || 284;
-        const height = node.height || 176;
-        const x = node.position.x - width / 2;
-        const y = node.position.y - height;
-        index.updateNode(node.id, { x, y, width, height });
-      }
-    });
-
-    return index;
-  }, [
-    activeCanvas?.promptNodes,
-    activeCanvas?.imageNodes,
-    activeCanvas?.workflow?.nodes,
-    isMobile,
-    imageCardHeightById,
-  ]);
-
-  // 简体中文：2. 视口裁剪逻辑
   return React.useMemo(() => {
     if (isNodeDragActive) {
       return stableVisibleCanvasSceneRef.current;
@@ -140,14 +113,7 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
       };
     }
 
-    // 简体中文：RENDER_BUFFER 视口外的缓存范围
-    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
-    const VIRTUAL_BUFFER = Math.max(RENDER_BUFFER * 2.5, 2500);
-
-    const vLeft = -canvasTransform.x / canvasTransform.scale - VIRTUAL_BUFFER;
-    const vTop = -canvasTransform.y / canvasTransform.scale - VIRTUAL_BUFFER;
-    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + VIRTUAL_BUFFER;
-    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + VIRTUAL_BUFFER;
+    const { vLeft, vTop, vRight, vBottom } = viewportBounds;
 
     const getPromptGroupStackZIndex = (promptNode: PromptNode) => (
       promptGroupStackZIndexById.get(promptNode.id)
@@ -166,39 +132,82 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
         )
     );
 
-    // 简体中文：通过空间索引查询可能在可视视口内的节点 ID 集合
+    // 🚀 核心优化：只查询 viewport 覆盖的 bucket 节点集合，杜绝遍历节点大数组
     const visibleIds = spatialIndex.query(vLeft, vTop, vRight, vBottom);
 
-    // 简体中文：为了防止 unmount 丢失输入状态，强制将 selected 节点以及正在编辑的 draft 节点视作可见
-    selectedNodeIds.forEach((id) => visibleIds.add(id));
-    if (draftNodeId) {
-      visibleIds.add(draftNodeId);
+    const rawVisiblePrompts: PromptNode[] = [];
+    const rawVisibleImages: GeneratedImage[] = [];
+    const rawVisibleWorkflows: WorkflowUtilityCanvasNode[] = [];
+
+    // O(1) 过滤与搜集可视卡片
+    visibleIds.forEach((id) => {
+      const promptNode = promptNodeById.get(id);
+      if (promptNode) {
+        rawVisiblePrompts.push(promptNode);
+        return;
+      }
+
+      const imageNode = imageNodeById.get(id);
+      if (imageNode) {
+        rawVisibleImages.push(imageNode);
+        return;
+      }
+
+      const workflowNode = workflowNodeById.get(id);
+      if (workflowNode) {
+        rawVisibleWorkflows.push(workflowNode);
+      }
+    });
+
+    // 强制把 selected 与正在编辑的 draft 节点加入可见集合，防 unmount 状态丢失
+    selectedNodeIds.forEach((id) => {
+      if (!visibleIds.has(id)) {
+        const promptNode = promptNodeById.get(id);
+        if (promptNode) {
+          rawVisiblePrompts.push(promptNode);
+          return;
+        }
+
+        const imageNode = imageNodeById.get(id);
+        if (imageNode) {
+          rawVisibleImages.push(imageNode);
+          return;
+        }
+
+        const workflowNode = workflowNodeById.get(id);
+        if (workflowNode) {
+          rawVisibleWorkflows.push(workflowNode);
+        }
+      }
+    });
+
+    if (draftNodeId && !visibleIds.has(draftNodeId)) {
+      const promptNode = promptNodeById.get(draftNodeId);
+      if (promptNode) {
+        rawVisiblePrompts.push(promptNode);
+      }
     }
 
-    // 简体中文：A. 筛选可见的 Prompt 节点并排序
-    const visiblePromptNodes = activeCanvas.promptNodes
-      .filter((n) => {
-        if (collapsedCanvasGroupNodeIds.has(n.id)) {
+    // A. 筛选并排序 Prompt 节点
+    const visiblePromptNodes = rawVisiblePrompts
+      .filter((node) => {
+        if (collapsedCanvasGroupNodeIds.has(node.id)) {
           return false;
         }
-
-        if (n.isDraft && !n.isGenerating && n.id !== draftNodeId) {
+        if (node.isDraft && !node.isGenerating && node.id !== draftNodeId) {
           return false;
         }
-
-        if (n.hiddenInCanvas) {
+        if (node.hiddenInCanvas) {
           return false;
         }
-
         if (
-          n.mode === GenerationMode.ECOMMERCE
-          && n.ecommerce?.frameworkId
-          && n.ecommerce.kind === 'a-plus-group'
+          node.mode === GenerationMode.ECOMMERCE
+          && node.ecommerce?.frameworkId
+          && node.ecommerce.kind === 'a-plus-group'
         ) {
           return false;
         }
-
-        return visibleIds.has(n.id);
+        return true;
       })
       .sort((a, b) => {
         const zDiff = getPromptGroupStackZIndex(a) - getPromptGroupStackZIndex(b);
@@ -206,18 +215,16 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
         return a.timestamp - b.timestamp;
       });
 
-    // 简体中文：B. 筛选可见的 Image 节点并排序
-    const visibleImageNodes = activeCanvas.imageNodes
+    // B. 筛选并排序 Image 节点
+    const visibleImageNodes = rawVisibleImages
       .filter((n) => {
         if (collapsedCanvasGroupNodeIds.has(n.id)) {
           return false;
         }
-
         if (isPptDeckChildImageNode(n)) {
           return false;
         }
-
-        return visibleIds.has(n.id);
+        return true;
       })
       .sort((a, b) => {
         const zDiff = getImageGroupStackZIndex(a) - getImageGroupStackZIndex(b);
@@ -225,23 +232,16 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
         return a.timestamp - b.timestamp;
       });
 
-    // 简体中文：C. 筛选可见的 Workflow 节点并排序
-    const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
-      .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
-      .filter((node) => {
-        if (collapsedCanvasGroupNodeIds.has(node.id)) {
-          return false;
-        }
-
-        return visibleIds.has(node.id);
-      })
+    // C. 筛选并排序 Workflow 节点
+    const visibleWorkflowUtilityNodes = rawVisibleWorkflows
+      .filter((node) => !collapsedCanvasGroupNodeIds.has(node.id))
       .sort((left, right) => {
         const zDiff = (left.zIndex ?? 0) - (right.zIndex ?? 0);
         if (zDiff !== 0) return zDiff;
         return left.id.localeCompare(right.id);
       });
 
-    // 简体中文：D. 筛选可见的 Group 边界
+    // D. 筛选可见的 Group 边界 (保持视口碰撞)
     const visibleGroups = activeCanvas.groups
       .filter((g) => {
         if (!g.nodeIds || g.nodeIds.length === 0) {
@@ -272,8 +272,30 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     };
     return stableVisibleCanvasSceneRef.current;
   }, [
+    spatialIndex,
+    promptNodeById,
+    imageNodeById,
+    workflowNodeById,
+    viewportBounds,
     activeCanvas,
-    canvasPerformanceProfile.overscanBuffer,
+    collapsedCanvasGroupNodeIds,
+    getComputedGroupBounds,
+    isNodeDragActive,
+    isCanvasTransforming,
+    isPptDeckChildImageNode,
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+    standaloneImageStackZIndexById,
+    selectedNodeIds,
+    draftNodeId,
+  ]);
+}
+
+// 简体中文：向下兼容的经典可视区裁剪 Hook，内部桥接调用了新版的优化逻辑。
+export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleCanvasItemsResult {
+  const {
+    activeCanvas,
+    canvasPerformanceProfile,
     canvasTransform,
     collapsedCanvasGroupNodeIds,
     getComputedGroupBounds,
@@ -286,7 +308,45 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
-    spatialIndex,
     isCanvasTransforming,
-  ]);
+  } = deps;
+
+  // 1. 构建空间索引与查找表
+  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById } = useCanvasSpatialIndex({
+    activeCanvas,
+    isMobile,
+    imageCardHeightById,
+  });
+
+  // 2. 算视口范围与 buffer 缓存边界
+  const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
+  const VIRTUAL_BUFFER = Math.max(RENDER_BUFFER * 2.5, 2500);
+
+  const viewportBounds = React.useMemo(() => {
+    const vLeft = -canvasTransform.x / canvasTransform.scale - VIRTUAL_BUFFER;
+    const vTop = -canvasTransform.y / canvasTransform.scale - VIRTUAL_BUFFER;
+    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + VIRTUAL_BUFFER;
+    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + VIRTUAL_BUFFER;
+    return { vLeft, vTop, vRight, vBottom };
+  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale, VIRTUAL_BUFFER]);
+
+  // 3. 桥接调用新版的 O(1) 极速裁剪查询
+  return useVisibleCanvasItemsNew({
+    spatialIndex,
+    promptNodeById,
+    imageNodeById,
+    workflowNodeById,
+    viewportBounds,
+    activeCanvas,
+    collapsedCanvasGroupNodeIds,
+    getComputedGroupBounds,
+    isNodeDragActive,
+    isCanvasTransforming,
+    isPptDeckChildImageNode,
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+    standaloneImageStackZIndexById,
+    selectedNodeIds,
+    draftNodeId,
+  });
 }

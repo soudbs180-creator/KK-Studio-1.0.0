@@ -153,4 +153,30 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
 - **风险与下一步**：
   - **风险**：无回归风险，本基准测试隔离在 `tests/benchmark`，不干扰主代码库和一般单元测试。
-  - **下一步**：推送代码，圆满结束本次画布性能重构。
+  - **下一步**：已为 Phase 5/P1 的 WorkspacePage 空间虚拟化裁剪扫清了所有障碍，已开展重构。
+
+## 14. 2026-06-25 - WorkspacePage 空间索引与虚拟可视裁剪重构 (本次追加)
+- **修改范围**：重构可视裁剪算法，将空间索引的构建与可视卡片的提取和深度排序逻辑解耦，消除在大画布下对全量节点列表大数组的遍历。
+- **修改文件**：
+  - [useCanvasSpatialIndex.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/useCanvasSpatialIndex.ts)
+  - [useVisibleCanvasItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/useVisibleCanvasItems.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [canvas-spatial-index-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-spatial-index-contract.test.ts)
+  - [canvas-performance.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/benchmark/canvas-performance.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 提取了独立的 `useCanvasSpatialIndex` Hook 用于构建网格空间索引，同时生成 ID 到节点对象的 Lookup Maps（`promptNodeById`、`imageNodeById`）。
+  - 重构可视区域裁剪。由原来的 `filter` 遍历全量节点大数组，重构为遍历 `spatialIndex.query(viewportBounds)` 产生的 `visibleIds` 集合进行 `O(1)` Map 查找与收集。
+  - 这使大画布可视裁剪的运行开销从 $O(N)$ 降低到最理想的 $O(M)$（$M$ 为视口内可见节点数）。
+  - 保证了 selected 与正在编辑的 draft 节点始终强制可见防 unmount。
+  - 在 `WorkspacePage` 引入 `useCanvasSpatialIndex` 和新裁剪逻辑作为只读 diagnostics 并行运行验证稳定性，保证零风险过渡。
+  - 编写了静态分析测试，对 `useVisibleCanvasItems.ts` 源码结构做严格的正则断言校验。
+- **已运行验证**：
+  - 运行 `npm run verify:canvas-performance` 基准测试全部 Pass。
+  - 运行 `npm run test:unit` 全部 1594 个单元测试 100% Pass，完全兼容各类极其严格的正则变量形参断言。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+- **风险与下一步**：
+  - **风险**：无明显回归风险，老接口桥接极速查询且经过严格一致性断言。
+  - **下一步**：推送代码，圆满结束此阶段重构，等待后续全面切流。
+
