@@ -146,7 +146,7 @@ async function main() {
   await addDirectoryToZip(zip, portableBundleDir);
   const archiveBuffer = await zip.generateAsync({
     compression: "DEFLATE",
-    compressionOptions: { level: 9 },
+    compressionOptions: { level: 1 },
     type: "nodebuffer",
   });
 
