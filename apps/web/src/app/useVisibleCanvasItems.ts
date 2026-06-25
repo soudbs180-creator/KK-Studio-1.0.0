@@ -51,6 +51,7 @@ export interface UseVisibleCanvasItemsNewDeps {
   promptNodeById: Map<string, PromptNode>;
   imageNodeById: Map<string, GeneratedImage>;
   workflowNodeById: Map<string, WorkflowUtilityCanvasNode>;
+  groupById: Map<string, CanvasGroup>;
   viewportBounds: { vLeft: number; vTop: number; vRight: number; vBottom: number };
   activeCanvas: UseVisibleCanvasItemsDeps['activeCanvas'];
   collapsedCanvasGroupNodeIds: Set<string>;
@@ -72,6 +73,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     promptNodeById,
     imageNodeById,
     workflowNodeById,
+    groupById,
     viewportBounds,
     activeCanvas,
     collapsedCanvasGroupNodeIds,
@@ -138,6 +140,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     const rawVisiblePrompts: PromptNode[] = [];
     const rawVisibleImages: GeneratedImage[] = [];
     const rawVisibleWorkflows: WorkflowUtilityCanvasNode[] = [];
+    const rawVisibleGroups: CanvasGroup[] = [];
 
     // O(1) 过滤与搜集可视卡片
     visibleIds.forEach((id) => {
@@ -156,6 +159,12 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       const workflowNode = workflowNodeById.get(id);
       if (workflowNode) {
         rawVisibleWorkflows.push(workflowNode);
+        return;
+      }
+
+      const group = groupById.get(id);
+      if (group) {
+        rawVisibleGroups.push(group);
       }
     });
 
@@ -242,7 +251,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       });
 
     // D. 筛选可见的 Group 边界 (保持视口碰撞)
-    const visibleGroups = activeCanvas.groups
+    const visibleGroups = rawVisibleGroups
       .filter((g) => {
         if (!g.nodeIds || g.nodeIds.length === 0) {
           return false;
@@ -312,10 +321,11 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
   } = deps;
 
   // 1. 构建空间索引与查找表
-  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById } = useCanvasSpatialIndex({
+  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById, groupById } = useCanvasSpatialIndex({
     activeCanvas,
     isMobile,
     imageCardHeightById,
+    getComputedGroupBounds,
   });
 
   // 2. 算视口范围与 buffer 缓存边界
@@ -336,6 +346,7 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     promptNodeById,
     imageNodeById,
     workflowNodeById,
+    groupById,
     viewportBounds,
     activeCanvas,
     collapsedCanvasGroupNodeIds,

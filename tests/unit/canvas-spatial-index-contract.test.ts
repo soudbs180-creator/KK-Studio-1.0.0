@@ -59,9 +59,4 @@ test('visible canvas items preserve interaction state during transforms', () => 
   assert.match(source, /if \(draftNodeId && !visibleIds\.has\(draftNodeId\)\)/);
 });
 
-test('WorkspacePage still carries temporary spatial-index diagnostics before final cleanup', () => {
-  const source = workspaceSource();
 
-  assert.match(source, /Diagnostics: Run useCanvasSpatialIndex and useVisibleCanvasItemsNew in parallel/);
-  assert.match(source, /const diagnosticsVisibleItems = useVisibleCanvasItemsNew\(/);
-});

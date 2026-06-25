@@ -3507,10 +3507,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
   }, [isGenerating, setConfig, setActiveSourceImage, clearSelection, setFocusedGroupId, setSelectionMenuPosition, draftNodeId, deletePromptNode, setDraftNodeId]);
 
   // 1. 构建空间索引与查找表
-  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById } = useCanvasSpatialIndex({
+  const { spatialIndex, promptNodeById, imageNodeById, workflowNodeById, groupById } = useCanvasSpatialIndex({
     activeCanvas,
     isMobile,
     imageCardHeightById,
+    getComputedGroupBounds,
   });
 
   // 2. 算视口范围与 buffer 缓存边界
@@ -3538,6 +3539,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     promptNodeById,
     imageNodeById,
     workflowNodeById,
+    groupById,
     viewportBounds,
     activeCanvas,
     collapsedCanvasGroupNodeIds,

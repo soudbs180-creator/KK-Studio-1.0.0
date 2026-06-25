@@ -17,6 +17,7 @@ export interface UseCanvasSpatialIndexDeps {
   } | null | undefined;
   isMobile: boolean;
   imageCardHeightById: Record<string, number>;
+  getComputedGroupBounds: (group: CanvasGroup) => { x: number; y: number; width: number; height: number } | null | undefined;
 }
 
 export interface CanvasSpatialIndexResult {
@@ -24,17 +25,19 @@ export interface CanvasSpatialIndexResult {
   promptNodeById: Map<string, PromptNode>;
   imageNodeById: Map<string, GeneratedImage>;
   workflowNodeById: Map<string, WorkflowUtilityCanvasNode>;
+  groupById: Map<string, CanvasGroup>;
 }
 
 // 简体中文：空间索引构建 Hook。在此 Hook 中为所有节点建立网格桶空间索引，并生成 ID 对应节点的 Lookup Map，供视口裁剪实现 O(1) 查询。
 export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSpatialIndexResult {
-  const { activeCanvas, isMobile, imageCardHeightById } = deps;
+  const { activeCanvas, isMobile, imageCardHeightById, getComputedGroupBounds } = deps;
 
   return useMemo(() => {
     const index = new CanvasSpatialIndex(1000);
     const promptNodeById = new Map<string, PromptNode>();
     const imageNodeById = new Map<string, GeneratedImage>();
     const workflowNodeById = new Map<string, WorkflowUtilityCanvasNode>();
+    const groupById = new Map<string, CanvasGroup>();
 
     if (!activeCanvas) {
       return {
@@ -42,6 +45,7 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
         promptNodeById,
         imageNodeById,
         workflowNodeById,
+        groupById,
       };
     }
 
@@ -78,17 +82,32 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
       }
     });
 
+    // 4. 插入 Group 节点
+    activeCanvas.groups.forEach((group) => {
+      if (!group.nodeIds || group.nodeIds.length === 0) {
+        return;
+      }
+      groupById.set(group.id, group);
+      const bounds = getComputedGroupBounds(group) || group.bounds;
+      if (bounds) {
+        index.updateNode(group.id, bounds);
+      }
+    });
+
     return {
       spatialIndex: index,
       promptNodeById,
       imageNodeById,
       workflowNodeById,
+      groupById,
     };
   }, [
     activeCanvas?.promptNodes,
     activeCanvas?.imageNodes,
     activeCanvas?.workflow?.nodes,
+    activeCanvas?.groups,
     isMobile,
     imageCardHeightById,
+    getComputedGroupBounds,
   ]);
 }

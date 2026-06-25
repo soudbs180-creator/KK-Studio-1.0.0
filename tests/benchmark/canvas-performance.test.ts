@@ -94,7 +94,7 @@ test('dense canvas performance benchmark and regression check', () => {
   // 性能预算红线阈值 (在 500 节点规模下，考虑 CI 机器可能存在的浮动)
   const BUDGET_SPATIAL_INSERT_MS = 25.0; // 500 节点构建索引上限
   const BUDGET_SPATIAL_QUERY_MS = 3.0;    // 500 节点单次视口查询上限
-  const BUDGET_CULLING_SORT_MS = 20.0;    // 500 节点可视区筛选和深度排序上限
+  const BUDGET_CULLING_SORT_MS = 8.0;     // 500 节点可视区筛选和深度排序上限
   const BUDGET_SCHEDULER_QUEUE_MS = 10.0; // 500 节点调度开销上限
 
   for (const size of scales) {
@@ -134,6 +134,11 @@ test('dense canvas performance benchmark and regression check', () => {
     const promptGroupStackZIndexById = new Map<string, number>();
     const standaloneImageStackZIndexById = new Map<string, number>();
 
+    const promptNodeById = new Map<string, DummyPromptNode>();
+    fixture.promptNodes.forEach(node => promptNodeById.set(node.id, node));
+    const imageNodeById = new Map<string, DummyImageNode>();
+    fixture.imageNodes.forEach(node => imageNodeById.set(node.id, node));
+
     const startCulling = performance.now();
     for (let i = 0; i < cullingCount; i++) {
       const vLeft = (i * 30) % 8000;
@@ -143,8 +148,23 @@ test('dense canvas performance benchmark and regression check', () => {
 
       const visibleIds = index.query(vLeft, vTop, vRight, vBottom);
 
-      const visiblePrompts = fixture.promptNodes
-        .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id) && visibleIds.has(n.id))
+      const rawVisiblePrompts: DummyPromptNode[] = [];
+      const rawVisibleImages: DummyImageNode[] = [];
+
+      visibleIds.forEach(id => {
+        const p = promptNodeById.get(id);
+        if (p) {
+          rawVisiblePrompts.push(p);
+          return;
+        }
+        const img = imageNodeById.get(id);
+        if (img) {
+          rawVisibleImages.push(img);
+        }
+      });
+
+      const visiblePrompts = rawVisiblePrompts
+        .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
         .sort((a, b) => {
           const az = promptGroupStackZIndexById.get(a.id) ?? ((promptGroupLayerById.get(a.id) ?? a.zIndex ?? 0) * 100 + 10);
           const bz = promptGroupStackZIndexById.get(b.id) ?? ((promptGroupLayerById.get(b.id) ?? b.zIndex ?? 0) * 100 + 10);
@@ -153,8 +173,8 @@ test('dense canvas performance benchmark and regression check', () => {
           return a.timestamp - b.timestamp;
         });
 
-      const visibleImages = fixture.imageNodes
-        .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id) && visibleIds.has(n.id))
+      const visibleImages = rawVisibleImages
+        .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
         .sort((a, b) => {
           const az = a.parentPromptId
             ? (promptGroupStackZIndexById.get(a.parentPromptId) ?? ((promptGroupLayerById.get(a.parentPromptId) ?? a.zIndex ?? 0) * 100 + 10))
