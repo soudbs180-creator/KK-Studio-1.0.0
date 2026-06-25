@@ -201,3 +201,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - **风险**：无明显回归风险，已由单元测试与基准测试保障功能。
   - **下一步**：提交并推送代码，继续跟进 Phase 4.4 卡片轻量化与 detail level 降级等交互优化。
+
+## 16. 2026-06-25 - PR#25合并及性能基准与回归阈值收口
+- **修改范围**：合并 PR#25 分支，对齐 `WorkspacePage` 空间索引生产环境契约校验；修改并修复契约测试在 `groupById` 解构变动下的兼容性；解决发布版构建版本一致性检查所需的本地 API 覆盖机制；跑通全套 CI 级别治理和回归基准测试。
+- **修改文件**：
+  - [tests/unit/canvas-spatial-index-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-spatial-index-contract.test.ts)
+  - [release/publish/stable/manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/publish/stable/manifest.json)
+- **当前设计决策**：
+  - 合并 `origin/test/workspace-spatial-index-production-contract` 分支，正式引入断言确保 `WorkspacePage` 完全直连空间索引的可视区筛选和渲染，杜绝历史并行诊断逻辑存留。
+  - 修正测试契约正则匹配模式，添加 `.*` 泛型匹配以兼容返回对象中含有 `groupById` 字段的解构声明。
+  - 在生成发布包时临时指定远程 API 环境 `VITE_KK_API_BASE_URL`，成功构建并签署 sha256 指纹，确保治理脚本 `governance:version` 对版本与发布配置信息一致性验证无阻碍。
+- **已运行验证**：
+  - 运行 `npm run verify:canvas-performance` 100% 通过（500 节点可视区筛选和排序耗时约 `0.0038ms` 远低于 8.0ms 预算红线）。
+  - 运行 `npm run verify:changes` 包含单元测试、基准测试、打包构建、版本合规验证全部 100% 成功通过。
+- **下一步计划**：
+  - 交付本轮“卡顿优化”与“防回归”闭环成果。
+  - 下一步将进入 Phase 4.4 的卡片轻量化与可视降级（Ghost 卡片渲染、高空缩放拦截 ResizeObserver 等）及连接线极致轻量化等体验提升工作。
+
