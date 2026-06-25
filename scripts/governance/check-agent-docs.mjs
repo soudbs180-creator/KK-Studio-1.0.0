@@ -124,6 +124,33 @@ expectIncludes(skills, aiAssistantDocs.skills, "download-selected-originals");
 expectIncludes(safetyPolicy, aiAssistantDocs.safetyPolicy, "API Key");
 expectIncludes(sessionMemory, aiAssistantDocs.sessionMemory, "session-handoff.md");
 
+// 技能索引自演化一致性校验 (Skills Index Consistency Self-Evolution Check)
+const skillsDir = path.join(root, "docs", "ai-assistant", "skills");
+if (fs.existsSync(skillsDir) && exists(aiAssistantDocs.skills)) {
+  const skillsIndexContent = read(aiAssistantDocs.skills);
+  const actualSkillFiles = fs.readdirSync(skillsDir)
+    .filter(file => file.endsWith(".md") && file !== "README.md" && file !== "TEMPLATE.md");
+
+  // 1. 检验：物理磁盘上的技能文件必须登记在 skills.md 索引中
+  for (const file of actualSkillFiles) {
+    const relativeLink = `skills/${file}`;
+    if (!skillsIndexContent.includes(relativeLink)) {
+      fail(`Skills Index 漂移：物理技能文件 "docs/ai-assistant/skills/${file}" 存在，但未在 "docs/ai-assistant/skills.md" 索引文件中登记引用。`);
+    }
+  }
+
+  // 2. 检验：skills.md 中引用的技能文件必须在物理磁盘上真实存在
+  const indexReferencedRegex = /skills\/([a-zA-Z0-9_.-]+\.md)/g;
+  let match;
+  while ((match = indexReferencedRegex.exec(skillsIndexContent)) !== null) {
+    const referencedFile = match[1];
+    const fullPath = path.join(skillsDir, referencedFile);
+    if (!fs.existsSync(fullPath)) {
+      fail(`Skills Index 漂移："docs/ai-assistant/skills.md" 中引用了不存在的物理技能文件 "skills/${referencedFile}"。`);
+    }
+  }
+}
+
 const requiredCurrentVersionDocs = [
   [aiAssistantDocs.readme, aiReadme, `KK Studio ${currentDisplayVersion}`],
   [aiAssistantDocs.runbooks, runbooks, `KK Studio ${currentDisplayVersion}`],

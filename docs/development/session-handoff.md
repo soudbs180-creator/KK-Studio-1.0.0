@@ -424,3 +424,23 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 100% 成功通过。
   - 运行 `npm run check:encoding` 100% 成功通过，确认修改无乱码引入。
 
+## 29. 2026-06-25 - Establish AI Self-Evolution Guard and Diagnostics Guide (本次追加)
+- **修改范围**：对齐了技能总索引文档，新增了快速排障调试指南与 `.agents/` 工作区 Agent 规则目录，并在校验脚本中加入技能一致性自演化熔断机制。重新编译打包了 portable 发布包以更新哈希与版本签名。
+- **修改文件**：
+  - [docs/ai-assistant/skills.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/skills.md)
+  - [docs/governance/DIAGNOSTICS_AND_DEBUGGING.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/DIAGNOSTICS_AND_DEBUGGING.md)
+  - [.agents/AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agents/AGENTS.md)
+  - [scripts/governance/check-agent-docs.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/check-agent-docs.mjs)
+  - [release/publish/stable/manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/publish/stable/manifest.json)
+- **当前设计决策**：
+  - 对齐 `skills.md` 与实际技能清单，将多模态、音频、PPT等 16 个技能补齐。
+  - 在 `.agents/AGENTS.md` 写入专供 AI 自动载入的边界和协作规则，防止开发偏离。
+  - 创建 `DIAGNOSTICS_AND_DEBUGGING.md` 汇总编译、打包、边界校验等常见错误的定位和修复链路，辅助 AI 快速排错。
+  - 修改 `check-agent-docs.mjs` 在 CI 流程中自动比对技能索引与实际物理技能文件的完整契约一致性，缺失引用即熔断报错，实现文档与技能的“自进化完善”。
+  - 以远程 API 重新打包构建并签署便携版发布包哈希以通过 `governance:version` 校验。
+- **已运行验证**：
+  - 运行 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+  - 运行 `npm run check:encoding` 100% 成功通过。
+
+

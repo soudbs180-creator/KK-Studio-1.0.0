@@ -44,14 +44,34 @@
    - 关联工具：`generation.start`
 
 10. **[快速打开设置功能 Skill (quick-open-settings-view)](skills/quick-open-settings-view.md)**
-   - 职责：把“帮我打开个人中心 / API / 日志 / 存储 / 计费”等本地导航指令直接映射到底层设置路由能力。
-   - 关联工具：`ui.openSettings`
+    - 职责：把“帮我打开个人中心 / API / 日志 / 存储 / 计费”等本地导航指令直接映射到底层设置路由能力。
+    - 关联工具：`ui.openSettings`
 
 11. **[Browser Bridge Automation Skill (browser-bridge-automation)](skills/browser-bridge-automation.md)**
-   - 职责：把浏览器助手、连接诊断、商品页提取、网页直通生图、社媒草稿和 DOM 回写请求映射到 Browser Bridge 工具链。
-   - 关联工具：`browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.inspectPage`, `browser.openDesktopProject`, `browser.checkLocalLlm`, `browser.writeBackDom`
+    - 职责：把浏览器助手、连接诊断、商品页提取、网页直通生图、社媒草稿和 DOM 回写请求映射到 Browser Bridge 工具链。
+    - 关联工具：`browser.getStatus`, `browser.openAssistant`, `browser.extractProduct`, `browser.generateExternal`, `browser.publishDraft`, `browser.inspectPage`, `browser.openDesktopProject`, `browser.checkLocalLlm`, `browser.writeBackDom`
+
+12. **[多模态图像理解与路由降级 Skill (agent-image-understanding-routing)](skills/agent-image-understanding-routing.md)**
+    - 职责：检测当前模型能力并根据多模态（Image Understanding）支持情况进行 Base64 降级防错提示。
+    - 关联工具：`provider.getModelCapabilities`
+
+13. **[工具箱插件运行时多实例与常驻 Skill (toolbox-plugin-multi-instance-runtime)](skills/toolbox-plugin-multi-instance-runtime.md)**
+    - 职责：管理 iframe 及 React 工具箱实例生命周期，配置多实例 `multiInstance` 和常驻 `autoPinOnOpen` 布局。
+    - 关联工具：`ui.openToolWindow`, `ui.pinTool`, `ui.updateWindowLayout`
+
+14. **[PPT大纲生图与幻灯片批量排版 Skill (ppt-outline-batch-generation)](skills/ppt-outline-batch-generation.md)**
+    - 职责：处理自然语言转 PPT 大纲与多页面批量生图的网格布局自动生成及 tag 注入。
+    - 关联工具：`generation.createBatchJob`, `canvas.arrangeNodes`
+
+15. **[音频多媒体生成与播放器并发控制 Skill (audio-multimedia-generation-playback)](skills/audio-multimedia-generation-playback.md)**
+    - 职责：支持创建音频多媒体卡片，并在播放多音频时控制排他性 `PAUSE` 信号并发。
+    - 关联工具：`canvas.createAudioCard`, `audio.playbackControl`
+
+16. **[智能 CDN 优先加载与离线兜底 SW 路由 Skill (smart-cdn-offline-fallback)](skills/smart-cdn-offline-fallback.md)**
+    - 职责：使用 Service Worker 缓存策略做 CDN 超时 (200ms) 自动回源站降级与测速偏好广播。
+    - 关联工具：`browser.getStatus` (Connectivity Doctor)
 
 ---
 
-## 🛡️ 静态分析与校验支持
+## 🛡️ 静态 analysis 与校验支持
 本索引及子目录下的技能规范，通过静态脚本 `scripts/ai-assistant/check-skills-consistency.mjs` 与 ToolRegistry 进行双向校验，确保敏感控制等级与防护说明绝对对齐。
