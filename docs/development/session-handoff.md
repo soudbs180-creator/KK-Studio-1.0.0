@@ -660,4 +660,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
 
 
-
+## 43. 2026-06-25 - Fix Local Storage Path Change and Self-healing Reconnection (本次追加)
+- **修改范围**：
+  1. 彻底解决了本地存储模式下无法更换存储路径的严重漏洞，以及由于物理文件夹失效导致项目自动保存报错死锁的问题。
+  2. 在设置看板中，针对“本地文件夹模式”项在支持本地文件系统的浏览器中常驻显示“更换 / Change”按钮，消除了原来无法触发重选的机制缺陷。
+- **修改文件**：
+  - [CanvasContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/CanvasContext.tsx)
+  - [StorageSettingsView.localized.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/StorageSettingsView.localized.tsx)
+  - [StorageSettingsView.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/StorageSettingsView.tsx)
+- **当前设计决策**：
+  - **无句柄自愈性重选**：重构了 `changeLocalFolder` 逻辑，在 `currentState.fileSystemHandle` 为 null 时，不再直接返回，而是视为全新连接请求弹起系统目录选择器，成功选择后重新建立关联并自动载入及合并数据，实现了连接失效后的主动更换与自愈。
+  - **常驻更换配置 UI 策略**：去除了原 UI 渲染更换按钮时对 `mode === 'local'` 的苛刻检测，仅依赖 `supportsLocal` 支持度。使用户即使在连接意外断开或失效时（`mode` 和 `fileSystemHandle` 状态不一致），依旧可以通过点击“更换”按钮来直接重新绑定目录并进行自愈。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产打包编译 100% 成功通过。
+  - 运行浏览器子代理（Browser Subagent）连入本地开发服务器，截图核对显示“更换”与“切换”按钮排版精致整齐、无任何重叠或拥挤。

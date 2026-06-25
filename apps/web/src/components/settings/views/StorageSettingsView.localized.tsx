@@ -62,6 +62,7 @@ export const StorageSettingsView: React.FC = () => {
   const {
     connectLocalFolder,
     disconnectLocalFolder,
+    changeLocalFolder,
     isConnectedToLocal,
     state,
     activeCanvas,
@@ -561,19 +562,30 @@ export const StorageSettingsView: React.FC = () => {
 
             <div className="mt-3.5 space-y-2">
               <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1 mr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
                   <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? pick('状态：已授权连接', 'Status: Connected') : pick('支持但未授权', 'Ready to connect')) : pick('当前浏览器不支持', 'Not supported')}</div>
                 </div>
-                <button
-                  type="button"
-                  disabled={!supportsLocal || mode === 'local'}
-                  onClick={() => void switchToLocal()}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToLocalMode.uiAction}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
-                >
-                  {pick('切换', 'Switch')}
-                </button>
+                <div className="flex gap-1.5 shrink-0">
+                  {supportsLocal && (
+                    <button
+                      type="button"
+                      onClick={() => void changeLocalFolder()}
+                      className="bg-slate-600 hover:bg-slate-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                    >
+                      {pick('更换', 'Change')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!supportsLocal || mode === 'local'}
+                    onClick={() => void switchToLocal()}
+                    data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToLocalMode.uiAction}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    {pick('切换', 'Switch')}
+                  </button>
+                </div>
               </div>
 
               <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>

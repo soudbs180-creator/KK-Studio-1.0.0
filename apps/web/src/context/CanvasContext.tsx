@@ -2315,8 +2315,83 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const changeLocalFolder = useCallback(async () => {
         const currentState = stateRef.current;
-        if (!currentState.fileSystemHandle) return;
 
+        // 1. 如果当前没有有效的本地句柄（已被破坏或从未授权），则直接执行全新绑定/连接
+        if (!currentState.fileSystemHandle) {
+            try {
+                const newHandle = await fileSystemService.selectDirectory();
+                if (!newHandle) return;
+                setIsLoading(true);
+                try {
+                    // 更新状态句柄
+                    setState(prev => ({
+                        ...prev,
+                        fileSystemHandle: newHandle,
+                        folderName: newHandle.name
+                    }));
+                    await setLocalFolderHandle(newHandle);
+
+                    // 重新载入所选目录下的项目并进行合并
+                    const { canvases, images } = await fileSystemService.loadProjectWithThumbs(newHandle);
+                    
+                    // 预加载恢复的媒体缓存
+                    for (const [id, data] of images.entries()) {
+                        void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
+                            console.error('[CanvasContext] Failed to cache image ' + id, error);
+                        });
+                    }
+
+                    if (canvases.length > 0) {
+                        setState(prev => {
+                            const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
+                            const finalCanvases = mergedCanvases.map(canvas => ({
+                                ...canvas,
+                                imageNodes: (canvas.imageNodes || []).map(img => {
+                                    const lookupId = img.storageId || img.id;
+                                    const localData = images.get(lookupId) || images.get(img.id);
+                                    return {
+                                        ...img,
+                                        url: localData?.url || img.url || img.apiResultUrl || '',
+                                        originalUrl: localData?.originalUrl || img.originalUrl || img.apiResultUrl,
+                                        filename: localData?.filename || img.fileName
+                                    };
+                                }),
+                                promptNodes: (canvas.promptNodes || []).map(pn => ({
+                                    ...pn,
+                                    referenceImages: pn.referenceImages?.map(ref => ({ ...ref })) || []
+                                }))
+                            }));
+
+                            const finalActiveId = resolvePreferredActiveCanvasId(
+                                prev.activeCanvasId,
+                                null,
+                                finalCanvases
+                            );
+
+                            return {
+                                ...prev,
+                                canvases: finalCanvases,
+                                activeCanvasId: finalActiveId,
+                                fileSystemHandle: newHandle,
+                                folderName: newHandle.name,
+                                history: {}
+                            };
+                        });
+                    }
+                    notify.success('连接成功', '已重新绑定本地存储文件夹。');
+                } catch (error: any) {
+                    notify.error('连接失败', '无法连接或读取所选文件夹: ' + error.message);
+                    console.error(error);
+                } finally {
+                    setIsLoading(false);
+                }
+            } catch (error) {
+                // Cancelled picker
+            }
+            return;
+        }
+
+        // 2. 如果当前存在有效本地句柄，则执行目录迁移逻辑
         try {
             // 1. Pick new folder
             const newHandle = await fileSystemService.selectDirectory();

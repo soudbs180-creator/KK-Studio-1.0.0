@@ -70,6 +70,7 @@ export const StorageSettingsView: React.FC = () => {
   const {
     connectLocalFolder,
     disconnectLocalFolder,
+    changeLocalFolder,
     isConnectedToLocal,
     state,
     activeCanvas,
@@ -407,18 +408,29 @@ export const StorageSettingsView: React.FC = () => {
 
             <div className="mt-3.5 space-y-2">
               <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1 mr-2">
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white">Local Folder Mode</div>
                   <div className="text-[9px] text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? 'Status: Connected' : 'Ready to connect') : 'Not supported'}</div>
                 </div>
-                <button
-                  type="button"
-                  disabled={!supportsLocal || mode === 'local'}
-                  onClick={() => void switchToLocal()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
-                >
-                  Switch
-                </button>
+                <div className="flex gap-1.5 shrink-0">
+                  {supportsLocal && (
+                    <button
+                      type="button"
+                      onClick={() => void changeLocalFolder()}
+                      className="bg-slate-600 hover:bg-slate-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                    >
+                      Change
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!supportsLocal || mode === 'local'}
+                    onClick={() => void switchToLocal()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    Switch
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
