@@ -1,6 +1,6 @@
 # Current State Inventory
 
-This inventory records the current active runtime layout for KK Studio v1.5.6.
+This inventory records the current active runtime layout for KK Studio v1.5.8.
 
 | Area | Current path | Status |
 | --- | --- | --- |

@@ -407,3 +407,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 将 `admin-credit-provider-routes-contract.test.ts` 中原本加载不存在的 `credit-provider-router.js` 改为加载 `admin.js`，并将相关 SQL 参数化和 API 密钥指纹保留断言一并迁移至 `admin.js`。
 - **已运行验证**：
   - 运行 `npm run test:unit`（1601 个用例）全部 100% 成功通过。
+
+## 28. 2026-06-25 - Align Documentation Version References to v1.5.8 (本次追加)
+- **修改范围**：修正了 6 份活跃说明文档中残留的旧版本硬编码 `v1.5.6`，将它们统一升级对齐到最新权威版本 `v1.5.8`。
+- **修改文件**：
+  - [COMPLETE_DEVELOPMENT_GUIDE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/COMPLETE_DEVELOPMENT_GUIDE.md)
+  - [PROJECT_STRUCTURE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/PROJECT_STRUCTURE.md)
+  - [setup/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/setup/README.md)
+  - [specs/API_INTEGRATION_GUIDE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/API_INTEGRATION_GUIDE.md)
+  - [specs/current-state-inventory.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/current-state-inventory.md)
+  - [superpowers/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/superpowers/README.md)
+- **当前设计决策**：
+  - 将所有提及当前事实版本、主路径或历史代码兼容性的 `v1.5.6` 字眼全部精确更新为 `v1.5.8`，使知识库与主版本清单一致，消除大模型 Agent 的信息漂移。
+- **已运行验证**：
+  - 运行 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+  - 运行 `npm run check:encoding` 100% 成功通过，确认修改无乱码引入。
+
