@@ -551,6 +551,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run verify:changes` 100% 成功通过。
 
+## 36. 2026-06-25 - Standardize Backend API Error Responses and Fix Route Comments (本次追加)
+- **修改范围**：修复了 `generate-v1.js` 中因冲突合并导致的头部注释与模块导入拼写隐患；同时对 `provider-probe.js` 路由的错误抛出模式进行了标准化重构，统一接入 `sendError` 并输出规范化的 API 异常结构。
+- **修改文件**：
+  - [generate-v1.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/generate-v1.js)
+  - [provider-probe.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/provider-probe.js)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **拼写纠偏**：修复 `generate-v1.js` 开头因拼写错误导致将 `const express = require('express')` 错误混入注释的问题，消除后端的运行期引用崩溃风险。
+  - **DTO 信封收拢**：在 `provider-probe.js` 引入标准化 `sendError` 拦截函数，替代原先散落在路由各处的 `res.status().json({ error: ... })` 的原生表达。这样，报错响应的 DTO 被规范统一，极大地提高了接口返回数据对于前端对接与调试的友好度。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run test:unit` 全套 1601 个测试用例均 100% 成功通过。
+
+
 
 
 

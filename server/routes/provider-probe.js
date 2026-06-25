@@ -24,11 +24,20 @@ function okEnvelope(data, req) {
   };
 }
 
+function sendError(res, status, code, message, details) {
+  return res.status(status).json({
+    success: false,
+    error: message,
+    code,
+    ...(details ? { details } : {})
+  });
+}
+
 function userAuth() {
   return async (req, res, next) => {
     const userId = verifyJWT(req.headers.authorization);
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized.' });
+      return sendError(res, 401, 'UNAUTHORIZED', 'Unauthorized.');
     }
 
     try {
@@ -39,7 +48,7 @@ function userAuth() {
       );
 
       if (result.rows.length === 0) {
-        return res.status(401).json({ error: 'User not found.' });
+        return sendError(res, 401, 'USER_NOT_FOUND', 'User not found.');
       }
 
       req.userId = userId;
@@ -58,7 +67,7 @@ function adminAuth(requiredLevel) {
       const adminLevel = Number(req.adminLevel || 0);
       const allowed = requiredLevel === 1 ? adminLevel === 1 : adminLevel === 1 || adminLevel === 2;
       if (!allowed) {
-        return res.status(403).json({ error: 'Admin permission required.' });
+        return sendError(res, 403, 'FORBIDDEN', 'Admin permission required.');
       }
       req.adminUserId = req.userId;
       return next();
@@ -80,10 +89,13 @@ const probeProviderSchema = z.object({
 async function handleProbe(req, res, ownerKind) {
   const parsed = probeProviderSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({
-      error: 'Invalid provider probe payload.',
-      details: parsed.error.issues,
-    });
+    return sendError(
+      res,
+      400,
+      'INVALID_PAYLOAD',
+      'Invalid provider probe payload.',
+      parsed.error.issues
+    );
   }
 
   try {
@@ -97,10 +109,12 @@ async function handleProbe(req, res, ownerKind) {
       billingMode: ownerKind === 'admin' ? 'system-credit-before-request' : 'user-owned-api-no-system-credit',
     }, req));
   } catch (err) {
-    return res.status(err.statusCode || 500).json({
-      error: err.message || 'Provider probe failed.',
-      code: err.code || 'PROVIDER_PROBE_FAILED',
-    });
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.code || 'PROVIDER_PROBE_FAILED',
+      err.message || 'Provider probe failed.'
+    );
   }
 }
 

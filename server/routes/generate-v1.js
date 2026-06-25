@@ -2,7 +2,10 @@
  * @file generate-v1.js
  * @module server/routes
  * @description 统一的同步与异步生成网关路由模块。
- *              整合原有const express = require('express');
+ *              整合原有分散路由，实现零直连前端、BYOK 安全域名白名单、统一派发与直接执行。
+ */
+
+const express = require('express');
 const { verifyJWT } = require('../lib/jwt');
 const { listProviders } = require('../lib/dispatcher/providerRegistry');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
