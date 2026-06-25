@@ -520,6 +520,26 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run governance:check` 100% 成功通过，Skills 规约比对完全对齐。
   - 运行 `npm run build` 100% 成功通过，前端打包无任何异常。
 
+## 34. 2026-06-25 - Integrate PPTX Slide Transition Animation Settings (本次追加)
+- **修改范围**：合并并优化了 `Anionex/banana-slides` 中的 PPTX 切换过渡效果。在前端利用 OpenXML 注入方式实现了 `fade`, `page_turn`, `push`, `wipe`, `split`, `blinds`, `checker`, `wheel` 等 8 种过渡动画，并在大画布 `WorkspacePage` 引入了精美的过渡设置 Modal（`PptxExportDialog`），支持切换开关与多选轮播洗牌机制；同时升级 `usePptRuntime.ts` 契约和单元测试以对齐新增的函数签名。
+- **修改文件**：
+  - [buildPptxSlideDocuments.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/buildPptxSlideDocuments.ts)
+  - [usePptRuntime.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/usePptRuntime.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [ppt-runtime-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/ppt-runtime-contract.test.ts)
+  - [types.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/types.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **XML 级别过渡注入**：由于 KK Studio 为纯前端架构，不使用后端 Python 服务，本次过渡动画通过 JSZip 动态拼接与写入 OpenXML 结构（在 `<p:sld>` 内插入 `<p:transition spd="med">` 及其子切换类型节点，如 `<p:fade/>`、`<p:cover dir="l"/>`等）实现，完全由前端执行，实现了零服务器开销与即时导出。
+  - **随机洗牌队列**：在多选切换效果时，利用随机洗牌（Shuffle）机制打乱队列进行依次弹出轮播，避免多页幻灯片使用同一动画引起的单调感。
+  - **静态契约校验维护**：因为修改了 `handleExportPptx` 及 `handleExportPptxEditable` 的入参签名，我们在测试层面同时跟进重构了正则表达式，以保障契约测试校验链的完整性。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。
+  - 运行 `npm run build` Vite 生产 bundle 打包 100% 成功通过。
+  - 运行 `npm run test:unit` 全套 1601 个单元测试用例全部 100% 成功通过。
+
+
 ## 34. 2026-06-25 - Workflow and Legacy Dual-Model Merge Risk Assessment and Decision (本次追加)
 - **修改范围**：完成了新旧 Workflow 数据模型合并与双向 Adapter 废弃的高风险可行性源码检索与依赖树评估。更新并固化了架构实施方案决策。
 - **修改文件**：
