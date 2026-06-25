@@ -113,3 +113,27 @@ npm run verify:changes
 - 风险与下一步
 
 优先记录到 `docs/development/session-handoff.md`，复杂能力变更再补充 `openspec/changes/<change-id>/tasks.md`。
+
+## 9. 多 Agent 协作与状态同步守卫协议 (Multi-Agent Sync Protocol)
+
+由于本项目经常由不同 AI 代理 (例如 Codex 和 Antigravity) 在同一物理代码库上进行协作开发，为避免不同 Agent 编辑器缓存覆盖、工作区代码冲突以及状态无法同步等问题，所有 AI 代理在处理任务时必须遵循以下协议：
+
+### 9.1 任务开始：接手期校验 (Pre-flight Check)
+1. **获取最新本地状态**：
+   - 接手任何任务时，Agent 第一步必须在控制台运行 `npm run agents:status` 检查本地状态。
+   - 若检测到工作区存在未提交的脏文件（Changes not staged for commit），必须先将之前遗留的工作提交或告知用户，严禁直接在脏工作区修改文件。
+2. **强制文件重读，废弃老缓存**：
+   - 严禁使用大模型自带的旧 Context 记忆去推测代码。在修改任何代码文件之前，**必须重新调用文件读取工具 (如 view_file)**，以获取当前磁盘上的最新源码内容。
+
+### 9.2 任务执行：小步变更与局部验证 (Implementation)
+1. 遵循 `AGENTS.md` 的修改边界进行操作。
+2. 每次完成子任务后，执行相应的单测与构建检查。
+
+### 9.3 任务结束：交付期同步 (Post-flight Sync)
+1. **追加 Handoff 记录**：
+   - 在 `docs/development/session-handoff.md` 中按最新版序号追加本次会话的修改范围、设计决策和验证记录。
+2. **强制本地 Git 提交**：
+   - 文档和验证全部通过后，**必须在控制台运行 `npm run agents:commit`** 将当前工作成果固化为本地 Git Commit。
+   - `agents:commit` 会自动分析 Handoff 最新追加条目的标题作为 Git Commit 信息，确保文档描述与 Git 提交内容强一致。
+   - 此提交将跳过 Husky 针对 portable 编译资产的验证，实现一键安全存档，绝对防止后续 Agent 接手时强行覆盖代码。
+

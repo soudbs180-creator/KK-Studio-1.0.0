@@ -366,3 +366,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - **风险**：无明显回归风险，修改仅限移动端抽屉面板内的局部按钮排列样式。
   - **下一步**：推送代码，交由用户在真实手机屏幕分辨率下验证“更多设置”面板按钮的视觉排列和使用体验。
+
+## 25. 2026-06-25 - Multi-Agent Synchronization and Git Guard Protocol (本次追加)
+- **修改范围**：建立多 Agent 协作状态同步守护协议，防范 Codex 与 Antigravity 重复修改与代码覆盖风险。
+- **修改文件**：
+  - [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md)
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - [agent-sync-guard.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/maintenance/agent-sync-guard.mjs)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 新增 `scripts/maintenance/agent-sync-guard.mjs` 守护脚本，读取当前 Git 脏状态与 handoff 历史日志，在接手时提供警告提示；
+  - 注册 `npm run agents:status` 与 `npm run agents:commit` 命令，实现交付时一键无校验（`--no-verify`）自动从 handoff 中提取标题进行 commit 的流水线；
+  - 在 `AGENTS.md` 注入第 9 节《多 Agent 协作与状态同步守卫协议》，强制接手前运行检查与文件读取、交付后强制 commit。
+- **已运行验证**：
+  - 运行 `npm run agents:status` 状态良好，已正确列出修改文件并读取了最近提交历史。
+

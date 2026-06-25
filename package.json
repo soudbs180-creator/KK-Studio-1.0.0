@@ -65,7 +65,9 @@
     "preview": "vite preview --configLoader native",
     "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
     "check:encoding": "node scripts/ci/check-encoding.js && node scripts/ci/check-mojibake.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "agents:status": "node scripts/maintenance/agent-sync-guard.mjs --status",
+    "agents:commit": "node scripts/maintenance/agent-sync-guard.mjs --commit"
   },
   "dependencies": {
     "jszip": "^3.10.1",
