@@ -1438,5 +1438,21 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 92. 2026-06-27 - Install esbuild to DevDependencies to Resolve Npx Warning (本次追加)
+- **修改范围**：将 `esbuild` 作为开发依赖显式安装到根目录的 `devDependencies` 以及 `packages/shared/package.json` 的 `devDependencies` 中，以解决在构建 `@kk/shared` 调用 `npx esbuild` 时，因本地没有匹配的依赖项而引发的“npm 警告 exec 以下包未找到并将被安装：esbuild@0.28.1”问题。
+- **修改文件**：
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - [packages/shared/package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/package.json)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 将 `esbuild: "0.28.1"` 同时加入根目录和 `@kk/shared` 的 `devDependencies` 中，使其可以在 `npm install` 时本地落盘。
+  - 由于根目录的 `overrides` 中已经指定了 `esbuild` 的版本为 `0.28.1`，此次显式安装保证了本地 `node_modules` 中拥有完全一致的 `0.28.1` 版本可执行文件，再次执行 `npx esbuild` 时无需再发起网络请求拉取，彻底消除了临时下载警告。
+- **已运行验证**：
+  - 运行 `npm install` 成功完成本地依赖安装。
+  - 运行 `npx esbuild --version` 返回 `0.28.1`，验证本地可执行程序就绪。
+  - 运行 `npm run architecture:check` 和 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` 成功通过并生成生产环境 bundle 包。
+
 
 
