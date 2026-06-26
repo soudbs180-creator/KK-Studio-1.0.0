@@ -429,7 +429,6 @@ function verifyMobileSourceContracts() {
     /data-testid="api-official-provider-add"/,
     /testId\?: string;/,
     /data-testid=\{testId\}/,
-    /testId="settings-workbench-overview"/,
     /testId="settings-model-center"/,
     /data-testid="api-model-center-provider-pool"/,
     /data-testid="api-model-center-preset-directory"/,
@@ -689,7 +688,6 @@ try {
   const addProviderEntry = page.getByTestId('api-official-provider-add');
   const proxyProviderEntry = page.getByTestId('api-proxy-provider-add');
   const officialEditorBack = page.getByTestId('api-official-editor-back');
-  const workbenchOverview = page.getByTestId('settings-workbench-overview');
   const modelCenter = page.getByTestId('settings-model-center');
   const providerPool = page.getByTestId('api-model-center-provider-pool');
   const presetDirectory = page.getByTestId('api-model-center-preset-directory');
@@ -704,8 +702,6 @@ try {
   await officialEditorBack.click();
   await assertVisible(modelCenter, 'Mobile API model center did not return after closing the editor.');
   await assertVisible(addProviderEntry, 'Mobile API local add entry did not return after closing the editor.');
-
-  await assertVisible(workbenchOverview, 'Settings workbench overview section did not render.');
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-model-center.png'),
@@ -723,9 +719,8 @@ try {
       detailVisible: true,
       continuationVisible: true,
     },
-    settingsWorkbench: {
+    settingsModelCenter: {
       settingsOverviewVisible: true,
-      overviewVisible: true,
       modelCenterVisible: true,
       providerPoolVisible: true,
       presetDirectoryVisible: true,
@@ -733,6 +728,10 @@ try {
     artifactDir: ARTIFACT_DIR,
   }, null, 2));
 } catch (error) {
+  if (!isBrowserLaunchUnavailable(error)) {
+    throw error;
+  }
+
   console.warn(`[Smoke Check] Playwright 运行时异常或超时，正在执行降级契约校验...`);
   await runFallbackVerification(error, browserPreflight, targetUrl);
 } finally {

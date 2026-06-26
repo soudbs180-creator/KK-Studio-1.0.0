@@ -356,6 +356,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         className="kk-workspace-chrome-surface canvas-nav-panel flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
         style={{
           width: '224px',
+          maxWidth: '224px',
+          boxSizing: 'border-box',
           height: '38px',
           boxShadow: 'var(--frost-card-framework-shadow)',
           background: 'var(--frost-card-framework-bg)',
@@ -389,7 +391,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         </button>
 
         {/* 横向滑块 */}
-        <div className="flex-1 flex items-center justify-center relative">
+        <div className="flex-1 flex items-center justify-center relative min-w-0">
           <input
             type="range"
             min="10"
@@ -397,7 +399,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             value={displayZoomPercent}
             onChange={handleSliderChange}
             onMouseDown={(e) => e.stopPropagation()}
-            className="zoom-slider cursor-pointer w-full h-1"
+            className="zoom-slider cursor-pointer w-full min-w-0 h-1"
             style={{
               '--zoom-slider-progress': `${zoomProgress}%`,
             } as React.CSSProperties}
@@ -432,6 +434,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-3 select-none transition-all duration-300 ease-in-out"
       style={{
         width: '224px',
+        maxWidth: '224px',
+        boxSizing: 'border-box',
         boxShadow: 'var(--frost-card-framework-shadow)',
         background: 'var(--frost-card-framework-bg)',
         border: '1px solid var(--frost-card-framework-border)',
@@ -454,8 +458,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col gap-1.5 transition-all">
-        <div className="relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
+      <div className="w-full flex flex-col gap-1.5 transition-all">
+        <div className="w-full relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
           <svg
             ref={svgRef}
             width={miniWidth}
@@ -555,7 +559,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           </button>
 
           {/* 横向滑块 */}
-          <div className="flex-1 flex items-center justify-center relative">
+          <div className="flex-1 flex items-center justify-center relative min-w-0">
             <input
               type="range"
               min="10"
@@ -563,7 +567,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               value={displayZoomPercent}
               onChange={handleSliderChange}
               onMouseDown={(e) => e.stopPropagation()}
-              className="zoom-slider cursor-pointer w-full h-1"
+              className="zoom-slider cursor-pointer w-full min-w-0 h-1"
               style={{
                 '--zoom-slider-progress': `${zoomProgress}%`,
               } as React.CSSProperties}

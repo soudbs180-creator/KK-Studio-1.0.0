@@ -9,6 +9,27 @@ export interface AdminAccessDto {
   adminSessionExpiresAt?: string;
 }
 
+export interface AdminUserListItemDto {
+  id: EntityId;
+  email: string;
+  credits: number;
+  adminLevel: number;
+  createdAt: string;
+}
+
+export interface ListAdminUsersQueryDto {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface ListAdminUsersResponseDto {
+  users: AdminUserListItemDto[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface VerifyAdminPasswordRequestDto {
   password: string;
 }
@@ -39,4 +60,18 @@ export interface SetUserRoleResponseDto {
   subjectId: EntityId;
   role: "user" | "admin";
   subjectEmail?: string;
+}
+
+export interface AdminAdjustCreditsRequestDto {
+  identity: string;
+  creditDelta: number;
+  description: string;
+}
+
+export interface AdminAdjustCreditsResponseDto {
+  identity: string;
+  subjectId: EntityId;
+  subjectEmail?: string;
+  balanceAfter: number;
+  delta: number;
 }

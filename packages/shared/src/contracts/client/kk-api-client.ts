@@ -1,7 +1,11 @@
 import type {
+  AdminAdjustCreditsRequestDto,
+  AdminAdjustCreditsResponseDto,
   AdminAccessDto,
   ChangeAdminPasswordRequestDto,
   ChangeAdminPasswordResponseDto,
+  ListAdminUsersQueryDto,
+  ListAdminUsersResponseDto,
   SetUserRoleRequestDto,
   SetUserRoleResponseDto,
   VerifyAdminPasswordRequestDto,
@@ -215,6 +219,10 @@ export interface KkApiClient {
   getAdminAccess(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminAccessDto>>;
+  listAdminUsers(
+    input?: ListAdminUsersQueryDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ListAdminUsersResponseDto>>;
   verifyAdminPassword(
     input: VerifyAdminPasswordRequestDto,
     options?: ApiClientRequestOptions,
@@ -260,6 +268,10 @@ export interface KkApiClient {
     input: AdminRechargeCreditsRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminRechargeCreditsResponseDto>>;
+  adjustAdminCredits(
+    input: AdminAdjustCreditsRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AdminAdjustCreditsResponseDto>>;
   getAdminCreditAccount(
     identity: string,
     options?: ApiClientRequestOptions,
@@ -944,6 +956,32 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
+    listAdminUsers(input, options) {
+      const query = new URLSearchParams();
+      if (typeof input?.page === "number") {
+        query.set("page", String(input.page));
+      }
+      if (typeof input?.limit === "number") {
+        query.set("limit", String(input.limit));
+      }
+      if (input?.search) {
+        query.set("search", input.search);
+      }
+
+      const path = query.size > 0
+        ? `api/v1/admin/users?${query.toString()}`
+        : "api/v1/admin/users";
+
+      return requestJson<ListAdminUsersResponseDto>(
+        config,
+        path,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
     verifyAdminPassword(input, options) {
       return requestJson<VerifyAdminPasswordResponseDto>(
         config,
@@ -1090,6 +1128,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<AdminRechargeCreditsResponseDto>(
         config,
         "api/v1/admin/billing/recharges",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    adjustAdminCredits(input, options) {
+      return requestJson<AdminAdjustCreditsResponseDto>(
+        config,
+        "api/v1/admin/billing/credit-adjustments",
         {
           method: "POST",
           body: JSON.stringify(input),

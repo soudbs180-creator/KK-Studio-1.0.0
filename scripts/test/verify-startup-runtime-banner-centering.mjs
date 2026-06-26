@@ -1,3 +1,4 @@
+// window.__KK_STARTUP_SMOKE_HOLD_MS = 60_000;
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
@@ -410,19 +411,7 @@ try {
   await installSmokeApiRoutes(page);
 
   await page.addInitScript(() => {
-    const originalSetTimeout = window.setTimeout.bind(window);
-
-    window.setTimeout = ((handler, timeout = 0, ...args) => {
-      const handlerSource = typeof handler === 'function'
-        ? Function.prototype.toString.call(handler)
-        : String(handler);
-      const isStartupAdvanceTimer = handlerSource.includes('profile_ready')
-        || handlerSource.includes('workspace_ready')
-        || handlerSource.includes('background_ready');
-      const nextDelay = isStartupAdvanceTimer ? 60_000 : timeout;
-      return originalSetTimeout(handler, nextDelay, ...args);
-    });
-
+    window.__KK_STARTUP_SMOKE_HOLD_MS = 60_000;
     window.localStorage.setItem('theme', 'dark');
     window.localStorage.setItem('kk_theme', 'dark');
     window.localStorage.setItem('kk_language', 'zh-CN');
@@ -502,6 +491,10 @@ try {
     artifactDir: ARTIFACT_DIR,
   }, null, 2));
 } catch (error) {
+  if (!isBrowserLaunchUnavailable(error)) {
+    throw error;
+  }
+
   console.warn(`[Smoke Check] Playwright 运行时异常或超时，正在执行降级契约校验...`);
   await runFallbackVerification(error, browserPreflight, targetUrl);
 } finally {

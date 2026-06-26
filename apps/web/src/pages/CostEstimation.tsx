@@ -692,39 +692,6 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   const content = (
     <SettingsViewShell>
       <style>{`
-        .dashboard-grid-card {
-          position: relative;
-          overflow: hidden;
-          border-radius: 18px;
-          border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
-          background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
-          padding: 12px 14px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
-          -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
-          transition: all 0.25s ease-in-out;
-          cursor: default;
-          box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
-        }
-        .dashboard-grid-card:hover {
-          transform: translateY(-2px);
-          border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.16));
-          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.84));
-          box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
-        }
-        .dashboard-card-glow {
-          position: absolute;
-          top: -30px;
-          right: -30px;
-          width: 100px;
-          height: 100px;
-          border-radius: 50%;
-          filter: blur(45px);
-          opacity: 0.12;
-          pointer-events: none;
-        }
         .ledger-table-container {
           overflow-y: auto;
           max-height: 280px;
@@ -737,24 +704,10 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
       />
 
       <SettingsCardGridContainer>
-        {/* 第一排: 4 个指标卡片 (1A * 4A) */}
-        {activeTab === 'api' ? (
-          isMobile ? (
-            <div className="grid grid-cols-2 gap-3 w-full">
-              {apiMetricCards}
-            </div>
-          ) : (
-            apiMetricCards
-          )
-        ) : (
-          isMobile ? (
-            <div className="grid grid-cols-2 gap-3 w-full">
-              {creditMetricCards}
-            </div>
-          ) : (
-            creditMetricCards
-          )
-        )}
+        {/* 第一排: 4 个指标卡片 (1A * 4A)，整体包裹在 a-card-span-4-col 的自适应网格容器中以防排版空洞与错乱 */}
+        <div className="a-card-span-4-col grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {activeTab === 'api' ? apiMetricCards : creditMetricCards}
+        </div>
 
         {/* 第二排: 模式切换与控制 (2A*2A) + 快照信息 (2A*2A) */}
         <div className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between">

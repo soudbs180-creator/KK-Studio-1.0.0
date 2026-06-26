@@ -651,6 +651,10 @@ try {
     throw new Error(`Child-card connector did not stay aligned with the dragged image: ${JSON.stringify(result)}`);
   }
 } catch (error) {
+  if (!isBrowserLaunchUnavailable(error)) {
+    throw error;
+  }
+
   console.warn(`[Smoke Check] Playwright 运行时异常或超时，正在执行降级契约校验...`);
   await runFallbackVerification(error, browserPreflight);
 } finally {

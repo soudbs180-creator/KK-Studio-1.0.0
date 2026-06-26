@@ -552,13 +552,10 @@ export const StorageSettingsView: React.FC = () => {
       />
 
       <SettingsCardGridContainer>
-        {isMobile ? (
-          <div className="grid grid-cols-2 gap-3 w-full">
-            {metricCardsContent}
-          </div>
-        ) : (
-          metricCardsContent
-        )}
+        {/* 第一排: 4 个指标卡片 (1A * 4A)，整体包裹在 a-card-span-4-col 的自适应网格容器中以防排版空洞与错乱 */}
+        <div className="a-card-span-4-col grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {metricCardsContent}
+        </div>
 
         {/* 卡片 5: 持久化模式 (2A * 2row) */}
         <div 
