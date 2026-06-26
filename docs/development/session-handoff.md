@@ -1472,7 +1472,19 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 和 `npm run governance:check` 100% 成功通过。
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
-
-
-
-
+## 94. 2026-06-27 - Fix Double Transform and Blank Cards in Large Project Canvas (本次追加)
+- **修改范围**：
+  1. **插槽支持与层级隔离**：真正为 `InfiniteCanvas.tsx` 实现了 `backgroundOverlay` 插槽支持，并将 `CanvasLayerRenderer` 提取为 `backgroundOverlay` 传入（使其位于 `viewport` 之外、`grid` 背景层之上），彻底规避了 `canvas-viewport` 容器 CSS 变换引起的双重缩放与平移对齐偏差。
+  2. **事件流与交互归口**：真正移除了 `CanvasLayerRenderer.tsx` 中的 Canvas 点击命中测试（Hit Test）和事件绑定，将其设置为纯渲染底图层（`pointer-events-none`），释放了画布空白区域的平移拖拽手势拦截。
+  3. **React DOM 占位交互**：在 `WorkspacePage.tsx` 渲染的占位卡片 `div` 上启用 `pointer-events-auto cursor-pointer` 并绑定 `onClick` 和 `onDoubleClick` 监听器，完美继承了 React DOM 卡片自身的框选与聚焦流程。
+- **修改文件**：
+  - [InfiniteCanvas.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/InfiniteCanvas.tsx)
+  - [CanvasLayerRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/CanvasLayerRenderer.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 将离线底图转换为无交互纯绘图层，将未选中状态下的卡片点击检测收口至轻量级 React DOM 占位卡片上，降低了手写 Hit Test 的复杂度与误差，同时打通了平移缩放时的 0 重载渲染隔离。
+- **已运行验证**：
+  - 运行全量 `npm run verify:changes` 成功变绿。包含 1588 个单元测试用例及全套 Playwright 桌面/移动端交互冒烟测试、性能基准测试等。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
