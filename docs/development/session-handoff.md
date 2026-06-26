@@ -1234,3 +1234,24 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run governance:check` 全局预设与事实治理 100% 成功通过。
   - 运行 `npm run test:unit` 1565 项单元测试 100% 成功通过。
   - 运行 `$env:VITE_KK_API_BASE_URL="https://api.kkstudio.com"; npm run package:portable` 和 `publish:portable` 重新编译且版本发布资产及 manifest 签名对齐成功。
+
+## 83. 2026-06-26 - Canvas Viewport Pruning and Mobile Settings Redirect Optimization (本次追加)
+- **修改范围**：
+  1. **画布视口外 React DOM 彻底裁剪**：在 `WorkspacePage.tsx` 中对 `visiblePromptGroupViews` 和 `standaloneVisibleImageNodes` 进行根据 `visibleCardIds` 空间索引的二次过滤。仅当卡片被选中、激活、生成中，或者在当前 1500px 视口缓冲区中时，才挂载 React DOM 节点，大幅降低 DOM 节点层数与 Layout 重绘开销。
+  2. **移动端一键配置 API 引导**：在 `WorkspacePage.tsx` 注册全局 `kk-open-settings` 事件。在 `NotificationToast.tsx` 中，针对 API 密钥和配额等相关报错（`isSetupRequired`），将气泡 Badge 从“查看”改为“配置”并绑定跳转事件；在通知二级 Drawer 报错卡片内追加了精致的 “去配置 API” 按钮，点击即可一键跳转设置面板。
+  3. **AI 助手 Dock 窄屏自适应**：在 `AIAssistantDock.tsx` 中监听 `window` 的 resize 状态，在窄屏（宽度 < 480px）时动态切换宽度为 `100%`，防止挤压画布交互空间。
+  4. **废弃 Zone 清理核对**：检查了 `apps/admin/`, `apps/api/`, `apps/payment-sidecar/`, `billing/` 和 `payment-server/` 等历史路径，确认物理依赖已被完全治理且无残留。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [NotificationToast.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/common/NotificationToast.tsx)
+  - [AIAssistantDock.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **按需 DOM 虚拟化挂载**：对于不在视口的非交互态卡片，完全由底层的高性能 CanvasLayerRenderer 绘制，React DOM 只接管当前视口附近及高频交互（选中/生成）的少数卡片，大幅降低 React 挂载负担。
+  - **自定义事件解耦**：采用 `kk-open-settings` 全局 CustomEvent 进行页面跳转分发，规避了 props 深度穿透与复杂的 context 依赖，代码结构极简。
+- **已运行验证**：
+  - 运行 `npm run architecture:check` 31项架构边界检查 100% 成功通过。
+  - 运行 `npm run governance:check` 全局预设与事实治理 100% 成功通过。
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run test:unit` 1563 项单元测试 100% 成功通过。
+  - 运行 `npm run verify:changes` 变更全量验证 100% 成功通过。

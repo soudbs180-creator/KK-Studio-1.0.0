@@ -204,6 +204,26 @@ const NotificationToast: React.FC = () => {
         }
     };
 
+    const handleOpenSettings = () => {
+        const event = new CustomEvent('kk-open-settings', { detail: { tab: 'api-management' } });
+        window.dispatchEvent(event);
+        setIsMobileDrawerOpen(false);
+    };
+
+    const checkIsSetupRequired = (notification: Notification) => {
+        if (notification.type !== 'error') return false;
+        const errText = String(notification.title + ' ' + notification.message + ' ' + (notification.details || '')).toUpperCase();
+        return errText.includes('SETUP_REQUIRED') ||
+            errText.includes('CAPABILITY_UNAVAILABLE') ||
+            errText.includes('API') ||
+            errText.includes('KEY') ||
+            errText.includes('密钥') ||
+            errText.includes('配置') ||
+            errText.includes('余额') ||
+            errText.includes('CREDIT') ||
+            errText.includes('CREDITS');
+    };
+
     const getIcon = (type: NotificationType) => {
         switch (type) {
             case 'success': return <CheckCircle size={18} />;
@@ -329,6 +349,8 @@ const NotificationToast: React.FC = () => {
                             if (!isMobileBarExpanded) return;
                             if (latestNotification.id === 'system-update-card') {
                                 handleCardClick(latestNotification);
+                            } else if (checkIsSetupRequired(latestNotification)) {
+                                handleOpenSettings();
                             } else {
                                 setIsMobileDrawerOpen(true);
                             }
@@ -357,7 +379,11 @@ const NotificationToast: React.FC = () => {
                                 </div>
                                 <div className="shrink-0 flex items-center justify-center opacity-70">
                                     <span className="kk-toast-action-badge text-[10px] px-2 py-0.5 rounded-full flex items-center gap-0.5 font-bold">
-                                        {latestNotification.id === 'system-update-card' ? pick('应用', 'Apply') : pick('查看', 'View')}
+                                        {latestNotification.id === 'system-update-card' 
+                                            ? pick('应用', 'Apply') 
+                                            : (checkIsSetupRequired(latestNotification) 
+                                                ? pick('配置', 'Setup') 
+                                                : pick('查看', 'View'))}
                                         <ChevronRight size={10} />
                                     </span>
                                 </div>
@@ -435,6 +461,21 @@ const NotificationToast: React.FC = () => {
                                                         {isUpdateCard && <ArrowUp size={12} className="kk-toast-accent-icon animate-bounce" />}
                                                     </div>
                                                     <div className="kk-toast-message text-xs mt-1 leading-relaxed break-words">{notification.message}</div>
+                                                    {checkIsSetupRequired(notification) && (
+                                                        <div className="mt-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenSettings();
+                                                                }}
+                                                                className="kk-toast-action-badge text-[10px] px-3 py-1 rounded-full active:scale-95 transition-all inline-flex items-center gap-1 select-none cursor-pointer"
+                                                            >
+                                                                <ChevronRight size={10} />
+                                                                {pick('去配置 API', 'Configure API')}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                     {notification.details && (
                                                         <div className="kk-toast-details mt-2 rounded p-2 text-[10px] font-mono max-h-20 overflow-y-auto">
                                                             {notification.details}

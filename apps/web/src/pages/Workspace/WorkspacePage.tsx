@@ -1004,6 +1004,18 @@ export const AppContent: React.FC<AppContentProps> = () => {
     setShowSettingsPanel(true);
   }, []);
 
+  useEffect(() => {
+    const handleOpenSettingsEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tab: string }>;
+      const tab = customEvent.detail?.tab || 'api-management';
+      openSettingsPanel(tab as any);
+    };
+    window.addEventListener('kk-open-settings', handleOpenSettingsEvent);
+    return () => {
+      window.removeEventListener('kk-open-settings', handleOpenSettingsEvent);
+    };
+  }, [openSettingsPanel]);
+
   const handleMobileResultOpen = useCallback((entryId: string) => {
     setMobileActiveResultId(entryId);
     setMobileScreen('detail');
@@ -4829,6 +4841,16 @@ export const AppContent: React.FC<AppContentProps> = () => {
     const items: CanvasRenderItem[] = [
       ...visiblePromptGroupViews
         .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
+        .filter((groupView) => {
+          const isGroupSelected = selectedNodeIds.includes(groupView.rootPrompt.id) 
+            || groupView.childImages.some(child => selectedNodeIds.includes(child.id))
+            || groupView.rootPrompt.id === activeSourceImage;
+          const isGenerating = generatingGroupIds.includes(groupView.rootPrompt.id);
+          const isVisible = visibleCardIds.has(groupView.rootPrompt.id)
+            || groupView.childImages.some(child => visibleCardIds.has(child.id));
+          // 仅当被选中、正在生成，或者在空间索引的可视集合中时，才挂载 React DOM 树
+          return isGroupSelected || isGenerating || isVisible;
+        })
         .map((groupView) => {
           const visibleChildImages = groupView.childImages.filter((imageNode) => !collapsedCanvasGroupNodeIds.has(imageNode.id));
           
@@ -4876,63 +4898,85 @@ export const AppContent: React.FC<AppContentProps> = () => {
             isPlaceholder: isGroupPlaceholder,
           };
         }),
-      ...standaloneVisibleImageNodes.map((node) => {
-        const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
-        const height = imageCardHeightById[node.id] ?? totalHeight;
-        const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
-        const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
-        const isImagePlaceholder = isLargeProject 
-          ? !isImageSelected 
-          : (
-            pos.x - width / 2 > rRight ||
-            pos.x + width / 2 < rLeft ||
-            pos.y - height > rBottom ||
+      ...standaloneVisibleImageNodes
+        .filter((node) => {
+          const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
+          const isGenerating = generatingGroupIds.includes(node.id);
+          // 仅当独立图片节点被选中、激活、生成中或在空间索引中可见时，才挂载 React DOM
+          return isImageSelected || isGenerating || visibleCardIds.has(node.id);
+        })
+        .map((node) => {
+          const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
+          const height = imageCardHeightById[node.id] ?? totalHeight;
+          const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
+          const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
+          const isImagePlaceholder = isLargeProject 
+            ? !isImageSelected 
+            : (
+              pos.x - width / 2 > rRight ||
+              pos.x + width / 2 < rLeft ||
+              pos.y - height > rBottom ||
+              pos.y < rTop
+            );
+
+          return {
+            id: node.id,
+            kind: 'image' as const,
+            node,
+            detailLevel: canvasPerformanceProfile.cardDetailLevel,
+            loadPriority: imageLoadSchedulingById.get(node.id)?.loadPriority ?? 0,
+            loadBand: imageLoadSchedulingById.get(node.id)?.loadBand ?? 0,
+            groupLayerZIndex: node.parentPromptId
+              ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
+              : (node.zIndex ?? 0),
+            stackZIndexOverride: node.parentPromptId
+              ? promptGroupStackZIndexById.get(node.parentPromptId)
+              : standaloneImageStackZIndexById.get(node.id),
+            isPlaceholder: isImagePlaceholder,
+          };
+        }),
+      ...visibleWorkflowUtilityNodes.filter((node) => !collapsedCanvasGroupNodeIds.has(node.id))
+        .filter((node) => {
+          // 限制只渲染屏幕内/选中态的辅助工作流节点
+          const isSelected = selectedNodeIds.includes(node.id);
+          if (isSelected) return true;
+          const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
+          const w = 400;
+          const h = 300;
+          return !(
+            pos.x - w / 2 > rRight ||
+            pos.x + w / 2 < rLeft ||
+            pos.y - h > rBottom ||
             pos.y < rTop
           );
+        })
+        .flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
+          if (node.kind === 'preview') {
+            return [{
+              id: node.id,
+              kind: 'preview',
+              node,
+            }];
+          }
 
-        return {
-          id: node.id,
-          kind: 'image' as const,
-          node,
-          detailLevel: canvasPerformanceProfile.cardDetailLevel,
-          loadPriority: imageLoadSchedulingById.get(node.id)?.loadPriority ?? 0,
-          loadBand: imageLoadSchedulingById.get(node.id)?.loadBand ?? 0,
-          groupLayerZIndex: node.parentPromptId
-            ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
-            : (node.zIndex ?? 0),
-          stackZIndexOverride: node.parentPromptId
-            ? promptGroupStackZIndexById.get(node.parentPromptId)
-            : standaloneImageStackZIndexById.get(node.id),
-          isPlaceholder: isImagePlaceholder,
-        };
-      }),
-      ...visibleWorkflowUtilityNodes.filter((node) => !collapsedCanvasGroupNodeIds.has(node.id)).flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
-        if (node.kind === 'preview') {
-          return [{
-            id: node.id,
-            kind: 'preview',
-            node,
-          }];
-        }
+          if (node.kind === 'save') {
+            return [{
+              id: node.id,
+              kind: 'save',
+              node,
+            }];
+          }
 
-        if (node.kind === 'save') {
-          return [{
-            id: node.id,
-            kind: 'save',
-            node,
-          }];
-        }
+          if (node.kind === 'agent') {
+            return [{
+              id: node.id,
+              kind: 'agent',
+              node,
+            }];
+          }
 
-        if (node.kind === 'agent') {
-          return [{
-            id: node.id,
-            kind: 'agent',
-            node,
-          }];
-        }
-
-        return [];
-      }),
+          return [];
+        }),
     ];
 
     stableCanvasRenderItemsRef.current = items;
@@ -4954,6 +4998,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
     shouldFreezeRender,
     isCanvasTransforming,
     isNodeDragActive,
+    visibleCardIds,
+    selectedNodeIds,
+    activeSourceImage,
+    generatingGroupIds,
   ]);
 
   const renderedItems = useCanvasRenderItems({

@@ -103,6 +103,17 @@ export const AIAssistantDock: React.FC = () => {
 
   const isNearLimit = percentUsed >= 80;
 
+  const [isNarrow, setIsNarrow] = useState(typeof window !== 'undefined' ? window.innerWidth < 480 : false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsNarrow(window.innerWidth < 480);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => durableGenerationQueue.subscribe(setJobs), []);
 
   const activeJobs = React.useMemo(() => jobs.filter(job => (
@@ -488,7 +499,12 @@ export const AIAssistantDock: React.FC = () => {
   return (
     <div
       className="flex flex-col h-full bg-[#0b0c10] border-l border-zinc-800 font-inter select-none"
-      style={{ width: '380px', minWidth: '380px', maxWidth: '380px', flexShrink: 0 }}
+      style={{
+        width: isNarrow ? '100%' : '380px',
+        minWidth: isNarrow ? '100%' : '380px',
+        maxWidth: isNarrow ? '100%' : '380px',
+        flexShrink: 0
+      }}
     >
       
       {/* 1. Header 头部栏 */}
