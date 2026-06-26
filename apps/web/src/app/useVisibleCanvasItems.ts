@@ -97,6 +97,9 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
   });
 
   return React.useMemo(() => {
+    if (isCanvasTransforming) {
+      return stableVisibleCanvasSceneRef.current;
+    }
     if (isNodeDragActive) {
       return stableVisibleCanvasSceneRef.current;
     }

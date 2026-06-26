@@ -1918,36 +1918,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [isInteractionDeferred, setIsInteractionDeferred] = useState(false);
   const interactionTimerRef = useRef<number | null>(null);
 
-  // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
-  // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
-  // 同时，只有在卡片数 >= 80 (大型/巨型项目) 时才启用大项目延迟加载防抖机制，保障极限操作下的性能
-  const isLargeProject = ((activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0)) >= 80;
-  const shouldPauseLoading = isCanvasTransforming && isLargeProject;
-
-  useEffect(() => {
-    if (shouldPauseLoading) {
-      setIsInteractionDeferred(true);
-      if (interactionTimerRef.current !== null) {
-        window.clearTimeout(interactionTimerRef.current);
-        interactionTimerRef.current = null;
-      }
-    } else {
-      if (interactionTimerRef.current !== null) {
-        window.clearTimeout(interactionTimerRef.current);
-      }
-      interactionTimerRef.current = window.setTimeout(() => {
-        setIsInteractionDeferred(false);
-        interactionTimerRef.current = null;
-      }, 2000);
-    }
-
-    return () => {
-      if (interactionTimerRef.current !== null) {
-        window.clearTimeout(interactionTimerRef.current);
-      }
-    };
-  }, [shouldPauseLoading]);
-
   // [Draft Feature] Persistent Input Card State - Moved to Top
 
 
@@ -1999,6 +1969,57 @@ export const AppContent: React.FC<AppContentProps> = () => {
     linkNodes,
   });
   const { tryStartGenerationSubmission } = useGenerationSubmitGuard();
+
+  // 简体中文：通过时间（200ms）与位移（250px）双重节流，优化交互期间（平移、缩放、拖拽）的重绘机制，保证高频平移流畅度的同时杜绝卡片丢失与白屏
+  const lastInteractionRef = useRef({ time: 0, x: 0, y: 0 });
+  const shouldFreezeRender = React.useMemo(() => {
+    if (!isCanvasTransforming && !isNodeDragActive) {
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y };
+      return false;
+    }
+    const now = Date.now();
+    const timeElapsed = now - lastInteractionRef.current.time;
+    const distanceX = canvasTransform.x - lastInteractionRef.current.x;
+    const distanceY = canvasTransform.y - lastInteractionRef.current.y;
+    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+    if (distance < 250 && timeElapsed < 200) {
+      return true;
+    }
+
+    lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y };
+    return false;
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y]);
+
+  // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
+  // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
+  // 同时，只有在卡片数 >= 80 (大型/巨型项目) 时才启用大项目延迟加载防抖机制，保障极限操作下的性能
+  const isLargeProject = ((activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0)) >= 80;
+  const shouldPauseLoading = shouldFreezeRender && isLargeProject;
+
+  useEffect(() => {
+    if (shouldPauseLoading) {
+      setIsInteractionDeferred(true);
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+        interactionTimerRef.current = null;
+      }
+    } else {
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+      interactionTimerRef.current = window.setTimeout(() => {
+        setIsInteractionDeferred(false);
+        interactionTimerRef.current = null;
+      }, 2000);
+    }
+
+    return () => {
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+    };
+  }, [shouldPauseLoading]);
 
   // error state removed, using notify service
   const {
@@ -3642,8 +3663,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     activeCanvas,
     collapsedCanvasGroupNodeIds,
     getComputedGroupBounds,
-    isNodeDragActive,
-    isCanvasTransforming,
+    isNodeDragActive: shouldFreezeRender,
+    isCanvasTransforming: shouldFreezeRender,
     isPptDeckChildImageNode,
     promptGroupLayerById,
     promptGroupStackZIndexById,
@@ -3673,7 +3694,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     onPreview: handleOpenPreview,
     onPreviewPptStack: handleOpenPptStackPreview,
     onDownloadPptComposite: handleDownloadPptComposite,
-    isCanvasTransforming: isInteractionDeferred,
+    isCanvasTransforming: shouldFreezeRender,
     isNew: (nowTimestamp || Date.now()) - (image.timestamp || 0) < 10000,
     canvasTransform,
     snapToGrid,
@@ -4511,7 +4532,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
+    if (isCanvasTransforming) {
+      return stableCanvasRenderItemsRef.current;
+    }
     if (isNodeDragActive) {
+      return stableCanvasRenderItemsRef.current;
+    }
+    if (shouldFreezeRender) {
       return stableCanvasRenderItemsRef.current;
     }
 
@@ -4637,14 +4664,19 @@ export const AppContent: React.FC<AppContentProps> = () => {
     canvasPerformanceProfile.overscanBuffer,
     isMobile,
     imageCardHeightById,
-    isCanvasTransforming,
-    isNodeDragActive,
+    shouldFreezeRender,
   ]);
 
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
   const renderedVisibleGroups = React.useMemo(() => {
+    if (isCanvasTransforming) {
+      return stableRenderedVisibleGroupsRef.current;
+    }
     if (isNodeDragActive) {
+      return stableRenderedVisibleGroupsRef.current;
+    }
+    if (shouldFreezeRender) {
       return stableRenderedVisibleGroupsRef.current;
     }
 
@@ -4709,8 +4741,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     snapToGrid,
     updateGroup,
     visibleGroups,
-    isCanvasTransforming,
-    isNodeDragActive,
+    shouldFreezeRender,
   ]);
 
   const renderedCanvasItems = React.useMemo(() => (
@@ -4723,6 +4754,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   useEffect(() => {
     if (!isReady || !activeCanvas || !canvasRef.current) return;
+    if (isCanvasTransforming || shouldFreezeRender) return;
 
     const totalCards = (activeCanvas.promptNodes?.length || 0) + (activeCanvas.imageNodes?.length || 0);
     if (totalCards === 0) return;
@@ -4751,7 +4783,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
     activeCanvas,
     visiblePromptNodes.length,
     visibleImageNodes.length,
-    resetViewFn
+    resetViewFn,
+    isCanvasTransforming,
+    shouldFreezeRender
   ]);
 
 

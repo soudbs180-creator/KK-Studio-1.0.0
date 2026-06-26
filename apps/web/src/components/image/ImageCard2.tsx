@@ -433,6 +433,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [displaySrc]);
 
     const qualityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 🚀 质量切换防抖
+    const offscreenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 🚀 移出视口延迟降级定时器
     const [retryTick, setRetryTick] = useState(0); // 主动重试触发器
     const autoRetryRef = useRef(0); // 🚀 自动重试计数器（刷新后IndexedDB竞态）
     const loadGenRef = useRef(0); // 🚀 加载代次计数器（替代 isCancelled 闭包变量）
@@ -762,27 +763,37 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     // 🚀 根据画布缩放自动选择合适 quality - 使用队列加载优化
     useEffect(() => {
-        // 🚀 如果不可见，取消加载并降级显存
-        if (!isVisible) {
-            cancelImageLoad(imageStorageKey);
-            if (qualityDebounceRef.current) {
-                clearTimeout(qualityDebounceRef.current);
+        if (isVisible) {
+            // 🚀 回到视口时，如果存在未执行的降级定时器，必须立即注销以复用大图，杜绝重载闪烁
+            if (offscreenTimerRef.current) {
+                clearTimeout(offscreenTimerRef.current);
+                offscreenTimerRef.current = null;
             }
-            // 🚀 [生产级性能优化] 移出视口时，将图片降级为极轻量级微缩略图 (MICRO)，释放 GPU 大图显存，且滑回时能从微缩略图平滑渐变重载，杜绝“硬白块闪烁”的体验断层
-            if (!image.isGenerating && displaySrc && currentQuality !== ImageQuality.MICRO) {
-                loadImage(imageStorageKey, ImageQuality.MICRO, -100).then((microUrl) => {
-                    if (!isVisible && microUrl) {
-                        setDisplaySrc(sanitizeUrl(microUrl));
-                        setCurrentQuality(ImageQuality.MICRO);
-                        loadedRef.current = false;
-                        setIsLoading(false);
+        } else {
+            // 🚀 移出视口时防抖，延迟 2000ms 执行取消与降级，避免在视口边缘高频拖拽导致 IndexedDB 读写雪崩和图片卡死
+            if (!offscreenTimerRef.current) {
+                offscreenTimerRef.current = setTimeout(() => {
+                    cancelImageLoad(imageStorageKey);
+                    if (qualityDebounceRef.current) {
+                        clearTimeout(qualityDebounceRef.current);
                     }
-                }).catch(() => {
-                    setDisplaySrc(undefined);
-                    loadedRef.current = false;
-                    setIsLoading(true);
-                    setIsMediaLoaded(false);
-                });
+                    if (!image.isGenerating && displaySrc && currentQuality !== ImageQuality.MICRO) {
+                        loadImage(imageStorageKey, ImageQuality.MICRO, -100).then((microUrl) => {
+                            if (!isVisible && microUrl) { // 再次确认当前依然不可见
+                                setDisplaySrc(sanitizeUrl(microUrl));
+                                setCurrentQuality(ImageQuality.MICRO);
+                                loadedRef.current = false;
+                                setIsLoading(false);
+                            }
+                        }).catch(() => {
+                            setDisplaySrc(undefined);
+                            loadedRef.current = false;
+                            setIsLoading(true);
+                            setIsMediaLoaded(false);
+                        });
+                    }
+                    offscreenTimerRef.current = null;
+                }, 2000);
             }
             return;
         }
@@ -956,6 +967,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 取消只在 isVisible=false 时发生（在 effect 开头处理）
             if (qualityDebounceRef.current) {
                 clearTimeout(qualityDebounceRef.current);
+            }
+            if (offscreenTimerRef.current) {
+                clearTimeout(offscreenTimerRef.current);
+                offscreenTimerRef.current = null;
             }
         };
         }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew, loadBand, loadPriority, sanitizeUrl]); // Re-evaluate when performance detail mode changes
