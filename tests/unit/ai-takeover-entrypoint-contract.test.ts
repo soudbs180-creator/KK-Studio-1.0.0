@@ -7,6 +7,7 @@ test('chat sidebar AI takeover controls stay inside the composer action row', ()
   const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(source, /kk-chat-sidebar-composer-actions[^"]*min-w-0[^"]*flex-wrap/);
+  assert.match(source, /id="btn-desktop-ai-assistant"/);
   assert.match(source, /kk-chat-sidebar-agent-controls[^"]*min-w-0[^"]*flex-1[^"]*flex-wrap/);
   assert.match(source, /id="btn-ai-takeover-toggle"[\s\S]{0,520}className=\{`shrink-0/);
   assert.match(source, /currentRun[\s\S]{0,120}agentRunTimeline/);

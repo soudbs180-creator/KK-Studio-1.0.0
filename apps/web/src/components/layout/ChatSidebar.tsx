@@ -2998,6 +2998,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             {!isOpen && !isMobile && (!workspaceSurface || workspaceSurface === 'workspace') && (
             <button
                 onClick={onToggle}
+                id="btn-desktop-ai-assistant"
                 data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
                 className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                     style={{

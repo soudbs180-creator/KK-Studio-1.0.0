@@ -8,8 +8,10 @@ export interface ApiManagementListState {
 }
 
 const API_MANAGEMENT_SOURCE = 'api-management';
-const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
-const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
+const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/capability-sources/official/';
+const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/capability-sources/provider/';
+const LEGACY_API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
+const LEGACY_API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
 
 function normalizeNonEmptyString(value: unknown): string | undefined {
@@ -72,19 +74,21 @@ export function readApiManagementListState(value: unknown): ApiManagementListSta
 }
 
 export function deriveApiManagementListStateFromPath(pathname: string): ApiManagementListState | null {
-  if (!pathname.startsWith('/settings/api-management/')) {
-    return null;
-  }
-
-  if (pathname.startsWith(API_MANAGEMENT_OFFICIAL_PREFIX)) {
-    const routeValue = decodeRouteValue(pathname.slice(API_MANAGEMENT_OFFICIAL_PREFIX.length)).trim();
+  if (pathname.startsWith(API_MANAGEMENT_OFFICIAL_PREFIX) || pathname.startsWith(LEGACY_API_MANAGEMENT_OFFICIAL_PREFIX)) {
+    const prefix = pathname.startsWith(API_MANAGEMENT_OFFICIAL_PREFIX)
+      ? API_MANAGEMENT_OFFICIAL_PREFIX
+      : LEGACY_API_MANAGEMENT_OFFICIAL_PREFIX;
+    const routeValue = decodeRouteValue(pathname.slice(prefix.length)).trim();
     return buildApiManagementListState('official', {
       highlightOfficialId: routeValue && routeValue !== ROUTE_NEW_ITEM ? routeValue : undefined,
     });
   }
 
-  if (pathname.startsWith(API_MANAGEMENT_PROVIDER_PREFIX)) {
-    const routeValue = decodeRouteValue(pathname.slice(API_MANAGEMENT_PROVIDER_PREFIX.length)).trim();
+  if (pathname.startsWith(API_MANAGEMENT_PROVIDER_PREFIX) || pathname.startsWith(LEGACY_API_MANAGEMENT_PROVIDER_PREFIX)) {
+    const prefix = pathname.startsWith(API_MANAGEMENT_PROVIDER_PREFIX)
+      ? API_MANAGEMENT_PROVIDER_PREFIX
+      : LEGACY_API_MANAGEMENT_PROVIDER_PREFIX;
+    const routeValue = decodeRouteValue(pathname.slice(prefix.length)).trim();
     return buildApiManagementListState('third-party', {
       highlightProviderId: routeValue && routeValue !== ROUTE_NEW_ITEM ? routeValue : undefined,
     });

@@ -372,14 +372,13 @@ async function assertHttpHtml(url) {
 }
 
 function verifySourceContracts() {
-  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const generationToolsSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
 
   const checks = [
-    { source: desktopChromeSource, pattern: /id="btn-desktop-ai-assistant"/, label: 'desktop AI assistant entrypoint' },
-    { source: desktopChromeSource, pattern: /aria-pressed=\{isChatOpen\}/, label: 'desktop AI entry state' },
+    { source: chatSidebarSource, pattern: /id="btn-desktop-ai-assistant"/, label: 'desktop AI assistant edge entrypoint' },
+    { source: chatSidebarSource, pattern: /data-chat-shell-action=\{CHAT_SHELL_ACTIONS\.toggleSidebar\.uiAction\}/, label: 'desktop AI entry state' },
     { source: chatSidebarSource, pattern: /id="btn-ai-takeover-toggle"/, label: 'AI takeover toggle' },
     { source: chatSidebarSource, pattern: /kk-chat-sidebar-composer-actions[^"]*min-w-0[^"]*flex-wrap/, label: 'composer action wrapping' },
     { source: chatSidebarSource, pattern: /ai-takeover-run-timeline/, label: 'chat sidebar run timeline surface' },
@@ -591,6 +590,5 @@ try {
     await closeLocalViteServer(viteServer);
   }
 }
-
 
 

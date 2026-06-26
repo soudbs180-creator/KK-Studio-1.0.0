@@ -9,6 +9,17 @@ import {
 
 test('deriveApiManagementListStateFromPath maps official editor routes back to the official API list tab', () => {
   assert.deepEqual(
+    deriveApiManagementListStateFromPath('/settings/capability-sources/official/google-main'),
+    {
+      source: 'api-management',
+      activeTab: 'official',
+      highlightOfficialId: 'google-main',
+    },
+  );
+});
+
+test('deriveApiManagementListStateFromPath preserves legacy official editor route compatibility', () => {
+  assert.deepEqual(
     deriveApiManagementListStateFromPath('/settings/api-management/official/google-main'),
     {
       source: 'api-management',
@@ -19,6 +30,16 @@ test('deriveApiManagementListStateFromPath maps official editor routes back to t
 });
 
 test('deriveApiManagementListStateFromPath maps provider create routes back to the provider tab without a highlight id', () => {
+  assert.deepEqual(
+    deriveApiManagementListStateFromPath('/settings/capability-sources/provider/new'),
+    {
+      source: 'api-management',
+      activeTab: 'third-party',
+    },
+  );
+});
+
+test('deriveApiManagementListStateFromPath preserves legacy provider editor route compatibility', () => {
   assert.deepEqual(
     deriveApiManagementListStateFromPath('/settings/api-management/provider/new'),
     {

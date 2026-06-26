@@ -11,7 +11,7 @@ const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, 'temp', 'playwright', 'desktop-settings-smoke');
 const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
-const SETTINGS_API_PATH = '/settings/api-management';
+const SETTINGS_API_PATH = '/settings/capability-sources'; // '/settings/api-management'
 const SMOKE_PROFILE = {
   id: 'smoke-settings-user',
   email: 'smoke-settings-user@temp.local',

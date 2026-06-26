@@ -267,20 +267,34 @@ const CAPABILITY_ROLE_META: Array<{
   },
 ];
 
-const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
-const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
-const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
+const API_MANAGEMENT_HOME_PATH = '/settings/capability-sources';
+const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/capability-sources/official/';
+const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/capability-sources/provider/';
+const API_MANAGEMENT_LEGACY_OFFICIAL_PREFIX = '/settings/api-management/official/';
+const API_MANAGEMENT_LEGACY_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
 
 const buildOfficialEditorPath = (officialId?: string | null) =>
   officialId
-    ? `/settings/api-management/official/${encodeURIComponent(officialId)}`
-    : '/settings/api-management/official/new';
+    ? `${API_MANAGEMENT_OFFICIAL_PREFIX}${encodeURIComponent(officialId)}`
+    : `${API_MANAGEMENT_OFFICIAL_PREFIX}${ROUTE_NEW_ITEM}`;
 
 const buildProviderEditorPath = (providerId?: string | null) =>
   providerId
-    ? `/settings/api-management/provider/${encodeURIComponent(providerId)}`
-    : '/settings/api-management/provider/new';
+    ? `${API_MANAGEMENT_PROVIDER_PREFIX}${encodeURIComponent(providerId)}`
+    : `${API_MANAGEMENT_PROVIDER_PREFIX}${ROUTE_NEW_ITEM}`;
+
+const readEditorRouteValue = (pathname: string, canonicalPrefix: string, legacyPrefix: string) => {
+  if (pathname.startsWith(canonicalPrefix)) {
+    return decodeRouteParam(pathname.slice(canonicalPrefix.length));
+  }
+
+  if (pathname.startsWith(legacyPrefix)) {
+    return decodeRouteParam(pathname.slice(legacyPrefix.length));
+  }
+
+  return '';
+};
 
 const buildDefaultProviderPricingEndpoint = (baseUrl?: string) => {
   const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
@@ -1324,11 +1338,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return routeValue;
     }
 
-    if (!location.pathname.startsWith(API_MANAGEMENT_OFFICIAL_PREFIX)) {
-      return '';
-    }
-
-    return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_OFFICIAL_PREFIX.length));
+    return readEditorRouteValue(
+      location.pathname,
+      API_MANAGEMENT_OFFICIAL_PREFIX,
+      API_MANAGEMENT_LEGACY_OFFICIAL_PREFIX,
+    );
   }, [location.pathname, officialId]);
   const routePresetOfficialProvider = useMemo(() => {
     if (!isRecord(location.state) || !('presetOfficialProvider' in location.state)) {
@@ -1364,11 +1378,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return routeValue;
     }
 
-    if (!location.pathname.startsWith(API_MANAGEMENT_PROVIDER_PREFIX)) {
-      return '';
-    }
-
-    return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_PROVIDER_PREFIX.length));
+    return readEditorRouteValue(
+      location.pathname,
+      API_MANAGEMENT_PROVIDER_PREFIX,
+      API_MANAGEMENT_LEGACY_PROVIDER_PREFIX,
+    );
   }, [legacySupplierId, location.pathname, providerId]);
   const selectedOfficialSlot = useMemo(
     () => officialSlots.find((slot) => (

@@ -29,6 +29,8 @@ type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
   | { path: 'generation-mode'; kind: 'generation-mode' }
   | { path: 'capability-sources'; kind: 'capability-sources' }
+  | { path: 'capability-sources/official/:officialId'; kind: 'capability-sources' }
+  | { path: 'capability-sources/provider/:providerId'; kind: 'capability-sources' }
   | { path: 'provider-routes'; kind: 'provider-routes' }
   | { path: 'browser-assistant'; kind: 'browser-assistant' }
   | { path: 'canvas-performance'; kind: 'canvas-performance' }
@@ -42,6 +44,8 @@ const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] =
   { path: '', kind: 'dashboard', index: true },
   { path: 'generation-mode', kind: 'generation-mode' },
   { path: 'capability-sources', kind: 'capability-sources' },
+  { path: 'capability-sources/official/:officialId', kind: 'capability-sources' },
+  { path: 'capability-sources/provider/:providerId', kind: 'capability-sources' },
   { path: 'provider-routes', kind: 'provider-routes' },
   { path: 'browser-assistant', kind: 'browser-assistant' },
   { path: 'canvas-performance', kind: 'canvas-performance' },
@@ -129,6 +133,10 @@ export function createSettingsRouteObjects(options: SettingsRouteOptions = {}): 
       index: definition.kind === 'dashboard' ? definition.index : undefined,
       element: getRouteElement(definition, options),
     })),
+    {
+      path: `${basePath}/api-management/*`,
+      element: getRouteElement({ path: 'capability-sources', kind: 'capability-sources' }, options),
+    },
     ...LEGACY_SETTINGS_ROUTE_REDIRECTS.map(({ path, target }) => ({
       path: `${basePath}/${path}`,
       element: <Navigate to={basePath === '/settings' ? buildSettingsPath(target) : `${basePath}${buildSettingsPath(target)}`} replace />,
@@ -152,6 +160,11 @@ export function renderSettingsRouteElements(options: SettingsRouteOptions = {}) 
         element={getRouteElement(definition, options)}
       />
     )),
+    <Route
+      key="api-management-wildcard"
+      path={`${basePath}/api-management/*`}
+      element={getRouteElement({ path: 'capability-sources', kind: 'capability-sources' }, options)}
+    />,
     ...LEGACY_SETTINGS_ROUTE_REDIRECTS.map(({ path, target }) => (
       <Route
         key={path}

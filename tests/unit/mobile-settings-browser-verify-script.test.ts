@@ -102,7 +102,7 @@ test('desktop settings smoke verification covers direct settings routes and the 
   const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(scriptSource, /\/settings'/);
-  assert.match(scriptSource, /\/settings\/api-management'/);
+  assert.match(scriptSource, /\/settings\/capability-sources'/);
   assert.match(scriptSource, /desktop-user-menu-trigger/);
   assert.match(scriptSource, /desktop-user-menu-settings/);
   assert.match(scriptSource, /settings-page-root/);

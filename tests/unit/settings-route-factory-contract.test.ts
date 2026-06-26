@@ -16,6 +16,9 @@ test('settings shell and exported routes use one shared route factory instead of
   assert.match(routeConfigSource, /export function createSettingsRouteObjects\(/);
   assert.match(routeConfigSource, /export function renderSettingsRouteElements\(/);
   assert.match(routeConfigSource, /path: 'storage-settings'/);
+  assert.match(routeConfigSource, /path: 'capability-sources\/official\/:officialId'/);
+  assert.match(routeConfigSource, /path: 'capability-sources\/provider\/:providerId'/);
+  assert.match(routeConfigSource, /path: `\$\{basePath\}\/api-management\/\*`/);
   assert.match(panelSource, /from '\.\/settingsRouteConfig';/);
   assert.match(routesSource, /from '\.\.\/components\/settings\/settingsRouteConfig';/);
   assert.doesNotMatch(panelSource, /<Route path="\/settings\/api-management"/);

@@ -63,7 +63,7 @@
     "test:contract": "node --test --test-isolation=none \"tests/contract/*.test.ts\"",
     "test:e2e": "node --test --test-isolation=none \"tests/e2e/*.test.ts\"",
     "test": "npm run test:unit && npm run test:integration && npm run test:contract && npm run test:e2e",
-    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
+    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
     "preview": "vite preview --configLoader native",
     "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
     "check:encoding": "node scripts/ci/check-encoding.js && node scripts/ci/check-mojibake.mjs",

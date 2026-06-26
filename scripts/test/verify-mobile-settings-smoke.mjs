@@ -11,7 +11,7 @@ const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, 'temp', 'playwright', 'mobile-settings-smoke');
 const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
-const SETTINGS_API_PATH = '/settings/api-management';
+const SETTINGS_API_PATH = '/settings/capability-sources';
 const STORAGE_KEY = 'kk_studio_canvas_state';
 
 const SMOKE_PROFILE = {
@@ -673,7 +673,7 @@ try {
   const settingsOverviewHeading = page.getByRole('heading', { name: /设置总览|Settings Overview/i });
   const apiEntry = page.getByRole('button', { name: /\+ 添加 API|\+ Add API/i });
 
-  const currentApiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace/i });
+  const currentApiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace|配置能力来源|Configure Capability Sources/i });
 
   await assertVisible(settingsOverviewHeading, 'Mobile settings overview did not open by default.');
   await assertVisible(currentApiEntry, 'Mobile settings overview API action did not render.');
