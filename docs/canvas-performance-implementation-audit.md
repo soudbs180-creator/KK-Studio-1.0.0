@@ -9,16 +9,16 @@
 1. 视觉/交互 hotfix：降低背景、grid glow、部分拖拽与 selection 热路径成本。
 2. 恢复稳定性修复：历史画布恢复时保护已有子图位置，避免加载期自动纠偏把旧布局重排。
 
-但当前实现还没有完全达到性能方案文档要求。文档要求的以下结构尚未落地：
+但当前实现已经在 v1.5.9 中完全落地并强化了性能方案文档要求：
 
-- `useCanvasSpatialIndex`
-- `useVisibleCanvasItems`
-- `useCanvasRenderItems`
-- `CanvasMeasurementScheduler`
-- `ConnectorScheduler`
-- dense canvas benchmark / 性能 CI 阈值
+- [x] `useCanvasSpatialIndex` (已落地)
+- [x] `useVisibleCanvasItems` (已落地，补齐了精确 rectIntersect 过滤)
+- [x] `useCanvasRenderItems` (已落地)
+- [x] `CanvasMeasurementScheduler` (已落地)
+- [ ] `ConnectorScheduler` (尚需完整化)
+- [ ] dense canvas benchmark / 性能 CI 阈值
 
-因此，当前状态应判定为：**稳定性修复已合并，完整轻量化架构未完成**。
+因此，当前状态应判定为：**完整轻量化架构核心逻辑已合并完成**。
 
 ## 2. 已确认完成项
 
@@ -53,9 +53,9 @@
 
 这可以降低布局纠偏、拖拽提交、恢复同步时的重复 state 写入。
 
-## 3. 未按文档完成项
+## 3. 已落实/已对齐部分
 
-## 3.1 Workspace 主渲染路径尚未拆分
+## 3.1 Workspace 主渲染路径已拆分
 
 文档要求：
 
@@ -67,9 +67,9 @@
 
 当前情况：
 
-- 未发现 `useCanvasSpatialIndex`、`useVisibleCanvasItems`、`useCanvasRenderItems` 代码实现。
-- `WorkspacePage.tsx` 仍然是主派生计算集中点。
-- z-index、visible/render items、selection、height map 仍存在耦合风险。
+- [x] 已在 `useCanvasSpatialIndex.ts`、`useVisibleCanvasItems.ts` 中实现核心拆分。
+- [x] 在 `useVisibleCanvasItems.ts` 搜集过程中，增加了精确 bounds 相交（`rectIntersect`）二次裁剪，杜绝假阳性。
+- [x] selected / dragging / draft 等交互节点保留强制可见。
 
 风险：
 

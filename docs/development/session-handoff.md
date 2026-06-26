@@ -1030,3 +1030,35 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run test:unit`（共 1543 个用例）全部 100% 成功通过。
   - 运行 `npm run typecheck` 类型编译 100% 成功通过。
+
+## 76. 2026-06-26 - Align New Architecture Consistency and Close Technical Gaps (本次追加)
+- **修改范围**：
+  1. 移除了前端 `secureModelProxy.ts` 和 `kkApiBaseUrl.ts` 中硬编码的备用 VPS IP 串，改为动态的环境变量 fallback配置。
+  2. 重构了手机端的存储偏好逻辑，在手机端不强设为纯 `browser` 本地模式，修改文案对齐云端优先。
+  3. 优化了 `useVisibleCanvasItems.ts` 可视区卡片搜集算法，引入了二次 `rectIntersect` 精确几何过滤，避免假阳性引起 DOM 过量渲染。
+  4. 物理清理了陈旧的 `Canvas.tsx` 画布组件，并更新了对应的 2 个单元测试契约以指向新核心组件。
+  5. 补充了 5 个新架构防回归 CI 校验脚本，并挂载在 `package.json` 的 `architecture:check` 命令中。
+  6. 重新打包和发布了便携版（portable）包，并同步了 manifest。
+- **修改文件**：
+  - [secureModelProxy.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/model/secureModelProxy.ts)
+  - [kkApiBaseUrl.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/api/kkApiBaseUrl.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [useVisibleCanvasItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/useVisibleCanvasItems.ts)
+  - [Canvas.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/Canvas.tsx) [DELETE]
+  - [NEW_ARCHITECTURE_SOURCE_OF_TRUTH.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/NEW_ARCHITECTURE_SOURCE_OF_TRUTH.md) [NEW]
+  - [canvas-performance-implementation-audit.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/canvas-performance-implementation-audit.md)
+  - [canvas-dormant-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-dormant-unused-cleanup-contract.test.ts)
+  - [canvas-toolbar-ui-system-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-toolbar-ui-system-contract.test.ts)
+  - [kk-api-base-url-hosted-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/kk-api-base-url-hosted-contract.test.ts)
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - 5 个静态 CI 校验脚本
+- **当前设计决策**：
+  - **IP 硬编码消除**：将原 `DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL` 常量重构为动态的 `getDefaultHostedModelProxyApiBaseUrl()` 函数，结合 `VITE_KK_API_FALLBACK_URL` 提供配置驱动型地址保护，通过了 IP 扫描校验。
+  - **精确裁剪杜绝冗余**：用 `rectIntersect` 进行几何交集比较，只渲染在可见视口内的卡片，仅保留 selected/draft 节点强制可见。
+  - **CI 防回归固化**：在架构校验中接入 5 个脚本（防 IP 硬编码、防陈旧 Canvas 引用、空间过滤精度、WorkspacePage 膨胀控制、文档事实源），一有违规立即报错阻断。
+- **已运行验证**：
+  - 运行 `npm run architecture:check` 21 项边界检查完全 Pass。
+  - 运行 `npm run governance:check` 100% 成功通过。
+  - 运行 `npm run typecheck` 类型编译无错误通过。
+  - 运行 `npm run test` 1564 个单元/集成/E2E 用例完全 Pass 绿灯。
+  - 运行 `npm run package:portable` 和 `npm run publish:portable` 成功对齐便携包版本并生成发布清单。

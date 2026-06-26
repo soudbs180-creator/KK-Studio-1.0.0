@@ -1263,8 +1263,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
         const isMobilePhone = isMobileDevice();
 
         if (isMobilePhone) {
-          // 手机端直接默认使用 browser 存储模式，不弹出选择弹窗，且静默将其设为 'browser'
-          if (!storageMode || storageMode !== 'browser') {
+          // 手机端若无存储模式，默认使用 browser 存储模式作为本地缓存，但不强行覆盖已有合法模式
+          if (!storageMode) {
             localStorage.setItem('kk_studio_storage_mode', 'browser');
             storageMode = 'browser';
           }
@@ -1282,9 +1282,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
             });
           }
 
-          // 提醒用户生成的内容需要及时下载保持，避免不必要的丢失风险
+          // 提醒用户当前存储状态，对齐手机端云端优先原则
           import('../../services/system/notificationService').then(({ notify }) => {
-            notify.warning('安全提醒', '手机端数据保存在浏览器本地，请及时下载保存生成的内容，避免数据丢失风险。');
+            if (authenticatedUserId) {
+              notify.success('云端同步', '手机端已开启云端优先。您的创作数据已安全同步至云端主存储。');
+            } else {
+              notify.warning('体验提醒', '当前为临时本地缓存模式。更换设备或清理浏览器可能导致数据丢失，请登录以开通云端主存储。');
+            }
           }).catch(err => console.error('[App] Failed to notify mobile storage warning:', err));
         }
 

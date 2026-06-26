@@ -1,6 +1,8 @@
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 
-const DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL = "https://172-245-156-16.sslip.io";
+export function getDefaultHostedModelProxyApiBaseUrl(): string {
+  return readRuntimeEnv("VITE_KK_API_FALLBACK_URL") || "http://127.0.0.1:3001";
+}
 
 // 内存中缓存的延迟最低 API URL
 let memoryOptimalApiBaseUrl: string | null = null;
@@ -434,14 +436,14 @@ export function resolveKkApiModelProxyBaseUrl(): string {
       return runtimeOrigin!;
     }
     if (isHostedRuntimeOrigin(runtimeOrigin)) {
-      return DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL;
+      return getDefaultHostedModelProxyApiBaseUrl();
     }
     return configuredBaseUrl;
   }
 
   if (runtimeOrigin) {
     if (isHostedRuntimeOrigin(runtimeOrigin)) {
-      return DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL;
+      return getDefaultHostedModelProxyApiBaseUrl();
     }
     return runtimeOrigin;
   }

@@ -5,6 +5,7 @@ import { type StandardizedProxyRequest } from './ProxyRequestBuilder';
 import { resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
+import { readRuntimeEnv } from '../../utils/runtimeEnv';
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -224,7 +225,7 @@ let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = 
 
 function getLocalUserRouteApiEndpoint(body: Record<string, unknown>, useVpsFallback = false): string {
   const baseUrl = useVpsFallback
-    ? 'https://172-245-156-16.sslip.io'
+    ? (readRuntimeEnv("VITE_KK_API_FALLBACK_URL") || resolveKkApiModelProxyBaseUrl())
     : resolveKkApiModelProxyBaseUrl();
   const isAsync = body.mode === 'task_status' || body.mode === 'video' || body.mode === 'audio';
   const path = isAsync ? '/api/v1/generate/async' : '/api/v1/generate';
@@ -233,7 +234,7 @@ function getLocalUserRouteApiEndpoint(body: Record<string, unknown>, useVpsFallb
 
 function getLocalSystemProxyEndpoint(body: Record<string, unknown>, useVpsFallback = false): string {
   const baseUrl = useVpsFallback
-    ? 'https://172-245-156-16.sslip.io'
+    ? (readRuntimeEnv("VITE_KK_API_FALLBACK_URL") || resolveKkApiModelProxyBaseUrl())
     : resolveKkApiModelProxyBaseUrl();
   const isAsync = body.mode === 'task_status' || body.mode === 'video' || body.mode === 'audio';
   const path = isAsync ? '/api/v1/generate/async' : '/api/v1/generate';

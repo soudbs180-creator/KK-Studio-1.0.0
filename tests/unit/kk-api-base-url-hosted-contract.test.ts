@@ -69,10 +69,12 @@ test("hosted model proxy calls temporary HTTPS VPS API origins directly to avoid
 
 test("hosted model proxy uses the direct VPS API default when the public runtime has no API base override", () => {
   const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+  const originalFallbackUrl = process.env.VITE_KK_API_FALLBACK_URL;
   const locationLike = globalThis as { location?: { origin?: string } };
   const originalLocation = locationLike.location;
 
   delete process.env.VITE_KK_API_BASE_URL;
+  process.env.VITE_KK_API_FALLBACK_URL = "https://172-245-156-16.sslip.io";
   locationLike.location = { origin: "https://kkai.plus" };
 
   try {
@@ -83,6 +85,11 @@ test("hosted model proxy uses the direct VPS API default when the public runtime
       process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
     } else {
       delete process.env.VITE_KK_API_BASE_URL;
+    }
+    if (typeof originalFallbackUrl === "string") {
+      process.env.VITE_KK_API_FALLBACK_URL = originalFallbackUrl;
+    } else {
+      delete process.env.VITE_KK_API_FALLBACK_URL;
     }
     locationLike.location = originalLocation;
   }

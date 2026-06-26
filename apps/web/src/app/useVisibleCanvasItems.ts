@@ -141,8 +141,24 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     const rawVisibleWorkflows: WorkflowUtilityCanvasNode[] = [];
     const rawVisibleGroups: CanvasGroup[] = [];
 
-    // O(1) 过滤与搜集可视卡片
+    // O(1) 过滤与搜集可视卡片并做二次精确几何裁剪过滤
     visibleIds.forEach((id) => {
+      const isForceVisible = id === draftNodeId || selectedNodeIds.includes(id);
+      if (!isForceVisible) {
+        const bounds = spatialIndex.getNodeBounds(id);
+        if (bounds) {
+          const isIntersecting = !(
+            bounds.x + bounds.width < vLeft ||
+            bounds.x > vRight ||
+            bounds.y + bounds.height < vTop ||
+            bounds.y > vBottom
+          );
+          if (!isIntersecting) {
+            return; // 视口外节点，精确裁剪剔除
+          }
+        }
+      }
+
       const promptNode = promptNodeById.get(id);
       if (promptNode) {
         rawVisiblePrompts.push(promptNode);

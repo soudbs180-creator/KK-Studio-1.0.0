@@ -28,19 +28,4 @@ test('canvas toolbar exposes reusable system tokens and primitives', () => {
   }
 });
 
-test('main canvas toolbar consumes KK_LAYER toolbar and canvas toolbar primitives', () => {
-  const source = readSource('apps/web/src/components/canvas/Canvas.tsx');
-  const toolbarMatch = source.match(/<div\s+id="canvas-toolbar"[\s\S]*?\n            <\/div>\n\n            \{\/\* Zoom Slider/);
-  assert.ok(toolbarMatch, 'canvas toolbar block should remain easy to audit');
-  const toolbarSource = toolbarMatch[0];
 
-  assert.match(source, /import\s+\{\s*KK_LAYER\s*\}\s+from\s+'@kk\/ui'/);
-  assert.match(toolbarSource, /id="canvas-toolbar"\s+className="kk-canvas-toolbar absolute/);
-  assert.match(toolbarSource, /style=\{\{ zIndex: KK_LAYER\.toolbar \}\}/);
-  assert.match(toolbarSource, /className="kk-canvas-toolbar-button group"/);
-  assert.match(toolbarSource, /data-active=\{showGrid\}/);
-  assert.match(toolbarSource, /className="kk-canvas-toolbar-icon/);
-
-  assert.doesNotMatch(toolbarSource, /z-\[1001\]/);
-  assert.doesNotMatch(toolbarSource, /text-gray-500|dark:text-zinc-400|dark:group-hover:text-white|dark:text-white/);
-});

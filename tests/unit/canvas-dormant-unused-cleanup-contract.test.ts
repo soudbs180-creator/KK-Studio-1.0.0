@@ -45,11 +45,7 @@ test('dormant Pixi canvas renderer remains removed from source', () => {
 });
 
 test('dormant canvas support files do not retain compiler-proven unused destructures', () => {
-  const canvasSource = readRelativeSource('apps/web/src/components/canvas/Canvas.tsx');
   const pendingNodeSource = readRelativeSource('apps/web/src/components/canvas/PendingNode.tsx');
-
-  assert.doesNotMatch(canvasSource, /cardPositions\s*=\s*\[\],\s*onAutoArrange\s*\}\)/);
-  assert.match(canvasSource, /onAutoArrange\?: \(\) => void;/);
 
   assert.doesNotMatch(pendingNodeSource, /isMobile\s*=\s*false,\s*\n/);
   assert.doesNotMatch(pendingNodeSource, /sourcePosition,\s*\n\s*onDisconnect/);
