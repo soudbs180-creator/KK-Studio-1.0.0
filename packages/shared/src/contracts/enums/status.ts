@@ -9,17 +9,6 @@ export const GenerationTaskStatus = {
 
 export type GenerationTaskStatus = (typeof GenerationTaskStatus)[keyof typeof GenerationTaskStatus];
 
-export const PaymentOrderStatus = {
-  Created: "created",
-  Pending: "pending",
-  Paid: "paid",
-  Failed: "failed",
-  Cancelled: "cancelled",
-  Refunded: "refunded",
-} as const;
-
-export type PaymentOrderStatus = (typeof PaymentOrderStatus)[keyof typeof PaymentOrderStatus];
-
 export const CreditTransactionType = {
   Recharge: "recharge",
   Debit: "debit",

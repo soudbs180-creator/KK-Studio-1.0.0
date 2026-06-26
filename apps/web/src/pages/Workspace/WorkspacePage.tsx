@@ -4288,9 +4288,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
             <g>
               {groupConnectorLayouts
                 .filter((segment) => {
-                  const parts = segment.key.split('-');
-                  const imageId = parts[1];
-                  return visibleImageIdSet.has(imageId);
+                  return visibleImageIdSet.has(segment.imageId);
                 })
                 .map((segment) => (
                   <path

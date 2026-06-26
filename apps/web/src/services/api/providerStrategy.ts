@@ -943,14 +943,15 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
     const protocolFamily = toProtocolFamily(resolvedFormat);
     const providerFamily = toProviderFamily(strategy, protocolFamily);
 
-    let authMethod = normalizeAuthMethod(input.authMethod)
-        || (
-            protocolFamily === 'gemini-native'
-                ? (strategy.geminiAuthMethod || strategy.defaultAuthMethod || 'header')
-                : protocolFamily === 'claude-native'
-                    ? (strategy.claudeAuthMethod || strategy.defaultAuthMethod || 'header')
-                    : (strategy.defaultAuthMethod || 'header')
-        );
+    const defaultAuthMethod = protocolFamily === 'gemini-native'
+        ? (strategy.geminiAuthMethod || strategy.defaultAuthMethod || 'header')
+        : protocolFamily === 'claude-native'
+            ? (strategy.claudeAuthMethod || strategy.defaultAuthMethod || 'header')
+            : (strategy.defaultAuthMethod || 'header');
+
+    let authMethod = strategy.known
+        ? defaultAuthMethod
+        : (normalizeAuthMethod(input.authMethod) || defaultAuthMethod);
 
     if (strategy.id === 'gpt-best') {
         authMethod = 'header';
@@ -961,13 +962,16 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
         : protocolFamily === 'claude-native'
             ? (strategy.claudeHeaderName || strategy.defaultHeaderName || AUTHORIZATION_HEADER)
             : (strategy.defaultHeaderName || AUTHORIZATION_HEADER);
-    const headerName = String(input.headerName || '').trim() || defaultHeaderName;
+    const headerName = strategy.known
+        ? defaultHeaderName
+        : (String(input.headerName || '').trim() || defaultHeaderName);
 
-    const authorizationValueFormat = protocolFamily === 'gemini-native'
+    const defaultAuthorizationValueFormat = protocolFamily === 'gemini-native'
         ? (strategy.geminiAuthorizationValueFormat || strategy.authorizationValueFormat || (headerName === GOOGLE_API_HEADER ? 'raw' : 'bearer'))
         : protocolFamily === 'claude-native'
             ? (strategy.claudeAuthorizationValueFormat || strategy.authorizationValueFormat || (headerName === CLAUDE_API_HEADER ? 'raw' : 'bearer'))
             : (strategy.authorizationValueFormat || 'bearer');
+    const authorizationValueFormat = defaultAuthorizationValueFormat;
 
     const compatibilityMode = normalizeCompatibilityMode(input.compatibilityMode)
         || strategy.defaultCompatibilityMode

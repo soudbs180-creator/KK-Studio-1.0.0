@@ -35,6 +35,7 @@ test('startup runtime banner browser verification uses stable selectors and chec
   const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const appSource = readSource('apps/web/src/App.tsx');
+  const startupContextSource = readSource('apps/web/src/context/AppStartupContext.tsx');
 
   assert.match(scriptSource, /startup-runtime-banner/);
   assert.match(scriptSource, /prompt-bar-container/);
@@ -44,6 +45,8 @@ test('startup runtime banner browser verification uses stable selectors and chec
   assert.match(scriptSource, /throw new Error\(`Startup runtime banner is not centered to the prompt input/);
   assert.match(scriptSource, /runFallbackVerification/);
   assert.match(scriptSource, /sourceContractsVerified: true/);
+  assert.match(scriptSource, /window\.__KK_STARTUP_SMOKE_HOLD_MS = 60_000;/);
+  assert.doesNotMatch(scriptSource, /window\.setTimeout =/);
 
   assert.match(shellSource, /data-testid="startup-runtime-banner"/);
   assert.match(shellSource, /PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container'/);
@@ -53,4 +56,8 @@ test('startup runtime banner browser verification uses stable selectors and chec
   assert.match(promptBarSource, /id="prompt-bar-container"/);
   assert.match(promptBarSource, /className=\{`input-bar-textarea/);
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
+  assert.match(startupContextSource, /__KK_STARTUP_SMOKE_HOLD_MS\?: number;/);
+  assert.match(startupContextSource, /import\.meta\.env\.DEV/);
+  assert.match(startupContextSource, /typeof window\.__KK_STARTUP_SMOKE_HOLD_MS === 'number'/);
+  assert.match(startupContextSource, /nextStage === 'background_ready' && resolveStartupSmokeHoldMs\(\) > 0/);
 });

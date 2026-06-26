@@ -82,31 +82,31 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
     : t({ zh: '登录', en: 'Sign in' });
 
   return (
-    <div className="ng-landing-root">
-      <div className="ng-continuous-stage" aria-hidden />
-      <div className="ng-noise" aria-hidden />
+    <div className="kk-landing-root">
+      <div className="kk-landing-continuous-stage" aria-hidden />
+      <div className="kk-landing-noise" aria-hidden />
 
-      <header className="ng-nav" aria-label={t({ zh: '主导航', en: 'Primary navigation' })}>
-        <a className="ng-nav__brand" href="#top" aria-label="KK Studio home">
+      <header className="kk-landing-nav" aria-label={t({ zh: '主导航', en: 'Primary navigation' })}>
+        <a className="kk-landing-nav__brand" href="#top" aria-label="KK Studio home">
           KK Studio
         </a>
-        <nav className="ng-nav__links" aria-label={t({ zh: '介绍页分区', en: 'Landing sections' })}>
+        <nav className="kk-landing-nav__links" aria-label={t({ zh: '介绍页分区', en: 'Landing sections' })}>
           {navItems.map((item) => (
             <a key={item.href} href={item.href}>
               {t(item.label)}
             </a>
           ))}
         </nav>
-        <button type="button" className="ng-nav__login" onClick={primaryAction}>
+        <button type="button" className="kk-landing-nav__login" onClick={primaryAction}>
           {primaryLabel}
         </button>
       </header>
 
-      <main className="ng-main" id="top">
-        <section className="ng-hero" aria-labelledby="ng-hero-title">
-          <div className="ng-hero__copy">
-            <p className="ng-kicker">{t({ zh: 'AI 原生创意工作台', en: 'AI-native creative workspace' })}</p>
-            <h1 id="ng-hero-title">
+      <main className="kk-landing-main" id="top">
+        <section className="kk-landing-hero" aria-labelledby="kk-landing-hero-title">
+          <div className="kk-landing-hero__copy">
+            <p className="kk-landing-kicker">{t({ zh: 'AI 原生创意工作台', en: 'AI-native creative workspace' })}</p>
+            <h1 id="kk-landing-hero-title">
               {t({
                 zh: 'KK Studio 是面向全流程创意生产的 AI 原生工作区。',
                 en: 'KK Studio is an AI-native creative workspace for full-flow creative production.',
@@ -114,12 +114,12 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
             </h1>
           </div>
 
-          <a className="ng-work-pill" href="#ai-flow">
+          <a className="kk-landing-work-pill" href="#ai-flow">
             <span>{t({ zh: '查看 AI 流程', en: 'See AI Flow' })}</span>
             <ArrowUpRight size={14} strokeWidth={1.7} />
           </a>
 
-          <aside className="ng-hero-card" aria-label={t({ zh: 'AI 接管说明', en: 'AI takeover note' })}>
+          <aside className="kk-landing-hero-card" aria-label={t({ zh: 'AI 接管说明', en: 'AI takeover note' })}>
             <span>{t({ zh: 'AI 接管', en: 'AI takeover' })}</span>
             <p>
               {t({
@@ -130,10 +130,10 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </aside>
         </section>
 
-        <section className="ng-work-section" id="work" aria-labelledby="ng-work-title">
-          <div className="ng-section-label">{t({ zh: '作品', en: 'Work' })}</div>
-          <div className="ng-work-heading">
-            <h2 id="ng-work-title">{t({ zh: '真正的生产工作，不只是演示稿。', en: 'Production work, not demo decks.' })}</h2>
+        <section className="kk-landing-work-section" id="work" aria-labelledby="kk-landing-work-title">
+          <div className="kk-landing-section-label">{t({ zh: '作品', en: 'Work' })}</div>
+          <div className="kk-landing-work-heading">
+            <h2 id="kk-landing-work-title">{t({ zh: '真正的生产工作，不只是演示稿。', en: 'Production work, not demo decks.' })}</h2>
             <p>
               {t({
                 zh: 'KK Studio 把 Prompt、图片、批量任务、原图和排版决策放进同一个可滚动的创意系统，在真实工作量下依然清晰快速。',
@@ -142,11 +142,11 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
             </p>
           </div>
 
-          <div className="ng-work-grid">
+          <div className="kk-landing-work-grid">
             {workItems.map((item) => (
-              <article className="ng-work-card" key={item.index}>
-                <div className={`ng-work-card__image ng-work-card__image--${item.visualClass}`} aria-hidden />
-                <div className="ng-work-card__body">
+              <article className="kk-landing-work-card" key={item.index}>
+                <div className={`kk-landing-work-card__image kk-landing-work-card__image--${item.visualClass}`} aria-hidden />
+                <div className="kk-landing-work-card__body">
                   <span>{item.index}</span>
                   <h3>{t(item.title)}</h3>
                   <p>{t(item.type)}</p>
@@ -156,14 +156,14 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </div>
         </section>
 
-        <section className="ng-approach-section" id="approach" aria-labelledby="ng-approach-title">
-          <div className="ng-section-label">{t({ zh: '方法', en: 'Approach' })}</div>
-          <h2 id="ng-approach-title">
+        <section className="kk-landing-approach-section" id="approach" aria-labelledby="kk-landing-approach-title">
+          <div className="kk-landing-section-label">{t({ zh: '方法', en: 'Approach' })}</div>
+          <h2 id="kk-landing-approach-title">
             {t({ zh: '足够顺滑地日常创作，也足够严格地交给 Agent。', en: 'Smooth enough for daily creation, strict enough for agents.' })}
           </h2>
-          <div className="ng-approach-list">
+          <div className="kk-landing-approach-list">
             {approachItems.map(([index, text]) => (
-              <article key={index} className="ng-approach-row">
+              <article key={index} className="kk-landing-approach-row">
                 <span>{index}</span>
                 <p>{t(text)}</p>
               </article>
@@ -171,7 +171,7 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </div>
         </section>
 
-        <section className="ng-news-section" id="ai-flow" aria-label={t({ zh: 'AI 流程', en: 'AI Flow' })}>
+        <section className="kk-landing-news-section" id="ai-flow" aria-label={t({ zh: 'AI 流程', en: 'AI Flow' })}>
           <p>{t({ zh: 'AI 流程', en: 'AI Flow' })}</p>
           <h2>
             {t({
@@ -181,35 +181,35 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </h2>
         </section>
 
-        <section className="ng-services-section" id="services" aria-labelledby="ng-services-title">
-          <div className="ng-section-label">{t({ zh: '能力', en: 'Services' })}</div>
-          <h2 id="ng-services-title">
+        <section className="kk-landing-services-section" id="services" aria-labelledby="kk-landing-services-title">
+          <div className="kk-landing-section-label">{t({ zh: '能力', en: 'Services' })}</div>
+          <h2 id="kk-landing-services-title">
             {t({ zh: '画布、生成、资产、知识和验证。', en: 'Canvas, generation, assets, knowledge, verification.' })}
           </h2>
-          <div className="ng-services-grid">
+          <div className="kk-landing-services-grid">
             {capabilityTiles.map((service) => (
               <span key={service.en}>{t(service)}</span>
             ))}
           </div>
         </section>
 
-        <section className="ng-about-section" id="about" aria-labelledby="ng-about-title">
-          <div className="ng-section-label">{t({ zh: '关于', en: 'About' })}</div>
-          <h2 id="ng-about-title">
+        <section className="kk-landing-about-section" id="about" aria-labelledby="kk-landing-about-title">
+          <div className="kk-landing-section-label">{t({ zh: '关于', en: 'About' })}</div>
+          <h2 id="kk-landing-about-title">
             {t({ zh: '为需要智能生产流的创作者准备的工作台。', en: 'A studio surface for creators who need intelligent flow.' })}
           </h2>
         </section>
 
-        <section className="ng-join-section" id="join" aria-labelledby="ng-join-title">
-          <div className="ng-section-label">{t({ zh: '加入', en: 'Join' })}</div>
-          <h2 id="ng-join-title">
+        <section className="kk-landing-join-section" id="join" aria-labelledby="kk-landing-join-title">
+          <div className="kk-landing-section-label">{t({ zh: '加入', en: 'Join' })}</div>
+          <h2 id="kk-landing-join-title">
             {t({ zh: '给希望 AI 谨慎、快速、可见地行动的团队。', en: 'For teams that want AI to act carefully, quickly, and visibly.' })}
           </h2>
         </section>
 
-        <footer className="ng-footer" id="contact">
-          <div className="ng-footer__flower" aria-hidden />
-          <div className="ng-footer__content">
+        <footer className="kk-landing-footer" id="contact">
+          <div className="kk-landing-footer__flower" aria-hidden />
+          <div className="kk-landing-footer__content">
             <p>{t({ zh: '从 KK Studio 开始', en: 'Start with KK Studio' })}</p>
             <h2>
               {t({
@@ -222,7 +222,7 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
               <ArrowUpRight size={16} strokeWidth={1.7} />
             </button>
           </div>
-          <div className="ng-footer__links">
+          <div className="kk-landing-footer__links">
             <span>Canvas</span>
             <span>ToolRegistry</span>
             <span>Verification</span>

@@ -59,6 +59,22 @@ export function isGeminiImageLikeModel(modelId?: string): boolean {
     );
 }
 
+export function isDedicatedImageModel(modelId?: string): boolean {
+    if (!modelId) return false;
+    const lower = modelId.toLowerCase();
+    return (
+        isGeminiImageLikeModel(modelId)
+        || lower.includes('dall-e')
+        || lower.includes('flux')
+        || lower.includes('sdxl')
+        || lower.includes('stable-diffusion')
+        || lower.includes('recraft')
+        || lower.includes('ideogram')
+        || lower.includes('midjourney')
+        || lower.includes('pixelart')
+    );
+}
+
 export function classifyProviderEndpointHints(endpointTypes?: string[]): ProviderEndpointHints {
     const hints = new Set(
         (endpointTypes || [])
@@ -160,6 +176,9 @@ export function resolveProviderImageRoute(input: ProviderImageRouteInput): Provi
     const endpointHints = classifyProviderEndpointHints(input.endpointTypes);
     const isGeminiImage = isGeminiImageLikeModel(input.modelId);
     const strategyId = input.runtime.strategyId;
+    const shouldBypassChat = input.runtime.isKnownProvider
+        && isDedicatedImageModel(input.modelId)
+        && input.runtime.imageProfile !== 'chat-preferred';
 
     if (input.runtime.requestProfileId === 'apimart') {
         return buildImageDecision(
@@ -235,6 +254,7 @@ export function resolveProviderImageRoute(input: ProviderImageRouteInput): Provi
         && input.compatibilityMode === 'chat'
         && !forceGeminiNativeOn12AI
         && input.runtime.imageRoutingPolicy !== 'surface-first'
+        && !shouldBypassChat
     ) {
         return buildImageDecision(
             input,
@@ -248,6 +268,7 @@ export function resolveProviderImageRoute(input: ProviderImageRouteInput): Provi
         input.compatibilityMode === 'chat'
         && !forceGeminiNativeOn12AI
         && input.runtime.imageRoutingPolicy !== 'surface-first'
+        && !shouldBypassChat
     ) {
         return buildImageDecision(
             input,

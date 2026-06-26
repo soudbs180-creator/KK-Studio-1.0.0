@@ -56,5 +56,5 @@ test('WorkspacePage virtualizes connector lines by viewport visible image ids', 
   assert.match(source, /const visibleImageIdSet = React\.useMemo\(\(\) => \{/);
   assert.match(source, /visibleImageNodes\.forEach\(\(node\) => ids\.add\(node\.id\)\)/);
   assert.match(source, /groupConnectorLayouts\s*\.filter\(\(segment\) => \{/);
-  assert.match(source, /return visibleImageIdSet\.has\(imageId\);/);
+  assert.match(source, /return visibleImageIdSet\.has\((?:segment\.)?imageId\);/);
 });

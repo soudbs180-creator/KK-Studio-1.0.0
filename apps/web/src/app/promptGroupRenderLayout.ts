@@ -101,6 +101,7 @@ export function buildPromptGroupRenderLayout({
 
   const groupConnectorLayouts = childVisualLayouts.map((layout) => ({
     key: `${node.id}-${layout.childNode.id}`,
+    imageId: layout.childNode.id,
     path: buildDockedVerticalConnectorPath(
       promptConnectorPosition.x - connectorSvgLeft,
       promptConnectorPosition.y - connectorSvgTop,

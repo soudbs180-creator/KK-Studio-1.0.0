@@ -6,7 +6,6 @@ export * from "./dto/billing.ts";
 export * from "./dto/common.ts";
 export * from "./dto/generation.ts";
 export * from "./dto/model-catalog.ts";
-export * from "./dto/payment.ts";
 export * from "./dto/workspace-canvas.ts";
 export * from "./dto/workflow.ts";
 export * from "./enums/status.ts";

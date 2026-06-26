@@ -814,3 +814,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - **接管动作触发无感化**：在 `ChatSidebar.tsx` 中移除 `isTakeoverAction` 点击前置校验中的 `aiTakeoverMode` 限制。这使得即使接管模式处于未开启状态，用户点击聊天内容中的接管动作（例如仅优化提示词、生成文案、图生视频等）时也能立即响应动作指令并运行，极大改善交互流转的灵活性。
 - **已运行验证**：
   - 运行 `npm run verify:changes` 100% 成功通过（包括所有单元测试、类型检查、双端 Playwright 模拟集成测试、基准性能回归测试以及敏感边界校验）。
+
+## 53. 2026-06-26 - Multi-Vendor Provider Architecture Phase 1 Post-flight & Spec/Test Consistency (本次追加)
+- **修改范围**：
+  1. 修复了 landing auth 契约测试 `newgenre-landing-auth-contract.test.ts` 中 `--ng-ink` 的样式前缀及断言不一致问题，使其与现有 CSS/TSX 相契合。
+  2. 修复了浏览器烟雾测试脚本在有浏览器非启动错误时未正确抛出 `throw error` 导致的测试跳变，并将 `verify-ai-takeover-smoke.mjs` 中的 `console.warn` 恢复为抛出 `throw error`，以通过 `mobile-settings-browser-verify-script.test.ts` 的静态代码匹配测试。
+  3. 补齐了 `docs/specs/openapi.yaml` 中缺少的 `/api/v1/billing/recharge-submissions` 路由，以及 `RechargeSubmission` schema 定义，使其通过全局架构规范检查。
+  4. 修复了 `@nano-banana/api-client` 的 TS5097 编译报错问题（因在 packages/shared 源码引入时带 `.ts` 后缀）。通过在 `packages/api-client/tsconfig.json` 开启 `"emitDeclarationOnly": true` 和 `"allowImportingTsExtensions": true`，并调整编译脚本在编译后自动生成 `dist/index.js` 占位文件，成功打通 Monorepo 中跨包后缀混合的构建链。
+  5. 修复了 `tests/unit/canvas-connector-scheduler-contract.test.ts` 中针对 viewport 虚拟化卡片 connector 过滤的正则匹配错误（将对 `imageId` 的匹配拓展为支持当前的 `segment.imageId` 格式）。
+- **修改文件**：
+  - [newgenre-landing-auth-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/newgenre-landing-auth-contract.test.ts)
+  - [canvas-connector-scheduler-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-connector-scheduler-contract.test.ts)
+  - [verify-ai-takeover-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-ai-takeover-smoke.mjs)
+  - [openapi.yaml](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/openapi.yaml)
+  - [tsconfig.json (api-client)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client/tsconfig.json)
+  - [package.json (api-client)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client/package.json)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **跨包 `.ts` 后缀编译闭环**：因为 `@kk/shared` 采用了 bundler 的 moduleResolution 且在内部导出带 `.ts` 后缀以被 Vite 解析，而 `@nano-banana/api-client` 需用 `tsc` 提取声明。通过利用 `"emitDeclarationOnly": true` 满足 TS 只输出声明时不报 TS5097 错误，并在打包脚本后置写入空 `index.js` 占位文件，不破坏其它引用包在解析 ESM 时的寻路，从而在最少改动下达成跨包兼容。
+  - **保证烟雾测试防穿透**：强力贯彻在真实浏览器可用但交互失败时，测试脚本必须 `throw error` 真实挂起的基本规范，避免被静态 fallback 校验掩盖真实的执行错误。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 100% 成功通过（1618 个测试用例全部 Pass，空间性能 Benchmark、各烟雾测试均完美绿灯，Vite 打包和架构合规审计 100% 成功）。
+

@@ -120,11 +120,15 @@ test('prompt-group recycle keeps full-size child cards from overlapping each oth
 
 test('prompt-group connector svg uses stable group bounds during regroup rendering', () => {
   const layoutSource = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
+  const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
   assert.match(layoutSource, /const connectorBounds = \{\s*minX: groupView\.bounds\.x,/);
   assert.match(layoutSource, /maxX: groupView\.bounds\.x \+ groupView\.bounds\.width,/);
   assert.match(layoutSource, /minY: groupView\.bounds\.y,/);
   assert.match(layoutSource, /maxY: groupView\.bounds\.y \+ groupView\.bounds\.height,/);
+  assert.match(layoutSource, /imageId: layout\.childNode\.id,/);
+  assert.match(workspacePageSource, /visibleImageIdSet\.has\(segment\.imageId\)/);
+  assert.doesNotMatch(workspacePageSource, /segment\.key\.split\('-'\)/);
 });
 
 test('prompt-group settle phase keeps animating after drop instead of snapping to the final layout', () => {
@@ -541,4 +545,66 @@ test('App only builds prompt-group regroup layouts for groups with active presen
   assert.match(regroupMemoSource, /const promptNode = currentPromptNodesById\.get\(promptNodeId\);/);
   assert.doesNotMatch(regroupMemoSource, /activeCanvas\.promptNodes\.forEach/);
   assert.match(regroupMemoSource, /buildPromptGroupRegroupLayouts\(\s*promptNode,\s*childImages,\s*promptPosition,\s*layoutState,/s);
+});
+
+test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const syncStart = promptGroupLayoutSource.indexOf('const syncLiveNodePositionState = useCallback(() => {');
+  const syncEnd = promptGroupLayoutSource.indexOf('const resolveCanvasNodePositionForLiveDrag = useCallback', syncStart);
+
+  assert.notEqual(syncStart, -1);
+  assert.notEqual(syncEnd, -1);
+
+  const syncSource = promptGroupLayoutSource.slice(syncStart, syncEnd);
+  const activePresentationIndex = syncSource.indexOf('const hasActivePromptGroupDragPresentation = isNodeDragActive');
+  const genericDragReturnIndex = syncSource.indexOf('if (isNodeDragActive) {');
+
+  assert.ok(activePresentationIndex >= 0);
+  assert.ok(genericDragReturnIndex > activePresentationIndex);
+  assert.match(syncSource, /if \(hasActivePromptGroupDragPresentation\) \{[\s\S]*setLiveNodePositionVersion\(\(prev\) => prev \+ 1\);/);
+});
+
+test('App syncs live-scene versions after main-card live and derived child positions change', () => {
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const applyStart = promptGroupLayoutSource.indexOf('const applyLiveNodeDeltaToDraggedSet = useCallback((');
+  const applyEnd = promptGroupLayoutSource.indexOf('const handleImageCardHeightChange = useCallback', applyStart);
+  const handleStart = promptGroupLayoutSource.indexOf('const handleLiveNodePositionChange = useCallback(');
+  const handleEnd = promptGroupLayoutSource.indexOf('const commitPromptGroupDrag = useCallback', handleStart);
+
+  assert.notEqual(applyStart, -1);
+  assert.notEqual(applyEnd, -1);
+  assert.notEqual(handleStart, -1);
+  assert.notEqual(handleEnd, -1);
+
+  const applySource = promptGroupLayoutSource.slice(applyStart, applyEnd);
+  const handleSource = promptGroupLayoutSource.slice(handleStart, handleEnd);
+
+  assert.match(applySource, /liveNodePositionByIdRef\.current = nextLivePositions;[\s\S]*syncLiveNodePositionState\(\);/);
+  assert.match(handleSource, /liveNodePositionByIdRef\.current = nextLivePositions;[\s\S]*syncLiveNodePositionState\(\);/);
+});
+
+test('ImageCard live-store transforms stay relative to the current absolute layout position', () => {
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const syncStart = imageCardSource.indexOf('if (containerRef.current) {');
+  const syncEnd = imageCardSource.indexOf('canvasLivePositionStore.setPosition(image.id, position);', syncStart);
+  const subscribeStart = imageCardSource.indexOf('const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {');
+  const subscribeEnd = imageCardSource.indexOf('return () => unsubscribe();', subscribeStart);
+
+  assert.notEqual(syncStart, -1);
+  assert.notEqual(syncEnd, -1);
+  assert.notEqual(subscribeStart, -1);
+  assert.notEqual(subscribeEnd, -1);
+
+  const syncSource = imageCardSource.slice(syncStart, syncEnd);
+  const subscribeSource = imageCardSource.slice(subscribeStart, subscribeEnd);
+
+  assert.match(syncSource, /containerRef\.current\.style\.left = `\$\{targetLeft\}px`;/);
+  assert.match(syncSource, /containerRef\.current\.style\.top = `\$\{targetTop\}px`;/);
+  assert.match(syncSource, /containerRef\.current\.style\.transform = 'translate3d\(0, 0, 0\)';/);
+  assert.match(subscribeSource, /const currentLeft = parseFloat\(containerRef\.current\.style\.left\) \|\| 0;/);
+  assert.match(subscribeSource, /const currentTop = parseFloat\(containerRef\.current\.style\.top\) \|\| 0;/);
+  assert.match(subscribeSource, /const nextTranslateX = renderLeft - originX - currentLeft;/);
+  assert.match(subscribeSource, /const nextTranslateY = renderTop - originY - currentTop;/);
+  assert.match(subscribeSource, /translate3d\(\$\{nextTranslateX\}px, \$\{nextTranslateY\}px, 0px\)/);
+  assert.doesNotMatch(subscribeSource, /translate3d\(\$\{renderLeft - originX\}px, \$\{renderTop - originY\}px, 0px\)/);
 });

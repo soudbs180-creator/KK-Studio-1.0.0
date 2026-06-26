@@ -18,6 +18,12 @@ import { useAuth } from './AuthContext';
 
 type StartupHealthState = 'idle' | 'checking' | 'ready';
 
+declare global {
+  interface Window {
+    __KK_STARTUP_SMOKE_HOLD_MS?: number;
+  }
+}
+
 export interface AppStartupContextValue {
   stage: AppStartupStage;
   isAuthenticatedUser: boolean;
@@ -60,6 +66,16 @@ const AppStartupContext = createContext<AppStartupContextValue>(DEFAULT_STARTUP_
 
 function hasReachedStage(stage: AppStartupStage, target: AppStartupStage): boolean {
   return isStartupStageReady(stage, target);
+}
+
+function resolveStartupSmokeHoldMs(): number {
+  if (typeof window === 'undefined' || !import.meta.env.DEV) {
+    return 0;
+  }
+
+  return typeof window.__KK_STARTUP_SMOKE_HOLD_MS === 'number'
+    ? Math.max(0, window.__KK_STARTUP_SMOKE_HOLD_MS)
+    : 0;
 }
 
 export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -181,13 +197,17 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setLastStartupWarning(null);
     }
 
+    const startupSmokeHoldMs = resolveStartupSmokeHoldMs();
+    const profileReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 0;
+    const workspaceReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 120;
+
     profileTimer = window.setTimeout(() => {
       setStageSafely('profile_ready');
-    }, 0);
+    }, profileReadyDelayMs);
 
     workspaceTimer = window.setTimeout(() => {
       setStageSafely('workspace_ready');
-    }, 120);
+    }, workspaceReadyDelayMs);
 
     return () => {
       cancelled = true;
@@ -196,6 +216,10 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [isTempUser, localOnlyRuntime, user?.id]);
 
   const advanceTo = React.useCallback((nextStage: AppStartupStage) => {
+    if (nextStage === 'background_ready' && resolveStartupSmokeHoldMs() > 0) {
+      return;
+    }
+
     startTransition(() => {
       setStage((currentStage) => {
         return hasReachedStage(currentStage, nextStage) ? currentStage : nextStage;

@@ -339,7 +339,7 @@ async function ensureWorkspaceReady(page) {
     return desktopEntry;
   }
 
-  const landingLogin = page.locator('.ng-nav__login').first();
+  const landingLogin = page.locator('.kk-landing-nav__login').first();
   if (await isVisibleWithin(landingLogin, 10000)) {
     await landingLogin.click();
   }
@@ -576,7 +576,7 @@ try {
   const failureScreenshot = await captureFailureScreenshot(page, 'ai-takeover-smoke-failure.png');
   const diagnostics = await collectFailureDiagnostics(page);
   if (!isBrowserLaunchUnavailable(error)) {
-    console.warn(`[AI Takeover Smoke] Browser path failed, running fallback contracts: ${String(error?.message || error)}${failureScreenshot ? ` (screenshot: ${failureScreenshot})` : ''}`);
+    throw error;
   }
   await runFallbackVerification(error, browserPreflight, targetUrl, diagnostics);
 } finally {

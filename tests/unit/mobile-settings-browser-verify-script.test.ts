@@ -56,7 +56,9 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.doesNotMatch(scriptSource, /mobile-settings-home/);
   assert.doesNotMatch(scriptSource, /mobile-settings-entry-api-management/);
   assert.doesNotMatch(scriptSource, /鏌ョ湅璇婃柇/);
-  assert.match(scriptSource, /settings-workbench-overview/);
+  assert.doesNotMatch(scriptSource, /const workbenchOverview = page\.getByTestId\('settings-workbench-overview'\)/);
+  assert.doesNotMatch(scriptSource, /Settings workbench overview section did not render/);
+  assert.match(scriptSource, /settingsModelCenter/);
   assert.doesNotMatch(scriptSource, /Advanced mode/);
   assert.doesNotMatch(scriptSource, /Hide advanced mode/);
   assert.match(scriptSource, /mode: 'fallback'/);
@@ -76,8 +78,20 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(dashboardSource, /dashboardPrimaryAction/);
   assert.match(scaffoldSource, /testId\?: string;/);
   assert.match(scaffoldSource, /data-testid=\{testId\}/);
-  assert.match(workbenchSectionsSource, /testId="settings-workbench-overview"/);
   assert.match(workbenchSectionsSource, /testId="settings-model-center"/);
+});
+
+test('mobile settings smoke follows the current Model Center default without requiring the advanced workbench overview', () => {
+  const scriptSource = readSource('scripts/test/verify-mobile-settings-smoke.mjs');
+
+  assert.match(scriptSource, /const modelCenter = page\.getByTestId\('settings-model-center'\);/);
+  assert.match(scriptSource, /const providerPool = page\.getByTestId\('api-model-center-provider-pool'\);/);
+  assert.match(scriptSource, /const presetDirectory = page\.getByTestId\('api-model-center-preset-directory'\);/);
+  assert.match(scriptSource, /const addProviderEntry = page\.getByTestId\('api-official-provider-add'\);/);
+  assert.match(scriptSource, /const officialEditorBack = page\.getByTestId\('api-official-editor-back'\);/);
+  assert.match(scriptSource, /await addProviderEntry\.click\(\);/);
+  assert.match(scriptSource, /await officialEditorBack\.click\(\);/);
+  assert.doesNotMatch(scriptSource, /await assertVisible\(workbenchOverview/);
 });
 
 test('desktop settings smoke verification covers direct settings routes and the in-app settings entry with stable selectors', () => {
@@ -184,5 +198,20 @@ test('browser smoke health checks also stub smart probe query requests', () => {
 
   for (const scriptSource of scriptSources) {
     assert.match(scriptSource, /page\.route\('\*\*\/healthz\*\*'/);
+  }
+});
+
+test('browser smoke scripts only fall back when the browser runtime is unavailable', () => {
+  const scriptSources = [
+    readSource('scripts/test/verify-ai-takeover-smoke.mjs'),
+    readSource('scripts/test/verify-mobile-settings-smoke.mjs'),
+    readSource('scripts/test/verify-desktop-settings-smoke.mjs'),
+    readSource('scripts/test/verify-prompt-group-drag.mjs'),
+    readSource('scripts/test/verify-startup-runtime-banner-centering.mjs'),
+  ];
+
+  for (const scriptSource of scriptSources) {
+    assert.match(scriptSource, /if \(!isBrowserLaunchUnavailable\(error\)\) \{\s*throw error;\s*\}/);
+    assert.match(scriptSource, /await runFallbackVerification\(error,/);
   }
 });

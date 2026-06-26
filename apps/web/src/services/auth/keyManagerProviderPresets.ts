@@ -153,9 +153,20 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
     'gpt-best': {
         name: 'GPT-Best',
         baseUrl: '',
-        models: ['gpt-4o', 'gpt-4o-mini', 'o3-pro', 'codex-mini-latest', 'o3-deep-research-2025-06-26'],
+        models: [
+            'gpt-4o', 'gpt-4o-mini', 'o3-pro', 'codex-mini-latest', 'o3-deep-research-2025-06-26',
+            'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview', 'gemini-2.5-flash-image',
+            'nano-banana-2', 'nano-banana-pro', 'nano-banana'
+        ],
         format: 'openai',
         icon: '\u{1F3AF}'
+    },
+    'suxi': {
+        name: 'New Suxi AI',
+        baseUrl: 'https://new.suxi.ai/v1',
+        models: ['gpt-4o', 'gpt-4o-mini', 'claude-3-5-sonnet-latest', 'gemini-2.5-flash-image', 'gemini-3.1-flash-image-preview', 'nano-banana-2'],
+        format: 'openai',
+        icon: '\u{1F388}'
     },
     'apimart': {
         name: 'APIMart',

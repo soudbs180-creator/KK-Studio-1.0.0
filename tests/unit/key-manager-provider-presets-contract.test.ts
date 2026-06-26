@@ -54,6 +54,7 @@ test('provider presets preserve documented built-in routes and defaults', async 
     'flow2api',
     'wuyinkeji-google-omni',
     'gpt-best',
+    'suxi',
     'apimart',
     'custom',
   ]);

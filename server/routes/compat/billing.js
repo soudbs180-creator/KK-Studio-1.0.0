@@ -544,8 +544,6 @@ router.get('/api/v1/billing/payment-channels', requireUser, async (req, res) => 
   return res.json(okEnvelope({
     items: [
       { channel: 'manual', label: 'Manual', isActive: true, instructionText: 'Submit transfer proof for manual review.' },
-      { channel: 'alipay', label: 'Alipay', isActive: true },
-      { channel: 'wechat', label: 'WeChat Pay', isActive: true },
     ],
   }, req));
 });

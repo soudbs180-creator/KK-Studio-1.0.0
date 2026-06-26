@@ -1,8 +1,4 @@
 import {
-  persistBrowserAccessToken,
-  clearBrowserAccessToken,
-} from "@nano-banana/api-client";
-import {
   getLatestAuthSessionChange,
   subscribeAuthSessionChange,
 } from "../auth/authSessionEvents.ts";
@@ -161,24 +157,10 @@ function setStoredBrowserToken(key: string, token?: string): void {
     removeStorageItem(getSessionStorage(), key);
     removeStorageItem(getLocalStorage(), key);
     removeCookieItem(key);
-    if (key === accessTokenStorageKey) {
-      try {
-        clearBrowserAccessToken();
-      } catch {
-        // 简体中文注释：防范可能存在的跨包初始化时序问题
-      }
-    }
     return;
   }
 
   syncTokenToAllBrowserStores(key, token);
-  if (key === accessTokenStorageKey) {
-    try {
-      persistBrowserAccessToken(token);
-    } catch {
-      // 简体中文注释：防范可能存在的跨包初始化时序问题
-    }
-  }
 }
 
 export function getStoredKkApiAccessToken(): string | undefined {

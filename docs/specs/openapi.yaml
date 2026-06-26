@@ -2,15 +2,13 @@ openapi: 3.1.0
 info:
   title: KK Studio Unified API
   version: 1.0.0
-  summary: REST + OpenAPI 3.1 contract for the server-backed API and payment routes.
+  summary: REST + OpenAPI 3.1 contract for the server-backed API and current billing routes.
   description: |
     This contract freezes the first wave of external and internal-facing APIs used by KK Studio.
     All routes return a unified JSON envelope and use typed DTOs through the current server/ backend.
 servers:
   - url: https://api.kkai.plus
     description: Main API / BFF
-  - url: https://payment.kkai.plus
-    description: Payment route compatibility host backed by server/
 security:
   - bearerAuth: []
 tags:
@@ -22,7 +20,6 @@ tags:
   - name: Billing/Credits API
   - name: Model Catalog API
   - name: Admin API
-  - name: Payment API
 paths:
   /api/v1/auth/register:
     post:
@@ -511,6 +508,130 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /api/v1/billing/recharge-submissions:
+    post:
+      tags: [Billing/Credits API]
+      summary: Create a new manual recharge submission
+      operationId: createRechargeSubmission
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                currencyCode:
+                  type: string
+                paymentChannel:
+                  type: string
+                manualProvider:
+                  type: string
+      responses:
+        '201':
+          description: Recharge submission created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    required: [submission]
+                    properties:
+                      submission:
+                        $ref: '#/components/schemas/RechargeSubmission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/billing/recharge-submissions/{submissionId}/proof:
+    post:
+      tags: [Billing/Credits API]
+      summary: Upload payment proof for a recharge submission
+      operationId: uploadRechargeProof
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transferReferenceLast4:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Recharge proof uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    required: [submission]
+                    properties:
+                      submission:
+                        $ref: '#/components/schemas/RechargeSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/billing/recharge-submissions/{submissionId}/mark-paid:
+    post:
+      tags: [Billing/Credits API]
+      summary: Mark a recharge submission as paying
+      operationId: markRechargePaid
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recharge submission marked as paying
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    required: [submission]
+                    properties:
+                      submission:
+                        $ref: '#/components/schemas/RechargeSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/model-catalog/models:
     get:
       tags: [Model Catalog API]
@@ -781,95 +902,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
-  /payment/v1/orders:
-    post:
-      tags: [Payment API]
-      summary: Create a payment order through the server payment route
-      operationId: createPaymentOrder
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/XClientVersion'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentOrderRequest'
-      responses:
-        '201':
-          description: Payment order created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentOrderResponseEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /payment/v1/orders/{merchantOrderNo}/status:
-    get:
-      tags: [Payment API]
-      summary: Get the current payment order status view
-      operationId: getPaymentOrderStatus
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/XRequestId'
-        - $ref: '#/components/parameters/XClientVersion'
-        - name: merchantOrderNo
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Payment order status resolved
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentOrderStatusResponseEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /payment/v1/callbacks/alipay:
-    post:
-      tags: [Payment API]
-      summary: Receive Alipay callback and write back to main API
-      operationId: receiveAlipayCallback
-      security:
-        - internalServiceToken: []
-      parameters:
-        - $ref: '#/components/parameters/XRequestId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AlipayCallbackRequest'
-      responses:
-        '200':
-          description: Callback accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentCallbackResponseEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-    internalServiceToken:
-      type: apiKey
-      in: header
-      name: X-Internal-Token
   parameters:
     XRequestId:
       in: header
@@ -2217,132 +2255,68 @@ components:
           $ref: '#/components/schemas/DeleteAdminCreditProviderResponse'
         meta:
           $ref: '#/components/schemas/Meta'
-    CreatePaymentOrderRequest:
-      type: object
-      required: [providerCode, amount, currency, returnUrl, notifyUrl, idempotencyKey]
-      properties:
-        providerCode:
-          type: string
-        amount:
-          type: string
-          description: Decimal string to avoid float precision loss
-        currency:
-          type: string
-        creditAmount:
-          type: integer
-          description: Optional legacy client hint. The server resolves the final credit amount from amount and currency.
-        returnUrl:
-          type: string
-          format: uri
-        notifyUrl:
-          type: string
-          format: uri
-        idempotencyKey:
-          type: string
-    PaymentOrder:
-      type: object
-      required: [id, merchantOrderNo, status, amount, currency, creditAmount, paymentUrl]
-      properties:
-        id:
-          type: string
-          format: uuid
-        merchantOrderNo:
-          type: string
-        status:
-          $ref: '#/components/schemas/PaymentOrderStatus'
-        amount:
-          type: string
-        currency:
-          type: string
-        creditAmount:
-          type: integer
-        paymentUrl:
-          type: string
-          format: uri
-    PaymentOrderResponseEnvelope:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          $ref: '#/components/schemas/PaymentOrder'
-        meta:
-          $ref: '#/components/schemas/Meta'
-    PaymentOrderStatusView:
-      type: object
-      required:
-        [paymentOrderId, merchantOrderNo, paymentOrderStatus, tradeStatus, creditAmount, amount, currency, settlementApplied]
-      properties:
-        paymentOrderId:
-          type: string
-          format: uuid
-        merchantOrderNo:
-          type: string
-        paymentOrderStatus:
-          $ref: '#/components/schemas/PaymentOrderStatus'
-        tradeStatus:
-          type: string
-        creditAmount:
-          type: integer
-        amount:
-          type: string
-        currency:
-          type: string
-        settlementApplied:
-          type: boolean
-        settlementLedgerId:
-          type: string
-    PaymentOrderStatusResponseEnvelope:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          $ref: '#/components/schemas/PaymentOrderStatusView'
-        meta:
-          $ref: '#/components/schemas/Meta'
-    AlipayCallbackRequest:
-      type: object
-      required: [callbackId, merchantOrderNo, tradeStatus, payload]
-      properties:
-        callbackId:
-          type: string
-        merchantOrderNo:
-          type: string
-        tradeStatus:
-          type: string
-        payload:
-          type: object
-          additionalProperties: true
-    PaymentCallbackResult:
-      type: object
-      required: [accepted, paymentOrderStatus]
-      properties:
-        accepted:
-          type: boolean
-        paymentOrderStatus:
-          $ref: '#/components/schemas/PaymentOrderStatus'
-    PaymentCallbackResponseEnvelope:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          $ref: '#/components/schemas/PaymentCallbackResult'
-        meta:
-          $ref: '#/components/schemas/Meta'
     GenerationTaskStatus:
       type: string
       enum: [queued, running, succeeded, failed, cancelled, refunded]
-    PaymentOrderStatus:
-      type: string
-      enum: [created, pending, paid, failed, cancelled, refunded]
+    RechargeSubmission:
+      type: object
+      required: [submissionId, userId, amount, currencyCode, status, createdAt]
+      properties:
+        submissionId:
+          type: string
+        userId:
+          type: string
+        amount:
+          type: number
+        baseAmount:
+          type: number
+        serviceFee:
+          type: number
+        payableAmount:
+          type: number
+        baseCredits:
+          type: integer
+        bonusCredits:
+          type: integer
+        creditAmount:
+          type: integer
+        creditsPerUnit:
+          type: integer
+        currencyCode:
+          type: string
+        paymentChannel:
+          type: string
+        manualProvider:
+          type: string
+          nullable: true
+        transferReferenceLast4:
+          type: string
+          nullable: true
+        note:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        paymentMarkedAt:
+          type: string
+          format: date-time
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewActorUserId:
+          type: string
+          nullable: true
     CreditTransactionType:
       type: string
       enum: [recharge, debit, refund, freeze, unfreeze]

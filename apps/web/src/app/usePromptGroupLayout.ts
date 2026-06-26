@@ -445,10 +445,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   ]);
 
   const syncLiveNodePositionState = useCallback(() => {
-    if (isNodeDragActive) {
-      return;
-    }
-
     const hasActivePromptGroupDragPresentation = isNodeDragActive
       && Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
         state.layoutMode === 'regrouping' || state.layoutMode === 'docked'
@@ -462,6 +458,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         liveSceneFrameRef.current = null;
         setLiveNodePositionVersion((prev) => prev + 1);
       });
+      return;
+    }
+
+    if (isNodeDragActive) {
       return;
     }
 
@@ -591,6 +591,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
           canvasLivePositionStore.setPosition(nodeId, pos);
         }
       });
+      syncLiveNodePositionState();
     }
   }, [
     liveDerivedNodeIdsByOwnerRef,
@@ -1097,8 +1098,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         }
       } else {
         canvasLivePositionStore.setPosition(nodeId, null);
-        syncLiveNodePositionState();
       }
+      syncLiveNodePositionState();
     }
 
     if (!groupId) {

@@ -3,6 +3,8 @@ import { readSource } from '../support/workspacePaths.js';
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
+import { resolveProviderRuntime } from '../../apps/web/src/services/api/providerStrategy.ts';
+import { resolveImageSurface } from '../../apps/web/src/services/api/providerSurfaceRouter.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -239,4 +241,51 @@ test("base64 image extraction preserves upstream mime types instead of forcing p
     payloadHelperSource,
     /return 'image\/png';/,
   );
+});
+
+test("dedicated image models like dall-e-3 or flux-schnell bypass chat compatibilityMode on known providers but not custom providers", () => {
+  const siliconFlowRuntime = resolveProviderRuntime({
+    provider: "SiliconFlow",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    compatibilityMode: "chat",
+  });
+
+  // SiliconFlow is known, so it bypasses compatibilityMode === 'chat' for flux-schnell
+  assert.equal(
+    resolveImageSurface({
+      runtime: siliconFlowRuntime,
+      modelId: "flux-schnell",
+      compatibilityMode: "chat",
+    }),
+    "provider-images"
+  );
+
+  const customRuntime = resolveProviderRuntime({
+    provider: "Custom",
+    baseUrl: "https://example.com/v1",
+    compatibilityMode: "chat",
+  });
+
+  // Custom (generic) is not known, so it stays on chat-image under compatibilityMode === 'chat'
+  assert.equal(
+    resolveImageSurface({
+      runtime: customRuntime,
+      modelId: "flux-schnell",
+      compatibilityMode: "chat",
+    }),
+    "chat-image"
+  );
+});
+
+test("known provider strategies enforce default auth settings and ignore legacy config overrides", () => {
+  const gptBestRuntime = resolveProviderRuntime({
+    provider: "GPT Best",
+    baseUrl: "https://gpt-best.apifox.cn",
+    format: "openai",
+    authMethod: "query",
+  });
+
+  assert.equal(gptBestRuntime.authMethod, "header");
+  assert.equal(gptBestRuntime.headerName, "Authorization");
+  assert.equal(gptBestRuntime.authorizationValueFormat, "bearer");
 });
