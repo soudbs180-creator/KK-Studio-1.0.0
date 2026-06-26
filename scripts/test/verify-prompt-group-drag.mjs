@@ -398,6 +398,13 @@ async function measureScene(page) {
     const imageBoxes = imageSurfaces.map((element) => {
       const box = element.getBoundingClientRect();
       return {
+        id: element.id || element.closest('[id]')?.id || '',
+        className: element.className || '',
+        styleLeft: element.style?.left || '',
+        styleTop: element.style?.top || '',
+        styleTransform: element.style?.transform || '',
+        dataX: element.getAttribute('data-x') || '',
+        dataY: element.getAttribute('data-y') || '',
         left: box.left,
         top: box.top,
         width: box.width,
@@ -633,6 +640,7 @@ try {
   const result = {
     initialPromptBox: initialScene.promptBox,
     mainDragPromptBox: mainDragScene.promptBox,
+    mainDragImageBoxes: mainDragScene.imageBoxes,
     initialSpread,
     mainDragSpread,
     mainDragGrouped,

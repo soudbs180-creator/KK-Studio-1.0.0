@@ -699,8 +699,16 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
       `}</style>
 
       <SettingsHero
+        eyebrow={pick('系统账本', 'System Billing')}
         title={pick('计费账本', 'Billing Ledger')}
         description={pick('查看您的 API 充值消耗明细、内部积分消费情况及账户交易历史。', 'Review your API recharge spend, internal credit balance, and transaction history.')}
+        icon={Wallet}
+        tone="amber"
+        badge={
+          <SettingsBadge tone={activeTab === 'api' ? 'amber' : 'emerald'}>
+            {activeTab === 'api' ? pick('API 视图', 'API View') : pick('积分视图', 'Credits View')}
+          </SettingsBadge>
+        }
       />
 
       <SettingsCardGridContainer>

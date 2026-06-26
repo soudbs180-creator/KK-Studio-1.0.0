@@ -28,6 +28,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   });
 
   const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
+  const [minimapCenterOffset, setMinimapCenterOffset] = useState<{ x: number; y: number } | null>(null);
 
   const toggleCollapsed = (e?: React.MouseEvent) => {
     if (e) {
@@ -102,12 +103,15 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const currentTargetScale = isEdited ? targetScale : scale;
   const displayZoomPercent = Math.round(currentTargetScale * 100);
 
-  // 6. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘 3.0，保持聚焦框适中尺寸
+  // 6. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘小地图自身倍数，保持聚焦框适中尺寸
   const viewportW = isNaN(viewportMaxX - viewportMinX) ? 800 : (viewportMaxX - viewportMinX);
   const viewportH = isNaN(viewportMaxY - viewportMinY) ? 600 : (viewportMaxY - viewportMinY);
   
-  const currentCenterX = viewportMinX + viewportW / 2;
-  const currentCenterY = viewportMinY + viewportH / 2;
+  const viewportCenterX = viewportMinX + viewportW / 2;
+  const viewportCenterY = viewportMinY + viewportH / 2;
+
+  const currentCenterX = viewportCenterX + (minimapCenterOffset?.x || 0);
+  const currentCenterY = viewportCenterY + (minimapCenterOffset?.y || 0);
 
   const totalWidth = viewportW * minimapScaleMultiplier;
   const totalHeight = viewportH * minimapScaleMultiplier;
@@ -316,14 +320,60 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     }
   };
 
-  // 小地图 SVG 区域上 of 鼠标滚轮缩放事件（缩放的是小地图的内容本身，不更改主画布缩放）
+  // 小地图 SVG 区域上 of 鼠标滚轮缩放事件（根据鼠标的位置来局部缩放小地图内容）
   const handleSvgWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // 1. 计算鼠标当前位置在真实大画布坐标系下的世界坐标
+    const mouseXInWorld = (mx - safeDx) / scaleMini + minX;
+    const mouseYInWorld = (my - safeDy) / scaleMini + minY;
+
+    // 2. 算新的 scale multiplier
     const delta = -e.deltaY;
     const zoomFactor = delta > 0 ? 0.9 : 1.1; // 向上滚是放大（视野变窄，细节变大），向下滚是缩小（视野变宽，细节变小）
     const nextMultiplier = Math.max(1.0, Math.min(10.0, minimapScaleMultiplier * zoomFactor));
+
+    // 3. 计算新的 totalWidth 和 totalHeight
+    const totalWidth_new = viewportW * nextMultiplier;
+    const totalHeight_new = viewportH * nextMultiplier;
+
+    // 4. 计算新的 scaleMini_new 以及安全的 dx_new 和 dy_new
+    const scaleMiniX_new = miniWidth / (totalWidth_new <= 0 ? 1 : totalWidth_new);
+    const scaleMiniY_new = miniHeight / (totalHeight_new <= 0 ? 1 : totalHeight_new);
+    let scaleMini_new = Math.min(scaleMiniX_new, scaleMiniY_new);
+    if (isNaN(scaleMini_new) || scaleMini_new === Infinity || scaleMini_new <= 0) {
+      scaleMini_new = 0.1;
+    }
+
+    const contentWidth_new = totalWidth_new * scaleMini_new;
+    const contentHeight_new = totalHeight_new * scaleMini_new;
+    const dx_new = (miniWidth - contentWidth_new) / 2;
+    const dy_new = (miniHeight - contentHeight_new) / 2;
+    const safeDx_new = isNaN(dx_new) ? 0 : dx_new;
+    const safeDy_new = isNaN(dy_new) ? 0 : dy_new;
+
+    // 5. 算新的 minX_new 和 minY_new 以锁定鼠标指向点
+    const minX_new = mouseXInWorld - (mx - safeDx_new) / scaleMini_new;
+    const minY_new = mouseYInWorld - (my - safeDy_new) / scaleMini_new;
+
+    // 6. 反推新的小地图中心并计算新的偏移量
+    const centerX_new = minX_new + totalWidth_new / 2;
+    const centerY_new = minY_new + totalHeight_new / 2;
+
+    const offsetX = centerX_new - viewportCenterX;
+    const offsetY = centerY_new - viewportCenterY;
+
+    // 7. 更新状态
     setMinimapScaleMultiplier(nextMultiplier);
+    setMinimapCenterOffset({ x: offsetX, y: offsetY });
   };
 
   // 确认定位
@@ -341,12 +391,14 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       
       canvasRef.current.setView(finalX, finalY, currentTargetScale);
       setIsEdited(false);
+      setMinimapCenterOffset(null); // 重置视野偏移
     }
   };
 
   // 取消并重置
   const handleCancelLocation = () => {
     setIsEdited(false);
+    setMinimapCenterOffset(null); // 重置视野偏移
   };
 
   // 折叠状态下，在右上角渲染成扁平横向缩放控制栏

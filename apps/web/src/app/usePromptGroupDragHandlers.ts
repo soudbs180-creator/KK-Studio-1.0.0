@@ -66,6 +66,14 @@ export function usePromptGroupDragHandlers({
     }
 
     const shouldRegroup = shouldAutoRegroupPromptGroup(node, childImages, sourceNodeId);
+    console.log('[prompt-group-debug] drag-delta ' + JSON.stringify({
+      promptId: node.id,
+      sourceNodeId,
+      childCount: childImages.length,
+      selectedCount: selectedNodeIds.length,
+      shouldRegroup,
+      delta,
+    }));
     if (shouldRegroup) {
       beginPromptGroupRegroup(node.id, childImages);
       applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta);

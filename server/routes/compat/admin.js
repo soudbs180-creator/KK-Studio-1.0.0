@@ -244,6 +244,50 @@ async function findUserByIdentity(identity) {
   };
 }
 
+function readBoundedInteger(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function toAdminUserListItem(row) {
+  const id = String(row.id || '').trim();
+  const email = String(row.email || (id ? `${id}@local` : 'local-user@example.com'));
+  const createdAt = row.created_at || row.createdAt || nowIso();
+  return {
+    id,
+    email,
+    credits: Number(row.credits || 0),
+    adminLevel: Number(row.admin_level ?? row.adminLevel ?? 0),
+    createdAt: new Date(createdAt).toISOString(),
+  };
+}
+
+function readLocalAdminUsers(store, currentAdminProfile, search) {
+  const normalizedSearch = String(search || '').trim().toLowerCase();
+  const byId = new Map();
+
+  if (currentAdminProfile?.id) {
+    byId.set(currentAdminProfile.id, toAdminUserListItem(currentAdminProfile));
+  }
+
+  for (const [userId, profileStore] of Object.entries(store.profiles || {})) {
+    const profile = buildLocalProfile(userId, {
+      ...(profileStore.profile || {}),
+      credits: profileStore.creditBalance ?? profileStore.profile?.credits,
+    });
+    byId.set(userId, toAdminUserListItem(profile));
+  }
+
+  const items = Array.from(byId.values());
+  if (!normalizedSearch) return items;
+
+  return items.filter((item) => {
+    return item.id.toLowerCase().includes(normalizedSearch)
+      || item.email.toLowerCase().includes(normalizedSearch);
+  });
+}
+
 function mapCreditLog(row) {
   return {
     id: String(row.id),
@@ -436,6 +480,58 @@ router.post('/api/v1/admin/password', requireAdmin, async (req, res) => {
   return res.json(okEnvelope({ changed: true }, req));
 });
 
+router.get('/api/v1/admin/users', requireAdmin, async (req, res) => {
+  const page = readBoundedInteger(req.query?.page, 1, 1, 100000);
+  const limit = readBoundedInteger(req.query?.limit, 20, 1, 100);
+  const search = String(req.query?.search || '').trim();
+  const offset = (page - 1) * limit;
+
+  if (isDbEnabled()) {
+    const pool = getPool();
+    const params = [];
+    let whereClause = '';
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause = `WHERE email ILIKE $1 OR id::text ILIKE $1`;
+    }
+
+    const countResult = await pool.query(`SELECT COUNT(*) AS count FROM public.users ${whereClause}`, params);
+    const rowsResult = await pool.query(
+      `SELECT id, email, credits, created_at, COALESCE(admin_level, 0) AS admin_level
+       FROM public.users
+       ${whereClause}
+       ORDER BY created_at DESC, id ASC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    );
+
+    return res.json(okEnvelope({
+      users: rowsResult.rows.map(toAdminUserListItem),
+      total: Number(countResult.rows[0]?.count || 0),
+      page,
+      limit,
+    }, req));
+  }
+
+  const store = await readStore();
+  let users = readLocalAdminUsers(store, req.adminProfile, search);
+
+  if (search && users.length === 0) {
+    const syntheticUser = await findUserByIdentity(search);
+    if (syntheticUser) {
+      users = [toAdminUserListItem(syntheticUser)];
+    }
+  }
+
+  users.sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+  return res.json(okEnvelope({
+    users: users.slice(offset, offset + limit),
+    total: users.length,
+    page,
+    limit,
+  }, req));
+});
+
 router.post('/api/v1/admin/users/roles', requireAdmin, async (req, res) => {
   const identity = String(req.body?.identity || '').trim();
   const role = req.body?.role === 'admin' ? 'admin' : 'user';
@@ -445,6 +541,17 @@ router.post('/api/v1/admin/users/roles', requireAdmin, async (req, res) => {
   if (isDbEnabled()) {
     const pool = getPool();
     await pool.query('UPDATE public.users SET admin_level = $1, updated_at = NOW() WHERE id = $2', [role === 'admin' ? 2 : 0, target.id]);
+  } else {
+    const store = await readStore();
+    const profileStore = ensureProfileStore(store, target.id);
+    profileStore.profile = {
+      ...(profileStore.profile || {}),
+      email: target.email || profileStore.profile?.email,
+      adminLevel: role === 'admin' ? 2 : 0,
+      credits: Number(profileStore.creditBalance ?? target.credits ?? DEFAULT_CREDIT_BALANCE),
+      updatedAt: nowIso(),
+    };
+    await writeStore(store);
   }
   return res.json(okEnvelope({
     identity,
@@ -476,8 +583,85 @@ router.post('/api/v1/admin/billing/recharges', requireAdmin, async (req, res) =>
     } finally {
       client.release();
     }
+  } else {
+    const store = await readStore();
+    const profileStore = ensureProfileStore(store, target.id);
+    balanceAfter = Number(profileStore.creditBalance ?? target.credits ?? DEFAULT_CREDIT_BALANCE) + amount;
+    profileStore.creditBalance = balanceAfter;
+    profileStore.profile = {
+      ...(profileStore.profile || {}),
+      email: target.email || profileStore.profile?.email,
+      credits: balanceAfter,
+      updatedAt: nowIso(),
+    };
+    profileStore.creditTransactions = [
+      ...(profileStore.creditTransactions || []),
+      {
+        id: `ledger_${crypto.randomUUID()}`,
+        userId: target.id,
+        transactionType: 'recharge',
+        amount,
+        balanceAfter,
+        description: req.body?.description || 'admin_recharge',
+        status: 'completed',
+        createdAt: nowIso(),
+        completedAt: nowIso(),
+      },
+    ];
+    await writeStore(store);
   }
   return res.json(okEnvelope({ identity, subjectId: target.id, balanceAfter, creditedAmount: amount, subjectEmail: target.email }, req));
+});
+
+router.post('/api/v1/admin/billing/credit-adjustments', requireAdmin, async (req, res) => {
+  const identity = String(req.body?.identity || '').trim();
+  const delta = Number(req.body?.creditDelta ?? req.body?.delta ?? 0);
+  const description = String(req.body?.description || req.body?.note || 'admin_adjust').trim() || 'admin_adjust';
+  if (!identity || !Number.isSafeInteger(delta) || delta === 0) {
+    return sendError(res, req, 400, 'INVALID_CREDIT_ADJUSTMENT_PAYLOAD', 'identity and non-zero creditDelta are required.');
+  }
+
+  const target = await findUserByIdentity(identity);
+  if (!target) return sendError(res, req, 404, 'USER_NOT_FOUND', 'User was not found.');
+
+  let balanceAfter = Math.max(0, Number(target.credits || DEFAULT_CREDIT_BALANCE) + delta);
+  if (isDbEnabled()) {
+    balanceAfter = await credits.adjustCreditsByAdmin(req.userId, target.id, delta, description);
+  } else {
+    const store = await readStore();
+    const profileStore = ensureProfileStore(store, target.id);
+    balanceAfter = Math.max(0, Number(profileStore.creditBalance ?? target.credits ?? DEFAULT_CREDIT_BALANCE) + delta);
+    profileStore.creditBalance = balanceAfter;
+    profileStore.profile = {
+      ...(profileStore.profile || {}),
+      email: target.email || profileStore.profile?.email,
+      credits: balanceAfter,
+      updatedAt: nowIso(),
+    };
+    profileStore.creditTransactions = [
+      ...(profileStore.creditTransactions || []),
+      {
+        id: `ledger_${crypto.randomUUID()}`,
+        userId: target.id,
+        transactionType: delta > 0 ? 'recharge' : 'debit',
+        amount: Math.abs(delta),
+        balanceAfter,
+        description,
+        status: 'completed',
+        createdAt: nowIso(),
+        completedAt: nowIso(),
+      },
+    ];
+    await writeStore(store);
+  }
+
+  return res.json(okEnvelope({
+    identity,
+    subjectId: target.id,
+    subjectEmail: target.email,
+    balanceAfter,
+    delta,
+  }, req));
 });
 
 router.get('/api/v1/admin/billing/accounts/:identity', requireAdmin, async (req, res) => {

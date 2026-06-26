@@ -349,8 +349,16 @@ export const StorageSettingsView: React.FC = () => {
   return (
     <SettingsViewShell>
       <SettingsHero
+        eyebrow="System maintenance"
         title="Storage Settings"
         description="Manage modes, capacity, and repair actions."
+        icon={HardDrive}
+        tone={mode === 'local' ? 'emerald' : 'amber'}
+        badge={
+          <SettingsBadge tone={mode === 'local' ? 'emerald' : 'amber'}>
+            {mode === 'local' ? 'Local Folder' : 'Browser Cache'}
+          </SettingsBadge>
+        }
       />
 
       <SettingsCardGridContainer>

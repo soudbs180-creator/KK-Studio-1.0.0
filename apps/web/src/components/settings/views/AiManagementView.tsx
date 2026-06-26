@@ -26,7 +26,7 @@ import {
   getOcrServiceSettings,
   subscribeOcrServiceSettings,
   updateOcrServiceSettings,
-} from '../../../services/document/ocrServiceSettings';
+} from '../../../services/document/ocrServiceSettings.ts';
 import keyManager, { type KeySlot, type ThirdPartyProvider } from '../../../services/auth/keyManager';
 import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
@@ -412,7 +412,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
 
               <div className="flex items-center justify-between p-3.5 rounded-xl border text-xs" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
                 <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && (ocrSettings.provider === 'nutrient' || (ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey)) ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} />
+                  <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && (ocrSettings.provider === 'nutrient' || (ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey)) ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} /> // UI_TOKEN_EXCEPTION
                   <span className="font-semibold text-[var(--text-primary)]">
                     {ocrSettings.provider === 'nutrient'
                       ? pick('Nutrient 服务：已就绪 (由服务端托管)', 'Nutrient: Ready (Hosted by server)')

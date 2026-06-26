@@ -34,7 +34,7 @@
 | 🔌 [specs/](specs/README.md) | **数据规格与 API 协议**。规范第三方提供商的 API 模型、轮询与对接参数。 | [openapi.yaml](specs/openapi.yaml)<br>[API_DOCS.md](specs/API_DOCS.md)<br>[NANO_BANANA.md](specs/NANO_BANANA.md) |
 | 🛠️ [setup/](setup/README.md) | **环境搭建与自发布部署**。系统在 VPS 和 Supabase 上运行、配置、启动的命令手册。 | [GUIDE.md](setup/GUIDE.md)<br>[SUPABASE_CLI.md](setup/SUPABASE_CLI.md) |
 | 💻 [development/](development/README.md) | **开发手册与交接模板**。指导多提供商架构设计、发布流以及 Durable 的会话交接。 | [session-handoff.md](development/session-handoff.md)<br>[multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) |
-| ⚡ [superpowers/](superpowers/README.md) | **具体业务功能计划**。留作历史架构与具体超级功能逻辑实现的开发参考。 | [plans/](superpowers/plans/) 实施方案<br>[specs/](superpowers/specs/) 业务定义 |
+| ⚡ [archive/superpowers/](archive/superpowers/README.md) | **具体业务功能计划历史归档**。留作历史架构与具体超级功能逻辑实现的开发参考。 | [plans/](archive/superpowers/plans/) 实施方案<br>[specs/](archive/superpowers/specs/) 业务定义 |
 | 📊 [reports/](reports/README.md) | **分析与优化报告**。收集各类自动化或人工输出的性能与安全审计报告。 | [mobile-ui-optimization.md](reports/mobile-ui-optimization.md) |
 | 📦 [archive/](archive/README.md) | **归档区**。存放已经过时、与 v1.5.8 事实相冲突的历史文档，仅供追溯历史使用。 | 🚫 **警告：AI 严禁将此处文档作为当前代码开发的参考依据！** |
 

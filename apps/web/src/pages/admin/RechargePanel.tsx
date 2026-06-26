@@ -3,7 +3,7 @@
 // 鉴权：使用管理员 token 调用接口
 
 import React, { useState } from "react";
-import { adminRechargeUser, adminGetUsers } from "@nano-banana/api-client";
+import { adminRechargeUser, adminGetUsers } from "../../services/api/adminPanelApi.ts";
 import { getStoredKkApiAccessToken } from "../../services/api/authAccessToken.ts";
 import { Coins, Mail, PlusCircle } from "lucide-react";
 

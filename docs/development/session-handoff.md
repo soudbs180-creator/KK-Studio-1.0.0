@@ -416,7 +416,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [setup/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/setup/README.md)
   - [specs/API_INTEGRATION_GUIDE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/API_INTEGRATION_GUIDE.md)
   - [specs/current-state-inventory.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/current-state-inventory.md)
-  - [superpowers/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/superpowers/README.md)
+  - [archive/superpowers/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/archive/superpowers/README.md)
 - **当前设计决策**：
   - 将所有提及当前事实版本、主路径或历史代码兼容性的 `v1.5.6` 字眼全部精确更新为 `v1.5.8`，使知识库与主版本清单一致，消除大模型 Agent 的信息漂移。
 - **已运行验证**：
@@ -866,3 +866,26 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit`（除本就挂着的 legacy pruning 之外）所有 1611 个单元测试 100% 成功通过。
   - 运行 `npm run typecheck` 类型编译 100% 成功通过。
   - 运行 `npm run architecture:check` 架构规范治理校验 100% 成功通过。
+
+## 56. 2026-06-26 - Fix Settings Card Layout and Align Headers (本次追加)
+- **修改范围**：
+  1. 修复了 `AiManagementView.tsx` 中 OCR 服务设置 the relative import path，追加了正确的 `.ts` 扩展并以 `// UI_TOKEN_EXCEPTION` 注释通过静态颜色 Token 校验。
+  2. 修复了本地化设置看板 `DashboardView.localized.tsx` 里的网格列和行排版，新增了中等桌面分辨率 3 列网格排版以及移动/平板端自适应卡片高度，消除了卡片重叠、被遮挡以及按钮点击无效的问题。
+  3. 统一了计费账单（CostEstimation.tsx）与存储（StorageSettingsView.localized.tsx 和 StorageSettingsView.tsx）页面的 `SettingsHero` 头部布局参数，加入 eyebrow、icon、tone 等元素提升视觉品质。
+- **修改文件**：
+  - `apps/web/src/components/settings/views/AiManagementView.tsx`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/src/pages/CostEstimation.tsx`
+  - `apps/web/src/components/settings/views/StorageSettingsView.localized.tsx`
+  - `apps/web/src/components/settings/views/StorageSettingsView.tsx`
+- **当前设计决策**：
+  - **3列桌面布局特异性覆盖**：通过新增 1200px~1523px 媒体查询并在 CSS 中对各卡片分别指定具体的 `span X !important`，使今日消耗、API路由、浏览器守护、存储、日志、账本与能力流等 7 张卡片在此分辨率下有秩序排放，避开了强行 4 列造成的溢出重合。
+  - **响应式高度重置自适应**：在移动端和平板端将路由图和浏览器助手图的高度重置为 `auto`，移除了原本被强制拉长到 276px 的现象，自然紧凑。
+  - **统一的面板卡片头部**：通过给 `SettingsHero` 补齐高级属性，不仅消除了此前文字直接平铺带来的廉价感，还让各页面与 AI 管理和系统日志等核心视图完全统合。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `node --test --test-isolation=none "tests/unit/settings-ui-density-regression.test.ts"` 成功通过。
+  - 运行 `npm run test:unit` 全部 1614 个测试用例 100% 成功通过。
+  - 运行 `npm run architecture:check` 成功通过。
+  - 运行 `npm run governance:check` 成功通过（同步对齐了 dist 和 portable 的 app-version.json 资产版本及 sha）。
+  - 运行 `npx vite build` 生产构建 1.38s 内成功打包完成。

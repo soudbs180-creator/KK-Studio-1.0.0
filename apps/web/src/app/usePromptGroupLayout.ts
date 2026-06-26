@@ -417,15 +417,22 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         }
 
         const promptPosition = liveNodePositionByIdRef.current[promptNodeId] ?? promptNode.position;
-        regroupLayoutMap.set(
-          promptNodeId,
-          buildPromptGroupRegroupLayouts(
+        const childLayouts = buildPromptGroupRegroupLayouts(
             promptNode,
             childImages,
             promptPosition,
             layoutState,
-          ),
-        );
+          );
+        console.log('[prompt-group-debug] regroup-layouts ' + JSON.stringify({
+          promptNodeId,
+          promptPosition,
+          layoutMode: layoutState.layoutMode,
+          regroupProgress: layoutState.regroupProgress,
+          liveNodePositionVersion,
+          promptGroupLayoutVersion,
+          childLayouts: Array.from(childLayouts.entries()),
+        }));
+        regroupLayoutMap.set(promptNodeId, childLayouts);
       });
 
       return regroupLayoutMap;

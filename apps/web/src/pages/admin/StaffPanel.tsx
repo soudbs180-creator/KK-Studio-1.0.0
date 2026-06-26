@@ -3,7 +3,7 @@
 // 鉴权：仅超级管理员 (adminLevel === 1) 可见并有权操作
 
 import React, { useState, useEffect } from "react";
-import { adminGetUsers, adminSetAdminLevel } from "@nano-banana/api-client";
+import { adminGetUsers, adminSetAdminLevel } from "../../services/api/adminPanelApi.ts";
 import { getStoredKkApiAccessToken } from "../../services/api/authAccessToken.ts";
 import { ShieldAlert, Award, User, Search, Clock, ShieldCheck } from "lucide-react";
 

@@ -9,14 +9,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@kk/shared": "*",
-    "@tanstack/react-query": "^5.101.0",
-    "axios": "^1.18.0",
-    "react": "^19.2.7"
+    "@kk/shared": "*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "@types/react": "^19.2.17",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   }

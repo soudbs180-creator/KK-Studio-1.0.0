@@ -547,8 +547,16 @@ export const StorageSettingsView: React.FC = () => {
   return (
     <SettingsViewShell>
       <SettingsHero
+        eyebrow={pick('系统维护', 'System maintenance')}
         title={pick('存储维护', 'Storage Settings')}
         description={pick('管理模式、容量和修复动作。', 'Manage modes, capacity, and repair actions.')}
+        icon={HardDrive}
+        tone={mode === 'local' ? 'emerald' : 'amber'}
+        badge={
+          <SettingsBadge tone={mode === 'local' ? 'emerald' : 'amber'}>
+            {mode === 'local' ? pick('本地持久化', 'Local Folder') : pick('浏览器缓存', 'Browser Cache')}
+          </SettingsBadge>
+        }
       />
 
       <SettingsCardGridContainer>

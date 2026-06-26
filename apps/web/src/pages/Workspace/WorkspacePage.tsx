@@ -4432,14 +4432,30 @@ export const AppContent: React.FC<AppContentProps> = () => {
               id={`image-card-${childLayout.childNode.id}`}
               {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
-              loadPriority={1200}
-              loadBand={0}
+              loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
+              loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
               stackZIndexOverride={promptCardZIndex + 10 + childIndex}
               shadowBoost={shadowBoost}
               position={childLayout.visualPosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}
+              isVisible={(() => {
+                const screenLeft = -canvasTransform.x / canvasTransform.scale;
+                const screenTop = -canvasTransform.y / canvasTransform.scale;
+                const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
+                const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
+                const { width: w, totalHeight: h } = getCardDimensions(childLayout.childNode.aspectRatio, true);
+                const x = childLayout.visualPosition.x - w / 2;
+                const y = childLayout.visualPosition.y - h;
+                const margin = 150;
+                return !(
+                  x > screenRight + margin ||
+                  x + w < screenLeft - margin ||
+                  y > screenBottom + margin ||
+                  y + h < screenTop - margin
+                );
+              })()}
               isCanvasTransforming={isCanvasTransforming}
               highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
               onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
