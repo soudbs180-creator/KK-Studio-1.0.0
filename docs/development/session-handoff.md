@@ -1393,5 +1393,29 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 单独运行单元测试 `vps-api-storage-and-health-audit.test.ts` 3 项大用例 100% 成功通过。
   - 全量运行 `npm run verify:changes` 1600+ 用例 100% 成功通过。
 
+## 90. 2026-06-26 - AI Assistant Queue Clean-up, Unified Runtime Execution, and Real Path E2E Contract (本次追加)
+- **修改范围**：
+  1. **彻底移除 React 内存生图队列**：清理了 `AITakeoverContext.tsx` 中旧的 `generationQueue`/`addToQueue` React 状态与相关的排队 `useEffect` 调度器，确保所有生图入口唯一进入 `DurableGenerationQueue` 统一管理。
+  2. **统一 Agent 执行路径**：重构 `AgentRuntime.run` 将职责纯粹化为“规划”，移除内部自动拉起执行的逻辑。在 `AITakeoverContext.tsx` 内通过显式 `await executePlan(record.id)` 控制非确认情况下的自动执行，杜绝双通道执行风险。
+  3. **补齐真实路径 E2E 测试**：新建 `tests/e2e/ai-takeover-real-paths.test.ts`，对一句话生成到画布、选中卡片编辑、缺密钥引导、刷新/重连恢复队列、品牌研究到画布等 5 大核心用户路径完成了动态测试与静态契约断言覆盖。
+  4. **LogRedactor 挂载时机与 Cookie 脱敏**：调整了 `server/index.js` 中 `logRedactor` 中间件挂载点，使其位于 body parser 之后以确保 `req.body` 已解析后能真正脱敏；将 `cookie` 敏感词加入 `SENSITIVE_KEYS`；在 `vps-security-middlewares.test.ts` 补充了深度脱敏测试。
+  5. **同步 AI Roadmap 事实**：更新了 `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md` 标题至 v1.5.9 真实状态，剔除了 React 内存队列的过时缺口说明，并补充了已落地的 `DurableGenerationQueue`、`TaskCenterTray` 状态。
+- **修改文件**：
+  - [AITakeoverContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx)
+  - [AgentRuntime.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts)
+  - [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/logRedactor.js)
+  - [AI_ASSISTANT_ROADMAP.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/AI_ASSISTANT_ROADMAP.md)
+  - [ai-takeover-real-paths.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/e2e/ai-takeover-real-paths.test.ts)
+  - [ai-control-runtime-single-path-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/ai-control-runtime-single-path-contract.test.ts)
+  - [vps-security-middlewares.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-security-middlewares.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **Durable 统一化**：React 内存排队是极大的架构隐患，统一进入 DurableGenerationQueue 并使用 Ref 规避 React 状态闭包陈旧。
+  - **纯规划 Agent**：AgentRuntime.run 应当是一台纯规划机，执行端点单一化，便于拦截、安全审查与断言。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 1600+ 项测试和 CI 质量门 100% 成功通过，0 regressions。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
 
 
