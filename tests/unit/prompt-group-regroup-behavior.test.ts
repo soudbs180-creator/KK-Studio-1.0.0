@@ -474,11 +474,70 @@ test('App keeps child live positions owned by regroup layout during single main-
 
 test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const syncStart = promptGroupLayoutSource.indexOf('const syncLiveNodePositionState = useCallback(() => {');
+  const syncEnd = promptGroupLayoutSource.indexOf('const isFirstDragRenderRef = useRef(true);', syncStart);
 
+  assert.notEqual(syncStart, -1);
+  assert.notEqual(syncEnd, -1);
+  const syncSource = promptGroupLayoutSource.slice(syncStart, syncEnd);
+  const activeBranchIndex = syncSource.indexOf('const hasActivePromptGroupDragPresentation = isNodeDragActive');
+  const plainDragReturnIndex = syncSource.indexOf('if (isNodeDragActive) {\n      return;\n    }');
+
+  assert.notEqual(activeBranchIndex, -1);
+  assert.ok(
+    plainDragReturnIndex === -1 || activeBranchIndex < plainDragReturnIndex,
+    'active prompt-group regroup presentation must be checked before the generic node-drag bailout',
+  );
   assert.match(promptGroupLayoutSource, /const hasActivePromptGroupDragPresentation = isNodeDragActive/);
   assert.match(promptGroupLayoutSource, /Object\.values\(promptGroupLayoutStateByIdRef\.current\)\.some/);
   assert.match(promptGroupLayoutSource, /if \(hasActivePromptGroupDragPresentation\) \{/);
   assert.match(promptGroupLayoutSource, /setLiveNodePositionVersion\(\(prev\) => prev \+ 1\)/);
+});
+
+test('App syncs live-scene versions after main-card live and derived child positions change', () => {
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const liveChangeStart = promptGroupLayoutSource.indexOf('const handleLiveNodePositionChange = useCallback(');
+  const liveChangeEnd = promptGroupLayoutSource.indexOf('const shouldAutoRegroupPromptGroup = useCallback(', liveChangeStart);
+  const deltaStart = promptGroupLayoutSource.indexOf('const applyLiveNodeDeltaToDraggedSet = useCallback(');
+  const deltaEnd = promptGroupLayoutSource.indexOf('const handleImageCardHeightChange = useCallback(', deltaStart);
+
+  assert.notEqual(liveChangeStart, -1);
+  assert.notEqual(liveChangeEnd, -1);
+  assert.notEqual(deltaStart, -1);
+  assert.notEqual(deltaEnd, -1);
+
+  const liveChangeSource = promptGroupLayoutSource.slice(liveChangeStart, liveChangeEnd);
+  const deltaSource = promptGroupLayoutSource.slice(deltaStart, deltaEnd);
+
+  assert.match(
+    liveChangeSource,
+    /liveNodePositionByIdRef\.current = nextLivePositions;\s*syncLiveNodePositionState\(\);\s*if \(position\) \{/,
+  );
+  assert.doesNotMatch(
+    liveChangeSource,
+    /} else \{\s*canvasLivePositionStore\.setPosition\(nodeId, null\);\s*syncLiveNodePositionState\(\);/,
+  );
+  assert.match(
+    deltaSource,
+    /liveNodePositionByIdRef\.current = nextLivePositions;\s*syncLiveNodePositionState\(\);\s*companionIds\.forEach/,
+  );
+});
+
+test('ImageCard live-store transforms stay relative to the current absolute layout position', () => {
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const subscribeStart = imageCardSource.indexOf('const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {');
+  const subscribeEnd = imageCardSource.indexOf('return () => unsubscribe();', subscribeStart);
+
+  assert.notEqual(subscribeStart, -1);
+  assert.notEqual(subscribeEnd, -1);
+  const subscribeSource = imageCardSource.slice(subscribeStart, subscribeEnd);
+
+  assert.match(subscribeSource, /const currentLeft = parseFloat\(containerRef\.current\.style\.left\) \|\| 0;/);
+  assert.match(subscribeSource, /const currentTop = parseFloat\(containerRef\.current\.style\.top\) \|\| 0;/);
+  assert.match(subscribeSource, /const nextTranslateX = renderLeft - originX - currentLeft;/);
+  assert.match(subscribeSource, /const nextTranslateY = renderTop - originY - currentTop;/);
+  assert.match(subscribeSource, /translate3d\(\$\{nextTranslateX\}px, \$\{nextTranslateY\}px, 0px\)/);
+  assert.doesNotMatch(subscribeSource, /translate3d\(\$\{renderLeft - originX\}px, \$\{renderTop - originY\}px, 0px\)/);
 });
 
 test('App freezes overlap-map recomputation while node drag is active', () => {

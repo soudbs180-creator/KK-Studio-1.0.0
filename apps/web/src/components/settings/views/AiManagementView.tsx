@@ -22,6 +22,11 @@ import {
   getCapabilityRouteAssignments,
   subscribeCapabilityRouteAssignments,
 } from '../../../services/api/capabilityRouteAssignments';
+import {
+  getOcrServiceSettings,
+  subscribeOcrServiceSettings,
+  updateOcrServiceSettings,
+} from '../../../services/document/ocrServiceSettings.ts';
 import keyManager, { type KeySlot, type ThirdPartyProvider } from '../../../services/auth/keyManager';
 import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
@@ -41,7 +46,7 @@ import {
   SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
-import { SettingInput } from '../ui/index';
+import { SettingInput, SettingSelect, SettingToggle } from '../ui/index';
 
 const PRESETS_STORAGE_KEY = 'kk_capability_presets_v1';
 
@@ -67,6 +72,11 @@ const defaultPresets: LocalPresetsState = {
   video_generation: {
     systemPrompt: '你是一个电影导演与分镜视频规划专家。请将用户的画面描述转换为富有动态感、运镜细腻、折射高级的短视频提示词与镜头控制指令。',
     temperature: 1.0,
+    maxTokens: 4096,
+  },
+  ocr_document: {
+    systemPrompt: '你是一个专业的 OCR 文字识别与排版结构化专家。请精准提取图片中的所有文本内容，并按自然的阅读顺序整理输出。',
+    temperature: 0.1,
     maxTokens: 4096,
   },
 };
@@ -109,6 +119,17 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
   const [localTemp, setLocalTemp] = useState(preset.temperature);
   const [localMaxTokens, setLocalMaxTokens] = useState(preset.maxTokens);
 
+  const isOcr = role === 'ocr_document';
+  const [ocrSettings, setOcrSettings] = useState(() => isOcr ? getOcrServiceSettings() : null);
+
+  useEffect(() => {
+    if (!isOcr) return;
+    setOcrSettings(getOcrServiceSettings());
+    return subscribeOcrServiceSettings(() => {
+      setOcrSettings(getOcrServiceSettings());
+    });
+  }, [isOcr]);
+
   useEffect(() => {
     setLocalPrompt(preset.systemPrompt);
     setLocalTemp(preset.temperature);
@@ -136,6 +157,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
     if (r === 'assistant') return pick('文本对话', 'Text Chat');
     if (r === 'image_generation') return pick('图片生成', 'Image Generation');
     if (r === 'video_generation') return pick('视频生成', 'Video Generation');
+    if (r === 'ocr_document') return pick('OCR 文本识别', 'OCR Document');
     return r;
   };
 
@@ -143,13 +165,15 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
     if (r === 'assistant') return pick('处理画布的对话助理、脑暴大纲及交互控制的核心大脑通道。', 'Core channel for text conversation, brainstorming, and canvas controls.');
     if (r === 'image_generation') return pick('文生图与图生图的扩写、美化和模型指派接口。', 'Preferred route for expansion, optimization and model routing of image generation.');
     if (r === 'video_generation') return pick('电影视频分镜生成、动态控制及镜头控制能力的路由信道。', 'Routing endpoint for dynamic video generation models.');
+    if (r === 'ocr_document') return pick('对画布中的图片提取文本、分析排版结构以及进行文字识别的底层通道。', 'Preferred route for extracting text, layout analysis and text recognition in canvas images.');
     return '';
   };
 
   const getRoleIcon = (r: string) => {
     if (r === 'assistant') return MessageSquare;
     if (r === 'image_generation') return ImageIcon;
-    return VideoIcon;
+    if (r === 'video_generation') return VideoIcon;
+    return Bot;
   };
 
   const Icon = getRoleIcon(role);
@@ -315,6 +339,101 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
               </div>
             </div>
           </div>
+
+          {isOcr && ocrSettings && (
+            <div className="mt-4 pt-4 border-t space-y-4" style={{ borderColor: 'var(--border-light)' }}>
+              <h4 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                <Sparkles size={14} className="text-blue-500" />
+                {pick('OCR 服务接口与密钥配置', 'OCR Service Credentials & Provider')}
+              </h4>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <SettingSelect
+                    label={pick('OCR 服务商', 'OCR Provider')}
+                    value={ocrSettings.provider}
+                    options={[
+                      { value: 'nutrient', label: pick('Nutrient (默认集成)', 'Nutrient (Built-in)') },
+                      { value: 'baidu', label: pick('Baidu 百度智能云 OCR', 'Baidu Cloud OCR') },
+                    ]}
+                    onChange={(val) => {
+                      const updated = updateOcrServiceSettings({ provider: val as 'baidu' | 'nutrient' });
+                      setOcrSettings(updated);
+                    }}
+                  />
+                  <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                    {ocrSettings.provider === 'nutrient'
+                      ? pick('使用系统内置免费的 Nutrient 服务，密钥由服务端环境托管。', 'Uses system default Nutrient OCR hosted by the backend.')
+                      : pick('使用您自己的百度智能云 OCR 服务，需在下方配置专属的 API Key。', 'Uses your own Baidu OCR cloud services. Credentials required below.')}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <SettingInput
+                    label={pick('默认识别语言', 'Default OCR Language')}
+                    value={ocrSettings.defaultLanguage || 'chi_sim'}
+                    onChange={(val) => {
+                      const updated = updateOcrServiceSettings({ defaultLanguage: val });
+                      setOcrSettings(updated);
+                    }}
+                    placeholder="chi_sim"
+                  />
+                  <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                    {pick('常见选项：chi_sim (简体中文), ENG (英文)。', 'Options: chi_sim (Simplified Chinese), ENG (English).')}
+                  </p>
+                </div>
+              </div>
+
+              {ocrSettings.provider === 'baidu' && (
+                <div className="grid gap-4 md:grid-cols-2 bg-[var(--bg-secondary)] p-4 rounded-2xl border" style={{ borderColor: 'var(--border-light)' }}>
+                  <SettingInput
+                    label="Baidu API Key"
+                    value={ocrSettings.baiduApiKey || ''}
+                    autoComplete="new-password"
+                    onChange={(val) => {
+                      const updated = updateOcrServiceSettings({ baiduApiKey: val });
+                      setOcrSettings(updated);
+                    }}
+                    placeholder={pick('输入百度的 API Key', 'Enter Baidu API Key')}
+                  />
+                  <SettingInput
+                    label="Baidu Secret Key"
+                    value={ocrSettings.baiduSecretKey || ''}
+                    type="password"
+                    autoComplete="new-password"
+                    onChange={(val) => {
+                      const updated = updateOcrServiceSettings({ baiduSecretKey: val });
+                      setOcrSettings(updated);
+                    }}
+                    placeholder={pick('输入百度的 Secret Key', 'Enter Baidu Secret Key')}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between p-3.5 rounded-xl border text-xs" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && (ocrSettings.provider === 'nutrient' || (ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey)) ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} /> // UI_TOKEN_EXCEPTION
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {ocrSettings.provider === 'nutrient'
+                      ? pick('Nutrient 服务：已就绪 (由服务端托管)', 'Nutrient: Ready (Hosted by server)')
+                      : ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey
+                        ? pick('百度智能云 OCR：已就绪 (已配置专属密钥)', 'Baidu OCR: Active (BYOK Configured)')
+                        : pick('百度智能云 OCR：未就绪 (缺少 API 密钥)', 'Baidu OCR: Inactive (Keys Missing)')}
+                  </span>
+                </div>
+                {ocrSettings.provider === 'baidu' && (
+                  <a
+                    href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors cursor-pointer"
+                  >
+                    {pick('获取百度 API 密钥 ↗', 'Get Baidu Key ↗')}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -611,7 +730,7 @@ const AiManagementView: React.FC = () => {
     }
   };
 
-  const targetRoles: CapabilityRole[] = ['assistant', 'image_generation', 'video_generation'];
+  const targetRoles: CapabilityRole[] = ['assistant', 'image_generation', 'ocr_document', 'video_generation'];
 
   return (
     <SettingsViewShell>

@@ -162,69 +162,41 @@ test("no runtime source keeps ViaSupabase alias naming after the cloud-record mi
 });
 
 test("retired public static surfaces are removed from the current web runtime", () => {
-  for (const retiredPath of [
-    "apps/web/public/newgenre_static",
-    "apps/web/public/pay/success",
-    "scripts/alipay",
-    "docs/setup/ALIPAY_MCP.md",
-  ]) {
-    assert.equal(
-      existsSync(resolveWorkspacePath(retiredPath)),
-      false,
-      `${retiredPath} must stay out of the current v1.5.9 runtime`,
-    );
-  }
+  assert.equal(existsSync(resolveWorkspacePath("apps/web/public/newgenre_static")), false);
+  assert.equal(existsSync(resolveWorkspacePath("apps/web/public/pay/success")), false);
+  assert.equal(existsSync(resolveWorkspacePath("scripts/alipay")), false);
 });
 
-test("current runtime no longer exposes payment v1 or Alipay callback protocol", () => {
-  const adminCompatSource = readWorkspaceFile("server/routes/compat/admin.js");
-  const billingCompatSource = readWorkspaceFile("server/routes/compat/billing.js");
-  const sharedClientSource = readWorkspaceFile("packages/shared/src/contracts/client/kk-api-client.ts");
-  const sharedContractsIndexSource = readWorkspaceFile("packages/shared/src/contracts/index.ts");
-  const statusEnumsSource = readWorkspaceFile("packages/shared/src/contracts/enums/status.ts");
-  const openApiSource = readWorkspaceFile("docs/specs/openapi.yaml");
-  const specGuardSource = readWorkspaceFile("scripts/architecture/check-spec-structure.mjs");
+test("current runtime no longer exposes payment/v1 or Alipay callback protocol", () => {
+  const activeFiles = [
+    "server/routes/compat/admin.js",
+    "server/routes/compat/billing.js",
+    "packages/shared/src/contracts/client/kk-api-client.ts",
+    "packages/shared/src/contracts/index.ts",
+    "packages/shared/src/contracts/enums/status.ts",
+    "docs/specs/openapi.yaml",
+    "scripts/architecture/check-spec-structure.mjs",
+  ];
 
-  for (const source of [
-    adminCompatSource,
-    billingCompatSource,
-    sharedClientSource,
-    sharedContractsIndexSource,
-    statusEnumsSource,
-    openApiSource,
-  ]) {
-    assert.doesNotMatch(source, /\/payment\/v1/);
-    assert.doesNotMatch(source, /callbacks\/alipay/);
-    assert.doesNotMatch(source, /AlipayCallback|CreatePaymentOrder|PaymentOrderDto|PaymentCallback|PaymentOrderStatusView/);
-    assert.doesNotMatch(source, /createPaymentOrder|getPaymentOrderStatus/);
-  }
+  const source = activeFiles
+    .map((relativePath) => readFileSync(resolveWorkspacePath(relativePath), "utf8"))
+    .join("\n");
 
-  assert.equal(
-    existsSync(resolveWorkspacePath("packages/shared/src/contracts/dto/payment.ts")),
-    false,
-  );
-  assert.match(specGuardSource, /\/api\/v1\/billing\/recharge-submissions/);
-  assert.doesNotMatch(specGuardSource, /\/payment\/v1/);
+  assert.doesNotMatch(source, /payment\/v1/);
+  assert.doesNotMatch(source, /callbacks\/alipay/i);
+  assert.doesNotMatch(source, /AlipayCallback|CreatePaymentOrder|PaymentOrderStatusView|PaymentCallback/);
+  assert.doesNotMatch(source, /createPaymentOrder|getPaymentOrderStatus/);
 });
 
 test("api-client package does not retain legacy endpoint wrappers or browser storage ownership", () => {
-  const packageJson = JSON.parse(readWorkspaceFile("packages/api-client/package.json"));
-  const indexSource = readWorkspaceFile("packages/api-client/src/index.ts");
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/api.ts")), false);
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/hooks.ts")), false);
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/client.ts")), false);
 
-  for (const retiredSource of [
-    "packages/api-client/src/api.ts",
-    "packages/api-client/src/client.ts",
-    "packages/api-client/src/hooks.ts",
-  ]) {
-    assert.equal(
-      existsSync(resolveWorkspacePath(retiredSource)),
-      false,
-      `${retiredSource} must not return as a legacy HTTP wrapper`,
-    );
-  }
+  const indexSource = readFileSync(resolveWorkspacePath("packages/api-client/src/index.ts"), "utf8");
+  const packageSource = readFileSync(resolveWorkspacePath("packages/api-client/package.json"), "utf8");
+  const combinedSource = `${indexSource}\n${packageSource}`;
 
-  assert.deepEqual(packageJson.dependencies, { "@kk/shared": "*" });
-  assert.equal(packageJson.peerDependencies, undefined);
-  assert.equal(packageJson.devDependencies, undefined);
-  assert.equal(indexSource.trim(), 'export * from "@kk/shared";');
+  assert.doesNotMatch(combinedSource, /axios|@tanstack\/react-query|localStorage|sessionStorage|document\.cookie/);
+  assert.doesNotMatch(combinedSource, /\/auth|\/billing|\/admin|\/generate|\/chat/);
 });

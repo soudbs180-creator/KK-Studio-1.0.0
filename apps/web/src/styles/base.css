@@ -9743,7 +9743,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 768px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(2, 270px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 简体中文注释：强制左侧对齐，与顶部的 Hero 标题、面包屑完全贴合在同一条 28px 左垂线上，避免当卡片较少时居中产生视觉不对齐和右侧空荡的问题 */
     justify-content: start !important;
   }
@@ -9751,7 +9751,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 1238px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(3, 270px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     /* 简体中文注释：中等桌面宽度下主内容区扣除侧边栏后不足 4A，先降为 3A 以避免横向滚动。 */
     justify-content: start !important;
   }
@@ -9759,7 +9759,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 1524px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(4, 270px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     /* 简体中文注释：强制左侧对齐，与顶部 Hero 标题的左边缘百分百垂直一致，确保在宽屏下绝不偏离对齐线 */
     justify-content: start !important;
   }
@@ -9868,27 +9868,27 @@ body:not(.dark-mode) .settings-log-group-badge {
    ========================================================================== */
 @media (min-width: 768px) {
   .dashboard-grid-card {
-    width: 270px !important;
+    width: 100% !important;
     height: auto !important;
-    min-width: 270px !important;
-    max-width: 270px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     min-height: 130px !important;
     box-sizing: border-box !important;
   }
 
-  /* 2列跨度大卡片宽度：2 * W_A + gap_16 = 556px */
+  /* 2列跨度大卡片宽度：使用 100% 自适应 Grid 单元格宽度 */
   .dashboard-grid-card.a-card-span-2-col {
-    width: 556px !important;
-    min-width: 556px !important;
-    max-width: 556px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   /* 3列与4列大卡片在中屏下自适应降级为跨2列宽度 */
   .dashboard-grid-card.a-card-span-3-col,
   .dashboard-grid-card.a-card-span-4-col {
-    width: 556px !important;
-    min-width: 556px !important;
-    max-width: 556px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
   /* 2行跨度大卡片高度：2 * H_A + gap_16 = 276px */
@@ -9914,20 +9914,20 @@ body:not(.dark-mode) .settings-log-group-badge {
 }
 
 @media (min-width: 1238px) {
-  /* 电脑宽屏端：3列与4列大卡片以 16px 间隙公式展开独立宽度 */
+  /* 电脑宽屏端：3列与4列大卡片自适应宽度 */
   .dashboard-grid-card.a-card-span-3-col,
   .dashboard-grid-card.a-card-span-4-col {
-    width: 842px !important;
-    min-width: 842px !important;
-    max-width: 842px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 
 @media (min-width: 1524px) {
   .dashboard-grid-card.a-card-span-4-col {
-    width: 1128px !important;
-    min-width: 1128px !important;
-    max-width: 1128px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 

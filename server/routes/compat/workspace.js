@@ -551,7 +551,81 @@ router.get('/api/v1/model-catalog/models', async (req, res) => {
       })),
     }, req));
   }
-  return res.json(okEnvelope({ items: [] }, req));
+  const defaultItems = [
+    {
+      id: 'default-imagen-4',
+      modelCode: 'imagen-4.0-generate-001',
+      displayName: 'Imagen 4.0 Standard',
+      kind: 'image',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 10,
+    },
+    {
+      id: 'default-imagen-4-ultra',
+      modelCode: 'imagen-4.0-ultra-generate-001',
+      displayName: 'Imagen 4.0 Ultra',
+      kind: 'image',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 15,
+    },
+    {
+      id: 'default-imagen-4-fast',
+      modelCode: 'imagen-4.0-fast-generate-001',
+      displayName: 'Imagen 4.0 Fast',
+      kind: 'image',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 10,
+    },
+    {
+      id: 'default-imagen-3',
+      modelCode: 'imagen-3.0-generate-001',
+      displayName: 'Imagen 3.0 Pro',
+      kind: 'image',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 10,
+    },
+    {
+      id: 'default-dalle-3',
+      modelCode: 'dall-e-3',
+      displayName: 'DALL-E 3',
+      kind: 'image',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 15,
+    },
+    {
+      id: 'default-gpt-4o-mini',
+      modelCode: 'gpt-4o-mini',
+      displayName: 'GPT-4o Mini',
+      kind: 'chat',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 2,
+    },
+    {
+      id: 'default-gpt-4o',
+      modelCode: 'gpt-4o',
+      displayName: 'GPT-4o',
+      kind: 'chat',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 5,
+    },
+    {
+      id: 'default-gemini-2.5-flash',
+      modelCode: 'gemini-2.5-flash',
+      displayName: 'Gemini 2.5 Flash',
+      kind: 'chat',
+      availability: 'available',
+      billingMode: 'credits',
+      defaultCreditCost: 2,
+    }
+  ];
+  return res.json(okEnvelope({ items: defaultItems }, req));
 });
 
 

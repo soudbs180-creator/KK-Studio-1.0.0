@@ -2,17 +2,17 @@
   "appName": "KK Studio",
   "version": "1.5.9",
   "displayVersion": "v1.5.9",
-  "buildTime": "2026-06-26T07:36:52.674Z",
+  "buildTime": "2026-06-26T08:16:37.487Z",
   "releaseDate": "2026-06-26",
   "releaseNotes": [
     "升级版本至 v1.5.9 并同步推送至远端",
     "verified kkai.plus same-origin API workaround."
   ],
   "channel": "stable",
-  "commitSha": "0f5e09965de6695bad35d0c02caf85694d7bf053",
-  "commitShortSha": "0f5e099",
+  "commitSha": "71406a7165e0234ca6c088520095bdd16d5717ff",
+  "commitShortSha": "71406a7",
   "packageFile": "KK-Studio-Portable-1.5.9.zip",
   "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.9/KK-Studio-Portable-1.5.9.zip",
-  "sha256": "8a047ffcf8fce8b7593b9570c34019374069e394bb4760616f83799375111056",
-  "size": 70843111
+  "sha256": "41666d62f87e433148308f1a19f24ab0fc76a3cff2973af73ca33d198ab03b6f",
+  "size": 70857349
 }

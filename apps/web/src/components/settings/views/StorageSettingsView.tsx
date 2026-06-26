@@ -15,7 +15,7 @@ import {
   getStorageUsage,
 } from '../../../services/storage/imageStorage';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsViewShell } from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsHero, SettingsViewShell } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
 
 const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -348,56 +348,68 @@ export const StorageSettingsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
+      <SettingsHero
+        eyebrow="System maintenance"
+        title="Storage Settings"
+        description="Manage modes, capacity, and repair actions."
+        icon={HardDrive}
+        tone={mode === 'local' ? 'emerald' : 'amber'}
+        badge={
+          <SettingsBadge tone={mode === 'local' ? 'emerald' : 'amber'}>
+            {mode === 'local' ? 'Local Folder' : 'Browser Cache'}
+          </SettingsBadge>
+        }
+      />
+
       <SettingsCardGridContainer>
-        {/* Metric Card 1: Local Permission (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">Permission</span>
-              <HardDrive size={13} />
+        {/* 第一排: 4 个指标卡片 (1A * 4A)，整体包裹在 a-card-span-4-col 的自适应网格容器中以防排版空洞与错乱 */}
+        <div className="a-card-span-4-col grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {/* Metric Card 1: Local Permission (1A) */}
+          <div className="dashboard-grid-card">
+            <div className="flex flex-col justify-between h-full w-full">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[9px] font-bold uppercase tracking-wider">Permission</span>
+                <HardDrive size={13} />
+              </div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
+              <div className="text-[9px] text-slate-400 mt-1 truncate">Local folder read/write capability.</div>
             </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">Local folder read/write capability.</div>
           </div>
-        </div>
 
-        {/* Metric Card 2: Active Project (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">Active Project</span>
-              <FolderOpen size={13} />
+          {/* Metric Card 2: Active Project (1A) */}
+          <div className="dashboard-grid-card">
+            <div className="flex flex-col justify-between h-full w-full">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[9px] font-bold uppercase tracking-wider">Active Project</span>
+                <FolderOpen size={13} />
+              </div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || 'None'}</div>
+              <div className="text-[9px] text-slate-400 mt-1 truncate">Canvas currently in use.</div>
             </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || 'None'}</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">Canvas currently in use.</div>
           </div>
-        </div>
 
-        {/* Metric Card 3: Footprint (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">Footprint</span>
-              <Activity size={13} />
+          {/* Metric Card 3: Footprint (1A) */}
+          <div className="dashboard-grid-card">
+            <div className="flex flex-col justify-between h-full w-full">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[9px] font-bold uppercase tracking-wider">Footprint</span>
+                <Activity size={13} />
+              </div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{usageMB.toFixed(2)} MB</div>
+              <div className="text-[9px] text-slate-400 mt-1 truncate">Total storage consumed locally.</div>
             </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{usageMB.toFixed(2)} MB</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">Total storage consumed locally.</div>
           </div>
-        </div>
 
-        {/* Metric Card 4: Projects (1A) */}
-        <div className="dashboard-grid-card">
-          
-          <div className="flex flex-col justify-between h-full w-full">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[9px] font-bold uppercase tracking-wider">Projects</span>
-              <Layers3 size={13} />
+          {/* Metric Card 4: Projects (1A) */}
+          <div className="dashboard-grid-card">
+            <div className="flex flex-col justify-between h-full w-full">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[9px] font-bold uppercase tracking-wider">Projects</span>
+                <Layers3 size={13} />
+              </div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} total</div>
+              <div className="text-[9px] text-slate-400 mt-1 truncate">Total canvases stored.</div>
             </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} total</div>
-            <div className="text-[9px] text-slate-400 mt-1 truncate">Total canvases stored.</div>
           </div>
         </div>
 

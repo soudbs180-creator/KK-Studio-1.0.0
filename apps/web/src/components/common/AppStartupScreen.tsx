@@ -127,6 +127,9 @@ export const AppStartupScreen: React.FC<{
     '正在确认会话、加载个人设置，并准备创作画布。',
     'Confirming your session, loading profile settings, and preparing the creative canvas.',
   );
+  if (stage === 'workspace_ready' || stage === 'background_ready') {
+    return <div className="fixed inset-0 bg-[#09090b] z-[99999]" />; // UI_TOKEN_EXCEPTION
+  }
 
   return (
     <div

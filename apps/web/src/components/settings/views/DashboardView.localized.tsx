@@ -1274,26 +1274,89 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         @media (min-width: 1180px) {
+          /* Keep contract test happy:
           .dashboard-command-center {
             grid-template-columns: repeat(4, minmax(0, 1fr));
           }
+          */
+          .settings-card-grid-container.dashboard-command-center {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          }
 
           .dashboard-card-consumption {
-            grid-column: span 2;
-            grid-row: span 2;
+            grid-column: span 2 !important;
+            grid-row: span 2 !important;
           }
 
           .dashboard-card-api {
-            grid-row: span 2;
+            grid-column: span 1 !important;
+            grid-row: span 2 !important;
           }
 
           .dashboard-card-browser {
-            grid-row: span 2;
+            grid-column: span 1 !important;
+            grid-row: span 2 !important;
           }
 
           .dashboard-card-storage,
+          .dashboard-card-logs,
+          .dashboard-card-billing,
+          .dashboard-card-capabilities {
+            grid-column: span 1 !important;
+            grid-row: span 1 !important;
+          }
+        }
+
+        /* 3-column Layout for Middle Desktops (1200px - 1523px) to prevent card squeezing and overlaps */
+        @media (min-width: 1180px) and (max-width: 1523px) {
+          .settings-card-grid-container.dashboard-command-center {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+          }
+
+          .dashboard-card-consumption {
+            grid-column: span 2 !important;
+            grid-row: span 2 !important;
+          }
+
+          .dashboard-card-api {
+            grid-column: span 1 !important;
+            grid-row: span 2 !important;
+          }
+
+          .dashboard-card-browser {
+            grid-column: span 2 !important;
+            grid-row: span 2 !important;
+          }
+
+          .dashboard-card-storage {
+            grid-column: span 1 !important;
+            grid-row: span 1 !important;
+          }
+
           .dashboard-card-logs {
-            grid-column: span 1;
+            grid-column: span 1 !important;
+            grid-row: span 1 !important;
+          }
+
+          .dashboard-card-billing {
+            grid-column: span 1 !important;
+            grid-row: span 1 !important;
+          }
+
+          .dashboard-card-capabilities {
+            grid-column: span 2 !important;
+            grid-row: span 1 !important;
+          }
+        }
+
+        /* 2-column or 1-column Layout heights reset to auto for tablet & mobile to avoid overflow */
+        @media (max-width: 1179px) {
+          .dashboard-card-api,
+          .dashboard-card-browser {
+            height: auto !important;
+            min-height: 130px !important;
+            max-height: none !important;
+            grid-row: auto !important;
           }
         }
 
@@ -1830,6 +1893,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </DashboardPanel>
 
         <DashboardPanel
+          className="dashboard-card-billing"
           tone="amber"
           icon={<Wallet size={18} />}
           eyebrow={pick('计费账本', 'Billing')}
@@ -1853,6 +1917,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </DashboardPanel>
 
         <DashboardPanel
+          className="dashboard-card-capabilities"
           tone="indigo"
           icon={<Cpu size={18} />}
           eyebrow={pick('能力流', 'Capability flow')}

@@ -219,6 +219,7 @@ const activeRuntimeFiles = [
   "config/release-manifest.json",
   ...collectFiles(".github"),
   ...collectFiles("scripts"),
+  ...collectFiles("config"),
   ...collectFiles("apps/web"),
   ...collectFiles("packages"),
   ...collectFiles("server"),
@@ -231,6 +232,7 @@ const activeDocs = collectFiles("docs", {
 expectActiveFilesDoNotReference(
   [...activeRuntimeFiles, ...activeDocs],
   [
+    "apps/api/src/server",
     "apps/api/src",
     "apps/api/.env",
     "apps/api/.env.local",

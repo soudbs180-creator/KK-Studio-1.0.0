@@ -417,15 +417,13 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         }
 
         const promptPosition = liveNodePositionByIdRef.current[promptNodeId] ?? promptNode.position;
-        regroupLayoutMap.set(
-          promptNodeId,
-          buildPromptGroupRegroupLayouts(
-            promptNode,
-            childImages,
-            promptPosition,
-            layoutState,
-          ),
+        const childLayouts = buildPromptGroupRegroupLayouts(
+          promptNode,
+          childImages,
+          promptPosition,
+          layoutState,
         );
+        regroupLayoutMap.set(promptNodeId, childLayouts);
       });
 
       return regroupLayoutMap;
@@ -585,6 +583,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
       companionIds.forEach((nodeId) => {
         const pos = nextLivePositions[nodeId];
         if (pos) {
@@ -1083,6 +1082,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
       if (position) {
         canvasLivePositionStore.setPosition(nodeId, position);
 

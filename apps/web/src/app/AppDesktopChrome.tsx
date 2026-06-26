@@ -38,8 +38,6 @@ interface AppDesktopChromeProps {
   onOpenProfile: (view: UserProfileView) => void;
   onOpenSettings: () => void;
   onSignOut: () => void | Promise<void>;
-  isChatOpen: boolean;
-  onToggleChat: () => void;
 }
 
 interface DesktopMenuActionButtonProps {
@@ -86,8 +84,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onOpenProfile,
   onOpenSettings,
   onSignOut,
-  isChatOpen,
-  onToggleChat,
 }) => {
   const { adminLevel } = useAuth();
   if (isMobile) {
@@ -147,25 +143,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         </div>
       )}
 
-
-
-      {/* 简体中文：用户下拉菜单弹出容器 - 改为 left-0 并向下平移，完美配合左侧等宽面板 */}
-      <button
-        id="btn-desktop-ai-assistant"
-        type="button"
-        aria-label="AI assistant"
-        aria-pressed={isChatOpen}
-        title="AI assistant"
-        onClick={onToggleChat}
-        className="kk-workspace-icon-control inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border active:scale-95"
-        style={{
-          borderColor: isChatOpen ? 'var(--clay-brand-coral)' : 'var(--kk-workspace-control-border)',
-          background: isChatOpen ? 'color-mix(in srgb, var(--clay-brand-coral) 16%, transparent)' : 'transparent',
-          color: isChatOpen ? 'var(--clay-brand-coral)' : 'var(--kk-workspace-control-muted-text)',
-        }}
-      >
-        <Bot size={17} aria-hidden="true" />
-      </button>
 
       {showUserMenu ? (
         createPortal(

@@ -312,11 +312,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 🚀 [关键修复] 当外部通过 React Props 驱动位置变化时（例如在重组动画播放的每一帧中），
             // 同步将最新的位置更新到 canvasLivePositionStore，确保虚线连线能完美获取到该帧的最新位置！
             if (containerRef.current) {
+                const currentLeft = parseFloat(containerRef.current.style.left) || 0;
+                const currentTop = parseFloat(containerRef.current.style.top) || 0;
                 const targetLeft = snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX;
                 const targetTop = snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY;
-                containerRef.current.style.left = `${targetLeft}px`;
-                containerRef.current.style.top = `${targetTop}px`;
-                containerRef.current.style.transform = 'translate3d(0, 0, 0)';
+                if (Math.abs(currentLeft - targetLeft) > 1 || Math.abs(currentTop - targetTop) > 1) {
+                    containerRef.current.style.left = `${targetLeft}px`;
+                    containerRef.current.style.top = `${targetTop}px`;
+                    containerRef.current.style.transform = 'translate3d(0, 0, 0)';
+                }
             }
 
             // Notify after normalizing DOM positioning so subscribers compute relative transforms.
@@ -948,17 +952,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
         };
 
+        // 🚀 [体验优化] 纠正图片加载反向延迟：视口最中心（loadBand=0）延迟最小优先加载（120ms），中郊（loadBand=1）280ms，远郊及边缘更慢，避免主线程解码并发卡顿
         const qualityChangeDelayMs = !displaySrc
             ? 100
-            : loadBand >= 2
-                ? 180
+            : loadBand === 0
+                ? 120
                 : loadBand === 1
-                    ? 220
-                    : detailLevel === 'thumbnail-shell'
-                        ? 160
-                        : detailLevel === 'compact'
-                            ? 320
-                            : 700;
+                    ? 280
+                    : loadBand === 2
+                        ? 450
+                        : detailLevel === 'thumbnail-shell'
+                            ? 600
+                            : 850;
 
         qualityDebounceRef.current = setTimeout(() => {
             loadQualityImage();

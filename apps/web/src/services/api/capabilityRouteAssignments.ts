@@ -72,7 +72,7 @@ const buildDefaultAssignments = (): CapabilityRouteAssignment[] => {
   const timestamp = Date.now();
   return CAPABILITY_ROLES.map((role) => ({
     role,
-    enabled: role !== 'ocr_document',
+    enabled: true,
     updatedAt: timestamp,
   }));
 };

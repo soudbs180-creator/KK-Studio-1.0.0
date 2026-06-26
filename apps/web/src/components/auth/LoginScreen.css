@@ -95,7 +95,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   --auth-system-primary-text: #ffffff;
 }
 
-/* 简体中文：暗色模式面板已覆盖为亮色风格 */
 .auth-page--dark .auth-panel {
   background: rgba(255, 255, 255, 0.45);
   border-color: rgba(255, 255, 255, 0.4);
@@ -293,8 +292,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   -webkit-backdrop-filter: blur(32px) saturate(1.8);
 }
 
-/* 彻底删除暗色模式登录卡片深色覆盖 */
-
 .auth-modal-close {
   position: absolute;
   top: 12px;
@@ -320,8 +317,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   background: #ffffff;
   border-color: rgba(12, 16, 24, 0.2);
 }
-
-/* 彻底删除暗色模式关闭按钮深色覆盖 */
 
 .auth-link-back {
   width: fit-content;
@@ -349,7 +344,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
 .auth-header h2 {
   margin: 0;
   color: var(--kk-landing-ink);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 28px;
   font-weight: 570;
   line-height: 1.04;
@@ -377,7 +372,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
 
 .auth-field > span {
   color: var(--kk-landing-muted);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1;
 }
@@ -522,7 +517,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   justify-content: center;
   gap: 8px;
   font: inherit;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
   font-weight: 570;
   cursor: pointer;
@@ -621,7 +616,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   gap: 7px;
   border-radius: 999px;
   font: inherit;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   cursor: pointer;
 }
@@ -640,7 +635,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   background: transparent;
   color: var(--kk-landing-ink);
   font: inherit;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
@@ -791,7 +786,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
   font-size: 11px;
   opacity: 0.8;
   border-top: 1px solid rgba(220, 38, 38, 0.1);
-  padding-top: 4px;
+  paddikk-landing-top: 4px;
 }
 
 @keyframes auth-spin {
@@ -943,12 +938,10 @@ body.auth-screen-active--landing.auth-modal-open #root {
   gap: 10px;
 }
 
-/* 登录卡片子元素过渡效果 */
 .auth-panel > * {
   transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 激活验证码时，卡片内其他所有内容模糊且接近完全透明，并禁用交互 */
 .auth-panel.is-captcha-active > :not(.auth-captcha-overlay) {
   filter: blur(12px);
   opacity: 0.03;
@@ -971,7 +964,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   animation: auth-captcha-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 简体中文：暗色模式验证弹窗 — 磨砂效果 + 高透光高可读性 (优化为完全透明底) */
 .auth-page--dark .auth-captcha-overlay {
   background: transparent !important;
   border: none !important;
@@ -979,7 +971,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   -webkit-backdrop-filter: none !important;
 }
 
-/* 验证组件淡入和轻微放大动画 */
 @keyframes auth-captcha-fade-in {
   from {
     opacity: 0;
@@ -1105,3 +1096,7 @@ body.auth-screen-active--landing.auth-modal-open #root {
     transform: rotate(360deg);
   }
 }
+
+
+
+

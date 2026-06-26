@@ -515,6 +515,72 @@ export const AppContent: React.FC<AppContentProps> = () => {
     unlinkNodes
   } = useCanvas();
 
+  // 简体中文注释：跟踪首屏图片与多媒体加载状态，合流数据与视图加载体验
+  const [isFirstScreenMediaLoading, setIsFirstScreenMediaLoading] = useState(true);
+
+  const displayLoadingProgress = React.useMemo(() => {
+    if (isLoading) {
+      return Math.min(98, loadingProgress);
+    }
+    if (isFirstScreenMediaLoading) {
+      return 99;
+    }
+    return 100;
+  }, [isLoading, loadingProgress, isFirstScreenMediaLoading]);
+
+  useEffect(() => {
+    if (isLoading) {
+      setIsFirstScreenMediaLoading(true);
+      return;
+    }
+
+    let active = true;
+    let initialTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+
+    const checkFirstScreenImages = () => {
+      if (!active) return;
+
+      const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[data-native-drag-source="true"]'));
+      const pendingImages = images.filter(img => img.src && !img.complete);
+
+      if (pendingImages.length === 0) {
+        setIsFirstScreenMediaLoading(false);
+      } else {
+        let loadedCount = 0;
+        const total = pendingImages.length;
+
+        const onImageDone = () => {
+          loadedCount++;
+          if (loadedCount >= total) {
+            checkFirstScreenImages();
+          }
+        };
+
+        pendingImages.forEach(img => {
+          img.addEventListener('load', onImageDone, { once: true });
+          img.addEventListener('error', onImageDone, { once: true });
+        });
+      }
+    };
+
+    initialTimer = setTimeout(() => {
+      checkFirstScreenImages();
+    }, 50);
+
+    timeoutTimer = setTimeout(() => {
+      if (active) {
+        setIsFirstScreenMediaLoading(false);
+      }
+    }, 2500);
+
+    return () => {
+      active = false;
+      if (initialTimer) clearTimeout(initialTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    };
+  }, [isLoading]);
+
   const updatePromptNodeRef = useRef(updatePromptNode);
   useLayoutEffect(() => {
     updatePromptNodeRef.current = updatePromptNode;
@@ -1971,12 +2037,19 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const { tryStartGenerationSubmission } = useGenerationSubmitGuard();
 
   // 简体中文：通过时间（200ms）与位移（250px）双重节流，优化交互期间（平移、缩放、拖拽）的重绘机制，保证高频平移流畅度的同时杜绝卡片丢失与白屏
-  const lastInteractionRef = useRef({ time: 0, x: 0, y: 0 });
+  const lastInteractionRef = useRef({ time: 0, x: 0, y: 0, scale: 1 });
   const shouldFreezeRender = React.useMemo(() => {
     if (!isCanvasTransforming && !isNodeDragActive) {
-      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y };
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
       return false;
     }
+
+    // 🚀 如果 scale 发生了改变，说明是在进行画布缩放，此时绝不能 Freeze，否则会导致视口改变但渲染不更新（卡片丢失、位置错位）
+    if (canvasTransform.scale !== lastInteractionRef.current.scale) {
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
+      return false;
+    }
+
     const now = Date.now();
     const timeElapsed = now - lastInteractionRef.current.time;
     const distanceX = canvasTransform.x - lastInteractionRef.current.x;
@@ -1987,9 +2060,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return true;
     }
 
-    lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y };
+    lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
     return false;
-  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y]);
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale]);
 
   // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
   // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
@@ -4364,14 +4437,30 @@ export const AppContent: React.FC<AppContentProps> = () => {
               id={`image-card-${childLayout.childNode.id}`}
               {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
-              loadPriority={1200}
-              loadBand={0}
+              loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
+              loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
               stackZIndexOverride={promptCardZIndex + 10 + childIndex}
               shadowBoost={shadowBoost}
               position={childLayout.visualPosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}
+              isVisible={(() => {
+                const screenLeft = -canvasTransform.x / canvasTransform.scale;
+                const screenTop = -canvasTransform.y / canvasTransform.scale;
+                const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
+                const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
+                const { width: w, totalHeight: h } = getCardDimensions(childLayout.childNode.aspectRatio, true);
+                const x = childLayout.visualPosition.x - w / 2;
+                const y = childLayout.visualPosition.y - h;
+                const margin = 150;
+                return !(
+                  x > screenRight + margin ||
+                  x + w < screenLeft - margin ||
+                  y > screenBottom + margin ||
+                  y + h < screenTop - margin
+                );
+              })()}
               isCanvasTransforming={isCanvasTransforming}
               highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
               onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
@@ -4530,17 +4619,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
-    if (isCanvasTransforming) {
-      return stableCanvasRenderItemsRef.current;
-    }
-    if (isNodeDragActive) {
-      return stableCanvasRenderItemsRef.current;
-    }
     if (shouldFreezeRender) {
       return stableCanvasRenderItemsRef.current;
     }
 
-    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
+    // 🚀 [体验优化] 卡片自身占位渲染外扩缓冲区由窄小的220px/500px扩大到至少1200px，防止在画布边缘来回平移时DOM频繁销毁与重建（颠簸闪烁）
+    const RENDER_BUFFER = Math.max(canvasPerformanceProfile.overscanBuffer * 2.5, 1200);
     const rLeft = -canvasTransform.x / canvasTransform.scale - RENDER_BUFFER;
     const rTop = -canvasTransform.y / canvasTransform.scale - RENDER_BUFFER;
     const rRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + RENDER_BUFFER;
@@ -4670,12 +4754,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
   const renderedVisibleGroups = React.useMemo(() => {
-    if (isCanvasTransforming) {
-      return stableRenderedVisibleGroupsRef.current;
-    }
-    if (isNodeDragActive) {
-      return stableRenderedVisibleGroupsRef.current;
-    }
     if (shouldFreezeRender) {
       return stableRenderedVisibleGroupsRef.current;
     }
@@ -5416,8 +5494,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
             onOpenProfile={openProfileSurface}
             onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
             onSignOut={() => { void signOut(); }}
-            isChatOpen={isChatOpen}
-            onToggleChat={toggleChatPanel}
           />
         </div>
       )}
@@ -6039,7 +6115,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         </div>
       )}
 
-      {isLoading && (
+      {(isLoading || isFirstScreenMediaLoading) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
             {/* 简体中文注释：标题文字 */}
@@ -6051,12 +6127,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
               <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out" 
-                  style={{ width: `${loadingProgress}%` }}
+                  style={{ width: `${displayLoadingProgress}%` }}
                 />
               </div>
               {/* 简体中文注释：进度百分比数值 */}
               <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
-                {loadingProgress}%
+                {displayLoadingProgress}%
               </span>
             </div>
           </div>

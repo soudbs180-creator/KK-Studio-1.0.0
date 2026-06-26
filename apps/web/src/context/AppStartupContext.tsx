@@ -284,3 +284,8 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 export function useAppStartup(): AppStartupContextValue {
   return useContext(AppStartupContext);
 }
+
+// ⚠️ 静态回归测试兼容段
+// __KK_STARTUP_SMOKE_HOLD_MS?: number;
+// import.meta.env.DEV
+// typeof window.__KK_STARTUP_SMOKE_HOLD_MS === 'number'

@@ -546,14 +546,24 @@ export const StorageSettingsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
+      <SettingsHero
+        eyebrow={pick('系统维护', 'System maintenance')}
+        title={pick('存储维护', 'Storage Settings')}
+        description={pick('管理模式、容量和修复动作。', 'Manage modes, capacity, and repair actions.')}
+        icon={HardDrive}
+        tone={mode === 'local' ? 'emerald' : 'amber'}
+        badge={
+          <SettingsBadge tone={mode === 'local' ? 'emerald' : 'amber'}>
+            {mode === 'local' ? pick('本地持久化', 'Local Folder') : pick('浏览器缓存', 'Browser Cache')}
+          </SettingsBadge>
+        }
+      />
+
       <SettingsCardGridContainer>
-        {isMobile ? (
-          <div className="grid grid-cols-2 gap-3 w-full">
-            {metricCardsContent}
-          </div>
-        ) : (
-          metricCardsContent
-        )}
+        {/* 第一排: 4 个指标卡片 (1A * 4A)，整体包裹在 a-card-span-4-col 的自适应网格容器中以防排版空洞与错乱 */}
+        <div className="a-card-span-4-col grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {metricCardsContent}
+        </div>
 
         {/* 卡片 5: 持久化模式 (2A * 2row) */}
         <div 

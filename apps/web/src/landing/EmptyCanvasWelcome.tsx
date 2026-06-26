@@ -21,8 +21,8 @@ export const EmptyCanvasWelcome: React.FC<EmptyCanvasWelcomeProps> = ({
   };
 
   return (
-    <div className="empty-canvas-welcome-layer absolute inset-0 flex items-start justify-center pointer-events-none p-6">
-      <div className="empty-canvas-welcome-panel w-full max-w-2xl rounded-3xl border border-[#e5e5e5] bg-white/70 backdrop-blur-md p-8 md:p-12 shadow-sm pointer-events-auto flex flex-col items-center text-center transition-all duration-300">
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-6 empty-canvas-welcome-layer">
+      <div className="w-full max-w-2xl rounded-3xl border border-[#e5e5e5] bg-white/70 backdrop-blur-md p-8 md:p-12 shadow-sm pointer-events-auto flex flex-col items-center text-center transition-all duration-300 empty-canvas-welcome-panel">
         
         {/* Animated Brand Icon */}
         <div className="w-10 h-10 rounded-2xl bg-[#0a0a0a] text-white flex items-center justify-center mb-6">
