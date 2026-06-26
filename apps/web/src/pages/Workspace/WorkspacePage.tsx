@@ -515,6 +515,72 @@ export const AppContent: React.FC<AppContentProps> = () => {
     unlinkNodes
   } = useCanvas();
 
+  // 简体中文注释：跟踪首屏图片与多媒体加载状态，合流数据与视图加载体验
+  const [isFirstScreenMediaLoading, setIsFirstScreenMediaLoading] = useState(true);
+
+  const displayLoadingProgress = React.useMemo(() => {
+    if (isLoading) {
+      return Math.min(98, loadingProgress);
+    }
+    if (isFirstScreenMediaLoading) {
+      return 99;
+    }
+    return 100;
+  }, [isLoading, loadingProgress, isFirstScreenMediaLoading]);
+
+  useEffect(() => {
+    if (isLoading) {
+      setIsFirstScreenMediaLoading(true);
+      return;
+    }
+
+    let active = true;
+    let initialTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+
+    const checkFirstScreenImages = () => {
+      if (!active) return;
+
+      const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[data-native-drag-source="true"]'));
+      const pendingImages = images.filter(img => img.src && !img.complete);
+
+      if (pendingImages.length === 0) {
+        setIsFirstScreenMediaLoading(false);
+      } else {
+        let loadedCount = 0;
+        const total = pendingImages.length;
+
+        const onImageDone = () => {
+          loadedCount++;
+          if (loadedCount >= total) {
+            checkFirstScreenImages();
+          }
+        };
+
+        pendingImages.forEach(img => {
+          img.addEventListener('load', onImageDone, { once: true });
+          img.addEventListener('error', onImageDone, { once: true });
+        });
+      }
+    };
+
+    initialTimer = setTimeout(() => {
+      checkFirstScreenImages();
+    }, 50);
+
+    timeoutTimer = setTimeout(() => {
+      if (active) {
+        setIsFirstScreenMediaLoading(false);
+      }
+    }, 2500);
+
+    return () => {
+      active = false;
+      if (initialTimer) clearTimeout(initialTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    };
+  }, [isLoading]);
+
   const updatePromptNodeRef = useRef(updatePromptNode);
   useLayoutEffect(() => {
     updatePromptNodeRef.current = updatePromptNode;
@@ -6042,7 +6108,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         </div>
       )}
 
-      {isLoading && (
+      {(isLoading || isFirstScreenMediaLoading) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
             {/* 简体中文注释：标题文字 */}
@@ -6054,12 +6120,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
               <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out" 
-                  style={{ width: `${loadingProgress}%` }}
+                  style={{ width: `${displayLoadingProgress}%` }}
                 />
               </div>
               {/* 简体中文注释：进度百分比数值 */}
               <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
-                {loadingProgress}%
+                {displayLoadingProgress}%
               </span>
             </div>
           </div>

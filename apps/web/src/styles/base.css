@@ -9743,7 +9743,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 768px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(2, 270px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 简体中文注释：强制左侧对齐，与顶部的 Hero 标题、面包屑完全贴合在同一条 28px 左垂线上，避免当卡片较少时居中产生视觉不对齐和右侧空荡的问题 */
     justify-content: start !important;
   }
@@ -9751,7 +9751,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 1238px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(3, 270px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     /* 简体中文注释：中等桌面宽度下主内容区扣除侧边栏后不足 4A，先降为 3A 以避免横向滚动。 */
     justify-content: start !important;
   }
@@ -9759,7 +9759,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 1524px) {
   .settings-card-grid-container {
-    grid-template-columns: repeat(4, 270px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     /* 简体中文注释：强制左侧对齐，与顶部 Hero 标题的左边缘百分百垂直一致，确保在宽屏下绝不偏离对齐线 */
     justify-content: start !important;
   }

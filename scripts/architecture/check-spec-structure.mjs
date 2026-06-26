@@ -26,7 +26,7 @@ const requiredMarkers = [
   },
   {
     file: "docs/specs/openapi.yaml",
-    includes: ["openapi: 3.1.0", "/api/v1/generation-tasks", "/payment/v1/orders"],
+    includes: ["openapi: 3.1.0", "/api/v1/generation-tasks", "/api/v1/billing/recharge-submissions"],
   },
   {
     file: "docs/specs/data-spec.md",

@@ -156,3 +156,43 @@ test("no runtime source keeps ViaSupabase alias naming after the cloud-record mi
   const source = readSource("apps/web/src/services/api/userApiCloudRecordStorage.ts");
   assert.doesNotMatch(source, /ViaSupabase/);
 });
+
+test("retired public static surfaces are removed from the current web runtime", () => {
+  assert.equal(existsSync(resolveWorkspacePath("apps/web/public/newgenre_static")), false);
+  assert.equal(existsSync(resolveWorkspacePath("apps/web/public/pay/success")), false);
+  assert.equal(existsSync(resolveWorkspacePath("scripts/alipay")), false);
+});
+
+test("current runtime no longer exposes payment/v1 or Alipay callback protocol", () => {
+  const activeFiles = [
+    "server/routes/compat/admin.js",
+    "server/routes/compat/billing.js",
+    "packages/shared/src/contracts/client/kk-api-client.ts",
+    "packages/shared/src/contracts/index.ts",
+    "packages/shared/src/contracts/enums/status.ts",
+    "docs/specs/openapi.yaml",
+    "scripts/architecture/check-spec-structure.mjs",
+  ];
+
+  const source = activeFiles
+    .map((relativePath) => readFileSync(resolveWorkspacePath(relativePath), "utf8"))
+    .join("\n");
+
+  assert.doesNotMatch(source, /payment\/v1/);
+  assert.doesNotMatch(source, /callbacks\/alipay/i);
+  assert.doesNotMatch(source, /AlipayCallback|CreatePaymentOrder|PaymentOrderStatusView|PaymentCallback/);
+  assert.doesNotMatch(source, /createPaymentOrder|getPaymentOrderStatus/);
+});
+
+test("api-client package does not retain legacy endpoint wrappers or browser storage ownership", () => {
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/api.ts")), false);
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/hooks.ts")), false);
+  assert.equal(existsSync(resolveWorkspacePath("packages/api-client/src/client.ts")), false);
+
+  const indexSource = readFileSync(resolveWorkspacePath("packages/api-client/src/index.ts"), "utf8");
+  const packageSource = readFileSync(resolveWorkspacePath("packages/api-client/package.json"), "utf8");
+  const combinedSource = `${indexSource}\n${packageSource}`;
+
+  assert.doesNotMatch(combinedSource, /axios|@tanstack\/react-query|localStorage|sessionStorage|document\.cookie/);
+  assert.doesNotMatch(combinedSource, /\/auth|\/billing|\/admin|\/generate|\/chat/);
+});

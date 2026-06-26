@@ -16,6 +16,18 @@ test('chat sidebar AI takeover controls stay inside the composer action row', ()
   assert.match(source, /className="kk-chat-sidebar-send-control shrink-0"/);
 });
 
+test('desktop chrome exposes a stable AI assistant entrypoint wired to the existing chat panel', () => {
+  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+  assert.match(desktopChromeSource, /id="btn-desktop-ai-assistant"/);
+  assert.match(desktopChromeSource, /aria-pressed=\{isChatOpen\}/);
+  assert.match(desktopChromeSource, /onClick=\{onToggleChat\}/);
+  assert.match(desktopChromeSource, /aria-label="AI assistant"/);
+  assert.match(workspaceSource, /isChatOpen=\{isChatOpen\}/);
+  assert.match(workspaceSource, /onToggleChat=\{toggleChatPanel\}/);
+});
+
 test('generation tools use the shared notification service instead of raw DOM progress toasts', () => {
   const source = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
 
