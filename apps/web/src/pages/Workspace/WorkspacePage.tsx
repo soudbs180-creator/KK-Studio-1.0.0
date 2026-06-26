@@ -2037,12 +2037,19 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const { tryStartGenerationSubmission } = useGenerationSubmitGuard();
 
   // 简体中文：通过时间（200ms）与位移（250px）双重节流，优化交互期间（平移、缩放、拖拽）的重绘机制，保证高频平移流畅度的同时杜绝卡片丢失与白屏
-  const lastInteractionRef = useRef({ time: 0, x: 0, y: 0 });
+  const lastInteractionRef = useRef({ time: 0, x: 0, y: 0, scale: 1 });
   const shouldFreezeRender = React.useMemo(() => {
     if (!isCanvasTransforming && !isNodeDragActive) {
-      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y };
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
       return false;
     }
+
+    // 🚀 如果 scale 发生了改变，说明是在进行画布缩放，此时绝不能 Freeze，否则会导致视口改变但渲染不更新（卡片丢失、位置错位）
+    if (canvasTransform.scale !== lastInteractionRef.current.scale) {
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
+      return false;
+    }
+
     const now = Date.now();
     const timeElapsed = now - lastInteractionRef.current.time;
     const distanceX = canvasTransform.x - lastInteractionRef.current.x;
@@ -2053,9 +2060,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return true;
     }
 
-    lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y };
+    lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
     return false;
-  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y]);
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale]);
 
   // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
   // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
@@ -4614,12 +4621,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
-    if (isCanvasTransforming) {
-      return stableCanvasRenderItemsRef.current;
-    }
-    if (isNodeDragActive) {
-      return stableCanvasRenderItemsRef.current;
-    }
     if (shouldFreezeRender) {
       return stableCanvasRenderItemsRef.current;
     }
@@ -4755,12 +4756,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
   const renderedVisibleGroups = React.useMemo(() => {
-    if (isCanvasTransforming) {
-      return stableRenderedVisibleGroupsRef.current;
-    }
-    if (isNodeDragActive) {
-      return stableRenderedVisibleGroupsRef.current;
-    }
     if (shouldFreezeRender) {
       return stableRenderedVisibleGroupsRef.current;
     }

@@ -944,3 +944,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run governance:check` 治理规约校验 100% 通过。
 - **未运行验证及原因**：未运行完整的 `verify:changes`，因为这次是一次极简单的无状态 UI 冗余按钮删除，并且全套类型、架构与治理检查均已验证通过。
 - **风险与下一步**：无风险。用户以后可通过右侧侧边栏的箭头直接展开/折叠 AI 助手侧边栏。
+
+## 60. 2026-06-26 - Fix Zoom-Induced Card Loss and Position Mismatch (本次追加)
+- **修改范围**：
+  1. 修复了画面缩放（Zoom）时发生的卡片丢失（显示为透明空白占位）和卡片位置错乱（连线和布局没有跟随 scale 对齐）问题。
+  2. 移除了 canvasRenderItems 与 renderedVisibleGroups 在进行画布缩放、平移与卡片拖拽时的一刀切阻断，将冻结控制统一归于双重节流器。
+  3. 优化了 shouldFreezeRender 双重节流感应器，使之能够灵敏检测并比对 canvasTransform.scale 缩放比例的变化，在缩放期间自动解锁重绘。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **基于 Scale 差异检测感知缩放**：在 `shouldFreezeRender` 的 `useMemo` 计算中引入对缩放比例 `scale` 的追踪与检测。如果当前的 `canvasTransform.scale` 相比上次记录的值有变化，直接判定为缩放，强制返回 `false` 解锁 Freeze，使得缩放期间的可视卡片提取与几何排版计算能实时同步演进，彻底根治缩放白屏与错位。
+  - **统一双重节流防抖控制**：移除了先前直接写在 `canvasRenderItems` 和 `renderedVisibleGroups` 最前方的 `isCanvasTransforming || isNodeDragActive` 一刀切冻结，让所有的交互防抖完全听从 `shouldFreezeRender` 的决策。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 类型编译 100% 成功通过。
+  - 运行 `npm run build` 生产构建完全打包编译通过。
