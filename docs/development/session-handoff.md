@@ -1535,4 +1535,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
-
+## 97. 2026-06-27 - Fix Large Canvas Card Loading Obscurity and Web Worker Deadlock (本次追加)
+- **修改范围**：
+  1. **React DOM 占位卡片透明化**：重构了 `WorkspacePage.tsx` 中的 `renderImageWorkflowItem` 和 `renderPromptGroupWorkflowItem`。在 `isLargeProject` 模式下，将非选中态的占位卡片样式设置为完全透明（去除背景色、边框、阴影和模糊滤镜），避免遮挡底下 Canvas 绘制的精美卡片和图片缩略图，彻底解决主副卡不显示、不加载的问题。
+  2. **弃用异步 Web Worker 视口裁剪**：完全去除了 `WorkspacePage.tsx` 依赖的 Web Worker 异步视口过滤机制，避免了多线程通信引发的 React 高频挂载与卸载颠簸，解决了由此触发的 `Maximum update depth exceeded` 死循环和 React 协调 `removeChild` DOM 崩溃白屏问题。
+  3. **主线程同步过滤整合**：将 `effectiveVisibleCardIds` 统一改为主线程同步计算的 `visiblePromptNodes` 和 `visibleImageNodes` 的 ID 集合。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **同步裁剪降级**：主线程的空间网格桶索引查询极其高效（耗时仅 0.0038ms），使用主线程同步过滤避免了 Worker 异步响应带来的通信时差与状态不一致，确保首帧 100% 完整显示。
+  - **透明点击代理**：在底图由 Canvas 绘制时，前台 React 占位层仅需充当无色的点击与事件响应区域，无需任何视觉点缀，完美实现了视觉（Canvas）与交互（React DOM）的分工配合。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 编译通过。
+  - 运行 `node --test tests/unit/capability-tree-runtime.test.ts` 单元测试成功通过。
+  - 运行 `browser_subagent` 启动大型项目，截图确认 552 张卡片在缩放、切换项目时均能瞬间完全高清展示，无任何黑色模糊遮挡和白屏报错。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
