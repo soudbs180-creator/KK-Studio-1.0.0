@@ -1552,3 +1552,38 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `browser_subagent` 启动大型项目，截图确认 552 张卡片在缩放、切换项目时均能瞬间完全高清展示，无任何黑色模糊遮挡和白屏报错。
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+## 98. 2026-06-27 - Infinite Canvas, Multi-Type Cards, Sizing Hysteresis, and Bundle Splitting Optimization (本次追加)
+- **修改范围**：
+  1. **大项目 Placeholder/Culling 修复**：彻底清除了 isLargeProject 下将非选中卡片强行 placeholder 化导致空白的错误逻辑；移除了 web worker visibleCardIds 控制主渲染可视区门禁的弊端，统一改为主线程空间索引 `useVisibleCanvasItemsNew` 和 groupBounds 组合挂载决策。
+  2. **多类型卡片系统构建**：定义了 `CanvasCardKind` 与路由策略；建立了统一卡片派发入口 `CanvasCardRendererRegistry`，并实现了 `ImageGenerationGroupRenderer`, `VideoGenerationGroupRenderer`, `EcommerceTaskCardRenderer` 等多达 11 种专属业务卡片的分发渲染，把 WorkspacePage 庞大的卡片 UI 成功剥离。
+  3. **卡组原子化挂载与 LOD 降级**：实现“主卡 + 副卡”的卡组原子绑定。只要主卡或任意副卡处于视口内、被选中、或处于生成中，整个 group bundle 强制整体挂载，防止被单独裁剪。LOD 降级（Ghost/Compact/Full/Skeleton）不改变业务结构，且移除了 Ghost 态 backdrop-filter 和 blur 等造成重绘开销的顽疾。
+  4. **生成 telemetry 元数据展示**：设计了统一的 `GenerationTelemetry` 类型，在 full 和 compact 态卡片页脚及 Task Center 胶囊中稳定展示了实际扣费积分、Tokens 消耗、渠道 Provider、模型名称和运行 Lane。
+  5. **首屏 Bundle 拆分与懒加载**：对 `WorkspacePage` 静态导入的 `TaskCenterTray`, `WindowManager`, `AppDesktopChrome`, `AppMobileWorkspace`, `WorkspaceSurfacePanels` 以及 `ProjectManager` 实施了项目内置的 `lazyWithRetry` / `lazyNamedWithRetry` 重试式异步懒加载，配合 Suspense 降低了首屏体积。
+  6. **测试契约路径修正**：同步修复了 `prompt-group-regroup-behavior`, `mobile-app-shell-integration`, `app-shell-panel-layer` 和 `canvas-connector-scheduler-contract` 单元测试中由于卡片和 SVG 渲染逻辑从 `App.tsx` / `WorkspacePage.tsx` 拆离所引发的读取文件路径断言失效问题。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [useCanvasRenderItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/hooks/useCanvasRenderItems.ts)
+  - [PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+  - [TaskCenterTray.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/TaskCenterTray.tsx)
+  - [CanvasCardRendererRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts)
+  - [ImageGenerationGroupRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx)
+  - [telemetry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/types/telemetry.ts)
+  - [prompt-group-regroup-behavior.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/prompt-group-regroup-behavior.test.ts)
+  - [mobile-app-shell-integration.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-app-shell-integration.test.ts)
+  - [app-shell-panel-layer.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/app-shell-panel-layer.test.ts)
+  - [canvas-connector-scheduler-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-connector-scheduler-contract.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **组件分箱 (Chunk Bundling)**：使用 `lazyWithRetry` 代替标准 React 懒加载，以应对网络抖动等原因产生的 chunks 加载失败，使得主画布轻量启动。
+  - **卡片渲染解耦 (Card Dispatcher)**：由 `CanvasCardRendererRegistry` 统一做 node 到 card kind 的映射及分发，将卡片 UI 的复杂度限制在具体的 Renderer 子文件内部。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` 打包完全通过，并彻底消除了 Ineffective Dynamic Import 警告。
+  - 运行 `npm run verify:canvas-performance` 空间索引 culling 耗时 0.0039ms，远优于性能红线要求。
+  - 运行 `npm run architecture:check` 通过，无任何硬编码 Token 和非法 z-index 使用。
+  - 运行 `npm run governance:check` 通过，各 preset 和 key 边界正常。
+  - 运行 `npm run verify:changes` 100% 成功通过，包含 1610+ 个单元测试用例及全部 Playwright 浏览器 smoke 仿真流程测试。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。

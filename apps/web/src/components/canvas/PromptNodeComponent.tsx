@@ -2615,6 +2615,33 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             </div>
                         );
                     })()}
+                    {/* Telemetry Footer */}
+                    <div
+                        className="flex items-center justify-between px-3.5 py-1.5 w-full text-[10px] rounded-b-2xl"
+                        style={{
+                            background: 'rgba(24, 24, 27, 0.25)',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                            color: 'var(--text-secondary)',
+                        }}
+                    >
+                        <div className="flex items-center gap-2 truncate">
+                            <span className="font-semibold text-amber-400">
+                                {node.creditCost !== undefined ? `${node.creditCost} 积分` : '10 积分'}
+                            </span>
+                            <span className="text-[rgba(255,255,255,0.15)]">|</span>
+                            <span className="truncate text-slate-300 font-medium">
+                                {node.model ? resolveModelDisplayName(node.model, node.modelLabel) : 'Gemini 3.5 Flash'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
+                            <span className="px-1 py-0.2 rounded bg-black/30 border border-white/5 text-[8px] text-slate-300">
+                                {node.provider ? resolveDisplayedProviderLabel(node) : 'Google'}
+                            </span>
+                            <span className="text-[8px] opacity-70">
+                                {node.executionLane === 'cloud-credit-model' ? '平台路由' : '本地优先'}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
 

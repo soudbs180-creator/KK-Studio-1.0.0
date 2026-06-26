@@ -11,6 +11,8 @@ const ROOT_DIR = process.cwd();
 test('ecommerce build keeps one framework workbench visible while child task cards stay hidden', () => {
   const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
   const appSource = readSource('apps/web/src/App.tsx');
+  const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const imageGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(
@@ -24,12 +26,12 @@ test('ecommerce build keeps one framework workbench visible while child task car
     'framework-owned group helper cards can remain hidden',
   );
   assert.doesNotMatch(
-    appSource,
+    workspacePageSource,
     /n\.mode === GenerationMode\.ECOMMERCE[\s\S]{0,120}n\.ecommerce\?\.frameworkId[\s\S]{0,120}n\.ecommerce\.kind !== 'framework'/,
     'canvas viewport filtering must not use the old child-card visibility rule',
   );
-  assert.match(appSource, /ecommerceFrameworkTaskNodesById/);
-  assert.match(appSource, /ecommerceFrameworkTaskNodes=\{ecommerceFrameworkTaskNodesById\.get\(renderedPromptNode\.id\) \|\| \[\]\}/);
+  assert.match(workspacePageSource, /ecommerceFrameworkTaskNodesById/);
+  assert.match(imageGroupRendererSource, /ecommerceFrameworkTaskNodes=\{ecommerceFrameworkTaskNodesById\.get\(renderedPromptNode\.id\) \|\| \[\]\}/);
   assert.doesNotMatch(
     promptGroupLayoutSource,
     /promptNode\.mode === GenerationMode\.ECOMMERCE[\s\S]{0,120}promptNode\.ecommerce\?\.frameworkId[\s\S]{0,120}promptNode\.ecommerce\.kind !== 'framework'/,

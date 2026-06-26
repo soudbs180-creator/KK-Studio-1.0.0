@@ -1424,7 +1424,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 id={`image-card-${image.id}`}
                 className="image-node absolute flex flex-col items-center select-none"
                 style={{
-                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    transform: `translate3d(${snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX}px, ${snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY}px, 0px)`,
                     left: 0,
                     top: 0,
                     zIndex: effectiveStackZIndex,
@@ -1441,24 +1441,45 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 }}
             >
                 <div
-                    className="relative w-full h-full overflow-hidden border border-dashed border-[var(--border-light)] rounded-lg bg-[var(--frost-card-main-bg)] flex flex-col p-1"
-                    style={{
-                        backgroundColor: 'var(--bg-tertiary)',
-                    }}
+                    className="relative w-full h-full overflow-hidden border border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] flex flex-col justify-between p-2"
                 >
-                    {displaySrc ? (
-                        <img
-                            src={displaySrc}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover opacity-45 rounded select-none pointer-events-none"
-                            alt=""
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-slate-800/10 rounded">
-                            <span className="text-[9px] text-[var(--text-tertiary)] truncate px-1">{image.prompt || 'Ghost'}</span>
-                        </div>
-                    )}
+                    {/* Ghost Header: Type Icon & Model */}
+                    <div className="flex items-center justify-between w-full text-[9px] text-slate-400">
+                        <span className="flex items-center gap-1 font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            {image.mode === GenerationMode.VIDEO ? '视频' : '图片'}
+                        </span>
+                        <span className="truncate max-w-[80px] text-slate-500 font-medium">
+                            {image.model ? resolveModelDisplayName(image.model, image.modelLabel).slice(0, 10) : 'Image'}
+                        </span>
+                    </div>
+
+                    {/* Image Preview / Prompt */}
+                    <div className="flex-1 w-full my-1 rounded overflow-hidden relative min-h-[40px]">
+                        {displaySrc ? (
+                            <img
+                                src={displaySrc}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-cover opacity-50 rounded select-none pointer-events-none"
+                                alt=""
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-800/10 rounded">
+                                <span className="text-[8px] text-[var(--text-tertiary)] truncate px-1">{image.prompt || 'Ghost'}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Ghost Footer: Cost & Status */}
+                    <div className="flex items-center justify-between w-full text-[8px] text-[var(--text-secondary)] font-medium">
+                        <span className="text-amber-400">
+                            {isCreditModel ? `${resolvedCreditCost || 10} 积分` : `$${(displayCost || 0.015).toFixed(3)}`}
+                        </span>
+                        <span className="text-slate-500">
+                            {image.isGenerating ? '生成中' : image.error ? '失败' : '完成'}
+                        </span>
+                    </div>
                 </div>
             </div>
         );

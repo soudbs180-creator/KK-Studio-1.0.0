@@ -9,16 +9,16 @@ const ROOT_DIR = process.cwd();
 
 
 test('App delegates mobile rendering to MobileWorkspaceSurface instead of assembling mobile header/feed/composer inline', () => {
-  const appSource = readSource('apps/web/src/App.tsx');
+  const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const appMobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
 
-  assert.match(appSource, /import AppMobileWorkspace from '\.\/app\/AppMobileWorkspace';/);
-  assert.match(appSource, /<AppMobileWorkspace/);
+  assert.match(workspacePageSource, /AppMobileWorkspace/);
+  assert.match(workspacePageSource, /<AppMobileWorkspace/);
   assert.match(appMobileWorkspaceSource, /import \{[\s\S]*?MobileWorkspaceSurface[\s\S]*?\} from '\.\.\/components\/mobile';/);
   assert.match(appMobileWorkspaceSource, /<MobileWorkspaceSurface/);
-  assert.doesNotMatch(appSource, /const mobileHeader = isMobile \?/);
-  assert.doesNotMatch(appSource, /const mobileFeed = isMobile \?/);
-  assert.doesNotMatch(appSource, /const mobileComposer = isMobile \?/);
+  assert.doesNotMatch(workspacePageSource, /const mobileHeader = isMobile \?/);
+  assert.doesNotMatch(workspacePageSource, /const mobileFeed = isMobile \?/);
+  assert.doesNotMatch(workspacePageSource, /const mobileComposer = isMobile \?/);
 });
 
 test('mobile component barrel exports the dedicated mobile surface entry', () => {

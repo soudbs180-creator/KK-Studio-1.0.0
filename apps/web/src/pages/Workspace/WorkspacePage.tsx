@@ -29,7 +29,7 @@ import {
 } from '../../utils/referenceImageStorage';
 import type { CanvasInteractionPhase } from '../../canvas/liveScene';
 import AppPromptComposer from '../../app/AppPromptComposer';
-import AppGlobalModals, { type AppGlobalModalsProps } from '../../app/AppGlobalModals';
+import type { AppGlobalModalsProps } from '../../app/AppGlobalModals';
 import {
   type AgentRenderItem,
   type CanvasRenderItem,
@@ -42,16 +42,15 @@ import {
   type WorkflowUtilityCanvasNode,
 } from '../../app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
-import AppDesktopChrome from '../../app/AppDesktopChrome';
 import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
 import { getCollapsedCanvasGroupNodeIds } from '../../app/collapsedCanvasGroups';
-import AppMobileWorkspace from '../../app/AppMobileWorkspace';
 import { resolveFollowUpDraftPosition } from '../../app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from '../../app/promptGroupRenderLayout';
 import { useAppPromptBarProps } from '../../app/useAppPromptBarProps';
 import { useCanvasViewport } from '../../hooks/useCanvasViewport';
 import { useCanvasRenderItems } from '../../hooks/useCanvasRenderItems';
+import { canvasCardRendererRegistry } from '../../core/canvas/renderers/CanvasCardRendererRegistry';
 import { useCanvasInteractionState } from '../../hooks/useCanvasInteractionState';
 import { useCanvasNodeSelection } from '../../app/useCanvasNodeSelection';
 import { useDraftNodeSync } from '../../app/useDraftNodeSync';
@@ -124,7 +123,6 @@ import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementSchedu
 import { CanvasLayerRenderer } from '../../components/canvas/CanvasLayerRenderer';
 import type { CachedCardMeta } from '../../services/storage/offlineDb';
 import { syncService } from '../../services/system/syncService';
-import { TaskCenterTray } from '../../components/workspace/TaskCenterTray';
 
 const GENERATE_TIMEOUT_MS = 600000;
 
@@ -300,8 +298,6 @@ import { ImageQuality } from '../../services/image/imageQuality';
 import { calculateImageHash } from '../../utils/imageUtils';
 import { useImageGeneration } from '../../hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
-import { WorkspaceSurfacePanels } from '../../components/workspace/WorkspaceSurfacePanels';
-import { WindowManager } from '../../components/workspace/WindowManager';
 import {
   appendReferenceMappingToPrompt,
   reorderReferenceImagesByMentions,
@@ -309,8 +305,7 @@ import {
 } from '../../features/favorites';
 // import { notify } from '../../services/system/notificationService'; // [FIX] Dynamic Import
 
-// ProjectManager imported from components
-import ProjectManager from '../../components/settings/ProjectManager';
+// ProjectManager imported dynamically
 import GpuBackground from '../../components/layout/GpuBackground';
 import type { Supplier } from '../../services/billing/supplierService';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
@@ -337,6 +332,14 @@ import { isWorkflowUtilityNodeKind } from '../../workflow/schema';
 import {
   getCanvasPerformanceProfile,
 } from '../../canvas/performanceProfile';
+
+const AppDesktopChrome = lazyWithRetry(() => import('../../app/AppDesktopChrome'));
+const AppGlobalModals = lazyWithRetry(() => import('../../app/AppGlobalModals'));
+const AppMobileWorkspace = lazyWithRetry(() => import('../../app/AppMobileWorkspace'));
+const TaskCenterTray = lazyNamedWithRetry(() => import('../../components/workspace/TaskCenterTray'), 'TaskCenterTray');
+const WindowManager = lazyNamedWithRetry(() => import('../../components/workspace/WindowManager'), 'WindowManager');
+const WorkspaceSurfacePanels = lazyNamedWithRetry(() => import('../../components/workspace/WorkspaceSurfacePanels'), 'WorkspaceSurfacePanels');
+const ProjectManager = lazyWithRetry(() => import('../../components/settings/ProjectManager'));
 
 interface AppContentProps {
 }
@@ -4332,7 +4335,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
 
-    if (item.isPlaceholder || item.detailLevel === 'ghost') {
+    if (item.isPlaceholder) {
       const { width: nodeWidth, totalHeight } = getCardDimensions(node.aspectRatio, true);
       const cardHeight = imageCardHeightById[node.id] ?? totalHeight;
       const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
@@ -4463,7 +4466,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     const { groupView } = item;
     const node = groupView.rootPrompt;
 
-    if (item.isPlaceholder || item.detailLevel === 'ghost') {
+    if (item.isPlaceholder) {
       const width = getPromptNodeBoundsWidth(node, isMobile);
       const height = node.height || 200;
       const position = resolveLivePromptPosition(node) ?? node.position;
@@ -4513,197 +4516,58 @@ export const AppContent: React.FC<AppContentProps> = () => {
         </div>
       );
     }
+    const cardKind = canvasCardRendererRegistry.resolveCardKind(node);
+    const cardRenderer = canvasCardRendererRegistry.getRenderer(cardKind);
 
-    const screenLeft = -canvasTransform.x / canvasTransform.scale;
-    const screenTop = -canvasTransform.y / canvasTransform.scale;
-    const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
-    const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
+    if (cardRenderer) {
+      return cardRenderer({
+        item,
+        detailLevel: item.detailLevel,
+        isSelected: selectedNodeIds.includes(node.id),
+        highlighted: highlightedIdVal === node.id,
+        zoomScale: canvasTransform.scale,
+        isMobile,
+        canvasTransform,
+        generatingGroupIds,
+        focusedGroupId,
+        promptGroupLayerById,
+        promptGroupStackZIndexById,
+        promptGroupRegroupLayoutsById,
+        imageCardHeightById,
+        imageNodesById,
+        promptGroupNodeIdsById,
+        promptGroupLayoutStateByIdRef,
+        imageLoadSchedulingById,
+        selectedNodeIds,
+        highlightedIdVal,
+        snapToGrid,
+        isCanvasTransforming,
+        nowTimestamp,
+        ecommerceFrameworkTaskNodesById,
+        handlePromptGroupChildDragCommit,
+        handlePromptGroupChildDragDelta,
+        handlePromptGroupDragCommit,
+        handlePromptGroupDragDelta,
+        handlePromptGroupNodeHeightChange,
+        handlePromptGroupNodeSelect,
+        handlePromptGroupTagRemove,
+        handleConnectStart,
+        handleCanvasNodeDragStateChange,
+        handleCanvasCardClick,
+        handleLiveNodePositionChange,
+        handleFocusPromptGroup,
+        getSharedImageNodeProps,
+        getSharedPromptNodeActionProps,
+        handlePinDraft,
+        resolveLiveImagePosition,
+        resolveLivePromptPosition,
+        buildPromptGroupRenderLayout,
+        visibleImageIdSet,
+        handleImageCardHeightChange,
+      });
+    }
 
-    const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
-    const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
-    const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
-    const sourceImageNode = node.sourceImageId ? imageNodesById.get(node.sourceImageId) : null;
-    const {
-      isGroupFocused,
-      promptDetailLevel,
-      shadowBoost,
-      connectorLayerZIndex,
-      promptCardZIndex,
-      groupConnectorStroke,
-      groupConnectorDash,
-      connectorSvgLeft,
-      connectorSvgTop,
-      connectorSvgWidth,
-      connectorSvgHeight,
-      connectorOpacity,
-      renderedPromptNode,
-      childVisualLayouts,
-      groupConnectorLayouts,
-    } = buildPromptGroupRenderLayout({
-      item,
-      groupStackZIndex,
-      focusedGroupId,
-      generatingGroupIds,
-      canvasScale: canvasTransform.scale,
-      promptGroupLayoutState,
-      regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
-      imageCardHeightById,
-      resolveLivePromptPosition,
-      resolveLiveImagePosition,
-    });
-
-    return (
-      <>
-        {groupConnectorLayouts.length > 0 && (
-          <svg
-            className="absolute top-0 left-0 pointer-events-none"
-            shapeRendering="geometricPrecision"
-            width={connectorSvgWidth}
-            height={connectorSvgHeight}
-            viewBox={`0 0 ${connectorSvgWidth} ${connectorSvgHeight}`}
-            data-left={connectorSvgLeft}
-            data-top={connectorSvgTop}
-            {...childVisualLayouts.reduce((acc, layout) => {
-              acc[`data-card-height-${layout.childNode.id}`] = layout.resolvedImageHeight;
-              return acc;
-            }, {} as Record<string, number>)}
-            style={{
-              width: `${connectorSvgWidth}px`,
-              height: `${connectorSvgHeight}px`,
-              left: `${connectorSvgLeft}px`,
-              top: `${connectorSvgTop}px`,
-              overflow: 'visible',
-              zIndex: connectorLayerZIndex,
-            }}
-          >
-            <g>
-              {groupConnectorLayouts
-                .filter((segment) => {
-                  return visibleImageIdSet.has(segment.imageId);
-                })
-                .map((segment) => (
-                  <path
-                    id={`connector-${segment.key}`}
-                    key={segment.key}
-                    d={segment.path}
-                    fill="none"
-                    stroke="var(--connector-color, #6366f1)"
-                    strokeWidth={groupConnectorStroke}
-                    strokeDasharray={groupConnectorDash}
-                    vectorEffect="non-scaling-stroke"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity={connectorOpacity}
-                  />
-                ))}
-            </g>
-          </svg>
-        )}
-
-        <PromptNodeComponent
-          node={renderedPromptNode}
-          detailLevel={promptDetailLevel}
-          groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
-          stackZIndexOverride={promptCardZIndex}
-          shadowBoost={shadowBoost}
-          actualChildImageCount={groupView.childImages.length}
-          onPositionChange={updatePromptNodePosition}
-          isSelected={selectedNodeIds.includes(node.id)}
-          highlighted={highlightedIdVal === node.id || isGroupFocused}
-          onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-          onSelect={() => handlePromptGroupNodeSelect(node.id, node.id)}
-          onClickPrompt={handlePromptClick}
-          onConnectStart={handleConnectStart}
-          zoomScale={canvasTransform.scale}
-          snapToGrid={snapToGrid}
-          isCanvasTransforming={isCanvasTransforming}
-          isMobile={isMobile}
-          sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
-          ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
-          {...getSharedPromptNodeActionProps(renderedPromptNode)}
-          onLivePositionChange={handleLiveNodePositionChange}
-          onHeightChange={(id, height) => {
-            handlePromptGroupNodeHeightChange(node, id, height);
-          }}
-          onPin={handlePinDraft}
-          onRemoveTag={handlePromptGroupTagRemove}
-          onDragDelta={(delta, sourceNodeId) => {
-            handlePromptGroupDragDelta({
-              node,
-              childImages: groupView.childImages,
-              groupNodeIds,
-              delta,
-              sourceNodeId,
-            });
-          }}
-          onDragCommit={(delta, sourceNodeId, finalPosition) => {
-            handlePromptGroupDragCommit({
-              node,
-              childImages: groupView.childImages,
-              delta,
-              sourceNodeId,
-              finalPosition,
-            });
-          }}
-          canvasTransform={canvasTransform}
-          onDragStateChange={handleCanvasNodeDragStateChange}
-        />
-
-        {childVisualLayouts.map((childLayout, childIndex) => (
-          <React.Fragment key={childLayout.childNode.id}>
-            <ImageNode
-              id={`image-card-${childLayout.childNode.id}`}
-              {...getSharedImageNodeProps(childLayout.childNode)}
-              detailLevel="full"
-              loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
-              loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
-              groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
-              stackZIndexOverride={promptCardZIndex + 10 + childIndex}
-              shadowBoost={shadowBoost}
-              position={childLayout.visualPosition}
-              onLivePositionChange={handleLiveNodePositionChange}
-              onHeightChange={handleImageCardHeightChange}
-              isVisible={(() => {
-                const screenLeft = -canvasTransform.x / canvasTransform.scale;
-                const screenTop = -canvasTransform.y / canvasTransform.scale;
-                const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
-                const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
-                const { width: w, totalHeight: h } = getCardDimensions(childLayout.childNode.aspectRatio, true);
-                const x = childLayout.visualPosition.x - w / 2;
-                const y = childLayout.visualPosition.y - h;
-                const margin = 150;
-                return !(
-                  x > screenRight + margin ||
-                  x + w < screenLeft - margin ||
-                  y > screenBottom + margin ||
-                  y + h < screenTop - margin
-                );
-              })()}
-              isCanvasTransforming={isCanvasTransforming}
-              highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
-              onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-              isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
-              onSelect={() => handlePromptGroupNodeSelect(node.id, childLayout.childNode.id)}
-              onDragStateChange={handleCanvasNodeDragStateChange}
-              onDragDelta={(delta, sourceNodeId) => {
-                handlePromptGroupChildDragDelta({
-                  groupId: node.id,
-                  delta,
-                  sourceNodeId,
-                });
-              }}
-              onDragCommit={(delta, sourceNodeId) => {
-                handlePromptGroupChildDragCommit({
-                  groupId: node.id,
-                  delta,
-                  sourceNodeId,
-                });
-              }}
-            />
-          </React.Fragment>
-        ))}
-      </>
-    );
+    return null;
   }, [
     handlePromptGroupChildDragCommit,
     handlePromptGroupChildDragDelta,
@@ -4899,9 +4763,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
             || visibleChildImages.some(child => selectedNodeIds.includes(child.id))
             || groupView.rootPrompt.id === activeSourceImage;
 
-          const isGroupPlaceholder = isLargeProject 
-            ? !isGroupSelected 
-            : (!promptInRender && !anyChildInRender);
+          const isGroupPlaceholder = (!promptInRender && !anyChildInRender);
 
           return {
             id: groupView.id,
@@ -4929,14 +4791,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
           const height = imageCardHeightById[node.id] ?? totalHeight;
           const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
           const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
-          const isImagePlaceholder = isLargeProject 
-            ? !isImageSelected 
-            : (
-              pos.x - width / 2 > rRight ||
-              pos.x + width / 2 < rLeft ||
-              pos.y - height > rBottom ||
-              pos.y < rTop
-            );
+          const isImagePlaceholder = (
+            pos.x - width / 2 > rRight ||
+            pos.x + width / 2 < rLeft ||
+            pos.y - height > rBottom ||
+            pos.y < rTop
+          );
 
           return {
             id: node.id,
@@ -5399,7 +5259,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       focusWorkspace={focusWorkspace}
       handlePreviewFromLibrary={handlePreviewFromLibrary}
       handleFocusLibraryImage={handleFocusLibraryImage}
-      onRenameFavoriteImage={(imageId, name) => updateImageNode(imageId, { alias: name })}
+      onRenameFavoriteImage={(imageId: string, name: string) => updateImageNode(imageId, { alias: name })}
       config={config}
       setConfig={setConfig}
       ecommerceState={ecommerceState}
@@ -5492,37 +5352,39 @@ export const AppContent: React.FC<AppContentProps> = () => {
   );
 
   const projectManagerNode = !isMobile ? (
-    <ProjectManager
-      onSearch={() => {
-        focusWorkspace();
-        setIsSearchOpen(true);
-      }}
-      onFavorites={() => {
-        openFavoritesSurface();
-      }}
-      isSidebarOpen={isSidebarOpen}
-      onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
-      isMobile={isMobile}
-      onFitToAll={handleFitToAll}
-      onResetView={resetViewFn}
-      onToggleCanvasMode={() => setCanvasMode(prev => prev === 'normal' ? 'board' : 'normal')}
-      onToggleSnapToGrid={handleToggleSnapToGrid}
-      canvasMode={canvasMode}
-      showSnapToGrid={snapToGrid}
-      onAutoArrange={handleAutoArrange}
-      onToggleChat={toggleChatPanel}
-      isChatOpen={isChatOpen}
-      desktopScale={desktopSideRailLayout.projectManagerScale}
-      desktopOffset={desktopSideRailLayout.projectManagerOffset}
-      workflowTemplates={WORKFLOW_TEMPLATES}
-      onApplyWorkflowTemplate={(templateId) => {
-        void handleApplyWorkflowTemplate(templateId);
-      }}
-      onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
-      isUserMenuOpen={showUserMenu}
-      onOpenMarkdownImport={() => setShowMarkdownModal(true)}
-      onOpenMermaidImport={() => setShowMermaidModal(true)}
-    />
+    <React.Suspense fallback={null}>
+      <ProjectManager
+        onSearch={() => {
+          focusWorkspace();
+          setIsSearchOpen(true);
+        }}
+        onFavorites={() => {
+          openFavoritesSurface();
+        }}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+        isMobile={isMobile}
+        onFitToAll={handleFitToAll}
+        onResetView={resetViewFn}
+        onToggleCanvasMode={() => setCanvasMode(prev => prev === 'normal' ? 'board' : 'normal')}
+        onToggleSnapToGrid={handleToggleSnapToGrid}
+        canvasMode={canvasMode}
+        showSnapToGrid={snapToGrid}
+        onAutoArrange={handleAutoArrange}
+        onToggleChat={toggleChatPanel}
+        isChatOpen={isChatOpen}
+        desktopScale={desktopSideRailLayout.projectManagerScale}
+        desktopOffset={desktopSideRailLayout.projectManagerOffset}
+        workflowTemplates={WORKFLOW_TEMPLATES}
+        onApplyWorkflowTemplate={(templateId) => {
+          void handleApplyWorkflowTemplate(templateId);
+        }}
+        onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
+        isUserMenuOpen={showUserMenu}
+        onOpenMarkdownImport={() => setShowMarkdownModal(true)}
+        onOpenMermaidImport={() => setShowMermaidModal(true)}
+      />
+    </React.Suspense>
   ) : null;
 
   const globalModalsProps: any = {
@@ -5762,21 +5624,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
       {/* 简体中文：左上角等宽悬浮控制卡片 */}
       {!isMobile && (
         <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-auto pointer-events-auto select-none">
-          <AppDesktopChrome
-            isMobile={isMobile}
-            billingUiEnabled={billingUiEnabled}
-            remainingBalanceDisplay={remainingBalanceDisplay}
-            onRecharge={() => setShowRechargeModal(true)}
-            rightOffset="0px"
-            user={user}
-            avatarUrl={derivedMobileUserAvatarUrl}
-            apiStatus={derivedApiStatus}
-            showUserMenu={showUserMenu}
-            setShowUserMenu={setShowUserMenu}
-            onOpenProfile={openProfileSurface}
-            onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
-            onSignOut={() => { void signOut(); }}
-          />
+          <React.Suspense fallback={null}>
+            <AppDesktopChrome
+              isMobile={isMobile}
+              billingUiEnabled={billingUiEnabled}
+              remainingBalanceDisplay={remainingBalanceDisplay}
+              onRecharge={() => setShowRechargeModal(true)}
+              rightOffset="0px"
+              user={user}
+              avatarUrl={derivedMobileUserAvatarUrl}
+              apiStatus={derivedApiStatus}
+              showUserMenu={showUserMenu}
+              setShowUserMenu={setShowUserMenu}
+              onOpenProfile={openProfileSurface}
+              onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
+              onSignOut={() => { void signOut(); }}
+            />
+          </React.Suspense>
         </div>
       )}
 
@@ -5822,42 +5686,44 @@ export const AppContent: React.FC<AppContentProps> = () => {
         selectionBox={selectionBox}
         selectionMenu={selectionMenuOverlay}
       />
-      <AppMobileWorkspace
-        isMobile={isMobile}
-        surface={responsiveSurface}
-        workspaceSurface={workspaceSurface}
-        mobileScreen={mobileScreen}
-        setMobileScreen={setMobileScreen}
-        onOpenSettings={openCurrentMobileSettingsSurface}
-        userName={derivedMobileUserName}
-        userAvatarUrl={derivedMobileUserAvatarUrl}
-        billingUiEnabled={billingUiEnabled}
-        balance={balance}
-        billingLoading={billingLoading}
-        activeCanvas={activeCanvas}
-        frameworkRuntime={ecommerceState.frameworkRuntime}
-        projectCount={state.canvases.length}
-        focusWorkspace={focusWorkspace}
-        setIsSearchOpen={setIsSearchOpen}
-        setWorkspaceSurface={setWorkspaceSurface}
-        setIsChatOpen={setIsChatOpen}
-        openProfileSurface={openProfileSurface}
-        onShowRecharge={() => setShowRechargeModal(true)}
-        activeEntryId={mobileActiveResultId}
-        activeSourceImage={activeSourceImage}
-        onEntryOpen={handleMobileResultOpen}
-        onPreviewImage={handleOpenPreview}
-        onUseResultAsSource={handleMobileUseImageAsSource}
-        onPartialRedraw={handleMobileResultRedraw}
-        onDownloadEntry={handleMobileResultDownload}
-        onDeleteImage={deleteImageNode}
-        onEditEcommerceTask={handleMobileEditEcommerceTask}
-        onConfirmEcommerceDesktop={handleMobileConfirmEcommerceDesktop}
-        onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
-        onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
-        promptBarProps={mobilePromptBarProps}
-        overlays={workspacePanels}
-      />
+      <React.Suspense fallback={null}>
+        <AppMobileWorkspace
+          isMobile={isMobile}
+          surface={responsiveSurface}
+          workspaceSurface={workspaceSurface}
+          mobileScreen={mobileScreen}
+          setMobileScreen={setMobileScreen}
+          onOpenSettings={openCurrentMobileSettingsSurface}
+          userName={derivedMobileUserName}
+          userAvatarUrl={derivedMobileUserAvatarUrl}
+          billingUiEnabled={billingUiEnabled}
+          balance={balance}
+          billingLoading={billingLoading}
+          activeCanvas={activeCanvas}
+          frameworkRuntime={ecommerceState.frameworkRuntime}
+          projectCount={state.canvases.length}
+          focusWorkspace={focusWorkspace}
+          setIsSearchOpen={setIsSearchOpen}
+          setWorkspaceSurface={setWorkspaceSurface}
+          setIsChatOpen={setIsChatOpen}
+          openProfileSurface={openProfileSurface}
+          onShowRecharge={() => setShowRechargeModal(true)}
+          activeEntryId={mobileActiveResultId}
+          activeSourceImage={activeSourceImage}
+          onEntryOpen={handleMobileResultOpen}
+          onPreviewImage={handleOpenPreview}
+          onUseResultAsSource={handleMobileUseImageAsSource}
+          onPartialRedraw={handleMobileResultRedraw}
+          onDownloadEntry={handleMobileResultDownload}
+          onDeleteImage={deleteImageNode}
+          onEditEcommerceTask={handleMobileEditEcommerceTask}
+          onConfirmEcommerceDesktop={handleMobileConfirmEcommerceDesktop}
+          onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
+          onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
+          promptBarProps={mobilePromptBarProps}
+          overlays={workspacePanels}
+        />
+      </React.Suspense>
 
       {/* Main Infinite Canvas - 浠呭湪闈炴墜鏈虹鏄剧ず */}
       {!isMobile && (
@@ -6247,9 +6113,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
         />
       )}
 
-      {!isMobile && workspacePanels}
+      {!isMobile && (
+        <React.Suspense fallback={null}>
+          {workspacePanels}
+        </React.Suspense>
+      )}
 
-      <AppGlobalModals {...globalModalsProps} />
+      <React.Suspense fallback={null}>
+        <AppGlobalModals {...globalModalsProps} />
+      </React.Suspense>
 
 
 
@@ -6436,19 +6308,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
         </div>
       )}
 
-      <WindowManager
-        toolWindows={toolWindows}
-        onCloseWindow={handleCloseWindow}
-        onMinimizeWindow={handleMinimizeWindow}
-        onFocusWindow={handleFocusWindow}
-        onUpdateWindowLayout={handleUpdateWindowLayout}
-      />
+      <React.Suspense fallback={null}>
+        <WindowManager
+          toolWindows={toolWindows}
+          onCloseWindow={handleCloseWindow}
+          onMinimizeWindow={handleMinimizeWindow}
+          onFocusWindow={handleFocusWindow}
+          onUpdateWindowLayout={handleUpdateWindowLayout}
+        />
+      </React.Suspense>
 
-      <TaskCenterTray
-        onOpenSettings={openSettingsSurfaceTracked}
-        isChatOpen={isChatOpen}
-        chatSidebarWidth={chatSidebarWidth}
-      />
+      <React.Suspense fallback={null}>
+        <TaskCenterTray
+          onOpenSettings={openSettingsSurfaceTracked}
+          isChatOpen={isChatOpen}
+          chatSidebarWidth={chatSidebarWidth}
+        />
+      </React.Suspense>
     </WorkspaceShell>
   );
 };

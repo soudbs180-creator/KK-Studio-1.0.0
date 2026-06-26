@@ -121,13 +121,14 @@ test('prompt-group recycle keeps full-size child cards from overlapping each oth
 test('prompt-group connector svg uses stable group bounds during regroup rendering', () => {
   const layoutSource = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
   const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const imageGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
 
   assert.match(layoutSource, /const connectorBounds = \{\s*minX: groupView\.bounds\.x,/);
   assert.match(layoutSource, /maxX: groupView\.bounds\.x \+ groupView\.bounds\.width,/);
   assert.match(layoutSource, /minY: groupView\.bounds\.y,/);
   assert.match(layoutSource, /maxY: groupView\.bounds\.y \+ groupView\.bounds\.height,/);
   assert.match(layoutSource, /imageId: layout\.childNode\.id,/);
-  assert.match(workspacePageSource, /visibleImageIdSet\.has\(segment\.imageId\)/);
+  assert.match(imageGroupRendererSource, /visibleImageIdSet\.has\(segment\.imageId\)/);
   assert.doesNotMatch(workspacePageSource, /segment\.key\.split\('-'\)/);
 });
 
@@ -144,12 +145,13 @@ test('prompt-group settle phase keeps animating after drop instead of snapping t
 });
 
 test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
-  const appSource = readSource('apps/web/src/App.tsx');
+  const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const imageGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
 
-  assert.match(appSource, /<svg[\s\S]*shapeRendering="geometricPrecision"/);
-  assert.match(appSource, /strokeDasharray=\{groupConnectorDash\}[\s\S]*vectorEffect="non-scaling-stroke"/);
-  assert.match(appSource, /strokeDasharray=\{connectorStrokeDasharray\}[\s\S]*vectorEffect="non-scaling-stroke"/);
-  assert.match(appSource, /strokeDasharray=\{`\$\{activeDragDashA\} \$\{activeDragDashB\}`\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(workspacePageSource, /<svg[\s\S]*shapeRendering="geometricPrecision"/);
+  assert.match(imageGroupRendererSource, /strokeDasharray=\{groupConnectorDash\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(workspacePageSource, /strokeDasharray=\{connectorStrokeDasharray\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(workspacePageSource, /strokeDasharray=\{\`[\s\S]*activeDragDashA[\s\S]*activeDragDashB[\s\S]*\`\}[\s\S]*vectorEffect="non-scaling-stroke"/);
 });
 
 test('explicit regroup target slots keep recycle assignments stable even if live positions jitter', () => {

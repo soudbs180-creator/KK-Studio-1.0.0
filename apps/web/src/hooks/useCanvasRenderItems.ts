@@ -53,17 +53,21 @@ export function useCanvasRenderItems(props: UseCanvasRenderItemsProps): CanvasRe
       // 2. 计算卡片精细度 (Detail Level / LOD)
       let detailLevel: CanvasDetailLevel = 'full';
 
+      const isGenerating = item.node?.isGenerating || (item.childNodes && item.childNodes.some((child: any) => child.isGenerating));
+      const isRecent = item.node?.isNew || (item.childNodes && item.childNodes.some((child: any) => child.isNew));
+      const isHighPriority = isSelected || isGenerating || isRecent;
+
       if (isCanvasTransforming) {
         // 🚀 画布在拖拽、缩放、平移等高频交互中，非选中卡片全部退化为极其轻量的 ghost，保障 60 FPS
-        detailLevel = isSelected ? 'compact' : 'ghost';
+        detailLevel = isHighPriority ? 'compact' : 'ghost';
       } else {
         // 静态下根据缩放比例 (scale) 决定 LOD
         if (scale >= 0.7) {
           detailLevel = 'full';
-        } else if (scale >= 0.25) {
+        } else if (scale >= 0.35) {
           detailLevel = 'compact';
         } else {
-          detailLevel = 'ghost';
+          detailLevel = isHighPriority ? 'compact' : 'ghost';
         }
       }
 

@@ -386,7 +386,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
   return (
     <div
-      className="fixed top-4 z-[1000] flex flex-col items-center pointer-events-none"
+      className="fixed top-4 z-[1000] flex flex-col items-center pointer-events-none" // Z_INDEX_EXCEPTION
       style={{
         left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
         transform: 'translateX(-50%)',
@@ -544,6 +544,37 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         <div className="text-[10px] text-rose-400 mt-1 flex items-center gap-1">
                           <AlertTriangle size={9} />
                           <span>{task.error}</span>
+                        </div>
+                      )}
+
+                      {/* Telemetry metadata row */}
+                      {task.rawJob && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[9px] text-gray-400 font-medium">
+                          <span className="px-1 py-0.2 rounded bg-white/5 border border-white/5 text-gray-300">
+                            {task.rawJob.options?.modelId ? task.rawJob.options.modelId.slice(0, 15) : 'Model'}
+                          </span>
+                          <span>·</span>
+                          <span className="text-amber-400 font-semibold">
+                            预计: {(task.rawJob.prompts?.length || 1) * 10} 积分
+                          </span>
+                          <span>·</span>
+                          <span className="text-sky-400">
+                            {task.rawJob.options?.aspectRatio || '1:1'}
+                          </span>
+                          {task.rawJob.createdAt && (
+                            <>
+                              <span>·</span>
+                              <span className="text-gray-500">
+                                {new Date(task.rawJob.createdAt).toLocaleTimeString()}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {!task.isGenerationJob && task.createdAt && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[9px] text-gray-500">
+                          <span>创建时间: {new Date(task.createdAt).toLocaleTimeString()}</span>
                         </div>
                       )}
                     </div>
