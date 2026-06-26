@@ -778,6 +778,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 修复了画布在平移、缩放、或卡片拖动等 Transforming/Dragging 交互结束后，卡片在主画布上完全消失只剩下连线虚线、且永久无法自动水合重新加载恢复的重大渲染死锁缺陷。
 - **修改文件**：
   - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/publish/stable/manifest.json)
 - **当前设计决策**：
   - **补齐核心 Memo 依赖项以驱动解冻**：在 `WorkspacePage.tsx` 的 `canvasRenderItems` 和 `renderedVisibleGroups` 的 useMemo 依赖项中，补全了 `isCanvasTransforming` 和 `isNodeDragActive` 两个状态控制变量。之前版本虽然在 Memo 内部使用它们做了短路拦截，但由于未在依赖项数组中声明，导致交互结束状态变回 `false` 时无法重新求值，卡片永久停留在 Transforming 期间的空/旧状态中。补齐依赖后，任何状态变换结束的那一帧均能百分之百驱动 React 触发最后一帧的解冻刷新，拉起最新可视卡片列表。
 - **已运行验证**：
