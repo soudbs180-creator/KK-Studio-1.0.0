@@ -49,7 +49,6 @@ function defaultStore() {
   return {
     version: 1,
     profiles: {},
-    paymentOrders: {},
     exchangeRates: [
       { currencyCode: 'CNY', creditsPerUnit: 100, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },
       { currencyCode: 'USD', creditsPerUnit: 700, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },

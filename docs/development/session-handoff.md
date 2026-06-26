@@ -836,3 +836,41 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：
   - 运行 `npm run verify:changes` 100% 成功通过（1618 个测试用例全部 Pass，空间性能 Benchmark、各烟雾测试均完美绿灯，Vite 打包和架构合规审计 100% 成功）。
 
+
+## 54. 2026-06-26 - Current-Only v1.5.8 Cleanup and Portable Realignment
+- **修改范围**：
+  - 将项目收敛到 `config/release-manifest.json` 指定的 v1.5.8 当前主链路，移除旧静态运行面、旧 `/payment/v1` 支付协议、Alipay 回调和旧 api-client 包装器。
+  - 重新构建并发布 portable，使 `apps/web/dist/app-version.json`、`release/KK-Studio-Portable/app/dist/app-version.json` 与 `release/publish/stable/manifest.json` 的版本、commit 和 buildTime 对齐。
+- **修改文件**：
+  - `apps/web/public/newgenre_static/`、`apps/web/public/pay/success/`、`scripts/alipay/`、`docs/setup/ALIPAY_MCP.md`
+  - `apps/web/src/landing/KkLandingPage.tsx`、`apps/web/src/landing/landingStyles.css`、`apps/web/src/landing/landingReferenceOverrides.css`、`apps/web/src/components/auth/LoginScreen.css`
+  - `server/routes/compat/admin.js`、`server/routes/compat/billing.js`
+  - `packages/shared/src/contracts/client/kk-api-client.ts`、`packages/shared/src/contracts/dto/admin-console.ts`、`packages/shared/src/contracts/enums/status.ts`、`packages/shared/src/contracts/index.ts`
+  - `packages/api-client/package.json`、`packages/api-client/src/index.ts`、`packages/api-client/tsconfig.json`、`package-lock.json`
+  - `docs/specs/openapi.yaml`、`scripts/architecture/check-spec-structure.mjs`、`scripts/governance/check-current-facts.mjs`
+  - `docs/README.md`、`docs/INDEX.md`、`docs/setup/README.md`、`docs/archive/superpowers/`
+  - `tests/unit/kk-landing-auth-contract.test.ts`、`tests/unit/legacy-compatibility-pruning.test.ts`
+  - `release/publish/stable/manifest.json`
+- **当前设计决策**：
+  - 当前支付方向只保留 Stripe checkout/webhook 与 `/api/v1/billing/recharge-submissions` 人工审核充值；`/payment/v1/*` 和 Alipay callback 不再属于公共接口。
+  - `packages/api-client` 不再持有旧 `/auth`、`/billing`、`/admin`、`/generate`、`/chat` 风格包装器，也不再负责浏览器 token 持久化；前端通过 web 层服务和 typed client 调用当前接口。
+  - `docs/archive/` 可以保留历史资料，但治理脚本会阻止旧入口重新出现在当前运行时代码、脚本、活跃文档和发布包中。
+- **已运行验证**：
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/legacy-compatibility-pruning.test.ts"`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/kk-landing-auth-contract.test.ts"`
+  - `npm run spec:check`
+  - `npm run governance:current`
+  - `npm run check:encoding`
+  - `npm run architecture:check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm run package:portable:publish`
+  - `npm run governance:check`
+  - `npm run verify:changes`
+  - `npm run agents:status`
+- **未运行验证及原因**：
+  - 无。
+- **风险与下一步**：
+  - 当前工作区在执行中被其他 Agent 同步过一次，最新清理内容已被 #53 吸收；本条记录补齐 current-only 清理和最终 portable 对齐事实。
+  - `verify:changes` 期间的 DurableQueue 和网络错误日志来自单测刻意模拟的重试路径，命令最终通过。
+
