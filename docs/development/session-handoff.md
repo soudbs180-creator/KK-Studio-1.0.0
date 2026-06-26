@@ -909,3 +909,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit` 全套 1615 个单元测试 100% 成功通过，兼容性状态圆满。
   - 运行 `npm run typecheck` 与 `npm run architecture:check` 编译及规范检验均 100% 通过。
 
+## 58. 2026-06-26 - Fix Minimap Hover Zoom Centering Closure and Event Bubbling (本次追加)
+- **修改范围**：
+  1. 修复了在小地图（Minimap SVG）上滚动鼠标滚轮时，缩放未以鼠标指针（像素坐标）为中心进行无级局部视野缩放的缺陷。
+  2. 解决了高频滚动时由于 React 异步状态更新导致的“闭包失效状态（Stale State Closure）”陷阱。
+  3. 通过原生非 passive 事件绑定，彻底阻止了滚动事件冒泡导致的外部主画布同步缩放问题。
+- **修改文件**：
+  - [AppCanvasNavigationPanel.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/AppCanvasNavigationPanel.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **基于 Ref 缓存规避高频闭包陷阱**：在 `AppCanvasNavigationPanel` 中引入 `minimapScaleMultiplierRef` 与 `minimapCenterOffsetRef` 来同步缓存最新的缩放倍率和中心偏移。在 `handleSvgWheel` 原生滚轮高频触发周期中，摒弃原本由 React 闭包捕获的上一帧过期 state 计算，改为完全基于实时的 Ref 变量直接运算，并将计算后的新状态同步刷入 State，彻底打通了连续高频滚动的无级雷达缩放。
+  - **原生非被动事件阻止冒泡**：通过 `useEffect` 在小地图 SVG 节点加载时手动添加原生 `wheel` 事件监听器，并显式将配置参数设为 `{ passive: false }`。在此事件处理器内部执行 `e.preventDefault()` 和 `e.stopPropagation()`，彻底规避了浏览器对 React 自带 `onWheel` 实施的 passive listener 忽略行为，彻底断绝了滚轮事件冒泡引发主画布失控缩放的隐藏 Bug。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 类型编译通过。
+  - 运行 `npm run test:unit` 全套 1613 个单元测试用例 100% 成功通过。
+  - 经由浏览器子代理（Browser Subagent）滚动缩放测试，确证将鼠标放置在小地图右下角高频滚动滚轮时，小地图内部完全以鼠标指针为中心完美缩放且主画布纹丝不动，控制台无报错。
+
+

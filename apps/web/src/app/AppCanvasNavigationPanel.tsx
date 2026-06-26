@@ -30,6 +30,19 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
   const [minimapCenterOffset, setMinimapCenterOffset] = useState<{ x: number; y: number } | null>(null);
 
+  const minimapScaleMultiplierRef = useRef(3.0);
+  const minimapCenterOffsetRef = useRef<{ x: number; y: number } | null>(null);
+
+  const setMinimapScale = (val: number) => {
+    setMinimapScaleMultiplier(val);
+    minimapScaleMultiplierRef.current = val;
+  };
+
+  const setMinimapOffset = (val: { x: number; y: number } | null) => {
+    setMinimapCenterOffset(val);
+    minimapCenterOffsetRef.current = val;
+  };
+
   const toggleCollapsed = (e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
@@ -321,10 +334,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   };
 
   // 小地图 SVG 区域上 of 鼠标滚轮缩放事件（根据鼠标的位置来局部缩放小地图内容）
-  const handleSvgWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  const handleSvgWheel = useCallback((e: WheelEvent) => {
     const svg = svgRef.current;
     if (!svg) return;
 
@@ -332,14 +342,42 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
+    const currentMultiplier = minimapScaleMultiplierRef.current;
+    const currentOffset = minimapCenterOffsetRef.current;
+
+    // 实时计算出当前的 totalWidth, totalHeight 等
+    const currentTotalWidth = viewportW * currentMultiplier;
+    const currentTotalHeight = viewportH * currentMultiplier;
+
+    const currentCenterX = viewportCenterX + (currentOffset?.x || 0);
+    const currentCenterY = viewportCenterY + (currentOffset?.y || 0);
+
+    const currentMinX = currentCenterX - currentTotalWidth / 2;
+    const currentMinY = currentCenterY - currentTotalHeight / 2;
+
+    // 计算 scaleMini
+    const currentScaleMiniX = miniWidth / (currentTotalWidth <= 0 ? 1 : currentTotalWidth);
+    const currentScaleMiniY = miniHeight / (currentTotalHeight <= 0 ? 1 : currentTotalHeight);
+    let currentScaleMini = Math.min(currentScaleMiniX, currentScaleMiniY);
+    if (isNaN(currentScaleMini) || currentScaleMini === Infinity || currentScaleMini <= 0) {
+      currentScaleMini = 0.1;
+    }
+
+    const currentContentWidth = currentTotalWidth * currentScaleMini;
+    const currentContentHeight = currentTotalHeight * currentScaleMini;
+    const currentDx = (miniWidth - currentContentWidth) / 2;
+    const currentDisplayDy = (miniHeight - currentContentHeight) / 2;
+    const currentSafeDx = isNaN(currentDx) ? 0 : currentDx;
+    const currentSafeDy = isNaN(currentDisplayDy) ? 0 : currentDisplayDy;
+
     // 1. 计算鼠标当前位置在真实大画布坐标系下的世界坐标
-    const mouseXInWorld = (mx - safeDx) / scaleMini + minX;
-    const mouseYInWorld = (my - safeDy) / scaleMini + minY;
+    const mouseXInWorld = (mx - currentSafeDx) / currentScaleMini + currentMinX;
+    const mouseYInWorld = (my - currentSafeDy) / currentScaleMini + currentMinY;
 
     // 2. 算新的 scale multiplier
     const delta = -e.deltaY;
     const zoomFactor = delta > 0 ? 0.9 : 1.1; // 向上滚是放大（视野变窄，细节变大），向下滚是缩小（视野变宽，细节变小）
-    const nextMultiplier = Math.max(1.0, Math.min(10.0, minimapScaleMultiplier * zoomFactor));
+    const nextMultiplier = Math.max(1.0, Math.min(10.0, currentMultiplier * zoomFactor));
 
     // 3. 计算新的 totalWidth 和 totalHeight
     const totalWidth_new = viewportW * nextMultiplier;
@@ -372,9 +410,26 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     const offsetY = centerY_new - viewportCenterY;
 
     // 7. 更新状态
-    setMinimapScaleMultiplier(nextMultiplier);
-    setMinimapCenterOffset({ x: offsetX, y: offsetY });
-  };
+    setMinimapScale(nextMultiplier);
+    setMinimapOffset({ x: offsetX, y: offsetY });
+  }, [viewportW, viewportH, viewportCenterX, viewportCenterY, miniWidth, miniHeight]);
+
+  // 绑定小地图原生 wheel 事件，用 passive: false 以便 preventDefault 彻底阻断大画布和页面滚动
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSvgWheel(e);
+    };
+
+    svg.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      svg.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [handleSvgWheel]);
 
   // 确认定位
   const handleConfirmLocation = () => {
@@ -391,14 +446,14 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       
       canvasRef.current.setView(finalX, finalY, currentTargetScale);
       setIsEdited(false);
-      setMinimapCenterOffset(null); // 重置视野偏移
+      setMinimapOffset(null); // 重置视野偏移
     }
   };
 
   // 取消并重置
   const handleCancelLocation = () => {
     setIsEdited(false);
-    setMinimapCenterOffset(null); // 重置视野偏移
+    setMinimapOffset(null); // 重置视野偏移
   };
 
   // 折叠状态下，在右上角渲染成扁平横向缩放控制栏
@@ -517,7 +572,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             width={miniWidth}
             height={miniHeight}
             onMouseDown={handleMouseDown}
-            onWheel={handleSvgWheel}
             className="kk-workspace-canvas-minimap cursor-crosshair overflow-hidden"
           >
             {/* 背景网格装饰 */}

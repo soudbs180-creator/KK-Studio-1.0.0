@@ -311,8 +311,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
             // 🚀 [关键修复] 当外部通过 React Props 驱动位置变化时（例如在重组动画播放的每一帧中），
             // 同步将最新的位置更新到 canvasLivePositionStore，确保虚线连线能完美获取到该帧的最新位置！
-            canvasLivePositionStore.setPosition(image.id, position);
-
             if (containerRef.current) {
                 const currentLeft = parseFloat(containerRef.current.style.left) || 0;
                 const currentTop = parseFloat(containerRef.current.style.top) || 0;
@@ -321,8 +319,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 if (Math.abs(currentLeft - targetLeft) > 1 || Math.abs(currentTop - targetTop) > 1) {
                     containerRef.current.style.left = `${targetLeft}px`;
                     containerRef.current.style.top = `${targetTop}px`;
+                    containerRef.current.style.transform = 'translate3d(0, 0, 0)';
                 }
             }
+
+            // Notify after normalizing DOM positioning so subscribers compute relative transforms.
+            canvasLivePositionStore.setPosition(image.id, position);
 
             // 🚀 [关键修复] 立即同步更新局部连接线，消除一帧延迟，确保绝对不发生漂移
             if (image.parentPromptId) {

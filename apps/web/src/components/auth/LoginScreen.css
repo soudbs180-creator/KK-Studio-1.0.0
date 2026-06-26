@@ -1,4 +1,4 @@
-﻿.auth-screen-active.auth-screen-active--dark,
+.auth-screen-active.auth-screen-active--dark,
 body.auth-screen-active.auth-screen-active--dark,
 html.auth-screen-active.auth-screen-active--dark,
 html.auth-screen-active.auth-screen-active--dark body,
@@ -95,7 +95,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   --auth-system-primary-text: #ffffff;
 }
 
-/* 绠€浣撲腑鏂囷細鏆楄壊妯″紡闈㈡澘宸茶鐩栦负浜壊椋庢牸 */
 .auth-page--dark .auth-panel {
   background: rgba(255, 255, 255, 0.45);
   border-color: rgba(255, 255, 255, 0.4);
@@ -293,8 +292,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   -webkit-backdrop-filter: blur(32px) saturate(1.8);
 }
 
-/* 褰诲簳鍒犻櫎鏆楄壊妯″紡鐧诲綍鍗＄墖娣辫壊瑕嗙洊 */
-
 .auth-modal-close {
   position: absolute;
   top: 12px;
@@ -320,8 +317,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   background: #ffffff;
   border-color: rgba(12, 16, 24, 0.2);
 }
-
-/* 褰诲簳鍒犻櫎鏆楄壊妯″紡鍏抽棴鎸夐挳娣辫壊瑕嗙洊 */
 
 .auth-link-back {
   width: fit-content;
@@ -943,12 +938,10 @@ body.auth-screen-active--landing.auth-modal-open #root {
   gap: 10px;
 }
 
-/* 鐧诲綍鍗＄墖瀛愬厓绱犺繃娓℃晥鏋?*/
 .auth-panel > * {
   transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 婵€娲婚獙璇佺爜鏃讹紝鍗＄墖鍐呭叾浠栨墍鏈夊唴瀹规ā绯婁笖鎺ヨ繎瀹屽叏閫忔槑锛屽苟绂佺敤浜や簰 */
 .auth-panel.is-captcha-active > :not(.auth-captcha-overlay) {
   filter: blur(12px);
   opacity: 0.03;
@@ -971,7 +964,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   animation: auth-captcha-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 绠€浣撲腑鏂囷細鏆楄壊妯″紡楠岃瘉寮圭獥 鈥?纾ㄧ爞鏁堟灉 + 楂橀€忓厜楂樺彲璇绘€?(浼樺寲涓哄畬鍏ㄩ€忔槑搴? */
 .auth-page--dark .auth-captcha-overlay {
   background: transparent !important;
   border: none !important;
@@ -979,7 +971,6 @@ body.auth-screen-active--landing.auth-modal-open #root {
   -webkit-backdrop-filter: none !important;
 }
 
-/* 楠岃瘉缁勪欢娣″叆鍜岃交寰斁澶у姩鐢?*/
 @keyframes auth-captcha-fade-in {
   from {
     opacity: 0;
