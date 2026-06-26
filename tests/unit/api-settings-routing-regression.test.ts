@@ -43,7 +43,7 @@ test('ApiSettingsView clears stale provider models when the provider connection 
 });
 
 test('Settings mobile shell routes nested API editor back actions to the API management list', () => {
-  const source = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const source = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.ok(source.includes('isApiManagementEditorRoute'));
   assert.ok(source.includes('onBackToApiManagement'));

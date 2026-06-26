@@ -39,7 +39,7 @@ test('shared settings ui primitives use a calmer desktop density scale', () => {
 
 test('settings workbench compacts mobile surfaces instead of stacking oversized cards', () => {
   const cssSource = readFullCssSource() + '\n' + readSource('apps/web/src/styles/settings.css');
-  const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const panelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.match(
     cssSource,

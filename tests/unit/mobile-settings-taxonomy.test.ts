@@ -10,13 +10,14 @@ const ROOT_DIR = process.cwd();
 
 test('settings routes and panel use Apple-style billing naming for consumption records', () => {
   const routesSource = readSource('apps/web/src/routes/settingsRoutes.tsx');
-  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.match(routesSource, /getSettingsNavItems\('zh-CN'\)/);
   assert.match(registrySource, /labelZh:\s*'计费账本'/);
-  assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'计费',\s*'Billing'\)/);
+  assert.match(registrySource, /mobileUsageLabel:\s*'计费'/);
+  assert.match(registrySource, /mobileUsageLabel:\s*'Billing'/);
   assert.match(dashboardSource, /pick\('计费账本', 'Billing'\)/);
   assert.match(dashboardSource, /pick\('账户交易记录', 'Transaction History'\)/);
 });

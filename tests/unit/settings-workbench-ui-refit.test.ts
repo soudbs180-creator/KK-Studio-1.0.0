@@ -36,7 +36,7 @@ test('billing ledger shares the same settings hero and section rhythm as the res
 });
 
 test('mobile settings opens directly on overview instead of a separate overview entry screen', () => {
-  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
@@ -79,8 +79,8 @@ test('dashboard overview uses card-based grid layout', () => {
   assert.match(dashboardSource, /dashboard-grid-container/);
   assert.match(dashboardSource, /dashboard-grid-card/);
   assert.match(dashboardSource, /ProgressBar/);
-  assert.match(dashboardSource, /api-management/);
-  assert.match(dashboardSource, /consumption-records/);
+  assert.match(dashboardSource, /capability-sources/);
+  assert.match(dashboardSource, /data-sync/);
 });
 
 test('destructive settings maintenance actions require confirmation before mutating local data', () => {

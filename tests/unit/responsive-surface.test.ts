@@ -47,10 +47,9 @@ describe('responsive surface utilities', () => {
       'apps/web/src/components/common/TutorialOverlay.tsx',
       'apps/web/src/utils/canvasCenter.ts',
       'apps/web/src/context/CanvasContext.tsx',
+      'apps/web/src/components/settings/SettingsWorkbenchPanel.tsx',
     ];
-    const compactSurfaceFiles = [
-      'apps/web/src/components/settings/SettingsPanel.localized.tsx',
-    ];
+    const compactSurfaceFiles = [];
 
     for (const file of phoneSurfaceFiles) {
       const source = readSource(file);
@@ -95,7 +94,7 @@ describe('responsive surface utilities', () => {
 
   test('Clay settings shell keeps separate mobile and desktop surface tokens', () => {
     const cssSource = readSource('apps/web/src/index.css');
-    const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+    const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
     assert.match(settingsSource, /settings-shell-page--desktop/);
     assert.match(settingsSource, /settings-shell-page--mobile/);

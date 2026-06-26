@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd();
 
 test('settings shell and routes share a single registry for canonical views and legacy aliases', () => {
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
-  const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const panelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const routesSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
   const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
 

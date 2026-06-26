@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('desktop settings shell keeps navigation metadata in the sidebar and leaves page titles to the active settings view', () => {
-  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const routeConfigSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
   const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
@@ -77,7 +77,7 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
 });
 
 test('desktop settings sidebar keeps navigation search visible and renders filtered entries', () => {
-  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
   assert.match(shellSource, /items=\{filteredItems\}/);

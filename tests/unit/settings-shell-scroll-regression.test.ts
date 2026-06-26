@@ -7,7 +7,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 
 test('desktop settings shell keeps a real inner scroll container and viewport-safe shell sizing', () => {
-  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
   const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
   const cssSource = readSource('apps/web/src/index.css');

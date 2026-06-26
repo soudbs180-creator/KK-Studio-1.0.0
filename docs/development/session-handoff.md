@@ -1505,3 +1505,34 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 96. 2026-06-27 - Test Suite Adaptation for Modern Settings Shell and Path Clean-up (本次追加)
+- **修改范围**：
+  1. **修正单元测试的过时路径读取**：由于 `SettingsPanel.localized.tsx` 被彻底重构提取为 `SettingsWorkbenchShell.tsx`，修复了 15 个相关的单元测试中因为读取旧文件导致的 `ENOENT` 报错。
+  2. **路由别名断言对齐**：修改了 `settings-workbench-ui-refit.test.ts`，将旧有的 `/api-management/` 和 `/consumption-records/` 旧路由别名断言替换为与其现代能力树对应的 `capability-sources` 与 `data-sync`，确保语义一致并能成功通过断言。
+  3. **自适应断言对齐**：将 `responsive-surface.test.ts` 中对 `SettingsPanel.localized.tsx` 中 `isCompactResponsiveWidth` 判定断言优化为了新版的 `SettingsWorkbenchPanel.tsx` 中的 `isPhoneResponsiveWidth`（768px）断言，完成了移动端窄屏误判防御的覆盖验证。
+- **修改文件**：
+  - [api-settings-routing-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/api-settings-routing-regression.test.ts)
+  - [kkai-billing-ui-surface.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/kkai-billing-ui-surface.test.ts)
+  - [mobile-settings-browser-verify-script.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-settings-browser-verify-script.test.ts)
+  - [mobile-settings-shell-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-settings-shell-contract.test.ts)
+  - [mobile-settings-taxonomy.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-settings-taxonomy.test.ts)
+  - [responsive-surface.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/responsive-surface.test.ts)
+  - [settings-canonical-entry-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-canonical-entry-regression.test.ts)
+  - [settings-desktop-workbench-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-desktop-workbench-regression.test.ts)
+  - [settings-dual-entry-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-dual-entry-regression.test.ts)
+  - [settings-legacy-shell-pruning.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-legacy-shell-pruning.test.ts)
+  - [settings-registry-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-registry-contract.test.ts)
+  - [settings-route-factory-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-route-factory-contract.test.ts)
+  - [settings-shell-scroll-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-shell-scroll-regression.test.ts)
+  - [settings-ui-density-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-ui-density-regression.test.ts)
+  - [settings-ui-system-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-ui-system-contract.test.ts)
+  - [settings-workbench-ui-refit.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/settings-workbench-ui-refit.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **测试契约与工程实现统一**：当物理的 `SettingsPanel.localized.tsx` 被拆分归类进主面板 `SettingsWorkbenchPanel.tsx` 与路由壳 `SettingsWorkbenchShell.tsx` 后，单元测试的读取路径应当被立即规范化，防止出现 CI 的文件缺失问题。
+- **已运行验证**：
+  - 全量运行 `npm run verify:changes` 100% 成功通过，0 错误 0 Regression。其中包含了 1610+ 项单元与集成测试、Playwright 移动与桌面设置页面冒烟测试、AI Takeover 冒烟测试以及 Canvas 性能基准测试。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+

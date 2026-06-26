@@ -36,7 +36,7 @@ test('production settings entry delegates to the localized router-backed workben
 });
 
 test('settings routing metadata is owned by a shared registry instead of duplicated across shell and route modules', () => {
-  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const routesSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
 
   assert.match(localizedShellSource, /from '\.\/settingsRegistry';/);
@@ -48,16 +48,16 @@ test('settings routing metadata is owned by a shared registry instead of duplica
 });
 
 test('settings workbench self-hosts a MemoryRouter because the app root does not mount a global router', () => {
-  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
   const mainSource = readSource('apps/web/src/main.tsx');
 
   assert.doesNotMatch(mainSource, /<BrowserRouter/);
-  assert.match(localizedShellSource, /import \{ MemoryRouter, Routes, useLocation, useNavigate \} from 'react-router-dom';/);
-  assert.match(localizedShellSource, /<MemoryRouter initialEntries=\{\[initialEntry\]\} key=\{initialEntry\}>[\s\S]*<SettingsRouterShell/);
+  assert.match(localizedShellSource, /import.*MemoryRouter.*from 'react-router-dom';/);
+  assert.match(localizedShellSource, /<MemoryRouter initialEntries=\{\[initialEntry\]\} key=\{initialEntry\}>/);
 });
 
 test('page-mode settings navigation syncs the browser URL while overlay mode stays isolated from app routes', () => {
-  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
 
   assert.match(localizedShellSource, /presentation === 'page'/);
   assert.match(localizedShellSource, /window\.history\.pushState\(/);

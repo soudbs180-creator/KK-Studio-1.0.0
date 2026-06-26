@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd();
 
 test('mobile settings shell opens the overview directly inside the shared router-backed workbench', () => {
   const appSource = readSource('apps/web/src/App.tsx');
-  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
@@ -33,7 +33,7 @@ test('mobile settings shell opens the overview directly inside the shared router
 });
 
 test('mobile settings shell treats settings root as the dashboard detail route', () => {
-  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.doesNotMatch(settingsSource, /SettingsRouterLocationState/);
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);

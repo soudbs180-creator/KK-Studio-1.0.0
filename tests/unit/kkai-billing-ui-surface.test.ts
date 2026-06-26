@@ -19,7 +19,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   const profileModalSource = readSource('apps/web/src/components/modals/UserProfileModal.tsx');
   const settingsRoutesSource = readSource('apps/web/src/routes/settingsRoutes.tsx');
   const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.tsx');
-  const localizedSettingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const localizedSettingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.match(appSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(appSource, /<AppDesktopChrome[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
@@ -52,7 +52,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(settingsRoutesSource, /path: 'consumption-records'/);
   assert.match(settingsRoutesSource, /element: <CostEstimation embedded \/>/);
 
-  assert.match(settingsPanelSource, /export \{ default \} from '\.\/SettingsPanel\.localized';/);
+  assert.match(settingsPanelSource, /import SettingsWorkbenchPanel/);
   assert.match(settingsPanelSource, /export type \{ SettingsViewId \} from '\.\/settingsRegistry';/);
   assert.doesNotMatch(settingsPanelSource, /lazy\(\(\) => import\('\.\/views\/DashboardView\.localized\.tsx'\)\)/);
   assert.doesNotMatch(localizedSettingsPanelSource, /CostEstimation embedded/);

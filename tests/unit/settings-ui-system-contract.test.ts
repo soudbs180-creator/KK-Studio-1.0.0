@@ -82,7 +82,7 @@ test('appearance and motion view consumes only the shared settings system primit
 });
 
 test('mobile settings shell title stays out of heading landmarks', () => {
-  const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const panelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.match(panelSource, /<div className="settings-shell-mobile__title"/);
   assert.doesNotMatch(panelSource, /<h[1-6]\s+className="settings-shell-mobile__title"/);

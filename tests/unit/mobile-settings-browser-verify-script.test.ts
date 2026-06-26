@@ -99,7 +99,7 @@ test('mobile settings smoke follows the current Model Center default without req
 test('desktop settings smoke verification covers direct settings routes and the in-app settings entry with stable selectors', () => {
   const scriptSource = readSource('scripts/test/verify-desktop-settings-smoke.mjs');
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
-  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
   const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
