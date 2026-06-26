@@ -35,14 +35,7 @@ loadServerEnvFiles();
 const express = require('express');
 const cors = require('cors');
 const webhookRouter = require('./routes/webhook');
-const userApiPayloadRouter = require('./routes/user-api-payload-router');
-const adminRouter = require('./routes/admin');
-const generateV1Router = require('./routes/generate-v1');
-const userRouter = require('./routes/user');
-const ocrRouter = require('./routes/ocr');
-const aiAssistantRouter = require('./routes/ai-assistant');
-const configRouter = require('./routes/config');
-const providerProbeRouter = require('./routes/provider-probe');
+const apiRouter = require('./routes/api');
 const telemetryRouter = require('./routes/telemetry');
 const contractCompatRouter = require('./routes/contract-compat');
 const securityHeaders = require('./middleware/securityHeaders');
@@ -282,16 +275,8 @@ function createApp() {
 
   app.use('/webhook', webhookRouter);
   // 简体中文注释：新增的影子生成路由，必须挂在其它生成和反代路由之前，以便进行请求委派和埋点
-  app.use('/api', generateV1Router);
-
-  // 简体中文注释：用户 API 配置保存增强层必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据。
-  app.use('/api', userApiPayloadRouter);
-  app.use('/api', userRouter);
-  app.use('/api', adminRouter);
-  app.use('/api', providerProbeRouter);
-  app.use('/api', ocrRouter);
-  app.use('/api', aiAssistantRouter);
-  app.use('/api', configRouter);
+  // 简体中文注释：使用统一的 apiRouter 收口挂载所有本挂载在 /api 下的子路由，防止路由乱序拦截退化
+  app.use('/api', apiRouter);
   app.use(contractCompatRouter);
   app.use('/', telemetryRouter);
 

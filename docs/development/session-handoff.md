@@ -1417,5 +1417,26 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 91. 2026-06-26 - Backend API Router Consolidation and Routing Regression Check (本次追加)
+- **修改范围**：
+  1. **API 网关聚合重构**：新建了 [api.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/api.js)，将本挂载在 `/api` 根路径下的 8 个分散的路由器（`generateV1Router`、`userApiPayloadRouter` 等）合并收拢到单一的 `apiRouter` 网关。
+  2. **挂载节点精简**：修改了 [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)，以 `app.use('/api', apiRouter)` 替换了原本的 8 个独立挂载声明，精简了入口，彻底预防匹配冲突退化风险。
+  3. **单元测试与顺序契约修正**：
+     - 新建了单元测试 [vps-api-router-consolidation.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-api-router-consolidation.test.ts)，验证了分发至同步生图、用户 API 配置、OCR 代理等各个子端点的分发行为。
+     - 调整了 [wuyin-user-route-image-mode-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/wuyin-user-route-image-mode-contract.test.ts) 中的源码匹配，使其读取收口后的新 API 路由定义文件，通过了严苛的顺序契约核对。
+- **修改文件**：
+  - [api.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/api.js)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+  - [vps-api-router-consolidation.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-api-router-consolidation.test.ts)
+  - [wuyin-user-route-image-mode-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/wuyin-user-route-image-mode-contract.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **集中式网关**：将分散的路由挂载转为明确、按序的声明式挂载，确保路由注册顺序在单一文件内被严格保护，降低维护负担。
+- **已运行验证**：
+  - 单独运行新增的 `vps-api-router-consolidation.test.ts` 6 项测试全部通过。
+  - 全量运行 `npm run verify:changes` 成功变绿。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
 
 

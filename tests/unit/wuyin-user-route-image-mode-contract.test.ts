@@ -4,7 +4,7 @@ import { readSource } from "../support/workspacePaths.js";
 
 describe("Wuyin / Suchuang documented API routing", () => {
   test("strict Wuyin router is mounted before the legacy user router", () => {
-    const indexSource = readSource("server/index.js");
+    const indexSource = readSource("server/routes/api.js");
     const strictRouterIndex = indexSource.indexOf("generateV1Router");
     const legacyRouterIndex = indexSource.indexOf("userRouter");
 
