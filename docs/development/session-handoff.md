@@ -888,3 +888,29 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `npm run check:encoding`
 - **未运行验证及原因**：无。
 - **风险与下一步**：工作区仍保留并行 prompt-group smoke 相关未提交改动，未纳入本次 current-only 提交。
+
+## 56. 2026-06-26 - Prompt Group Smoke Retry and Final Defect Sweep Verification
+- **Modification scope**:
+  - Hardened `verify:prompt-group-drag` against transient Playwright page-context churn after build/dev-server navigation while keeping real UI assertion failures fatal.
+  - Added a unit contract so the smoke script only retries known transient page evaluation errors and still throws all other errors.
+- **Modified files**:
+  - `scripts/test/verify-prompt-group-drag.mjs`
+  - `tests/unit/prompt-group-regroup-behavior.test.ts`
+  - `docs/development/session-handoff.md`
+- **Current design decisions**:
+  - `measureScene()` retries only `Execution context was destroyed`, `Cannot find context with specified id`, and closed target/context errors.
+  - Smoke fallback policy remains strict: browser-available UI failures still exit non-zero instead of falling back to static checks.
+  - Portable release metadata remains as recorded in #55; stable manifest carries `commitSha`, `commitShortSha`, `sha256`, `size`, and `buildTime` from the packaged app publish flow.
+- **Validation run**:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/portable-payment-package-contract.test.ts`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts`
+  - `$env:VITE_KK_API_BASE_URL='https://172-245-156-16.sslip.io'; npm run package:portable`
+  - `npm run publish:portable`
+  - `npm run verify:ai-takeover-smoke`
+  - `npm run governance:version`
+  - `npm run verify:changes`
+- **Validation not run and reason**:
+  - None.
+- **Risks and next steps**:
+  - The retry is intentionally narrow; future non-navigation prompt-group regressions should still fail the smoke directly.
+  - `verify:changes` logs expected DurableGenerationQueue retry errors from intentional unit-test failure paths, but the command completed with exit code 0.

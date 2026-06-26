@@ -608,3 +608,13 @@ test('ImageCard live-store transforms stay relative to the current absolute layo
   assert.match(subscribeSource, /translate3d\(\$\{nextTranslateX\}px, \$\{nextTranslateY\}px, 0px\)/);
   assert.doesNotMatch(subscribeSource, /translate3d\(\$\{renderLeft - originX\}px, \$\{renderTop - originY\}px, 0px\)/);
 });
+
+test('prompt-group drag smoke retries only transient page evaluation navigation errors', () => {
+  const scriptSource = readSource('scripts/test/verify-prompt-group-drag.mjs');
+
+  assert.match(scriptSource, /function isTransientPageEvaluationError\(error\) \{/);
+  assert.match(scriptSource, /Execution context was destroyed/);
+  assert.match(scriptSource, /Cannot find context with specified id/);
+  assert.match(scriptSource, /if \(!isTransientPageEvaluationError\(error\)\) \{\s*throw error;\s*\}/);
+  assert.match(scriptSource, /for \(let attempt = 0; attempt < 4; attempt \+= 1\)/);
+});

@@ -388,8 +388,18 @@ async function dismissSettingsPanelIfPresent(page) {
   }
 }
 
+function isTransientPageEvaluationError(error) {
+  const message = String(error?.message || error || '');
+  return /Execution context was destroyed/i.test(message)
+    || /Cannot find context with specified id/i.test(message)
+    || /Target page, context or browser has been closed/i.test(message);
+}
+
 async function measureScene(page) {
-  return page.evaluate(() => {
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await page.evaluate(() => {
     const promptSurface = document.querySelector('[data-canvas-surface="prompt"]');
     const imageSurfaces = Array.from(document.querySelectorAll('[data-canvas-surface="image"]'));
     const connectorPaths = Array.from(document.querySelectorAll('path[stroke-dasharray]'));
@@ -435,7 +445,18 @@ async function measureScene(page) {
       imageBoxes,
       connectorEnds,
     };
-  });
+      });
+    } catch (error) {
+      if (!isTransientPageEvaluationError(error)) {
+        throw error;
+      }
+      lastError = error;
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(350);
+    }
+  }
+
+  throw lastError;
 }
 
 ensureArtifactsDir();
