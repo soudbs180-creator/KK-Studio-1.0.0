@@ -30,11 +30,12 @@ import { abortSyncImageBridgeRequest } from '../../services/llm/syncImageBridge'
 import { normalizeModelId } from '../../utils/modelIdNormalization';
 
 // Import route engine and clients
-import { providerRouteEngine } from './providerRouteEngine';
+import { providerRouteEngine } from '../../core/routing/ProviderRouteEngine';
 import { localRunnerClient } from './localRunnerClient';
 import { cloudRelayClient } from './cloudRelayClient';
 import { platformCreditClient } from './platformCreditClient';
 import { accountLinkerClient } from './accountLinkerClient';
+import { taskOrchestrator } from '../../core/orchestration/TaskOrchestrator';
 
 export interface GenerateImageResult {
   url: string;
@@ -444,96 +445,25 @@ export class GenerationService {
     }
 
     public async chat(options: ChatOptions): Promise<string> {
-        let lastError: any;
-        const maxAttempts = 1;
-
-        for (let i = 0; i < maxAttempts; i++) {
-            const keySlot = this.resolveKey(options.modelId, options.preferredKeyId);
-            if (!keySlot) {
-                if (i === 0) throw new Error(`No available key for model: ${options.modelId} `);
-                break;
+        const result = await taskOrchestrator.orchestrate({
+            type: 'generation',
+            mediaType: 'text',
+            modelId: options.modelId,
+            prompt: '',
+            preferredKeyId: options.preferredKeyId,
+            params: {
+                messages: options.messages,
+                temperature: options.temperature,
+                maxTokens: options.maxTokens,
+                stream: options.stream,
+                onStream: options.onStream
             }
+        });
 
-            try {
-                // Decide route using ProviderRouteEngine
-                const decision = await providerRouteEngine.decideRoute({
-                  modelId: options.modelId,
-                  taskType: 'text',
-                  preferredKeyId: options.preferredKeyId,
-                });
-
-                const payload = {
-                  modelId: options.modelId,
-                  messages: options.messages.map((message) => ({
-                      role: message.role as 'system' | 'user' | 'assistant',
-                      content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
-                  })),
-                  temperature: options.temperature,
-                  maxTokens: options.maxTokens,
-                  stream: false,
-                };
-
-                let response;
-                const routeId = this.buildUserRouteForKeySlot(keySlot);
-
-                try {
-                  if (decision.mode === 'local-runner') {
-                    response = await localRunnerClient.chat({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-user-key') {
-                    response = await cloudRelayClient.chat({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-platform-key') {
-                    response = await platformCreditClient.chat(payload);
-                  } else if (decision.mode === 'account-bridge') {
-                    response = await accountLinkerClient.chat(payload);
-                  } else {
-                    this.throwBrowserDirectProviderCallBlocked('chat routing', keySlot);
-                  }
-                } catch (error) {
-                  const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
-                  if (decision.fallback && this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
-                    console.warn(this.createCloudFallbackNotice('chat routing', keySlot), normalizedUserRouteError);
-                    try {
-                      if (decision.fallback.mode === 'cloud-user-key') {
-                        response = await cloudRelayClient.chat({ ...payload, routeId });
-                      } else if (decision.fallback.mode === 'cloud-platform-key') {
-                        response = await platformCreditClient.chat(payload);
-                      } else {
-                        throw normalizedUserRouteError;
-                      }
-                    } catch (cloudError) {
-                      throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
-                    }
-                  } else {
-                    throw normalizedUserRouteError;
-                  }
-                }
-
-                keyManager.reportSuccess(keySlot.id);
-                const inputLen = options.messages.reduce((acc, m) => acc + m.content.length, 0);
-                const outputLen = response.content.length;
-                const tokens = response.usage?.totalTokens || Math.ceil((inputLen + outputLen) * 0.3);
-
-                keyManager.addUsage(keySlot.id, tokens);
-                if (keySlot.creditCost !== undefined) {
-                    keyManager.addCost(keySlot.id, keySlot.creditCost);
-                }
-
-                if (options.stream && typeof options.onStream === 'function' && response.content) {
-                    options.onStream(response.content);
-                }
-
-                return response.content;
-            } catch (error: any) {
-                lastError = error;
-                console.warn(`[GenerationService] Chat attempt ${i + 1} failed: `, error);
-
-                logWarning('GenerationService', `Chat attempt ${i + 1} failed(${keySlot.name})`,
-                    `Model: ${options.modelId} \nProvider: ${keySlot.provider} \nError: ${error.message} `);
-
-                keyManager.reportFailure(keySlot.id, error.message);
-            }
+        if (!result.success) {
+            throw new Error(result.error);
         }
-        throw lastError || new Error("Chat generation failed after retries");
+        return result.data;
     }
 
     public async generateImageRaw(options: ImageGenerationOptions, onTaskId?: (id: string) => void): Promise<ImageGenerationResult> {

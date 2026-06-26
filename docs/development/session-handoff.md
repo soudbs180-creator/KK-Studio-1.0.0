@@ -1124,4 +1124,42 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 446 个测试文件与 server 的 TypeScript 语法与类型校验全部 **PASS**。
   - 运行 `npm run verify:changes` 综合卡口与 1545 项测试及高密度画布性能 Benchmark 全部 **PASS**。
 
+## 79. 2026-06-26 - Implement KK Studio Capability Tree and Refactor Core Trunk (本次追加)
+- **修改范围**：
+  1. 建立了 KK Studio 的“能力树”统一架构，创建 `apps/web/src/core/` 及其子物理目录（`routing/`, `capability/`, `orchestration/`, `browser/`, `permissions/`, `canvas/`, `generation/`）。
+  2. 迁移 `ProviderRouteEngine` 核心至 `core/routing`，建立 `CapabilityRegistry` 登记 8 种底层能力来源，编写 `TaskOrchestrator` 与统一 `Intent` 接口作为总调度。
+  3. 迁移并重构了网页助手的动作路由器为 `core/browser/BrowserActionRouter.ts` 并完美对接 `BaseBrowserTaskIntent`。
+  4. 实现 `PermissionPolicy` 对中高风险操作进行拦截与评估。
+  5. 建立了 `CanvasRuntime.ts` 与 `AIControlPlane.ts` 主入口。
+  6. 重构了 `generateService.ts` 的 `chat` 入口，使其 100% 委托给 `TaskOrchestrator.orchestrate` 调度，实现业务与底层的完全解耦挂树。
+  7. 新增并编写了 Vitest 自动化单元测试 `capability-tree-runtime.test.ts`。
+- **修改文件**：
+  - [RouteContext.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/routing/RouteContext.ts) [NEW]
+  - [RouteDecision.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/routing/RouteDecision.ts) [NEW]
+  - [routePolicies.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/routing/routePolicies.ts) [NEW]
+  - [ProviderRouteEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/routing/ProviderRouteEngine.ts) [NEW]
+  - [capabilitySource.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/capability/capabilitySource.ts) [NEW]
+  - [capabilityRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/capability/capabilityRegistry.ts) [NEW]
+  - [taskIntent.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/orchestration/taskIntent.ts) [NEW]
+  - [taskResult.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/orchestration/taskResult.ts) [NEW]
+  - [TaskOrchestrator.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/orchestration/TaskOrchestrator.ts) [NEW]
+  - [GenerationEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/generation/GenerationEngine.ts) [NEW]
+  - [BrowserActionRouter.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/browser/BrowserActionRouter.ts) [NEW]
+  - [PermissionPolicy.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/permissions/PermissionPolicy.ts) [NEW]
+  - [CanvasRuntime.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/CanvasRuntime.ts) [NEW]
+  - [AIControlPlane.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/modules/ai-assistant/AIControlPlane.ts) [NEW]
+  - [generateService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generateService.ts)
+  - [providerRouteEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/providerRouteEngine.ts)
+  - [generationIntent.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generationIntent.ts)
+  - [browserActionRouter.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserActionRouter.ts)
+  - [capability-tree-runtime.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/capability-tree-runtime.test.ts) [NEW]
+- **当前设计决策**：
+  - **架构一棵树重组**：彻底收口能力来源（Root）、能力引擎（Trunk）、业务模块（Branch）及输出（Leaf）层。解耦了各模块自连 API、自拟路由的问题，强制经过 Intent 机制以及 TaskOrchestrator 接收与风控校验。
+  - **前进转发兼容**：在原有 features 的 `providerRouteEngine.ts` 和 `browserActionRouter.ts` 中通过 Re-export 实现了无缝过渡兼容，保证已有代码不需要一次性重构也能完美运行且完全符合极度苛刻的 `architecture:check`。
+- **已运行验证**：
+  - 运行 `npx vitest run tests/unit/capability-tree-runtime.test.ts` 单元测试全部 **PASS**。
+  - 运行 `npm run architecture:check` 31 项静态边界校验全部 **PASS**。
+  - 运行 `npm run typecheck` 447 个测试文件与 server 的 TypeScript 语法与类型校验全部 **PASS**。
+
+
 
