@@ -1,5 +1,6 @@
 import { type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, type VideoGenerationOptions, type VideoGenerationResult, type AudioGenerationOptions, type AudioGenerationResult, type ProviderConfig } from '../../services/llm/LLMAdapter';
 import { GenerationMode, AspectRatio, ImageSize, type ModelType, type ReferenceImage, type Provider } from '../../types';
+import type { GenerationTelemetry } from '@kk/shared';
 
 export class GenerationError extends Error {
   public success = false;
@@ -110,12 +111,13 @@ export interface GenerateImageResult {
   pythonSnippet?: string;
   referenceImagesUsed?: number;
   referenceImagesDropped?: number;
-  groundingSources?: Array<{
-    uri: string;
-    title?: string;
-    imageUri?: string;
-  }>;
-}
+    groundingSources?: Array<{
+      uri: string;
+      title?: string;
+      imageUri?: string;
+    }>;
+    telemetry?: GenerationTelemetry;
+  }
 
 function parseModelSuffix(modelId: string): {
   baseModel: string;
@@ -699,6 +701,7 @@ export class GenerationService {
         onSyncBridgeRegistered?: (requestId: string, startedAt?: number) => void;
       }
     ): Promise<GenerateImageResult> {
+      const startTime = Date.now();
       const rawModelBeforeNormalize = model;
       const isWuyinModel =
         String(model || '').includes('image_nanoBanana')
@@ -973,6 +976,60 @@ export class GenerationService {
         const result = await this.generateImageRaw(llmOptions);
 
         if ((result.status === 'pending' || result.status === 'processing') && result.taskId) {
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          const telemetry: GenerationTelemetry = {
+            jobId: result.taskId,
+            taskType: 'image',
+            model: {
+              id: result.model || model,
+              name: result.modelName || result.model || model,
+              provider: result.provider || 'unknown',
+              providerName: result.providerName || 'unknown',
+            },
+            route: {
+              sourceType: keySlot?.id?.includes('@slot_key_') ? 'api-user-local' : 'api-platform',
+              executionSide: options?.executionLane === 'local-user-api' ? 'local' : 'cloud',
+              keySlotId: result.keySlotId || options?.preferredKeyId,
+            },
+            timing: {
+              queuedAt: new Date(startTime).toISOString(),
+              startedAt: new Date(startTime).toISOString(),
+              firstByteAt: new Date(startTime + Math.min(200, duration)).toISOString(),
+              completedAt: undefined,
+              queueDurationMs: 0,
+              generationDurationMs: duration,
+              totalDurationMs: duration,
+            },
+            usage: {
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0,
+              apiDurationMs: duration,
+            },
+            cost: {
+              chargedCredits: 0,
+              refundedCredits: 0,
+              estimatedAmount: 0,
+              chargedAmount: 0,
+            },
+            settings: {
+              prompt,
+              aspectRatio,
+              size: (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K,
+              imageCount: 1,
+            },
+            result: {
+              assetIds: [result.taskId],
+              canvasNodeIds: [requestId || ''],
+              urls: [],
+            },
+            retry: {
+              previousJobIds: [],
+              retryCount: 0,
+            }
+          };
+
           return {
             url: '',
             taskId: result.taskId,
@@ -993,6 +1050,7 @@ export class GenerationService {
             requestBodyPreview: result.metadata?.requestBodyPreview,
             referenceImagesUsed: normalizedReferenceImages.length,
             referenceImagesDropped: totalDroppedReferenceImages,
+            telemetry,
           } as any;
         }
 
@@ -1035,6 +1093,63 @@ export class GenerationService {
           }
         }
 
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        const telemetry: GenerationTelemetry = {
+          jobId: requestId || result.taskId || `job-${Date.now()}`,
+          taskType: 'image',
+          model: {
+            id: resolvedResultModel,
+            name: result.modelName || resolvedResultModel,
+            provider: result.provider || 'unknown',
+            providerName: result.providerName || 'unknown',
+          },
+          route: {
+            sourceType: keySlot?.id?.includes('@slot_key_') ? 'api-user-local' : 'api-platform',
+            executionSide: options?.executionLane === 'local-user-api' ? 'local' : 'cloud',
+            keySlotId: resolvedKeySlotId,
+          },
+          timing: {
+            queuedAt: new Date(startTime).toISOString(),
+            startedAt: new Date(startTime).toISOString(),
+            firstByteAt: new Date(startTime + Math.min(200, duration)).toISOString(),
+            completedAt: new Date(endTime).toISOString(),
+            queueDurationMs: 0,
+            generationDurationMs: duration,
+            totalDurationMs: duration,
+          },
+          usage: {
+            promptTokens,
+            completionTokens,
+            totalTokens: tokens,
+            apiDurationMs: duration,
+          },
+          cost: {
+            chargedCredits: result.deducted ? cost : 0,
+            refundedCredits: 0,
+            estimatedAmount: cost,
+            chargedAmount: cost,
+            ledgerId: result.ledgerId,
+            billingTransactionId: result.billingTransactionId || result.paymentTransactionId,
+            balanceAfter: result.balanceAfter,
+          },
+          settings: {
+            prompt,
+            aspectRatio,
+            size: resolvedResultImageSize,
+            imageCount: 1,
+          },
+          result: {
+            assetIds: result.taskId ? [result.taskId] : [],
+            canvasNodeIds: [requestId || ''],
+            urls: [resultUrl],
+          },
+          retry: {
+            previousJobIds: [],
+            retryCount: 0,
+          }
+        };
+
         return {
           url: resultUrl,
           deducted: result.deducted,
@@ -1059,7 +1174,8 @@ export class GenerationService {
           pythonSnippet: result.metadata?.pythonSnippet,
           referenceImagesUsed: normalizedReferenceImages.length,
           referenceImagesDropped: totalDroppedReferenceImages,
-          groundingSources: result.metadata?.grounding?.sources
+          groundingSources: result.metadata?.grounding?.sources,
+          telemetry,
         };
 
       } catch (error: any) {
@@ -1130,6 +1246,7 @@ export class GenerationService {
                     modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
                     model: options.modelId,
                     keySlotId: keySlot.id,
+                    telemetry: response.telemetry,
                 };
                 this.applyProviderIdentity(proxyResult, keySlot);
                 keyManager.reportSuccess(keySlot.id);
@@ -1200,6 +1317,7 @@ export class GenerationService {
                     modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
                     model: options.modelId,
                     keySlotId: keySlot.id,
+                    telemetry: response.telemetry,
                 };
                 this.applyProviderIdentity(proxyResult, keySlot);
                 keyManager.reportSuccess(keySlot.id);

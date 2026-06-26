@@ -15,15 +15,26 @@ export const EcommerceTaskCardRenderer: React.FC<CanvasCardRenderContext> = ({
   if (detailLevel === 'ghost') {
     return (
       <div 
-        className="rounded-2xl border border-dashed border-indigo-500/30 bg-indigo-950/20 backdrop-blur-sm pointer-events-auto"
+        className="rounded-2xl border border-dashed border-indigo-500/30 bg-zinc-950 pointer-events-auto p-4 flex flex-col justify-between"
         style={{
           width: '320px',
           height: '240px',
-          padding: '12px',
+          color: '#f4f4f5',
         }}
       >
-        <div className="w-16 h-3 bg-indigo-500/20 rounded mb-2" />
-        <div className="w-full h-8 bg-indigo-500/10 rounded" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">电商重绘 GHOST</span>
+          <span className="text-indigo-400 font-semibold">{node?.isGenerating ? '生成中' : '已就绪'}</span>
+        </div>
+        <div className="text-xs text-zinc-300 font-semibold truncate my-2">
+          {node?.prompt || '未命名商品重绘任务'}
+        </div>
+        <div className="flex flex-col gap-1 text-[9px] text-zinc-500 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>通道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>费用: {telemetry?.cost?.chargedCredits ?? 10} Credits</span>
+          <span>输出数量: {node?.childImageIds?.length || 0}</span>
+        </div>
       </div>
     );
   }
@@ -32,17 +43,25 @@ export const EcommerceTaskCardRenderer: React.FC<CanvasCardRenderContext> = ({
   if (detailLevel === 'skeleton') {
     return (
       <div 
-        className="rounded-2xl border border-white/10 bg-zinc-900/90 pointer-events-auto flex flex-col p-5 gap-4 overflow-hidden shadow-2xl"
+        className="rounded-2xl border border-white/10 bg-zinc-900 pointer-events-auto flex flex-col p-5 gap-4 overflow-hidden shadow-2xl"
         style={{
           width: '420px',
           height: '300px',
+          color: '#f4f4f5',
         }}
       >
-        <div className="flex justify-between items-center">
-          <div className="w-24 h-4 bg-zinc-700 rounded animate-pulse" />
-          <div className="w-16 h-3 bg-zinc-800 rounded animate-pulse" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span>电商重绘 SKELETON</span>
+          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
         </div>
-        <div className="w-full h-12 bg-zinc-800 rounded-lg animate-pulse" />
+        <div className="text-xs font-semibold truncate text-zinc-300">
+          {node?.prompt || '未命名商品重绘任务'}
+        </div>
+        <div className="flex flex-col gap-1 text-[10px] text-zinc-400 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>渠道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>预计费用: {telemetry?.cost?.chargedCredits ?? 10} Credits</span>
+        </div>
         <div className="flex gap-3 mt-2 flex-1">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex-1 aspect-square bg-zinc-800 rounded-lg border border-white/5 animate-pulse" />

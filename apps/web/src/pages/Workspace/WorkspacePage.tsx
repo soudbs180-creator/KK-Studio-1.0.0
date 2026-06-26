@@ -4351,7 +4351,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
           id={`image-card-${node.id}`}
           data-x={node.position.x}
           data-y={node.position.y}
-          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none transition-all duration-300 flex flex-col items-center justify-center"
+          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none flex flex-col items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
             handleCanvasNodeSelect(node.id);
@@ -4366,11 +4366,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
             width: `${nodeWidth}px`,
             height: `${cardHeight}px`,
             zIndex: stackZIndex,
-            background: isTransparentProxy ? 'transparent' : 'rgba(24, 24, 27, 0.25)',
-            border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
-            boxShadow: isTransparentProxy ? 'none' : '0 4px 16px 0 rgba(0, 0, 0, 0.2)',
-            backdropFilter: isTransparentProxy ? 'none' : 'blur(4px)',
-            WebkitBackdropFilter: isTransparentProxy ? 'none' : 'blur(4px)',
+            background: isTransparentProxy ? 'transparent' : '#18181b',
+            border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
           }}
         >
           {!isTransparentProxy && (

@@ -52,8 +52,72 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   const groupView = item.groupView;
   const visibleChildImages = groupView.childImages;
 
-  const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
+  const promptWidth = 320;
+  const promptHeight = node.height || 180;
+  const promptPos = resolveLivePromptPosition(node) ?? node.position;
+  const left = promptPos.x - promptWidth / 2;
+  const top = promptPos.y - promptHeight;
   const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
+
+  if (detailLevel === 'ghost') {
+    const telemetry = node?.telemetry;
+    const childCount = visibleChildImages?.length || 0;
+    return (
+      <div 
+        className="absolute border border-dashed border-zinc-700/60 bg-zinc-950 pointer-events-auto rounded-3xl p-4 flex flex-col justify-between shadow-2xl"
+        style={{
+          left: `${left}px`,
+          top: `${top}px`,
+          width: `${promptWidth}px`,
+          height: `${promptHeight}px`,
+          zIndex: groupStackZIndex,
+          color: '#f4f4f5',
+        }}
+      >
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">图像卡组 GHOST</span>
+          <span className="text-zinc-500 font-mono">{node.model || 'Unknown'}</span>
+        </div>
+        <div className="text-xs text-zinc-300 font-semibold truncate my-2">
+          {node.prompt || '未命名提示词'}
+        </div>
+        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mt-auto">
+          <span>结果数: {childCount} 张</span>
+          <span className="text-zinc-400">费用: {telemetry?.cost?.chargedCredits ?? 10} Credits</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (detailLevel === 'skeleton') {
+    const telemetry = node?.telemetry;
+    const childCount = visibleChildImages?.length || 0;
+    return (
+      <div 
+        className="absolute border border-white/5 bg-zinc-900 pointer-events-auto rounded-3xl p-4 flex flex-col justify-between shadow-2xl"
+        style={{
+          left: `${left}px`,
+          top: `${top}px`,
+          width: `${promptWidth}px`,
+          height: `${promptHeight}px`,
+          zIndex: groupStackZIndex,
+          color: '#f4f4f5',
+        }}
+      >
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span className="px-2 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/30 animate-pulse">图像卡组 SKELETON</span>
+          <span className="text-zinc-500 font-mono">{node.model || 'Unknown'}</span>
+        </div>
+        <div className="w-full h-4 bg-zinc-800 rounded animate-pulse my-2" />
+        <div className="flex justify-between text-[10px] text-zinc-500 font-mono mt-auto">
+          <span>结果数: {childCount} 张</span>
+          <span className="text-zinc-400">费用: {telemetry?.cost?.chargedCredits ?? 10} Credits</span>
+        </div>
+      </div>
+    );
+  }
+
+  const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
   const sourceImageNode = node.sourceImageId ? imageNodesById.get(node.sourceImageId) : null;
   const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
 

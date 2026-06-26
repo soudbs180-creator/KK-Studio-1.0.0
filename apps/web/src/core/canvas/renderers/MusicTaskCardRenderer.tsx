@@ -14,11 +14,21 @@ export const MusicTaskCardRenderer: React.FC<CanvasCardRenderContext> = ({
   if (detailLevel === 'ghost') {
     return (
       <div 
-        className="rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-950/20 backdrop-blur-sm pointer-events-auto"
-        style={{ width: '320px', height: '160px', padding: '12px' }}
+        className="rounded-2xl border border-dashed border-emerald-500/30 bg-zinc-950 pointer-events-auto p-4 flex flex-col justify-between"
+        style={{ width: '320px', height: '160px', color: '#f4f4f5' }}
       >
-        <div className="w-12 h-3 bg-emerald-500/20 rounded mb-2" />
-        <div className="w-full h-8 bg-emerald-500/10 rounded" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">音乐生成 GHOST</span>
+          <span className="text-emerald-400 font-semibold">{node?.isGenerating ? '生成中' : '已就绪'}</span>
+        </div>
+        <div className="text-xs text-zinc-300 font-semibold truncate my-2">
+          {node?.prompt || '未命名音乐生成任务'}
+        </div>
+        <div className="flex flex-col gap-1 text-[9px] text-zinc-500 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>通道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>费用: {telemetry?.cost?.chargedCredits ?? 2} Credits</span>
+        </div>
       </div>
     );
   }
@@ -27,19 +37,27 @@ export const MusicTaskCardRenderer: React.FC<CanvasCardRenderContext> = ({
   if (detailLevel === 'skeleton') {
     return (
       <div 
-        className="rounded-2xl border border-white/10 bg-zinc-900/90 pointer-events-auto flex flex-col p-5 gap-3 shadow-2xl"
-        style={{ width: '380px', height: '200px' }}
+        className="rounded-2xl border border-white/10 bg-zinc-900 pointer-events-auto flex flex-col p-5 gap-3 shadow-2xl"
+        style={{ width: '380px', height: '200px', color: '#f4f4f5' }}
       >
-        <div className="flex gap-4 items-center">
-          <div className="w-12 h-12 rounded-lg bg-zinc-800 animate-pulse" />
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="w-24 h-4 bg-zinc-700 rounded animate-pulse" />
-            <div className="w-16 h-3 bg-zinc-800 rounded animate-pulse" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span>音乐生成 SKELETON</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        </div>
+        <div className="flex gap-4 items-center mt-1">
+          <div className="w-10 h-10 rounded-lg bg-zinc-800 animate-pulse" />
+          <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+            <div className="text-xs font-semibold truncate text-zinc-300">
+              {node?.prompt || '未命名音乐生成任务'}
+            </div>
+            <div className="text-[9px] text-zinc-500 font-mono">
+              模型: {node?.model || 'Unknown'} | 预计费用: {telemetry?.cost?.chargedCredits ?? 2} Credits
+            </div>
           </div>
         </div>
-        <div className="w-full h-8 bg-zinc-800 rounded-lg animate-pulse mt-2 flex items-center gap-1 px-2">
+        <div className="w-full h-8 bg-zinc-800 rounded-lg animate-pulse mt-1 flex items-center gap-1 px-2">
           {[...Array(20)].map((_, i) => (
-            <div key={i} className="flex-1 bg-zinc-700/50 rounded" style={{ height: `${Math.random() * 20 + 4}px` }} />
+            <div key={i} className="flex-1 bg-zinc-700/50 rounded" style={{ height: `${(i % 5) * 4 + 4}px` }} />
           ))}
         </div>
       </div>

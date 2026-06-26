@@ -119,6 +119,8 @@ export interface ImageGenerationResult {
     deducted?: boolean;
     ledgerId?: string;
     balanceAfter?: number;
+    billingTransactionId?: string;
+    paymentTransactionId?: string;
     usage?: {
         promptTokens?: number;
         completionTokens?: number;
@@ -196,6 +198,7 @@ export interface VideoGenerationResult {
     providerName?: string;
     modelName?: string;
     keySlotId?: string;
+    telemetry?: any;
 }
 
 export interface AudioGenerationOptions {
@@ -243,6 +246,7 @@ export interface AudioGenerationResult {
     modelName?: string;
     keySlotId?: string;
     metadata?: any;
+    telemetry?: any;
 }
 
 export interface LLMAdapter {

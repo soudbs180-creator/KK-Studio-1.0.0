@@ -1681,6 +1681,7 @@ export const useImageGeneration = (options: {
           
           if (isAudio) {
             const audioResult = await generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
+            apiResult = audioResult;
             videoUrl = audioResult.url;
             resolvedResultKeySlotId = audioResult.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = audioResult.provider || resolvedProvider;
@@ -1706,6 +1707,7 @@ export const useImageGeneration = (options: {
                 void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
               }
             });
+            apiResult = videoResult;
             videoUrl = videoResult.url;
             resolvedResultKeySlotId = videoResult.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = videoResult.provider || resolvedProvider;
@@ -1805,6 +1807,7 @@ export const useImageGeneration = (options: {
             totalExecTime: apiResult?.totalExecTime,
             execTime: apiResult?.execTime,
             providerTaskId: apiResult?.providerTaskId,
+            telemetry: apiResult?.telemetry,
           };
         } catch (error: any) {
           return {
@@ -2066,6 +2069,7 @@ export const useImageGeneration = (options: {
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
             tokens: item.tokens, promptTokens: item.promptTokens, completionTokens: item.completionTokens, cost: item.cost, costSource: item.costSource,
+            telemetry: item.telemetry,
             partialRedraw: executionNode.partialRedraw,
             redraw: executionNode.redraw,
           };
@@ -2124,6 +2128,7 @@ export const useImageGeneration = (options: {
           provider: resolvedSuccessDisplay.provider || executionNode.provider,
           providerLabel: resolvedSuccessDisplay.providerLabel || executionNode.providerLabel,
           modelLabel: resolveModelDisplayName(firstSuccess?.model || executionNode.model, firstSuccess?.modelName || executionNode.modelLabel),
+          telemetry: firstSuccess?.telemetry,
         }, finalizedCompletedTasks);
 
         urgentUpdatePromptNode(persistedPromptState);

@@ -13,23 +13,42 @@ export const BrowserTaskCardRenderer: React.FC<CanvasCardRenderContext> = ({
   if (detailLevel === 'ghost') {
     return (
       <div 
-        className="rounded-xl border border-dashed border-blue-500/30 bg-blue-950/10 pointer-events-auto"
-        style={{ width: '280px', height: '140px' }}
-      />
+        className="rounded-2xl border border-dashed border-blue-500/30 bg-zinc-950 pointer-events-auto p-3 flex flex-col justify-between"
+        style={{ width: '280px', height: '140px', color: '#f4f4f5' }}
+      >
+        <div className="flex justify-between items-center text-[9px] text-zinc-400 font-mono">
+          <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">浏览器任务 GHOST</span>
+          <span className="text-blue-400 font-semibold">{node?.isGenerating ? '生成中' : '已就绪'}</span>
+        </div>
+        <div className="text-[11px] text-zinc-300 font-semibold truncate my-1">
+          {node?.prompt || '未命名浏览器任务'}
+        </div>
+        <div className="flex justify-between text-[8px] text-zinc-500 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>费用: {telemetry?.cost?.chargedCredits ?? 2} Credits</span>
+        </div>
+      </div>
     );
   }
 
   if (detailLevel === 'skeleton') {
     return (
       <div 
-        className="rounded-2xl border border-white/10 bg-zinc-900/90 pointer-events-auto flex flex-col p-4 gap-3 shadow-2xl animate-pulse"
-        style={{ width: '380px', height: '220px' }}
+        className="rounded-2xl border border-white/10 bg-zinc-900 pointer-events-auto flex flex-col p-4 gap-3 shadow-2xl animate-pulse"
+        style={{ width: '380px', height: '220px', color: '#f4f4f5' }}
       >
-        <div className="flex gap-2">
-          <div className="w-12 h-3 bg-zinc-700 rounded" />
-          <div className="w-24 h-3 bg-zinc-800 rounded" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span>浏览器任务 SKELETON</span>
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
         </div>
-        <div className="w-full h-8 bg-zinc-800 rounded-lg" />
+        <div className="text-xs font-semibold truncate text-zinc-300">
+          {node?.prompt || '未命名浏览器任务'}
+        </div>
+        <div className="flex justify-between text-[9px] text-zinc-500 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>渠道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>预计费用: {telemetry?.cost?.chargedCredits ?? 2} Credits</span>
+        </div>
         <div className="flex-1 rounded bg-zinc-800/40 border border-white/5" />
       </div>
     );

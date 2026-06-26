@@ -12,37 +12,56 @@ export const PptDeckCardRenderer: React.FC<CanvasCardRenderContext> = ({
 
   // 1. Ghost Level
   if (detailLevel === 'ghost') {
+    const pageCount = node?.pptDeck?.pages?.length || node?.pptSlides?.length || 8;
     return (
       <div 
-        className="rounded-2xl border border-dashed border-amber-500/30 bg-amber-950/20 backdrop-blur-sm pointer-events-auto"
-        style={{ width: '320px', height: '220px', padding: '12px' }}
+        className="rounded-2xl border border-dashed border-amber-500/30 bg-zinc-950 pointer-events-auto p-4 flex flex-col justify-between"
+        style={{ width: '320px', height: '220px', color: '#f4f4f5' }}
       >
-        <div className="w-16 h-3 bg-amber-500/20 rounded mb-2" />
-        <div className="w-full h-8 bg-amber-500/10 rounded" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">演示文稿大纲 GHOST</span>
+          <span className="text-amber-400 font-semibold">{node?.isGenerating ? '生成中' : '已就绪'}</span>
+        </div>
+        <div className="text-xs text-zinc-300 font-semibold truncate my-2">
+          {node?.prompt || '未命名演示文稿大纲'}
+        </div>
+        <div className="flex flex-col gap-1 text-[9px] text-zinc-500 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>通道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>费用: {telemetry?.cost?.chargedCredits ?? 10} Credits</span>
+          <span>页数: {pageCount} 页</span>
+        </div>
       </div>
     );
   }
 
   // 2. Skeleton Level (book/stacked deck wireframe skeleton)
   if (detailLevel === 'skeleton') {
+    const pageCount = node?.pptDeck?.pages?.length || node?.pptSlides?.length || 8;
     return (
       <div 
-        className="rounded-2xl border border-white/10 bg-zinc-900/90 pointer-events-auto flex flex-col p-5 gap-3 shadow-2xl relative"
-        style={{ width: '420px', height: '280px' }}
+        className="rounded-2xl border border-white/10 bg-zinc-900 pointer-events-auto flex flex-col p-5 gap-3 shadow-2xl relative"
+        style={{ width: '420px', height: '280px', color: '#f4f4f5' }}
       >
         {/* Layer stack effect skeletons */}
         <div className="absolute top-[-6px] left-[10px] right-[10px] h-[6px] rounded-t-xl bg-zinc-800 border-t border-x border-white/5 animate-pulse" />
         <div className="absolute top-[-12px] left-[20px] right-[20px] h-[6px] rounded-t-xl bg-zinc-700 border-t border-x border-white/5 animate-pulse" />
         
-        <div className="flex justify-between items-center">
-          <div className="w-20 h-4 bg-zinc-700 rounded animate-pulse" />
-          <div className="w-12 h-3 bg-zinc-800 rounded animate-pulse" />
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
+          <span>演示文稿大纲 SKELETON</span>
+          <span className="w-12 h-3 bg-zinc-800 rounded animate-pulse" />
         </div>
-        <div className="w-full h-10 bg-zinc-800 rounded animate-pulse mt-1" />
+        <div className="text-xs font-semibold truncate text-zinc-300">
+          {node?.prompt || '未命名演示文稿大纲'}
+        </div>
+        <div className="flex flex-col gap-1 text-[10px] text-zinc-400 font-mono">
+          <span>模型: {node?.model || 'Unknown'}</span>
+          <span>渠道: {telemetry?.route?.sourceType || 'api-platform'}</span>
+          <span>预计费用: {telemetry?.cost?.chargedCredits ?? 10} Credits | 页数: {pageCount} 页</span>
+        </div>
         <div className="flex-1 rounded-lg bg-zinc-800/40 border border-white/5 flex flex-col p-3 gap-2 mt-2 animate-pulse">
           <div className="w-1/3 h-3 bg-zinc-700 rounded" />
           <div className="w-full h-2.5 bg-zinc-800 rounded" />
-          <div className="w-4/5 h-2.5 bg-zinc-800 rounded" />
         </div>
       </div>
     );

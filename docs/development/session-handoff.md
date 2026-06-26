@@ -1625,6 +1625,11 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [scripts/test/verify-mobile-settings-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-mobile-settings-smoke.mjs)
   - [scripts/test/verify-ai-takeover-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-ai-takeover-smoke.mjs)
   - [scripts/test/verify-prompt-group-drag.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-prompt-group-drag.mjs)
+  - [apps/web/src/services/llm/LLMAdapter.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/llm/LLMAdapter.ts)
+  - [apps/web/src/features/generation/generateService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generateService.ts)
+  - [apps/web/src/hooks/useImageGeneration.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/hooks/useImageGeneration.ts)
+  - [tests/contract/card-ghost-skeleton-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/card-ghost-skeleton-contract.test.ts)
+  - [tests/contract/card-render-policy.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/card-render-policy.test.ts)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
   - **静态契约校验设计**：在 Node 单元测试中通过正则表达式静态提取与匹配组件源码中的属性配置和依赖，这既打通了对专属卡片与 Skeleton 重绘检测的 CI 回归校验，又完美避开了 TSX/JSX 的 React 复杂虚拟 DOM 挂载耗时。
