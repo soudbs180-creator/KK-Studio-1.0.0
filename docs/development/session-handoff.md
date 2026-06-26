@@ -1454,5 +1454,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 100% 成功通过。
   - 运行 `npm run build` 成功通过并生成生产环境 bundle 包。
 
+## 93. 2026-06-27 - Task Center Capsule Top Layout and Canvas Layer Renderer Overlay Optimization (本次追加)
+- **修改范围**：
+  1. **任务控制台胶囊移至顶部**：将统一任务控制台（`TaskCenterTray.tsx`）的页面悬浮定位由底部的 `bottom-24` 统一调整到顶部的 `top-4`。并在折叠时将 Chevron 指示器箭头由 `ChevronUp` 变更为 `ChevronDown`（代表向下展开），在展开状态的面板头部将折叠按钮由 `ChevronDown` 变更为 `ChevronUp`（代表向上收起），符合顶部的空间物理折叠直觉。
+  2. **Canvas 离线底图图层渲染深度整合**：在 `WorkspacePage.tsx` 中，去除了底部的独立 `<CanvasLayerRenderer>` 重复渲染逻辑，并将其作为 `backgroundOverlay` prop 直接挂载传入 `<InfiniteCanvas>` 组件内部渲染。去除了该渲染器上未声明且未被使用的 `onCardClick` 属性，根治了由此引发的 TypeScript 类型编译卡点报错。
+  3. **画布卡片点击交互体验修复**：修改了卡片节点（`ImageCard.tsx` / `PromptNodeComponent.tsx`）的容器元素类名，由 `pointer-events-none` 变更为 `pointer-events-auto cursor-pointer`，并正确注册 `onClick` 和 `onDoubleClick` 以实现卡片的框选与双击选中聚焦。
+- **修改文件**：
+  - [TaskCenterTray.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/TaskCenterTray.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **顶部空间合理分配**：在大画布桌面环境下，中间顶部空闲无关键组件占用，在此悬浮胶囊可达成完美的视觉水平对齐，而往下渲染展开的设计不影响两侧核心面板的展开操作。
+  - **背景渲染解耦与事件解绑**：对离线底图渲染层，在属性上精简无用交互回调并内嵌为 Canvas 背景图层，保证渲染职责单一；同时通过还原 pointer-events 使前台 React 伪卡片支持鼠标选区命中与操作聚焦。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过，0 typescript 编译错误。
+  - 运行 `npm run build` 成功通过并顺利打包所有 Vite 静态 bundle。
+  - 运行 `npm run architecture:check` 和 `npm run governance:check` 100% 成功通过。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+
 
 

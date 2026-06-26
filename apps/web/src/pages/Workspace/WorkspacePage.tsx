@@ -4363,7 +4363,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
           id={`image-card-${node.id}`}
           data-x={node.position.x}
           data-y={node.position.y}
-          className="image-node absolute pointer-events-none rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center"
+          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCanvasNodeSelect(node.id);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            handleCanvasCardClick(node.id, true);
+          }}
           style={{
             left: `${left}px`,
             top: `${top}px`,
@@ -4449,6 +4457,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     bringNodesToFront,
     expandedSelectedNodeIds,
     handleCanvasNodeSelect,
+    handleCanvasCardClick,
     handleImageCardHeightChange,
     handleCanvasNodeDragStateChange,
     handleLiveNodePositionChange,
@@ -4477,7 +4486,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return (
         <div
           id={`prompt-card-${node.id}`}
-          className="absolute pointer-events-none rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
+          className="absolute pointer-events-auto cursor-pointer rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCanvasNodeSelect(node.id);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            handleCanvasCardClick(node.id, true);
+          }}
           style={{
             left: `${left}px`,
             top: `${top}px`,
@@ -4706,6 +4723,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     ecommerceFrameworkTaskNodesById,
     handleConnectStart,
     handleCanvasNodeDragStateChange,
+    handleCanvasCardClick,
     handleLiveNodePositionChange,
     handleFocusPromptGroup,
     getSharedImageNodeProps,
@@ -5855,6 +5873,19 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
         cardPositions={cardPositionsVal}
+        backgroundOverlay={
+          isLargeProject && (
+            <CanvasLayerRenderer
+              cardMetas={cardMetas}
+              visibleCardIds={visibleCardIds}
+              canvasTransform={canvasTransform}
+              selectedNodeIds={selectedNodeIds}
+              activeSourceImage={activeSourceImage}
+              width={window.innerWidth}
+              height={window.innerHeight}
+            />
+          )
+        }
         onCanvasClick={handleCanvasClick}
         onCanvasDoubleClick={handleCanvasDoubleClick}
         onAutoArrange={handleAutoArrange}
@@ -6189,19 +6220,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-        {/* 🚀 Canvas Layer Renderer - 大画布超轻量离线底图渲染层 */}
-        {isLargeProject && (
-          <CanvasLayerRenderer
-            cardMetas={cardMetas}
-            visibleCardIds={visibleCardIds}
-            canvasTransform={canvasTransform}
-            selectedNodeIds={selectedNodeIds}
-            activeSourceImage={activeSourceImage}
-            onCardClick={handleCanvasCardClick}
-            width={window.innerWidth}
-            height={window.innerHeight}
-          />
-        )}
+
 
         {/* 2. Canvas items */}
         {renderedVisibleGroups}

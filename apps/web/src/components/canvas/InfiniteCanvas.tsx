@@ -40,6 +40,7 @@ interface InfiniteCanvasProps {
     onContextMenu?: (e: React.MouseEvent) => void;
     onImageDrop?: (file: File, canvasPosition: { x: number; y: number }) => void; // [NEW] 拖入图片创建副卡
     id?: string;
+    backgroundOverlay?: React.ReactNode;
 }
 
 interface Transform {
@@ -93,7 +94,7 @@ const buildViewportTransform = (nextTransform: Transform, _preferGpu: boolean = 
     return `translate(${nextTransform.x}px, ${nextTransform.y}px) scale(${nextTransform.scale})`;
 };
 
-const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop }, ref) => {
+const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop, backgroundOverlay }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
@@ -1104,6 +1105,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 {/* 拖拽悬停效果 - 只显示边框高亮，不显示提示文本 */}
                 {/* Grid Background */}
                 {showGrid && <div ref={gridRef} className="canvas-grid" />}
+
+                {/* 不受 viewport 缩放平移影响的背景插槽 */}
+                {backgroundOverlay}
 
                 {/* Viewport with transform - GPU accelerated */}
                 <div

@@ -7,7 +7,6 @@ interface CanvasLayerRendererProps {
   canvasTransform: { x: number; y: number; scale: number };
   selectedNodeIds: string[];
   activeSourceImage: string | null;
-  onCardClick?: (cardId: string, isDoubleClick: boolean) => void;
   width: number;
   height: number;
 }
@@ -21,7 +20,6 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
   canvasTransform,
   selectedNodeIds,
   activeSourceImage,
-  onCardClick,
   width,
   height,
 }) => {
@@ -188,52 +186,12 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
     draw();
   }, [draw]);
 
-  // 点击命中测试 (Hit Test)
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // 转换成画布坐标
-    const canvasX = (mouseX - canvasTransform.x) / canvasTransform.scale;
-    const canvasY = (mouseY - canvasTransform.y) / canvasTransform.scale;
-
-    // 反向查找命中的卡片（层级高的优先，即后面插入的优先）
-    let hitCardId: string | null = null;
-
-    for (let i = cardMetas.length - 1; i >= 0; i--) {
-      const meta = cardMetas[i];
-      if (!visibleCardIds.has(meta.id)) continue;
-
-      const { x, y, width: w, height: h } = meta;
-      const left = x - w / 2;
-      const right = x + w / 2;
-      const top = y - h;
-      const bottom = y;
-
-      if (canvasX >= left && canvasX <= right && canvasY >= top && canvasY <= bottom) {
-        hitCardId = meta.id;
-        break;
-      }
-    }
-
-    if (hitCardId && onCardClick) {
-      const isDoubleClick = e.detail === 2;
-      onCardClick(hitCardId, isDoubleClick);
-    }
-  };
-
   return (
     <canvas
       ref={canvasRef}
       width={width}
       height={height}
-      onClick={handleCanvasClick}
-      onDoubleClick={handleCanvasClick}
-      className="absolute inset-0 pointer-events-auto"
+      className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 5 }} // 在背景层之上，React DOM卡片层之下
     />
   );

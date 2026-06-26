@@ -379,7 +379,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
   };
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center pointer-events-none"> {/* Z_INDEX_EXCEPTION */}
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center pointer-events-none"> {/* Z_INDEX_EXCEPTION */}
       {/* 1. 悬浮底栏胶囊（折叠状态） */}
       {!isOpen && (
         <button
@@ -413,7 +413,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
             )}
           </div>
 
-          <ChevronUp size={14} className="text-gray-400" />
+          <ChevronDown size={14} className="text-gray-400" />
         </button>
       )}
 
@@ -451,7 +451,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
               >
-                <ChevronDown size={16} />
+                <ChevronUp size={16} />
               </button>
             </div>
           </div>
