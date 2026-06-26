@@ -55,6 +55,20 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function comparableVersionMetadata(manifest) {
+  if (!manifest) {
+    return manifest;
+  }
+
+  return {
+    appName: manifest.appName ?? null,
+    version: manifest.version ?? null,
+    releaseDate: manifest.releaseDate ?? null,
+    releaseNotes: manifest.releaseNotes || [],
+    channel: manifest.channel ?? null,
+  };
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -168,13 +182,7 @@ if (portableManifest) {
   if (portableManifest.version !== expectedVersion) {
     fail(`${portableManifestPath} version is ${portableManifest.version}, expected ${expectedVersion}. Run npm run package:portable.`);
   }
-  const normalizeManifest = (manifest) => manifest
-    ? {
-      ...manifest,
-      buildTime: undefined,
-    }
-    : manifest;
-  if (distManifest && JSON.stringify(normalizeManifest(portableManifest)) !== JSON.stringify(normalizeManifest(distManifest))) {
+  if (distManifest && !sameJson(comparableVersionMetadata(portableManifest), comparableVersionMetadata(distManifest))) {
     fail(`${portableManifestPath} does not match ${distManifestPath}. Run npm run package:portable.`);
   }
 }
@@ -206,24 +214,7 @@ if (!Number.isInteger(stablePortableManifest.size) || stablePortableManifest.siz
 }
 
 if (portableManifest) {
-  const comparableStablePortableManifest = {
-    appName: stablePortableManifest.appName,
-    version: stablePortableManifest.version,
-    buildTime: stablePortableManifest.buildTime ?? null,
-    releaseDate: stablePortableManifest.releaseDate ?? null,
-    releaseNotes: stablePortableManifest.releaseNotes || [],
-    channel: stablePortableManifest.channel ?? null,
-  };
-  const comparableLocalPortableManifest = {
-    appName: portableManifest.appName,
-    version: portableManifest.version,
-    buildTime: portableManifest.buildTime ?? null,
-    releaseDate: portableManifest.releaseDate ?? null,
-    releaseNotes: portableManifest.releaseNotes || [],
-    channel: portableManifest.channel ?? null,
-  };
-
-  if (!sameJson(comparableStablePortableManifest, comparableLocalPortableManifest)) {
+  if (!sameJson(comparableVersionMetadata(stablePortableManifest), comparableVersionMetadata(portableManifest))) {
     fail(`${stablePortableManifestPath} does not match release/KK-Studio-Portable/app/dist/app-version.json for version metadata. Run npm run publish:portable after packaging.`);
   }
 }

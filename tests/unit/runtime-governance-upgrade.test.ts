@@ -60,6 +60,17 @@ test("version governance checks internal package versions against the release ma
   assert.match(versionCheckSource, /packages\/shared\/package\.json/);
 });
 
+test("version governance compares release metadata without requiring local build commit freshness", () => {
+  const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
+
+  assert.match(versionCheckSource, /function comparableVersionMetadata/);
+  assert.match(versionCheckSource, /appName: manifest\.appName \?\? null/);
+  assert.match(versionCheckSource, /releaseNotes: manifest\.releaseNotes \|\| \[\]/);
+  assert.doesNotMatch(versionCheckSource, /buildTime: stablePortableManifest\.buildTime \?\? null/);
+  assert.doesNotMatch(versionCheckSource, /commitSha: portableManifest\.commitSha/);
+  assert.doesNotMatch(versionCheckSource, /commitShortSha: portableManifest\.commitShortSha/);
+});
+
 test("agent docs governance blocks stale AI assistant version drift", () => {
   const agentDocsSource = readSource("scripts/governance/check-agent-docs.mjs");
 

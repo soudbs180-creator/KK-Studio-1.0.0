@@ -26,7 +26,10 @@ test('verify:changes pulls the startup runtime banner browser verification into 
 
   const verifyChanges = pkg.scripts?.['verify:changes'] || '';
 
-  assert.match(verifyChanges, /npm run verify:desktop-settings-smoke && npm run verify:startup-runtime-banner-centering/);
+  assert.match(
+    verifyChanges,
+    /npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering/,
+  );
   assert.equal((verifyChanges.match(/verify:startup-runtime-banner-centering/g) || []).length, 1);
 });
 

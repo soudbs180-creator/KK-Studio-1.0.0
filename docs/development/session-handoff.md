@@ -1279,3 +1279,29 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 成功通过。
   - 运行 `npm run test:unit` 1568 项单元测试 100% 成功通过。
   - 运行 `npm run verify:changes` 变更全量验证、Playwright 移动端/桌面端冒烟、大画布性能基准等全部 100% 成功通过。
+## 85. 2026-06-26 - Verification Chain Governance Idempotency and AI Takeover Smoke Contract (本次追加)
+- **修改范围**：
+  1. 将 `verify:changes` 链路中的 AI takeover smoke 纳入单元契约断言，确保 `verify:ai-takeover-smoke` 保持在移动/桌面设置 smoke 之后、startup runtime banner smoke 之前。
+  2. 修正 startup runtime banner 契约测试的顺序预期，适配新增的 AI takeover smoke 质量门。
+  3. 收窄版本治理脚本对 build 产物 manifest 的一致性比较范围：日常治理只比较 `appName`、`version`、`releaseDate`、`releaseNotes`、`channel` 等发布版本元数据，不再要求本地 build 刷新的 `buildTime` / `commitSha` / `commitShortSha` 与 portable 已发布产物同步。
+  4. 补充治理源码契约测试，防止后续再次把本地构建 commit 新鲜度误作为 `verify:changes` 的版本治理门槛。
+- **修改文件**：
+  - [check-version-consistency.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/check-version-consistency.mjs)
+  - [mobile-settings-browser-verify-script.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/mobile-settings-browser-verify-script.test.ts)
+  - [startup-runtime-banner-browser-verify-script.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/startup-runtime-banner-browser-verify-script.test.ts)
+  - [runtime-governance-upgrade.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/runtime-governance-upgrade.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **版本真相与构建元数据分离**：`config/release-manifest.json`、发布版本号、发布日期和 release notes 仍是治理强约束；`buildTime` 和 commit 字段属于构建/发布产物元数据，由 `build`、`package:portable`、`publish:portable` 生成与携带，不再让一次本地 build 后的 ignored `apps/web/dist/app-version.json` 使日常 `governance:check` 失去幂等性。
+  - **质量门顺序显式化**：AI takeover smoke 被固定在桌面设置 smoke 与 startup banner smoke 之间，确保入口、任务时间线和 DurableGenerationQueue 可视状态在主验证链路中持续覆盖。
+- **已运行验证**：
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/mobile-settings-browser-verify-script.test.ts" "tests/unit/startup-runtime-banner-browser-verify-script.test.ts" "tests/unit/runtime-governance-upgrade.test.ts"`：19 项全部通过。
+  - `git diff --check`：通过，无 trailing whitespace。
+  - `npm run governance:check`：通过，版本、事实源、Agent 文档、Skills、Provider、安全边界全部通过。
+  - `npm run verify:changes`：通过，覆盖 architecture、governance、audit、typecheck、spec、build、unit/integration/contract/e2e、Playwright smoke、encoding 与 canvas performance。
+- **未运行验证及原因**：
+  - `npm run package:portable` 曾尝试运行，但因当前环境未设置远端 `VITE_KK_API_BASE_URL`，被脚本安全检查拒绝：`Portable release does not package the core KK API. Set VITE_KK_API_BASE_URL to a remote VPS API before packaging.` 本次没有伪造远端 API，也没有发布 portable 包。
+  - CodeRabbit CLI 本地不可用，`Get-Command coderabbit` 未找到命令；本次未将人工审查结果伪装为 CodeRabbit 审查。
+- **风险与下一步**：
+  - 后续真正发布 portable 前，必须提供合法远端 `VITE_KK_API_BASE_URL` 后重新执行 `npm run package:portable` 与 `npm run publish:portable`。
+  - 若要接入 CodeRabbit 自动审查，需要先安装并完成 CLI 认证，再运行 `coderabbit review --agent -t uncommitted -c AGENTS.md`。

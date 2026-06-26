@@ -28,6 +28,8 @@ test('verify:changes pulls the mobile settings smoke verification into the main 
   assert.equal((verifyChanges.match(/verify:mobile-settings-smoke/g) || []).length, 1);
   assert.match(verifyChanges, /npm run verify:desktop-settings-smoke/);
   assert.equal((verifyChanges.match(/verify:desktop-settings-smoke/g) || []).length, 1);
+  assert.match(verifyChanges, /npm run verify:ai-takeover-smoke/);
+  assert.equal((verifyChanges.match(/verify:ai-takeover-smoke/g) || []).length, 1);
 });
 
 test('mobile settings smoke verification opens settings directly on overview before entering API workbench', () => {
