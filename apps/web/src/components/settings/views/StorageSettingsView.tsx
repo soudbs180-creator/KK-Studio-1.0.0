@@ -15,7 +15,7 @@ import {
   getStorageUsage,
 } from '../../../services/storage/imageStorage';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsViewShell } from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsHero, SettingsViewShell } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
 
 const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -348,6 +348,11 @@ export const StorageSettingsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
+      <SettingsHero
+        title="Storage Settings"
+        description="Manage modes, capacity, and repair actions."
+      />
+
       <SettingsCardGridContainer>
         {/* Metric Card 1: Local Permission (1A) */}
         <div className="dashboard-grid-card">

@@ -69,6 +69,11 @@ const defaultPresets: LocalPresetsState = {
     temperature: 1.0,
     maxTokens: 4096,
   },
+  ocr_document: {
+    systemPrompt: '你是一个专业的 OCR 文字识别与排版结构化专家。请精准提取图片中的所有文本内容，并按自然的阅读顺序整理输出。',
+    temperature: 0.1,
+    maxTokens: 4096,
+  },
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -136,6 +141,7 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
     if (r === 'assistant') return pick('文本对话', 'Text Chat');
     if (r === 'image_generation') return pick('图片生成', 'Image Generation');
     if (r === 'video_generation') return pick('视频生成', 'Video Generation');
+    if (r === 'ocr_document') return pick('OCR 文本识别', 'OCR Document');
     return r;
   };
 
@@ -143,13 +149,15 @@ const CapabilityCard: React.FC<CapabilityCardProps> = React.memo(({
     if (r === 'assistant') return pick('处理画布的对话助理、脑暴大纲及交互控制的核心大脑通道。', 'Core channel for text conversation, brainstorming, and canvas controls.');
     if (r === 'image_generation') return pick('文生图与图生图的扩写、美化和模型指派接口。', 'Preferred route for expansion, optimization and model routing of image generation.');
     if (r === 'video_generation') return pick('电影视频分镜生成、动态控制及镜头控制能力的路由信道。', 'Routing endpoint for dynamic video generation models.');
+    if (r === 'ocr_document') return pick('对画布中的图片提取文本、分析排版结构以及进行文字识别的底层通道。', 'Preferred route for extracting text, layout analysis and text recognition in canvas images.');
     return '';
   };
 
   const getRoleIcon = (r: string) => {
     if (r === 'assistant') return MessageSquare;
     if (r === 'image_generation') return ImageIcon;
-    return VideoIcon;
+    if (r === 'video_generation') return VideoIcon;
+    return Bot;
   };
 
   const Icon = getRoleIcon(role);
@@ -611,7 +619,7 @@ const AiManagementView: React.FC = () => {
     }
   };
 
-  const targetRoles: CapabilityRole[] = ['assistant', 'image_generation', 'video_generation'];
+  const targetRoles: CapabilityRole[] = ['assistant', 'image_generation', 'ocr_document', 'video_generation'];
 
   return (
     <SettingsViewShell>

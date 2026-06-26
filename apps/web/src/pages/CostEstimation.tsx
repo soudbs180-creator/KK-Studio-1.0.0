@@ -731,6 +731,11 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
         }
       `}</style>
 
+      <SettingsHero
+        title={pick('计费账本', 'Billing Ledger')}
+        description={pick('查看您的 API 充值消耗明细、内部积分消费情况及账户交易历史。', 'Review your API recharge spend, internal credit balance, and transaction history.')}
+      />
+
       <SettingsCardGridContainer>
         {/* 第一排: 4 个指标卡片 (1A * 4A) */}
         {activeTab === 'api' ? (

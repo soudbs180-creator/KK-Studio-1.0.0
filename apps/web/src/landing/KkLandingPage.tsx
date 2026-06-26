@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { useLocale } from '../context/LocaleContext';
 import { pickByResolvedLanguage } from '../utils/localeText';
@@ -17,56 +17,56 @@ type LocalizedText = {
 };
 
 const navItems = [
-  { label: { zh: '作品', en: 'Work' }, href: '#work' },
-  { label: { zh: '方法', en: 'Approach' }, href: '#approach' },
-  { label: { zh: 'AI 流程', en: 'AI Flow' }, href: '#ai-flow' },
-  { label: { zh: '能力', en: 'Services' }, href: '#services' },
-  { label: { zh: '关于', en: 'About' }, href: '#about' },
-  { label: { zh: '加入', en: 'Join' }, href: '#join' },
-  { label: { zh: '联系', en: 'Contact' }, href: '#contact' },
+  { label: { zh: '浣滃搧', en: 'Work' }, href: '#work' },
+  { label: { zh: '鏂规硶', en: 'Approach' }, href: '#approach' },
+  { label: { zh: 'AI 娴佺▼', en: 'AI Flow' }, href: '#ai-flow' },
+  { label: { zh: '鑳藉姏', en: 'Services' }, href: '#services' },
+  { label: { zh: '鍏充簬', en: 'About' }, href: '#about' },
+  { label: { zh: '鍔犲叆', en: 'Join' }, href: '#join' },
+  { label: { zh: '鑱旂郴', en: 'Contact' }, href: '#contact' },
 ] as const;
 
 const workItems = [
   {
     index: '01',
-    title: { zh: '跟得上意图的无限画布。', en: 'Canvas that keeps up with intent.' },
-    type: { zh: '无限画布 / 创作生产', en: 'Infinite canvas / Creation' },
+    title: { zh: '璺熷緱涓婃剰鍥剧殑鏃犻檺鐢诲竷銆?, en: 'Canvas that keeps up with intent.' },
+    type: { zh: '鏃犻檺鐢诲竷 / 鍒涗綔鐢熶骇', en: 'Infinite canvas / Creation' },
     visualClass: 'canvas',
   },
   {
     index: '02',
-    title: { zh: '带记忆和控制的批量生产。', en: 'Batch work with memory and control.' },
-    type: { zh: '持久队列 / 自动化', en: 'Durable queue / Automation' },
+    title: { zh: '甯﹁蹇嗗拰鎺у埗鐨勬壒閲忕敓浜с€?, en: 'Batch work with memory and control.' },
+    type: { zh: '鎸佷箙闃熷垪 / 鑷姩鍖?, en: 'Durable queue / Automation' },
     visualClass: 'batch',
   },
   {
     index: '03',
-    title: { zh: '每一步都可见的 AI 接管。', en: 'AI takeover with a visible trail.' },
-    type: { zh: 'Agent 运行时 / 验证', en: 'Agent runtime / Verification' },
+    title: { zh: '姣忎竴姝ラ兘鍙鐨?AI 鎺ョ銆?, en: 'AI takeover with a visible trail.' },
+    type: { zh: 'Agent 杩愯鏃?/ 楠岃瘉', en: 'Agent runtime / Verification' },
     visualClass: 'takeover',
   },
 ] as const;
 
 const approachItems = [
   ['01', {
-    zh: 'IntentGate 先读懂任务，再允许系统移动画布和资产。',
+    zh: 'IntentGate 鍏堣鎳備换鍔★紝鍐嶅厑璁哥郴缁熺Щ鍔ㄧ敾甯冨拰璧勪骇銆?,
     en: 'IntentGate reads the job before the system moves the canvas.',
   }],
   ['02', {
-    zh: 'Planner 与 ToolRegistry 把用户目标转成可回退的产品动作。',
+    zh: 'Planner 涓?ToolRegistry 鎶婄敤鎴风洰鏍囪浆鎴愬彲鍥為€€鐨勪骇鍝佸姩浣溿€?,
     en: 'Planner and ToolRegistry turn user goals into reversible product actions.',
   }],
   ['03', {
-    zh: 'PermissionPolicy、Executor、Verification 与 Memory 让 AI 接管全程可见。',
+    zh: 'PermissionPolicy銆丒xecutor銆乂erification 涓?Memory 璁?AI 鎺ョ鍏ㄧ▼鍙銆?,
     en: 'PermissionPolicy, Executor, Verification, and Memory keep AI takeover visible end to end.',
   }],
 ] as const;
 
 const capabilityTiles: LocalizedText[] = [
-  { zh: '画布运行时', en: 'Canvas runtime' },
-  { zh: '批量生成', en: 'Batch generation' },
-  { zh: '原图资产', en: 'Original assets' },
-  { zh: '知识更新', en: 'Knowledge update' },
+  { zh: '鐢诲竷杩愯鏃?, en: 'Canvas runtime' },
+  { zh: '鎵归噺鐢熸垚', en: 'Batch generation' },
+  { zh: '鍘熷浘璧勪骇', en: 'Original assets' },
+  { zh: '鐭ヨ瘑鏇存柊', en: 'Knowledge update' },
 ];
 
 export const KkLandingPage: React.FC<KkLandingPageProps> = ({
@@ -78,75 +78,75 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
   const t = <T,>(text: { zh: T; en: T }): T => pickByResolvedLanguage(language, text.zh, text.en);
   const primaryAction = isLoggedIn ? onEnterWorkspace : onLoginClick;
   const primaryLabel = isLoggedIn
-    ? t({ zh: '进入工作区', en: 'Open workspace' })
-    : t({ zh: '登录', en: 'Sign in' });
+    ? t({ zh: '杩涘叆宸ヤ綔鍖?, en: 'Open workspace' })
+    : t({ zh: '鐧诲綍', en: 'Sign in' });
 
   return (
-    <div className="ng-landing-root">
-      <div className="ng-continuous-stage" aria-hidden />
-      <div className="ng-noise" aria-hidden />
+    <div className="kk-landikk-landing-landikk-landing-root">
+      <div className="kk-landikk-landing-continuous-stage" aria-hidden />
+      <div className="kk-landikk-landing-noise" aria-hidden />
 
-      <header className="ng-nav" aria-label={t({ zh: '主导航', en: 'Primary navigation' })}>
-        <a className="ng-nav__brand" href="#top" aria-label="KK Studio home">
+      <header className="kk-landikk-landing-nav" aria-label={t({ zh: '涓诲鑸?, en: 'Primary navigation' })}>
+        <a className="kk-landikk-landing-nav__brand" href="#top" aria-label="KK Studio home">
           KK Studio
         </a>
-        <nav className="ng-nav__links" aria-label={t({ zh: '介绍页分区', en: 'Landing sections' })}>
+        <nav className="kk-landikk-landing-nav__links" aria-label={t({ zh: '浠嬬粛椤靛垎鍖?, en: 'Landing sections' })}>
           {navItems.map((item) => (
             <a key={item.href} href={item.href}>
               {t(item.label)}
             </a>
           ))}
         </nav>
-        <button type="button" className="ng-nav__login" onClick={primaryAction}>
+        <button type="button" className="kk-landikk-landing-nav__login" onClick={primaryAction}>
           {primaryLabel}
         </button>
       </header>
 
-      <main className="ng-main" id="top">
-        <section className="ng-hero" aria-labelledby="ng-hero-title">
-          <div className="ng-hero__copy">
-            <p className="ng-kicker">{t({ zh: 'AI 原生创意工作台', en: 'AI-native creative workspace' })}</p>
-            <h1 id="ng-hero-title">
+      <main className="kk-landikk-landing-main" id="top">
+        <section className="kk-landikk-landing-hero" aria-labelledby="kk-landikk-landing-hero-title">
+          <div className="kk-landikk-landing-hero__copy">
+            <p className="kk-landikk-landing-kicker">{t({ zh: 'AI 鍘熺敓鍒涙剰宸ヤ綔鍙?, en: 'AI-native creative workspace' })}</p>
+            <h1 id="kk-landikk-landing-hero-title">
               {t({
-                zh: 'KK Studio 是面向全流程创意生产的 AI 原生工作区。',
+                zh: 'KK Studio 鏄潰鍚戝叏娴佺▼鍒涙剰鐢熶骇鐨?AI 鍘熺敓宸ヤ綔鍖恒€?,
                 en: 'KK Studio is an AI-native creative workspace for full-flow creative production.',
               })}
             </h1>
           </div>
 
-          <a className="ng-work-pill" href="#ai-flow">
-            <span>{t({ zh: '查看 AI 流程', en: 'See AI Flow' })}</span>
+          <a className="kk-landikk-landing-work-pill" href="#ai-flow">
+            <span>{t({ zh: '鏌ョ湅 AI 娴佺▼', en: 'See AI Flow' })}</span>
             <ArrowUpRight size={14} strokeWidth={1.7} />
           </a>
 
-          <aside className="ng-hero-card" aria-label={t({ zh: 'AI 接管说明', en: 'AI takeover note' })}>
-            <span>{t({ zh: 'AI 接管', en: 'AI takeover' })}</span>
+          <aside className="kk-landikk-landing-hero-card" aria-label={t({ zh: 'AI 鎺ョ璇存槑', en: 'AI takeover note' })}>
+            <span>{t({ zh: 'AI 鎺ョ', en: 'AI takeover' })}</span>
             <p>
               {t({
-                zh: '从意图到验证，每一次自动化画布动作都保持可见、可控，并准备好衔接下一步生产。',
+                zh: '浠庢剰鍥惧埌楠岃瘉锛屾瘡涓€娆¤嚜鍔ㄥ寲鐢诲竷鍔ㄤ綔閮戒繚鎸佸彲瑙併€佸彲鎺э紝骞跺噯澶囧ソ琛旀帴涓嬩竴姝ョ敓浜с€?,
                 en: 'From intent to verification, every automated canvas action stays visible, scoped, and ready for the next product step.',
               })}
             </p>
           </aside>
         </section>
 
-        <section className="ng-work-section" id="work" aria-labelledby="ng-work-title">
-          <div className="ng-section-label">{t({ zh: '作品', en: 'Work' })}</div>
-          <div className="ng-work-heading">
-            <h2 id="ng-work-title">{t({ zh: '真正的生产工作，不只是演示稿。', en: 'Production work, not demo decks.' })}</h2>
+        <section className="kk-landikk-landing-work-section" id="work" aria-labelledby="kk-landikk-landing-work-title">
+          <div className="kk-landikk-landing-section-label">{t({ zh: '浣滃搧', en: 'Work' })}</div>
+          <div className="kk-landikk-landing-work-heading">
+            <h2 id="kk-landikk-landing-work-title">{t({ zh: '鐪熸鐨勭敓浜у伐浣滐紝涓嶅彧鏄紨绀虹銆?, en: 'Production work, not demo decks.' })}</h2>
             <p>
               {t({
-                zh: 'KK Studio 把 Prompt、图片、批量任务、原图和排版决策放进同一个可滚动的创意系统，在真实工作量下依然清晰快速。',
+                zh: 'KK Studio 鎶?Prompt銆佸浘鐗囥€佹壒閲忎换鍔°€佸師鍥惧拰鎺掔増鍐崇瓥鏀捐繘鍚屼竴涓彲婊氬姩鐨勫垱鎰忕郴缁燂紝鍦ㄧ湡瀹炲伐浣滈噺涓嬩緷鐒舵竻鏅板揩閫熴€?,
                 en: 'KK Studio brings prompts, images, batches, originals, and layout decisions into one scrollable creative system that stays fast under real workloads.',
               })}
             </p>
           </div>
 
-          <div className="ng-work-grid">
+          <div className="kk-landikk-landing-work-grid">
             {workItems.map((item) => (
-              <article className="ng-work-card" key={item.index}>
-                <div className={`ng-work-card__image ng-work-card__image--${item.visualClass}`} aria-hidden />
-                <div className="ng-work-card__body">
+              <article className="kk-landikk-landing-work-card" key={item.index}>
+                <div className={`kk-landing-work-card__image kk-landing-work-card__image--${item.visualClass}`} aria-hidden />
+                <div className="kk-landikk-landing-work-card__body">
                   <span>{item.index}</span>
                   <h3>{t(item.title)}</h3>
                   <p>{t(item.type)}</p>
@@ -156,14 +156,14 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </div>
         </section>
 
-        <section className="ng-approach-section" id="approach" aria-labelledby="ng-approach-title">
-          <div className="ng-section-label">{t({ zh: '方法', en: 'Approach' })}</div>
-          <h2 id="ng-approach-title">
-            {t({ zh: '足够顺滑地日常创作，也足够严格地交给 Agent。', en: 'Smooth enough for daily creation, strict enough for agents.' })}
+        <section className="kk-landikk-landing-approach-section" id="approach" aria-labelledby="kk-landikk-landing-approach-title">
+          <div className="kk-landikk-landing-section-label">{t({ zh: '鏂规硶', en: 'Approach' })}</div>
+          <h2 id="kk-landikk-landing-approach-title">
+            {t({ zh: '瓒冲椤烘粦鍦版棩甯稿垱浣滐紝涔熻冻澶熶弗鏍煎湴浜ょ粰 Agent銆?, en: 'Smooth enough for daily creation, strict enough for agents.' })}
           </h2>
-          <div className="ng-approach-list">
+          <div className="kk-landikk-landing-approach-list">
             {approachItems.map(([index, text]) => (
-              <article key={index} className="ng-approach-row">
+              <article key={index} className="kk-landikk-landing-approach-row">
                 <span>{index}</span>
                 <p>{t(text)}</p>
               </article>
@@ -171,49 +171,49 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           </div>
         </section>
 
-        <section className="ng-news-section" id="ai-flow" aria-label={t({ zh: 'AI 流程', en: 'AI Flow' })}>
-          <p>{t({ zh: 'AI 流程', en: 'AI Flow' })}</p>
+        <section className="kk-landikk-landing-news-section" id="ai-flow" aria-label={t({ zh: 'AI 娴佺▼', en: 'AI Flow' })}>
+          <p>{t({ zh: 'AI 娴佺▼', en: 'AI Flow' })}</p>
           <h2>
             {t({
-              zh: '从 IntentGate 到 Memory，完整 AI 接管路径始终留在屏幕上。',
+              zh: '浠?IntentGate 鍒?Memory锛屽畬鏁?AI 鎺ョ璺緞濮嬬粓鐣欏湪灞忓箷涓娿€?,
               en: 'IntentGate to Memory: the full-flow AI takeover path stays on screen.',
             })}
           </h2>
         </section>
 
-        <section className="ng-services-section" id="services" aria-labelledby="ng-services-title">
-          <div className="ng-section-label">{t({ zh: '能力', en: 'Services' })}</div>
-          <h2 id="ng-services-title">
-            {t({ zh: '画布、生成、资产、知识和验证。', en: 'Canvas, generation, assets, knowledge, verification.' })}
+        <section className="kk-landikk-landing-services-section" id="services" aria-labelledby="kk-landikk-landing-services-title">
+          <div className="kk-landikk-landing-section-label">{t({ zh: '鑳藉姏', en: 'Services' })}</div>
+          <h2 id="kk-landikk-landing-services-title">
+            {t({ zh: '鐢诲竷銆佺敓鎴愩€佽祫浜с€佺煡璇嗗拰楠岃瘉銆?, en: 'Canvas, generation, assets, knowledge, verification.' })}
           </h2>
-          <div className="ng-services-grid">
+          <div className="kk-landikk-landing-services-grid">
             {capabilityTiles.map((service) => (
               <span key={service.en}>{t(service)}</span>
             ))}
           </div>
         </section>
 
-        <section className="ng-about-section" id="about" aria-labelledby="ng-about-title">
-          <div className="ng-section-label">{t({ zh: '关于', en: 'About' })}</div>
-          <h2 id="ng-about-title">
-            {t({ zh: '为需要智能生产流的创作者准备的工作台。', en: 'A studio surface for creators who need intelligent flow.' })}
+        <section className="kk-landikk-landing-about-section" id="about" aria-labelledby="kk-landikk-landing-about-title">
+          <div className="kk-landikk-landing-section-label">{t({ zh: '鍏充簬', en: 'About' })}</div>
+          <h2 id="kk-landikk-landing-about-title">
+            {t({ zh: '涓洪渶瑕佹櫤鑳界敓浜ф祦鐨勫垱浣滆€呭噯澶囩殑宸ヤ綔鍙般€?, en: 'A studio surface for creators who need intelligent flow.' })}
           </h2>
         </section>
 
-        <section className="ng-join-section" id="join" aria-labelledby="ng-join-title">
-          <div className="ng-section-label">{t({ zh: '加入', en: 'Join' })}</div>
-          <h2 id="ng-join-title">
-            {t({ zh: '给希望 AI 谨慎、快速、可见地行动的团队。', en: 'For teams that want AI to act carefully, quickly, and visibly.' })}
+        <section className="kk-landikk-landing-join-section" id="join" aria-labelledby="kk-landikk-landing-join-title">
+          <div className="kk-landikk-landing-section-label">{t({ zh: '鍔犲叆', en: 'Join' })}</div>
+          <h2 id="kk-landikk-landing-join-title">
+            {t({ zh: '缁欏笇鏈?AI 璋ㄦ厧銆佸揩閫熴€佸彲瑙佸湴琛屽姩鐨勫洟闃熴€?, en: 'For teams that want AI to act carefully, quickly, and visibly.' })}
           </h2>
         </section>
 
-        <footer className="ng-footer" id="contact">
-          <div className="ng-footer__flower" aria-hidden />
-          <div className="ng-footer__content">
-            <p>{t({ zh: '从 KK Studio 开始', en: 'Start with KK Studio' })}</p>
+        <footer className="kk-landikk-landing-footer" id="contact">
+          <div className="kk-landikk-landing-footer__flower" aria-hidden />
+          <div className="kk-landikk-landing-footer__content">
+            <p>{t({ zh: '浠?KK Studio 寮€濮?, en: 'Start with KK Studio' })}</p>
             <h2>
               {t({
-                zh: '把完整创意流程变成可控的 AI 工作区。',
+                zh: '鎶婂畬鏁村垱鎰忔祦绋嬪彉鎴愬彲鎺х殑 AI 宸ヤ綔鍖恒€?,
                 en: 'Turn the whole creative flow into a controlled AI workspace.',
               })}
             </h2>
@@ -222,7 +222,7 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
               <ArrowUpRight size={16} strokeWidth={1.7} />
             </button>
           </div>
-          <div className="ng-footer__links">
+          <div className="kk-landikk-landing-footer__links">
             <span>Canvas</span>
             <span>ToolRegistry</span>
             <span>Verification</span>
@@ -235,3 +235,4 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
 };
 
 export default KkLandingPage;
+

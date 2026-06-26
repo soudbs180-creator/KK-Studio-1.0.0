@@ -1,2 +1,0 @@
-import{t as e}from"./rolldown-runtime.hRWgVQ0p.mjs";import{M as t,T as n,c as r,o as i}from"./react.BAcgWRLM.mjs";import{$ as a,l as o}from"./framer.CX7RhTv5.mjs";function s(){return{style:{height:`100dvh`,width:`100%`}}}function c(e){return n=>(t(o),r(e,{...n,...s(n)}))}var l=e((()=>{i(),n(),a(),c.displayName=`FullDynamicHeight`}));export{c as n,l as t};
-//# sourceMappingURL=Height_Dvh.CfmaMaNj.mjs.map

@@ -1274,8 +1274,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         @media (min-width: 1180px) {
-          .dashboard-command-center {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+          .settings-card-grid-container.dashboard-command-center {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
           }
 
           .dashboard-card-consumption {

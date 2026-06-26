@@ -1,49 +1,17 @@
-@font-face {
-  font-family: "Saans Regular";
-  src: url("/newgenre_static/assets/framerusercontent.com__OxeBY6UTBDrdVkYpbWOTAOONI__aed33fca1583.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 380;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Saans Medium";
-  src: url("/newgenre_static/assets/framerusercontent.com__ql7WEctRB3a8uNodtQppYLb62I__95a6193f31c3.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 570;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Saans Variable";
-  src: url("/newgenre_static/assets/framerusercontent.com__n02NY1r6t0j8yHjzBcssUDrV4__2e0cb3f4e5d5.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 300 900;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Serrif Condensed Regular";
-  src: url("/newgenre_static/assets/framerusercontent.com__OtJp94PYSpTDGKBXXdZXMkV27E__9528f17a0cab.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-.ng-landing-root {
-  --ng-white: #fff;
-  --ng-cream: #f7f3f0;
-  --ng-ink: #0c1018;
-  --ng-muted: #535a65;
-  --ng-soft: #a3a9b2;
-  --ng-orange: #e46c44;
-  --ng-blue-1: #182644;
-  --ng-blue-2: #5a769f;
-  --ng-blue-3: #87a1c4;
-  --ng-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --ng-gutter: clamp(18px, 3.7vw, 64px);
-  --ng-max: 1440px;
-  --ng-page-gradient: linear-gradient(
+﻿.kk-landikk-landing-landikk-landing-root {
+  --kk-landikk-landing-white: #fff;
+  --kk-landikk-landing-cream: #f7f3f0;
+  --kk-landikk-landing-ink: #0c1018;
+  --kk-landikk-landing-muted: #535a65;
+  --kk-landikk-landing-soft: #a3a9b2;
+  --kk-landikk-landing-orange: #e46c44;
+  --kk-landikk-landing-blue-1: #182644;
+  --kk-landikk-landing-blue-2: #5a769f;
+  --kk-landikk-landing-blue-3: #87a1c4;
+  --kk-landikk-landing-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --kk-landikk-landing-gutter: clamp(18px, 3.7vw, 64px);
+  --kk-landikk-landing-max: 1440px;
+  --kk-landikk-landing-page-gradient: linear-gradient(
     180deg,
     #280e01 0%,
     #182644 12%,
@@ -60,20 +28,20 @@
   position: relative;
   overflow-x: clip;
   touch-action: pan-y;
-  background: var(--ng-page-gradient);
-  color: var(--ng-ink);
-  font-family: "Saans Regular", "Saans Variable", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--kk-landikk-landing-page-gradient);
+  color: var(--kk-landikk-landing-ink);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
   isolation: isolate;
 }
 
-.ng-landing-root *,
-.ng-landing-root *::before,
-.ng-landing-root *::after {
+.kk-landikk-landing-landikk-landing-root *,
+.kk-landikk-landing-landikk-landing-root *::before,
+.kk-landikk-landing-landikk-landing-root *::after {
   box-sizing: border-box;
 }
 
-.ng-continuous-stage {
+.kk-landikk-landing-continuous-stage {
   position: absolute;
   inset: 0;
   min-height: 100%;
@@ -83,10 +51,10 @@
     radial-gradient(circle at 18% 8%, rgba(241, 189, 122, 0.24), transparent 20%),
     radial-gradient(circle at 82% 35%, rgba(135, 161, 196, 0.2), transparent 24%),
     radial-gradient(circle at 72% 78%, rgba(228, 108, 68, 0.26), transparent 22%),
-    var(--ng-page-gradient);
+    var(--kk-landikk-landing-page-gradient);
 }
 
-.ng-continuous-stage::after {
+.kk-landikk-landing-continuous-stage::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -96,7 +64,7 @@
     radial-gradient(ellipse at 50% 48%, rgba(247, 243, 240, 0.38), transparent 36%);
 }
 
-.ng-noise {
+.kk-landikk-landing-noise {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -106,7 +74,7 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.84' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.48'/%3E%3C/svg%3E");
 }
 
-.ng-nav {
+.kk-landikk-landing-nav {
   position: fixed;
   top: 0;
   left: 0;
@@ -116,49 +84,49 @@
   grid-template-columns: auto 1fr auto;
   gap: clamp(18px, 3vw, 48px);
   align-items: center;
-  padding: 24px var(--ng-gutter);
+  padding: 24px var(--kk-landikk-landing-gutter);
   color: rgba(255, 255, 255, 0.86);
   pointer-events: none;
 }
 
-.ng-nav a,
-.ng-nav button {
+.kk-landikk-landing-nav a,
+.kk-landikk-landing-nav button {
   pointer-events: auto;
 }
 
-.ng-nav__brand,
-.ng-nav__links a,
-.ng-nav__login {
+.kk-landikk-landing-nav__brand,
+.kk-landikk-landing-nav__links a,
+.kk-landikk-landing-nav__login {
   color: inherit;
   text-decoration: none;
-  font-family: "Saans Medium", "Saans Regular", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   line-height: 1;
 }
 
-.ng-nav__brand {
+.kk-landikk-landing-nav__brand {
   min-width: 92px;
 }
 
-.ng-nav__links {
+.kk-landikk-landing-nav__links {
   justify-self: end;
   display: flex;
   gap: clamp(16px, 2.2vw, 34px);
 }
 
-.ng-nav__links a,
-.ng-nav__login {
+.kk-landikk-landing-nav__links a,
+.kk-landikk-landing-nav__login {
   opacity: 0.76;
-  transition: opacity 180ms var(--ng-ease), transform 180ms var(--ng-ease);
+  transition: opacity 180ms var(--kk-landikk-landing-ease), transform 180ms var(--kk-landikk-landing-ease);
 }
 
-.ng-nav__links a:hover,
-.ng-nav__login:hover {
+.kk-landikk-landing-nav__links a:hover,
+.kk-landikk-landing-nav__login:hover {
   opacity: 1;
   transform: translate3d(0, -1px, 0);
 }
 
-.ng-nav__login {
+.kk-landikk-landing-nav__login {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
@@ -170,52 +138,52 @@
   cursor: pointer;
 }
 
-.ng-main {
+.kk-landikk-landing-main {
   position: relative;
   z-index: 2;
 }
 
-.ng-hero {
+.kk-landikk-landing-hero {
   position: relative;
   min-height: 82vh;
-  padding: clamp(118px, 11vw, 170px) var(--ng-gutter) 12vh;
+  padding: clamp(118px, 11vw, 170px) var(--kk-landikk-landing-gutter) 12vh;
 }
 
-.ng-hero__copy {
+.kk-landikk-landing-hero__copy {
   width: min(100%, 560px);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.ng-kicker,
-.ng-section-label,
-.ng-work-card__body span,
-.ng-footer__content p,
-.ng-news-section p {
+.kk-landikk-landing-kicker,
+.kk-landikk-landing-section-label,
+.kk-landikk-landing-work-card__body span,
+.kk-landikk-landing-footer__content p,
+.kk-landikk-landing-news-section p {
   margin: 0;
-  font-family: "Saans Medium", "Saans Regular", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1;
   letter-spacing: 0;
 }
 
-.ng-kicker {
+.kk-landikk-landing-kicker {
   margin-bottom: 18px;
   color: rgba(255, 255, 255, 0.58);
 }
 
-.ng-hero h1 {
+.kk-landikk-landing-hero h1 {
   margin: 0;
   max-width: 14.8ch;
-  font-family: "Saans Regular", "Saans Variable", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: clamp(28px, 2.95vw, 43px);
   font-weight: 380;
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
 
-.ng-work-pill {
+.kk-landikk-landing-work-pill {
   position: absolute;
-  left: var(--ng-gutter);
+  left: var(--kk-landikk-landing-gutter);
   top: 51vh;
   display: inline-flex;
   align-items: center;
@@ -227,65 +195,65 @@
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.86);
   text-decoration: none;
-  font-family: "Saans Medium", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
   backdrop-filter: blur(16px) saturate(1.12);
   -webkit-backdrop-filter: blur(16px) saturate(1.12);
 }
 
-.ng-hero-card {
+.kk-landikk-landing-hero-card {
   position: absolute;
-  right: var(--ng-gutter);
+  right: var(--kk-landikk-landing-gutter);
   top: clamp(150px, 18vw, 278px);
   width: min(326px, calc(100vw - 44px));
   padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.56);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.78);
-  color: var(--ng-ink);
+  color: var(--kk-landikk-landing-ink);
   box-shadow: 0 24px 76px rgba(12, 16, 24, 0.12);
   backdrop-filter: blur(26px) saturate(1.22);
   -webkit-backdrop-filter: blur(26px) saturate(1.22);
 }
 
-.ng-hero-card span {
+.kk-landikk-landing-hero-card span {
   display: block;
   margin-bottom: 22px;
-  color: var(--ng-muted);
-  font-family: "Saans Medium", sans-serif;
+  color: var(--kk-landikk-landing-muted);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
 }
 
-.ng-hero-card p {
+.kk-landikk-landing-hero-card p {
   margin: 0;
-  color: var(--ng-ink);
+  color: var(--kk-landikk-landing-ink);
   font-size: 14px;
   line-height: 1.42;
   letter-spacing: -0.01em;
 }
 
-.ng-work-section,
-.ng-approach-section,
-.ng-services-section,
-.ng-news-section {
+.kk-landikk-landing-work-section,
+.kk-landikk-landing-approach-section,
+.kk-landikk-landing-services-section,
+.kk-landikk-landing-news-section {
   position: relative;
   z-index: 3;
-  width: min(100%, var(--ng-max));
+  width: min(100%, var(--kk-landikk-landing-max));
   margin: 0 auto;
-  padding: clamp(78px, 8vw, 132px) var(--ng-gutter);
+  padding: clamp(78px, 8vw, 132px) var(--kk-landikk-landing-gutter);
   scroll-margin-top: 96px;
 }
 
-.ng-work-section {
+.kk-landikk-landing-work-section {
   min-height: 150vh;
 }
 
-.ng-section-label {
+.kk-landikk-landing-section-label {
   margin-bottom: clamp(28px, 5vw, 78px);
   color: rgba(12, 16, 24, 0.48);
 }
 
-.ng-work-heading {
+.kk-landikk-landing-work-heading {
   display: grid;
   grid-template-columns: minmax(0, 0.72fr) minmax(260px, 0.28fr);
   gap: clamp(24px, 5vw, 82px);
@@ -293,20 +261,20 @@
   margin-bottom: clamp(44px, 7vw, 112px);
 }
 
-.ng-work-heading h2,
-.ng-approach-section h2,
-.ng-services-section h2,
-.ng-news-section h2,
-.ng-footer__content h2 {
+.kk-landikk-landing-work-heading h2,
+.kk-landikk-landing-approach-section h2,
+.kk-landikk-landing-services-section h2,
+.kk-landikk-landing-news-section h2,
+.kk-landikk-landing-footer__content h2 {
   margin: 0;
-  font-family: "Serrif Condensed Regular", "Saans Regular", sans-serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(54px, 9.7vw, 154px);
   font-weight: 400;
   line-height: 1.0;
   letter-spacing: -0.03em;
 }
 
-.ng-work-heading p {
+.kk-landikk-landing-work-heading p {
   margin: 0 0 8px;
   color: rgba(12, 16, 24, 0.68);
   font-size: 15px;
@@ -314,13 +282,13 @@
   letter-spacing: -0.01em;
 }
 
-.ng-work-grid {
+.kk-landikk-landing-work-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(18px, 2.4vw, 34px);
 }
 
-.ng-work-card {
+.kk-landikk-landing-work-card {
   min-height: clamp(480px, 56vw, 760px);
   display: flex;
   flex-direction: column;
@@ -333,7 +301,7 @@
   transform: translateZ(0);
 }
 
-.ng-work-card__image {
+.kk-landikk-landing-work-card__image {
   position: relative;
   flex: 1 1 auto;
   min-height: 360px;
@@ -344,25 +312,25 @@
   filter: saturate(1.02) contrast(1.02);
 }
 
-.ng-work-card__image::before,
-.ng-work-card__image::after {
+.kk-landikk-landing-work-card__image::before,
+.kk-landikk-landing-work-card__image::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.ng-work-card__image::before {
+.kk-landikk-landing-work-card__image::before {
   inset: -4%;
-  background-image: var(--ng-project-image);
-  background-position: var(--ng-project-position, center);
+  background-image: var(--kk-landikk-landing-project-image);
+  background-position: var(--kk-landikk-landing-project-position, center);
   background-repeat: no-repeat;
-  background-size: var(--ng-project-size, cover);
+  background-size: var(--kk-landikk-landing-project-size, cover);
   filter: saturate(1.02) contrast(1.02);
   transform: scale(1.02);
 }
 
-.ng-work-card__image::after {
+.kk-landikk-landing-work-card__image::after {
   background:
     linear-gradient(180deg, rgba(12, 16, 24, 0.03) 0%, rgba(12, 16, 24, 0.18) 100%),
     radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.24), transparent 36%),
@@ -370,53 +338,53 @@
   mix-blend-mode: soft-light;
 }
 
-.ng-work-card__image--canvas {
-  --ng-project-image: url("/landing/kk-infinite-canvas-workspace.png");
-  --ng-project-position: 50% 44%;
-  --ng-project-size: cover;
+.kk-landikk-landing-work-card__image--canvas {
+  --kk-landikk-landing-project-image: url("/landing/kk-infinite-canvas-workspace.png");
+  --kk-landikk-landing-project-position: 50% 44%;
+  --kk-landikk-landing-project-size: cover;
   background-color: #c1d3e6;
 }
 
-.ng-work-card__image--batch {
-  --ng-project-image: url("/landing/kk-durable-batch-queue.png");
-  --ng-project-position: 50% 50%;
-  --ng-project-size: cover;
+.kk-landikk-landing-work-card__image--batch {
+  --kk-landikk-landing-project-image: url("/landing/kk-durable-batch-queue.png");
+  --kk-landikk-landing-project-position: 50% 50%;
+  --kk-landikk-landing-project-size: cover;
   background-color: #f1bd7a;
 }
 
-.ng-work-card__image--takeover {
-  --ng-project-image: url("/landing/kk-agent-takeover-runtime.png");
-  --ng-project-position: 52% 50%;
-  --ng-project-size: cover;
+.kk-landikk-landing-work-card__image--takeover {
+  --kk-landikk-landing-project-image: url("/landing/kk-agent-takeover-runtime.png");
+  --kk-landikk-landing-project-position: 52% 50%;
+  --kk-landikk-landing-project-size: cover;
   background-color: #182644;
 }
 
-.ng-work-card__body {
+.kk-landikk-landing-work-card__body {
   min-height: 148px;
   display: grid;
   grid-template-columns: 48px 1fr;
   column-gap: 16px;
   row-gap: 10px;
   padding: 24px;
-  color: var(--ng-ink);
+  color: var(--kk-landikk-landing-ink);
 }
 
-.ng-work-card__body span {
+.kk-landikk-landing-work-card__body span {
   color: rgba(12, 16, 24, 0.48);
 }
 
-.ng-work-card__body h3 {
+.kk-landikk-landing-work-card__body h3 {
   grid-column: 2;
   margin: 0;
   max-width: 9.8ch;
-  font-family: "Saans Regular", "Saans Variable", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: clamp(26px, 3vw, 42px);
   font-weight: 380;
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
 
-.ng-work-card__body p {
+.kk-landikk-landing-work-card__body p {
   grid-column: 2;
   margin: 0;
   color: rgba(12, 16, 24, 0.58);
@@ -424,22 +392,22 @@
   letter-spacing: -0.01em;
 }
 
-.ng-approach-section {
+.kk-landikk-landing-approach-section {
   min-height: 130vh;
 }
 
-.ng-approach-section h2,
-.ng-services-section h2,
-.ng-news-section h2 {
+.kk-landikk-landing-approach-section h2,
+.kk-landikk-landing-services-section h2,
+.kk-landikk-landing-news-section h2 {
   max-width: 10.4ch;
 }
 
-.ng-approach-list {
+.kk-landikk-landing-approach-list {
   margin-top: clamp(58px, 9vw, 140px);
   border-top: 1px solid rgba(12, 16, 24, 0.16);
 }
 
-.ng-approach-row {
+.kk-landikk-landing-approach-row {
   display: grid;
   grid-template-columns: minmax(72px, 0.16fr) 1fr;
   gap: clamp(20px, 5vw, 90px);
@@ -448,13 +416,13 @@
   border-bottom: 1px solid rgba(12, 16, 24, 0.16);
 }
 
-.ng-approach-row span {
+.kk-landikk-landing-approach-row span {
   color: rgba(12, 16, 24, 0.42);
-  font-family: "Saans Medium", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
 }
 
-.ng-approach-row p {
+.kk-landikk-landing-approach-row p {
   margin: 0;
   max-width: 760px;
   font-size: clamp(24px, 4vw, 58px);
@@ -462,11 +430,11 @@
   letter-spacing: -0.02em;
 }
 
-.ng-services-section {
+.kk-landikk-landing-services-section {
   min-height: 120vh;
 }
 
-.ng-services-grid {
+.kk-landikk-landing-services-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
@@ -475,7 +443,7 @@
   border: none;
 }
 
-.ng-services-grid span {
+.kk-landikk-landing-services-grid span {
   min-height: 190px;
   display: flex;
   align-items: flex-end;
@@ -483,7 +451,7 @@
   background: rgba(255, 255, 255, 0.48);
   border: 1px solid rgba(12, 16, 24, 0.12);
   border-radius: 20px;
-  color: var(--ng-ink);
+  color: var(--kk-landikk-landing-ink);
   font-size: clamp(20px, 2.2vw, 34px);
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -492,39 +460,39 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-.ng-news-section,
-.ng-about-section,
-.ng-join-section {
+.kk-landikk-landing-news-section,
+.kk-landikk-landing-about-section,
+.kk-landikk-landing-join-section {
   min-height: 100vh;
 }
 
-.ng-about-section,
-.ng-join-section {
+.kk-landikk-landing-about-section,
+.kk-landikk-landing-join-section {
   position: relative;
   z-index: 3;
-  width: min(100%, var(--ng-max));
+  width: min(100%, var(--kk-landikk-landing-max));
   margin: 0 auto;
-  padding: clamp(118px, 13vw, 210px) var(--ng-gutter);
+  padding: clamp(118px, 13vw, 210px) var(--kk-landikk-landing-gutter);
   scroll-margin-top: 96px;
 }
 
-.ng-news-section p {
+.kk-landikk-landing-news-section p {
   margin-bottom: clamp(24px, 5vw, 76px);
   color: rgba(12, 16, 24, 0.48);
 }
 
-.ng-about-section h2,
-.ng-join-section h2 {
+.kk-landikk-landing-about-section h2,
+.kk-landikk-landing-join-section h2 {
   max-width: 11ch;
   margin: 0;
-  font-family: "Serrif Condensed Regular", "Saans Regular", sans-serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(54px, 9.7vw, 154px);
   font-weight: 400;
   line-height: 1.0;
   letter-spacing: -0.03em;
 }
 
-.ng-footer {
+.kk-landikk-landing-footer {
   position: relative;
   z-index: 3;
   min-height: 112vh;
@@ -534,14 +502,14 @@
   gap: clamp(28px, 5vw, 84px);
   align-items: center;
   overflow: hidden;
-  padding: clamp(110px, 12vw, 190px) var(--ng-gutter) 32px;
+  padding: clamp(110px, 12vw, 190px) var(--kk-landikk-landing-gutter) 32px;
   background:
     radial-gradient(circle at 84% 28%, rgba(135, 161, 196, 0.22), transparent 28%),
     linear-gradient(180deg, rgba(30, 19, 16, 0) 0%, #14243b 30%, #0c1018 100%);
   color: #f9fafb;
 }
 
-.ng-footer__flower {
+.kk-landikk-landing-footer__flower {
   position: relative;
   grid-column: 2;
   grid-row: 1;
@@ -561,7 +529,7 @@
   pointer-events: none;
 }
 
-.ng-footer__flower::after {
+.kk-landikk-landing-footer__flower::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -571,26 +539,26 @@
     linear-gradient(180deg, transparent 48%, rgba(12, 16, 24, 0.32));
 }
 
-.ng-footer__content {
+.kk-landikk-landing-footer__content {
   position: relative;
   grid-column: 1;
   grid-row: 1;
-  width: min(100%, var(--ng-max));
+  width: min(100%, var(--kk-landikk-landing-max));
   margin: 0 auto;
   align-self: center;
 }
 
-.ng-footer__content p {
+.kk-landikk-landing-footer__content p {
   margin-bottom: 32px;
   color: rgba(249, 250, 251, 0.68);
 }
 
-.ng-footer__content h2 {
+.kk-landikk-landing-footer__content h2 {
   max-width: 11ch;
   font-size: clamp(52px, 8.2vw, 126px);
 }
 
-.ng-footer__content button {
+.kk-landikk-landing-footer__content button {
   appearance: none;
   min-height: 46px;
   display: inline-flex;
@@ -603,14 +571,14 @@
   background: rgba(249, 250, 251, 0.08);
   color: #f9fafb;
   font: inherit;
-  font-family: "Saans Medium", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   cursor: pointer;
 }
 
-.ng-footer__links {
+.kk-landikk-landing-footer__links {
   position: relative;
   grid-column: 1 / -1;
-  width: min(100%, var(--ng-max));
+  width: min(100%, var(--kk-landikk-landing-max));
   margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
@@ -621,145 +589,146 @@
 }
 
 @media (max-width: 980px) {
-  .ng-nav {
+  .kk-landikk-landing-nav {
     grid-template-columns: auto auto;
   }
 
-  .ng-nav__links {
+  .kk-landikk-landing-nav__links {
     display: none;
   }
 
-  .ng-nav__login {
+  .kk-landikk-landing-nav__login {
     justify-self: end;
   }
 
-  .ng-hero {
+  .kk-landikk-landing-hero {
     min-height: 88vh;
   }
 
-  .ng-hero-card {
-    left: var(--ng-gutter);
+  .kk-landikk-landing-hero-card {
+    left: var(--kk-landikk-landing-gutter);
     right: auto;
     top: 48vh;
   }
 
-  .ng-work-pill {
+  .kk-landikk-landing-work-pill {
     top: 82vh;
   }
 
-  .ng-work-heading,
-  .ng-work-grid {
+  .kk-landikk-landing-work-heading,
+  .kk-landikk-landing-work-grid {
     grid-template-columns: 1fr;
   }
 
-  .ng-work-card {
+  .kk-landikk-landing-work-card {
     min-height: 560px;
   }
 
-  .ng-footer {
+  .kk-landikk-landing-footer {
     grid-template-columns: 1fr;
     min-height: auto;
   }
 
-  .ng-footer__content,
-  .ng-footer__flower,
-  .ng-footer__links {
+  .kk-landikk-landing-footer__content,
+  .kk-landikk-landing-footer__flower,
+  .kk-landikk-landing-footer__links {
     grid-column: 1;
   }
 
-  .ng-footer__content {
+  .kk-landikk-landing-footer__content {
     grid-row: 1;
   }
 
-  .ng-footer__flower {
+  .kk-landikk-landing-footer__flower {
     grid-row: 2;
     min-height: 280px;
   }
 
-  .ng-footer__links {
+  .kk-landikk-landing-footer__links {
     grid-row: 3;
   }
 
-  .ng-services-grid {
+  .kk-landikk-landing-services-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
 
-  .ng-services-grid span {
+  .kk-landikk-landing-services-grid span {
     min-height: 140px;
   }
 }
 
 @media (max-width: 620px) {
-  .ng-landing-root {
-    --ng-gutter: 18px;
+  .kk-landikk-landing-landikk-landing-root {
+    --kk-landikk-landing-gutter: 18px;
   }
 
-  .ng-nav {
-    padding-top: 18px;
+  .kk-landikk-landing-nav {
+    paddikk-landing-top: 18px;
   }
 
-  .ng-hero {
-    padding-top: 102px;
+  .kk-landikk-landing-hero {
+    paddikk-landing-top: 102px;
   }
 
-  .ng-work-section,
-  .ng-approach-section,
-  .ng-services-section,
-  .ng-news-section,
-  .ng-about-section,
-  .ng-join-section {
-    padding-top: 64px;
-    padding-bottom: 96px;
+  .kk-landikk-landing-work-section,
+  .kk-landikk-landing-approach-section,
+  .kk-landikk-landing-services-section,
+  .kk-landikk-landing-news-section,
+  .kk-landikk-landing-about-section,
+  .kk-landikk-landing-join-section {
+    paddikk-landing-top: 64px;
+    paddikk-landing-bottom: 96px;
     scroll-margin-top: 72px;
   }
 
-  .ng-hero h1 {
+  .kk-landikk-landing-hero h1 {
     font-size: clamp(25px, 9vw, 40px);
   }
 
-  .ng-hero-card {
+  .kk-landikk-landing-hero-card {
     top: 56vh;
   }
 
-  .ng-work-card__body {
+  .kk-landikk-landing-work-card__body {
     grid-template-columns: 40px 1fr;
   }
 
-  .ng-approach-row {
+  .kk-landikk-landing-approach-row {
     grid-template-columns: 1fr;
   }
 
-  .ng-services-grid {
+  .kk-landikk-landing-services-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
-  .ng-services-grid span {
+  .kk-landikk-landing-services-grid span {
     min-height: 108px;
   }
 
-  .ng-footer {
-    padding-top: 86px;
+  .kk-landikk-landing-footer {
+    paddikk-landing-top: 86px;
   }
 
-  .ng-footer__content h2 {
+  .kk-landikk-landing-footer__content h2 {
     max-width: 9.5ch;
     font-size: clamp(42px, 13vw, 72px);
   }
 
-  .ng-footer__flower {
+  .kk-landikk-landing-footer__flower {
     min-height: 220px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ng-landing-root *,
-  .ng-landing-root *::before,
-  .ng-landing-root *::after {
+  .kk-landikk-landing-landikk-landing-root *,
+  .kk-landikk-landing-landikk-landing-root *::before,
+  .kk-landikk-landing-landikk-landing-root *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
   }
 }
+

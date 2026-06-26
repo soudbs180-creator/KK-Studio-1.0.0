@@ -546,6 +546,11 @@ export const StorageSettingsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
+      <SettingsHero
+        title={pick('存储维护', 'Storage Settings')}
+        description={pick('管理模式、容量和修复动作。', 'Manage modes, capacity, and repair actions.')}
+      />
+
       <SettingsCardGridContainer>
         {isMobile ? (
           <div className="grid grid-cols-2 gap-3 w-full">

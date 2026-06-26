@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+﻿import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -339,7 +339,7 @@ async function ensureWorkspaceReady(page) {
     return desktopEntry;
   }
 
-  const landingLogin = page.locator('.ng-nav__login').first();
+  const landingLogin = page.locator('.kk-landikk-landing-nav__login').first();
   if (await isVisibleWithin(landingLogin, 10000)) {
     await landingLogin.click();
   }
@@ -391,8 +391,8 @@ function verifySourceContracts() {
     { source: chatSidebarSource, pattern: /data-action="locate-durable-job"/, label: 'durable queue locate action' },
     { source: chatSidebarSource, pattern: /data-action="cancel-durable-job"/, label: 'durable queue cancel action' },
     { source: dockSource, pattern: /ai-takeover-run-timeline/, label: 'run timeline surface' },
-    { source: dockSource, pattern: /placeholder="输入对话或指令（回车发送）\.\.\."/u, label: 'dock composer input' },
-    { source: generationToolsSource, pattern: /notify\.info\('音频合成中'/u, label: 'shared notification start state' },
+    { source: dockSource, pattern: /placeholder="杈撳叆瀵硅瘽鎴栨寚浠わ紙鍥炶溅鍙戦€侊級\.\.\."/u, label: 'dock composer input' },
+    { source: generationToolsSource, pattern: /notify\.info\('闊抽鍚堟垚涓?/u, label: 'shared notification start state' },
   ];
 
   for (const check of checks) {
@@ -590,3 +590,4 @@ try {
     await closeLocalViteServer(viteServer);
   }
 }
+
