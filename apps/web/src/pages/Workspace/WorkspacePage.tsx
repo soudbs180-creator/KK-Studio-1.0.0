@@ -120,6 +120,9 @@ import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../../util
 import { useVisibleCanvasItems, useVisibleCanvasItemsNew } from '../../app/useVisibleCanvasItems';
 import { useCanvasSpatialIndex } from '../../app/useCanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
+import { CanvasLayerRenderer } from '../../components/canvas/CanvasLayerRenderer';
+import type { CachedCardMeta } from '../../services/storage/offlineDb';
+import { syncService } from '../../services/system/syncService';
 
 const GENERATE_TIMEOUT_MS = 600000;
 
@@ -4160,6 +4163,81 @@ export const AppContent: React.FC<AppContentProps> = () => {
     resolveWorkflowSourceIdsFromSelection,
   });
 
+  // 10000+ 卡片轻量元数据本地状态与可视区状态
+  const [cardMetas, setCardMetas] = useState<CachedCardMeta[]>([]);
+  const [visibleCardIds, setVisibleCardIds] = useState<Set<string>>(new Set());
+  const workerRef = useRef<Worker | null>(null);
+
+  // 点击 Canvas 卡片时的选中与加载逻辑
+  const handleCanvasCardClick = useCallback((cardId: string, isDoubleClick: boolean) => {
+    handleCanvasNodeSelect(cardId);
+    
+    if (isDoubleClick) {
+      void syncService.loadCardDetail(cardId).then(detail => {
+        if (detail) {
+          console.log(`[WorkspacePage] Loaded full card detail for ${cardId}`, detail);
+        }
+      });
+    }
+  }, [handleCanvasNodeSelect]);
+
+  // 初始化 Web Worker
+  useEffect(() => {
+    workerRef.current = new Worker(
+      new URL('../../canvas/canvasCalculationWorker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    workerRef.current.onmessage = (e) => {
+      const { type, payload } = e.data;
+      if (type === 'QUERY_VIEWPORT_RESULT') {
+        setVisibleCardIds(new Set(payload.visibleIds));
+      } else if (type === 'AUTO_ARRANGE_RESULT') {
+        const arranged = payload.arrangedPositions;
+        Object.keys(arranged).forEach(cardId => {
+          const pos = arranged[cardId];
+          updateImageNodePosition(cardId, pos);
+          updatePromptNodePosition(cardId, pos);
+          void syncService.queueOperation('MOVE', cardId, pos);
+        });
+      }
+    };
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, [updateImageNodePosition, updatePromptNodePosition]);
+
+  // 当画布节点数据变动时重建索引
+  useEffect(() => {
+    if (!activeCanvas) return;
+    const metas: CachedCardMeta[] = [];
+    activeCanvas.promptNodes.forEach(n => metas.push({ id: n.id, x: n.position.x, y: n.position.y, width: n.width || 360, height: n.height || 200, type: 'prompt', updatedAt: n.timestamp }));
+    activeCanvas.imageNodes.forEach(n => metas.push({ id: n.id, x: n.position.x, y: n.position.y, width: 400, height: 600, type: 'image', thumbnailUrl: n.apiResultUrl || n.url, updatedAt: n.timestamp }));
+    
+    setCardMetas(metas);
+
+    workerRef.current?.postMessage({
+      type: 'REBUILD_INDEX',
+      payload: { nodes: metas }
+    });
+  }, [activeCanvas]);
+
+  // 视口变动时向 Worker 发送可视区筛选请求
+  useEffect(() => {
+    const scale = canvasTransform.scale || 1;
+    const buffer = 1500;
+    const vLeft = -canvasTransform.x / scale - buffer;
+    const vTop = -canvasTransform.y / scale - buffer;
+    const vRight = (window.innerWidth - canvasTransform.x) / scale + buffer;
+    const vBottom = (window.innerHeight - canvasTransform.y) / scale + buffer;
+
+    workerRef.current?.postMessage({
+      type: 'QUERY_VIEWPORT',
+      payload: { vLeft, vTop, vRight, vBottom }
+    });
+  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale]);
+
 
 
 
@@ -4692,7 +4770,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
             );
           });
 
-          const isGroupPlaceholder = !promptInRender && !anyChildInRender;
+          const isGroupSelected = selectedNodeIds.includes(groupView.rootPrompt.id) 
+            || visibleChildImages.some(child => selectedNodeIds.includes(child.id))
+            || groupView.rootPrompt.id === activeSourceImage;
+
+          const isGroupPlaceholder = isLargeProject 
+            ? !isGroupSelected 
+            : (!promptInRender && !anyChildInRender);
 
           return {
             id: groupView.id,
@@ -4712,12 +4796,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
         const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
         const height = imageCardHeightById[node.id] ?? totalHeight;
         const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
-        const isImagePlaceholder = (
-          pos.x - width / 2 > rRight ||
-          pos.x + width / 2 < rLeft ||
-          pos.y - height > rBottom ||
-          pos.y < rTop
-        );
+        const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
+        const isImagePlaceholder = isLargeProject 
+          ? !isImageSelected 
+          : (
+            pos.x - width / 2 > rRight ||
+            pos.x + width / 2 < rLeft ||
+            pos.y - height > rBottom ||
+            pos.y < rTop
+          );
 
         return {
           id: node.id,
@@ -5959,6 +6046,20 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
 
 
+
+        {/* 🚀 Canvas Layer Renderer - 大画布超轻量离线底图渲染层 */}
+        {isLargeProject && (
+          <CanvasLayerRenderer
+            cardMetas={cardMetas}
+            visibleCardIds={visibleCardIds}
+            canvasTransform={canvasTransform}
+            selectedNodeIds={selectedNodeIds}
+            activeSourceImage={activeSourceImage}
+            onCardClick={handleCanvasCardClick}
+            width={window.innerWidth}
+            height={window.innerHeight}
+          />
+        )}
 
         {/* 2. Canvas items */}
         {renderedVisibleGroups}

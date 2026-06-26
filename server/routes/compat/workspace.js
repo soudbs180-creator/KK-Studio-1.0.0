@@ -408,6 +408,170 @@ router.get('/api/v1/workspaces/layout', requireUser, async (req, res) => {
   return res.json(okEnvelope(ensureProfileStore(store, req.userId).workspaceLayout || { canvases: [] }, req));
 });
 
+router.get('/api/v1/workspaces/layout/meta', requireUser, async (req, res) => {
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  const layout = profileStore.workspaceLayout || { canvases: [] };
+
+  const canvasesMeta = (layout.canvases || []).map(canvas => {
+    const cardMetas = [];
+
+    (canvas.promptNodes || []).forEach(node => {
+      cardMetas.push({
+        id: node.id,
+        x: node.position?.x || 0,
+        y: node.position?.y || 0,
+        width: node.width || 360,
+        height: node.height || 200,
+        type: 'prompt',
+        updatedAt: node.timestamp || Date.now()
+      });
+    });
+
+    (canvas.imageNodes || []).forEach(node => {
+      cardMetas.push({
+        id: node.id,
+        x: node.position?.x || 0,
+        y: node.position?.y || 0,
+        width: node.width || 400,
+        height: node.height || 600,
+        type: 'image',
+        thumbnailUrl: node.apiResultUrl || node.url,
+        updatedAt: node.timestamp || Date.now()
+      });
+    });
+
+    (canvas.workflow?.nodes || []).forEach(node => {
+      cardMetas.push({
+        id: node.id,
+        x: node.position?.x || 0,
+        y: node.position?.y || 0,
+        width: node.width || 200,
+        height: node.height || 176,
+        type: 'workflow',
+        updatedAt: node.timestamp || Date.now()
+      });
+    });
+
+    return {
+      canvasId: canvas.id,
+      name: canvas.name,
+      folderName: canvas.folderName,
+      lastModified: canvas.lastModified,
+      cardMetas
+    };
+  });
+
+  return res.json(okEnvelope({ canvases: canvasesMeta }, req));
+});
+
+router.get('/api/v1/workspaces/cards/:cardId', requireUser, async (req, res) => {
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  const layout = profileStore.workspaceLayout || { canvases: [] };
+  const cardId = req.params.cardId;
+
+  for (const canvas of layout.canvases || []) {
+    const promptNode = (canvas.promptNodes || []).find(n => n.id === cardId);
+    if (promptNode) {
+      return res.json(okEnvelope({ type: 'prompt', detail: promptNode }, req));
+    }
+    const imageNode = (canvas.imageNodes || []).find(n => n.id === cardId);
+    if (imageNode) {
+      return res.json(okEnvelope({ type: 'image', detail: imageNode }, req));
+    }
+    const workflowNode = (canvas.workflow?.nodes || []).find(n => n.id === cardId);
+    if (workflowNode) {
+      return res.json(okEnvelope({ type: 'workflow', detail: workflowNode }, req));
+    }
+  }
+
+  const { sendError } = require('./compatHelper');
+  return sendError(res, req, 404, 'CARD_NOT_FOUND', 'Card was not found.');
+});
+
+router.post('/api/v1/workspaces/layout/batch-sync', requireUser, async (req, res) => {
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  if (!profileStore.workspaceLayout) {
+    profileStore.workspaceLayout = { canvases: [] };
+  }
+  const layout = profileStore.workspaceLayout;
+  const operations = Array.isArray(req.body?.operations) ? req.body.operations : [];
+
+  operations.forEach(op => {
+    const canvasId = op.canvasId || (layout.canvases?.[0]?.id) || 'default';
+    let canvas = (layout.canvases || []).find(c => c.id === canvasId);
+    if (!canvas) {
+      canvas = {
+        id: canvasId,
+        name: 'Workspace',
+        promptNodes: [],
+        imageNodes: [],
+        groups: [],
+        drawings: [],
+        workflow: { nodes: [], edges: [] },
+        lastModified: Date.now()
+      };
+      if (!layout.canvases) layout.canvases = [];
+      layout.canvases.push(canvas);
+    }
+
+    const { action, cardId, data } = op;
+
+    if (action === 'CREATE') {
+      const type = data.type;
+      if (type === 'prompt') {
+        if (!canvas.promptNodes.some(n => n.id === cardId)) {
+          canvas.promptNodes.push({ id: cardId, ...data.detail });
+        }
+      } else if (type === 'image') {
+        if (!canvas.imageNodes.some(n => n.id === cardId)) {
+          canvas.imageNodes.push({ id: cardId, ...data.detail });
+        }
+      } else if (type === 'workflow') {
+        if (!canvas.workflow) canvas.workflow = { nodes: [], edges: [] };
+        if (!canvas.workflow.nodes) canvas.workflow.nodes = [];
+        if (!canvas.workflow.nodes.some(n => n.id === cardId)) {
+          canvas.workflow.nodes.push({ id: cardId, ...data.detail });
+        }
+      }
+    } else if (action === 'UPDATE' || action === 'MOVE') {
+      let found = false;
+      const promptIdx = canvas.promptNodes.findIndex(n => n.id === cardId);
+      if (promptIdx !== -1) {
+        canvas.promptNodes[promptIdx] = { ...canvas.promptNodes[promptIdx], ...data };
+        found = true;
+      }
+      if (!found) {
+        const imgIdx = canvas.imageNodes.findIndex(n => n.id === cardId);
+        if (imgIdx !== -1) {
+          canvas.imageNodes[imgIdx] = { ...canvas.imageNodes[imgIdx], ...data };
+          found = true;
+        }
+      }
+      if (!found && canvas.workflow?.nodes) {
+        const wfIdx = canvas.workflow.nodes.findIndex(n => n.id === cardId);
+        if (wfIdx !== -1) {
+          canvas.workflow.nodes[wfIdx] = { ...canvas.workflow.nodes[wfIdx], ...data };
+          found = true;
+        }
+      }
+    } else if (action === 'DELETE') {
+      canvas.promptNodes = canvas.promptNodes.filter(n => n.id !== cardId);
+      canvas.imageNodes = canvas.imageNodes.filter(n => n.id !== cardId);
+      if (canvas.workflow?.nodes) {
+        canvas.workflow.nodes = canvas.workflow.nodes.filter(n => n.id !== cardId);
+      }
+    }
+    
+    canvas.lastModified = Date.now();
+  });
+
+  await writeStore(store);
+  return res.json(okEnvelope({ success: true, lastModified: Date.now() }, req));
+});
+
 router.put('/api/v1/workspaces/layout', requireUser, async (req, res) => {
   const store = await readStore();
   const profileStore = ensureProfileStore(store, req.userId);
