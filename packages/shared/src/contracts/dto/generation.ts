@@ -1,6 +1,8 @@
 import type { EntityId, IdempotentRequestDto } from "./common.ts";
 import type { GenerationTaskStatus } from "../enums/status.ts";
 import type { ProviderProtocolFamily } from "./model-catalog.ts";
+import type { GenerationTelemetry } from "../../generation/types.ts";
+
 
 export type GenerationTaskType = "image" | "video" | "audio" | "document";
 export type GenerationBillingStatus =
@@ -213,6 +215,7 @@ export interface GenerationTaskDto {
     costUsd?: number;
     raw?: Record<string, unknown>;
   };
+  telemetry?: GenerationTelemetry;
 }
 
 export interface GenerationTaskListDto {
@@ -232,7 +235,9 @@ export interface UpdateGenerationTaskRequestDto {
   providerId?: string;
   protocolFamily?: ProviderProtocolFamily;
   usageSnapshot?: GenerationTaskDto["usageSnapshot"];
+  telemetry?: GenerationTelemetry;
 }
+
 
 export type SecureModelProxyMode =
   | "chat"

@@ -4462,67 +4462,28 @@ export const AppContent: React.FC<AppContentProps> = () => {
     isLargeProject,
   ]);
 
+const isRectIntersecting = (
+  r1: { x: number; y: number; width: number; height: number },
+  r2: { left: number; top: number; right: number; bottom: number }
+) => {
+  return !(
+    r1.x > r2.right ||
+    r1.x + r1.width < r2.left ||
+    r1.y > r2.bottom ||
+    r1.y + r1.height < r2.top
+  );
+};
+
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
     const { groupView } = item;
     const node = groupView.rootPrompt;
-
-    if (item.isPlaceholder) {
-      const width = getPromptNodeBoundsWidth(node, isMobile);
-      const height = node.height || 200;
-      const position = resolveLivePromptPosition(node) ?? node.position;
-      const left = position.x - width / 2;
-      const top = position.y - height;
-      const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
-
-      // 如果是大项目，为了不遮挡底下的 Canvas 渲染，占位层应该是完全透明的交互代理
-      const isTransparentProxy = isLargeProject;
-
-      return (
-        <div
-          id={`prompt-card-${node.id}`}
-          className="absolute pointer-events-auto cursor-pointer rounded-3xl select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleCanvasNodeSelect(node.id);
-          }}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            handleCanvasCardClick(node.id, true);
-          }}
-          style={{
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${width}px`,
-            height: `${height}px`,
-            zIndex: groupStackZIndex + 20,
-            background: isTransparentProxy ? 'transparent' : 'rgba(24, 24, 27, 0.4)',
-            border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
-            boxShadow: isTransparentProxy ? 'none' : '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-            backdropFilter: isTransparentProxy ? 'none' : 'blur(6px)',
-            WebkitBackdropFilter: isTransparentProxy ? 'none' : 'blur(6px)',
-          }}
-        >
-          {!isTransparentProxy && (
-            <div className="flex flex-col items-center gap-1.5 opacity-25">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              <span className="text-[10px] text-white font-medium truncate max-w-full px-2 text-center">
-                {node.prompt ? (node.prompt.slice(0, 16) + (node.prompt.length > 16 ? '...' : '')) : 'Prompt Card'}
-              </span>
-            </div>
-          )}
-        </div>
-      );
-    }
     const cardKind = canvasCardRendererRegistry.resolveCardKind(node);
     const cardRenderer = canvasCardRendererRegistry.getRenderer(cardKind);
 
     if (cardRenderer) {
       return cardRenderer({
         item,
-        detailLevel: item.detailLevel,
+        detailLevel: (item.isPlaceholder ? 'skeleton' : item.detailLevel) as any,
         isSelected: selectedNodeIds.includes(node.id),
         highlighted: highlightedIdVal === node.id,
         zoomScale: canvasTransform.scale,
@@ -4567,7 +4528,49 @@ export const AppContent: React.FC<AppContentProps> = () => {
       });
     }
 
+    if (item.isPlaceholder) {
+      const width = getPromptNodeBoundsWidth(node, isMobile);
+      const height = node.height || 200;
+      const position = resolveLivePromptPosition(node) ?? node.position;
+      const left = position.x - width / 2;
+      const top = position.y - height;
+      const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
+
+      return (
+        <div
+          id={`prompt-card-${node.id}`}
+          className="absolute pointer-events-auto cursor-pointer rounded-3xl select-none flex flex-col items-center justify-center p-4 gap-2 border border-white/5 bg-zinc-900/60"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCanvasNodeSelect(node.id);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            handleCanvasCardClick(node.id, true);
+          }}
+          style={{
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+            zIndex: groupStackZIndex + 20,
+          }}
+        >
+          <div className="flex flex-col items-center gap-1.5 opacity-25">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="text-[10px] text-white font-medium truncate max-w-full px-2 text-center">
+              {node.prompt ? (node.prompt.slice(0, 16) + (node.prompt.length > 16 ? '...' : '')) : 'Prompt Card'}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     return null;
+
   }, [
     handlePromptGroupChildDragCommit,
     handlePromptGroupChildDragDelta,
@@ -4721,6 +4724,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
     const rRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + RENDER_BUFFER;
     const rBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + RENDER_BUFFER;
 
+    const sLeft = -canvasTransform.x / canvasTransform.scale - 150;
+    const sTop = -canvasTransform.y / canvasTransform.scale - 150;
+    const sRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + 150;
+    const sBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + 150;
+
     const items: CanvasRenderItem[] = [
       ...visiblePromptGroupViews
         .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
@@ -4729,41 +4737,21 @@ export const AppContent: React.FC<AppContentProps> = () => {
             || groupView.childImages.some(child => selectedNodeIds.includes(child.id))
             || groupView.rootPrompt.id === activeSourceImage;
           const isGenerating = generatingGroupIds.includes(groupView.rootPrompt.id);
-          const isVisible = effectiveVisibleCardIds.has(groupView.rootPrompt.id)
-            || groupView.childImages.some(child => effectiveVisibleCardIds.has(child.id));
-          // 仅当被选中、正在生成，或者在空间索引的可视集合中时，才挂载 React DOM 树
-          return isGroupSelected || isGenerating || isVisible;
+          
+          // 只要整个卡组的 bounds 在 RENDER_BUFFER (rLeft, rTop, rRight, rBottom) 内就挂载
+          const isWithinRenderBuffer = groupView.bounds
+            ? isRectIntersecting(groupView.bounds, { left: rLeft, top: rTop, right: rRight, bottom: rBottom })
+            : false;
+
+          return isGroupSelected || isGenerating || isWithinRenderBuffer;
         })
         .map((groupView) => {
           const visibleChildImages = groupView.childImages.filter((imageNode) => !collapsedCanvasGroupNodeIds.has(imageNode.id));
           
-          const promptWidth = getPromptNodeBoundsWidth(groupView.rootPrompt, isMobile);
-          const promptHeight = groupView.rootPrompt.height || 200;
-          const promptPos = liveNodePositionByIdRef.current[groupView.rootPrompt.id] ?? groupView.rootPrompt.position;
-          const promptInRender = !(
-            promptPos.x - promptWidth / 2 > rRight ||
-            promptPos.x + promptWidth / 2 < rLeft ||
-            promptPos.y - promptHeight > rBottom ||
-            promptPos.y < rTop
-          );
-
-          const anyChildInRender = visibleChildImages.some((child) => {
-            const { width: cW, totalHeight: cH } = getCardDimensions(child.aspectRatio, true);
-            const cHeight = imageCardHeightById[child.id] ?? cH;
-            const cPos = liveNodePositionByIdRef.current[child.id] ?? child.position;
-            return !(
-              cPos.x - cW / 2 > rRight ||
-              cPos.x + cW / 2 < rLeft ||
-              cPos.y - cHeight > rBottom ||
-              cPos.y < rTop
-            );
-          });
-
-          const isGroupSelected = selectedNodeIds.includes(groupView.rootPrompt.id) 
-            || visibleChildImages.some(child => selectedNodeIds.includes(child.id))
-            || groupView.rootPrompt.id === activeSourceImage;
-
-          const isGroupPlaceholder = (!promptInRender && !anyChildInRender);
+          // 卡组整体判断 placeholder 状态（若 bounds 在实际可视视口外，则是 placeholder 占位符）
+          const isGroupPlaceholder = groupView.bounds
+            ? !isRectIntersecting(groupView.bounds, { left: sLeft, top: sTop, right: sRight, bottom: sBottom })
+            : true;
 
           return {
             id: groupView.id,

@@ -423,22 +423,26 @@ try {
       },
     };
 
-    window.localStorage.setItem('theme', 'dark');
-    window.localStorage.setItem('kk_theme', 'dark');
-    window.localStorage.setItem('kk_language', 'en-US');
-    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
-    window.localStorage.setItem('kk_tutorial_seen', 'true');
-    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
-      user: tempUser,
-      createdAt: now,
-      expiresAt,
-      isTempUser: true,
-    }));
-    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
-      user: tempUser,
-      isTempUser: true,
-      tempUserExpiry: expiresAt,
-    }));
+    try {
+      window.localStorage.setItem('theme', 'dark');
+      window.localStorage.setItem('kk_theme', 'dark');
+      window.localStorage.setItem('kk_language', 'en-US');
+      window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+      window.localStorage.setItem('kk_tutorial_seen', 'true');
+      window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+        user: tempUser,
+        createdAt: now,
+        expiresAt,
+        isTempUser: true,
+      }));
+      window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+        user: tempUser,
+        isTempUser: true,
+        tempUserExpiry: expiresAt,
+      }));
+    } catch (e) {
+      console.warn('InitScript localStorage error:', e);
+    }
   });
 
   await gotoWithRetry(page, `${targetUrl}${SETTINGS_HOME_PATH}`);

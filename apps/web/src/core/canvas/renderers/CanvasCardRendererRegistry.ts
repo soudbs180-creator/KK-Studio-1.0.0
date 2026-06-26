@@ -67,32 +67,38 @@ class CanvasCardRendererRegistry {
   }
 
   private registerDefaults() {
-    const defaultPolicy = (kind: CanvasCardKind, pattern: CardDisplayPattern): CardRenderPolicy => ({
+    const createPolicy = (
+      kind: CanvasCardKind,
+      pattern: CardDisplayPattern,
+      overrides: Partial<CardRenderPolicy> = {}
+    ): CardRenderPolicy => ({
       kind,
       displayPattern: pattern,
-      hasMainCard: true,
-      hasResultCards: true,
-      atomicGroup: true,
+      hasMainCard: false,
+      hasResultCards: false,
+      atomicGroup: false,
       supportsFull: true,
       supportsCompact: true,
       supportsGhost: true,
       canRenderSkeleton: true,
       canRenderThumbnail: true,
       canRenderPreview: true,
+      ...overrides,
     });
 
-    this.register('image-generation-group', defaultPolicy('image-generation-group', 'prompt-result-group'), ImageGenerationGroupRenderer);
-    this.register('video-generation-group', defaultPolicy('video-generation-group', 'prompt-result-group'), VideoGenerationGroupRenderer);
-    this.register('ecommerce-task-card', defaultPolicy('ecommerce-task-card', 'standalone-task-card'), EcommerceTaskCardRenderer);
-    this.register('ppt-slide-card', defaultPolicy('ppt-slide-card', 'multi-page-card'), PptSlideCardRenderer);
-    this.register('ppt-deck-card', defaultPolicy('ppt-deck-card', 'multi-page-card'), PptDeckCardRenderer);
-    this.register('music-task-card', defaultPolicy('music-task-card', 'standalone-task-card'), MusicTaskCardRenderer);
-    this.register('browser-task-card', defaultPolicy('browser-task-card', 'standalone-task-card'), BrowserTaskCardRenderer);
-    this.register('asset-card', defaultPolicy('asset-card', 'standalone-media-card'), AssetCardRenderer);
-    this.register('workflow-card', defaultPolicy('workflow-card', 'workflow-utility-card'), WorkflowCardRenderer);
-    this.register('agent-card', defaultPolicy('agent-card', 'workflow-utility-card'), AgentCardRenderer);
-    this.register('export-card', defaultPolicy('export-card', 'workflow-utility-card'), ExportCardRenderer);
+    this.register('image-generation-group', createPolicy('image-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), ImageGenerationGroupRenderer);
+    this.register('video-generation-group', createPolicy('video-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), VideoGenerationGroupRenderer);
+    this.register('ecommerce-task-card', createPolicy('ecommerce-task-card', 'standalone-task-card'), EcommerceTaskCardRenderer);
+    this.register('ppt-slide-card', createPolicy('ppt-slide-card', 'multi-page-card'), PptSlideCardRenderer);
+    this.register('ppt-deck-card', createPolicy('ppt-deck-card', 'multi-page-card'), PptDeckCardRenderer);
+    this.register('music-task-card', createPolicy('music-task-card', 'standalone-media-card'), MusicTaskCardRenderer);
+    this.register('browser-task-card', createPolicy('browser-task-card', 'standalone-task-card'), BrowserTaskCardRenderer);
+    this.register('asset-card', createPolicy('asset-card', 'standalone-media-card'), AssetCardRenderer);
+    this.register('workflow-card', createPolicy('workflow-card', 'workflow-utility-card'), WorkflowCardRenderer);
+    this.register('agent-card', createPolicy('agent-card', 'workflow-utility-card'), AgentCardRenderer);
+    this.register('export-card', createPolicy('export-card', 'workflow-utility-card'), ExportCardRenderer);
   }
+
 
   register(kind: CanvasCardKind, policy: CardRenderPolicy, renderer: CanvasCardRenderer) {
     this.renderers.set(kind, renderer);

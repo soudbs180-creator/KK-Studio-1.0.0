@@ -1,6 +1,9 @@
+import type { GenerationTelemetry } from '@kk/shared';
+
 export const AspectRatio = {
   AUTO: 'auto', // Auto match
   SQUARE: '1:1',
+
   PORTRAIT_1_8: '1:8', // New: Nano Banana 2 & Pro
   PORTRAIT_1_4: '1:4', // New: Nano Banana 2 & Pro
   PORTRAIT_3_4: '3:4',
@@ -337,6 +340,7 @@ export interface RedrawMetadata {
 
 export interface GeneratedImage {
   id: string;
+  telemetry?: GenerationTelemetry;
   storageId?: string; // Content-based Hash ID for storage deduplication
   url: string;
   originalUrl?: string; // High-res original (if different from url)
@@ -929,6 +933,7 @@ export interface EcommercePromptState {
 
 export interface PromptNode {
   id: string;
+  telemetry?: GenerationTelemetry;
   prompt: string;
   originalPrompt?: string;
   optimizedPromptEn?: string;

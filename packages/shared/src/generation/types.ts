@@ -102,3 +102,71 @@ export interface StandardGenerationError {
   status?: number;
   raw?: unknown;
 }
+
+/**
+ * 统一的生成过程度量与监控遥测数据契约 (GenerationTelemetry)
+ */
+export interface GenerationTelemetry {
+  jobId: string;
+  taskType: 'image' | 'video' | 'audio' | 'music' | 'ppt' | 'ecommerce' | 'browser' | 'workflow' | 'agent' | 'export';
+  model: {
+    id: string;
+    name: string;
+    provider: string;
+    providerName: string;
+  };
+  route: {
+    sourceType: string;         // e.g. 'api-user-local' | 'api-user-cloud' | 'api-platform' | 'cloud-vps'
+    executionSide: 'local' | 'cloud' | 'platform' | 'relay';
+    keySlotId?: string;
+  };
+  timing: {
+    queuedAt?: string;          // ISO string
+    startedAt?: string;         // ISO string
+    firstByteAt?: string;       // ISO string
+    completedAt?: string;       // ISO string
+    failedAt?: string;          // ISO string
+    queueDurationMs?: number;
+    generationDurationMs?: number;
+    totalDurationMs?: number;
+  };
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    apiDurationMs?: number;
+  };
+  cost?: {
+    chargedCredits?: number;
+    refundedCredits?: number;
+    estimatedAmount?: number;   // 预估费用
+    chargedAmount?: number;     // 实际扣费
+    ledgerId?: string;
+    billingTransactionId?: string;
+    balanceAfter?: number;
+  };
+  settings?: {
+    prompt: string;
+    negativePrompt?: string;
+    aspectRatio?: string;
+    size?: string;
+    imageCount?: number;
+    [key: string]: any;
+  };
+  result?: {
+    assetIds: string[];
+    canvasNodeIds: string[];
+    urls: string[];
+  };
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+    raw?: any;
+  };
+  retry?: {
+    previousJobIds: string[];
+    retryCount: number;
+  };
+}
+

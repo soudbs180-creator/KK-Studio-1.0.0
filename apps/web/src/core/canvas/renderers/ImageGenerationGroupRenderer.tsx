@@ -133,7 +133,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
         stackZIndexOverride={promptCardZIndex}
         shadowBoost={shadowBoost}
         actualChildImageCount={visibleChildImages.length}
-        onPositionChange={() => {}}
+        onPositionChange={handleLiveNodePositionChange}
         isSelected={isSelected}
         highlighted={highlightedIdVal === node.id || isGroupFocused}
         onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
@@ -189,24 +189,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
             position={childLayout.visualPosition}
             onLivePositionChange={handleLiveNodePositionChange}
             onHeightChange={handleImageCardHeightChange}
-            isVisible={(() => {
-              const screenLeft = -canvasTransform.x / canvasTransform.scale;
-              const screenTop = -canvasTransform.y / canvasTransform.scale;
-              const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
-              const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
-              const { width: w, totalHeight: h } = getSharedImageNodeProps(childLayout.childNode).image.aspectRatio 
-                ? { width: 400, totalHeight: 600 } 
-                : { width: 400, totalHeight: 600 }; // Fallback sizing check
-              const x = childLayout.visualPosition.x - w / 2;
-              const y = childLayout.visualPosition.y - h;
-              const margin = 150;
-              return !(
-                x > screenRight + margin ||
-                x + w < screenLeft - margin ||
-                y > screenBottom + margin ||
-                y + h < screenTop - margin
-              );
-            })()}
+            isVisible={true}
             isCanvasTransforming={isCanvasTransforming}
             highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
             isSelected={selectedNodeIds.includes(childLayout.childNode.id)}

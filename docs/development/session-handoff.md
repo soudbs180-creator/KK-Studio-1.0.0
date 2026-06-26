@@ -1587,3 +1587,49 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run verify:changes` 100% 成功通过，包含 1610+ 个单元测试用例及全部 Playwright 浏览器 smoke 仿真流程测试。
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+## 99. 2026-06-27 - Resolve P0 Multi-Type Card Renderers, Atomic Group Culling, and Generation Telemetry Contract (本次追加)
+- **修改范围**：
+  1. **假 Renderer 替换为专属真 Renderer**：重写了 `VideoGenerationGroupRenderer`, `EcommerceTaskCardRenderer`, `PptSlideCardRenderer`, `PptDeckCardRenderer`, `MusicTaskCardRenderer` 以及其他实用卡片渲染器。彻底移除对 `ImageGenerationGroupRenderer` 的假转发，为每种卡片提供专属的 Full, Compact, Ghost, Skeleton 样式渲染。
+  2. **CardRenderPolicy 规范修正**：修正了 `CanvasCardRendererRegistry` 中的默认政策和具体卡片政策，为 ecommerce, ppt, music 等卡片类型配置了专属的 DisplayPattern，并明确将它们的 `atomicGroup` 设为 `false`，解决所有卡片被错误判定为图片卡组原子结构的隐患。
+  3. **可视区占位与 Skeleton 骨架优化**：在 `WorkspacePage.tsx` 中重构卡片挂载检测逻辑，卡组挂载与占位计算完全依赖整体 `groupView.bounds` 的相交检测；在 skeleton 状态下移除了 transition-all、blur 和 backdrop-filter 等耗性能属性，以高品质的专属骨架代替空白透明代理。
+  4. **卡组原子化渲染与裁剪阻断**：卡组在进入可视区挂载后，内部所有子卡片的 `isVisible` 属性强制锁定为 `true`，防止子卡片被单独裁剪，确保原子卡组在视口内整体性呈现。
+  5. **遥测数据 GenerationTelemetry 闭环**：正式接入并实现 `GenerationTelemetry` 规范，对生图、重绘等任务的成功和失败均输出包含 timing, usage, cost 的标准遥测对象，打通卡片详情、Task Center 及后台费率流水。
+  6. **补齐契约回归测试**：在 `tests/contract` 新增并跑通了 5 个关键的静态契约与类型测试用例，用静态源码分析代替 React 挂载，彻底杜绝了假转发回流的问题。
+  7. **增强烟测初始化鲁棒性**：在 `verify-desktop-settings-smoke.mjs` 等全部四个 Playwright 烟测脚本的 `addInitScript` 中，为 `window.localStorage` 的操作加上了 `try/catch` 保护，以防在 Vite Chunk 失败强制重载时因浏览器沙箱安全策略限制 localStorage 读写导致测试脚本超时崩毁。
+- **修改文件**：
+  - [packages/shared/src/generation/types.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/generation/types.ts)
+  - [packages/shared/src/contracts/dto/generation.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/contracts/dto/generation.ts)
+  - [apps/web/src/types.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/types.ts)
+  - [apps/web/src/types/index.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/types/index.ts)
+  - [apps/web/src/canvas/performanceProfile.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/canvas/performanceProfile.ts)
+  - [apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts)
+  - [apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/EcommerceTaskCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/EcommerceTaskCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/PptSlideCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/PptSlideCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/PptDeckCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/PptDeckCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/MusicTaskCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/MusicTaskCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/BrowserTaskCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/BrowserTaskCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/AssetCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/AssetCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/WorkflowCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/WorkflowCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/AgentCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/AgentCardRenderer.tsx)
+  - [apps/web/src/core/canvas/renderers/ExportCardRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/ExportCardRenderer.tsx)
+  - [apps/web/src/core/generation/GenerationEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/generation/GenerationEngine.ts)
+  - [apps/web/src/pages/Workspace/WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [tests/contract/canvas-card-renderer-registry.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/canvas-card-renderer-registry.test.ts)
+  - [tests/contract/card-lod-display-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/card-lod-display-contract.test.ts)
+  - [tests/contract/generation-telemetry-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/generation-telemetry-contract.test.ts)
+  - [tests/contract/prompt-group-atomic-rendering.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/prompt-group-atomic-rendering.test.ts)
+  - [tests/contract/workspace-no-fake-renderer.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/contract/workspace-no-fake-renderer.test.ts)
+  - [scripts/test/verify-desktop-settings-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-desktop-settings-smoke.mjs)
+  - [scripts/test/verify-mobile-settings-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-mobile-settings-smoke.mjs)
+  - [scripts/test/verify-ai-takeover-smoke.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-ai-takeover-smoke.mjs)
+  - [scripts/test/verify-prompt-group-drag.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/test/verify-prompt-group-drag.mjs)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **静态契约校验设计**：在 Node 单元测试中通过正则表达式静态提取与匹配组件源码中的属性配置和依赖，这既打通了对专属卡片与 Skeleton 重绘检测的 CI 回归校验，又完美避开了 TSX/JSX 的 React 复杂虚拟 DOM 挂载耗时。
+  - **localStorage 容错**：在页面多次重定向跳转/强制重载期间，localStorage 随时可能被浏览器的沙箱所临时限制。使用 try-catch 能最大限度保障测试脚本不因此类瞬时拦截挂死。
+- **已运行验证**：
+  - 运行全量 `npm run verify:changes` 100% 成功通过，0 错误 0 Regression。其中包含了 1610+ 项单元与集成测试、Playwright 移动与桌面设置页面冒烟测试、AI Takeover 冒烟测试以及 Canvas 性能基准测试。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。

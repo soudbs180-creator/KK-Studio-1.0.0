@@ -1,6 +1,6 @@
 export type CanvasProjectSize = 'normal' | 'large' | 'huge';
 export type CanvasZoomBand = 'near' | 'mid' | 'tiny';
-export type CanvasCardDetailLevel = 'full' | 'compact' | 'thumbnail-shell' | 'ghost';
+export type CanvasCardDetailLevel = 'full' | 'compact' | 'thumbnail-shell' | 'ghost' | 'skeleton';
 export type CanvasRenderMode = 'standard' | 'performance' | 'interactive';
 export type CanvasDeviceTier = 'low' | 'medium' | 'high';
 export type CanvasInteractionPhase = 'idle' | 'pan' | 'zoom';

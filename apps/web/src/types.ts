@@ -1,3 +1,5 @@
+import type { GenerationTelemetry } from '@kk/shared';
+
 export const AspectRatio = {
   AUTO: 'auto', // Auto match
   SQUARE: '1:1',
@@ -18,9 +20,13 @@ export const AspectRatio = {
   STANDARD_2_3: '2:3', // Alias/Legacy
   STANDARD_3_2: '3:2', // Alias/Legacy
 } as const;
+
 export type AspectRatio = typeof AspectRatio[keyof typeof AspectRatio];
 
-
+export interface GeneratedImage {
+  id: string;
+  telemetry?: GenerationTelemetry;
+}
 
 export const ImageSize = {
   SIZE_05K: '0.5K', // 512px - Gemini 3.1 Flash Image
@@ -338,6 +344,7 @@ export interface RedrawMetadata {
 
 export interface GeneratedImage {
   id: string;
+  telemetry?: GenerationTelemetry;
   storageId?: string; // Content-based Hash ID for storage deduplication
   url: string;
   originalUrl?: string; // High-res original (if different from url)
@@ -929,6 +936,7 @@ export interface EcommercePromptState {
 
 export interface PromptNode {
   id: string;
+  telemetry?: GenerationTelemetry;
   prompt: string;
   originalPrompt?: string;
   optimizedPromptEn?: string;

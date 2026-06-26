@@ -510,23 +510,27 @@ try {
       },
     };
 
-    window.localStorage.setItem('theme', 'dark');
-    window.localStorage.setItem('kk_theme', 'dark');
-    window.localStorage.setItem('kk_language', 'zh-CN');
-    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
-    window.localStorage.setItem('kk_tutorial_seen', 'true');
-    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
-      user: tempUser,
-      createdAt: now,
-      expiresAt,
-      isTempUser: true,
-    }));
-    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
-      user: tempUser,
-      isTempUser: true,
-      tempUserExpiry: expiresAt,
-    }));
-    window.localStorage.setItem(storageKey, JSON.stringify(state));
+    try {
+      window.localStorage.setItem('theme', 'dark');
+      window.localStorage.setItem('kk_theme', 'dark');
+      window.localStorage.setItem('kk_language', 'zh-CN');
+      window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+      window.localStorage.setItem('kk_tutorial_seen', 'true');
+      window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+        user: tempUser,
+        createdAt: now,
+        expiresAt,
+        isTempUser: true,
+      }));
+      window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+        user: tempUser,
+        isTempUser: true,
+        tempUserExpiry: expiresAt,
+      }));
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch (e) {
+      console.warn('InitScript localStorage error:', e);
+    }
   }, {
     state: seededCanvasState,
     storageKey: STORAGE_KEY,

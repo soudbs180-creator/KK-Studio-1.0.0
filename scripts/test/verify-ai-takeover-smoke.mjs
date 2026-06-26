@@ -1,4 +1,4 @@
-﻿import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
@@ -491,27 +491,31 @@ try {
       },
     };
 
-    window.localStorage.setItem('theme', 'dark');
-    window.localStorage.setItem('kk_theme', 'dark');
-    window.localStorage.setItem('kk_language', 'zh-CN');
-    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
-    window.localStorage.setItem('kk_tutorial_seen', 'true');
-    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
-      user: tempUser,
-      createdAt: now,
-      expiresAt,
-      isTempUser: true,
-    }));
-    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
-      user: tempUser,
-      isTempUser: true,
-      tempUserExpiry: expiresAt,
-    }));
-    window.localStorage.setItem('kk_durable_generation_jobs', JSON.stringify(seedDurableQueueJobs.map((job) => ({
-      ...job,
-      createdAt: now,
-      updatedAt: now,
-    }))));
+    try {
+      window.localStorage.setItem('theme', 'dark');
+      window.localStorage.setItem('kk_theme', 'dark');
+      window.localStorage.setItem('kk_language', 'zh-CN');
+      window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+      window.localStorage.setItem('kk_tutorial_seen', 'true');
+      window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+        user: tempUser,
+        createdAt: now,
+        expiresAt,
+        isTempUser: true,
+      }));
+      window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+        user: tempUser,
+        isTempUser: true,
+        tempUserExpiry: expiresAt,
+      }));
+      window.localStorage.setItem('kk_durable_generation_jobs', JSON.stringify(seedDurableQueueJobs.map((job) => ({
+        ...job,
+        createdAt: now,
+        updatedAt: now,
+      }))));
+    } catch (e) {
+      console.warn('InitScript localStorage error:', e);
+    }
   }, SMOKE_DURABLE_QUEUE_JOBS);
 
   await gotoWithRetry(page, targetUrl);
