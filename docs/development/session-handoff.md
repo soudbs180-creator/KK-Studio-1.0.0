@@ -772,3 +772,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 类型校验 100% 成功通过。
   - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过（包括 contract 静态拦截测试）。
   - 运行 `npm run build` Vite 生产包构建打包 100% 成功通过。
+
+## 50. 2026-06-26 - Canvas Render Freeze Dependencies Fix and Unlock Recovery (本次追加)
+- **修改范围**：
+  - 修复了画布在平移、缩放、或卡片拖动等 Transforming/Dragging 交互结束后，卡片在主画布上完全消失只剩下连线虚线、且永久无法自动水合重新加载恢复的重大渲染死锁缺陷。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+- **当前设计决策**：
+  - **补齐核心 Memo 依赖项以驱动解冻**：在 `WorkspacePage.tsx` 的 `canvasRenderItems` 和 `renderedVisibleGroups` 的 useMemo 依赖项中，补全了 `isCanvasTransforming` 和 `isNodeDragActive` 两个状态控制变量。之前版本虽然在 Memo 内部使用它们做了短路拦截，但由于未在依赖项数组中声明，导致交互结束状态变回 `false` 时无法重新求值，卡片永久停留在 Transforming 期间的空/旧状态中。补齐依赖后，任何状态变换结束的那一帧均能百分之百驱动 React 触发最后一帧的解冻刷新，拉起最新可视卡片列表。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过，未对原有的静态正则和行为契约造成任何冲突。
+  - 运行 `npm run build` Vite 生产包构建打包完全通过。
+  - 经由浏览器子代理（Browser Subagent）进行自动化交互重载测试，确证大画布不论大位移/小位移平移或大幅缩放，卡片在交互期间和停止后都能秒级完美渲染显示，控制台无 “Maximum update depth exceeded” 或组件崩溃报错。
+

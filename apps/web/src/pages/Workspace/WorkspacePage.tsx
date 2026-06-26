@@ -4665,6 +4665,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     isMobile,
     imageCardHeightById,
     shouldFreezeRender,
+    isCanvasTransforming,
+    isNodeDragActive,
   ]);
 
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
