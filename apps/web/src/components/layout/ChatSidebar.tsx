@@ -936,7 +936,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                  url.startsWith('action://takeover-image-to-video') ||
                                  url.startsWith('action://takeover-bulk-generate');
 
-        if (aiTakeoverMode && isTakeoverAction) {
+        if (isTakeoverAction) {
             if (url === 'action://takeover-prompt-only') {
                 sendTakeoverMessage('帮我只优化提示词并填充，不进行图片生成。');
             } else if (url === 'action://takeover-prompt-doc') {

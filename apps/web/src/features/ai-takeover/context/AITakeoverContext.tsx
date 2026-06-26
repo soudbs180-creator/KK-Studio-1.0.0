@@ -609,6 +609,16 @@ export function AITakeoverProvider({
 
     // 挂载时，自动触发/恢复排队及挂起的批量任务
     durableGenerationQueue.processQueue();
+
+    const handleOnline = () => {
+      console.log('[TakeoverQueue] Network reconnected, resuming pending generation tasks...');
+      durableGenerationQueue.processQueue();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   return (
