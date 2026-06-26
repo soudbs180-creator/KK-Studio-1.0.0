@@ -361,6 +361,11 @@ async function handleAuthAliasLogin(req, res) {
     }
   }
 
+  const isTest = process.env.NODE_ENV === 'test';
+  if (!isTest && String(password).trim() !== 'admin123456') {
+    return sendError(res, req, 401, 'AUTH_INVALID_CREDENTIALS', 'Invalid email or password (Mock password must be admin123456).');
+  }
+
   return res.json(toLegacyAuthResponse(buildSession(buildLocalProfile('mock-user-id', { email, adminLevel: 1 })), 'Login successful.'));
 }
 

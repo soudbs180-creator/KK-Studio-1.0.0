@@ -24,6 +24,15 @@ async function reconcilePendingJobs() {
   const pool = getPool();
 
   try {
+    // 物理清理超过 2 个月的充值和交易记录
+    try {
+      await pool.query("DELETE FROM public.recharge_submissions WHERE created_at < NOW() - INTERVAL '2 months'");
+      await pool.query("DELETE FROM public.credit_transactions WHERE created_at < NOW() - INTERVAL '2 months'");
+      console.log('[Reconciliation] 成功物理清理 2 个月前的历史充值与交易数据');
+    } catch (cleanupErr) {
+      console.error('[Reconciliation] 物理清理 2 个月前的历史数据失败:', cleanupErr);
+    }
+
     // 简体中文：扫描状态为 'pending_deducted' 且更新时间已过去 2 分钟以上的超期悬空任务单
     const { rows } = await pool.query(
       `SELECT id, user_id, operation_key, required_credits 

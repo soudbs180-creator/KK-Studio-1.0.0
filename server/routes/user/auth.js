@@ -2,7 +2,7 @@
 // 职责：提供当前登录用户信息，前端依赖它刷新管理员等级和积分余额。
 
 const express = require('express');
-const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || 'admin@example.com';
+const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || '977483863@qq.com';
 
 const crypto = require('crypto');
 const { getPool } = require('../../lib/db');
@@ -808,8 +808,20 @@ router.post('/v1/auth/login', async (req, res) => {
 
   const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
   if (isNoDb) {
+    const isTest = process.env.NODE_ENV === 'test';
+    if (!isTest && String(password).trim() !== 'admin123456') {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_CREDENTIALS',
+          message: 'Invalid login credentials (Mock password must be admin123456).'
+        },
+        meta: buildMeta(req)
+      });
+    }
+
     const userId = 'mock-user-id';
-    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
+    const defaultEmail = isTest ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
     const loginEmail = String(email).trim() || defaultEmail;
     const session = buildAuthSession({
       id: userId,

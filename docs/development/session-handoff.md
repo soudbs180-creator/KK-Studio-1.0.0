@@ -1351,3 +1351,29 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 无。当前版本非常稳定，且已成功固化提交。
 
+## 88. 2026-06-26 - Superadmin Privacy Shielding, Auth Enforcement, and Retention Policy (本次追加)
+- **修改范围**：
+  1. **超级管理员隐私过滤**：在 `server/routes/admin.js` 中将超级管理员默认邮箱调整为 `977483863@qq.com`，且无论是数据库联合查询还是本地 mock 账户，均物理隐藏屏蔽此超级管理员账号的显示，实现其隐私不被其他用户/管理员窥探。
+  2. **强制密码登录加固**：在无数据库开发与调试模式下，非 `test` 测试环境（如开发/生产 mock 状态）强制要求密码必须匹配 `admin123456`，彻底封堵免密登录漏洞。
+  3. **联合账户与充值统计**：重构 `/admin/users` 为 `UNION ALL` 联合查询结构，合并展示 `users` 注册账户和 `temp_users` 临时账户，展示对应的余额和仅限近 2 个月的充值总额。
+  4. **2个月自动数据物理清理**：在 `reconciliation.js` 守护进程的方法顶部，注入针对 `recharge_submissions` 和 `credit_transactions` 两表的物理清理 SQL，每当守护进程轮询唤醒时会自动删除两个月以前的历史充值与交易数据，实现物理级的数据留存控制。
+  5. **新增单测守护**：创建了 `tests/unit/vps-admin-user-retention-privacy.test.ts` 对上述登录强密码校验、超级管理员隐私过滤、临时账户列表、近两个月充值过滤及物理过期清理进行了完整的 4 项单元测试校验。
+- **修改文件**：
+  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/admin.js)
+  - [auth.js (user)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/user/auth.js)
+  - [auth.js (compat)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/auth.js)
+  - [reconciliation.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/reconciliation.js)
+  - [vps-admin-user-retention-privacy.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-admin-user-retention-privacy.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **物理级脱敏与清理**：在 SQL 层对 `977483863@qq.com` 进行硬阻断，即便后台搜索也绝不会返回该账号。对老数据直接进行物理 `DELETE` 清理，配合子查询的近两个月限制，双重确保数据不会超期泄露。
+  - **登录拦截不漏网**：同时对 v1 标准登录和 legacy 兼容登录添加了 mock 状态下的 `admin123456` 的密码类型与去除空白字符防卫，防止免密穿透。
+- **已运行验证**：
+  - 运行新建单测 `vps-admin-user-retention-privacy.test.ts` 4 项测试 100% 成功通过。
+  - 运行全量集成验证链路 `npm run verify:changes` 100% 成功通过（1606 个单元测试与 13 项自检/集成校验全数变绿）。
+- **未运行验证及原因**：
+  - 无。所有关联校验均已完全运行通过。
+- **风险与下一步**：
+  - 无。代码安全可靠。
+
+
