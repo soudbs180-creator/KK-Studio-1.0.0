@@ -149,6 +149,15 @@ function buildHealthPayload() {
     blockers.push('JWT_SECRET_OR_PASSWORD_SALT');
   }
 
+  // 检查本地 uploads 目录状态
+  const uploadsDir = path.join(__dirname, 'uploads');
+  let uploadsDirExists = false;
+  try {
+    uploadsDirExists = fs.existsSync(uploadsDir);
+  } catch (e) {
+    uploadsDirExists = false;
+  }
+
   return {
     ok: true,
     success: true,
@@ -185,6 +194,25 @@ function buildHealthPayload() {
       allowDegradedPersistence: localOnly,
       blockers,
     },
+    // 🚀 [新架构健康状态扩展] 满足 Vercel/VPS 分离后的核心探测要求
+    auth: {
+      hasJwtSecret: Boolean(process.env.JWT_SECRET),
+      hasPasswordSalt: Boolean(process.env.PASSWORD_SALT),
+      hasUserApiEncryptionSecret,
+      hasAuthSecrets,
+    },
+    database: {
+      postgres: hasPostgresConfig ? 'configured' : 'missing',
+      urlAvailable: Boolean(process.env.DATABASE_URL),
+    },
+    uploads: {
+      uploadDirExists: uploadsDirExists,
+      s3Enabled: Boolean(process.env.AWS_S3_BUCKET || process.env.S3_BUCKET),
+    },
+    provider: {
+      openai: Boolean(process.env.OPENAI_API_KEY),
+      gemini: Boolean(process.env.GEMINI_API_KEY),
+    }
   };
 }
 

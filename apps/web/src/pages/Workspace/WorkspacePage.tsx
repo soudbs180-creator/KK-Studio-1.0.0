@@ -51,6 +51,7 @@ import { resolveFollowUpDraftPosition } from '../../app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from '../../app/promptGroupRenderLayout';
 import { useAppPromptBarProps } from '../../app/useAppPromptBarProps';
 import { useCanvasViewport } from '../../hooks/useCanvasViewport';
+import { useCanvasRenderItems } from '../../hooks/useCanvasRenderItems';
 import { useCanvasInteractionState } from '../../hooks/useCanvasInteractionState';
 import { useCanvasNodeSelection } from '../../app/useCanvasNodeSelection';
 import { useDraftNodeSync } from '../../app/useDraftNodeSync';
@@ -4254,7 +4255,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
 
-    if (item.isPlaceholder) {
+    if (item.isPlaceholder || item.detailLevel === 'ghost') {
       const { width: nodeWidth, totalHeight } = getCardDimensions(node.aspectRatio, true);
       const cardHeight = imageCardHeightById[node.id] ?? totalHeight;
       const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
@@ -4370,7 +4371,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     const { groupView } = item;
     const node = groupView.rootPrompt;
 
-    if (item.isPlaceholder) {
+    if (item.isPlaceholder || item.detailLevel === 'ghost') {
       const width = getPromptNodeBoundsWidth(node, isMobile);
       const height = node.height || 200;
       const position = resolveLivePromptPosition(node) ?? node.position;
@@ -4872,6 +4873,16 @@ export const AppContent: React.FC<AppContentProps> = () => {
     isNodeDragActive,
   ]);
 
+  const renderedItems = useCanvasRenderItems({
+    items: canvasRenderItems,
+    selectedNodeIds,
+    activeSourceImage,
+    draftNodeId,
+    isCanvasTransforming,
+    scale: canvasTransform.scale,
+    canvasPerformanceProfile,
+  });
+
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
   const renderedVisibleGroups = React.useMemo(() => {
@@ -4946,12 +4957,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
   ]);
 
   const renderedCanvasItems = React.useMemo(() => (
-    canvasRenderItems.map((item) => (
+    renderedItems.map((item) => (
       <React.Fragment key={item.id}>
-        {renderWorkflowNode(canvasNodeRendererRegistry, item)}
+        {renderWorkflowNode(canvasNodeRendererRegistry, item as any)}
       </React.Fragment>
     ))
-  ), [canvasNodeRendererRegistry, canvasRenderItems]);
+  ), [canvasNodeRendererRegistry, renderedItems]);
 
   useEffect(() => {
     if (!isReady || !activeCanvas || !canvasRef.current) return;

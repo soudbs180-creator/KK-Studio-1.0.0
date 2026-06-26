@@ -950,3 +950,23 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 类型编译 100% 成功通过。
   - 运行 `npm run build` 成功完成 Vite 静态资源包构建与 Worker 打包。
   - 运行 `npm run architecture:check` 及 `npm run governance:check` 全面合规通过。
+
+## 73. 2026-06-26 - Implement Local LOD Culling and VPS Security Health Endpoint
+- **修改范围**：
+  1. 完成了大画布卡片 LOD（精细度）与视口裁剪（occlusion culling）重构，仅对可视缓冲区（overscan）内的卡片挂载 DOM。
+  2. 扩展了后端健康探测接口 `/healthz`，支持返回 VPS 在 auth、database、uploads 及各 AI 服务商的物理配置状态，并保留对现有字段的完全向下兼容。
+- **修改文件**：
+  - [useCanvasRenderItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/hooks/useCanvasRenderItems.ts) [NEW]
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [performanceProfile.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/canvas/performanceProfile.ts)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+  - [app-version.json (portable)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/KK-Studio-Portable/app/dist/app-version.json)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **LOD 裁剪管理器**：新增 `useCanvasRenderItems` Hook，在画布进行 transforms 期间（平移、缩放、卡片拖拽）非选中卡片全部退化为极其轻便的 `ghost`（毛玻璃骨架占位框）渲染；静止时按 scale 比例在 React 层面计算其 LOD 状态。当前视口外（含 overscan 外）的卡片完全不创建 DOM 元素。
+  - **后端隔离与健康检测丰富**：在后端 `server/index.js` 重构 `/healthz` 端点。在 payload 展开返回了 auth（JWT 密钥/加密盐）、database（PostgreSQL 连通性）、uploads（上传目录物理探测）、provider（OpenAI/Gemini 后端密钥就绪状态），达成前端与后端的解耦与敏感密钥物理隔离。
+- **已运行验证**：
+  - 运行 `npm run verify:canvas-performance` 测试基准 100% 成功。
+  - 运行 `npm run architecture:check` 及 `npm run governance:check` 全局扫描 100% 通过。
+  - 运行 `npm run typecheck` TS 编译无错误通过。
+  - 运行 `npm run build` 静态打包完全成功。
