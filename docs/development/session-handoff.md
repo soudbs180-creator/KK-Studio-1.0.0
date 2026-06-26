@@ -800,3 +800,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit` 单元测试中与 AppStartupScreen 相关的 6 个测试用例 100% 成功通过。
   - 运行 `npm run typecheck` 类型系统编译 100% 成功通过。
   - 运行 `npm run architecture:check` 完美避开硬编码颜色校验（使用 `// UI_TOKEN_EXCEPTION` 标记），边界架构合规性 100% 成功通过。
+
+
+## 52. 2026-06-26 - Merge Duplicate Loader to Canvas-only Loading (本次追加)
+- **修改范围**：
+  - 解决了登录进入或刷新主工作区时，先显示“加载工作区外壳”，再展示“正在加载画布”引起的双重重复加载进度条的用户体验硬伤。
+- **修改文件**：
+  - [AppStartupScreen.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/common/AppStartupScreen.tsx)
+- **当前设计决策**：
+  - **按阶段短路工作区重复加载**：在 `AppStartupScreen.tsx` 组件内，于 hooks 声明之后加入了对 `workspace_ready` 及 `background_ready` 状态的判断。若当前启动进度已抵达这两个阶段（即正在异步加载 WorkspacePage 资源外壳时），无条件直接短路渲染并仅返回一个纯黑的背景占位，而将真正的进度条加载体验完整交给 `WorkspacePage` 挂载后自带的“正在加载画布”淡蓝色进度条弹窗。这样既避免了两个加载动画生硬重叠和多次提示，又保留了用户喜爱的“正在加载画布”的专有对话框 UI。
+- **已运行验证**：
+  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过，因为我们未改变对 AppRootContentSwitch 中 Suspense fallback 字段静态正则匹配。
+  - 运行 `npm run typecheck` 类型校验完全成功通过。
+  - 运行 `npm run architecture:check` 模块规范校验完全成功通过。

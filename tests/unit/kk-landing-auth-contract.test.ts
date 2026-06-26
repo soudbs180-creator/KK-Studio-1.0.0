@@ -50,7 +50,7 @@ test('landing page keeps KK Studio brand on current-only landing classes', () =>
 
   assert.match(combinedCss, /\.kk-landing-root\s*\{/);
   assert.match(combinedCss, /--kk-landing-/);
-  assert.match(combinedCss, /min-height:\s*100%;/);
+  assert.match(combinedCss, /min-height:\s*100(?:dvh|%)\s*(?:!important)?;/);
   assert.match(combinedCss, /\.kk-work-card\s*\{/);
   assert.match(combinedCss, /touch-action:\s*pan-y;/);
   assert.doesNotMatch(combinedCss, /New Genre|newgenre_static/);

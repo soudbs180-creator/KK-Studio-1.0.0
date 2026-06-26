@@ -1,40 +1,40 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
-/* 简体中文：参考 New Genre 风格的高端最终一致性覆盖层 */
+/* Current KK Studio landing reference alignment overrides. */
 
-/* 1. 根滚动环境修复与自适应字号等比缩放：强制解除所有可能导致锁定滚动的父级高度和 Overflow 限制 */
-html.auth-screen-active,
-body.auth-screen-active,
-html.auth-screen-active body,
-body.auth-screen-active #root {
+/* 1. 鏍规粴鍔ㄧ幆澧冧慨澶嶄笌鑷€傚簲瀛楀彿绛夋瘮缂╂斁锛氬己鍒惰В闄ゆ墍鏈夊彲鑳藉鑷撮攣瀹氭粴鍔ㄧ殑鐖剁骇楂樺害鍜?Overflow 闄愬埗 */
+html.auth-screen-active--landing,
+body.auth-screen-active--landing,
+html.auth-screen-active--landing body,
+body.auth-screen-active--landing #root {
   height: auto !important;
   min-height: 100% !important;
   overflow-y: auto !important;
   overflow-x: clip !important;
-  background: transparent !important; /* 解除根底色绑定，露出天空长渐变 */
+  background: transparent !important; /* 瑙ｉ櫎鏍瑰簳鑹茬粦瀹氾紝闇插嚭澶╃┖闀挎笎鍙?*/
 }
 
-/* 1.1 100% 还原原站的根字号等比自适应收缩，防止大标题在中低分辨率下对导航和内容进行挤压遮挡 */
+/* 1.1 100% 杩樺師鍘熺珯鐨勬牴瀛楀彿绛夋瘮鑷€傚簲鏀剁缉锛岄槻姝㈠ぇ鏍囬鍦ㄤ腑浣庡垎杈ㄧ巼涓嬪瀵艰埅鍜屽唴瀹硅繘琛屾尋鍘嬮伄鎸?*/
 @media (min-width: 1024px) and (max-width: 1439.98px) {
-  html.auth-screen-active,
+  html.auth-screen-active--landing,
   html.auth-screen-active body {
-    font-size: 87.5% !important; /* 约 14px */
+    font-size: 87.5% !important; /* 绾?14px */
   }
 }
 @media (min-width: 768px) and (max-width: 1023.98px) {
-  html.auth-screen-active,
+  html.auth-screen-active--landing,
   html.auth-screen-active body {
-    font-size: 75% !important; /* 约 12px */
+    font-size: 75% !important; /* 绾?12px */
   }
 }
 @media (max-width: 767.98px) {
-  html.auth-screen-active,
+  html.auth-screen-active--landing,
   html.auth-screen-active body {
-    font-size: 62.5% !important; /* 约 10px */
+    font-size: 62.5% !important; /* 绾?10px */
   }
 }
 
-/* 2. 纯白高保真极简纸张背景 */
+/* 2. 绾櫧楂樹繚鐪熸瀬绠€绾稿紶鑳屾櫙 */
 .auth-page--landing {
   position: relative !important;
   inset: auto !important;
@@ -51,14 +51,14 @@ body.auth-screen-active #root {
   touch-action: pan-y;
 }
 
-/* 隐藏外层背景伪元素 */
+/* 闅愯棌澶栧眰鑳屾櫙浼厓绱?*/
 .auth-page.auth-page--landing::before,
 .auth-page.auth-page--landing::after {
   display: none !important;
   content: none !important;
 }
 
-/* 3. 登录弹窗 (Modal Overlay & Content) 由全局 LoginScreen.css 强接管，此处让位以防样式冲突 */
+/* 3. 鐧诲綍寮圭獥 (Modal Overlay & Content) 鐢卞叏灞€ LoginScreen.css 寮烘帴绠★紝姝ゅ璁╀綅浠ラ槻鏍峰紡鍐茬獊 */
 
 .auth-page--landing .auth-modal-close {
   position: absolute;
@@ -82,15 +82,15 @@ body.auth-screen-active #root {
   color: #0f1d3a !important;
 }
 
-/* 4. 头部导航栏 & 首屏 Hero 区 (Dark Section - 深色段样式自适应) */
+/* 4. 澶撮儴瀵艰埅鏍?& 棣栧睆 Hero 鍖?(Dark Section - 娣辫壊娈垫牱寮忚嚜閫傚簲) */
 .kk-landing-root {
   min-height: 100dvh;
   overflow-x: clip;
   overflow-y: visible;
-  background: transparent !important; /* 让出底层长渐变 */
+  background: transparent !important; /* 璁╁嚭搴曞眰闀挎笎鍙?*/
 }
 
-/* 顶部导航条 */
+/* 椤堕儴瀵艰埅鏉?*/
 .kk-landing-chrome__inner {
   color: #000000 !important;
 }
@@ -109,7 +109,7 @@ body.auth-screen-active #root {
   color: #0c1428 !important;
 }
 
-/* 移动端菜单按钮与抽屉高端美化 */
+/* 绉诲姩绔彍鍗曟寜閽笌鎶藉眽楂樼缇庡寲 */
 .kk-landing-menu-button {
   color: #ffffff !important;
 }
@@ -199,7 +199,7 @@ body.auth-screen-active #root {
   color: #000000 !important;
 }
 
-/* Hero Preview 画布模拟块美化 */
+/* Hero Preview 鐢诲竷妯℃嫙鍧楃編鍖?*/
 .kk-canvas-preview {
   background: linear-gradient(135deg, #ffffff 0%, #fcfcfc 100%) !important;
   border-color: rgba(0, 0, 0, 0.06) !important;
@@ -226,7 +226,7 @@ body.auth-screen-active #root {
   color: #111111 !important;
 }
 
-/* 核心场景 Marquee 条 */
+/* 鏍稿績鍦烘櫙 Marquee 鏉?*/
 .kk-trust-strip {
   background: rgba(0, 0, 0, 0.01) !important;
   border-color: rgba(0, 0, 0, 0.06) !important;
@@ -247,7 +247,7 @@ body.auth-screen-active #root {
   color: rgba(0, 0, 0, 0.72) !important;
 }
 
-/* 5. 核心系统能力水平滑动卡片区 (FeatureNarrative) */
+/* 5. 鏍稿績绯荤粺鑳藉姏姘村钩婊戝姩鍗＄墖鍖?(FeatureNarrative) */
 .kk-work-section {
   background: rgba(0, 0, 0, 0.01) !important;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -268,7 +268,7 @@ body.auth-screen-active #root {
 }
 
 .kk-landing-root .kk-work-header h2 {
-  color: #0f1d3a !important; /* 优雅的深蓝墨色 */
+  color: #0f1d3a !important; /* 浼橀泤鐨勬繁钃濆ⅷ鑹?*/
   font-size: clamp(1.8rem, 4.5vw, 3.2rem) !important;
   line-height: 1.05 !important;
   letter-spacing: -0.06em !important;
@@ -278,7 +278,7 @@ body.auth-screen-active #root {
   color: rgba(15, 29, 58, 0.6) !important;
 }
 
-/* 水平拖拽滑动卡片视口 */
+/* 姘村钩鎷栨嫿婊戝姩鍗＄墖瑙嗗彛 */
 .kk-work-scroll-container {
   width: 100%;
   overflow-x: auto;
@@ -303,7 +303,7 @@ body.auth-screen-active #root {
 .kk-work-track {
   display: flex;
   gap: 32px;
-  /* 维持卡片在滑到两端时，刚好和中心对齐 */
+  /* 缁存寔鍗＄墖鍦ㄦ粦鍒颁袱绔椂锛屽垰濂藉拰涓績瀵归綈 */
   padding: 0 calc(50vw - 720px + 48px);
 }
 
@@ -323,7 +323,7 @@ body.auth-screen-active #root {
   }
 }
 
-/* 卡片整体高级感与毛玻璃 */
+/* 鍗＄墖鏁翠綋楂樼骇鎰熶笌姣涚幓鐠?*/
 .kk-work-card {
   flex: 0 0 420px;
   width: 420px;
@@ -363,7 +363,7 @@ body.auth-screen-active #root {
   }
 }
 
-/* 卡片内部视觉模块 */
+/* 鍗＄墖鍐呴儴瑙嗚妯″潡 */
 .kk-work-card__visual {
   position: relative;
   width: 100%;
@@ -455,7 +455,7 @@ body.auth-screen-active #root {
   -webkit-text-fill-color: transparent;
 }
 
-/* 卡片内容排版 */
+/* 鍗＄墖鍐呭鎺掔増 */
 .kk-work-card__content {
   display: flex;
   flex-direction: column;
@@ -516,9 +516,9 @@ body.auth-screen-active #root {
   align-items: center;
 }
 
-/* 6. 后半段浅色场景融合设计 (Timeline, Services, Thoughts, CTA) */
+/* 6. 鍚庡崐娈垫祬鑹插満鏅瀺鍚堣璁?(Timeline, Services, Thoughts, CTA) */
 
-/* Timeline 模块融合与对比度 */
+/* Timeline 妯″潡铻嶅悎涓庡姣斿害 */
 #process {
   background: transparent !important;
   border-top: 1px solid rgba(15, 29, 58, 0.08) !important;
@@ -546,7 +546,7 @@ body.auth-screen-active #root {
   color: #0f1d3a !important;
 }
 
-/* Services 模块融合与大字体对比度 */
+/* Services 妯″潡铻嶅悎涓庡ぇ瀛椾綋瀵规瘮搴?*/
 .kk-services-section {
   background: transparent !important;
   border-bottom: 1px solid rgba(15, 29, 58, 0.08) !important;
@@ -589,7 +589,7 @@ body.auth-screen-active #root {
   color: rgba(15, 29, 58, 0.4) !important;
 }
 
-/* Thoughts 模块融合 */
+/* Thoughts 妯″潡铻嶅悎 */
 .kk-thoughts {
   background: transparent !important;
 }
@@ -627,7 +627,7 @@ body.auth-screen-active #root {
   color: rgba(15, 29, 58, 0.5) !important;
 }
 
-/* CTA 模块融合 */
+/* CTA 妯″潡铻嶅悎 */
 .kk-cta-section {
   background: transparent !important;
 }
@@ -643,7 +643,7 @@ body.auth-screen-active #root {
 }
 
 /* ==========================================
-   6. 登录面板内部文字高对比度深色适配 (Contrast Text Rules)
+   6. 鐧诲綍闈㈡澘鍐呴儴鏂囧瓧楂樺姣斿害娣辫壊閫傞厤 (Contrast Text Rules)
    ========================================== */
 .auth-page--landing .auth-header h2 {
   color: #0f1d3a !important;
@@ -702,7 +702,7 @@ body.auth-screen-active #root {
 }
 
 /* ==========================================
-   7. 登录卡片输入框亮色配色重构 (Contrast Input Styling)
+   7. 鐧诲綍鍗＄墖杈撳叆妗嗕寒鑹查厤鑹查噸鏋?(Contrast Input Styling)
    ========================================== */
 .auth-page--landing .auth-input-wrap {
   background: rgba(255, 255, 255, 0.65) !important;
@@ -741,7 +741,7 @@ body.auth-screen-active #root {
 }
 
 /* ==========================================
-   8. 微信扫码、Cloudflare Turnstile 与第三方按钮浅色磨砂适配
+   8. 寰俊鎵爜銆丆loudflare Turnstile 涓庣涓夋柟鎸夐挳娴呰壊纾ㄧ爞閫傞厤
    ========================================== */
 .auth-page.auth-page--landing .kk-overlay-backdrop {
   background: rgba(12, 20, 40, 0.46) !important;
@@ -856,7 +856,7 @@ body.auth-screen-active #root {
 }
 
 /* ==========================================
-   9. 系统能力 Work Tags 个性化色彩渲染
+   9. 绯荤粺鑳藉姏 Work Tags 涓€у寲鑹插僵娓叉煋
    ========================================== */
 .kk-work-card[style*="coral"] .kk-work-tag {
   background: rgba(255, 107, 90, 0.12) !important;
@@ -915,7 +915,7 @@ body.auth-screen-active #root {
 }
 
 /* ==========================================
-   10. 服务行 (Services) 与 洞察行 (Thoughts) 悬停微动效 (Micro-animations)
+   10. 鏈嶅姟琛?(Services) 涓?娲炲療琛?(Thoughts) 鎮仠寰姩鏁?(Micro-animations)
    ========================================== */
 .kk-service-row, 
 .kk-thought-row {
@@ -940,3 +940,4 @@ body.auth-screen-active #root {
   transform: translateY(-4px) !important;
   border-bottom-color: rgba(15, 29, 58, 0.28) !important;
 }
+

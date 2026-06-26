@@ -27,6 +27,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     return false;
   });
 
+  const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
+
   const toggleCollapsed = (e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
@@ -107,8 +109,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const currentCenterX = viewportMinX + viewportW / 2;
   const currentCenterY = viewportMinY + viewportH / 2;
 
-  const totalWidth = viewportW * 3;
-  const totalHeight = viewportH * 3;
+  const totalWidth = viewportW * minimapScaleMultiplier;
+  const totalHeight = viewportH * minimapScaleMultiplier;
 
   const minX = currentCenterX - totalWidth / 2;
   const maxX = currentCenterX + totalWidth / 2;
@@ -235,26 +237,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   if (isMobile || !activeCanvas) return null;
 
   // 折叠状态下，在左下角渲染成一个极其精致的 Map 图标高亮悬浮小圆钮 (36x36)
-  if (isCollapsed) {
-    return (
-      <button
-        onClick={toggleCollapsed}
-        className="flex items-center justify-center rounded-xl border transition-all active:scale-90 outline-none cursor-pointer hover:bg-opacity-95"
-        style={{
-          width: '36px',
-          height: '36px',
-          boxShadow: '0 4px 14px rgba(255, 77, 139, 0.22)',
-          background: 'rgba(255, 77, 139, 0.15)',
-          borderColor: 'rgba(255, 77, 139, 0.42)',
-          WebkitBackdropFilter: 'blur(12px)',
-          backdropFilter: 'blur(12px)',
-        }}
-        title="展开小地图"
-      >
-        <Map size={16} style={{ color: 'var(--accent-coral)' }} />
-      </button>
-    );
-  }
+  // 折叠状态逻辑已下移到 return 前
 
   // 9. 计算视口框在小地图中 of 绘制参数
   // 9.1 当前实际大画布位置（虚线框）
@@ -280,32 +263,67 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     e.stopPropagation();
     const newScale = parseInt(e.target.value, 10) / 100;
     setTargetScale(newScale);
-    setIsEdited(true);
+    
+    if (isCollapsed && canvasRef.current) {
+      const center = {
+        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
+        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
+      };
+      const newX = safeContainerWidth / 2 - center.x * newScale;
+      const newY = safeContainerHeight / 2 - center.y * newScale;
+      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, newScale);
+      setIsEdited(false);
+    } else {
+      setIsEdited(true);
+    }
   };
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextScale = Math.min(3, currentTargetScale + 0.1);
     setTargetScale(nextScale);
-    setIsEdited(true);
+    
+    if (isCollapsed && canvasRef.current) {
+      const center = {
+        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
+        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
+      };
+      const newX = safeContainerWidth / 2 - center.x * nextScale;
+      const newY = safeContainerHeight / 2 - center.y * nextScale;
+      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, nextScale);
+      setIsEdited(false);
+    } else {
+      setIsEdited(true);
+    }
   };
 
   const handleZoomOut = (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextScale = Math.max(0.1, currentTargetScale - 0.1);
     setTargetScale(nextScale);
-    setIsEdited(true);
+    
+    if (isCollapsed && canvasRef.current) {
+      const center = {
+        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
+        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
+      };
+      const newX = safeContainerWidth / 2 - center.x * nextScale;
+      const newY = safeContainerHeight / 2 - center.y * nextScale;
+      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, nextScale);
+      setIsEdited(false);
+    } else {
+      setIsEdited(true);
+    }
   };
 
-  // 小地图 SVG 区域上 of 鼠标滚轮缩放事件
+  // 小地图 SVG 区域上 of 鼠标滚轮缩放事件（缩放的是小地图的内容本身，不更改主画布缩放）
   const handleSvgWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const delta = -e.deltaY;
-    const zoomFactor = delta > 0 ? 1.05 : 0.95;
-    const nextScale = Math.max(0.1, Math.min(3, currentTargetScale * zoomFactor));
-    setTargetScale(nextScale);
-    setIsEdited(true);
+    const zoomFactor = delta > 0 ? 0.9 : 1.1; // 向上滚是放大（视野变窄，细节变大），向下滚是缩小（视野变宽，细节变小）
+    const nextMultiplier = Math.max(1.0, Math.min(10.0, minimapScaleMultiplier * zoomFactor));
+    setMinimapScaleMultiplier(nextMultiplier);
   };
 
   // 确认定位
@@ -330,6 +348,84 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const handleCancelLocation = () => {
     setIsEdited(false);
   };
+
+  // 折叠状态下，在右上角渲染成扁平横向缩放控制栏
+  if (isCollapsed) {
+    return (
+      <div
+        className="kk-workspace-chrome-surface canvas-nav-panel flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
+        style={{
+          width: '224px',
+          height: '38px',
+          boxShadow: 'var(--frost-card-framework-shadow)',
+          background: 'var(--frost-card-framework-bg)',
+          border: '1px solid var(--frost-card-framework-border)',
+          WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+          backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+        }}
+      >
+        {/* 展开按钮，用带有 Map 图标的按钮 */}
+        <button
+          onClick={toggleCollapsed}
+          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer transition-colors"
+          style={{
+            background: 'rgba(255, 77, 139, 0.1)',
+            borderColor: 'rgba(255, 77, 139, 0.25)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+          }}
+          title="展开小地图"
+        >
+          <Map size={13} style={{ color: 'var(--accent-coral)' }} />
+        </button>
+
+        {/* 缩小按钮 */}
+        <button
+          onClick={handleZoomOut}
+          className="kk-workspace-icon-control w-6 h-6 rounded-md flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+          title="缩小"
+        >
+          <Minus size={11} />
+        </button>
+
+        {/* 横向滑块 */}
+        <div className="flex-1 flex items-center justify-center relative">
+          <input
+            type="range"
+            min="10"
+            max="300"
+            value={displayZoomPercent}
+            onChange={handleSliderChange}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="zoom-slider cursor-pointer w-full h-1"
+            style={{
+              '--zoom-slider-progress': `${zoomProgress}%`,
+            } as React.CSSProperties}
+          />
+        </div>
+
+        {/* 放大按钮 */}
+        <button
+          onClick={handleZoomIn}
+          className="kk-workspace-icon-control w-6 h-6 rounded-md flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+          title="放大"
+        >
+          <Plus size={11} />
+        </button>
+
+        {/* 缩放百分比数值 */}
+        <span
+          className={`inline-flex items-center justify-end text-[10px] font-black tracking-tighter text-right select-none min-w-[44px] whitespace-nowrap transition-colors ${
+            isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
+          }`}
+          style={{ height: '24px', lineHeight: '24px' }}
+          title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
+        >
+          {displayZoomPercent}%{isEdited && '*'}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -485,9 +581,10 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
           {/* 缩放百分比数值 */}
           <span
-            className={`text-[10px] font-black tracking-tighter text-right select-none min-w-[36px] transition-colors ${
+            className={`inline-flex items-center justify-end text-[10px] font-black tracking-tighter text-right select-none min-w-[44px] whitespace-nowrap transition-colors ${
               isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
             }`}
+            style={{ height: '28px', lineHeight: '28px' }}
             title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
           >
             {displayZoomPercent}%{isEdited && '*'}
