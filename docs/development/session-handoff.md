@@ -1305,3 +1305,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 后续真正发布 portable 前，必须提供合法远端 `VITE_KK_API_BASE_URL` 后重新执行 `npm run package:portable` 与 `npm run publish:portable`。
   - 若要接入 CodeRabbit 自动审查，需要先安装并完成 CLI 认证，再运行 `coderabbit review --agent -t uncommitted -c AGENTS.md`。
+
+## 86. 2026-06-26 - KnowledgeStore Static Import Refactoring and VPS-based Portable Publishing (本次追加)
+- **修改范围**：
+  1. **消除了 Vite 编译动态导入警告**：由于 `KnowledgeStore.ts` 已在前端的其它工具模块中被广泛静态导入，在 `localBrain.ts` 中使用动态 `import()` 不具备分包优化意义且会触发 Vite 构建的 `INEFFECTIVE_DYNAMIC_IMPORT` 警告。将其重构为在顶部静态导入，并直接使用 `knowledgeStore` 调用。
+  2. **固化了使用真实公网 VPS API 进行的便携式打包与发布**：利用远程 VPS API 的真实地址作为 `VITE_KK_API_BASE_URL` 完成了 `package:portable` 打包以及对应的 `publish:portable` 版本资产清单更新与签名对齐。
+- **修改文件**：
+  - [localBrain.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/core/localBrain.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **静态导入规避警告**：消除无意义的动态导入对构建效率的影响以及终端中混杂的提示，保持生产构建 0 编译警告。
+  - **基于公网 VPS 的发布流程打通**：在打包命令中以指定公网 API base URL 变量的形式通过脚本内防空网段/防本地地址的安全检查门槛，保证所分发的便携式软件包内硬编码的 API 入口具备真实的跨域请求与离线运行可能；坚持安全红线规范，不在任何配置文件、环境变量或文档中明文记录/留下服务器 root 密码。
+- **已运行验证**：
+  - `npm run verify:changes` 包含单元测试、架构规则、版本一致性、Vite 编译打包、Playwright 移动/桌面设置与 takeover smoke 等 100% 成功通过。
+  - 成功跑通打包和发布：`$env:VITE_KK_API_BASE_URL="https://172-245-156-16.sslip.io"; npm run package:portable && npm run publish:portable` 能够零警告生成 portable zip 产物并签署 manifest.json 哈希与发布渠道包。
+- **未运行验证及原因**：
+  - 本地环境因没有安装 CodeRabbit CLI 依赖，无法运行真实 CodeRabbit 审查，不阻塞日常代码集成。
+- **风险与下一步**：
+  - 无。版本已完全收拢且状态一致。
+

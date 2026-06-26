@@ -8,6 +8,7 @@ import { matchPromptTemplates } from '../prompts/promptMatcher.ts';
 import { optimizePromptLocally } from '../prompts/localPromptOptimizer.ts';
 import { safetyPolicy } from './safetyPolicy.ts';
 import { confirmationPolicy } from './confirmationPolicy.ts';
+import { knowledgeStore } from '../../ai-assistant-runtime/knowledge/KnowledgeStore.ts';
 
 const SETTINGS_VIEW_LABELS: Record<string, string> = {
   dashboard: '设置总览',
@@ -595,7 +596,6 @@ ${optResult.optimizedPromptZh}
 
         const promptSet = prompts.slice(0, count);
 
-        const { knowledgeStore } = await import('../../ai-assistant-runtime/knowledge/KnowledgeStore.ts');
         knowledgeStore.recordChange({
           title: researchTitle,
           summary: `已为 ${subject} 视觉方案设计了研究大纲、3大视觉方向，并规划了 ${count} 张图片的生成方案。`,
