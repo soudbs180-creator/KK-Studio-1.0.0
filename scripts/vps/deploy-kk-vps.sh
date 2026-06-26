@@ -36,6 +36,15 @@ require_repo_root() {
   fi
 }
 
+verify_preflight_changes() {
+  echo "[deploy-kk-vps] Running pre-deployment build verification and quality gates..."
+  if ! npm run verify:changes; then
+    echo "[deploy-kk-vps] ERROR: Pre-deployment change verification (npm run verify:changes) failed. Aborting." >&2
+    exit 1
+  fi
+  echo "[deploy-kk-vps] Pre-deployment verification passed."
+}
+
 # 部署出错时的自动化回滚逻辑
 on_error() {
   local exit_code=$?
@@ -241,7 +250,7 @@ validate_deployment_by_curl() {
   echo "[deploy-kk-vps] Testing backend health check: http://127.0.0.1/healthz"
   local health_status
   health_status="$(curl -sS --fail http://127.0.0.1/healthz || echo "")"
-  if [[ "${health_status}" != "ok" && "${health_status}" != '{"status":"ok"}' && ! "${health_status}" =~ "ok" ]]; then
+  if [[ ! "${health_status}" =~ '"status":"ok"' && ! "${health_status}" =~ '"ok":true' && "${health_status}" != "ok" ]]; then
     echo "[deploy-kk-vps] ERROR: Backend health check failed. Received: ${health_status}" >&2
     exit 1
   fi
@@ -285,6 +294,7 @@ cleanup_old_releases() {
 
 # 流程运行
 require_repo_root
+verify_preflight_changes
 sync_repo_to_release_dir
 install_dependencies
 apply_bootstrap_sql_if_requested

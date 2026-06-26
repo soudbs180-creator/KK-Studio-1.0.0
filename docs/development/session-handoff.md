@@ -1324,3 +1324,30 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 无。版本已完全收拢且状态一致。
 
+## 87. 2026-06-26 - VPS Backend Security and Deployment Gate Optimization (本次追加)
+- **修改范围**：
+  1. **安全存储加固**：创建了 `server/utils/crypto.js` 模块，实现了基于内置 `crypto` 库和 `aes-256-gcm` 算法的密文包裹加密解密功能，用以防范第三方厂商密钥和 OAuth 令牌以明文落盘或存库。
+  2. **网关安全标头与隐私脱敏**：新增了 [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/securityHeaders.js) and [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/logRedactor.js) 双安全中间件并挂载至主 Express 应用，以防止敏感头/请求体被打印进生产日志，同时强制应用 MIME nosniff、Clickjacking 拦截及跨域 Referer 限制等标头防护。
+  3. **数据库迁移就绪**：在 [migrations/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/) 目录下新增了数据库结构升级定义 [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/014_vps_security_and_jobs.sql)，对加密凭证、物理画布节点以及异步任务追踪表进行了定义。
+  4. **部署自检质量门**：优化了 [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/vps/deploy-kk-vps.sh)，在同步构建与部署动作前加入了 `npm run verify:changes` 前置静态与冒烟拦截质量门，并优化了健康检查 `/healthz` 响应结果的解析逻辑，有效防范部署期间出现服务瘫痪和不可控回滚。
+- **修改文件**：
+  - [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/vps/deploy-kk-vps.sh)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+  - [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/securityHeaders.js)
+  - [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/logRedactor.js)
+  - [crypto.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/utils/crypto.js)
+  - [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/014_vps_security_and_jobs.sql)
+  - [vps-crypto-aes-gcm.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-crypto-aes-gcm.test.ts)
+  - [vps-security-middlewares.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-security-middlewares.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **前置拦截防回滚**：部署脚本中静态自检和验证链被提升至首位，若代码无法成功通过 lint、编译和本地冒烟测试，将绝不往 VPS 实例推送同步，极大地保护了生产运行可靠性。
+  - **敏感头与密文硬隔离**：在应用入口和数据库层面通过两道关卡防御：在日志打印前利用中间件做递归脱敏，将 API 密钥用 `[REDACTED]` 抹除；存储层面完全抛弃本地明文 JSON 存储，由 AES-256-GCM 封装密文信封实现多层防御。
+- **已运行验证**：
+  - 全量运行 `npm run verify:changes` 100% 成功通过，0 错误 0 Regression。
+  - 单独运行新模块单测 `vps-crypto-aes-gcm.test.ts` 和 `vps-security-middlewares.test.ts` 全部通过。
+- **未运行验证及原因**：
+  - 本地环境暂未安装 CodeRabbit 命令行工具，因此未执行 CodeRabbit 自检。
+- **风险与下一步**：
+  - 无。当前版本非常稳定，且已成功固化提交。
+

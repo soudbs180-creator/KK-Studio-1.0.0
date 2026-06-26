@@ -45,6 +45,8 @@ const configRouter = require('./routes/config');
 const providerProbeRouter = require('./routes/provider-probe');
 const telemetryRouter = require('./routes/telemetry');
 const contractCompatRouter = require('./routes/contract-compat');
+const securityHeaders = require('./middleware/securityHeaders');
+const logRedactor = require('./middleware/logRedactor');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -220,14 +222,8 @@ function createApp() {
   const app = express();
   app.disable('x-powered-by');
 
-  app.use((req, res, next) => {
-    if (!req.path.startsWith('/webhook/stripe')) {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
-      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    }
-    next();
-  });
+  app.use(securityHeaders);
+  app.use(logRedactor);
 
   const allowedOrigins = new Set(getAllowedOrigins().map((origin) => origin.toLowerCase()));
   app.use(cors({
