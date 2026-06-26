@@ -4261,7 +4261,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   // 10000+ 卡片轻量元数据本地状态与可视区状态
   const [cardMetas, setCardMetas] = useState<CachedCardMeta[]>([]);
-  const [visibleCardIds, setVisibleCardIds] = useState<Set<string>>(new Set());
   const workerRef = useRef<Worker | null>(null);
 
   // 点击 Canvas 卡片时的选中与加载逻辑
@@ -4277,7 +4276,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [handleCanvasNodeSelect]);
 
-  // 初始化 Web Worker
+  // 初始化 Web Worker（Worker 目前仅处理耗时较长的后台自动排版整理逻辑，不再处理高频的视口裁剪）
   useEffect(() => {
     workerRef.current = new Worker(
       new URL('../../canvas/canvasCalculationWorker.ts', import.meta.url),
@@ -4286,9 +4285,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     workerRef.current.onmessage = (e) => {
       const { type, payload } = e.data;
-      if (type === 'QUERY_VIEWPORT_RESULT') {
-        setVisibleCardIds(new Set(payload.visibleIds));
-      } else if (type === 'AUTO_ARRANGE_RESULT') {
+      if (type === 'AUTO_ARRANGE_RESULT') {
         const arranged = payload.arrangedPositions;
         Object.keys(arranged).forEach(cardId => {
           const pos = arranged[cardId];
@@ -4304,7 +4301,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     };
   }, [updateImageNodePosition, updatePromptNodePosition]);
 
-  // 当画布节点数据变动时重建索引
+  // 当画布节点数据变动时向 Worker 发送重建索引请求（用于后台排版整理计算）
   useEffect(() => {
     if (!activeCanvas) return;
     const metas: CachedCardMeta[] = [];
@@ -4318,21 +4315,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
       payload: { nodes: metas }
     });
   }, [activeCanvas]);
-
-  // 视口变动时向 Worker 发送可视区筛选请求
-  useEffect(() => {
-    const scale = canvasTransform.scale || 1;
-    const buffer = 1500;
-    const vLeft = -canvasTransform.x / scale - buffer;
-    const vTop = -canvasTransform.y / scale - buffer;
-    const vRight = (window.innerWidth - canvasTransform.x) / scale + buffer;
-    const vBottom = (window.innerHeight - canvasTransform.y) / scale + buffer;
-
-    workerRef.current?.postMessage({
-      type: 'QUERY_VIEWPORT',
-      payload: { vLeft, vTop, vRight, vBottom }
-    });
-  }, [canvasTransform.x, canvasTransform.y, canvasTransform.scale]);
 
 
 
@@ -4358,12 +4340,15 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const top = renderedImagePosition.y - cardHeight;
       const stackZIndex = item.stackZIndexOverride ?? item.groupLayerZIndex;
 
+      // 如果是大项目，为了不遮挡底下的 Canvas 渲染，占位层应该是完全透明的交互代理
+      const isTransparentProxy = isLargeProject;
+
       return (
         <div
           id={`image-card-${node.id}`}
           data-x={node.position.x}
           data-y={node.position.y}
-          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center"
+          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none transition-all duration-300 flex flex-col items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
             handleCanvasNodeSelect(node.id);
@@ -4378,20 +4363,22 @@ export const AppContent: React.FC<AppContentProps> = () => {
             width: `${nodeWidth}px`,
             height: `${cardHeight}px`,
             zIndex: stackZIndex,
-            background: 'rgba(24, 24, 27, 0.25)',
-            borderColor: 'rgba(255, 255, 255, 0.04)',
-            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.2)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
+            background: isTransparentProxy ? 'transparent' : 'rgba(24, 24, 27, 0.25)',
+            border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
+            boxShadow: isTransparentProxy ? 'none' : '0 4px 16px 0 rgba(0, 0, 0, 0.2)',
+            backdropFilter: isTransparentProxy ? 'none' : 'blur(4px)',
+            WebkitBackdropFilter: isTransparentProxy ? 'none' : 'blur(4px)',
           }}
         >
-          <div className="flex flex-col items-center gap-1.5 opacity-20">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          </div>
+          {!isTransparentProxy && (
+            <div className="flex flex-col items-center gap-1.5 opacity-20">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+          )}
         </div>
       );
     }
@@ -4469,6 +4456,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     selectedNodeIds,
     snapToGrid,
     imageCardHeightById,
+    isLargeProject,
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
@@ -4483,10 +4471,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const top = position.y - height;
       const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
 
+      // 如果是大项目，为了不遮挡底下的 Canvas 渲染，占位层应该是完全透明的交互代理
+      const isTransparentProxy = isLargeProject;
+
       return (
         <div
           id={`prompt-card-${node.id}`}
-          className="absolute pointer-events-auto cursor-pointer rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
+          className="absolute pointer-events-auto cursor-pointer rounded-3xl select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
           onClick={(e) => {
             e.stopPropagation();
             handleCanvasNodeSelect(node.id);
@@ -4501,22 +4492,24 @@ export const AppContent: React.FC<AppContentProps> = () => {
             width: `${width}px`,
             height: `${height}px`,
             zIndex: groupStackZIndex + 20,
-            background: 'rgba(24, 24, 27, 0.4)',
-            borderColor: 'rgba(255, 255, 255, 0.06)',
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
+            background: isTransparentProxy ? 'transparent' : 'rgba(24, 24, 27, 0.4)',
+            border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
+            boxShadow: isTransparentProxy ? 'none' : '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+            backdropFilter: isTransparentProxy ? 'none' : 'blur(6px)',
+            WebkitBackdropFilter: isTransparentProxy ? 'none' : 'blur(6px)',
           }}
         >
-          <div className="flex flex-col items-center gap-1.5 opacity-25">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            <span className="text-[10px] text-white font-medium truncate max-w-full px-2 text-center">
-              {node.prompt ? (node.prompt.slice(0, 16) + (node.prompt.length > 16 ? '...' : '')) : 'Prompt Card'}
-            </span>
-          </div>
+          {!isTransparentProxy && (
+            <div className="flex flex-col items-center gap-1.5 opacity-25">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span className="text-[10px] text-white font-medium truncate max-w-full px-2 text-center">
+                {node.prompt ? (node.prompt.slice(0, 16) + (node.prompt.length > 16 ? '...' : '')) : 'Prompt Card'}
+              </span>
+            </div>
+          )}
         </div>
       );
     }
@@ -4746,6 +4739,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     selectedNodeIds,
     snapToGrid,
     updatePromptNodePosition,
+    isLargeProject,
   ]);
 
   const renderPreviewWorkflowItem = useCallback((item: PreviewRenderItem) => (
@@ -4844,6 +4838,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   const stableCanvasRenderItemsRef = useRef<CanvasRenderItem[]>([]);
 
+  const effectiveVisibleCardIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    visiblePromptNodes.forEach((n) => ids.add(n.id));
+    visibleImageNodes.forEach((n) => ids.add(n.id));
+    return ids;
+  }, [visiblePromptNodes, visibleImageNodes]);
+
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
     if (shouldFreezeRender) {
       return stableCanvasRenderItemsRef.current;
@@ -4864,8 +4865,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
             || groupView.childImages.some(child => selectedNodeIds.includes(child.id))
             || groupView.rootPrompt.id === activeSourceImage;
           const isGenerating = generatingGroupIds.includes(groupView.rootPrompt.id);
-          const isVisible = visibleCardIds.has(groupView.rootPrompt.id)
-            || groupView.childImages.some(child => visibleCardIds.has(child.id));
+          const isVisible = effectiveVisibleCardIds.has(groupView.rootPrompt.id)
+            || groupView.childImages.some(child => effectiveVisibleCardIds.has(child.id));
           // 仅当被选中、正在生成，或者在空间索引的可视集合中时，才挂载 React DOM 树
           return isGroupSelected || isGenerating || isVisible;
         })
@@ -4921,7 +4922,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
           const isImageSelected = selectedNodeIds.includes(node.id) || node.id === activeSourceImage;
           const isGenerating = generatingGroupIds.includes(node.id);
           // 仅当独立图片节点被选中、激活、生成中或在空间索引中可见时，才挂载 React DOM
-          return isImageSelected || isGenerating || visibleCardIds.has(node.id);
+          return isImageSelected || isGenerating || effectiveVisibleCardIds.has(node.id);
         })
         .map((node) => {
           const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
@@ -5016,7 +5017,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     shouldFreezeRender,
     isCanvasTransforming,
     isNodeDragActive,
-    visibleCardIds,
+    effectiveVisibleCardIds,
     selectedNodeIds,
     activeSourceImage,
     generatingGroupIds,
@@ -5877,7 +5878,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
           isLargeProject && (
             <CanvasLayerRenderer
               cardMetas={cardMetas}
-              visibleCardIds={visibleCardIds}
+              visibleCardIds={effectiveVisibleCardIds}
               canvasTransform={canvasTransform}
               selectedNodeIds={selectedNodeIds}
               activeSourceImage={activeSourceImage}
@@ -6443,7 +6444,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onUpdateWindowLayout={handleUpdateWindowLayout}
       />
 
-      <TaskCenterTray onOpenSettings={openSettingsSurfaceTracked} />
+      <TaskCenterTray
+        onOpenSettings={openSettingsSurfaceTracked}
+        isChatOpen={isChatOpen}
+        chatSidebarWidth={chatSidebarWidth}
+      />
     </WorkspaceShell>
   );
 };

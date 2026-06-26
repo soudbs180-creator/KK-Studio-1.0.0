@@ -482,6 +482,7 @@ ensureArtifactsDir();
 rmStaleFallbackArtifact('mobile-settings-fallback.json');
 
 let browser;
+let page;
 let viteServer;
 let browserPreflight = null;
 let targetUrl = DEFAULT_TARGET_URL;
@@ -505,13 +506,20 @@ try {
   const { chromium } = await import(playwrightModuleUrl);
 
   browser = await chromium.launch({ headless: true, timeout: 15000 });
-  const page = await browser.newPage({
+  page = await browser.newPage({
     viewport: { width: 430, height: 932 },
     isMobile: true,
     hasTouch: true,
   });
 
   await installSmokeApiRoutes(page);
+
+  page.on('console', (msg) => {
+    console.log(`[Browser Console] ${msg.type()}: ${msg.text()}`);
+  });
+  page.on('pageerror', (err) => {
+    console.error(`[Browser PageError] ${err.message}\n${err.stack}`);
+  });
 
   await page.addInitScript(({ state, storageKey }) => {
     const now = Date.now();
@@ -728,6 +736,19 @@ try {
     artifactDir: ARTIFACT_DIR,
   }, null, 2));
 } catch (error) {
+  if (page) {
+    try {
+      await page.screenshot({
+        path: path.join(ARTIFACT_DIR, 'mobile-error-debug.png'),
+        fullPage: true,
+      });
+      const html = await page.content();
+      writeFileSync(path.join(ARTIFACT_DIR, 'mobile-error-debug.html'), html, 'utf8');
+      console.log(`[Smoke Check] Saved error debug screenshot and HTML source to ${ARTIFACT_DIR}`);
+    } catch (debugError) {
+      console.error('Failed to capture error debug state:', debugError);
+    }
+  }
   if (!isBrowserLaunchUnavailable(error)) {
     throw error;
   }

@@ -26,6 +26,8 @@ import { useCanvas } from '../../context/CanvasContext';
 
 interface TaskCenterTrayProps {
   onOpenSettings?: (view?: any) => void;
+  isChatOpen?: boolean;
+  chatSidebarWidth?: number;
 }
 
 // 自定义非生图任务结构
@@ -39,7 +41,11 @@ interface CustomTask {
   createdAt: number;
 }
 
-export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }) => {
+export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
+  onOpenSettings,
+  isChatOpen = false,
+  chatSidebarWidth = 320
+}) => {
   const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
@@ -379,7 +385,14 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
   };
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center pointer-events-none"> {/* Z_INDEX_EXCEPTION */}
+    <div
+      className="fixed top-4 z-[1000] flex flex-col items-center pointer-events-none"
+      style={{
+        left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
+        transform: 'translateX(-50%)',
+        transition: 'left 0.3s ease-out'
+      }}
+    > {/* Z_INDEX_EXCEPTION */}
       {/* 1. 悬浮底栏胶囊（折叠状态） */}
       {!isOpen && (
         <button
@@ -399,7 +412,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
           </div>
           
           <span className="text-xs font-semibold text-white/90">
-            {activeRunningCount > 0 ? `${activeRunningCount} 个任务运行中` : '统一任务中心'}
+            {activeRunningCount > 0 ? `${activeRunningCount} 个任务运行中` : '任务状态列表'}
           </span>
 
           <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
@@ -430,7 +443,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }
           {/* 面板头部 */}
           <div className="flex justify-between items-center px-5 py-4 border-b border-white/10 bg-white/2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">统一任务控制台</span>
+              <span className="text-sm font-semibold text-white">任务状态列表</span>
               {activeRunningCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-400">
                   {activeRunningCount} 运行中

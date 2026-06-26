@@ -1488,3 +1488,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行全量 `npm run verify:changes` 成功变绿。包含 1588 个单元测试用例及全套 Playwright 桌面/移动端交互冒烟测试、性能基准测试等。
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+## 95. 2026-06-27 - Task Status List Dynamic Centering and Naming Refinement (本次追加)
+- **修改范围**：
+  1. **任务胶囊动态对齐与适配**：在 `TaskCenterTray.tsx` 的 Props 和容器 style 中引入 `isChatOpen` 和 `chatSidebarWidth`。外层定位容器由静态 `left-1/2 -translate-x-1/2` 重构为与底部 `PromptBar` 输入框完全对齐一致的动态 CSS 偏移计算 `left: isChatOpen ? calc(50% - chatSidebarWidth / 2) : '50%'`，完美解决了右侧聊天栏展开时导致的横向错位。
+  2. **组件命名规范化**：将 UI 界面折叠状态胶囊以及展开状态面板标题上所有的“统一任务中心”及“统一任务控制台”字样统一重命名变更为**“任务状态列表”**。
+  3. **调用上下文打通**：在 `WorkspacePage.tsx` 中使用时，将 `isChatOpen` 与 `chatSidebarWidth` 动态参数解耦下发传给 `TaskCenterTray` 标签。
+- **修改文件**：
+  - [TaskCenterTray.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/TaskCenterTray.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **自适应水平居中**：通过与 `PromptBar` 绑定相同的侧栏偏移宽度公式及 transition 缓动曲线，使任务状态列表始终跟随输入框的平移动作保持严格的 Y 轴对齐。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` vite 生产包 1.12s 构建打包通过。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+

@@ -1643,7 +1643,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('消耗曲线', 'Spend curve')}
           title={pick('今日累计消耗趋势', 'Today cumulative spend trend')}
           action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
-          onClick={() => onNavigate('consumption-records')}
+          onClick={() => onNavigate('capability-sources')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
         >
           <div className="dashboard-chart-shell">
@@ -1739,7 +1739,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('API 路由图', 'API topology')}
           title={pick('供应商配置与能力路由', 'Provider settings and capability routing')}
           action={<SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'amber'}>{hasAvailableRoute ? pick('可用', 'Ready') : pick('待配置', 'Setup')}</SettingsBadge>}
-          onClick={() => onNavigate('api-management')}
+          onClick={() => onNavigate('capability-sources')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openApiManagement.uiAction}
         >
           <div className="dashboard-module-stack">
@@ -1839,7 +1839,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('存储健康', 'Storage health')}
           title={pick('画布资源与容量', 'Canvas assets and capacity')}
           action={<SettingsBadge tone={storageMode ? 'emerald' : 'amber'}>{storageModeLabel}</SettingsBadge>}
-          onClick={() => onNavigate('storage-settings')}
+          onClick={() => onNavigate('data-sync')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openStorageSettings.uiAction}
         >
           <div className="dashboard-module-stack">
@@ -1873,7 +1873,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               label={hasCriticalLogs ? pick('存在错误', 'Errors') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('日志稳定', 'Healthy')}
             />
           )}
-          onClick={() => onNavigate('system-logs')}
+          onClick={() => onNavigate('dev-diagnostics')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openSystemLogs.uiAction}
         >
           <div className="dashboard-module-stack">
@@ -1899,7 +1899,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('计费账本', 'Billing')}
           title={pick('账户交易记录', 'Transaction History')}
           action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{dashboardBalanceCard.title}</SettingsBadge>}
-          onClick={() => onNavigate('consumption-records')}
+          onClick={() => onNavigate('capability-sources')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
         >
           <div className="dashboard-module-stack">
@@ -1923,7 +1923,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('能力流', 'Capability flow')}
           title={pick('模型调用与素材闭环', 'Model calls and assets loop')}
           action={<SettingsBadge tone="indigo">{pick('闭环', 'Loop')}</SettingsBadge>}
-          onClick={() => onNavigate('ai-management')}
+          onClick={() => onNavigate('ai-takeover')}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openAiManagement.uiAction}
         >
           <div className="dashboard-module-stack">

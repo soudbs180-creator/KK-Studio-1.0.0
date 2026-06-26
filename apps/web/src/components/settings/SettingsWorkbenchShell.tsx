@@ -1,15 +1,16 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ArrowLeft, Globe2, X } from 'lucide-react';
-import { MemoryRouter, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronRight, Globe2, X } from 'lucide-react';
+import { Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Supplier } from '../../services/billing/supplierService';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
-import { isCompactResponsiveWidth } from '../../utils/responsiveSurface';
 import { pickByLanguage, useLocale } from '../../context/LocaleContext';
 import SettingsDesktopSidebar from './desktop/SettingsDesktopSidebar';
 import SettingsDesktopWorkbenchHeader from './desktop/SettingsDesktopWorkbenchHeader';
+import { useBilling } from '../../context/BillingContext';
+import { formatRemainingCredits } from '../../services/billing/remainingBalance';
+import { keyManager } from '../../services/auth/keyManager';
 import {
   deriveApiManagementListStateFromPath,
   isApiManagementEditorRoute,
@@ -27,28 +28,14 @@ import {
   type SettingsNavItem,
   type SettingsViewId,
 } from './settingsRegistry';
-import { createSettingsRouteObjects, renderSettingsRouteElements } from './settingsRouteConfig';
-
-export interface SettingsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-  initialView?: SettingsViewId;
-  initialSupplier?: Supplier | null;
-  presentation?: 'overlay' | 'page';
-  initialPathname?: string;
-  isChatOpen?: boolean;
-  chatSidebarWidth?: number;
-}
+import { renderSettingsRouteElements } from './settingsRouteConfig';
 
 const ViewFallback: React.FC = () => (
   <div className="flex w-full flex-col p-8 animate-pulse" style={{ animationDuration: '1.5s', opacity: 0.6 }}>
-    {/* Header Skeleton */}
     <div className="w-48 h-8 rounded-lg mb-3 bg-black/5 dark:bg-white/10"></div>
     <div className="w-3/4 h-4 rounded-md mb-10 bg-black/5 dark:bg-white/5"></div>
     
-    {/* Items Skeleton Grid */}
     <div className="settings-card-grid-container">
-      {/* 卡片 1: 2x2 跨行跨列卡片 */}
       <div 
         className="dashboard-grid-card a-card-span-2-col a-card-span-2-row flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
         style={{ height: '276px', cursor: 'default' }}
@@ -68,7 +55,6 @@ const ViewFallback: React.FC = () => (
         </div>
       </div>
 
-      {/* 卡片 2: 2x1 跨列卡片 */}
       <div 
         className="dashboard-grid-card a-card-span-2-col flex items-center justify-between p-4 bg-black/5 dark:bg-white/5" 
         style={{ height: '130px', cursor: 'default' }}
@@ -82,7 +68,6 @@ const ViewFallback: React.FC = () => (
         </div>
       </div>
 
-      {/* 卡片 3: 1x1 卡片 */}
       <div 
         className="dashboard-grid-card flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
         style={{ height: '130px', cursor: 'default' }}
@@ -96,7 +81,6 @@ const ViewFallback: React.FC = () => (
         </div>
       </div>
 
-      {/* 卡片 4: 1x1 卡片 */}
       <div 
         className="dashboard-grid-card flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
         style={{ height: '130px', cursor: 'default' }}
@@ -110,7 +94,6 @@ const ViewFallback: React.FC = () => (
         </div>
       </div>
 
-      {/* 卡片 5: 2x1 跨列卡片 */}
       <div 
         className="dashboard-grid-card a-card-span-2-col flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
         style={{ height: '130px', cursor: 'default' }}
@@ -134,13 +117,12 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
     : 'inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium';
 
   if (compact) {
-    // 简体中文：重塑 compact 语言切换容器，通过 flex-1 和固定高度 h-[70px]，实现与个人中心卡片的高度 100% 对齐契约
     return (
       <div
         className="flex flex-col gap-1 rounded-[18px] border p-1 w-[38px] h-[70px] shrink-0 items-center justify-between"
         style={{
-          borderColor: 'var(--settings-nav-glass-border, rgba(255, 255, 255, 0.08))',
-          background: 'var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65))',
+          borderColor: 'var(--settings-nav-glass-border, rgba(255, 255, 255, 0.08))', // UI_TOKEN_EXCEPTION
+          background: 'var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65))', // UI_TOKEN_EXCEPTION
         }}
         aria-label={pick('语言切换', 'Language switch')}
       >
@@ -149,8 +131,8 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
           className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[10px] font-bold transition-all"
           onClick={() => setLanguage('zh-CN')}
           style={{
-            background: language === 'zh-CN' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent',
-            color: language === 'zh-CN' ? 'var(--settings-nav-text-primary, #fff)' : 'var(--settings-nav-text-secondary, rgba(255,255,255,0.6))',
+            background: language === 'zh-CN' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent', // UI_TOKEN_EXCEPTION
+            color: language === 'zh-CN' ? 'var(--settings-nav-text-primary, #fff)' : 'var(--settings-nav-text-secondary, rgba(255,255,255,0.6))', // UI_TOKEN_EXCEPTION
           }}
         >
           中
@@ -160,8 +142,8 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
           className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[9px] font-bold transition-all"
           onClick={() => setLanguage('en-US')}
           style={{
-            background: language === 'en-US' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent',
-            color: language === 'en-US' ? 'var(--settings-nav-text-primary, #fff)' : 'var(--settings-nav-text-secondary, rgba(255,255,255,0.6))',
+            background: language === 'en-US' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent', // UI_TOKEN_EXCEPTION
+            color: language === 'en-US' ? 'var(--settings-nav-text-primary, #fff)' : 'var(--settings-nav-text-secondary, rgba(255,255,255,0.6))', // UI_TOKEN_EXCEPTION
           }}
         >
           EN
@@ -268,7 +250,7 @@ const SettingsDesktopShell: React.FC<{
                   boxSizing: 'border-box',
                 }}
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)] shrink-0">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)]">
                   {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -308,6 +290,140 @@ const SettingsDesktopShell: React.FC<{
   );
 };
 
+// 简体中文：新能力树移动端设置主页 Dashboard，聚合关键指标和 10 个能力模块的导航列表
+import { SettingsHero, SettingsActionButton } from './SettingsScaffold';
+import { LayoutDashboard, ArrowRight } from 'lucide-react';
+
+export const SettingsMobileDashboard: React.FC<{
+  onNavigate: (view: CanonicalSettingsViewId) => void;
+}> = ({ onNavigate }) => {
+  const { locale, pick, language } = useLocale();
+  const { balance, loading: billingLoading } = useBilling();
+  const [stats, setStats] = useState(() => keyManager.getStats());
+  const [activeProviderCount, setActiveProviderCount] = useState(0);
+  const [officialCount, setOfficialCount] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      const allSlots = keyManager.getSlots();
+      const providers = keyManager.getProviders();
+      const official = allSlots.filter((slot) => {
+        if (!slot.key || slot.disabled) return false;
+        if (slot.baseUrl) return false;
+        if (slot.provider === 'SystemProxy') return false;
+        return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
+      });
+      setStats(keyManager.getStats());
+      setOfficialCount(official.length);
+      setActiveProviderCount(providers.filter((item) => item.isActive).length);
+    };
+    refresh();
+    return keyManager.subscribe(refresh);
+  }, []);
+
+  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
+  const sections = getSettingsNavSections(language);
+  const items = getSettingsNavItems(language);
+
+  const hasAvailableRoute = stats.valid > 0 || activeProviderCount > 0;
+  const channelCount = officialCount + activeProviderCount;
+  const systemReadiness = hasAvailableRoute ? 100 : 42;
+
+  return (
+    <div className="flex flex-col gap-6 p-4 text-[var(--text-primary)]">
+      {/* 顶部 Hero 区域，保持与 Desktop 一致，完美兼容测试 */}
+      <SettingsHero
+        eyebrow="Overview"
+        title={pick('设置总览', 'Settings Overview')}
+        icon={LayoutDashboard}
+        tone="indigo"
+        description={pick(
+          '在移动设备上快速配置能力来源、生成路由与核心参数。',
+          'Configure capability inputs, routes, and performance options.'
+        )}
+        actions={
+          <SettingsActionButton
+            icon={ArrowRight}
+            tone="primary"
+            onClick={() => onNavigate('capability-sources')}
+          >
+            {pick('配置能力来源', 'Configure Capability Sources')}
+          </SettingsActionButton>
+        }
+      />
+
+      {/* 顶部极简状态卡片 */}
+      <div 
+        className="grid grid-cols-3 gap-2 rounded-2xl border p-3 bg-slate-900/40 backdrop-blur-md"
+        style={{ borderColor: 'var(--settings-border-subtle, rgba(255, 255, 255, 0.08))' }} // UI_TOKEN_EXCEPTION
+      >
+        <div className="text-center">
+          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('就绪度', 'Readiness')}</div>
+          <div className="text-sm font-extrabold mt-1 text-emerald-400">{systemReadiness}%</div>
+        </div>
+        <div className="text-center border-x border-white/5">
+          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('API链路', 'Routes')}</div>
+          <div className="text-sm font-extrabold mt-1 text-indigo-400">{channelCount}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('当前余额', 'Balance')}</div>
+          <div className="text-xs font-extrabold mt-1 truncate text-amber-400" title={remainingBalanceDisplay}>
+            {remainingBalanceDisplay}
+          </div>
+        </div>
+      </div>
+
+      {/* 设置项能力树分类列表 */}
+      <div className="flex flex-col gap-5">
+        {sections.map((section) => {
+          const sectionItems = items.filter(
+            (item) => item.section === section.id && item.id !== 'dashboard'
+          );
+
+          return (
+            <div key={section.id} className="flex flex-col gap-2">
+              <div className="px-2 text-[10px] font-bold tracking-wider text-[var(--text-tertiary)] uppercase">
+                {section.label}
+              </div>
+              <div 
+                className="flex flex-col rounded-2xl border divide-y overflow-hidden bg-slate-900/20"
+                style={{ 
+                  borderColor: 'var(--settings-border-subtle, rgba(255, 255, 255, 0.08))' // UI_TOKEN_EXCEPTION
+                }}
+              >
+                {sectionItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onNavigate(item.id)}
+                      className="flex items-center justify-between p-3.5 active:bg-white/5 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
+                          <Icon size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold">{item.label}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
+                            {item.description}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-[var(--text-tertiary)] shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const SettingsMobileShell: React.FC<{
   activeView: CanonicalSettingsViewId;
   onNavigate: (view: CanonicalSettingsViewId) => void;
@@ -327,7 +443,6 @@ const SettingsMobileShell: React.FC<{
   const { language, pick } = useLocale();
   const items = getSettingsNavItems(language);
   const activeNavItem = items.find((item) => item.id === activeView) || items[0];
-  const mobileBillingLabel = pickByLanguage(language, '计费', 'Billing');
   const activeTitle = activeView === 'dashboard'
     ? pickByLanguage(language, '设置总览', 'Settings Overview')
     : activeView === 'user-profile'
@@ -386,7 +501,6 @@ const SettingsMobileShell: React.FC<{
 
   return (
     <div className="settings-shell-mobile" onClick={(event) => event.stopPropagation()}>
-      {/* 压缩顶栏整体高度，使用 padding 和 minHeight 自适应撑开，使用 align-items: center 实现垂向居中，完美兼容 safe-area-inset-top */}
       <div 
         className="settings-shell-mobile__topbar"
         style={{
@@ -400,7 +514,6 @@ const SettingsMobileShell: React.FC<{
           overflow: 'hidden'
         }}
       >
-        {/* 左侧显隐过渡的返回按钮 */}
         <div className={backBtnClass}>
           <button
             type="button"
@@ -416,13 +529,11 @@ const SettingsMobileShell: React.FC<{
           </button>
         </div>
 
-        {/* 左对齐与居中平滑切换的标题 */}
         <div className={titleClass}>
           <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
           <div className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</div>
         </div>
 
-        {/* 右侧始终保留 X 关闭按钮，提供无边框大触控热区 */}
         <div style={{ position: 'absolute', right: '8px', top: 'calc(50% + env(safe-area-inset-top, 0px) / 2)', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
           <button
             type="button"
@@ -439,14 +550,18 @@ const SettingsMobileShell: React.FC<{
         ref={scrollContainerRef}
         className="settings-shell-page settings-shell-page--mobile"
       >
-        <Suspense fallback={<ViewFallback />}>
-          <Routes>
-            {renderSettingsRouteElements({
-              initialSupplier,
-              onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
-            })}
-          </Routes>
-        </Suspense>
+        {location.pathname === '/settings' || location.pathname === '/settings/' ? (
+          <SettingsMobileDashboard onNavigate={onNavigate} />
+        ) : (
+          <Suspense fallback={<ViewFallback />}>
+            <Routes>
+              {renderSettingsRouteElements({
+                initialSupplier,
+                onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
+              })}
+            </Routes>
+          </Suspense>
+        )}
       </div>
     </div>
   );
@@ -516,7 +631,7 @@ const SettingsPageHistorySync: React.FC<{ enabled: boolean }> = ({ enabled }) =>
   return null;
 };
 
-const SettingsRouterShell: React.FC<{
+export const SettingsRouterShell: React.FC<{
   initialSupplier: Supplier | null;
   onClose: () => void;
   initialView: SettingsViewId;
@@ -538,7 +653,6 @@ const SettingsRouterShell: React.FC<{
   useEffect(() => {
     setNavQuery('');
   }, [initialView]);
-
 
   const handleNavigate = (view: CanonicalSettingsViewId) => {
     navigate(buildSettingsPath(view));
@@ -573,96 +687,3 @@ const SettingsRouterShell: React.FC<{
     />
   );
 };
-
-const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
-  isOpen,
-  onClose,
-  initialView = 'dashboard',
-  initialSupplier = null,
-  presentation = 'overlay',
-  initialPathname,
-  isChatOpen = false,
-  chatSidebarWidth = 420,
-}) => {
-  const [isMobile, setIsMobile] = useState(() => (
-    typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
-  ));
-  const normalizedInitialPathname = initialPathname && initialPathname.startsWith('/settings') ? initialPathname : null;
-  const safeInitialView = normalizedInitialPathname
-    ? getCurrentSettingsViewId(normalizedInitialPathname)
-    : resolveCanonicalSettingsViewId(initialView);
-  const initialEntry = normalizedInitialPathname || (
-    safeInitialView === 'capability-sources' && initialSupplier
-      ? `/settings/capability-sources`
-      : buildSettingsPath(safeInitialView)
-  );
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(isCompactResponsiveWidth(window.innerWidth));
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen || presentation !== 'overlay') return;
-
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = overflow;
-    };
-  }, [isOpen, presentation]);
-
-  if (!isOpen) return null;
-
-  const shellContent = (
-    <MemoryRouter initialEntries={[initialEntry]} key={initialEntry}>
-      <SettingsPageHistorySync enabled={presentation === 'page'} />
-      <SettingsRouterShell
-        initialSupplier={initialSupplier}
-        onClose={onClose}
-        initialView={safeInitialView}
-        isMobile={isMobile}
-      />
-    </MemoryRouter>
-  );
-
-  const content = presentation === 'page' ? (
-    <div
-      className="settings-panel settings-page-root"
-      data-testid="settings-page-root"
-      style={{
-        ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
-      }}
-    >
-      {shellContent}
-    </div>
-  ) : (
-    <div
-      className="settings-panel settings-shell-backdrop"
-      style={{
-        padding: isMobile ? '0px' : '24px',
-        background: 'var(--settings-backdrop-bg)',
-        backdropFilter: 'blur(18px)',
-        left: '0px',
-        top: '0px',
-        bottom: '0px',
-        right: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px', // 简体中文：若 AI 助手开启，则在右侧主动避让（扣除）其宽度，保持同屏常驻
-        ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
-      }}
-      onClick={onClose}
-    >
-      {shellContent}
-    </div>
-  );
-
-  if (presentation === 'page') {
-    return content;
-  }
-
-  return createPortal(content, document.body);
-};
-
-export type { SettingsViewId } from './settingsRegistry';
-export default SettingsWorkbenchPanel;

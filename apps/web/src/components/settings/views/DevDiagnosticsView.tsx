@@ -23,6 +23,14 @@ export const DevDiagnosticsView: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [runnerStatus, setRunnerStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [manifest, setManifest] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/app-version.json', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setManifest(data))
+      .catch((err) => console.warn('[DevDiagnostics] Failed to fetch app-version.json:', err));
+  }, []);
 
   const runDiagnostic = async () => {
     setLoading(true);
@@ -94,7 +102,7 @@ export const DevDiagnosticsView: React.FC = () => {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* System Health Card */}
         <SettingsSection title={pick('系统服务连通性', 'Connectivity')}>
           <div className="space-y-3 text-xs text-[var(--text-secondary)]">
@@ -147,6 +155,48 @@ export const DevDiagnosticsView: React.FC = () => {
             <div className="flex items-center justify-between">
               <span>{pick('交互流畅度预测', 'Expected Smoothness')}</span>
               <SettingsBadge tone="emerald">EXCELLENT (60FPS)</SettingsBadge>
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Build Metadata & Environment Card */}
+        <SettingsSection title={pick('环境诊断与元数据', 'Build Metadata & Environment')}>
+          <div className="space-y-2 text-xs text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between">
+              <span>Version / Target</span>
+              <span className="font-mono text-[var(--text-primary)]">
+                {manifest?.version || '1.5.9'} ({manifest?.deploymentTarget || 'production'})
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Commit SHA</span>
+              <span className="font-mono text-[var(--text-primary)] truncate max-w-[100px]" title={manifest?.commitSha || undefined}>
+                {manifest?.commitSha ? manifest.commitSha.slice(0, 7) : 'f4d2b09'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Pathname / Mode</span>
+              <span className="font-mono text-[var(--text-primary)] truncate max-w-[100px]" title={typeof window !== 'undefined' ? window.location.pathname : ''}>
+                {typeof window !== 'undefined' ? window.location.pathname : '/settings'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Active View</span>
+              <span className="font-mono text-[var(--text-primary)]">
+                {typeof window !== 'undefined' ? window.location.pathname.split('/').pop() || 'dashboard' : 'dashboard'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Settings Shell</span>
+              <span className="font-semibold text-emerald-400">
+                {typeof window !== 'undefined' ? (window.innerWidth <= 768 ? 'Mobile' : 'Desktop') : 'Desktop'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>UI Theme Preference</span>
+              <span className="font-mono text-[var(--text-primary)]">
+                {typeof window !== 'undefined' ? (localStorage.getItem('kk_theme') || localStorage.getItem('theme') || 'dark') : 'dark'}
+              </span>
             </div>
           </div>
         </SettingsSection>
