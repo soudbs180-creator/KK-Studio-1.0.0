@@ -926,3 +926,21 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 经由浏览器子代理（Browser Subagent）滚动缩放测试，确证将鼠标放置在小地图右下角高频滚动滚轮时，小地图内部完全以鼠标指针为中心完美缩放且主画布纹丝不动，控制台无报错。
 
 
+## 59. 2026-06-26 - Remove Desktop AI Assistant Header Button (本次追加)
+- **修改范围**：
+  1. 移除了桌面版 Header/TopBar (AppDesktopChrome.tsx) 中的 AI 助手图标按钮（ID 为 `btn-desktop-ai-assistant`），因为用户可以直接通过右下角/侧边的折叠拉手按钮开启/关闭 AI 助手侧边栏，保留此按钮显得多余。
+  2. 清理了 `AppDesktopChrome.tsx` 组件的参数和 Props，删除了由于移除该按钮而不再使用的 `isChatOpen` 和 `onToggleChat`，以及 `Bot` 图标的引入。
+  3. 相应地修改了调用方 `WorkspacePage.tsx` 中的 `<AppDesktopChrome>`，不再传递被删除的 `isChatOpen` 和 `onToggleChat` Props。
+- **修改文件**：
+  - [AppDesktopChrome.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/AppDesktopChrome.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 减少顶部状态栏的按钮冗余，由于侧边栏拉手在右侧非常醒目且是主交互入口，因此顶部的机器人（AI 助手）切换图标纯属功能重合，予以彻底移除。
+  - 清理不使用的变量和 imports 以维持代码的整洁，避免引发 ESLint 告警。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 类型检查 100% 通过。
+  - 运行 `npm run architecture:check` 架构边界规范校验 100% 通过。
+  - 运行 `npm run governance:check` 治理规约校验 100% 通过。
+- **未运行验证及原因**：未运行完整的 `verify:changes`，因为这次是一次极简单的无状态 UI 冗余按钮删除，并且全套类型、架构与治理检查均已验证通过。
+- **风险与下一步**：无风险。用户以后可通过右侧侧边栏的箭头直接展开/折叠 AI 助手侧边栏。

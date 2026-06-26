@@ -5501,8 +5501,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
             onOpenProfile={openProfileSurface}
             onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
             onSignOut={() => { void signOut(); }}
-            isChatOpen={isChatOpen}
-            onToggleChat={toggleChatPanel}
           />
         </div>
       )}
