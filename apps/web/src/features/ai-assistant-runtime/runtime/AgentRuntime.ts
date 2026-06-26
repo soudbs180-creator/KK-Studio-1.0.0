@@ -19,8 +19,7 @@ export class AgentRuntime {
   async run(
     text: string, 
     context: SanitizedProjectContext, 
-    modelId?: string,
-    executorContext?: any
+    modelId?: string
   ): Promise<AgentRunRecord> {
     const apiKeyStatus = context.settings.apiKeyStatus;
     let plan: AssistantPlan;
@@ -80,15 +79,6 @@ export class AgentRuntime {
       });
       const updated = agentRunStore.getRun(record.id)!;
       void writeHandoff(updated);
-    } else if (!plan.requiresConfirmation && executorContext) {
-      // 方案 A：立即异步拉起执行以让状态流转，避免只停在 waiting_execution 阶段而没有实际工具执行
-      Promise.resolve().then(async () => {
-        try {
-          await this.executePendingRun(record.id, executorContext);
-        } catch (err) {
-          console.error('[AgentRuntime] Auto-execution of plan failed:', err);
-        }
-      });
     }
 
     // 如果需要后端权威同步，此处可以发送异步请求，但不阻塞前台

@@ -1,6 +1,6 @@
 # AI Assistant Roadmap — KK Studio v1.5.9
 
-Last updated: 2026-06-03  
+Last updated: 2026-06-26  
 Primary rules: `AGENTS.md`
 
 ## 0. 文档定位
@@ -163,7 +163,13 @@ server/routes/generate-image.js
 4. `LLMService` 已有 Provider 能力、密钥路由、用户路由代理、系统代理等复杂逻辑。
 5. `server/routes/generate-image.js` 已有服务器端图像生成、积分扣除、限流、失败退款和静态文件落盘逻辑。
 
-缺口：AI 接管里的批量生成队列仍是 React 内存状态。需要升级成持久化、幂等、可恢复、可限速的 DurableGenerationQueue。
+落地状态：批量生成队列已完全从旧 React 内存状态升级为 `DurableGenerationQueue`。它作为一个持久化异步生图任务队列，支持断线自动重跑、限制最大并发、并通过 UI 的 TaskCenterTray 允许用户进行暂停/恢复/重试等。
+
+### 1.5 v1.5.9 核心功能落地状态
+- **DurableGenerationQueue**：全面落地，负责画布上所有的批量出图和单图异步排队任务，支持基于 idempotencyKey 的防重生成、网络断线自动重试与恢复。
+- **TaskCenterTray**：前端任务中心托盘，可视化展示当前的 queued、running、paused、completed 和 failed 任务列表，允许用户实时暂停、恢复、取消或重试。
+- **GenerationError & ProviderRouteEngine**：实现错误分级和多模型智能路由引擎，自动适配不同的绘图后端，在 API 异常或额度不足时自动回退，并向用户渲染友好具体的错误信息。
+- **research_to_canvas**：用户口头输入研究指令（如“研究咖啡品牌风格”）时，系统自动通过 LocalBrain 推导 `research_to_canvas` 意图，将格式化好的深度研究报告（Research Brief）作为专属节点插入画布，并与其批量生图任务紧密联动。
 
 ---
 
@@ -217,7 +223,7 @@ apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts
 
 ```ts
 export interface CanvasRuntimeState {
-  projectVersion: '1.5.8';
+  projectVersion: '1.5.9';
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
   canvas: {
     id: string;

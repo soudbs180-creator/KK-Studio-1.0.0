@@ -245,7 +245,7 @@ function readPayloadFromRequest(req) {
 }
 
 async function saveEnrichedProfile(req, profileState) {
-  const data = await readLocalStorage();
+  const data = await readLocalStorage(req.profileUserId);
   writeProfileState(data, req.profileUserId, profileState);
   await writeLocalStorage(data);
 }
@@ -263,7 +263,7 @@ router.put('/v1/profile/user-apis/payload', requireProfileAuth, async (req, res)
 });
 
 router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = await readLocalStorage();
+  const data = await readLocalStorage(req.profileUserId);
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,
@@ -278,7 +278,7 @@ router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
 });
 
 router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = await readLocalStorage();
+  const data = await readLocalStorage(req.profileUserId);
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,

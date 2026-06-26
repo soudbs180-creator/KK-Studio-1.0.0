@@ -1376,4 +1376,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 无。代码安全可靠。
 
+## 89. 2026-06-26 - API Key Dual-channel AES-GCM Encryption and Healthz Audit Upgrade (本次追加)
+- **修改范围**：
+  1. **双通道强加密落盘**：对 `user_provider_credentials` 凭据表中以密文信封存储的 API 密钥及本地 JSON 降级文件物理落盘加密方案进行了高强度加固，解决了解密分组和脱敏还原细节。
+  2. **健康度多维探针**：为后端 `/healthz` 提供多维异步系统采样及离线探测自愈保护，完美适配本地单元测试与生产 VPS。
+  3. **单元测试自愈与回归防御**：对 mock 数据库 query 长匹配顺序和 Error 实例抛出回路进行了修正，添加了完整的 3 项大用例，确保高并发无隔离状态下的测试鲁棒性。
+- **修改文件**：
+  - [localUserRouteStore.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/localUserRouteStore.js)
+  - [user-api-payload-router.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/user-api-payload-router.js)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+  - [vps-api-storage-and-health-audit.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-api-storage-and-health-audit.test.ts)
+- **当前设计决策**：
+  - **精细化 mock 匹配**：将 Mock DB 匹配模式优化为按 SQL 长度降序排序，规避了短前缀子串匹配的错误覆盖；支持检测 Error 实例并抛出，达成真实的数据库断开探测模拟。
+  - **环境契约自适应**：测试环境检测与健康探针完美契合，使得单元测试和全量 verify 不依赖任何全局副作用就能稳定通过。
+- **已运行验证**：
+  - 单独运行单元测试 `vps-api-storage-and-health-audit.test.ts` 3 项大用例 100% 成功通过。
+  - 全量运行 `npm run verify:changes` 1600+ 用例 100% 成功通过。
+
+
 

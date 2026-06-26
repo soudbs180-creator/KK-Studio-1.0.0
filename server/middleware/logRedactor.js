@@ -17,7 +17,7 @@ function redactObject(obj) {
   const SENSITIVE_KEYS = new Set([
     'password', 'apikey', 'api_key', 'key', 'secret',
     'authorization', 'token', 'access_token', 'refresh_token',
-    'encrypted_secret', 'encrypted_refresh_token'
+    'encrypted_secret', 'encrypted_refresh_token', 'cookie'
   ]);
 
   for (const [key, value] of Object.entries(obj)) {

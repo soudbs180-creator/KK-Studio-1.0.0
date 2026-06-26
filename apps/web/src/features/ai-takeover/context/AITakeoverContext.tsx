@@ -191,46 +191,7 @@ export function AITakeoverProvider({
   const [currentRun, setCurrentRun] = useState<AgentRunRecord | null>(null);
   const agentRunTimeline = React.useMemo(() => buildAgentRunTimeline(currentRun), [currentRun]);
 
-  // 简体中文：前端生图最大 3 并发排队队列状态
-  const [generationQueue, setGenerationQueue] = useState<any[]>([]);
 
-  // 调度函数：推进生图等待队列
-  const addToQueue = useCallback((node: any) => {
-    setGenerationQueue(prev => [...prev, node]);
-  }, []);
-
-  // 简体中文：生图排队控制器 —— 侦听画布，空闲时才启动 executeGeneration 并变更为 isGenerating 开始计时
-  React.useEffect(() => {
-    if (generationQueue.length === 0) return;
-
-    // 统计目前正在生成中的卡片数
-    const activeGeneratingCount = activeCanvas?.promptNodes?.filter((n: any) => n.isGenerating).length || 0;
-
-    if (activeGeneratingCount < 3) {
-      const nextNode = generationQueue[0];
-      setGenerationQueue(prev => prev.slice(1));
-
-      (async () => {
-        try {
-          // 1. 卡片正式进入 isGenerating = true 状态，开启倒计时与闪烁
-          await updatePromptNode({
-            ...nextNode,
-            isGenerating: true,
-            status: 'idle'
-          });
-
-          // 2. 真正拉起绘图接口
-          void executeGeneration({
-            ...nextNode,
-            isGenerating: true,
-            status: 'idle'
-          });
-        } catch (err) {
-          console.error('[TakeoverQueue] 调度执行异常:', err);
-        }
-      })();
-    }
-  }, [generationQueue, activeCanvas?.promptNodes, updatePromptNode, executeGeneration]);
 
   const setAiTakeoverMode = useCallback((enabled: boolean) => {
     setAiTakeoverModeState(enabled);
@@ -253,7 +214,6 @@ export function AITakeoverProvider({
       updatePromptNode,
       updateNodes,
       executeGeneration,
-      addToQueue,
       getNextCardPosition,
       arrangeAllNodes,
       addGroup,
@@ -282,7 +242,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
 
 
   // 发送消息

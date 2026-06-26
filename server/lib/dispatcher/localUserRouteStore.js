@@ -1,5 +1,8 @@
 const fs = require('fs/promises');
 const path = require('path');
+const cryptoUtil = require('../../utils/crypto');
+const { getPool } = require('../db');
+const { READONLY_SECRET_PLACEHOLDER } = require('../userApiSecret');
 
 const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../../.kk-local/local-user-apis.json');
 
@@ -196,7 +199,63 @@ function buildProfileRouteIndex(profileState) {
   return index;
 }
 
-async function readLocalStorage() {
+function isDbEnabled() {
+  return process.env.DATABASE_URL && process.env.KKAI_LOCAL_ONLY !== 'true';
+}
+
+function isReadonlySecret(value) {
+  const normalized = String(value || '').trim();
+  return !normalized
+    || normalized === READONLY_SECRET_PLACEHOLDER
+    || normalized.startsWith('__kk_redacted__:')
+    || normalized.includes('...')
+    || normalized.includes('••');
+}
+
+async function readLocalStorage(userId = null) {
+  if (isDbEnabled() && userId) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query(
+        'SELECT encrypted_secret FROM public.user_provider_credentials WHERE user_id = $1',
+        [userId]
+      );
+
+      const profileState = {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      };
+
+      for (const row of rows) {
+        try {
+          const decrypted = cryptoUtil.decrypt(row.encrypted_secret);
+          const item = JSON.parse(decrypted);
+          const group = item._group || 'entries';
+          delete item._group;
+          if (profileState[group]) {
+            profileState[group].push(item);
+          }
+        } catch (err) {
+          console.error('[localUserRouteStore] 数据库解密记录失败:', err);
+        }
+      }
+
+      if (!cache.payload) {
+        cache.payload = { version: 2, profiles: {} };
+      }
+      if (!cache.payload.profiles) {
+        cache.payload.profiles = {};
+      }
+      cache.payload.profiles[userId] = profileState;
+      return cache.payload;
+    } catch (dbErr) {
+      console.error('[localUserRouteStore] 数据库读取失败，降级本地文件:', dbErr);
+    }
+  }
+
+  // 降级使用本地物理 JSON 文件
   async function doRead() {
     let signature = 'missing';
     try {
@@ -223,6 +282,28 @@ async function readLocalStorage() {
       parsed = { version: 2, profiles: {} };
     }
 
+    // 本地 JSON 读出时的自动解密还原
+    if (parsed.profiles) {
+      for (const [uid, uState] of Object.entries(parsed.profiles)) {
+        const normalizeGroup = (group) => {
+          if (!uState || !Array.isArray(uState[group])) return;
+          uState[group] = uState[group].map(item => {
+            if (item && item.key && item.key.startsWith('enc:')) {
+              try {
+                item.key = cryptoUtil.decrypt(item.key.slice(4));
+              } catch (decErr) {
+                console.warn('[localUserRouteStore] 解密本地 key 失败:', decErr);
+              }
+            }
+            return item;
+          });
+        };
+        normalizeGroup('slots');
+        normalizeGroup('providers');
+        normalizeGroup('entries');
+      }
+    }
+
     cache = {
       signature,
       payload: parsed,
@@ -241,7 +322,7 @@ async function readLocalStorage() {
 }
 
 async function resolveLocalUserRoute(userId, routeId) {
-  const data = await readLocalStorage();
+  const data = await readLocalStorage(userId);
   if (!isObjectRecord(data.profiles)) data.profiles = {};
 
   const cacheKey = `${cache.signature}:${userId}`;
@@ -312,16 +393,96 @@ function writeProfileState(data, userId, profileState) {
 }
 
 async function writeLocalStorage(data) {
+  if (isDbEnabled()) {
+    const pool = getPool();
+    for (const [userId, profileState] of Object.entries(data.profiles || {})) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        
+        // 简体中文：在覆盖写入之前，我们需要防范将 placeholder 覆盖数据库里的真实凭据。
+        // 我们先从数据库读出已有的真实凭据
+        const { rows } = await client.query(
+          'SELECT encrypted_secret FROM public.user_provider_credentials WHERE user_id = $1',
+          [userId]
+        );
+        const existingKeys = new Map();
+        for (const row of rows) {
+          try {
+            const dec = cryptoUtil.decrypt(row.encrypted_secret);
+            const parsed = JSON.parse(dec);
+            if (parsed.id && parsed.key && !isReadonlySecret(parsed.key)) {
+              existingKeys.set(parsed.id, parsed.key);
+            }
+          } catch {}
+        }
+
+        await client.query('DELETE FROM public.user_provider_credentials WHERE user_id = $1', [userId]);
+
+        const groups = ['slots', 'providers', 'entries'];
+        for (const group of groups) {
+          const items = profileState[group] || [];
+          for (const item of items) {
+            const provider = String(item.provider || item.name || 'custom').trim();
+            const authType = item.auth_type || 'api_key';
+
+            // 掩码合并还原逻辑：如果是占位符，使用数据库里已有的真实 key
+            let realKey = item.key;
+            if (isReadonlySecret(realKey) && item.id && existingKeys.has(item.id)) {
+              realKey = existingKeys.get(item.id);
+            }
+
+            const itemToSave = { ...item, key: realKey, _group: group };
+            const encryptedSecret = cryptoUtil.encrypt(JSON.stringify(itemToSave));
+
+            await client.query(
+              `INSERT INTO public.user_provider_credentials 
+               (user_id, provider, auth_type, encrypted_secret) 
+               VALUES ($1, $2, $3, $4)`,
+              [userId, provider, authType, encryptedSecret]
+            );
+          }
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('[localUserRouteStore] 写入数据库凭据失败:', e);
+      } finally {
+        client.release();
+      }
+    }
+    // 同时也使缓存签名失效，保证下次 resolve 会重新建立 index
+    cache.signature = `db-${Date.now()}`;
+    cache.indexes.clear();
+    return;
+  }
+
+  // 本地物理 JSON 写入模式
+  const clone = JSON.parse(JSON.stringify(data));
+  if (clone.profiles) {
+    for (const [uid, uState] of Object.entries(clone.profiles)) {
+      const encryptGroup = (group) => {
+        if (!uState || !Array.isArray(uState[group])) return;
+        uState[group] = uState[group].map(item => {
+          if (item && item.key && !item.key.startsWith('enc:') && !isReadonlySecret(item.key)) {
+            item.key = `enc:${cryptoUtil.encrypt(item.key)}`;
+          }
+          return item;
+        });
+      };
+      encryptGroup('slots');
+      encryptGroup('providers');
+      encryptGroup('entries');
+    }
+  }
+
   const dir = path.dirname(LOCAL_STORAGE_PATH);
   try {
     await fs.mkdir(dir, { recursive: true });
-  } catch (err) {
-    // 忽略目录已存在等错误
-  }
-  const raw = JSON.stringify(data, null, 2);
+  } catch (err) {}
+  const raw = JSON.stringify(clone, null, 2);
   await fs.writeFile(LOCAL_STORAGE_PATH, raw, 'utf8');
 
-  // 使内存缓存及索引失效，并重新计算签名
   const stat = await fs.stat(LOCAL_STORAGE_PATH);
   const signature = `${stat.mtimeMs}:${stat.size}`;
   cache = {

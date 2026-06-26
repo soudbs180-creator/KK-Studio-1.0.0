@@ -51,13 +51,19 @@ test("logRedactor middleware redacts sensitive fields from body and headers", ()
       username: "user1",
       password: "secret_password",
       apiKey: "sk-proj-key123",
+      api_key: "another-api-key",
+      secret: "my-app-secret",
       nested: {
-        token: "access_token_val"
+        token: "access_token_val",
+        deepSecret: {
+          token: "deep-token"
+        }
       }
     },
     headers: {
       host: "localhost",
-      authorization: "Bearer my-jwt-token"
+      authorization: "Bearer my-jwt-token",
+      cookie: "session_id=abc123token"
     },
     redactedBody: null,
     redactedHeaders: null
@@ -75,10 +81,14 @@ test("logRedactor middleware redacts sensitive fields from body and headers", ()
   assert.ok(req.redactedBody);
   assert.equal((req.redactedBody as any).password, "[REDACTED]");
   assert.equal((req.redactedBody as any).apiKey, "[REDACTED]");
+  assert.equal((req.redactedBody as any).api_key, "[REDACTED]");
+  assert.equal((req.redactedBody as any).secret, "[REDACTED]");
   assert.equal((req.redactedBody as any).username, "user1");
   assert.equal((req.redactedBody as any).nested.token, "[REDACTED]");
+  assert.equal((req.redactedBody as any).nested.deepSecret.token, "[REDACTED]");
 
   assert.ok(req.redactedHeaders);
   assert.equal((req.redactedHeaders as any).host, "localhost");
   assert.equal((req.redactedHeaders as any).authorization, "[REDACTED]");
+  assert.equal((req.redactedHeaders as any).cookie, "[REDACTED]");
 });
