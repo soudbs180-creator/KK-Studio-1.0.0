@@ -14,10 +14,10 @@ import {
   type AgentRunTimelineStep,
 } from '../../ai-assistant-runtime';
 
-type LlmChat = typeof import('../../../services/llm/generationService')['generationService']['chat'];
+type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
 
 const chatWithLlm: LlmChat = async (...args) => {
-  const { generationService } = await import('../../../services/llm/generationService');
+  const { generationService } = await import('../../generation/generateService');
   return generationService.chat(...args);
 };
 

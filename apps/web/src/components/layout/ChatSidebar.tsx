@@ -236,16 +236,16 @@ const MODEL_MENU_SKELETON_COUNT = 3;
 
 type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
 type ChatOptions = import('../../services/llm/LLMAdapter').ChatOptions;
-type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerationServiceClass = import('../../features/generation/generateService').GenerationService;
 type GenerateImageFn = GenerationServiceClass['generateImage'];
 
 const chatWithLlm = async (options: ChatOptions): Promise<string> => {
-    const { generationService } = await import('../../services/llm/generationService');
+    const { generationService } = await import('../../features/generation/generateService');
     return generationService.chat(options);
 };
 
 const generateImageOnDemand = async (...args: Parameters<GenerateImageFn>): Promise<ReturnType<GenerateImageFn>> => {
-    const { generationService } = await import('../../services/llm/generationService');
+    const { generationService } = await import('../../features/generation/generateService');
     return generationService.generateImage(...args);
 };
 

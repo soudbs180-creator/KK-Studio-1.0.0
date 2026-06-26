@@ -127,19 +127,19 @@ import { syncService } from '../../services/system/syncService';
 
 const GENERATE_TIMEOUT_MS = 600000;
 
-type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerationServiceClass = import('../../features/generation/generateService').GenerationService;
 type GenerateImageFn = GenerationServiceClass['generateImage'];
 type GenerateVideoFn = GenerationServiceClass['generateVideo'];
 type EcommerceAnalysisModule = typeof import('../../services/ecommerce/ecommerceAnalysisClient.ts');
 type SecureModelProxyModule = typeof import('../../services/model/secureModelProxy');
 
 const generateImage = async (...args: Parameters<GenerateImageFn>) => {
-  const { generationService: runGenerationService } = await import('../../services/llm/generationService');
+  const { generationService: runGenerationService } = await import('../../features/generation/generateService');
   return runGenerationService.generateImage(...args);
 };
 
 const cancelGeneration = (id: string): void => {
-  void import('../../services/llm/generationService').then(({ generationService: runGenerationService }) => {
+  void import('../../features/generation/generateService').then(({ generationService: runGenerationService }) => {
     runGenerationService.cancelGeneration(id);
   });
 };
@@ -150,7 +150,7 @@ const analyzeEcommerceRequirementFile: EcommerceAnalysisModule['analyzeEcommerce
 };
 
 const generateVideo = async (...args: Parameters<GenerateVideoFn>) => {
-  const { generationService: runtimeLlmService } = await import('../../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../../features/generation/generateService');
   return runtimeLlmService.generateVideo(...args);
 };
 

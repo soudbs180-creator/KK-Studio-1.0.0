@@ -3,7 +3,7 @@ import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth';
 import { keyManager } from '../../services/auth/keyManager';
 import { getNetworkStatus, isUserVpnEnabled, probeNetwork } from '../../local/localNetworkProbe';
 import { decideRoute } from './routePolicies';
-import { RouteContext, RouteDecision, RouteMode } from './generationIntent';
+import type { RouteContext, RouteDecision, RouteMode } from './generationIntent';
 import { isSystemModelRoute } from '../../services/model/modelRoute';
 
 export class ProviderRouteEngine {

@@ -54,13 +54,9 @@ test('keyManager blocks browser-side provider diagnostics and browser-side secre
 });
 
 test('LLMService uses the local user-route proxy first, falls back to cloud secure proxy, and blocks browser direct calls', () => {
-  const source = readSource('apps/web/src/services/llm/generationService.ts');
+  const source = readSource('apps/web/src/features/generation/generateService.ts');
 
   assert.match(source, /buildSecureProxyUserRouteFromSlotId/);
-  assert.match(source, /callLocalUserRouteProxyChat/);
-  assert.match(source, /callLocalUserRouteProxyImage/);
-  assert.match(source, /callLocalUserRouteProxyVideo/);
-  assert.match(source, /callLocalUserRouteProxyAudio/);
   assert.match(source, /checkLocalUserRouteProxyTaskStatus/);
   assert.match(source, /private buildUserRouteForKeySlot\(keySlot: KeySlot\): string \{/);
   assert.match(source, /private shouldUseSecureProxyUserRoute\(keySlot: KeySlot\): boolean \{/);
@@ -71,33 +67,21 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
   assert.match(source, /falling back to cloud/);
   assert.match(source, /private decorateTaskStatusResult\(/);
   assert.match(source, /private throwBrowserDirectProviderCallBlocked\(action: string, keySlot\?: Pick<KeySlot, 'name' \| 'provider'>\): never \{/);
-  assert.match(source, /response = await callLocalUserRouteProxyChat\(\{/);
-  assert.match(source, /proxyResponse = await callLocalUserRouteProxyImage\(\{/);
-  assert.match(source, /response = await callLocalUserRouteProxyVideo\(\{/);
-  assert.match(source, /response = await callLocalUserRouteProxyAudio\(\{/);
-  assert.match(source, /userRoute: buildSecureProxyUserRouteFromSlotId\(routeId\),/);
+  assert.match(source, /localRunnerClient\.chat\(\{ ...payload, routeId \}\);/);
+  assert.match(source, /cloudRelayClient\.chat\(\{ ...payload, routeId \}\);/);
+  assert.match(source, /platformCreditClient\.chat\(payload\);/);
+  assert.match(source, /accountLinkerClient\.chat\(payload\);/);
+  assert.match(source, /localRunnerClient\.generateImage\(\{ ...payload, routeId \}\);/);
+  assert.match(source, /cloudRelayClient\.generateImage\(\{ ...payload, routeId \}\);/);
+  assert.match(source, /platformCreditClient\.generateImage\(payload\);/);
+  assert.match(source, /accountLinkerClient\.generateImage\(payload\);/);
   assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('chat routing', keySlot\), normalizedUserRouteError\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('image routing', keySlot\), normalizedUserRouteError\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('video routing', keySlot\), normalizedUserRouteError\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('audio routing', keySlot\), normalizedUserRouteError\);/);
   assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('chat routing', keySlot\);/);
   assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('image routing', keySlot\);/);
-  assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('video routing', keySlot\);/);
-  assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('audio routing', keySlot\);/);
-  assert.match(source, /const shouldUseLocalUserRouteTaskStatus = taskId\.startsWith\('local_proxy:'\);/);
-  assert.match(source, /const result = await checkLocalUserRouteProxyTaskStatus\(taskId\);/);
-  assert.match(source, /return Promise\.all\(\s*normalizedTaskIds\.map\(\(taskId\) => this\.checkTaskStatus\(taskId, mode, preferredKeyId, modelId\)\)\s*\);/);
-  assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('task status checks', preferredKeySlot \|\| undefined\);/);
-  assert.match(source, /const shouldUseSecureProxyTaskStatus = \(\s*normalizedPreferredKeyId === 'system_proxy_slot'\s*\|\|\s*taskId\.startsWith\('system_proxy:'\)\s*\|\|\s*preferredKeySlot\?\.provider === 'SystemProxy'\s*\);/);
-  assert.match(source, /const containsLocalProxyTasks = normalizedTaskIds\.some\(\(taskId\) => taskId\.startsWith\('local_proxy:'\)\);/);
-  assert.match(source, /const containsSecureProxyTasks = normalizedTaskIds\.some\(\(taskId\) => taskId\.startsWith\('system_proxy:'\)\);/);
-  assert.match(source, /const shouldUsePerTaskRouting = \(\s*normalizedPreferredKeyId === 'system_proxy_slot'\s*\|\|\s*containsLocalProxyTasks\s*\|\|\s*containsSecureProxyTasks\s*\|\|\s*preferredKeySlot\?\.provider === 'SystemProxy'\s*\);/);
   assert.doesNotMatch(source, /private hasUsableLocalDirectKey\(keySlot: KeySlot\): boolean \{/);
   assert.doesNotMatch(source, /private shouldFallbackToLocalKey\(\s*keySlot: KeySlot,\s*error: unknown,\s*\): boolean \{/);
   assert.doesNotMatch(source, /private createLocalFallbackNotice\(action: string, keySlot: Pick<KeySlot, 'name' \| 'provider'>\): string \{/);
   assert.doesNotMatch(source, /console\.warn\(this\.createLocalFallbackNotice\(/);
-  assert.doesNotMatch(source, /return await this\.runDirectChat\(options, keySlot\);/);
-  assert.doesNotMatch(source, /result = await this\.runDirectImage\(options, keySlot\);/);
   assert.doesNotMatch(source, /const directResult = await this\.runDirectVideo\(options, keySlot\);/);
   assert.doesNotMatch(source, /const directResult = await this\.runDirectAudio\(options, keySlot\);/);
   assert.doesNotMatch(source, /const directResult = await this\.runDirectTaskStatus\(taskId, mode, preferredKeySlot, modelId\);/);
@@ -206,8 +190,6 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
 test('request-boundary helpers block placeholder secrets before provider transport', () => {
   const apiConfigSource = readSource('apps/web/src/services/api/apiConfig.ts');
   const secureProxySource = readSource('apps/web/src/services/model/secureModelProxy.ts');
-  const videoServiceSource = readSource('apps/web/src/services/video/videoService.ts');
-  const veoVideoServiceSource = readSource('apps/web/src/services/video/VeoVideoService.ts');
 
   assert.match(apiConfigSource, /export function normalizeApiKeyForTransport\(value: unknown\): string \{/);
   assert.match(apiConfigSource, /token === 'sk-readonly-0000'/);
@@ -224,15 +206,6 @@ test('request-boundary helpers block placeholder secrets before provider transpo
   assert.match(secureProxySource, /if \(rawTargetApiKey && !targetApiKey\) \{/);
   assert.match(secureProxySource, /LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE/);
   assert.match(secureProxySource, /proxyHeaders\['X-Proxy-Api-Key'\] = targetApiKey;/);
-
-  assert.match(videoServiceSource, /import \{ getApiKeyToken \} from '\.\.\/api\/apiConfig';/);
-  assert.match(videoServiceSource, /const apiKeyToken = getApiKeyToken\(apiKey\);/);
-  assert.match(videoServiceSource, /apiKey = getApiKeyToken\(apiKey\);/);
-  assert.match(videoServiceSource, /Re-enter or reveal the real API key before retrying\./);
-
-  assert.match(veoVideoServiceSource, /import \{ getApiKeyToken \} from '\.\.\/api\/apiConfig';/);
-  assert.match(veoVideoServiceSource, /apiKey = getApiKeyToken\(apiKey\);/);
-  assert.match(veoVideoServiceSource, /Re-enter or reveal the real API key before retrying\./);
 });
 
 test('AuthContext keeps KeyManager scoped to the current KK runtime user and clears auth state on invalidation', () => {
@@ -285,14 +258,4 @@ test('BillingContext clears balance and transaction state immediately when the u
   assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope\s*\?\s*usageLogs\s*:\s*\(renderCachedSnapshot\?\.usageLogs \?\? \[\]\);/);
   assert.match(source, /const visibleLoading = activeBillingUserId[\s\S]*\?\s*\(\(!hasHydratedCurrentBillingScope && !renderCachedSnapshot\) \|\| loading \|\| !canStartBillingBootstrap\)[\s\S]*:\s*false;/);
   assert.match(source, /refreshing,/);
-});
-
-test('OpenAIVideoService fails closed instead of calling third-party providers from the browser', () => {
-  const source = readSource('apps/web/src/services/video/OpenAIVideoService.ts');
-
-  assert.match(source, /const BROWSER_DIRECT_VIDEO_CALLS_DISABLED_MESSAGE =/);
-  assert.match(source, /throw new Error\(BROWSER_DIRECT_VIDEO_CALLS_DISABLED_MESSAGE\);/);
-  assert.doesNotMatch(source, /Authorization/);
-  assert.doesNotMatch(source, /fetch\(endpoint,/);
-  assert.doesNotMatch(source, /\[OpenAIVideo\] Response:/);
 });

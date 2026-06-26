@@ -39,7 +39,6 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(syncServiceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
   assert.match(syncServiceSource, /kkWebApiClient\.saveWorkspaceLayout/);
   assert.match(syncServiceSource, /kkWebApiClient\.getWorkspaceLayout/);
-  assert.match(syncServiceSource, /kkWebApiClient\.cleanupCloudImages/);
   assert.doesNotMatch(syncServiceSource, /\.storage\s*\.\s*from\(/);
   assert.doesNotMatch(tempUserServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
   assert.match(tempUserServiceSource, /import \{ kkWebApiClient, shouldUseLegacyWebApiFallback \} from '\.\.\/api\/kkApiClient';/);

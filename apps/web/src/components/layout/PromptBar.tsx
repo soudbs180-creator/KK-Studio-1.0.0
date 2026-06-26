@@ -88,10 +88,10 @@ const PROMPT_BAR_DEEP_MODAL_BACKDROP_LAYER = KK_LAYER.modalBackdrop;
 const PROMPT_BAR_DEEP_MODAL_PANEL_LAYER = KK_LAYER.modal;
 const PROMPT_BAR_DEEP_SHEET_LAYER = KK_LAYER.modal;
 
-type LlmServiceModule = typeof import('../../services/llm/generationService');
+type LlmServiceModule = typeof import('../../features/generation/generateService');
 
 const chatWithLlm: LlmServiceModule['generationService']['chat'] = async (...args) => {
-    const { generationService: runtimeLlmService } = await import('../../services/llm/generationService');
+    const { generationService: runtimeLlmService } = await import('../../features/generation/generateService');
     return runtimeLlmService.chat(...args);
 };
 

@@ -17,6 +17,6 @@ test("canvas cloud sync is driven by a memoized sync signature instead of raw ca
   assert.match(hookSource, /const cloudSyncLayoutPayload = useMemo\(\s*\(\) => canvasCloudSyncSignature \? getCachedStrippedCanvases\(canvases\) : \[\],/);
   assert.doesNotMatch(hookSource, /import \{ syncService \} from '..\/services\/system\/syncService';/);
   assert.match(hookSource, /import\('..\/services\/system\/syncService'\)\s*\.then\(\(\{ syncService \}\) => syncService\.saveLayout\(cloudSyncLayoutPayload\)\)\s*\.catch/);
-  assert.match(hookSource, /\}, \[canvasCloudSyncSignature, cloudSyncLayoutPayload, enabled, hasCloudSyncLocalOnlyMedia, isLoading, canvases\.length\]\);/);
+  assert.match(hookSource, /\}, \[canvasCloudSyncSignature, cloudSyncLayoutPayload, enabled, hasCloudSyncLocalOnlyMedia, isLoading, canvases\.length, isLargeProject, canvases\]\);/);
   assert.match(source, /useCanvasCloudSync\(state\.canvases, isLoading, canSaveCloudLayout\);/);
 });

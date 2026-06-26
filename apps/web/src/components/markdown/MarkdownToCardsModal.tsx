@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { parseMarkdownToCards, type ParsedCardData } from '../../utils/markdownToCards';
-import { generationService } from '../../services/llm/generationService';
+import { generationService } from '../../features/generation/generateService';
 import { keyManager } from '../../services/auth/keyManager';
 import { notify } from '../../services/system/notificationService';
 

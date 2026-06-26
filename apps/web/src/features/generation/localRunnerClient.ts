@@ -2,7 +2,9 @@ import {
   callLocalUserRouteProxyChat,
   callLocalUserRouteProxyImage,
   callLocalUserRouteProxyVideo,
-  callLocalUserRouteProxyAudio,
+  callLocalUserRouteProxyAudio
+} from '../../services/model/secureModelProxy';
+import type {
   SecureProxyChatRequest,
   SecureProxyImageRequest,
   SecureProxyVideoRequest,

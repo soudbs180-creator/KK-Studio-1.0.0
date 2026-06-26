@@ -1,10 +1,10 @@
 import type { EcommerceAnalysisResult } from './types';
 import { keyManager } from '../auth/keyManager';
 
-type LlmServiceModule = typeof import('../llm/generationService');
+type LlmServiceModule = typeof import('../../features/generation/generateService');
 
 const chatWithLlm: LlmServiceModule['generationService']['chat'] = async (...args) => {
-  const { generationService: runtimeLlmService } = await import('../llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../../features/generation/generateService');
   return runtimeLlmService.chat(...args);
 };
 

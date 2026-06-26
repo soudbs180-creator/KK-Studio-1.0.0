@@ -18,11 +18,11 @@ test("workspace layout contract exposes explicit canvas fields instead of a gene
   assert.doesNotMatch(dtoSource, /\[key: string\]: unknown/);
 });
 
-test("sync service maps canvases through explicit workspace layout helpers instead of double-casting records", () => {
+test("sync service handles incremental operations and offline sync instead of double-casting records", () => {
   const syncServiceSource = readSource("apps/web/src/services/system/syncService.ts");
 
-  assert.match(syncServiceSource, /function toCanvasLayoutRecord\(canvas: Canvas\): CanvasLayoutRecordDto \{/);
-  assert.match(syncServiceSource, /function normalizeCanvasRecord\(raw: unknown\): Canvas \| null \{/);
-  assert.match(syncServiceSource, /canvases: canvases\.map\(toCanvasLayoutRecord\)/);
+  assert.match(syncServiceSource, /queueOperation\(/);
+  assert.match(syncServiceSource, /triggerSync\(\)/);
+  assert.match(syncServiceSource, /saveLayout\(/);
   assert.doesNotMatch(syncServiceSource, /as unknown as Record<string, unknown>\[\]/);
 });

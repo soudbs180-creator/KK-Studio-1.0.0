@@ -21,10 +21,10 @@ type RecoveryReason = 'initial' | 'visibility' | 'online' | 'manual';
 
 const RECOVERY_THROTTLE_MS = 30_000;
 
-type LlmServiceModule = typeof import('../services/llm/generationService');
+type LlmServiceModule = typeof import('../features/generation/generateService');
 
 const checkTaskStatuses: LlmServiceModule['generationService']['checkTaskStatuses'] = async (...args) => {
-  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../features/generation/generateService');
   return runtimeLlmService.checkTaskStatuses(...args);
 };
 

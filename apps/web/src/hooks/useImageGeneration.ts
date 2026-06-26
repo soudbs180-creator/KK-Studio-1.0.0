@@ -44,7 +44,7 @@ import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
 import { normalizeModelId } from '../utils/modelIdNormalization';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
-type GenerationServiceClass = import('../services/llm/generationService').GenerationService;
+type GenerationServiceClass = import('../features/generation/generateService').GenerationService;
 type CheckTaskStatusFn = GenerationServiceClass['checkTaskStatus'];
 type GenerateAudioFn = GenerationServiceClass['generateAudio'];
 type GenerateVideoFn = GenerationServiceClass['generateVideo'];
@@ -62,27 +62,27 @@ const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc
 const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
 
 const checkTaskStatus = async (...args: Parameters<CheckTaskStatusFn>) => {
-  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../features/generation/generateService');
   return runtimeLlmService.checkTaskStatus(...args);
 };
 
 const generateAudio = async (...args: Parameters<GenerateAudioFn>) => {
-  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../features/generation/generateService');
   return runtimeLlmService.generateAudio(...args);
 };
 
 const generateVideo = async (...args: Parameters<GenerateVideoFn>) => {
-  const { generationService: runtimeLlmService } = await import('../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../features/generation/generateService');
   return runtimeLlmService.generateVideo(...args);
 };
 
 const generateImage = async (...args: Parameters<GenerateImageFn>) => {
-  const { generationService: runGenerationService } = await import('../services/llm/generationService');
+  const { generationService: runGenerationService } = await import('../features/generation/generateService');
   return runGenerationService.generateImage(...args);
 };
 
 const cancelGeneration = (id: string): void => {
-  void import('../services/llm/generationService').then(({ generationService: runGenerationService }) => {
+  void import('../features/generation/generateService').then(({ generationService: runGenerationService }) => {
     runGenerationService.cancelGeneration(id);
   });
 };

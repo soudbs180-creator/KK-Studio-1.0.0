@@ -8,17 +8,17 @@ import {
 import { AspectRatio, ImageSize } from '../../types';
 import { notify } from '../../services/system/notificationService';
 
-type GenerationServiceClass = import('../../services/llm/generationService').GenerationService;
+type GenerationServiceClass = import('../../features/generation/generateService').GenerationService;
 type GenerateImageFn = GenerationServiceClass['generateImage'];
 type ChatFn = GenerationServiceClass['chat'];
 
 const generateMobileEcommerceImage = async (...args: Parameters<GenerateImageFn>) => {
-  const { generationService: runGenerationService } = await import('../../services/llm/generationService');
+  const { generationService: runGenerationService } = await import('../../features/generation/generateService');
   return runGenerationService.generateImage(...args);
 };
 
 const chatWithMobileEcommerceLlm = async (...args: Parameters<ChatFn>) => {
-  const { generationService: runtimeLlmService } = await import('../../services/llm/generationService');
+  const { generationService: runtimeLlmService } = await import('../../features/generation/generateService');
   return runtimeLlmService.chat(...args);
 };
 

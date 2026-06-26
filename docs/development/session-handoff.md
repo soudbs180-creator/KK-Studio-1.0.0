@@ -715,37 +715,40 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
   - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
 - **当前设计决策**：
-  - **人眼焦点优先的渐进载入时序 (Foveated Loading)**：利用 `loadBand` 精准控制时序梯度。松手的一瞬间，视觉焦点的 0 号带图片可在 `120ms` 黄金响应期内最优先回填为高清，剩余中远郊图片呈水波纹状依次排队，平摊了解码并发，极大改善松手卡顿（Jank）。
-  - **宽裕的卡片缓存带**：外扩 1200 像素的保留带。虽然 `useVisibleCanvasItemsNew` 使用了 2500 像素进行大裁剪以做垃圾回收，但在它之内的卡片，我们允许保持完整交互状态的距离扩宽至 1200 像素，避免频繁切换 Placeholder 造成 React diff 的巨额开销。
-- **已运行验证**：
-  - 运行 `npm run typecheck` 类型校验 100% 成功通过。
-  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过（包括 contract 静态拦截测试）。
-  - 运行 `npm run build` Vite 生产包构建打包 100% 成功通过。
-
-## 61. 2026-06-26 - Minimap Collapsed Slider and Aligned Zoom
+  - **人眼焦点优先的渐进载入时序 (Foveated Loading)**：利用 `loadBand` 精准控制时序梯度。松手的一瞬间，视觉焦点的 0 号带图片可在 `120ms` 黄金响应期内最优先回填为高清，剩余中远郊图片呈水波�## 75. 2026-06-26 - Align Test Contracts for Decoupled Wrapper Cleanups (本次追加)
 - **修改范围**：
-  - 重构小地图折叠状态，在收折叠时渲染扁平化的控制栏并集成滑块及缩放按钮，且操作时实时对大画布生效；
-  - 引入小地图内部滚动缩放机制，对齐 SVG 内的鼠标滚轮交互以局部缩放小地图自身雷达图，不干扰大画布缩放；
-  - 优化缩放数值、按钮、及标题文字排版对齐，防止折行错位；
-  - 治愈并修复了 EmptyCanvasWelcome 与 DashboardView 等由于此前遗留样式调整导致的契约测试失败。
+  1. 修复并重构了因物理删除遗留 Adapter、un-routed 视频/聊天服务及旧 `generationService.ts` 桥接文件后失效的单元测试契约。
+  2. 物理清除了针对已删除源文件的冗余和陈旧契约测试文件。
+  3. 修复了 Vite 生产构建打包时因客户端及路由文件混合导入类型声明造成的 missing export 错误。
 - **修改文件**：
-  - [AppCanvasNavigationPanel.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/AppCanvasNavigationPanel.tsx)
-  - [EmptyCanvasWelcome.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/EmptyCanvasWelcome.tsx)
-  - [DashboardView.localized.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/DashboardView.localized.tsx)
-  - [landingReferenceOverrides.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/landingReferenceOverrides.css)
+  - [workspace-layout-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/workspace-layout-contract.test.ts)
+  - [vite-manual-chunk-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vite-manual-chunk-boundary-contract.test.ts)
+  - [task-recovery-llm-lazy-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/task-recovery-llm-lazy-boundary-contract.test.ts)
+  - [prompt-bar-llm-lazy-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/prompt-bar-llm-lazy-boundary-contract.test.ts)
+  - [image-generation-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/image-generation-unused-cleanup-contract.test.ts)
+  - [canvas-cloud-sync-signature.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-cloud-sync-signature.test.ts)
+  - [credit-route-classification.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/credit-route-classification.test.ts)
+  - [frontend-key-boundary-hardening.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/frontend-key-boundary-hardening.test.ts)
+  - [generation-billing-runtime-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/generation-billing-runtime-contract.test.ts)
+  - [app-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/app-unused-cleanup-contract.test.ts)
+  - [runtime-legacy-fallback-guards.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/runtime-legacy-fallback-guards.test.ts)
+  - [video-service-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/video-service-unused-cleanup-contract.test.ts) [DELETE]
+  - [provider-image-routing-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/provider-image-routing-regression.test.ts) [DELETE]
+  - [llm-adapter-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/llm-adapter-unused-cleanup-contract.test.ts) [DELETE]
+  - [openai-compatible-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/openai-compatible-unused-cleanup-contract.test.ts) [DELETE]
+  - [chat-service-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/chat-service-unused-cleanup-contract.test.ts) [DELETE]
+  - [providerRouteEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/providerRouteEngine.ts)
+  - [localRunnerClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/localRunnerClient.ts)
+  - [cloudRelayClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/cloudRelayClient.ts)
+  - [platformCreditClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/platformCreditClient.ts)
+  - [accountLinkerClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/accountLinkerClient.ts)
 - **当前设计决策**：
-  - **折叠面板实时生效**：利用 `isCollapsed` 区分滑块操作策略。当展开时，滑块更改 `targetScale` 并进入 `isEdited` 编辑确认态；当折叠时，滑块与按钮操作直接调用 `canvasRef.current.setView` 实时改变大画布缩放，提供极致的即时缩放体验。
-  - **小地图局部滚轮缩放**：引入 `minimapScaleMultiplier` 独立状态（默认 3.0），滚动小地图 SVG 仅改变该乘数，控制雷达图局部缩放，使“缩放的是小地图里面的内容”。
-  - **契约测试自愈**：在 `DashboardView.localized.tsx` 中添加正则匹配所需的 commented css 桩，并还原 `EmptyCanvasWelcome.tsx` 所期望的 `empty-canvas-welcome-layer` 等类名，彻底消除了遗留错误。
+  - **契约重定向与对齐**：将原本对 `services/llm/generationService` 进行延迟加载和 API 防护的断言全部更新重定向至新核心路径 `features/generation/generateService`；把 `syncService` 对全量同步映射的旧断言重构为增量批量操作（`queueOperation`/`triggerSync`）的新签名断言；同步修正正则表达式转义和语法括号缺失问题。
+  - **死测试清理**：物理清除由于源文件被完全删除而失效的五个测试用例，使单元测试套件保持精简和纯粹。
+  - **类型别名拆分规避构建缺口**：将四大客户端（localRunner, cloudRelay 等）及 `providerRouteEngine` 中对 `generationIntent` 和 `secureModelProxy` 外部接口类型的非值（type-only）导入，全部重构为显式的 `import type` 语法。消除了 Rolldown/Vite 静态打包构建时因找不到运行时实际 Value 导出而抛出的 `MISSING_EXPORT` 错误，确保打包通过。
 - **已运行验证**：
-  - 运行 `npm run typecheck` 100% 编译成功通过。
-  - 运行 `npm run test:unit` 全套 1607 个测试用例 100% Pass。
-  - 运行 `npm run build` Vite 生产包 100% 构建成功通过。
-  - 经由浏览器子代理进行交互回测，确认折叠状态滑块与加减号缩放灵敏，展开状态局部滚轮缩放与文本对齐均符合预期。
-
-## 62. 2026-06-26 - Wait for Viewport Media Loading & Self-Healing Regression
-- **修改范围**：
-  1. 优化了“正在加载画布”进度条的消失条件，使其必须等待当前视口（Viewport）内已渲染的所有可见卡片图片加载完全就绪后方可关闭，避免进入瞬间卡片出现闪烁或空白占位。
+  - 运行 `npm run test:unit`（共 1543 个用例）全部 100% 成功通过。
+  - 运行 `npm run typecheck` 类型编译 100% 成功通过。件，使其必须等待当前视口（Viewport）内已渲染的所有可见卡片图片加载完全就绪后方可关闭，避免进入瞬间卡片出现闪烁或空白占位。
   2. 修复了由于上一位 Agent 提交 `#54` 导致 `startup-runtime-banner-browser-verify-script.test.ts` 静态契约测试失败的遗留问题。
 - **修改文件**：
   - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
@@ -999,3 +1002,31 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 16 项架构边界扫描全部成功通过。
   - 运行 `npm run typecheck` 编译及类型检查无报错成功通过。
   - 运行 `tests/unit/route-policies.test.ts` 新路由测试 100% 成功通过。
+
+## 75. 2026-06-26 - Align Test Contracts for Decoupled Wrapper Cleanups (本次追加)
+- **修改范围**：
+  1. 修复并重构了因物理删除遗留 Adapter、un-routed 视频/聊天服务及旧 `generationService.ts` 桥接文件后失效的单元测试契约。
+  2. 物理清除了针对已删除源文件的冗余和陈旧契约测试文件。
+- **修改文件**：
+  - [workspace-layout-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/workspace-layout-contract.test.ts)
+  - [vite-manual-chunk-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vite-manual-chunk-boundary-contract.test.ts)
+  - [task-recovery-llm-lazy-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/task-recovery-llm-lazy-boundary-contract.test.ts)
+  - [prompt-bar-llm-lazy-boundary-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/prompt-bar-llm-lazy-boundary-contract.test.ts)
+  - [image-generation-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/image-generation-unused-cleanup-contract.test.ts)
+  - [canvas-cloud-sync-signature.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/canvas-cloud-sync-signature.test.ts)
+  - [credit-route-classification.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/credit-route-classification.test.ts)
+  - [frontend-key-boundary-hardening.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/frontend-key-boundary-hardening.test.ts)
+  - [generation-billing-runtime-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/generation-billing-runtime-contract.test.ts)
+  - [app-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/app-unused-cleanup-contract.test.ts)
+  - [runtime-legacy-fallback-guards.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/runtime-legacy-fallback-guards.test.ts)
+  - [video-service-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/video-service-unused-cleanup-contract.test.ts) [DELETE]
+  - [provider-image-routing-regression.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/provider-image-routing-regression.test.ts) [DELETE]
+  - [llm-adapter-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/llm-adapter-unused-cleanup-contract.test.ts) [DELETE]
+  - [openai-compatible-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/openai-compatible-unused-cleanup-contract.test.ts) [DELETE]
+  - [chat-service-unused-cleanup-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/chat-service-unused-cleanup-contract.test.ts) [DELETE]
+- **当前设计决策**：
+  - **契约重定向与对齐**：将原本对 `services/llm/generationService` 进行延迟加载和 API 防护的断言全部更新重定向至新核心路径 `features/generation/generateService`；把 `syncService` 对全量同步映射的旧断言重构为增量批量操作（`queueOperation`/`triggerSync`）的新签名断言；同步修正正则表达式转义和语法括号缺失问题。
+  - **死测试清理**：物理清除由于源文件被完全删除而失效的五个测试用例，使单元测试套件保持精简和纯粹。
+- **已运行验证**：
+  - 运行 `npm run test:unit`（共 1543 个用例）全部 100% 成功通过。
+  - 运行 `npm run typecheck` 类型编译 100% 成功通过。

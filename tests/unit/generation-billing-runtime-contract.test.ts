@@ -59,7 +59,7 @@ test('frontend generation flow uses the shared billing coordinator and persists 
 
 test('system proxy image generation preserves billing metadata through llm and billing contexts', () => {
   const llmAdapterSource = readSource('apps/web/src/services/llm/LLMAdapter.ts');
-  const llmServiceSource = readSource('apps/web/src/services/llm/generationService.ts');
+  const llmServiceSource = readSource('apps/web/src/features/generation/generateService.ts');
   const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
   const generationHookSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
   const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
@@ -67,10 +67,8 @@ test('system proxy image generation preserves billing metadata through llm and b
 
   assert.match(llmAdapterSource, /ledgerId\?: string;/);
   assert.match(llmAdapterSource, /balanceAfter\?: number;/);
-  assert.match(llmServiceSource, /ledgerId: response\.ledgerId,/);
-  assert.match(llmServiceSource, /balanceAfter: response\.balanceAfter,/);
-  assert.match(llmServiceSource, /ledgerId: result\.ledgerId,/);
-  assert.match(llmServiceSource, /balanceAfter: result\.balanceAfter,/);
+  assert.match(llmServiceSource, /ledgerId: proxyResponse\.ledgerId,/);
+  assert.match(llmServiceSource, /balanceAfter: proxyResponse\.balanceAfter,/);
   assert.match(billingContextSource, /applyAuthoritativeBalance: \(nextBalance: number\) => void;/);
   assert.match(billingContextSource, /const applyAuthoritativeBalance = useCallback\(\(nextBalance: number\) => \{\s*setBalance\(toDisplayNumber\(nextBalance\)\);\s*\}, \[\]\);/);
   assert.match(generationHookSource, /const \{ refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance \} = useBilling\(\);/);

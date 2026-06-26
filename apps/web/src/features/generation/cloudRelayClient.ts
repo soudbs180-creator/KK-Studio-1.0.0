@@ -3,7 +3,9 @@ import {
   callSecureSystemProxyImage,
   callSecureSystemProxyVideo,
   callSecureSystemProxyAudio,
-  buildSecureProxyUserRouteFromSlotId,
+  buildSecureProxyUserRouteFromSlotId
+} from '../../services/model/secureModelProxy';
+import type {
   SecureProxyChatRequest,
   SecureProxyImageRequest,
   SecureProxyVideoRequest,
