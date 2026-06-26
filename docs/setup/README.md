@@ -1,6 +1,6 @@
 # 本地开发与发布部署指南
 
-本目录只保留 KK Studio v1.5.8 当前运行链路的环境、部署和本地调试说明。支付方向以 Stripe checkout/webhook 与 `/api/v1/billing/recharge-submissions` 人工审核充值为准。
+本目录只保留 KK Studio v1.5.9 当前运行链路的环境、部署 and 本地调试说明。支付方向以 Stripe checkout/webhook 与 `/api/v1/billing/recharge-submissions` 人工审核充值为准。
 
 ## 当前文档
 

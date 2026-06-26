@@ -1,7 +1,7 @@
 # Session Handoff - 卡片测量收口优化
 
 ## 版本合规声明
-- 本次会话基于 KK Studio 版本 `1.5.8`。
+- 本次会话基于 KK Studio 版本 `1.5.9`。
 - `config/release-manifest.json` 为本项目的主版本源。
 - `apps/web/src/config/appInfo.ts` 为运行时只读导出。
 - `release/publish/stable/manifest.json` 为 portable stable 发布清单。
@@ -925,3 +925,39 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm run package:portable:publish`
 - **未运行验证及原因**：未重新运行全量 `npm run verify:changes`；本次只同步发布 manifest，完整 current-only 验证已在 #54/#55 中完成。
 - **风险与下一步**：如后续再产生新的 Agent Sync 提交，portable manifest 需要按同一流程重新发布对齐。
+
+## 58. 2026-06-26 - Project Version Bump to v1.5.9 and Portable Publishing Alignment
+- **修改范围**：升级全栈项目版本号为 1.5.9，更新相应的配置文件、测试用例和知识库说明。执行打包并发布绿色免安装 Portable 版本，最后推送至远端。
+- **修改文件**：
+  - `config/release-manifest.json`
+  - `package.json` / `package-lock.json`
+  - `server/package.json` / `server/package-lock.json`
+  - `packages/shared/package.json`
+  - `packages/api-client/package.json`
+  - `packages/ui/package.json`
+  - `apps/web/package.json`
+  - `apps/mobile/package.json`
+  - `apps/web/src/features/ai-takeover/core/canvasRuntimeStateBuilder.ts`
+  - `tests/unit/canvas-runtime-state-builder.test.ts`
+  - `tests/unit/legacy-compatibility-pruning.test.ts`
+  - `apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts`
+  - `apps/web/src/components/settings/ApiConnectivityWidget.ts`
+  - `AGENTS.md`
+  - `README.md`
+  - `docs/README.md`
+  - `docs/INDEX.md`
+  - `docs/development/progress.md`
+  - `docs/development/COMPLETE_DEVELOPMENT_GUIDE.md`
+  - `docs/setup/README.md`
+  - `docs/governance/architecture_review.md`
+  - `docs/development/session-handoff.md`
+  - `release/publish/stable/manifest.json`
+- **当前设计决策**：以 v1.5.9 为当前主链路版本事实，所有清单、版本库和打包文件保持强一致性。
+- **已运行验证**：
+  - `npm run governance:version`
+  - `npm run verify:changes`
+  - `npm run package:portable`
+  - `node scripts/release/publish-portable-release.mjs --base-url https://github.com/soudbs180/kk-studio/releases/download/v1.5.9`
+- **未运行验证及原因**：无。
+- **风险与下一步**：推送到远端以更新 master 分支，版本发布一致性已完全验证。
+

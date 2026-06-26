@@ -1,10 +1,10 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.8",
-  "displayVersion": "v1.5.8",
-  "releaseDate": "2026-06-25",
+  "version": "1.5.9",
+  "displayVersion": "v1.5.9",
+  "releaseDate": "2026-06-26",
   "releaseNotes": [
-    "推送主要是API调整。",
+    "升级版本至 v1.5.9 并同步推送至远端",
     "verified kkai.plus same-origin API workaround."
   ],
   "versionTargets": {

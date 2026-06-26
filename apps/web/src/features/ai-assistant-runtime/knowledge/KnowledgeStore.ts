@@ -109,7 +109,7 @@ const BASELINE_DOCUMENTS: KnowledgeDocument[] = [
     source: 'doc',
     path: 'docs/ai-assistant/README.md',
     title: 'AI assistant knowledge base',
-    summary: 'Entry point for KK Studio v1.5.8 assistant module maps, flows, tools, safety, UI map, skills, and session memory.',
+    summary: 'Entry point for KK Studio v1.5.9 assistant module maps, flows, tools, safety, UI map, skills, and session memory.',
     contentHash: 'baseline-ai-readme',
     updatedAt: '2026-06-03T00:00:00.000Z',
   },

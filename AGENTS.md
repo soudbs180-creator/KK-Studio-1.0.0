@@ -1,7 +1,7 @@
-# AGENTS.md - AI Agent 项目总指导文件 — KK Studio v1.5.8
+# AGENTS.md - AI Agent 项目总指导文件 — KK Studio v1.5.9
 
 Last updated: 2026-06-25
-Project version: 1.5.8
+Project version: 1.5.9
 Version source of truth: `config/release-manifest.json`
 
 本文件只保留当前事实和修改边界。历史计划、迁移记录和旧架构描述只能用于追溯，不能覆盖当前源码、`package.json`、`config/release-manifest.json`、构建脚本和治理脚本。
@@ -11,7 +11,7 @@ Version source of truth: `config/release-manifest.json`
 | 领域 | 当前事实 |
 |---|---|
 | 产品名 | KK Studio |
-| 当前发布线 | KK Studio v1.5.8 |
+| 当前发布线 | KK Studio v1.5.9 |
 | 主版本源 | `config/release-manifest.json` |
 | Web 运行时 | `apps/web/` |
 | 后端运行时 | `server/` Express / VPS |

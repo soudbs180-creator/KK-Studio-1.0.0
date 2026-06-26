@@ -171,7 +171,7 @@ test("retired public static surfaces are removed from the current web runtime", 
     assert.equal(
       existsSync(resolveWorkspacePath(retiredPath)),
       false,
-      `${retiredPath} must stay out of the current v1.5.8 runtime`,
+      `${retiredPath} must stay out of the current v1.5.9 runtime`,
     );
   }
 });

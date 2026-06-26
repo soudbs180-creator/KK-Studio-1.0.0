@@ -1,7 +1,7 @@
 {
   "name": "@kk/shared",
   "private": true,
-  "version": "1.5.8",
+  "version": "1.5.9",
   "type": "module",
   "dependencies": {
     "zod": "^4.4.3"
