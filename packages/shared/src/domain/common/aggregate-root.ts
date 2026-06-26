@@ -1,5 +1,5 @@
-import { Entity } from "./entity";
-import type { DomainEventRecord } from "./domain-event";
+import { Entity } from "./entity.ts";
+import type { DomainEventRecord } from "./domain-event.ts";
 
 export abstract class AggregateRoot<TId extends string = string> extends Entity<TId> {
   private readonly pendingEvents: DomainEventRecord[] = [];

@@ -889,3 +889,23 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 成功通过。
   - 运行 `npm run governance:check` 成功通过（同步对齐了 dist 和 portable 的 app-version.json 资产版本及 sha）。
   - 运行 `npx vite build` 生产构建 1.38s 内成功打包完成。
+
+## 57. 2026-06-26 - API Client Compilation & Canvas Three-tier Loading Sync (本次追加)
+- **修改范围**：
+  1. 解决了 `@kk/shared` 类型文件带 `.ts` 后缀时 `@nano-banana/api-client` 编译失败与 Node 24 ESM 单元测试要求物理后缀的架构兼容性冲突。
+  2. 详尽审查并对齐了用户的“屏幕内优先/超出部分渲染框架/远郊不渲染/移动画布重绘”三级卡片及图片高性能加载策略。
+- **修改文件**：
+  - [packages/api-client/tsconfig.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client/tsconfig.json)
+  - [packages/api-client/package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client/package.json)
+  - [docs/development/session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **后缀与编译兼得方案 (TS Extension Resolver)**：保留 `@kk/shared` 中原生 ESM 单元测试要求的 `.ts` 后缀，保障全部 Node 24 测试畅通运行。在 `packages/api-client/tsconfig.json` 开启 `emitDeclarationOnly` 与 `allowImportingTsExtensions` 扫除 `tsc` 的编译障碍；并在其 `build` 脚本中以 `node -e` 命令手动输出对应的 ESM 导出文本（`export * from "@kk/shared";`）完成 JS 包分发。
+  - **三级画布卡片加载落地 (Three-Tier Canvas Loading)**：
+    - **视口内优先**：若卡片位于屏幕视口加 150px 边缘内，`isVisible` 计算为 `true`。屏幕内核心卡片在 `imageLoadSchedulingById` 被指定最高优先级（`loadBand=0`），防抖延迟降为 `120ms` 瞬时载入。
+    - **远视口缓冲框架**：超出屏幕但处在 `RENDER_BUFFER`（1200px）内的卡片，通过列表加载其 DOM 骨架框架，由于位置在视口外，`isVisible` 设为 `false`，彻底卸载大图或触发 `2000ms` 防抖释放降级为 `MICRO` 显存级小图。
+    - **超远郊去DOM占位**：在 1200px 至 2500px 内的卡片，`isPlaceholder` 为 `true`，退化为最简无子组件定位 `div`；超出 2500px 后，经由 `useVisibleCanvasItems` 空间过滤判定直接卸载不挂载 DOM，确保大画布高负载下的极佳操作流畅度。
+- **已运行验证**：
+  - 运行 `npm run build` 成功完成 shared、ui、api-client 以及 web 全套打包构建。
+  - 运行 `npm run test:unit` 全套 1615 个单元测试 100% 成功通过，兼容性状态圆满。
+  - 运行 `npm run typecheck` 与 `npm run architecture:check` 编译及规范检验均 100% 通过。
+

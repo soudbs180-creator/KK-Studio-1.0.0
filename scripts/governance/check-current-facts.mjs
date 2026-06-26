@@ -176,6 +176,10 @@ for (const [legacyPath, reason] of [
   ["apps/payment-sidecar", "Payment sidecar is not an active runtime."],
   ["billing", "Billing code must live behind current server/API boundaries."],
   ["payment-server", "Payment-server is historical and must not re-enter active runtime."],
+  ["apps/web/public/newgenre_static", "Old landing static assets were retired from the current web runtime."],
+  ["apps/web/public/pay/success", "Static payment success pages were retired in favor of current billing routes."],
+  ["scripts/alipay", "Alipay MCP scripts are not part of the current payment direction."],
+  ["docs/setup/ALIPAY_MCP.md", "Alipay MCP setup notes belong outside active setup docs."],
 ]) {
   expectMissing(legacyPath, reason);
 }
@@ -210,26 +214,42 @@ expectIncludes("AGENTS.md", "server/", "Current backend runtime must be explicit
 expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "apps/web/", "Current Web runtime must be explicit.");
 expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "server/", "Current backend runtime must be explicit.");
 
-const activeFiles = [
+const activeRuntimeFiles = [
   "package.json",
   ...collectFiles(".github"),
   ...collectFiles("scripts"),
-  ...collectFiles("tests"),
+  ...collectFiles("config"),
   ...collectFiles("apps/web"),
   ...collectFiles("packages"),
   ...collectFiles("server"),
 ].filter((file) => file !== SELF_PATH);
 
+const activeDocumentationFiles = collectFiles("docs", {
+  ignoredSegments: new Set(["archive", "governance", "screenshots"]),
+}).filter((file) => file !== "docs/development/session-handoff.md");
+
+const activeFiles = [
+  ...activeRuntimeFiles,
+  ...activeDocumentationFiles,
+];
+
 expectActiveFilesDoNotReference(
   activeFiles,
   [
     "apps/api/src/server",
+    "apps/api/src",
     "apps/api/.env",
     "apps/api/.env.local",
     "apps/api/.env.local.example",
+    "apps/payment-sidecar",
     "payment-server",
+    "payment/v1",
+    "callbacks/alipay",
+    "newgenre_static",
+    "scripts/alipay",
+    "ALIPAY_MCP.md",
   ],
-  "Active code, scripts, tests, and workflows must use the current server/Vercel deployment baseline.",
+  "Active runtime code, scripts, docs, and workflows must use the current server/Vercel deployment baseline.",
 );
 
 expectNoWuyinBrowserDirect();

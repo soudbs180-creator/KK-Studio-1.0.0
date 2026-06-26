@@ -343,8 +343,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 if (pos) {
                     const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
                     const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+                    const currentLeft = parseFloat(containerRef.current.style.left) || 0;
+                    const currentTop = parseFloat(containerRef.current.style.top) || 0;
+                    const nextTranslateX = renderLeft - originX - currentLeft;
+                    const nextTranslateY = renderTop - originY - currentTop;
 
-                    containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
+                    containerRef.current.style.transform = `translate3d(${nextTranslateX}px, ${nextTranslateY}px, 0px)`;
 
                     // 🚀 如果存在 parentPromptId，同时更新连线！
                     if (image.parentPromptId) {

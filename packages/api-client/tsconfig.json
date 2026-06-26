@@ -4,6 +4,8 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "jsx": "react-jsx",

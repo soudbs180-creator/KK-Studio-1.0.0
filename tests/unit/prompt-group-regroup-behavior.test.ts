@@ -519,6 +519,23 @@ test('App syncs live-scene versions after main-card live and derived child posit
   );
 });
 
+test('ImageCard live-store transforms stay relative to the current absolute layout position', () => {
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const subscribeStart = imageCardSource.indexOf('const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {');
+  const subscribeEnd = imageCardSource.indexOf('return () => unsubscribe();', subscribeStart);
+
+  assert.notEqual(subscribeStart, -1);
+  assert.notEqual(subscribeEnd, -1);
+  const subscribeSource = imageCardSource.slice(subscribeStart, subscribeEnd);
+
+  assert.match(subscribeSource, /const currentLeft = parseFloat\(containerRef\.current\.style\.left\) \|\| 0;/);
+  assert.match(subscribeSource, /const currentTop = parseFloat\(containerRef\.current\.style\.top\) \|\| 0;/);
+  assert.match(subscribeSource, /const nextTranslateX = renderLeft - originX - currentLeft;/);
+  assert.match(subscribeSource, /const nextTranslateY = renderTop - originY - currentTop;/);
+  assert.match(subscribeSource, /translate3d\(\$\{nextTranslateX\}px, \$\{nextTranslateY\}px, 0px\)/);
+  assert.doesNotMatch(subscribeSource, /translate3d\(\$\{renderLeft - originX\}px, \$\{renderTop - originY\}px, 0px\)/);
+});
+
 test('App freezes overlap-map recomputation while node drag is active', () => {
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 

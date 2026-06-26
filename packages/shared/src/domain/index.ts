@@ -1,5 +1,4 @@
-export * from "./common/aggregate-root";
-export * from "./common/domain-event";
-export * from "./common/entity";
-export * from "./repositories/repository";
-
+export * from "./common/aggregate-root.ts";
+export * from "./common/domain-event.ts";
+export * from "./common/entity.ts";
+export * from "./repositories/repository.ts";
