@@ -565,57 +565,6 @@ router.post('/api/v1/admin/models', requireAdmin, async (req, res) => {
   return res.status(201).json(okEnvelope(item, req));
 });
 
-router.post('/payment/v1/orders', requireUser, async (req, res) => {
-  const store = await readStore();
-  const merchantOrderNo = `pay_${crypto.randomUUID()}`;
-  const order = {
-    id: `order_${crypto.randomUUID()}`,
-    merchantOrderNo,
-    status: 'pending',
-    amount: String(req.body?.amount || '0'),
-    currency: String(req.body?.currency || 'CNY'),
-    creditAmount: Number(req.body?.creditAmount || 0),
-    paymentUrl: req.body?.returnUrl || '/',
-    providerCode: req.body?.providerCode || 'manual',
-    userId: req.userId,
-    settlementApplied: false,
-    tradeStatus: 'WAIT_BUYER_PAY',
-    createdAt: nowIso(),
-  };
-  store.paymentOrders[merchantOrderNo] = order;
-  await writeStore(store);
-  return res.status(201).json(okEnvelope(order, req));
-});
-
-router.get('/payment/v1/orders/:merchantOrderNo/status', requireUser, async (req, res) => {
-  const store = await readStore();
-  const order = store.paymentOrders?.[req.params.merchantOrderNo];
-  if (!order) return sendError(res, req, 404, 'PAYMENT_ORDER_NOT_FOUND', 'Payment order was not found.');
-  return res.json(okEnvelope({
-    paymentOrderId: order.id,
-    merchantOrderNo: order.merchantOrderNo,
-    paymentOrderStatus: order.status,
-    tradeStatus: order.tradeStatus || order.status,
-    creditAmount: Number(order.creditAmount || 0),
-    amount: order.amount,
-    currency: order.currency,
-    settlementApplied: Boolean(order.settlementApplied),
-    settlementLedgerId: order.settlementLedgerId,
-  }, req));
-});
-
-router.post('/payment/v1/callbacks/alipay', async (req, res) => {
-  const store = await readStore();
-  const merchantOrderNo = String(req.body?.merchantOrderNo || '').trim();
-  const order = store.paymentOrders?.[merchantOrderNo];
-  if (order) {
-    order.status = req.body?.tradeStatus === 'TRADE_SUCCESS' ? 'paid' : order.status;
-    order.tradeStatus = req.body?.tradeStatus || order.tradeStatus || 'CALLBACK_RECEIVED';
-    await writeStore(store);
-  }
-  return res.json(okEnvelope({ accepted: true, paymentOrderStatus: order?.status || 'pending' }, req));
-});
-
 router.use(['/api/v1/model-proxy/system', '/api/secure-proxy'], (req, res, next) => {
   const startTime = Date.now();
   const oldJson = res.json;
