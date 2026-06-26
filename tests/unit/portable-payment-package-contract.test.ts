@@ -74,3 +74,11 @@ test('portable stable release notes describe the hosted same-origin API workarou
     'release notes should not keep the already-mitigated DNS blocker as the active release state',
   );
 });
+
+test('portable publish manifest carries build commit metadata from the packaged app manifest', () => {
+  const publishSource = readSource('scripts/release/publish-portable-release.mjs');
+
+  assert.match(publishSource, /commitSha: portableAppManifest\.commitSha \?\? null,/);
+  assert.match(publishSource, /commitShortSha: portableAppManifest\.commitShortSha \?\? null,/);
+  assert.match(publishSource, /buildTime: portableAppManifest\.buildTime \?\? null,/);
+});

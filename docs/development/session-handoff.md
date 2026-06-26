@@ -874,3 +874,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 当前工作区在执行中被其他 Agent 同步过一次，最新清理内容已被 #53 吸收；本条记录补齐 current-only 清理和最终 portable 对齐事实。
   - `verify:changes` 期间的 DurableQueue 和网络错误日志来自单测刻意模拟的重试路径，命令最终通过。
 
+## 55. 2026-06-26 - Portable Manifest Refresh After Current-Only Commit
+- **修改范围**：在 #54 本地提交完成后，重新执行 portable 发布流程，使 `apps/web/dist/app-version.json`、`release/KK-Studio-Portable/app/dist/app-version.json` 与 `release/publish/stable/manifest.json` 再次使用同一 buildTime，并让 stable manifest 携带 packaged app 的 commit 元数据。
+- **修改文件**：
+  - `scripts/release/publish-portable-release.mjs`
+  - `tests/unit/portable-payment-package-contract.test.ts`
+  - `release/publish/stable/manifest.json`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：发布包对应 #54 的 current-only 清理代码状态；本提交只固化最终 stable manifest、发布脚本 commit 字段和交接记录。
+- **已运行验证**：
+  - `$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm run package:portable:publish`
+  - `npm run governance:version`
+  - `npm run check:encoding`
+- **未运行验证及原因**：无。
+- **风险与下一步**：工作区仍保留并行 prompt-group smoke 相关未提交改动，未纳入本次 current-only 提交。

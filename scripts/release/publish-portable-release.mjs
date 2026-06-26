@@ -161,6 +161,8 @@ async function main() {
     releaseDate: releaseManifest.releaseDate,
     releaseNotes: releaseManifest.releaseNotes || [],
     channel: options.channel,
+    commitSha: portableAppManifest.commitSha ?? null,
+    commitShortSha: portableAppManifest.commitShortSha ?? null,
     packageFile: archiveName,
     downloadUrl: `${baseUrl}/${archiveName}`,
     sha256: createHash("sha256").update(archiveBuffer).digest("hex"),
