@@ -470,11 +470,53 @@ test('App keeps child live positions owned by regroup layout during single main-
 
 test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const syncStart = promptGroupLayoutSource.indexOf('const syncLiveNodePositionState = useCallback(() => {');
+  const syncEnd = promptGroupLayoutSource.indexOf('const isFirstDragRenderRef = useRef(true);', syncStart);
 
+  assert.notEqual(syncStart, -1);
+  assert.notEqual(syncEnd, -1);
+  const syncSource = promptGroupLayoutSource.slice(syncStart, syncEnd);
+  const activeBranchIndex = syncSource.indexOf('const hasActivePromptGroupDragPresentation = isNodeDragActive');
+  const plainDragReturnIndex = syncSource.indexOf('if (isNodeDragActive) {\n      return;\n    }');
+
+  assert.notEqual(activeBranchIndex, -1);
+  assert.ok(
+    plainDragReturnIndex === -1 || activeBranchIndex < plainDragReturnIndex,
+    'active prompt-group regroup presentation must be checked before the generic node-drag bailout',
+  );
   assert.match(promptGroupLayoutSource, /const hasActivePromptGroupDragPresentation = isNodeDragActive/);
   assert.match(promptGroupLayoutSource, /Object\.values\(promptGroupLayoutStateByIdRef\.current\)\.some/);
   assert.match(promptGroupLayoutSource, /if \(hasActivePromptGroupDragPresentation\) \{/);
   assert.match(promptGroupLayoutSource, /setLiveNodePositionVersion\(\(prev\) => prev \+ 1\)/);
+});
+
+test('App syncs live-scene versions after main-card live and derived child positions change', () => {
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const liveChangeStart = promptGroupLayoutSource.indexOf('const handleLiveNodePositionChange = useCallback(');
+  const liveChangeEnd = promptGroupLayoutSource.indexOf('const shouldAutoRegroupPromptGroup = useCallback(', liveChangeStart);
+  const deltaStart = promptGroupLayoutSource.indexOf('const applyLiveNodeDeltaToDraggedSet = useCallback(');
+  const deltaEnd = promptGroupLayoutSource.indexOf('const handleImageCardHeightChange = useCallback(', deltaStart);
+
+  assert.notEqual(liveChangeStart, -1);
+  assert.notEqual(liveChangeEnd, -1);
+  assert.notEqual(deltaStart, -1);
+  assert.notEqual(deltaEnd, -1);
+
+  const liveChangeSource = promptGroupLayoutSource.slice(liveChangeStart, liveChangeEnd);
+  const deltaSource = promptGroupLayoutSource.slice(deltaStart, deltaEnd);
+
+  assert.match(
+    liveChangeSource,
+    /liveNodePositionByIdRef\.current = nextLivePositions;\s*syncLiveNodePositionState\(\);\s*if \(position\) \{/,
+  );
+  assert.doesNotMatch(
+    liveChangeSource,
+    /} else \{\s*canvasLivePositionStore\.setPosition\(nodeId, null\);\s*syncLiveNodePositionState\(\);/,
+  );
+  assert.match(
+    deltaSource,
+    /liveNodePositionByIdRef\.current = nextLivePositions;\s*syncLiveNodePositionState\(\);\s*companionIds\.forEach/,
+  );
 });
 
 test('App freezes overlap-map recomputation while node drag is active', () => {

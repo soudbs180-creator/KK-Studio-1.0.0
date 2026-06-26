@@ -87,11 +87,6 @@ import type {
   UpsertProviderPricingCacheRequestDto,
 } from "../dto/model-catalog.ts";
 import type {
-  CreatePaymentOrderRequestDto,
-  PaymentOrderDto,
-  PaymentOrderStatusViewDto,
-} from "../dto/payment.ts";
-import type {
   SaveWorkflowRequestDto,
   WorkflowDocumentDto,
 } from "../dto/workflow.ts";
@@ -352,14 +347,6 @@ export interface KkApiClient {
     providerId: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<DeleteAdminCreditProviderResponseDto>>;
-  createPaymentOrder(
-    input: CreatePaymentOrderRequestDto,
-    options?: ApiClientRequestOptions,
-  ): Promise<ApiResponse<PaymentOrderDto>>;
-  getPaymentOrderStatus(
-    merchantOrderNo: string,
-    options?: ApiClientRequestOptions,
-  ): Promise<ApiResponse<PaymentOrderStatusViewDto>>;
   listAssets(
     input?: { kind?: AssetKind; cursor?: string; limit?: number },
     options?: ApiClientRequestOptions,
@@ -1369,29 +1356,6 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         `api/v1/admin/credit-providers/${encodeURIComponent(providerId)}`,
         {
           method: "DELETE",
-        },
-        options,
-      );
-    },
-
-    createPaymentOrder(input, options) {
-      return requestJson<PaymentOrderDto>(
-        config,
-        "payment/v1/orders",
-        {
-          method: "POST",
-          body: JSON.stringify(input),
-        },
-        options,
-      );
-    },
-
-    getPaymentOrderStatus(merchantOrderNo, options) {
-      return requestJson<PaymentOrderStatusViewDto>(
-        config,
-        `payment/v1/orders/${encodeURIComponent(merchantOrderNo)}/status`,
-        {
-          method: "GET",
         },
         options,
       );
