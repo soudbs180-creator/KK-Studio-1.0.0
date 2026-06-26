@@ -2050,6 +2050,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return false;
     }
 
+    // 🚀 新增：如果当前交互阶段是缩放，也绝不能 Freeze，以解决滚动缩放防抖时状态未更新导致的误冻结问题
+    if (canvasInteractionPhase === 'zoom') {
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
+      return false;
+    }
+
     const now = Date.now();
     const timeElapsed = now - lastInteractionRef.current.time;
     const distanceX = canvasTransform.x - lastInteractionRef.current.x;
@@ -2062,7 +2068,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
     return false;
-  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale]);
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale, canvasInteractionPhase]);
 
   // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
   // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
@@ -4183,15 +4189,28 @@ export const AppContent: React.FC<AppContentProps> = () => {
           id={`image-card-${node.id}`}
           data-x={node.position.x}
           data-y={node.position.y}
-          className="image-node absolute pointer-events-none"
+          className="image-node absolute pointer-events-none rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center"
           style={{
             left: `${left}px`,
             top: `${top}px`,
             width: `${nodeWidth}px`,
             height: `${cardHeight}px`,
             zIndex: stackZIndex,
+            background: 'rgba(24, 24, 27, 0.25)',
+            borderColor: 'rgba(255, 255, 255, 0.04)',
+            boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.2)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
           }}
-        />
+        >
+          <div className="flex flex-col items-center gap-1.5 opacity-20">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </div>
+        </div>
       );
     }
 
@@ -4284,15 +4303,30 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return (
         <div
           id={`prompt-card-${node.id}`}
-          className="absolute pointer-events-none"
+          className="absolute pointer-events-none rounded-3xl border select-none transition-all duration-300 flex flex-col items-center justify-center p-4 gap-2"
           style={{
             left: `${left}px`,
             top: `${top}px`,
             width: `${width}px`,
             height: `${height}px`,
             zIndex: groupStackZIndex + 20,
+            background: 'rgba(24, 24, 27, 0.4)',
+            borderColor: 'rgba(255, 255, 255, 0.06)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
           }}
-        />
+        >
+          <div className="flex flex-col items-center gap-1.5 opacity-25">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="text-[10px] text-white font-medium truncate max-w-full px-2 text-center">
+              {node.prompt ? (node.prompt.slice(0, 16) + (node.prompt.length > 16 ? '...' : '')) : 'Prompt Card'}
+            </span>
+          </div>
+        </div>
       );
     }
 

@@ -914,3 +914,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 由于这三个元素都是每一行的最右侧节点（且三行都贴紧容器的右边缘），且它们占据完全一致的 44px 宽度并各自居中，从而它们的垂直中轴线达成了完美的直线对齐。
 - **已运行验证**：
   - 运行 `npm run typecheck` 类型编译 100% 通过。
+
+## 71. 2026-06-26 - Optimize Canvas Zoom Culling and Skeleton Placeholder
+- **修改范围**：
+  1. 修复了画布滚动缩放过程中卡片瞬间丢失、错位及闪烁的 Bug。
+  2. 移除了缩放期间的误冻结。在 `shouldFreezeRender` 中加入对 `canvasInteractionPhase === 'zoom'` 的监测，在缩放进行期间强制解除渲染冻结。
+  3. 优化了可视裁剪边界之外的占位节点（Placeholder）视觉展示，用精致的磨砂质感骨架卡片替代原本完全空白的 `div`。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **缩放阶段非冻结**：由于 React 在滚动缩放时由于防抖（50ms）延迟同步 `canvasTransform.scale` 状态，如果缩放时 `isCanvasTransforming` 为真但 scale 看起来尚未改变，会导致系统误判定为平移并触发 `shouldFreezeRender = true` 冻结。我们通过增加对 `canvasInteractionPhase === 'zoom'` 的识别，直接阻断了缩放期间的误冻结，保证缩放过程能自适应渲染。
+  - **精致半透明骨架卡片**：在 1000+ 卡片的超大项目中，懒加载裁剪（isPlaceholder）是保障浏览器极其顺畅的 60fps 必不可少的利器。为了消除懒加载或滚动未同步时产生的卡片“突兀消失/白屏”感，我们为占位符设计了极轻量但富有毛玻璃质感的骨架组件（具有 `rgba(24, 24, 27, 0.4)` 暗色毛玻璃背景与微弱的高光边缘），并且对于 Prompt 卡片，微弱展示其提示词的前 16 个字符，极大地改善了画布缩放与平移时的视觉连贯性。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run build` 生产构建成功通过。
