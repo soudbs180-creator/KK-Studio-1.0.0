@@ -1,4 +1,4 @@
-import { BrowserTaskIntent } from '../orchestration/taskIntent';
+import type { BrowserTaskIntent } from '../orchestration/taskIntent';
 import { SITE_CAPABILITY_MATRIX } from '../../features/browser-assistant/siteCapabilityMatrix';
 import { providerRouteEngine } from '../routing/ProviderRouteEngine';
 

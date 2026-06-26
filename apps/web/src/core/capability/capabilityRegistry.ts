@@ -1,4 +1,5 @@
-import { CapabilitySource, CapabilitySourceType, CapabilityProfile } from './capabilitySource';
+import { CapabilitySource } from './capabilitySource';
+import type { CapabilitySourceType, CapabilityProfile } from './capabilitySource';
 import { keyManager } from '../../services/auth/keyManager';
 import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth';
 import { isMobileDevice } from '../../services/storage/storagePreference';

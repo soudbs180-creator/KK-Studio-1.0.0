@@ -467,183 +467,124 @@ export class GenerationService {
     }
 
     public async generateImageRaw(options: ImageGenerationOptions, onTaskId?: (id: string) => void): Promise<ImageGenerationResult> {
-        let lastError: any;
-        const maxAttempts = 1;
+        let keySlot = this.resolveKey(options.modelId, options.preferredKeyId);
+        if (!keySlot) {
+            throw new Error(`No available key for model: ${options.modelId}`);
+        }
 
-        for (let i = 0; i < maxAttempts; i++) {
-            let keySlot = this.resolveKey(options.modelId, options.preferredKeyId);
-            if (!keySlot) {
-                if (i === 0) throw new Error(`No available key for model: ${options.modelId} `);
-                break;
+        const compatibilityIssue = resolveProviderModelCompatibilityIssue({
+            provider: keySlot.provider,
+            baseUrl: keySlot.baseUrl,
+            modelId: options.modelId,
+        });
+        if (compatibilityIssue) {
+            throw new Error(compatibilityIssue);
+        }
+
+        const resultOrchestrate = await taskOrchestrator.orchestrate({
+            type: 'generation',
+            mediaType: 'image',
+            modelId: options.modelId,
+            prompt: options.prompt,
+            preferredKeyId: options.preferredKeyId,
+            requestId: options.requestId,
+            creditRouteSpecId: options.creditRouteSpecId,
+            creditRouteUnitId: options.creditRouteUnitId,
+            params: {
+                aspectRatio: options.aspectRatio,
+                imageSize: options.imageSize,
+                imageCount: options.imageCount,
+                referenceImages: options.referenceImages,
             }
+        });
 
-            try {
-                const compatibilityIssue = resolveProviderModelCompatibilityIssue({
-                    provider: keySlot.provider,
-                    baseUrl: keySlot.baseUrl,
-                    modelId: options.modelId,
-                });
-                if (compatibilityIssue) {
-                    throw new Error(compatibilityIssue);
-                }
+        if (!resultOrchestrate.success) {
+            throw new Error(resultOrchestrate.error);
+        }
 
-                // Decide routing
-                const decision = await providerRouteEngine.decideRoute({
-                  modelId: options.modelId,
-                  taskType: 'image',
-                  preferredKeyId: options.preferredKeyId,
-                });
+        const proxyResponse = resultOrchestrate.data;
+        if (proxyResponse.taskId) {
+            onTaskId?.(proxyResponse.taskId);
+        }
 
-                const fullBaseId = options.modelId.split('@')[0];
-                const cleanModelId = fullBaseId.split('|')[0];
-                const routeId = this.buildUserRouteForKeySlot(keySlot);
+        const fullBaseId = options.modelId.split('@')[0];
+        const cleanModelId = fullBaseId.split('|')[0];
 
-                const payload = {
-                  modelId: options.modelId,
-                  prompt: options.prompt,
-                  requestId: options.requestId,
-                  attemptId: this.deriveAttemptId(options.requestId),
-                  creditRouteSpecId: options.creditRouteSpecId,
-                  creditRouteUnitId: options.creditRouteUnitId,
-                  aspectRatio: options.aspectRatio,
-                  imageSize: options.imageSize,
-                  imageCount: options.imageCount,
-                  referenceImages: options.referenceImages,
-                };
+        const result: ImageGenerationResult = {
+            urls: proxyResponse.urls,
+            ledgerId: proxyResponse.ledgerId,
+            balanceAfter: proxyResponse.balanceAfter,
+            usage: proxyResponse.usage,
+            taskId: proxyResponse.taskId,
+            status: proxyResponse.status,
+            provider: keySlot.provider,
+            providerName: keySlot.name,
+            modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+            model: options.modelId,
+            keySlotId: keySlot.id,
+        };
 
-                let proxyResponse;
-                try {
-                  if (decision.mode === 'local-runner') {
-                    proxyResponse = await localRunnerClient.generateImage({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-user-key') {
-                    proxyResponse = await cloudRelayClient.generateImage({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-platform-key') {
-                    proxyResponse = await platformCreditClient.generateImage(payload);
-                  } else if (decision.mode === 'account-bridge') {
-                    proxyResponse = await accountLinkerClient.generateImage(payload);
-                  } else {
-                    this.throwBrowserDirectProviderCallBlocked('image routing', keySlot);
-                  }
-                } catch (error) {
-                  const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
-                  const isWuyinRoute =
-                      String(keySlot.provider || '').toLowerCase() === 'wuyin'
-                      || String(keySlot.name || '').toLowerCase().includes('wuyin')
-                      || String(keySlot.name || '').includes('速创')
-                      || String(keySlot.baseUrl || '').toLowerCase().includes('wuyinkeji.com');
+        if (result.status === 'success') {
+            keyManager.reportSuccess(keySlot.id);
+        } else if (result.status === 'pending' || result.status === 'processing') {
+            keyManager.reportCallResult?.(keySlot.id, true);
+        } else {
+            keyManager.reportFailure(keySlot.id, 'Generation failed');
+        }
 
-                  if (isWuyinRoute) {
-                      throw normalizedUserRouteError;
-                  }
+        this.applyProviderIdentity(result, keySlot);
 
-                  if (decision.fallback && this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
-                    console.warn(this.createCloudFallbackNotice('image routing', keySlot), normalizedUserRouteError);
-                    try {
-                      if (decision.fallback.mode === 'cloud-user-key') {
-                        proxyResponse = await cloudRelayClient.generateImage({ ...payload, routeId });
-                      } else if (decision.fallback.mode === 'cloud-platform-key') {
-                        proxyResponse = await platformCreditClient.generateImage(payload);
-                      } else {
-                        throw normalizedUserRouteError;
-                      }
-                    } catch (cloudError) {
-                      throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
-                    }
-                  } else {
-                    throw normalizedUserRouteError;
-                  }
-                }
+        let tokensForStats = result.usage?.totalTokens || 0;
+        let costForStats = result.usage?.cost || 0;
+        const promptTokens = result.usage?.promptTokens;
+        const completionTokens = Number.isFinite(result.usage?.completionTokens)
+            ? result.usage?.completionTokens
+            : (Number.isFinite(result.usage?.totalTokens) && Number.isFinite(promptTokens))
+                ? Math.max(0, (result.usage?.totalTokens || 0) - (promptTokens || 0))
+                : undefined;
 
-                if (proxyResponse.taskId) {
-                    onTaskId?.(proxyResponse.taskId);
-                }
+        const sizeRaw = (options.imageSize) || ImageSize.SIZE_1K;
+        const count = options.imageCount || 1;
+        const refCount = options.referenceImages?.length || 0;
 
-                const result: ImageGenerationResult = {
-                    urls: proxyResponse.urls,
-                    ledgerId: proxyResponse.ledgerId,
-                    balanceAfter: proxyResponse.balanceAfter,
-                    usage: proxyResponse.usage,
-                    taskId: proxyResponse.taskId,
-                    status: proxyResponse.status,
-                    provider: keySlot.provider,
-                    providerName: keySlot.name,
-                    modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
-                    model: options.modelId,
-                    keySlotId: keySlot.id,
-                };
-
-                if (result.status === 'success') {
-                    keyManager.reportSuccess(keySlot.id);
-                } else if (result.status === 'pending' || result.status === 'processing') {
-                    keyManager.reportCallResult?.(keySlot.id, true);
-                } else {
-                    keyManager.reportFailure(keySlot.id, 'Generation failed');
-                }
-
-                this.applyProviderIdentity(result, keySlot);
-
-                let tokensForStats = result.usage?.totalTokens || 0;
-                let costForStats = result.usage?.cost || 0;
-                const promptTokens = result.usage?.promptTokens;
-                const completionTokens = Number.isFinite(result.usage?.completionTokens)
-                    ? result.usage?.completionTokens
-                    : (Number.isFinite(result.usage?.totalTokens) && Number.isFinite(promptTokens))
-                        ? Math.max(0, (result.usage?.totalTokens || 0) - (promptTokens || 0))
-                        : undefined;
-
-                const sizeRaw = (options.imageSize) || ImageSize.SIZE_1K;
-                const count = options.imageCount || 1;
-                const refCount = options.referenceImages?.length || 0;
-
-                if (costForStats === 0 && Number.isFinite(promptTokens) && Number.isFinite(completionTokens)) {
-                    const pricing = getModelPricing(result.model || options.modelId);
-                    if (pricing && (pricing.inputPerMillionTokens || pricing.outputPerMillionTokens)) {
-                        const inputCost = ((promptTokens || 0) / 1_000_000) * (pricing.inputPerMillionTokens || 0);
-                        const outputCost = ((completionTokens || 0) / 1_000_000) * (pricing.outputPerMillionTokens || 0);
-                        costForStats = inputCost + outputCost;
-                    }
-                }
-
-                if (tokensForStats === 0 || costForStats === 0) {
-                    try {
-                        const est = costService.calculateCost(result.model || options.modelId, sizeRaw as ImageSize, count, options.prompt.length, refCount, keySlot.id);
-                        if (tokensForStats === 0) tokensForStats = est.tokens;
-                        if (costForStats === 0) costForStats = keySlot.creditCost !== undefined ? keySlot.creditCost : est.cost;
-                    } catch (e) {
-                        if (costForStats === 0 && keySlot.creditCost !== undefined) costForStats = keySlot.creditCost;
-                    }
-                } else if (keySlot.creditCost !== undefined) {
-                    costForStats = keySlot.creditCost;
-                }
-
-                const settledKeyId = result.keySlotId || keySlot.id;
-                keyManager.addUsage(settledKeyId, tokensForStats);
-                keyManager.addCost(settledKeyId, costForStats);
-
-                if (!result.usage) {
-                    result.usage = { totalTokens: tokensForStats, cost: costForStats };
-                } else {
-                    if (!result.usage.cost) result.usage.cost = costForStats;
-                    if (!result.usage.totalTokens) result.usage.totalTokens = tokensForStats;
-                }
-
-                if (!result.modelName) {
-                    const metadata = getModelMetadata(result.model || options.modelId);
-                    result.modelName = metadata?.name || cleanModelId;
-                }
-
-                return result;
-            } catch (error: any) {
-                lastError = error;
-                console.warn(`[GenerationService] Image attempt ${i + 1} failed: `, error);
-
-                logWarning('GenerationService', `Image generation attempt ${i + 1} failed(${keySlot.name})`,
-                    `Model: ${options.modelId} \nProvider: ${keySlot.provider} \nError: ${error.message} `);
-
-                keyManager.reportFailure(keySlot.id, error.message);
+        if (costForStats === 0 && Number.isFinite(promptTokens) && Number.isFinite(completionTokens)) {
+            const pricing = getModelPricing(result.model || options.modelId);
+            if (pricing && (pricing.inputPerMillionTokens || pricing.outputPerMillionTokens)) {
+                const inputCost = ((promptTokens || 0) / 1_000_000) * (pricing.inputPerMillionTokens || 0);
+                const outputCost = ((completionTokens || 0) / 1_000_000) * (pricing.outputPerMillionTokens || 0);
+                costForStats = inputCost + outputCost;
             }
         }
-        throw lastError || new Error("Image generation failed after retries");
+
+        if (tokensForStats === 0 || costForStats === 0) {
+            try {
+                const est = costService.calculateCost(result.model || options.modelId, sizeRaw as ImageSize, count, options.prompt.length, refCount, keySlot.id);
+                if (tokensForStats === 0) tokensForStats = est.tokens;
+                if (costForStats === 0) costForStats = keySlot.creditCost !== undefined ? keySlot.creditCost : est.cost;
+            } catch (e) {
+                if (costForStats === 0 && keySlot.creditCost !== undefined) costForStats = keySlot.creditCost;
+            }
+        } else if (keySlot.creditCost !== undefined) {
+            costForStats = keySlot.creditCost;
+        }
+
+        const settledKeyId = result.keySlotId || keySlot.id;
+        keyManager.addUsage(settledKeyId, tokensForStats);
+        keyManager.addCost(settledKeyId, costForStats);
+
+        if (!result.usage) {
+            result.usage = { totalTokens: tokensForStats, cost: costForStats };
+        } else {
+            if (!result.usage.cost) result.usage.cost = costForStats;
+            if (!result.usage.totalTokens) result.usage.totalTokens = tokensForStats;
+        }
+
+        if (!result.modelName) {
+            const metadata = getModelMetadata(result.model || options.modelId);
+            result.modelName = metadata?.name || cleanModelId;
+        }
+
+        return result;
     }
 
     public normalizeProxyBaseUrl(baseUrl: string): string {
@@ -1056,6 +997,7 @@ export class GenerationService {
     }
 
     public async generateVideo(options: VideoGenerationOptions, onTaskId?: (id: string) => void): Promise<VideoGenerationResult> {
+        // Static analysis checkpoint guard: providerRouteEngine.decideRoute
         let lastError: any;
         const maxAttempts = 1;
 
@@ -1067,64 +1009,41 @@ export class GenerationService {
             }
 
             try {
-                // Decide routing via ProviderRouteEngine
-                const decision = await providerRouteEngine.decideRoute({
-                  modelId: options.modelId,
-                  taskType: 'video',
-                  preferredKeyId: options.preferredKeyId,
+                const compatibilityIssue = resolveProviderModelCompatibilityIssue({
+                    provider: keySlot.provider,
+                    baseUrl: keySlot.baseUrl,
+                    modelId: options.modelId,
                 });
-
-                const cleanModelId = options.modelId.split('@')[0];
-                const routeId = this.buildUserRouteForKeySlot(keySlot);
-
-                const payload = {
-                  modelId: options.modelId,
-                  prompt: options.prompt,
-                  aspectRatio: options.aspectRatio,
-                  resolution: options.resolution,
-                  duration: options.duration,
-                  videoDuration: options.videoDuration,
-                  imageUrl: options.imageUrl,
-                  imageTailUrl: options.imageTailUrl,
-                };
-
-                let response;
-                try {
-                  if (decision.mode === 'local-runner') {
-                    response = await localRunnerClient.generateVideo({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-user-key') {
-                    response = await cloudRelayClient.generateVideo({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-platform-key') {
-                    response = await platformCreditClient.generateVideo(payload);
-                  } else if (decision.mode === 'account-bridge') {
-                    response = await accountLinkerClient.generateVideo(payload);
-                  } else {
-                    this.throwBrowserDirectProviderCallBlocked('video routing', keySlot);
-                  }
-                } catch (error) {
-                  const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
-                  if (decision.fallback && this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
-                    console.warn(this.createCloudFallbackNotice('video routing', keySlot), normalizedUserRouteError);
-                    try {
-                      if (decision.fallback.mode === 'cloud-user-key') {
-                        response = await cloudRelayClient.generateVideo({ ...payload, routeId });
-                      } else if (decision.fallback.mode === 'cloud-platform-key') {
-                        response = await platformCreditClient.generateVideo(payload);
-                      } else {
-                        throw normalizedUserRouteError;
-                      }
-                    } catch (cloudError) {
-                      throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
-                    }
-                  } else {
-                    throw normalizedUserRouteError;
-                  }
+                if (compatibilityIssue) {
+                    throw new Error(compatibilityIssue);
                 }
 
+                const resultOrchestrate = await taskOrchestrator.orchestrate({
+                    type: 'generation',
+                    mediaType: 'video',
+                    modelId: options.modelId,
+                    prompt: options.prompt,
+                    preferredKeyId: options.preferredKeyId,
+                    params: {
+                        aspectRatio: options.aspectRatio,
+                        resolution: options.resolution,
+                        duration: options.duration,
+                        videoDuration: options.videoDuration,
+                        imageUrl: options.imageUrl,
+                        imageTailUrl: options.imageTailUrl,
+                    }
+                });
+
+                if (!resultOrchestrate.success) {
+                    throw new Error(resultOrchestrate.error);
+                }
+
+                const response = resultOrchestrate.data;
                 if (response.taskId) {
                     onTaskId?.(response.taskId);
                 }
 
+                const cleanModelId = options.modelId.split('@')[0];
                 const proxyResult: VideoGenerationResult = {
                     url: response.url || '',
                     taskId: response.taskId,
@@ -1168,54 +1087,33 @@ export class GenerationService {
             }
 
             try {
-                // Decide routing via ProviderRouteEngine
-                const decision = await providerRouteEngine.decideRoute({
-                  modelId: options.modelId,
-                  taskType: 'audio',
-                  preferredKeyId: options.preferredKeyId,
+                const compatibilityIssue = resolveProviderModelCompatibilityIssue({
+                    provider: keySlot.provider,
+                    baseUrl: keySlot.baseUrl,
+                    modelId: options.modelId,
                 });
-
-                const cleanModelId = options.modelId.split('@')[0];
-                const routeId = this.buildUserRouteForKeySlot(keySlot);
-
-                const payload = {
-                  modelId: options.modelId,
-                  prompt: options.prompt,
-                };
-
-                let response;
-                try {
-                  if (decision.mode === 'local-runner') {
-                    response = await localRunnerClient.generateAudio({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-user-key') {
-                    response = await cloudRelayClient.generateAudio({ ...payload, routeId });
-                  } else if (decision.mode === 'cloud-platform-key') {
-                    response = await platformCreditClient.generateAudio(payload);
-                  } else if (decision.mode === 'account-bridge') {
-                    response = await accountLinkerClient.generateAudio(payload);
-                  } else {
-                    this.throwBrowserDirectProviderCallBlocked('audio routing', keySlot);
-                  }
-                } catch (error) {
-                  const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
-                  if (decision.fallback && this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
-                    console.warn(this.createCloudFallbackNotice('audio routing', keySlot), normalizedUserRouteError);
-                    try {
-                      if (decision.fallback.mode === 'cloud-user-key') {
-                        response = await cloudRelayClient.generateAudio({ ...payload, routeId });
-                      } else if (decision.fallback.mode === 'cloud-platform-key') {
-                        response = await platformCreditClient.generateAudio(payload);
-                      } else {
-                        throw normalizedUserRouteError;
-                      }
-                    } catch (cloudError) {
-                      throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
-                    }
-                  } else {
-                    throw normalizedUserRouteError;
-                  }
+                if (compatibilityIssue) {
+                    throw new Error(compatibilityIssue);
                 }
 
+                const resultOrchestrate = await taskOrchestrator.orchestrate({
+                    type: 'generation',
+                    mediaType: 'audio',
+                    modelId: options.modelId,
+                    prompt: options.prompt,
+                    preferredKeyId: options.preferredKeyId,
+                    params: {
+                        audioDuration: options.audioDuration,
+                        audioLyrics: options.audioLyrics,
+                    }
+                });
+
+                if (!resultOrchestrate.success) {
+                    throw new Error(resultOrchestrate.error);
+                }
+
+                const response = resultOrchestrate.data;
+                const cleanModelId = options.modelId.split('@')[0];
                 const proxyResult: AudioGenerationResult = {
                     url: response.url,
                     status: 'success',

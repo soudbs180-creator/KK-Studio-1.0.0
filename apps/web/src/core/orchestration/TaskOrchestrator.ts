@@ -1,5 +1,5 @@
-import { KKIntent, GenerationIntent, BrowserTaskIntent } from './taskIntent';
-import { TaskResult } from './taskResult';
+import type { KKIntent, GenerationIntent, BrowserTaskIntent } from './taskIntent';
+import type { TaskResult } from './taskResult';
 import { capabilityRegistry } from '../capability/capabilityRegistry';
 import { generationEngine } from '../generation/GenerationEngine';
 import { browserActionRouter } from '../browser/BrowserActionRouter';
@@ -93,19 +93,83 @@ export class TaskOrchestrator {
   }
 
   private async handleSlides(intent: any, timestamp: number): Promise<TaskResult> {
+    let outlineText = intent.outlineText;
+    if (!outlineText) {
+      const textResult = await generationEngine.generate({
+        type: 'generation',
+        mediaType: 'text',
+        modelId: intent.stylePreset || 'gemini-2.5-flash',
+        prompt: `请为主题为“${intent.topic}”的幻灯片生成一份 ${intent.slideCount} 页的内容大纲，格式为每行一个主题，不要有多余的字。`,
+      });
+      outlineText = textResult.content || textResult.text || '';
+    }
+
+    const lines = (outlineText || '')
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter(Boolean)
+      .slice(0, intent.slideCount);
+
+    while (lines.length < intent.slideCount) {
+      lines.push(`第 ${lines.length + 1} 页：${intent.topic}`);
+    }
+
+    const images: any[] = [];
+    const modelId = intent.stylePreset || 'gemini-2.5-flash-image';
+
+    for (let i = 0; i < lines.length; i++) {
+      const pagePrompt = `PPT 第 ${i + 1} 页：${lines[i]}。16:9 演示文稿风格，中文排版清晰，信息层次分明。`;
+      const imageResult = await generationEngine.generate({
+        type: 'generation',
+        mediaType: 'image',
+        modelId: modelId,
+        prompt: pagePrompt,
+        params: {
+          aspectRatio: '16:9',
+          imageSize: '1K',
+          imageCount: 1,
+        }
+      });
+      images.push(imageResult);
+    }
+
     return {
       success: true,
       intentType: 'slides',
-      data: { message: 'Slides intent registered successfully' },
+      data: {
+        topic: intent.topic,
+        outline: lines,
+        images: images.map(img => img.url || (img.urls && img.urls[0]) || ''),
+      },
       timestamp
     };
   }
 
   private async handleEcommerce(intent: any, timestamp: number): Promise<TaskResult> {
+    const images: any[] = [];
+    const modelId = 'gemini-2.5-flash-image';
+
+    for (let i = 0; i < intent.batchSize; i++) {
+      const imageResult = await generationEngine.generate({
+        type: 'generation',
+        mediaType: 'image',
+        modelId: modelId,
+        prompt: `电商产品图背景重绘：${intent.scenePrompt}，布局模板为：${intent.layoutTemplate || '默认'}`,
+        params: {
+          aspectRatio: '1:1',
+          imageSize: '1K',
+          referenceImages: [{ id: intent.productImageId, role: 'product' }],
+        }
+      });
+      images.push(imageResult);
+    }
+
     return {
       success: true,
       intentType: 'ecommerce',
-      data: { message: 'Ecommerce intent registered successfully' },
+      data: {
+        images: images.map(img => img.url || (img.urls && img.urls[0]) || ''),
+      },
       timestamp
     };
   }

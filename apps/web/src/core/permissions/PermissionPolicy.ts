@@ -1,4 +1,4 @@
-import { KKIntent } from '../orchestration/taskIntent';
+import type { KKIntent } from '../orchestration/taskIntent';
 import { capabilityRegistry } from '../capability/capabilityRegistry';
 
 export type RiskLevel = 'low' | 'medium' | 'high';

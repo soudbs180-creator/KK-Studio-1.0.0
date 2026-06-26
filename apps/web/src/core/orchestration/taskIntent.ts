@@ -1,5 +1,5 @@
 import { AspectRatio, ImageSize } from '../../types';
-import { BrowserTaskIntent as BaseBrowserTaskIntent } from '../../features/browser-assistant/browserAssistantTypes';
+import type { BrowserTaskIntent as BaseBrowserTaskIntent } from '../../features/browser-assistant/browserAssistantTypes';
 
 export type KKIntent =
   | GenerationIntent

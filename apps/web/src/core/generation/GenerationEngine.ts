@@ -1,4 +1,4 @@
-import { GenerationIntent } from '../orchestration/taskIntent';
+import type { GenerationIntent } from '../orchestration/taskIntent';
 import { providerRouteEngine } from '../routing/ProviderRouteEngine';
 import { localRunnerClient } from '../../features/generation/localRunnerClient';
 import { cloudRelayClient } from '../../features/generation/cloudRelayClient';
@@ -80,6 +80,48 @@ export class GenerationEngine {
         return await accountLinkerClient.chat(payload);
       } else {
         throw new Error(`Browser direct provider calls are disabled for chat under mode: ${decision.mode}`);
+      }
+    } else if (intent.mediaType === 'video') {
+      const payload = {
+        modelId: intent.modelId,
+        prompt: intent.prompt,
+        aspectRatio: intent.params?.aspectRatio,
+        resolution: intent.params?.resolution,
+        duration: intent.params?.duration,
+        videoDuration: intent.params?.videoDuration,
+        imageUrl: intent.params?.imageUrl,
+        imageTailUrl: intent.params?.imageTailUrl,
+      };
+
+      if (decision.mode === 'local-runner') {
+        return await localRunnerClient.generateVideo({ ...payload, routeId });
+      } else if (decision.mode === 'cloud-user-key') {
+        return await cloudRelayClient.generateVideo({ ...payload, routeId });
+      } else if (decision.mode === 'cloud-platform-key') {
+        return await platformCreditClient.generateVideo(payload);
+      } else if (decision.mode === 'account-bridge') {
+        return await accountLinkerClient.generateVideo(payload);
+      } else {
+        throw new Error(`Browser direct provider calls are disabled for video generation under mode: ${decision.mode}`);
+      }
+    } else if (intent.mediaType === 'audio') {
+      const payload = {
+        modelId: intent.modelId,
+        prompt: intent.prompt,
+        audioDuration: intent.params?.audioDuration,
+        audioLyrics: intent.params?.audioLyrics,
+      };
+
+      if (decision.mode === 'local-runner') {
+        return await localRunnerClient.generateAudio({ ...payload, routeId });
+      } else if (decision.mode === 'cloud-user-key') {
+        return await cloudRelayClient.generateAudio({ ...payload, routeId });
+      } else if (decision.mode === 'cloud-platform-key') {
+        return await platformCreditClient.generateAudio(payload);
+      } else if (decision.mode === 'account-bridge') {
+        return await accountLinkerClient.generateAudio(payload);
+      } else {
+        throw new Error(`Browser direct provider calls are disabled for audio generation under mode: ${decision.mode}`);
       }
     } else {
       throw new Error(`Unsupported media type for GenerationEngine: ${intent.mediaType}`);
