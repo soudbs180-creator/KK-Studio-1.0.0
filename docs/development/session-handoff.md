@@ -970,3 +970,32 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 及 `npm run governance:check` 全局扫描 100% 通过。
   - 运行 `npm run typecheck` TS 编译无错误通过。
   - 运行 `npm run build` 静态打包完全成功。
+
+## 74. 2026-06-26 - Implement ProviderRouteEngine and Unified GenerateService (本次追加)
+- **修改范围**：
+  1. 建立了统一的 `ProviderRouteEngine`，收口了 KK Studio 前端所有的生成请求（图像、文本、视频、音频）。
+  2. 实现并规范化了 4 种路由请求模式（`local-runner`、`browser-direct`、`cloud-user-key` 和 `cloud-platform-key`，并提供 `account-linker` 自有账号登录态占位客户侧）。
+  3. 重构了前端 API Key 的分级存储，明确了本地与云端加密存储逻辑（自动检测 `sk-readonly-0000` 云端加密密钥占位符以决策路由）。
+  4. 新增了 7 个静态架构检查与安全扫描脚本并挂载在 `npm run architecture:check` 中，以防止组件直连 Provider 或泄露平台级密钥。
+- **修改文件**：
+  - [generationIntent.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generationIntent.ts)
+  - [routePolicies.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/routePolicies.ts)
+  - [providerRouteEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/providerRouteEngine.ts)
+  - [localRunnerClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/localRunnerClient.ts)
+  - [cloudRelayClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/cloudRelayClient.ts)
+  - [platformCreditClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/platformCreditClient.ts)
+  - [accountLinkerClient.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/accountLinkerClient.ts)
+  - [generateService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generateService.ts)
+  - [localNetworkProbe.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/local/localNetworkProbe.ts)
+  - [generationService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/llm/generationService.ts)
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - [route-policies.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/route-policies.test.ts)
+  - 7 个位于 `scripts/architecture/` 目录下的静态检查脚本
+- **当前设计决策**：
+  - **集中路由引擎决策**：消除了 UI 组件中分散判断走本地还是云端的逻辑，前端交互组件只提交 `GenerateIntent` 意图包，由 `ProviderRouteEngine` 综合考虑设备类型、网络状态、VPN 状态、本地与云端密钥就绪状态进行智能调度。
+  - **云端密钥加密占位符识别**：利用 `sk-readonly-0000` 检测用户是否在云端保存了加密的 API Key。如果存在且本地无直连 Key，则由路由引擎派发到 `cloud-user-key` 走 VPS 安全代理转发。
+  - **测试与规则熔断保护**：为 7 个静态规则提供完全的测试用例与架构拦截。确保所有生成接口都通过 `generateService`，前端不存在 JWT_SECRET 等平台密钥，UI 组件无直接 `fetch` API，且移动端默认云端策略不可被破坏。
+- **已运行验证**：
+  - 运行 `npm run architecture:check` 16 项架构边界扫描全部成功通过。
+  - 运行 `npm run typecheck` 编译及类型检查无报错成功通过。
+  - 运行 `tests/unit/route-policies.test.ts` 新路由测试 100% 成功通过。
