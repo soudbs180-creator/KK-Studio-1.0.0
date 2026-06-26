@@ -914,3 +914,14 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **Risks and next steps**:
   - The retry is intentionally narrow; future non-navigation prompt-group regressions should still fail the smoke directly.
   - `verify:changes` logs expected DurableGenerationQueue retry errors from intentional unit-test failure paths, but the command completed with exit code 0.
+
+## 57. 2026-06-26 - Stable Portable Manifest Realignment After Prompt Group Sync
+- **修改范围**：在并行 #56 prompt-group smoke 提交进入主线后，重新执行 portable 发布流程，使 stable portable manifest 对齐当前 packaged app manifest。
+- **修改文件**：
+  - `release/publish/stable/manifest.json`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：当前 stable manifest 记录 #56 构建产物的 `commitSha`、`commitShortSha` 和 `buildTime`，继续以 v1.5.8 当前主链路为唯一发布事实。
+- **已运行验证**：
+  - `$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm run package:portable:publish`
+- **未运行验证及原因**：未重新运行全量 `npm run verify:changes`；本次只同步发布 manifest，完整 current-only 验证已在 #54/#55 中完成。
+- **风险与下一步**：如后续再产生新的 Agent Sync 提交，portable manifest 需要按同一流程重新发布对齐。
