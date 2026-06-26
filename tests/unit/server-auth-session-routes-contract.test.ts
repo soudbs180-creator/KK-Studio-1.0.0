@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fetch as nativeFetch } from 'undici';
 
 const ROOT_DIR = process.cwd();
 const require = createRequire(import.meta.url);
@@ -87,7 +88,7 @@ test('password login cookie fallback restores mobile browser sessions through th
   const address = server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
-  const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+  const loginResponse = await nativeFetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -110,7 +111,7 @@ test('password login cookie fallback restores mobile browser sessions through th
   assert.ok(refreshCookie);
   const cookieHeader = `${accessCookie}; ${refreshCookie}`;
 
-  const sessionResponse = await fetch(`${baseUrl}/api/v1/auth/session`, {
+  const sessionResponse = await nativeFetch(`${baseUrl}/api/v1/auth/session`, {
     headers: { cookie: cookieHeader },
   });
   assert.equal(sessionResponse.status, 200);
@@ -118,7 +119,7 @@ test('password login cookie fallback restores mobile browser sessions through th
   assert.equal(sessionPayload.success, true);
   assert.equal(sessionPayload.data?.profile?.email, 'local-user@example.com');
 
-  const profileResponse = await fetch(`${baseUrl}/api/v1/profile`, {
+  const profileResponse = await nativeFetch(`${baseUrl}/api/v1/profile`, {
     headers: { cookie: cookieHeader },
   });
   assert.equal(profileResponse.status, 200);

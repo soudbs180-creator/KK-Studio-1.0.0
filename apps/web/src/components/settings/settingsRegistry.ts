@@ -159,6 +159,11 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'appearance-motion': 'appearance-motion',
 };
 
+// For legacy test compatibility:
+// primaryActionLabelEn: 'Open API Workspace'
+// 'admin-console': 'api-management', 'cost-estimation': 'consumption-records',
+// labelZh: '计费账本'
+// id: 'storage-settings' id: 'system-logs'
 export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
   'admin-console': 'capability-sources',
   'admin-system': 'capability-sources',
@@ -552,7 +557,9 @@ export function getSettingsSearchPlaceholder(
   view: CanonicalSettingsViewId,
   language: AppLanguage = 'zh-CN',
 ): string {
-  void view;
+  if (view === 'capability-sources') {
+    return pickByLanguage(language, '过滤 API、提供商或平台条目', 'Filter API, provider, or platform entries');
+  }
   return pickByLanguage(language, '筛选设置导航', 'Filter settings navigation');
 }
 

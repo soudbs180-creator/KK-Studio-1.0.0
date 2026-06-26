@@ -1,13 +1,13 @@
 // 简体中文：本地脑 (Local Brain) 模块
 
 import type { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
-import { analyzeIntent } from './intentGate';
-import { PROJECT_KNOWLEDGE, matchLocalKnowledge } from '../prompts/projectKnowledge';
-import { PROMPT_LIBRARY } from '../prompts/promptLibrary';
-import { matchPromptTemplates } from '../prompts/promptMatcher';
-import { optimizePromptLocally } from '../prompts/localPromptOptimizer';
-import { safetyPolicy } from './safetyPolicy';
-import { confirmationPolicy } from './confirmationPolicy';
+import { analyzeIntent } from './intentGate.ts';
+import { PROJECT_KNOWLEDGE, matchLocalKnowledge } from '../prompts/projectKnowledge.ts';
+import { PROMPT_LIBRARY } from '../prompts/promptLibrary.ts';
+import { matchPromptTemplates } from '../prompts/promptMatcher.ts';
+import { optimizePromptLocally } from '../prompts/localPromptOptimizer.ts';
+import { safetyPolicy } from './safetyPolicy.ts';
+import { confirmationPolicy } from './confirmationPolicy.ts';
 
 const SETTINGS_VIEW_LABELS: Record<string, string> = {
   dashboard: '设置总览',
@@ -519,37 +519,165 @@ ${optResult.optimizedPromptZh}
         break;
       }
 
-      case 'generate_images': {
-        const count = intentResult.extracted.count || 1;
-        // 尝试从 userInput 中提取提示词：
-        let promptText = userInput
-          .replace(/(开始生成|直接生成|出图|跑图|生成|创造|绘图)/g, '')
-          .replace(/(\d+)\s*(张|个)/g, '')
-          .replace(/“/g, '').replace(/”/g, '')
-          .trim();
+      case 'image_edit_missing_selection': {
+        reply = `请选择一张图或拖入参考图`;
+        break;
+      }
 
-        if (!promptText) {
-          // 如果提取失败，尝试找画布上当前被填充的内容
-          promptText = 'a detailed visual art';
-        }
-
-        reply = `### 🚀 准备开始生成图片
-我将为您生成 **${count}** 张图片。提示词设定为：「${promptText}」。
-此操作涉及额度消耗，我已为您准备好执行计划，请确认：`;
-
+      case 'image_to_video': {
+        const refImageId = intentResult.extracted.referenceImageNodeId;
+        reply = `### 🎬 准备为您生成视频版...
+已将生成模式切换至【视频】模式，并准备好以选定图片作为参考执行生成任务。`;
+        
+        actions.push({
+          type: 'changeMode',
+          payload: { mode: 'video' }
+        });
         actions.push({
           type: 'startGeneration',
           payload: {
-            prompt: promptText,
-            count
+            prompt: 'generate video version',
+            count: 1,
+            options: { referenceImageNodeId: refImageId }
           }
         });
         break;
       }
 
+      case 'research_to_canvas': {
+        const subject = intentResult.extracted.style || '品牌视觉';
+        const count = intentResult.extracted.count || 6;
+        
+        const isCoffee = /咖啡|coffee/i.test(userInput);
+        let researchTitle = `品牌研究: ${subject}`;
+        let researchBrief = `### 📋 ${subject} 视觉方案深度研究大纲
+1. **核心概念**：现代极简主义与自然美学结合，注重材质肌理与光影留白。
+2. **调色板**：温暖大地色系、燕麦白、低饱和灰与标志性点缀色。
+3. **排版设计**：大面积优雅留白，搭配极细无衬线现代字体。`;
+        
+        let visualDirections = [
+          '方向一：自然光影产品特写（以自然侧光照亮主体，营造静谧高端感）',
+          '方向二：极简材质空间组合（展现产品与水泥、木质表面的质感碰撞）',
+          '方向三：人机交互质感瞬间（聚焦使用时的局部细节与生活方式共鸣）'
+        ];
+
+        let prompts = [
+          `A premium minimalist packaging box for ${subject}, shot on organic concrete surface, soft window shadow, warm oatmeal tone background, photorealistic 4k`,
+          `Modern minimal store mockup with ${subject} design elements, concrete wall, warm spotlight, architectural lines, elegant, ultra detailed`,
+          `Close-up shot of a hand holding a beautifully designed ${subject} item, soft studio lighting, organic linen clothes, clean aesthetic`,
+          `Minimal graphic poster for ${subject}, abstract geometric shapes, earthy colors, large copy space, high-end editorial layout`,
+          `Flatlay of ${subject} collection on a textured oak table, decorated with dried plants, high-end branding layout, shot from above`,
+          `Modern Japanese interior design concept showing ${subject} branding products on a floating shelf, warm light glow, minimalist lifestyle`
+        ];
+
+        if (isCoffee) {
+          researchTitle = `品牌研究: 极简咖啡品牌风格`;
+          researchBrief = `### 📋 极简咖啡品牌 视觉方案深度研究大纲
+1. **核心概念**：现代日式极简主义与 Wabi-Sabi 侘寂美学的完美碰撞。
+2. **调色板**：燕麦色 (#F5F2EB)、磨砂白 (#FFFFFF)、炭黑 (#1A1A1A) 与原木色 (#D2B48C)。
+3. **视觉排版**：大面积留白设计，搭配前卫的无衬线英文字体，突出产品静谧质感。`;
+          
+          visualDirections = [
+            '方向一：晨光下的暖咖杯影（结合侧光与水合气泡，营造温润 of 唤醒仪式）',
+            '方向二：寂风咖啡店一角（通过粗糙水泥墙面与胡桃木桌椅的对比展现材质冷暖）',
+            '方向三：手冲滤泡拉丝瞬间（微距抓拍水流与滤杯的动态交融，强调匠心细节）'
+          ];
+          
+          prompts = [
+            'A ceramic coffee cup on an oak table in morning light, minimalist cafe style, 4k',
+            'Minimalist cafe interior, concrete walls, Wabi-Sabi style, spacious and airy, photorealistic',
+            'Hand pouring hot water into a coffee dripper, close-up, steam rising, minimalist dark background',
+            'A stack of simple coffee packaging bags, warm oatmeal tones, elegant typography, studio lighting',
+            'Oat milk latte art in a glass, close-up, textured froth, elegant wooden tray, minimal decor',
+            'Minimal coffee store entrance, black steel frame, warm light glow, modern Japanese aesthetic'
+          ];
+        }
+
+        const promptSet = prompts.slice(0, count);
+
+        const { knowledgeStore } = await import('../../ai-assistant-runtime/knowledge/KnowledgeStore.ts');
+        knowledgeStore.recordChange({
+          title: researchTitle,
+          summary: `已为 ${subject} 视觉方案设计了研究大纲、3大视觉方向，并规划了 ${count} 张图片的生成方案。`,
+          source: 'runtime'
+        });
+
+        reply = `### 🧬 深度品牌研究与视觉规划已完成！
+我已将「${subject}」的视觉研究成果记录并写入 KnowledgeStore。
+已自动在画布上为您新建 **Research Brief 研究卡片**，并将 **${count}** 个视觉生成任务提交至 Durable 队列中开始执行。`;
+
+        actions.push({
+          type: 'generation.createBatchJob',
+          payload: {
+            prompts: promptSet.map((p, idx) => ({
+              id: 'prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
+              prompt: p
+            })),
+            options: {
+              aspectRatio: '3:4',
+              layoutPreset: 'grid',
+              researchBrief: `${researchBrief}\n\n**建议视觉方向：**\n${visualDirections.join('\n')}`,
+              outputGroup: {
+                label: `研究生成：${subject}`,
+                color: '#6366f1',
+                includePromptNodes: true,
+                tags: ['research', 'automation']
+              }
+            },
+            idempotencyKey: 'research_job_' + Date.now()
+          }
+        });
+        break;
+      }
+
+      case 'generate_images': {
+        const count = intentResult.extracted.count || 4;
+        const refImageId = intentResult.extracted.referenceImageNodeId;
+        const aspectRatio = intentResult.extracted.aspectRatio;
+        
+        let promptText = userInput
+          .replace(/(开始生成|直接生成|出图|跑图|生成|创造|绘图|把背景换成|换背景|背景改为|做成电商主图|更高级一点|更高级)/g, '')
+          .replace(/(\d+)\s*(张|个)/g, '')
+          .replace(/“/g, '').replace(/”/g, '')
+          .trim();
+
+        if (!promptText) {
+          promptText = refImageId ? 'enhance details' : 'a detailed visual art';
+        }
+
+        if (refImageId) {
+          reply = `### 🚀 准备进行图片修改
+我将基于选中的参考图片，生成 **1** 张新图片。修改指令：「${promptText}」。
+此操作涉及额度消耗，我已为您准备好执行计划，请确认：`;
+
+          actions.push({
+            type: 'startGeneration',
+            payload: {
+              prompt: promptText,
+              count: 1,
+              aspectRatio,
+              referenceImageNodeId: refImageId
+            }
+          });
+        } else {
+          reply = `### 🚀 准备开始生成图片
+我将为您生成 **${count}** 张图片。提示词设定为：「${promptText}」。
+此操作涉及额度消耗，我已为您准备好执行计划，请确认：`;
+
+          actions.push({
+            type: 'startGeneration',
+            payload: {
+              prompt: promptText,
+              count,
+              aspectRatio
+            }
+          });
+        }
+        break;
+      }
+
       case 'batch_generate_from_folder': {
-        // 从资产池获取图片数量
-        const imageIds = context.assets?.images?.map(img => img.id) || [];
+        const imageIds = intentResult.extracted.fileIds || context.assets?.images?.map(img => img.id) || [];
         const imageCount = imageIds.length;
         const taskDomain = intentResult.extracted.taskDomain || 'general';
         const aspectRatio = intentResult.extracted.aspectRatio || '1:1';
@@ -563,41 +691,58 @@ ${optResult.optimizedPromptZh}
           tags: Array.from(new Set([...(extractedOutputGroup?.tags || []), 'automation', `batch:${batchPlanId}`]))
         };
 
-        reply = `### 📁 准备从选定文件夹执行批量重绘生图
+        if (taskDomain === 'ecommerce' && imageIds.length > 0) {
+          reply = `### 🛍️ 准备执行电商主图批量重绘
+共选中 **${imageCount}** 张图片作为批量生成的参考图。执行计划如下：`;
+          
+          actions.push({
+            type: 'ecommerce.createBatchTransformJob',
+            payload: {
+              imageIds,
+              rawUserRequest: userInput,
+              aspectRatio,
+              layoutPreset,
+              outputGroup,
+              idempotencyKey: batchPlanId
+            }
+          });
+        } else {
+          reply = `### 📁 准备从选定文件夹执行批量重绘生图
 我已将导入的项目资源池共 **${imageCount}** 张参考图绑定至批量任务中。
 此操作将为文件夹内的每张图片拉起生成任务，涉及高额积分消耗。执行计划如下：`;
 
-        actions.push({
-          type: 'startBatchGeneration',
-          payload: {
-            plan: {
-              id: batchPlanId,
-              sourceCollectionId: 'assets_pool',
-              imageIds,
-              taskDomain,
-              aspectRatio,
-              layoutPreset,
-              promptStrategy: {
-                mode: 'single_template',
-                rawUserStyle: userInput,
-                basePrompt: userInput,
-              },
-              output: {
-                countPerImage: 1,
-                expectedTotal: imageCount
-              },
-              referencePolicy: {
-                useEachImageAsReference: true,
-                uploadOnlyWhenGenerating: true
-              },
-              costPolicy: {
-                requiresCredits: context.settings.apiKeyStatus === 'missing'
-              },
-              confirmationRequired: true,
-              outputGroup
+          actions.push({
+            type: 'startBatchGeneration',
+            payload: {
+              plan: {
+                id: batchPlanId,
+                sourceCollectionId: 'assets_pool',
+                imageIds,
+                taskDomain,
+                aspectRatio,
+                layoutPreset,
+                promptStrategy: {
+                  mode: 'single_template',
+                  rawUserStyle: userInput,
+                  basePrompt: userInput,
+                },
+                output: {
+                  countPerImage: 1,
+                  expectedTotal: imageCount
+                },
+                referencePolicy: {
+                  useEachImageAsReference: true,
+                  uploadOnlyWhenGenerating: true
+                },
+                costPolicy: {
+                  requiresCredits: context.settings.apiKeyStatus === 'missing'
+                },
+                confirmationRequired: true,
+                outputGroup
+              }
             }
-          }
-        });
+          });
+        }
         break;
       }
 

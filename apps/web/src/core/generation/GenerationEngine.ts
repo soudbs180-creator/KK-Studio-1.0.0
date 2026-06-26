@@ -1,11 +1,11 @@
 import type { GenerationIntent } from '../orchestration/taskIntent';
-import { providerRouteEngine } from '../routing/ProviderRouteEngine';
-import { localRunnerClient } from '../../features/generation/localRunnerClient';
-import { cloudRelayClient } from '../../features/generation/cloudRelayClient';
-import { platformCreditClient } from '../../features/generation/platformCreditClient';
-import { accountLinkerClient } from '../../features/generation/accountLinkerClient';
-import { keyManager } from '../../services/auth/keyManager';
-import { buildSecureProxyUserRouteFromSlotId } from '../../services/model/secureModelProxy';
+import { providerRouteEngine } from '../routing/ProviderRouteEngine.ts';
+import { localRunnerClient } from '../../features/generation/localRunnerClient.ts';
+import { cloudRelayClient } from '../../features/generation/cloudRelayClient.ts';
+import { platformCreditClient } from '../../features/generation/platformCreditClient.ts';
+import { accountLinkerClient } from '../../features/generation/accountLinkerClient.ts';
+import { keyManager } from '../../services/auth/keyManager.ts';
+import { buildSecureProxyUserRouteFromSlotId } from '../../services/model/secureModelProxy.ts';
 
 export class GenerationEngine {
   private static instance: GenerationEngine;

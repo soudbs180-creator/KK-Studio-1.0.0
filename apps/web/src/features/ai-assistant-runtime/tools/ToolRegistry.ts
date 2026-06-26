@@ -99,6 +99,22 @@ export class AgentToolRegistry {
 
     try {
       const output = await tool.handler(input, ctx);
+      
+      // 审计工具执行的输出：如果返回 success === false
+      if (output && typeof output === 'object' && (output as any).success === false) {
+        const outObj = output as any;
+        const isSetupRequired = outObj.code === 'SETUP_REQUIRED' || outObj.code === 'CAPABILITY_UNAVAILABLE';
+        const status = isSetupRequired ? 'setup_required' : 'failed';
+        const failedLog: AgentToolCallLog = {
+          ...log,
+          status: status as any,
+          error: outObj.message || 'Execution failed',
+          completedAt: new Date().toISOString()
+        };
+        this.appendLog(failedLog);
+        return output;
+      }
+
       const successLog: AgentToolCallLog = {
         ...log,
         outputSummary: redactToolSummary(output),
@@ -109,9 +125,13 @@ export class AgentToolRegistry {
     } catch (e: any) {
       const safeError = redactToolSummary(e?.message || String(e));
       console.error(`[ToolRegistry] 工具执行异常: ${name}`, safeError);
+      
+      const isSetupRequired = e?.code === 'SETUP_REQUIRED';
+      const status = isSetupRequired ? 'setup_required' : 'failed';
+      
       const failedLog: AgentToolCallLog = {
         ...log,
-        status: 'failed',
+        status: status as any,
         error: safeError,
         completedAt: new Date().toISOString()
       };
@@ -182,7 +202,14 @@ toolRegistryInstance.register({
     },
     required: ['subject']
   },
-  handler: async () => {}
+  handler: async (input: { subject: string; style?: string }) => {
+    const subject = input.subject || '';
+    const styleSuffix = input.style ? `, ${input.style} style` : '';
+    const optimized = `${subject}${styleSuffix}, highly detailed, 4k resolution, cinematic lighting, masterpiece, sharp focus`;
+    return {
+      optimizedPrompt: optimized
+    };
+  }
 });
 
 // 注册别名机制

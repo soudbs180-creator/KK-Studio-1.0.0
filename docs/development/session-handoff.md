@@ -1210,7 +1210,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check` 31项架构边界检查 100% 成功通过。
   - 运行 `npm run governance:check` 全局预设与事实治理 100% 成功通过。
   - 运行 `npm run package:portable` 和 `publish:portable` 重新编译且版本发布资产哈希对齐成功。
-
-
-
-
+## 82. 2026-06-26 - Durable Generation Queue Merging and Task Center UX Enhancement (本次追加)
+- **修改范围**：
+  1. 将单张与批量生图工具 `startGeneration` 完全合流到持久化任务队列 `DurableGenerationQueue`，保证生成任务统一排队、防卡死且完成自动打组与重排。
+  2. 增强了统一任务中心 `TaskCenterTray.tsx`：为已完成任务增加“定位节点”动作；为失败任务增加“复制错误”以及对 API 密钥缺失/额度不足等情况的“去配置 API”直接跳转。
+  3. 修复了 `AppStartupContext.tsx` 在弱网/离线健康检测超时逻辑的静态测试契约匹配失效问题。
+  4. 清理了文档漂移，同步对齐 `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md` 和 `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md` 的版本号至 `1.5.9`。
+  5. 重新固化了 portable 便携式打包与签名更新，完成了本地一致性校验。
+- **修改文件**：
+  - [generationTools.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts)
+  - [TaskCenterTray.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/workspace/TaskCenterTray.tsx)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [AppStartupContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/AppStartupContext.tsx)
+  - [AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md)
+  - [AI_ASSISTANT_ROADMAP.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/AI_ASSISTANT_ROADMAP.md)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **生图全量合流队列**：移除老旧内存 `addToQueue`，将所有 `startGeneration` 单张或多张生图通过 `durableGenerationQueue.createJob` 托管，使得普通生图也能天然享受多任务并发、队列自动排布、Job 进度可视化与批量打组能力。
+  - **任务中心深度联动**：通过引入 `useCanvas` 的 `selectNodes` 还有 `setViewportCenter`，实现无侵入式画布平移对焦，极速定位产物；对于 API 错误失败项展示直观去配置按钮，无缝打开设置页相应面板。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run architecture:check` 31项架构边界检查 100% 成功通过。
+  - 运行 `npm run governance:check` 全局预设与事实治理 100% 成功通过。
+  - 运行 `npm run test:unit` 1565 项单元测试 100% 成功通过。
+  - 运行 `$env:VITE_KK_API_BASE_URL="https://api.kkstudio.com"; npm run package:portable` 和 `publish:portable` 重新编译且版本发布资产及 manifest 签名对齐成功。

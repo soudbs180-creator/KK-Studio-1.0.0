@@ -1698,7 +1698,21 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         };
 
-        void hydratePersistedImageSources();
+        const hydrateWithTimeout = async () => {
+            const timeoutPromise = new Promise<void>((_, reject) => {
+                setTimeout(() => reject(new Error('HydrationTimeout')), 2500);
+            });
+            try {
+                await Promise.race([
+                    hydratePersistedImageSources(),
+                    timeoutPromise
+                ]);
+            } catch (err) {
+                console.warn('[CanvasContext] Persisted image hydration timed out, falling back to local nodes.', err);
+            }
+        };
+
+        void hydrateWithTimeout();
 
         return () => {
             cancelled = true;

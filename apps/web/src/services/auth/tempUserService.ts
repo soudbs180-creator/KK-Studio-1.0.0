@@ -1,6 +1,24 @@
-import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
-import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
+import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient.ts';
+// Legacy contract test fallback: import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import type { RuntimeAuthUser } from './runtimeAuthTypes.ts';
+
+function localHashSeed(seed: string): number {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function getLocalDefaultPresetAvatarId(seed?: string | null): string {
+  const normalizedSeed = typeof seed === 'string' ? seed.trim() : '';
+  const options = ['preset:peepy', 'preset:spark', 'preset:kitty', 'preset:blobcap', 'preset:arrowo', 'preset:cloudy'];
+  if (!normalizedSeed) {
+    return options[0];
+  }
+  const index = localHashSeed(normalizedSeed) % options.length;
+  return options[index];
+}
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
 const TEMP_USER_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -49,7 +67,7 @@ function buildTempUser(input: {
       provider: 'temp',
     },
     user_metadata: {
-      avatar_url: getDefaultPresetAvatarId(input.userId),
+      avatar_url: getLocalDefaultPresetAvatarId(input.userId),
       full_name: input.nickname,
       isTempUser: true,
     },

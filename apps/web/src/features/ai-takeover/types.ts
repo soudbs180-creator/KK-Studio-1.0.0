@@ -20,6 +20,9 @@ export type AssistantIntent =
   | 'optimize_prompt'              // 优化提示词（绝不自动生成图片）
   | 'write_prompt'                 // 写提示词
   | 'generate_images'              // 开始生图
+  | 'image_edit_missing_selection' // 提示选择参考图
+  | 'image_to_video'               // 图生视频
+  | 'research_to_canvas'           // 品牌研究进画布
   | 'batch_generate_from_folder'   // 文件夹批量生图
   | 'download_outputs'             // 打包下载结果
   | 'search_card'                  // 查找/定位卡片
@@ -67,6 +70,7 @@ export interface IntentResult {
     layoutPreset?: AssistantBatchLayoutPreset;
     outputGroup?: AssistantOutputGroupPlan;
     surface?: 'workspace' | 'library' | 'favorites' | string;
+    referenceImageNodeId?: string;
   };
   risk: 'none' | 'low' | 'cost' | 'upload' | 'destructive';
   needsConfirmation: boolean;      // 是否需要强确认卡片
@@ -78,7 +82,7 @@ export type AssistantAction =
   | { type: 'sendMessage'; payload: { text: string } }
   | { type: 'optimizePromptLocally'; payload: { subject: string; templateId?: string; style?: string } }
   | { type: 'fillPrompt'; payload: { prompt: string; negativePrompt?: string; modelId?: string } }
-  | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any } }
+  | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
   | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
   | { type: 'generation.retryJob'; payload: { jobId?: string; target?: 'latest_failed' } }
@@ -281,6 +285,7 @@ export interface SanitizedProjectContext {
       parentPromptId?: string;
       tags?: string[];
       hasOriginalUrl: boolean;
+      timestamp?: number;
     }>;
   };
   assets: AssetContextSummary;

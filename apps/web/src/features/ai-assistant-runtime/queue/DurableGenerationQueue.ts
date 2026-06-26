@@ -43,6 +43,8 @@ export interface GenerationBatchJob {
     gap?: number;
   };
   outputGroup?: GenerationBatchOutputGroup;
+  arranged?: boolean;
+  completionHandled?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -153,6 +155,8 @@ const cloneJob = (job: GenerationBatchJob): GenerationBatchJob => ({
   })),
   options: { ...job.options },
   outputGroup: cloneOutputGroup(job.outputGroup),
+  arranged: job.arranged,
+  completionHandled: job.completionHandled,
 });
 
 const cloneJobs = (jobs: GenerationBatchJob[]): GenerationBatchJob[] => jobs.map(cloneJob);
@@ -187,6 +191,39 @@ export class DurableGenerationQueue {
     } catch (e) {
       console.error('[DurableQueue] Failed to load jobs from storage:', e);
       this.jobs = [];
+    }
+
+    this.healZombieTasks();
+  }
+
+  private healZombieTasks() {
+    let changed = false;
+    for (const job of this.jobs) {
+      if (job.status === 'paused' || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
+        continue;
+      }
+
+      let hasRunningPrompt = false;
+      for (const promptItem of job.prompts) {
+        if (promptItem.status === 'running') {
+          const taskKey = this.getTaskKey(job.id, promptItem.id);
+          if (!this.inFlightTasks.has(taskKey)) {
+            promptItem.status = 'queued';
+            changed = true;
+          } else {
+            hasRunningPrompt = true;
+          }
+        }
+      }
+
+      if (job.status === 'running' && !hasRunningPrompt) {
+        job.status = 'queued';
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.saveJobs();
     }
   }
 
@@ -241,14 +278,18 @@ export class DurableGenerationQueue {
 
   public registerExecutor(executor: typeof this.executor) {
     this.executor = executor;
+    this.healZombieTasks();
+    this.scheduleProcess();
   }
 
   public registerArrangeHandler(handler: typeof this.arrangeHandler) {
     this.arrangeHandler = handler;
+    this.scheduleProcess();
   }
 
   public registerCompletionHandler(handler: typeof this.completionHandler) {
     this.completionHandler = handler;
+    this.scheduleProcess();
   }
 
   public getJobs(): GenerationBatchJob[] {
@@ -437,6 +478,38 @@ export class DurableGenerationQueue {
   }
 
   private async processQueueOnce() {
+    // 补偿处理已完成但尚未进行排版或收尾的 jobs
+    const completedJobs = this.jobs.filter(j => j.status === 'completed');
+    for (const job of completedJobs) {
+      let changed = false;
+      const outputNodeIds = getJobOutputNodeIds(job);
+      
+      if (!job.arranged && outputNodeIds.length > 0 && this.arrangeHandler) {
+        try {
+          await this.arrangeHandler(outputNodeIds, job.options, job);
+          job.arranged = true;
+          changed = true;
+        } catch (err) {
+          console.error('[DurableQueue] Deferred Layout auto-arrangement failed:', err);
+        }
+      }
+      
+      if (!job.completionHandled && outputNodeIds.length > 0 && this.completionHandler) {
+        try {
+          await this.completionHandler(job, outputNodeIds);
+          job.completionHandled = true;
+          changed = true;
+        } catch (err) {
+          console.error('[DurableQueue] Deferred Completion handler failed:', err);
+        }
+      }
+      
+      if (changed) {
+        job.updatedAt = Date.now();
+        this.saveJobs();
+      }
+    }
+
     const runningJobs = this.jobs.filter(j => j.status === 'running');
     const queuedJobs = this.jobs.filter(j => j.status === 'queued');
 
@@ -465,12 +538,12 @@ export class DurableGenerationQueue {
         currentJob.outputGroup.nodeIds = outputNodeIds;
       }
       currentJob.updatedAt = Date.now();
-      this.saveJobs();
       
       // 触发自动排版
       if (outputNodeIds.length > 0 && this.arrangeHandler) {
         try {
           await this.arrangeHandler(outputNodeIds, currentJob.options, currentJob);
+          currentJob.arranged = true;
         } catch (err) {
           console.error('[DurableQueue] Layout auto-arrangement failed:', err);
         }
@@ -479,16 +552,16 @@ export class DurableGenerationQueue {
       if (outputNodeIds.length > 0 && this.completionHandler) {
         try {
           await this.completionHandler(currentJob, outputNodeIds);
+          currentJob.completionHandled = true;
           if (currentJob.outputGroup) {
             currentJob.outputGroup.nodeIds = outputNodeIds;
           }
-          currentJob.updatedAt = Date.now();
-          this.saveJobs();
         } catch (err) {
           console.error('[DurableQueue] Completion handler failed:', err);
         }
       }
 
+      this.saveJobs();
       // 递归处理下一个 Job
       this.scheduleProcess();
       return;
@@ -518,16 +591,28 @@ export class DurableGenerationQueue {
     if (this.inFlightTasks.has(taskKey)) return;
 
     const job = this.findJob(jobId);
-    if (!job || job.status !== 'running') return;
+    if (!job || (job.status !== 'running' && job.status !== 'queued')) return;
 
     const promptItem = job.prompts.find(p => p.id === promptId);
-    if (!promptItem || promptItem.status !== 'running') return;
+    if (!promptItem || (promptItem.status !== 'running' && promptItem.status !== 'queued')) return;
 
     if (!this.executor) {
       console.warn('[DurableQueue] No executor registered yet. Holding...');
       promptItem.status = 'queued';
+      promptItem.error = 'No executor registered yet';
+      if (job.status === 'running') {
+        job.status = 'queued';
+      }
       this.saveJobs();
       return;
+    }
+
+    // 确保把正在执行的子任务状态设为 running 并存盘，因为可能是从 queued 被重新调度的
+    if (promptItem.status !== 'running') {
+      promptItem.status = 'running';
+    }
+    if (job.status !== 'running') {
+      job.status = 'running';
     }
 
     this.inFlightTasks.add(taskKey);

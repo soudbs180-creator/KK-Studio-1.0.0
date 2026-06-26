@@ -140,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [runtimeState, setRuntimeState] = useState<RuntimeAuthState>(() => initialAuthStateRef.current!.runtimeState);
   const [authActionLoading, setAuthActionLoading] = useState(false);
   const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(() => initialAuthStateRef.current!.sessionRecoveryLoading);
+  const recoveryAttemptsRef = useRef(0);
   const [sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut] = useState(false);
   const [sessionRecoveryWarning, setSessionRecoveryWarning] = useState<string | null>(null);
   const [adminLevel, setAdminLevel] = useState<number>(() => {
@@ -271,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSessionRecoveryWarning(null);
       setSessionRecoveryLoading(false);
       setRuntimeState(nextState);
+      recoveryAttemptsRef.current = 0;
     };
 
     const tryRestoreHostedSession = async (): Promise<boolean> => {
@@ -286,6 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSessionRecoveryWarning(null);
         setSessionRecoveryLoading(false);
         setRuntimeState(nextState);
+        recoveryAttemptsRef.current = 0;
         return true;
       }
 
@@ -322,6 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSessionRecoveryWarning(null);
           setSessionRecoveryLoading(false);
           setRuntimeState(nextState);
+          recoveryAttemptsRef.current = 0;
           return;
         }
 
@@ -351,6 +355,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const recoverRuntimeSession = async () => {
+      if (recoveryAttemptsRef.current >= 2) {
+        console.warn('[AuthContext] Session recovery exceeded maximum retries. Cancelling loading to avoid UI block.');
+        setSessionRecoveryLoading(false);
+        return;
+      }
+      recoveryAttemptsRef.current++;
       setSessionRecoveryLoading(true);
       let storedToken = getStoredKkApiAccessToken();
 

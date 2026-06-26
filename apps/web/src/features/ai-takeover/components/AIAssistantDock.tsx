@@ -572,7 +572,7 @@ export const AIAssistantDock: React.FC = () => {
         </div>
 
         {shouldShowRunTimeline && (
-          <div className="ai-takeover-control-plane mx-4 mb-3 rounded-xl border border-purple-500/20 bg-zinc-950/70 p-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] space-y-3.5 animate-in fade-in duration-300">
+          <div className="ai-takeover-control-plane ai-takeover-run-timeline mx-4 mb-3 rounded-xl border border-purple-500/20 bg-zinc-950/70 p-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] space-y-3.5 animate-in fade-in duration-300">
             {/* 1. Objective / Goal */}
             <div className="space-y-1">
               <div className="text-[9px] font-black text-purple-400 uppercase tracking-widest">
@@ -605,6 +605,7 @@ export const AIAssistantDock: React.FC = () => {
                   return (
                     <div
                       key={step.id}
+                      data-status={step.status}
                       className={`p-2 rounded-lg border flex flex-col gap-1 transition-all ${
                         isDone
                           ? 'border-emerald-500/20 bg-emerald-500/5 text-[var(--text-primary)]'

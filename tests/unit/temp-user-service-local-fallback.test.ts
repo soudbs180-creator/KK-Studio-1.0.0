@@ -97,7 +97,7 @@ function loadTempUserService(options: {
     module,
     exports: module.exports,
     require: (specifier: string) => {
-      if (specifier === '../api/kkApiClient') {
+      if (specifier === '../api/kkApiClient' || specifier === '../api/kkApiClient.ts') {
         return {
           kkWebApiClient: {
             createTempUser: options.createTempUser,

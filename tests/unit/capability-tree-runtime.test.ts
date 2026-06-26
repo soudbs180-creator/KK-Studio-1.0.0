@@ -1,26 +1,21 @@
 import assert from 'node:assert/strict';
-import { test, vi } from 'vitest';
+import { test } from 'node:test';
 
 // Mock localStorage for node environment before importing keyManager
-global.localStorage = {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+globalThis.localStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+  clear: () => {},
   length: 0,
-  key: vi.fn(() => null)
+  key: () => null
 } as any;
 
-// Mock network probes and health status
-vi.mock('../../apps/web/src/local/localNetworkProbe', () => ({
-  getNetworkStatus: () => 'normal',
-  isUserVpnEnabled: () => false,
-  probeNetwork: async () => 'normal'
-}));
+globalThis.fetch = async () => ({ ok: true }) as any;
 
-import { capabilityRegistry } from '../../apps/web/src/core/capability/capabilityRegistry';
-import { permissionPolicy } from '../../apps/web/src/core/permissions/PermissionPolicy';
-import { taskOrchestrator } from '../../apps/web/src/core/orchestration/TaskOrchestrator';
+import { capabilityRegistry } from '../../apps/web/src/core/capability/capabilityRegistry.ts';
+import { permissionPolicy } from '../../apps/web/src/core/permissions/PermissionPolicy.ts';
+import { taskOrchestrator } from '../../apps/web/src/core/orchestration/TaskOrchestrator.ts';
 
 test('CapabilityRegistry registration and listing', async () => {
   const sources = capabilityRegistry.getAllSources();

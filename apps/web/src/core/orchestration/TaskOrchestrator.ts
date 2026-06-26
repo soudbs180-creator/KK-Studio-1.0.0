@@ -1,9 +1,9 @@
 import type { KKIntent, GenerationIntent, BrowserTaskIntent } from './taskIntent';
 import type { TaskResult } from './taskResult';
-import { capabilityRegistry } from '../capability/capabilityRegistry';
-import { generationEngine } from '../generation/GenerationEngine';
-import { browserActionRouter } from '../browser/BrowserActionRouter';
-import { permissionPolicy } from '../permissions/PermissionPolicy';
+import { capabilityRegistry } from '../capability/capabilityRegistry.ts';
+import { generationEngine } from '../generation/GenerationEngine.ts';
+import { browserActionRouter } from '../browser/BrowserActionRouter.ts';
+import { permissionPolicy } from '../permissions/PermissionPolicy.ts';
 
 export class TaskOrchestrator {
   private static instance: TaskOrchestrator;

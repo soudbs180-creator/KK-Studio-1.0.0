@@ -5,7 +5,7 @@
 - [docs/ai-assistant/tool-registry.md](docs/ai-assistant/tool-registry.md)
 - [docs/ai-assistant/canvas-runtime-state.md](docs/ai-assistant/canvas-runtime-state.md)
 
-以下为 CI 校验所需的关键标识规范（基于 KK Studio v1.5.8 版本事实）：
+以下为 CI 校验所需的关键标识规范（基于 KK Studio v1.5.9 版本事实）：
 - AI 助手工具注册表规范：ToolRegistry
 - 画布级状态模型规范：CanvasRuntimeState
 - 持久化批量队列处理机制：DurableGenerationQueue

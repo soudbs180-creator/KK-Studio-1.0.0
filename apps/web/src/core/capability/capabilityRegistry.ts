@@ -1,8 +1,8 @@
-import { CapabilitySource } from './capabilitySource';
-import type { CapabilitySourceType, CapabilityProfile } from './capabilitySource';
-import { keyManager } from '../../services/auth/keyManager';
-import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth';
-import { isMobileDevice } from '../../services/storage/storagePreference';
+import { CapabilitySource } from './capabilitySource.ts';
+import type { CapabilitySourceType, CapabilityProfile } from './capabilitySource.ts';
+import { keyManager } from '../../services/auth/keyManager.ts';
+import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth.ts';
+import { isMobileDevice } from '../../services/storage/storagePreference.ts';
 
 export class CapabilityRegistry {
   private static instance: CapabilityRegistry;

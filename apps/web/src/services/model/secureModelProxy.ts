@@ -1,11 +1,11 @@
-import { tempUserService } from '../auth/tempUserService';
-import { getLatestAuthSessionChange, requestAuthSessionInvalidation, waitForAuthSessionChange } from '../auth/authSessionEvents';
-import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { type StandardizedProxyRequest } from './ProxyRequestBuilder';
-import { resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
-import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
-import { kernelFetch } from '../http/requestKernel';
-import { readRuntimeEnv } from '../../utils/runtimeEnv';
+import { tempUserService } from '../auth/tempUserService.ts';
+import { getLatestAuthSessionChange, requestAuthSessionInvalidation, waitForAuthSessionChange } from '../auth/authSessionEvents.ts';
+import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken.ts';
+import { type StandardizedProxyRequest } from './ProxyRequestBuilder.ts';
+import { resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient.ts';
+import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils.ts';
+import { kernelFetch } from '../http/requestKernel.ts';
+import { readRuntimeEnv } from '../../utils/runtimeEnv.ts';
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';

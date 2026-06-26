@@ -1,6 +1,6 @@
 import type { BrowserTaskIntent } from '../orchestration/taskIntent';
-import { SITE_CAPABILITY_MATRIX } from '../../features/browser-assistant/siteCapabilityMatrix';
-import { providerRouteEngine } from '../routing/ProviderRouteEngine';
+import { SITE_CAPABILITY_MATRIX } from '../../features/browser-assistant/siteCapabilityMatrix.ts';
+import { providerRouteEngine } from '../routing/ProviderRouteEngine.ts';
 
 export class BrowserActionRouter {
   private static instance: BrowserActionRouter;

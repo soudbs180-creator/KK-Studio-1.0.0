@@ -7,7 +7,7 @@ export interface AgentRunRecord {
   userMessage: string;
   intent: string;
   plan: any;
-  status: 'planning' | 'waiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'planning' | 'waiting_confirmation' | 'waiting_execution' | 'running' | 'completed' | 'failed' | 'cancelled';
   toolCalls: AgentToolCallLog[];
   createdAt: string;
   updatedAt: string;
@@ -41,6 +41,20 @@ export class AgentRunStore {
       const stored = storage.getItem(STORAGE_KEY);
       if (stored) {
         this.runs = JSON.parse(stored);
+        
+        // 修正历史遗留的僵尸任务状态，防止 UI 一直卡在 loading 或执行中
+        let changed = false;
+        this.runs.forEach(run => {
+          if (run.status === 'running' || run.status === 'waiting_execution') {
+            run.status = 'failed';
+            run.nextStep = '任务运行异常中断，请重试。';
+            run.updatedAt = new Date().toISOString();
+            changed = true;
+          }
+        });
+        if (changed) {
+          this.saveRuns();
+        }
       }
     } catch (e) {
       console.error('[AgentRunStore] 加载失败:', e);
@@ -52,7 +66,8 @@ export class AgentRunStore {
     const storage = getBrowserStorage();
     if (!storage) return;
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify(this.runs));
+      const storageValue = JSON.stringify(this.runs);
+      storage.setItem(STORAGE_KEY, storageValue);
     } catch (e) {
       console.error('[AgentRunStore] 保存失败:', e);
     }
@@ -65,7 +80,7 @@ export class AgentRunStore {
       userMessage,
       intent,
       plan,
-      status: plan?.requiresConfirmation ? 'waiting_confirmation' : 'running',
+      status: plan?.requiresConfirmation ? 'waiting_confirmation' : 'waiting_execution',
       toolCalls: [],
       createdAt: now,
       updatedAt: now
@@ -97,7 +112,31 @@ export class AgentRunStore {
   }
 
   getPendingRun(): AgentRunRecord | undefined {
-    return this.runs.find(r => r.status === 'waiting_confirmation' || r.status === 'running');
+    const now = Date.now();
+    let changed = false;
+    this.runs.forEach(r => {
+      if (r.status === 'waiting_confirmation' || r.status === 'waiting_execution' || r.status === 'running') {
+        const diff = now - new Date(r.updatedAt).getTime();
+        if (diff >= 5 * 60 * 1000) {
+          r.status = 'failed';
+          r.nextStep = '任务执行超时，已自动重置。';
+          r.updatedAt = new Date().toISOString();
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      this.saveRuns();
+    }
+
+    return this.runs.find(r => {
+      if (r.status !== 'waiting_confirmation' && r.status !== 'waiting_execution' && r.status !== 'running') {
+        return false;
+      }
+      const diff = now - new Date(r.updatedAt).getTime();
+      return diff < 5 * 60 * 1000;
+    });
   }
 
   listRuns(): AgentRunRecord[] {

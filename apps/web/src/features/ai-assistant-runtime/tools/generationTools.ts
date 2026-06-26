@@ -166,68 +166,50 @@ export const generationTools: AgentToolDefinition[] = [
       type: 'object',
       properties: {
         prompt: { type: 'string', description: '绘图英文提示词' },
-        count: { type: 'number', description: '生成的数量张数' }
+        count: { type: 'number', description: '生成的数量张数' },
+        aspectRatio: { type: 'string', description: '图片比例' },
+        referenceImageNodeId: { type: 'string', description: '参考图节点ID' }
       },
       required: ['prompt']
     },
-    handler: async (input: { prompt: string; count: number }, ctx) => {
-      const { prompt, count } = input;
-      const { selectedModel, addPromptNode, addPromptNodes, addToQueue, getNextCardPosition, notify, activeCanvas } = ctx;
-
-      notify.success('生图计划已提交', `任务已加入排队队列，数量：${count}`);
+    handler: async (input: { prompt: string; count: number; aspectRatio?: string; referenceImageNodeId?: string }, ctx) => {
+      const { prompt, aspectRatio, referenceImageNodeId } = input;
+      const count = input.count || 4;
+      const { selectedModel, notify, activeCanvas } = ctx;
 
       try {
-        const lastPos = getNextCardPosition();
-        
-        // 空间位置感知避免重叠算法
-        const existingPositions = [
-          ...(activeCanvas?.promptNodes || []).map((n: any) => n.position),
-          ...(activeCanvas?.imageNodes || []).map((n: any) => n.position),
-          ...(activeCanvas?.audioNodes || []).map((n: any) => n.position)
-        ].filter(Boolean);
-
-        let startX = lastPos.x;
-        let startY = lastPos.y;
-
-        while (existingPositions.some(pos => Math.abs(pos.x - startX) < 150 && Math.abs(pos.y - startY) < 150)) {
-          startY += 260; // 发生重叠时，向下平移避开
-        }
-
-        const newNodes: any[] = [];
+        const prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }> = [];
         for (let i = 0; i < count; i++) {
-          const pos = {
-            x: startX + i * 440,
-            y: startY
-          };
-
-          const newNode = {
-            id: 'takeover_gen_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 9),
+          prompts.push({
+            id: 'prompt_item_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 9),
             prompt: prompt,
-            position: pos,
-            aspectRatio: '1:1',
-            imageSize: '1K',
-            model: selectedModel?.id || 'gemini-2.5-flash',
-            modelLabel: selectedModel?.name || 'Gemini 2.5 Flash',
-            provider: selectedModel?.provider || 'Google',
-            childImageIds: [],
-            timestamp: Date.now(),
-            parallelCount: 1,
-            isGenerating: false,
-            status: 'queued'
-          };
-          newNodes.push(newNode);
+            referenceImageNodeId
+          });
         }
 
-        // 批量事务提交：若支持批量写入则单次写入，避免 React 触发循环重排
-        if (typeof addPromptNodes === 'function') {
-          await addPromptNodes(newNodes);
-        } else {
-          await Promise.all(newNodes.map(node => addPromptNode(node)));
-        }
+        // 创建 output group 以便生成完成后的打组和排版
+        const tags = referenceImageNodeId
+          ? ['automation', 'edit', `source:${referenceImageNodeId}`]
+          : ['automation'];
 
-        // 批量添加至执行队列
-        newNodes.forEach(node => addToQueue(node));
+        const outputGroup = createDefaultOutputGroup({
+          label: count > 1 ? 'AI batch output' : 'AI output',
+          tags
+        });
 
+        const job = durableGenerationQueue.createJob(
+          prompts,
+          buildQueueOptions({
+            selectedModel,
+            count,
+            aspectRatio: aspectRatio || '1:1',
+            outputGroup
+          }),
+          activeCanvas?.id || 'default'
+        );
+
+        notify.success('生图计划已提交', `任务已加入持久化队列 (Job ID: ${job.id})`);
+        return job;
       } catch (e: any) {
         notify.error('生图排队触发失败', e.message || '未知异常');
         throw e;
@@ -330,8 +312,32 @@ export const generationTools: AgentToolDefinition[] = [
     },
     handler: async (input: { prompts: any[]; options?: any; idempotencyKey?: string }, ctx) => {
       const { prompts, options, idempotencyKey } = input;
-      const { activeCanvas, selectedModel, notify } = ctx;
+      const { activeCanvas, selectedModel, notify, addPromptNode, getNextCardPosition } = ctx;
       
+      if (options?.researchBrief && typeof addPromptNode === 'function') {
+        const lastPos = typeof getNextCardPosition === 'function' ? getNextCardPosition() : { x: 100, y: 100 };
+        const briefNode = {
+          id: 'research_brief_' + Date.now(),
+          prompt: options.researchBrief,
+          position: {
+            x: lastPos.x - 300,
+            y: lastPos.y
+          },
+          aspectRatio: '3:4',
+          imageSize: '1K',
+          model: 'local-research',
+          modelLabel: '深度研究报告',
+          provider: 'Local',
+          childImageIds: [],
+          timestamp: Date.now(),
+          parallelCount: 1,
+          isGenerating: false,
+          status: 'done',
+          tags: ['research-brief', 'automation']
+        };
+        await addPromptNode(briefNode);
+      }
+
       const formattedPrompts = prompts.map((p, idx) => ({
         id: 'prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
         prompt: p.prompt,
@@ -582,25 +588,19 @@ export const generationTools: AgentToolDefinition[] = [
     handler: async (input: { prompt: string; voice?: string; model?: string }, ctx) => {
       const { generateAudio, notify } = ctx;
 
+      if (typeof generateAudio !== 'function') {
+        return {
+          success: false,
+          code: 'CAPABILITY_UNAVAILABLE',
+          message: '音频生成功能不可用，请配置 API 密钥或路由。',
+          setupAction: 'open-settings'
+        };
+      }
+
       notify.info('音频合成中', `正在合成: "${input.prompt.slice(0, 20)}..."`);
       
       try {
-        let res;
-
-        if (typeof generateAudio === 'function') {
-          // 底层环境韧性：自动进行指数退避重试 (Max Retries: 3)
-          res = await fetchWithRetry(() => generateAudio(input.prompt, input.voice, input.model), 3);
-        } else {
-          // 降级模式，模拟真实的进度条变化与网络延迟
-          await new Promise(resolve => setTimeout(resolve, 800));
-          await new Promise(resolve => setTimeout(resolve, 600));
-          res = {
-            taskId: 'audio_task_' + Date.now(),
-            status: 'completed',
-            resultUrl: 'https://example.com/mock-audio.mp3'
-          };
-        }
-
+        const res = await fetchWithRetry(() => generateAudio(input.prompt, input.voice, input.model), 3);
         notify.success('音频合成成功', '已生成最新的多媒体音频任务并就绪。');
         return res;
       } catch (err: any) {

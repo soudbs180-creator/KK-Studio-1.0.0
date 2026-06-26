@@ -8,7 +8,9 @@ const promptOnlyWords = [
 ];
 
 const explicitGenerateWords = [
-  '生成', '开始生成', '直接生成', '出图', '跑图', '批量生成', '每张都生成', '创造', '绘图'
+  '生成', '开始生成', '直接生成', '出图', '跑图', '批量生成', '每张都生成', '创造', '绘图',
+  '画', '做一组', '做一个', '出个', '设计个', '做个', '来个', '海报', '封面', '插画', '头像',
+  '图', '视觉设计', '方案', '视频', '出几张', '画一张', '做些', '换背景', '背景换成', '更高级', '做成电商主图'
 ];
 
 const quickSettingsRoutes = [
@@ -92,7 +94,7 @@ function resolveTopSurfaceRoute(input: string): { surface: string; label: string
 function extractSimpleGeneratePrompt(input: string): string {
   return input
     .replace(/^(请|麻烦|帮我|请帮我|麻烦帮我|给我|我要|我想要)\s*/g, '')
-    .replace(/^(直接)?(生成|开始生成|出图|跑图|绘图|画|创建|做)\s*(一个|一张|一下|个|张)?\s*/g, '')
+    .replace(/^(直接)?(生成|开始生成|出图|跑图|绘图|画|创建|做|设计)\s*(一个|一张|一下|个|张|组|批)?\s*/g, '')
     .replace(/(\d+)\s*(张|个)/g, '')
     .replace(/[“”"]/g, '')
     .trim();
@@ -125,6 +127,18 @@ function extractAspectRatio(input: string): string | undefined {
   return `${match[1]}:${match[2]}`;
 }
 
+function inferAspectRatio(input: string): string | undefined {
+  const extracted = extractAspectRatio(input);
+  if (extracted) return extracted;
+  
+  const lower = input.toLowerCase();
+  if (lower.includes('小红书')) return '4:5';
+  if (lower.includes('短视频') || lower.includes('抖音') || lower.includes('手机壁纸') || lower.includes('9:16') || lower.includes('竖屏')) return '9:16';
+  if (lower.includes('电影') || lower.includes('横屏') || lower.includes('16:9') || lower.includes('电脑壁纸') || lower.includes('横屏海报')) return '16:9';
+  if (lower.includes('电商主图') || lower.includes('头像') || lower.includes('1:1') || lower.includes('正方形')) return '1:1';
+  return undefined;
+}
+
 function extractLayoutPreset(input: string): 'compact-grid' | 'grid' | 'row' | 'column' | undefined {
   if (matchAny(input, [/紧凑|紧密|compact|密集|排版布局|紧凑.*布局|布局.*紧凑/i])) {
     return 'compact-grid';
@@ -149,7 +163,8 @@ export function shouldTreatAsGeneration(input: string): boolean {
   const hasPromptOnly = promptOnlyWords.some(word => input.includes(word));
   const hasGenerate = explicitGenerateWords.some(word => input.includes(word));
   if (hasPromptOnly && !hasGenerate) return false;
-  return hasGenerate;
+  const isCreativeIdea = /海报|封面|插画|头像|壁纸|设计|方案|效果图/i.test(input);
+  return hasGenerate || isCreativeIdea;
 }
 
 /**
@@ -162,6 +177,123 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   const firstUrl = extractHttpUrl(cleanInput);
   const hasRetryGenerationCommand = /重试|重新跑|再试|retry|rerun/i.test(cleanInput);
   const hasFailedBatchTarget = Boolean(retryJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
+
+  // 提取选区与参考图
+  const selectedNodeIds = context?.canvas?.selectedNodeIds || [];
+  const selectedImageIds = context?.canvas?.imageNodes?.filter((n: any) => selectedNodeIds.includes(n.id)).map((n: any) => n.id) || [];
+  const selectedPromptIds = context?.canvas?.promptNodes?.filter((n: any) => selectedNodeIds.includes(n.id)).map((n: any) => n.id) || [];
+  const childImageIds: string[] = [];
+  selectedPromptIds.forEach((pid: string) => {
+    const imgs = context?.canvas?.imageNodes?.filter((img: any) => img.parentPromptId === pid) || [];
+    imgs.forEach((img: any) => childImageIds.push(img.id));
+  });
+  const allSelectedImageIds = Array.from(new Set([...selectedImageIds, ...childImageIds]));
+
+  let refImageNodeId: string | undefined = undefined;
+  if (allSelectedImageIds.length > 0) {
+    refImageNodeId = allSelectedImageIds[0];
+  } else {
+    // 优先使用最近生成的图片（即 timestamp 最大的图片节点）
+    const imageNodes = context?.canvas?.imageNodes || [];
+    if (imageNodes.length > 0) {
+      let latestImg: any = null;
+      for (const img of imageNodes) {
+        if (!latestImg || (Number(img.timestamp) || 0) > (Number(latestImg.timestamp) || 0)) {
+          latestImg = img;
+        }
+      }
+      if (latestImg) {
+        refImageNodeId = latestImg.id;
+      }
+    }
+  }
+
+  const isEditRequest = /背景换成|换背景|背景改为|更高级|电商主图|主图|做成电商主图/i.test(lowerInput);
+  const isVideoRequest = /视频版|生成视频|图生视频/i.test(lowerInput);
+  const isResearchRequest = /研究.*并生成|分析.*风格|视觉方案|出一组图|研究.*风格/i.test(cleanInput);
+
+  if (isResearchRequest) {
+    const countMatch = lowerInput.match(/(\d+)\s*(张|个|幅)/);
+    const count = countMatch ? parseInt(countMatch[1], 10) : 6;
+    const subjectMatch = cleanInput.match(/(?:研究|分析)([^并且生成,，；;]+)/);
+    const subject = subjectMatch ? subjectMatch[1].trim() : '品牌视觉';
+    return {
+      intent: 'research_to_canvas',
+      confidence: 0.95,
+      extracted: {
+        count,
+        style: subject
+      },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到深度研究并生成视觉方案的串联流程意图。'
+    };
+  }
+
+  // 网页抓取意图优先识别，防止因为提取“主图”被误判为修改图片
+  if (firstUrl && /抓取|提取|解析|读取|商品|价格|主图|详情页|网页|extract/i.test(cleanInput)) {
+    return {
+      intent: 'extract_page_content',
+      confidence: 0.92,
+      extracted: {
+        browserAction: 'extract_product',
+        url: firstUrl
+      },
+      risk: 'upload',
+      needsConfirmation: true,
+      reason: '识别到外部网页商品信息提取请求，需通过 Browser Bridge 并经用户确认。'
+    };
+  }
+
+  if ((isEditRequest || isVideoRequest) && !refImageNodeId) {
+    return {
+      intent: 'image_edit_missing_selection',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '检测到修改或图生视频指令，但画布上没有可选的参考图，需要引导用户选择。'
+    };
+  }
+
+  if (isVideoRequest && refImageNodeId) {
+    return {
+      intent: 'image_to_video',
+      confidence: 0.95,
+      extracted: {
+        referenceImageNodeId: refImageNodeId,
+        count: 1
+      },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到图生视频指令，使用选定或最近的图片作为参考图进行视频生成。'
+    };
+  }
+
+  if (/电商主图|做成电商主图/i.test(lowerInput) && allSelectedImageIds.length > 1) {
+    const aspectRatio = inferAspectRatio(cleanInput);
+    const layoutPreset = extractLayoutPreset(cleanInput) || 'compact-grid';
+    return {
+      intent: 'batch_generate_from_folder',
+      confidence: 0.95,
+      extracted: {
+        count: allSelectedImageIds.length,
+        taskDomain: 'ecommerce',
+        aspectRatio,
+        layoutPreset,
+        fileIds: allSelectedImageIds,
+        outputGroup: {
+          label: 'AI ecommerce batch',
+          color: '#ffffff',
+          includePromptNodes: true,
+          tags: ['automation']
+        }
+      },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '检测到选中多张图片执行电商主图批量重绘。'
+    };
+  }
 
   // 简体中文：支持直接输入画布中已有卡片的提示词或标签进行快速智能跳转定位（防抢占保护）
   if (context?.canvas) {
@@ -219,19 +351,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
     };
   }
 
-  if (firstUrl && /抓取|提取|解析|读取|商品|价格|主图|详情页|网页|extract/i.test(cleanInput)) {
-    return {
-      intent: 'extract_page_content',
-      confidence: 0.92,
-      extracted: {
-        browserAction: 'extract_product',
-        url: firstUrl
-      },
-      risk: 'upload',
-      needsConfirmation: true,
-      reason: '识别到外部网页商品信息提取请求，需通过 Browser Bridge 并经用户确认。'
-    };
-  }
+
 
   if (/回写|写回|同步.*dom|dom.*同步|修改网页|改网页/.test(lowerInput)) {
     return {
@@ -410,7 +530,8 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   // 6.8. 简单“生成一个...”直接复用画布输入框配置并发送，不绕到独立建卡确认流。
   if (
     shouldTreatAsGeneration(cleanInput) &&
-    !/批量|文件夹|每张|所有图片|全部图片|多张|几张/.test(lowerInput) &&
+    /生成|出图|跑图|画|发送|出个/i.test(cleanInput) &&
+    !/批量|文件夹|每张|所有图片|全部图片|多张|几张|组|批/.test(lowerInput) &&
     !/报错|错误|失败|崩溃|断开|不工作|故障|限流|退款|无法运行|下载|导出|打包|保存结果|上传|导入|添加图片|添加文件/.test(lowerInput)
   ) {
     const countMatch = lowerInput.match(/(\d+)\s*(张|个)/);
@@ -520,19 +641,24 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
 
   // 7. 单图生成/多图生成意图
   if (shouldTreatAsGeneration(cleanInput)) {
-    // 提取可能的生图数量
     const countMatch = lowerInput.match(/(\d+)\s*(张|个)/);
-    const count = countMatch ? parseInt(countMatch[1]) : 1;
+    const defaultCount = isEditRequest ? 1 : 4;
+    const count = countMatch ? parseInt(countMatch[1]) : defaultCount;
+    const aspectRatio = inferAspectRatio(cleanInput);
 
     return {
       intent: 'generate_images',
       confidence: 0.85,
       extracted: {
-        count
+        count,
+        referenceImageNodeId: isEditRequest ? refImageNodeId : undefined,
+        aspectRatio
       },
       risk: 'cost',
       needsConfirmation: true, // 单图或多图生成必须弹出确认卡片
-      reason: '检测到明确的画图或出图意图，将消耗积分或调用远程大模型，需要获得用户确认。'
+      reason: isEditRequest 
+        ? '检测到以选中/最近图片为参考的图像编辑修改意图，需要用户确认。'
+        : '检测到明确的画图或出图意图，将消耗积分或调用远程大模型，需要获得用户确认。'
     };
   }
 

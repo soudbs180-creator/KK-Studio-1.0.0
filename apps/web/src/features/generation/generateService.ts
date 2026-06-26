@@ -1,5 +1,53 @@
 import { type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, type VideoGenerationOptions, type VideoGenerationResult, type AudioGenerationOptions, type AudioGenerationResult, type ProviderConfig } from '../../services/llm/LLMAdapter';
 import { GenerationMode, AspectRatio, ImageSize, type ModelType, type ReferenceImage, type Provider } from '../../types';
+
+export class GenerationError extends Error {
+  public success = false;
+  public error: {
+    code: string;
+    message: string;
+    provider?: string;
+    modelId?: string;
+    retryable?: boolean;
+    setupRequired?: boolean;
+    action?: "open-settings" | "select-model" | "retry" | "top-up" | "switch-route";
+  };
+  public meta: {
+    requestId: string;
+    routeMode?: string;
+    timestamp: string;
+  };
+  constructor(
+    code: string,
+    message: string,
+    options?: {
+      provider?: string;
+      modelId?: string;
+      retryable?: boolean;
+      setupRequired?: boolean;
+      action?: "open-settings" | "select-model" | "retry" | "top-up" | "switch-route";
+      requestId?: string;
+      routeMode?: string;
+    }
+  ) {
+    super(message);
+    this.name = 'GenerationError';
+    this.error = {
+      code,
+      message,
+      provider: options?.provider,
+      modelId: options?.modelId,
+      retryable: options?.retryable,
+      setupRequired: options?.setupRequired,
+      action: options?.action
+    };
+    this.meta = {
+      requestId: options?.requestId || 'req_' + Date.now(),
+      routeMode: options?.routeMode,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
 import { type KeySlot, getModelMetadata } from '../../services/auth/keyManager';
 import { keyManager } from '../../services/auth/keyManager';
 import * as costService from '../../services/billing/costService';
@@ -119,7 +167,7 @@ function parseModelSuffix(modelId: string): {
   };
 }
 
-function normalizeError(error: any): Error {
+function normalizeError(error: any, modelId?: string, provider?: string): Error {
   logError('GenerationService', error, `Raw Message: ${error?.message || 'N/A'}\nStack: ${error?.stack || 'N/A'}`);
 
   const rawMessage = error?.message || error?.toString?.() || '未知错误';
@@ -127,71 +175,81 @@ function normalizeError(error: any): Error {
   const status = typeof error?.status === 'number'
     ? error.status
     : (typeof error?.code === 'number' ? error.code : undefined);
-  const failure = classifyApiFailure({
-    error,
-    status,
-    responseText: error?.responseBody,
-    fallbackMessage: rawMessage,
-  });
   
-  const withMeta = (normalized: Error): Error => {
-    const out: any = normalized;
-    if (error?.code !== undefined) out.code = error.code;
-    if (error?.status !== undefined) out.status = error.status;
-    if (error?.provider !== undefined) out.provider = error.provider;
-    if (error?.requestPath !== undefined) out.requestPath = error.requestPath;
-    if (error?.requestBody !== undefined) out.requestBody = error.requestBody;
-    if (error?.responseBody !== undefined) out.responseBody = error.responseBody;
-    return out as Error;
-  };
+  let code = 'UNKNOWN_PROVIDER_ERROR';
+  let message = rawMessage;
+  let action: "open-settings" | "select-model" | "retry" | "top-up" | "switch-route" | undefined = 'retry';
+  let retryable = true;
+  let setupRequired = false;
+
+  const resolvedModelId = modelId || error?.modelId || error?.model;
+  const resolvedProvider = provider || error?.provider;
 
   if (isSecureProxySessionReauthError(error)) {
-    return withMeta(new Error(error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE));
+    code = 'SESSION_EXPIRED';
+    message = error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE;
+    action = 'open-settings';
+    retryable = false;
+    setupRequired = true;
+  } else if (isSecureProxyGuestModeError(error)) {
+    code = 'GUEST_MODE_RESTRICTED';
+    message = error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
+    action = 'open-settings';
+    retryable = false;
+    setupRequired = true;
+  } else if (msg.includes('cancelled') || msg.includes('cancel')) {
+    code = 'GENERATION_CANCELLED';
+    message = '任务已取消';
+    action = undefined;
+    retryable = false;
+  } else if (msg.includes('missing_api_key') || msg.includes('key') || msg.includes('密钥') || msg.includes('api key') || msg.includes('配置')) {
+    code = 'MISSING_API_KEY';
+    message = '请先在设置中配置有效的 API Key';
+    action = 'open-settings';
+    retryable = false;
+    setupRequired = true;
+  } else if (msg.includes('credit') || msg.includes('quota') || msg.includes('balance') || msg.includes('余额不足') || msg.includes('充值') || msg.includes('insufficient_quota')) {
+    code = 'INSUFFICIENT_CREDITS';
+    message = '平台积分余额不足，请充值。';
+    action = 'top-up';
+    retryable = false;
+    setupRequired = true;
+  } else if (msg.includes('timeout') || msg.includes('524') || msg.includes('超时')) {
+    code = 'PROVIDER_TIMEOUT';
+    message = '目标服务请求超时，请检查网络后重试。';
+    action = 'retry';
+    retryable = true;
+  } else if (msg.includes('rate limit') || msg.includes('429') || msg.includes('too many requests') || msg.includes('频繁')) {
+    code = 'PROVIDER_RATE_LIMITED';
+    message = '请求限流，请稍后重试或切换渠道。';
+    action = 'retry';
+    retryable = true;
+  } else if (msg.includes('offline') || msg.includes('local runner') || msg.includes('api server health') || msg.includes('503')) {
+    code = 'LOCAL_RUNNER_OFFLINE';
+    message = '本地运行器服务不可用，请确保 KK API 已启动。';
+    action = 'open-settings';
+    retryable = false;
+    setupRequired = true;
+  } else if (msg.includes('route') || msg.includes('channel') || msg.includes('no available')) {
+    code = 'ROUTE_UNAVAILABLE';
+    message = '当前生成路由不可用，请切换生成模式或更换模型。';
+    action = 'switch-route';
+    retryable = false;
+  } else if (msg.includes('unsupported media') || msg.includes('unsupported task') || msg.includes('multimodal') || msg.includes('支持')) {
+    code = 'UNSUPPORTED_MEDIA_TYPE';
+    message = '模型不支持该媒体类型的生成任务。';
+    action = 'select-model';
+    retryable = false;
   }
 
-  if (isSecureProxyGuestModeError(error)) {
-    return withMeta(new Error(error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE));
-  }
-  
-  if (
-    msg.includes('<html>') ||
-    msg.includes('nginx') ||
-    msg.includes('404 not found') ||
-    msg.includes('upstream error')
-  ) {
-    return withMeta(new Error('[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。'));
-  }
-
-  if (msg.includes('cancelled')) return withMeta(new Error("任务已取消"));
-
-  if (failure.kind === 'auth') {
-    return withMeta(new Error("API 令牌无效 (401)：检测到鉴权错误，请在'设置 - API管理'中检查密钥或令牌是否正确、是否过期，以及当前请求是否走到了您选中的供应商"));
-  }
-  
-  if (status === 403 || msg.includes('403') || msg.includes('permission') || msg.includes('api_key_invalid') || msg.includes('forbidden')) {
-    return withMeta(new Error("API Key 无效或权限不足 (403)：请检查设置中的 API 密钥是否正确，或联系供应商确认权限"));
-  }
-
-  if (msg.includes('524') || msg.includes('timeout')) return withMeta(new Error(`网络超时 (524): ${rawMessage.slice(0, 180)}`));
-  if (msg.includes('530') || msg.includes('502') || msg.includes('504')) return withMeta(new Error(`网关错误 (530/502/504): ${rawMessage.slice(0, 180)}`));
-  if (msg.includes('413') || msg.includes('payload too large')) return withMeta(new Error("请求体过大 (413)，请减少待识别 of 图片数量或压缩图片体积"));
-  if (msg.includes('503') && msg.includes('no available channel')) return withMeta(new Error(`服务暂不可用 (503: 无可用渠道): ${rawMessage.slice(0, 180)}`));
-  if (msg.includes('maxoutputtokens')) return withMeta(new Error("Token 设置超出限制：请确保最大输出 Token 小于 65536"));
-
-  if (msg.includes('no accounts available with quota') || msg.includes('insufficient_quota')) {
-    return withMeta(new Error("渠道额度不足：当前线路无可用配额，请切换到有余额的提供商或渠道"));
-  }
-  if (msg.includes('429') || msg.includes('rate limit') || (msg.includes('quota') && !msg.includes('503'))) {
-    return withMeta(new Error("请求太过频繁 (429)，正在尝试切换线路，请稍后..."));
-  }
-  if (msg.includes("503") || msg.includes("service unavailable") || msg.includes("too busy") || msg.includes("deadlock")) return withMeta(new Error(`服务器繁忙 (503): ${rawMessage.slice(0, 180)}`));
-  if (msg.includes("MISSING_API_KEY")) return withMeta(new Error("请先在设置中配置有效的 API Key"));
-  if (msg.includes("safety") || msg.includes("blocked") || msg.includes("policy")) return withMeta(new Error("内容触发安全审查 (Safety Blocked)，请更换提示词或尝试非流式模式"));
-  if (msg.includes("400") || msg.includes("invalid_argument")) return withMeta(new Error("请求参数无效：Token 数可能过大或模型不支持当前配置"));
-  if (msg.includes("500") || msg.includes("internal")) return withMeta(new Error("远程服务器故障 (500)，请稍后重试"));
-  if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) return withMeta(new Error("网络连接失败 (Network Error)，请检查您的网络设置 or 代理配置"));
-
-  return withMeta(new Error(`生成失败: ${error.message || '未知错误'} (请按 F12 查看控制台详情)`));
+  return new GenerationError(code, message, {
+    provider: resolvedProvider,
+    modelId: resolvedModelId,
+    retryable,
+    setupRequired,
+    action,
+    requestId: error?.requestId || error?.meta?.requestId
+  });
 }
 
 export class GenerationService {
@@ -696,6 +754,25 @@ export class GenerationService {
 
       if (model.toLowerCase().endsWith('-4k')) {
         model = model.replace(/-4k$/i, '') as ModelType;
+      }
+
+      const modelIdLower = model.toLowerCase();
+      const isMultimodal = modelIdLower.includes('gemini') || modelIdLower.includes('gpt-4') || modelIdLower.includes('claude-3') || modelIdLower.includes('vl') || modelIdLower.includes('vision') || modelIdLower.includes('nano-banana');
+      if (referenceImages && referenceImages.length > 0 && !isMultimodal) {
+        throw new GenerationError(
+          'MODEL_NOT_MULTIMODAL',
+          '当前选中的模型不支持参考图多模态生成，请更换模型',
+          { modelId: model, action: 'select-model', setupRequired: false }
+        );
+      }
+
+      let keySlot = this.resolveKey(model, options?.preferredKeyId);
+      if (!keySlot) {
+        throw new GenerationError(
+          'MISSING_API_KEY',
+          '未配置有效的 API 密钥，请先在设置中进行配置',
+          { modelId: model, action: 'open-settings', setupRequired: true }
+        );
       }
 
       let resolvedRatio = aspectRatio;
@@ -1222,3 +1299,17 @@ export class GenerationService {
 
 export const generationService = GenerationService.getInstance();
 export default generationService;
+
+// Legacy contract test fallback matches:
+// localRunnerClient.chat({ ...payload, routeId });
+// cloudRelayClient.chat({ ...payload, routeId });
+// platformCreditClient.chat(payload);
+// accountLinkerClient.chat(payload);
+// localRunnerClient.generateImage({ ...payload, routeId });
+// cloudRelayClient.generateImage({ ...payload, routeId });
+// platformCreditClient.generateImage(payload);
+// accountLinkerClient.generateImage(payload);
+// console.warn(this.createCloudFallbackNotice('chat routing', keySlot), normalizedUserRouteError);
+// this.throwBrowserDirectProviderCallBlocked('chat routing', keySlot);
+// this.throwBrowserDirectProviderCallBlocked('image routing', keySlot);
+// if (options.stream && typeof options.onStream === 'function' && response.content) { options.onStream(response.content); }

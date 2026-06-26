@@ -1,11 +1,11 @@
-import { isMobileDevice } from '../../services/storage/storagePreference';
-import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth';
-import { keyManager } from '../../services/auth/keyManager';
-import { getNetworkStatus, isUserVpnEnabled, probeNetwork } from '../../local/localNetworkProbe';
-import { decideRoute } from './routePolicies';
+import { isMobileDevice } from '../../services/storage/storagePreference.ts';
+import { getKkApiServerHealth } from '../../services/api/kkApiServerHealth.ts';
+import { keyManager } from '../../services/auth/keyManager.ts';
+import { getNetworkStatus, isUserVpnEnabled, probeNetwork } from '../../local/localNetworkProbe.ts';
+import { decideRoute } from './routePolicies.ts';
 import type { RouteContext, RouteMode } from './RouteContext';
 import type { RouteDecision } from './RouteDecision';
-import { isSystemModelRoute } from '../../services/model/modelRoute';
+import { isSystemModelRoute } from '../../services/model/modelRoute.ts';
 
 export class ProviderRouteEngine {
   private static instance: ProviderRouteEngine;

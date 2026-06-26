@@ -102,6 +102,29 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     applyServiceStage(stage);
   }, [stage]);
 
+  // 全局启动超时兜底定时器：无论任何内部服务在 8s 内是否就绪，强行退去 loading 放行到画布
+  useEffect(() => {
+    if (!user) return;
+    
+    const fallbackTimer = window.setTimeout(() => {
+      console.warn('[AppStartup] Startup timeout backup reached (8s). Forcing ready to prevent infinite loading...');
+      startTransition(() => {
+        setStage((currentStage) => {
+          if (!hasReachedStage(currentStage, 'background_ready')) {
+            setLatestStartupSnapshot('background_ready', user?.id || null);
+            return 'background_ready';
+          }
+          return currentStage;
+        });
+        setHealthState('ready');
+      });
+    }, 8000);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     startupRunIdRef.current += 1;
     const startupRunId = startupRunIdRef.current;
@@ -159,7 +182,14 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setLastStartupWarning(null);
     } else if (!isTempUser) {
       setHealthState('checking');
-      void getKkApiServerHealth({ forceRefresh: true }).then((health) => {
+      
+      // void getKkApiServerHealth({ forceRefresh: true })
+      const healthPromise = getKkApiServerHealth({ forceRefresh: true });
+      const timeoutPromise = new Promise<KkApiServerHealth>((_, reject) =>
+        window.setTimeout(() => reject(new Error('Health check timeout')), 2500)
+      );
+
+      void Promise.race([healthPromise, timeoutPromise]).then((health) => {
         if (cancelled || startupRunIdRef.current !== startupRunId) {
           return;
         }

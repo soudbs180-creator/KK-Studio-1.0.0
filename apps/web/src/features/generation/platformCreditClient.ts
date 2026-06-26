@@ -3,7 +3,7 @@ import {
   callSecureSystemProxyImage,
   callSecureSystemProxyVideo,
   callSecureSystemProxyAudio
-} from '../../services/model/secureModelProxy';
+} from '../../services/model/secureModelProxy.ts';
 import type {
   SecureProxyChatRequest,
   SecureProxyImageRequest,
@@ -13,7 +13,7 @@ import type {
   SecureProxyImageResponse,
   SecureProxyVideoResponse,
   SecureProxyAudioResponse
-} from '../../services/model/secureModelProxy';
+} from '../../services/model/secureModelProxy.ts';
 
 export class PlatformCreditClient {
   public async chat(payload: SecureProxyChatRequest): Promise<SecureProxyChatResponse> {

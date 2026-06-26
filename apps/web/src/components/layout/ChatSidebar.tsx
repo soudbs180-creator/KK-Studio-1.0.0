@@ -3689,8 +3689,27 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                     <span className="shrink-0">产物 {outputNodeCount}</span>
                                                 </div>
                                                 {counts.firstFailure && (
-                                                    <div className="mt-1 truncate rounded-md border border-[var(--state-danger-border)] bg-[var(--state-danger-bg)] px-1.5 py-1 text-[8px] text-[var(--state-danger-text)]" title={counts.firstFailure}>
-                                                        {counts.firstFailure}
+                                                    <div className="mt-1 flex items-center justify-between gap-1.5 rounded-md border border-[var(--state-danger-border)] bg-[var(--state-danger-bg)] px-1.5 py-1 text-[8px] text-[var(--state-danger-text)]" title={counts.firstFailure}>
+                                                        <span className="min-w-0 truncate">{counts.firstFailure}</span>
+                                                        {counts.firstFailure.includes('API') || counts.firstFailure.includes('KEY') || counts.firstFailure.includes('密钥') || counts.firstFailure.includes('未配置') || counts.firstFailure.includes('offline') || counts.firstFailure.includes('运行器') ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (onOpenSettings) onOpenSettings('api-management');
+                                                                }}
+                                                                className="shrink-0 rounded bg-[var(--frost-card-sub-border)] px-1 py-0.5 font-bold hover:bg-[var(--toolbar-hover)]"
+                                                            >
+                                                                去配置
+                                                            </button>
+                                                        ) : counts.firstFailure.includes('credit') || counts.firstFailure.includes('积分') || counts.firstFailure.includes('余额') || counts.firstFailure.includes('quota') ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowRechargeModal(true)}
+                                                                className="shrink-0 rounded bg-[var(--state-warning-border)] px-1 py-0.5 font-bold hover:bg-[var(--state-warning-bg)]"
+                                                            >
+                                                                去充值
+                                                            </button>
+                                                        ) : null}
                                                     </div>
                                                 )}
                                                 <div className="mt-2 flex items-center justify-end gap-1.5">

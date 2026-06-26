@@ -6376,7 +6376,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onUpdateWindowLayout={handleUpdateWindowLayout}
       />
 
-      <TaskCenterTray />
+      <TaskCenterTray onOpenSettings={openSettingsSurfaceTracked} />
     </WorkspaceShell>
   );
 };

@@ -1,5 +1,5 @@
 import type { KKIntent } from '../orchestration/taskIntent';
-import { capabilityRegistry } from '../capability/capabilityRegistry';
+import { capabilityRegistry } from '../capability/capabilityRegistry.ts';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 

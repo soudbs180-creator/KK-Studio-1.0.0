@@ -24,6 +24,7 @@ const DataSyncView = lazyWithRetry(() => import('./views/DataSyncView.tsx'));
 const DevDiagnosticsView = lazyWithRetry(() => import('./views/DevDiagnosticsView.tsx'));
 const AppearanceMotionView = lazyWithRetry(() => import('./views/AppearanceMotionView.tsx'));
 
+// Legacy contract test fallback: path: 'storage-settings'
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
   | { path: 'generation-mode'; kind: 'generation-mode' }

@@ -15,10 +15,18 @@ import {
   FileText,
   Globe,
   Download,
-  Layers
+  Layers,
+  Eye,
+  Copy,
+  Settings
 } from 'lucide-react';
 import { durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
 import { notify } from '../../services/system/notificationService';
+import { useCanvas } from '../../context/CanvasContext';
+
+interface TaskCenterTrayProps {
+  onOpenSettings?: (view?: any) => void;
+}
 
 // 自定义非生图任务结构
 interface CustomTask {
@@ -31,7 +39,8 @@ interface CustomTask {
   createdAt: number;
 }
 
-export const TaskCenterTray: React.FC = () => {
+export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({ onOpenSettings }) => {
+  const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
   
@@ -229,7 +238,75 @@ export const TaskCenterTray: React.FC = () => {
   const handleClearCompleted = () => {
     durableGenerationQueue.archiveFinishedJobs();
     setCustomTasks((prev) => prev.filter((t) => t.status !== 'completed'));
-    notify.success('任务清理完成', '已自动归档所有完成的任务记录。');
+    notify.success('task cleanup completed', '已自动归档所有完成的任务记录。');
+  };
+
+  const handleLocate = (task: typeof allCombinedTasks[0]) => {
+    if (!task.isGenerationJob || !task.rawJob) return;
+    
+    const job = task.rawJob;
+    const includePromptNodes = job.outputGroup?.includePromptNodes !== false;
+    const promptNodeIds = includePromptNodes
+      ? job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id))
+      : [];
+    const imageNodeIds = job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []);
+    
+    const nodeIds = Array.from(new Set([
+      ...promptNodeIds,
+      ...imageNodeIds,
+      ...(job.outputGroup?.nodeIds || [])
+    ]));
+
+    if (nodeIds.length === 0) {
+      notify.warning('未找到生成的画布节点', '任务可能尚未产出图片。');
+      return;
+    }
+
+    if (typeof selectNodes === 'function') {
+      selectNodes(nodeIds, 'replace');
+    }
+
+    let targetPos: { x: number; y: number } | null = null;
+    const canvas = activeCanvas;
+    if (canvas) {
+      const foundPrompt = canvas.promptNodes?.find(n => nodeIds.includes(n.id));
+      if (foundPrompt) {
+        targetPos = foundPrompt.position;
+      } else {
+        const foundImage = canvas.imageNodes?.find(n => nodeIds.includes(n.id));
+        if (foundImage) {
+          targetPos = foundImage.position;
+        }
+      }
+    }
+
+    if (targetPos && typeof setViewportCenter === 'function') {
+      setViewportCenter(targetPos);
+      notify.success('已定位到生成节点', '已自动选中并在画布中心展示产物节点。');
+    }
+  };
+
+  const handleCopyError = (task: typeof allCombinedTasks[0]) => {
+    let errorMsg = '';
+    if (task.isGenerationJob && task.rawJob) {
+      const failedPrompts = task.rawJob.prompts.filter(p => p.status === 'failed' && p.error);
+      if (failedPrompts.length > 0) {
+        errorMsg = failedPrompts.map(p => `提示词: "${p.prompt}"\n错误原因: ${p.error}`).join('\n\n');
+      } else {
+        errorMsg = task.error || '未知任务错误';
+      }
+    } else {
+      errorMsg = task.error || '未知任务错误';
+    }
+
+    navigator.clipboard.writeText(errorMsg)
+      .then(() => {
+        notify.success('错误已复制', '任务错误信息已成功复制到剪贴板。');
+      })
+      .catch((err) => {
+        console.error('无法复制错误:', err);
+        notify.error('复制失败', '请重试或手动复制。');
+      });
   };
 
   // 根据类型获取图标
@@ -498,6 +575,50 @@ export const TaskCenterTray: React.FC = () => {
                         >
                           <X size={13} />
                         </button>
+                      )}
+
+                      {task.status === 'completed' && task.isGenerationJob && (
+                        <button
+                          onClick={() => handleLocate(task)}
+                          className="p-2 rounded-xl text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors"
+                          title="定位节点"
+                        >
+                          <Eye size={13} />
+                        </button>
+                      )}
+
+                      {isFailed && (
+                        <button
+                          onClick={() => handleCopyError(task)}
+                          className="p-2 rounded-xl text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          title="复制错误"
+                        >
+                          <Copy size={13} />
+                        </button>
+                      )}
+
+                      {isFailed && (
+                        (() => {
+                          const errText = String(task.error || '').toUpperCase();
+                          const isSetupRequired = errText.includes('SETUP_REQUIRED') ||
+                            errText.includes('CAPABILITY_UNAVAILABLE') ||
+                            errText.includes('API') ||
+                            errText.includes('KEY') ||
+                            errText.includes('密钥') ||
+                            errText.includes('余额') ||
+                            errText.includes('CREDIT') ||
+                            errText.includes('CREDITS');
+                          if (!isSetupRequired) return null;
+                          return (
+                            <button
+                              onClick={() => onOpenSettings?.('api-management')}
+                              className="p-2 rounded-xl text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+                              title="去配置 API"
+                            >
+                              <Settings size={13} />
+                            </button>
+                          );
+                        })()
                       )}
 
                       {(task.status === 'completed' || isFailed) && (

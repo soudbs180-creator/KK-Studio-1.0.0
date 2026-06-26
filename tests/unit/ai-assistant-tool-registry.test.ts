@@ -671,6 +671,8 @@ test('ToolRegistry: ui.updateWindowLayout calls updateToolWindowLayout in ctx', 
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
     assert.equal(updatedInstanceId, 'win_123');
     assert.equal(updatedLayout.x, 150);
     assert.equal(updatedLayout.y, 250);
@@ -681,4 +683,39 @@ test('ToolRegistry: ui.updateWindowLayout calls updateToolWindowLayout in ctx', 
     (globalThis as any).requestAnimationFrame = originalRaf;
   }
 });
+
+test('ToolRegistry: optimizePromptLocally performs real local prompt optimization', async () => {
+  const result = await toolRegistryInstance.execute('optimizePromptLocally', {
+    subject: 'cyberpunk tea poster',
+    style: 'retro'
+  }, {});
+
+  assert.ok(result.optimizedPrompt);
+  assert.match(result.optimizedPrompt, /cyberpunk tea poster/);
+  assert.match(result.optimizedPrompt, /retro style/);
+  assert.match(result.optimizedPrompt, /highly detailed/);
+});
+
+test('ToolRegistry: generation.createAudioTask returns capability_unavailable and updates logs to setup_required/failed if generateAudio is missing', async () => {
+  const result = await toolRegistryInstance.execute('generation.createAudioTask', {
+    prompt: 'test audio prompt'
+  }, {
+    notify: {
+      info: () => {},
+      success: () => {},
+      error: () => {}
+    }
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'CAPABILITY_UNAVAILABLE');
+  assert.equal(result.setupAction, 'open-settings');
+
+  // 验证日志状态
+  const logs = toolRegistryInstance.getLogs();
+  const latestLog = logs[logs.length - 1];
+  assert.equal(latestLog.toolName, 'generation.createAudioTask');
+  assert.equal(latestLog.status, 'setup_required'); // 因为 code 是 'CAPABILITY_UNAVAILABLE' 我们按 'setup_required' 或 'failed' 进行记录
+});
+
 
