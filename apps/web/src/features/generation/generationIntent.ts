@@ -5,7 +5,11 @@ export type RouteMode =
   | 'browser-direct'
   | 'cloud-user-key'
   | 'cloud-platform-key'
-  | 'account-bridge';
+  | 'account-bridge'
+  | 'local-browser-session'
+  | 'user-owned-web-provider'
+  | 'official-oauth-web-provider'
+  | 'browser-assistant-opencli';
 
 export type RouteContext = {
   deviceType: 'desktop' | 'mobile' | 'tablet';

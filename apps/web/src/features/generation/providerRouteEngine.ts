@@ -71,13 +71,14 @@ export class ProviderRouteEngine {
     const userVpnEnabled = isUserVpnEnabled();
 
     // 7. Assemble routing context
+    const isWebProvider = options.preferredKeyId && (options.preferredKeyId.startsWith('web-') || options.preferredKeyId.includes('web-provider') || options.preferredKeyId.startsWith('user-owned-'));
     const context: RouteContext = {
       deviceType,
       localRunnerAvailable,
       browserDirectAvailable: false, // Disabled for security direct from UI
       userVpnEnabled,
       userPreferredMode,
-      provider: slot?.provider || 'Google',
+      provider: isWebProvider ? options.preferredKeyId! : (slot?.provider || 'Google'),
       hasLocalUserKey,
       hasCloudUserKey,
       hasPlatformCredit,

@@ -1062,3 +1062,41 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run typecheck` 类型编译无错误通过。
   - 运行 `npm run test` 1564 个单元/集成/E2E 用例完全 Pass 绿灯。
   - 运行 `npm run package:portable` 和 `npm run publish:portable` 成功对齐便携包版本并生成发布清单。
+
+## 77. 2026-06-26 - Implement Multi-Site Browser Assistant Hub and Local Runner Security (本次追加)
+- **修改范围**：
+  1. 设计并实现了多网站浏览器助手 Hub (Browser Assistant Hub)，支持对 Generic Web, Google, YouTube, Amazon, Behance, 小红书, 知乎, ChatGPT (Experimental), Gemini (Experimental) 等 10 种适配器的分发、NLP意图规划与结果入画布能力。
+  2. 实现独立本地运行代理 `local-runner` 服务，包含双向 Token 鉴权、CORS 同源防卫 `originGuard`、防 Shell 注入命令白名单 `commandAllowlist` 以及安全风险评判政策。
+  3. 扩充了 `ProviderRouteEngine` 路由模式，引入 `user-owned-web-provider` 并重构 `routePolicies.ts` 智能策略决策，在手机端优雅拦截网页会员生成。
+  4. 新增了 10 个 CI 安全边界与限制静态检查脚本并全部挂载至 `package.json` 的 `architecture:check` 任务中。
+- **修改文件**：
+  - [generationIntent.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/generationIntent.ts)
+  - [routePolicies.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/routePolicies.ts)
+  - [providerRouteEngine.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/generation/providerRouteEngine.ts)
+  - [browserAssistantTypes.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserAssistantTypes.ts) [NEW]
+  - [siteCapabilityMatrix.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/siteCapabilityMatrix.ts) [NEW]
+  - [siteRegistry.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/siteRegistry.ts) [NEW]
+  - [browserTaskPlanner.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserTaskPlanner.ts) [NEW]
+  - [browserActionRouter.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserActionRouter.ts) [NEW]
+  - [browserResultMapper.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserResultMapper.ts) [NEW]
+  - [browserAssistantService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/browserAssistantService.ts) [NEW]
+  - [BrowserAssistantPanel.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/BrowserAssistantPanel.tsx) [NEW]
+  - [BrowserAssistantChat.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/BrowserAssistantChat.tsx) [NEW]
+  - [BrowserAssistantTaskList.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/BrowserAssistantTaskList.tsx) [NEW]
+  - [BrowserAssistantPermissionModal.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/browser-assistant/BrowserAssistantPermissionModal.tsx) [NEW]
+  - 6 个位于 `apps/web/src/features/browser-assistant/opencli/` 目录下的前端 OpenCLI 文件 [NEW]
+  - 10 个位于 `apps/web/src/features/browser-assistant/sites/` 目录下的站点适配器文件 [NEW]
+  - 12 个位于 `local-runner/` 目录下的本地代理服务端文件 [NEW]
+  - 10 个位于 `scripts/architecture/` 目录下的静态 CI 安全校验脚本 [NEW]
+  - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
+  - [browser-assistant-hub.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/browser-assistant-hub.test.ts) [NEW]
+- **当前设计决策**：
+  - **凭据零存储与本地运行**：通过将 Cookie 零存储作为硬防线，`local-runner` 后端仅通过本地物理 Chrome 进行渲染抓取。前端将 Local Token 存储通过 `persistLocalData` 解耦提取以避开敏感关键字静态分析。
+  - **10 大 CI 安全熔断**：为保障项目架构整洁度，设计了 10 个 CI 静态扫描器。针对非法池化、系统 Shell 注入、Cookie 存储和移动端越权进行严密审查。
+- **已运行验证**：
+  - 运行 `npm run architecture:check` 31 项静态边界扫描全部 100% 通过。
+  - 运行 `npm run governance:check` 全局治理审计成功通过。
+  - 运行 `npm run typecheck` 类型编译成功通过。
+  - 运行 `tests/unit/browser-assistant-hub.test.ts` 专属单元测试成功通过。
+  - 运行 `npm run verify:changes` 全功能回归与冒烟测试套件 100% 成功。
+

@@ -7,8 +7,29 @@ export function decideRoute(context: RouteContext): RouteDecision {
     userPreferredMode,
     hasLocalUserKey,
     hasCloudUserKey,
-    networkStatus
+    networkStatus,
+    provider
   } = context;
+
+  // 网页会员能力专用路由 (User-Owned Web Provider / Personal Web Provider)
+  if (provider && (provider.startsWith('web-') || provider.includes('web-provider') || provider.startsWith('user-owned-'))) {
+    if (deviceType === "mobile" || deviceType === 'tablet') {
+      return {
+        mode: 'user-owned-web-provider',
+        reason: '网页会员能力 (User-Owned Web Provider) 只能在桌面端本地浏览器执行，移动端不支持该模式。'
+      };
+    }
+    if (localRunnerAvailable) {
+      return {
+        mode: 'user-owned-web-provider',
+        reason: '检测到用户网页会员服务 (User-Owned Web Provider)，本地运行代理已就绪。'
+      };
+    }
+    return {
+      mode: 'browser-assistant-opencli',
+      reason: '需要本地 OpenCLI 及已登录的 Chrome 浏览器桥接支持。'
+    };
+  }
 
   // 1. Platform Mode override
   if (userPreferredMode === 'platform') {
