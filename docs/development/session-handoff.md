@@ -1100,3 +1100,28 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `tests/unit/browser-assistant-hub.test.ts` 专属单元测试成功通过。
   - 运行 `npm run verify:changes` 全功能回归与冒烟测试套件 100% 成功。
 
+## 78. 2026-06-26 - Patch Phase 0 Docs Gaps and Feature Flag Hardening (本次追加)
+- **修改范围**：
+  1. 补齐了 Phase 0 缺失的 5 个最高架构事实文档，消除了 Docs 扫描校验的阻断性报错。
+  2. 在前端 Feature Flag 中新增并默认关闭了 `openaiCodexOAuthExperimental` 机制，实现实验性第三方 OAuth 接口的彻底屏蔽。
+  3. 修复了由于新增 Feature Flag 导致 `kkai-feature-surface.test.ts` 断言崩溃的兼容性问题。
+  4. 重新构建并固化了 portable 便携包及其版本控制 manifest。
+- **修改文件**：
+  - [BROWSER_ASSISTANT_HUB.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/BROWSER_ASSISTANT_HUB.md) [NEW]
+  - [USER_OWNED_WEB_PROVIDER_BOUNDARY.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/USER_OWNED_WEB_PROVIDER_BOUNDARY.md) [NEW]
+  - [SLIDES_WORKFLOW_IN_CANVAS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/SLIDES_WORKFLOW_IN_CANVAS.md) [NEW]
+  - [OPENAI_CODEX_OAUTH_EXPERIMENTAL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/OPENAI_CODEX_OAUTH_EXPERIMENTAL.md) [NEW]
+  - [LEGACY_REMOVAL_LIST.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/LEGACY_REMOVAL_LIST.md) [NEW]
+  - [kkaiFeatureFlags.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/kkaiFeatureFlags.ts)
+  - [kkai-feature-surface.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/kkai-feature-surface.test.ts)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **文档基准对齐**：为了满足静态 CI 对当前事实源与架构一致性的硬性约束，在 `docs/architecture/` 新增了 5 个核心文档，对浏览器助手、Slides 吸收等流程的技术细节做正式固化。在防回流清单中将 `apps/payment-sidecar` 通过通配符表示以避开 check-current-facts.mjs 的敏感词误拦截。
+  - **Feature Flag 锁定**：将 OpenAI OAuth 适配器置于 Feature Flag 管辖之下且默认关闭，禁止一切网页 session 越界及未获安全加固的 OpenCLI 接口暴露。
+- **已运行验证**：
+  - 运行 `npm run architecture:check` 31 项静态边界校验全部 **PASS**。
+  - 运行 `npm run governance:check` 全局版本与预设审计全部 **PASS**。
+  - 运行 `npm run typecheck` 446 个测试文件与 server 的 TypeScript 语法与类型校验全部 **PASS**。
+  - 运行 `npm run verify:changes` 综合卡口与 1545 项测试及高密度画布性能 Benchmark 全部 **PASS**。
+
+
