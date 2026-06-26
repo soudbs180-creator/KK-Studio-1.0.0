@@ -339,7 +339,7 @@ async function ensureWorkspaceReady(page) {
     return desktopEntry;
   }
 
-  const landingLogin = page.locator('.kk-landikk-landing-nav__login').first();
+  const landingLogin = page.locator('.kk-landing-nav__login').first();
   if (await isVisibleWithin(landingLogin, 10000)) {
     await landingLogin.click();
   }
@@ -590,4 +590,6 @@ try {
     await closeLocalViteServer(viteServer);
   }
 }
+
+
 
