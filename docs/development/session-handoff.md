@@ -813,3 +813,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过，因为我们未改变对 AppRootContentSwitch 中 Suspense fallback 字段静态正则匹配。
   - 运行 `npm run typecheck` 类型校验完全成功通过。
   - 运行 `npm run architecture:check` 模块规范校验完全成功通过。
+
+## 53. 2026-06-26 - Stage 2 Foveated Loading and Expanded Render Buffer (本次追加)
+- **修改范围**：
+  1. 纠正图片加载反向延迟问题，在 `ImageCard2.tsx` 中将原本反直觉的延迟分层（远郊 180ms，视口中心 700ms）重构为符合焦点注视机制的“中心最优先（120ms），中郊（280ms），远郊（450ms），边缘及 thumbnail 降级载入（600ms~850ms）”，优化了松手瞬间主线程并发大图解码压力。
+  2. 扩大卡片自身占位渲染缓冲区，在 `WorkspacePage.tsx` 的 `canvasRenderItems` useMemo 内部将 `RENDER_BUFFER` 由原本极其窄小的 220px/500px 扩大至至少 `1200px`，使用户在中度拖动平移时边缘卡片内容保持挂载，杜绝卡片 DOM 反复销毁重建的颠簸闪烁。
+- **修改文件**：
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+- **当前设计决策**：
+  - **人眼焦点优先的渐进载入时序 (Foveated Loading)**：利用 `loadBand` 精准控制时序梯度。松手的一瞬间，视觉焦点的 0 号带图片可在 `120ms` 黄金响应期内最优先回填为高清，剩余中远郊图片呈水波纹状依次排队，平摊了解码并发，极大改善松手卡顿（Jank）。
+  - **宽裕的卡片缓存带**：外扩 1200 像素的保留带。虽然 `useVisibleCanvasItemsNew` 使用了 2500 像素进行大裁剪以做垃圾回收，但在它之内的卡片，我们允许保持完整交互状态的距离扩宽至 1200 像素，避免频繁切换 Placeholder 造成 React diff 的巨额开销。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 类型校验 100% 成功通过。
+  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过（包括 contract 静态拦截测试）。
+  - 运行 `npm run build` Vite 生产包构建打包 100% 成功通过。

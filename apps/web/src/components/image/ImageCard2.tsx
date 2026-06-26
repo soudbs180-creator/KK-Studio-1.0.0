@@ -946,17 +946,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
         };
 
+        // 🚀 [体验优化] 纠正图片加载反向延迟：视口最中心（loadBand=0）延迟最小优先加载（120ms），中郊（loadBand=1）280ms，远郊及边缘更慢，避免主线程解码并发卡顿
         const qualityChangeDelayMs = !displaySrc
             ? 100
-            : loadBand >= 2
-                ? 180
+            : loadBand === 0
+                ? 120
                 : loadBand === 1
-                    ? 220
-                    : detailLevel === 'thumbnail-shell'
-                        ? 160
-                        : detailLevel === 'compact'
-                            ? 320
-                            : 700;
+                    ? 280
+                    : loadBand === 2
+                        ? 450
+                        : detailLevel === 'thumbnail-shell'
+                            ? 600
+                            : 850;
 
         qualityDebounceRef.current = setTimeout(() => {
             loadQualityImage();

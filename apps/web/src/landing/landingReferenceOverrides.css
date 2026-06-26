@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 /* Current KK Studio landing reference alignment overrides. */
 
@@ -820,7 +820,7 @@ body.auth-screen-active--landing #root {
 }
 
 .auth-page--landing .auth-btn-main {
-  background: #0f1d3a !important;
+  background: #0c1018 !important;
   color: #ffffff !important;
   border-radius: 12px !important;
   font-weight: 700 !important;
@@ -828,7 +828,7 @@ body.auth-screen-active--landing #root {
 }
 
 .auth-page--landing .auth-btn-main:hover {
-  background: #091122 !important;
+  background: #192029 !important;
 }
 
 .auth-page--landing .auth-btn-google {

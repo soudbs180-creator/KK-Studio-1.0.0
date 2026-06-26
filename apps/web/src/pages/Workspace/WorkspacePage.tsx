@@ -4542,7 +4542,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return stableCanvasRenderItemsRef.current;
     }
 
-    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
+    // 🚀 [体验优化] 卡片自身占位渲染外扩缓冲区由窄小的220px/500px扩大到至少1200px，防止在画布边缘来回平移时DOM频繁销毁与重建（颠簸闪烁）
+    const RENDER_BUFFER = Math.max(canvasPerformanceProfile.overscanBuffer * 2.5, 1200);
     const rLeft = -canvasTransform.x / canvasTransform.scale - RENDER_BUFFER;
     const rTop = -canvasTransform.y / canvasTransform.scale - RENDER_BUFFER;
     const rRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + RENDER_BUFFER;
