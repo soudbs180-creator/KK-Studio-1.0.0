@@ -556,13 +556,15 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           <Map size={12} className="text-[var(--accent-coral)]" />
           <span className="text-[10px] font-bold tracking-tight text-[var(--text-secondary)]">导航小地图</span>
         </div>
-        <button
-          onClick={toggleCollapsed}
-          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title="收起小地图"
-        >
-          <Minimize2 size={13} className="text-[var(--text-secondary)]" />
-        </button>
+        <div className="w-11 flex justify-center items-center">
+          <button
+            onClick={toggleCollapsed}
+            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            title="收起小地图"
+          >
+            <Minimize2 size={13} className="text-[var(--text-secondary)]" />
+          </button>
+        </div>
       </div>
 
       <div className="w-full flex flex-col gap-1.5 transition-all">
@@ -691,7 +693,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
           {/* 缩放百分比数值 */}
           <span
-            className={`inline-flex items-center justify-end text-[10px] font-black tracking-tighter text-right select-none min-w-[44px] whitespace-nowrap transition-colors ${
+            className={`inline-flex items-center justify-center text-[10px] font-black tracking-tighter text-center select-none w-11 whitespace-nowrap transition-colors ${
               isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
             }`}
             style={{ height: '28px', lineHeight: '28px' }}
@@ -717,7 +719,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           <button
             disabled={!isEdited}
             onClick={handleCancelLocation}
-            className={`px-2.5 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
+            className={`w-11 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
               isEdited
                 ? 'bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] hover:opacity-90 active:scale-95 cursor-pointer'
                 : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'

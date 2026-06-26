@@ -899,3 +899,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - npm run build 和 npm run package:portable 100% 成功。
   - npm run test:unit (1619 项) 全量通过。
   - npm run governance:check (9 大项) 100% 成功。
+
+## 70. 2026-06-26 - Align Minimap Layout Elements Vertically
+- **修改范围**：
+  1. 修复了展开状态下的小地图（Minimap）布局中，右上角的“收起小地图按钮（Minimize2）”、中下右侧的“缩放百分比数值（77%）”、以及底部的“重置按钮”在垂直方向上没有水平居中对齐的问题。
+- **修改文件**：
+  - [AppCanvasNavigationPanel.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/AppCanvasNavigationPanel.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **右侧布局纵向中轴线对齐**：统一将这三个最右侧贴边元素的宽度区域设定为固定的 `w-11` (44px) 或在 `w-11` 容器内居中。
+    - 将 Minimize2 收缩按钮的容器包装在 `w-11 flex justify-center items-center` 内部，保证 hover 背景大小依然维持在 `w-7 h-7` 的正方形。
+    - 将缩放百分比的 span 宽度设定为 `w-11`，并使用 `justify-center text-center` 让文字在其内部居中。
+    - 将最下方的 “重置” 按钮的宽度设为 `w-11`（去除了之前的 `px-2.5` 左右内边距），并在其内部居中。
+  - 由于这三个元素都是每一行的最右侧节点（且三行都贴紧容器的右边缘），且它们占据完全一致的 44px 宽度并各自居中，从而它们的垂直中轴线达成了完美的直线对齐。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 类型编译 100% 通过。
