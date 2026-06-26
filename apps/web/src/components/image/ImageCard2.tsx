@@ -1397,9 +1397,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 : showActiveAccent
                     ? `0 0 0 ${activeRingWidth}px var(--kk-image-card-active-ring)`
                     : '';
-    const cardSurfaceShadow = accentRingShadow
-        ? `${accentRingShadow}, ${baseCardShadow}`
-        : baseCardShadow;
+    const shouldReduceShadow = (isDragging || isCanvasTransforming) && localStorage.getItem('kk_studio_perf_zoom_reduce_motion') !== 'false';
+    const cardSurfaceShadow = shouldReduceShadow
+        ? 'none'
+        : (accentRingShadow
+            ? `${accentRingShadow}, ${baseCardShadow}`
+            : baseCardShadow);
     const cardSurfaceScale = isDragging
         ? 1
         : showSelectedAccent
@@ -1412,6 +1415,54 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         boxShadow: 'none',
         overflow: 'visible',
     } as const;
+
+    if (detailLevel === 'ghost') {
+        const displaySrc = image.url || image.originalUrl || image.apiResultUrl;
+        return (
+            <div
+                ref={containerRef}
+                id={`image-card-${image.id}`}
+                className="image-node absolute flex flex-col items-center select-none"
+                style={{
+                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    left: 0,
+                    top: 0,
+                    zIndex: effectiveStackZIndex,
+                    width: nodeWidth,
+                    height: cardHeight,
+                    opacity: 0.8,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleMouseDown}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (canHandleCardClick()) onClick?.(image.id);
+                }}
+            >
+                <div
+                    className="relative w-full h-full overflow-hidden border border-dashed border-[var(--border-light)] rounded-lg bg-[var(--frost-card-main-bg)] flex flex-col p-1"
+                    style={{
+                        backgroundColor: 'var(--bg-tertiary)',
+                    }}
+                >
+                    {displaySrc ? (
+                        <img
+                            src={displaySrc}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover opacity-45 rounded select-none pointer-events-none"
+                            alt=""
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-800/10 rounded">
+                            <span className="text-[9px] text-[var(--text-tertiary)] truncate px-1">{image.prompt || 'Ghost'}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     if (isSlowLoading) {
         return (

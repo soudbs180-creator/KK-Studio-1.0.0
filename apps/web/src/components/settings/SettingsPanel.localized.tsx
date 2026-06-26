@@ -287,7 +287,7 @@ const SettingsDesktopShell: React.FC<{
           <SettingsDesktopWorkbenchHeader
             activeView={activeView}
             onRefreshCurrentView={onRefreshCurrentView}
-            onOpenLogs={() => onNavigate('system-logs')}
+            onOpenLogs={() => onNavigate('dev-diagnostics')}
             onClose={onClose}
           />
 
@@ -330,11 +330,9 @@ const SettingsMobileShell: React.FC<{
   const mobileBillingLabel = pickByLanguage(language, '计费', 'Billing');
   const activeTitle = activeView === 'dashboard'
     ? pickByLanguage(language, '设置总览', 'Settings Overview')
-    : activeView === 'consumption-records'
-      ? mobileBillingLabel
-      : activeView === 'user-profile'
-        ? pickByLanguage(language, '个人中心', 'User Profile')
-        : activeNavItem.label;
+    : activeView === 'user-profile'
+      ? pickByLanguage(language, '个人中心', 'User Profile')
+      : activeNavItem?.label || '';
 
   const hasContentBack = isApiManagementEditorRoute;
   const [isContentBackScrolled, setIsContentBackScrolled] = useState(false);
@@ -547,7 +545,7 @@ const SettingsRouterShell: React.FC<{
   };
 
   const handleBackToApiManagement = () => {
-    navigate('/settings/api-management', {
+    navigate('/settings/capability-sources', {
       state: nestedApiListState || undefined,
     });
   };
@@ -594,8 +592,8 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     ? getCurrentSettingsViewId(normalizedInitialPathname)
     : resolveCanonicalSettingsViewId(initialView);
   const initialEntry = normalizedInitialPathname || (
-    safeInitialView === 'api-management' && initialSupplier
-      ? `/settings/api-management/provider/${encodeURIComponent(initialSupplier.id || initialSupplier.baseUrl)}`
+    safeInitialView === 'capability-sources' && initialSupplier
+      ? `/settings/capability-sources`
       : buildSettingsPath(safeInitialView)
   );
 

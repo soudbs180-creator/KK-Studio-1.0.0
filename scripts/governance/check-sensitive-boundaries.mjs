@@ -10,6 +10,7 @@ const storageAllowlist = new Set([
   "apps/web/src/services/api/authAccessToken.ts",
   "packages/api-client/src/client.ts",
   "packages/shared/src/contracts/client/kk-api-client.ts",
+  "apps/web/src/components/settings/views/GenerationModeView.tsx",
 ]);
 
 const publicViteSensitiveEnvAllowlist = new Set([

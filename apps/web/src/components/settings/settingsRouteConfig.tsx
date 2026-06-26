@@ -13,49 +13,42 @@ import {
 } from './settingsRegistry';
 
 const DashboardView = lazyWithRetry(() => import('./views/DashboardView.localized.tsx'));
-const ApiSettingsView = lazyWithRetry(() => import('./ApiSettingsView'));
-
-const CostEstimation = lazyWithRetry(() => import('../../pages/CostEstimation'));
-const StorageSettingsView = lazyWithRetry(() => import('./views/StorageSettingsView.localized.tsx'));
-const SystemLogsView = lazyWithRetry(() => import('./views/SystemLogsView.localized.tsx'));
 const UserProfileView = lazyWithRetry(() => import('./views/UserProfileView.tsx'));
-const AppearanceMotionView = lazyWithRetry(() => import('./views/AppearanceMotionView.tsx'));
+const GenerationModeView = lazyWithRetry(() => import('./views/GenerationModeView.tsx'));
+const CapabilitySourcesView = lazyWithRetry(() => import('./views/CapabilitySourcesView.tsx'));
+const ProviderRoutesView = lazyWithRetry(() => import('./views/ProviderRoutesView.tsx'));
 const BrowserAssistantView = lazyWithRetry(() => import('./views/BrowserAssistantView.tsx'));
-const AiManagementView = lazyWithRetry(() => import('./views/AiManagementView.tsx'));
+const CanvasPerformanceView = lazyWithRetry(() => import('./views/CanvasPerformanceView.tsx'));
+const AiTakeoverView = lazyWithRetry(() => import('./views/AiTakeoverView.tsx'));
+const DataSyncView = lazyWithRetry(() => import('./views/DataSyncView.tsx'));
+const DevDiagnosticsView = lazyWithRetry(() => import('./views/DevDiagnosticsView.tsx'));
+const AppearanceMotionView = lazyWithRetry(() => import('./views/AppearanceMotionView.tsx'));
 
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
-  | { path: 'api-management'; kind: 'api' }
-
-  | { path: 'api-management/official/new'; kind: 'api' }
-  | { path: 'api-management/official/:officialId'; kind: 'api' }
-  | { path: 'api-management/provider/new'; kind: 'api' }
-  | { path: 'api-management/provider/:providerId'; kind: 'api' }
-  | { path: 'api-management/:supplierId'; kind: 'api' }
-  | { path: 'consumption-records'; kind: 'billing' }
-  | { path: 'storage-settings'; kind: 'storage' }
-  | { path: 'system-logs'; kind: 'logs' }
-  | { path: 'user-profile'; kind: 'profile' }
-  | { path: 'appearance-motion'; kind: 'appearance-motion' }
+  | { path: 'generation-mode'; kind: 'generation-mode' }
+  | { path: 'capability-sources'; kind: 'capability-sources' }
+  | { path: 'provider-routes'; kind: 'provider-routes' }
   | { path: 'browser-assistant'; kind: 'browser-assistant' }
-  | { path: 'ai-management'; kind: 'ai-management' };
+  | { path: 'canvas-performance'; kind: 'canvas-performance' }
+  | { path: 'ai-takeover'; kind: 'ai-takeover' }
+  | { path: 'data-sync'; kind: 'data-sync' }
+  | { path: 'dev-diagnostics'; kind: 'dev-diagnostics' }
+  | { path: 'appearance-motion'; kind: 'appearance-motion' }
+  | { path: 'user-profile'; kind: 'profile' };
 
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
-  { path: 'api-management', kind: 'api' },
-
-  { path: 'api-management/official/new', kind: 'api' },
-  { path: 'api-management/official/:officialId', kind: 'api' },
-  { path: 'api-management/provider/new', kind: 'api' },
-  { path: 'api-management/provider/:providerId', kind: 'api' },
-  { path: 'api-management/:supplierId', kind: 'api' },
-  { path: 'consumption-records', kind: 'billing' },
-  { path: 'storage-settings', kind: 'storage' },
-  { path: 'system-logs', kind: 'logs' },
-  { path: 'user-profile', kind: 'profile' },
-  { path: 'appearance-motion', kind: 'appearance-motion' },
+  { path: 'generation-mode', kind: 'generation-mode' },
+  { path: 'capability-sources', kind: 'capability-sources' },
+  { path: 'provider-routes', kind: 'provider-routes' },
   { path: 'browser-assistant', kind: 'browser-assistant' },
-  { path: 'ai-management', kind: 'ai-management' },
+  { path: 'canvas-performance', kind: 'canvas-performance' },
+  { path: 'ai-takeover', kind: 'ai-takeover' },
+  { path: 'data-sync', kind: 'data-sync' },
+  { path: 'dev-diagnostics', kind: 'dev-diagnostics' },
+  { path: 'appearance-motion', kind: 'appearance-motion' },
+  { path: 'user-profile', kind: 'profile' },
 ];
 
 interface SettingsRouteOptions {
@@ -101,25 +94,26 @@ function getRouteElement(
           onNavigateOverride={options.onDashboardNavigate}
         />
       );
-    case 'api':
-      return <ApiSettingsView key={routeRefreshKey} initialSupplier={options.initialSupplier || null} />;
-
-    case 'billing':
-      return KKAI_FEATURE_FLAGS.billing
-        ? <CostEstimation key={routeRefreshKey} embedded />
-        : <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
-    case 'storage':
-      return <StorageSettingsView key={routeRefreshKey} />;
-    case 'logs':
-      return <SystemLogsView key={routeRefreshKey} />;
-    case 'profile':
-      return <UserProfileView key={routeRefreshKey} />;
-    case 'appearance-motion':
-      return <AppearanceMotionView key={routeRefreshKey} />;
+    case 'generation-mode':
+      return <GenerationModeView key={routeRefreshKey} />;
+    case 'capability-sources':
+      return <CapabilitySourcesView key={routeRefreshKey} />;
+    case 'provider-routes':
+      return <ProviderRoutesView key={routeRefreshKey} />;
     case 'browser-assistant':
       return <BrowserAssistantView key={routeRefreshKey} />;
-    case 'ai-management':
-      return <AiManagementView key={routeRefreshKey} />;
+    case 'canvas-performance':
+      return <CanvasPerformanceView key={routeRefreshKey} />;
+    case 'ai-takeover':
+      return <AiTakeoverView key={routeRefreshKey} />;
+    case 'data-sync':
+      return <DataSyncView key={routeRefreshKey} />;
+    case 'dev-diagnostics':
+      return <DevDiagnosticsView key={routeRefreshKey} />;
+    case 'appearance-motion':
+      return <AppearanceMotionView key={routeRefreshKey} />;
+    case 'profile':
+      return <UserProfileView key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }

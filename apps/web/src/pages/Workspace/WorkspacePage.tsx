@@ -124,6 +124,7 @@ import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementSchedu
 import { CanvasLayerRenderer } from '../../components/canvas/CanvasLayerRenderer';
 import type { CachedCardMeta } from '../../services/storage/offlineDb';
 import { syncService } from '../../services/system/syncService';
+import { TaskCenterTray } from '../../components/workspace/TaskCenterTray';
 
 const GENERATE_TIMEOUT_MS = 600000;
 
@@ -1949,6 +1950,19 @@ export const AppContent: React.FC<AppContentProps> = () => {
     const handleZipOriginals = async (e: Event) => {
       const { scope } = (e as CustomEvent).detail;
       const { notify } = await import('../../services/system/notificationService');
+      const taskId = `zip_${Date.now()}`;
+
+      // 派发任务添加事件
+      window.dispatchEvent(new CustomEvent('task-center:add', {
+        detail: {
+          id: taskId,
+          name: scope === 'selected_nodes' ? '导出选中原图 (ZIP)' : '导出全部原图 (ZIP)',
+          type: 'export',
+          status: 'running',
+          progress: 15
+        }
+      }));
+
       try {
         await toolRegistryInstance.execute('assets.zipOriginals', {
           scope: scope || 'all_canvas_outputs'
@@ -1957,8 +1971,26 @@ export const AppContent: React.FC<AppContentProps> = () => {
           selectedNodeIds,
           notify
         });
+
+        // 派发成功状态
+        window.dispatchEvent(new CustomEvent('task-center:update', {
+          detail: {
+            id: taskId,
+            status: 'completed',
+            progress: 100
+          }
+        }));
       } catch (err: any) {
         console.error('[BrowserAssistant] Failed to run assets.zipOriginals', err);
+        // 派发失败状态
+        window.dispatchEvent(new CustomEvent('task-center:update', {
+          detail: {
+            id: taskId,
+            status: 'failed',
+            progress: 100,
+            error: err?.message || String(err)
+          }
+        }));
       }
     };
     window.addEventListener('takeover-zip-originals', handleZipOriginals);
@@ -2880,6 +2912,53 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }, 150);
   }, [arrangeAllNodes, handleFitToAll]);
 
+  // 简体中文：包装可编辑 PPT 导出任务以支持统一任务中心
+  const handleExportPptPackageWithTaskCenter = useCallback(async (node: PromptNode) => {
+    const taskId = `ppt_zip_${Date.now()}`;
+    window.dispatchEvent(new CustomEvent('task-center:add', {
+      detail: {
+        id: taskId,
+        name: `导出可编辑 PPT 素材包 (${node.prompt.slice(0, 15)}...)`,
+        type: 'ppt',
+        status: 'running',
+        progress: 10
+      }
+    }));
+    try {
+      await handleExportPptPackageEditable(node);
+      window.dispatchEvent(new CustomEvent('task-center:update', {
+        detail: { id: taskId, status: 'completed', progress: 100 }
+      }));
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('task-center:update', {
+        detail: { id: taskId, status: 'failed', progress: 100, error: e?.message || String(e) }
+      }));
+    }
+  }, [handleExportPptPackageEditable]);
+
+  const handleExportPptxWithTaskCenter = useCallback(async (node: PromptNode, options?: any) => {
+    const taskId = `ppt_pptx_${Date.now()}`;
+    window.dispatchEvent(new CustomEvent('task-center:add', {
+      detail: {
+        id: taskId,
+        name: `生成并导出 PPTX 幻灯片 (${node.prompt.slice(0, 15)}...)`,
+        type: 'ppt',
+        status: 'running',
+        progress: 10
+      }
+    }));
+    try {
+      await handleExportPptxEditable(node, options);
+      window.dispatchEvent(new CustomEvent('task-center:update', {
+        detail: { id: taskId, status: 'completed', progress: 100 }
+      }));
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('task-center:update', {
+        detail: { id: taskId, status: 'failed', progress: 100, error: e?.message || String(e) }
+      }));
+    }
+  }, [handleExportPptxEditable]);
+
   // --- 连接管理 ---
   // 🎨 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
   const handleDisconnectPrompt = useCallback((id: string) => {
@@ -3092,7 +3171,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     onCancel: handleCancelGeneration,
     onRetry: handleRetryNode,
     onEditPptDeck: handleOpenPptDeckEditor,
-    onExportPpt: handleExportPptPackageEditable,
+    onExportPpt: handleExportPptPackageWithTaskCenter,
     onExportPptx: (targetNode) => {
       setExportPptxNode(targetNode);
       setShowPptxExportDialog(true);
@@ -3140,9 +3219,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
     handleCancelEcommerceFrameworkNodeQueue,
     handleDisconnectPrompt,
     handleExportEcommerceGroup,
-    handleExportPptPackageEditable,
+    handleExportPptPackageWithTaskCenter,
     handleExportPptSinglePage,
-    handleExportPptxEditable,
+    handleExportPptxWithTaskCenter,
     handleGenerateEcommerceGroup,
     handleGenerateEcommerceFramework,
     handleGenerateEcommerceNode,
@@ -6250,7 +6329,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
               <button
                 onClick={() => {
                   setShowPptxExportDialog(false);
-                  void handleExportPptxEditable(exportPptxNode, {
+                  void handleExportPptxWithTaskCenter(exportPptxNode, {
                     transitionEnabled: pptxTransitionsEnabled,
                     transitionEffects: pptxTransitionEffects,
                   });
@@ -6296,6 +6375,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
         onFocusWindow={handleFocusWindow}
         onUpdateWindowLayout={handleUpdateWindowLayout}
       />
+
+      <TaskCenterTray />
     </WorkspaceShell>
   );
 };

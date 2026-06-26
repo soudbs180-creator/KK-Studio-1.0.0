@@ -1238,12 +1238,27 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const effectiveChildImageCount = Math.max(0, actualChildImageCount);
     const pptDeck = node.mode === GenerationMode.PPT ? buildPptDeckModuleState(node) : null;
     const pptReadyPageCount = pptDeck?.pages.filter((page) => page.generationStatus === 'ready').length || 0;
+    const shouldReduceShadow = (isDragging || isCanvasTransforming) && localStorage.getItem('kk_studio_perf_zoom_reduce_motion') !== 'false';
     const renderedSuccessCount = effectiveChildImageCount > 0
         ? effectiveChildImageCount
         : (pptReadyPageCount > 0 ? pptReadyPageCount : Math.max(0, Number(node.lastGenerationSuccessCount || 0)));
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
     const showError = Boolean(node.error);
     const isThumbnailShell = detailLevel === 'thumbnail-shell';
+    const shellCardShadow = shouldReduceShadow
+        ? 'none'
+        : (showError
+            ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
+            : isSelected
+                ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
+                : getCanvasCardShadow({ boost: shadowBoost, zoomScale }));
+    const mainCardShadow = shouldReduceShadow
+        ? 'none'
+        : (showError
+            ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
+            : isSelected
+                ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
+                : getCanvasCardShadow({ boost: shadowBoost, zoomScale }));
     const shellPreviewText = (
         node.optimizedPromptEn
         || node.promptOptimizerResult?.optimized_prompt_en
@@ -1275,16 +1290,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         opacity: textSoftening.secondaryOpacity,
         transition: textTransition,
     };
-    const shellCardShadow = showError
-        ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
-        : isSelected
-            ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
-            : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
-    const mainCardShadow = showError
-        ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
-        : isSelected
-            ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
-            : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
     const promptCardScale = isDragging
         ? 1
         : isSelected
@@ -1292,6 +1297,43 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             : (highlighted ? 1.01 : 1);
     const promptCardTransform = `scale(${promptCardScale})`;
     const promptGlassFill = 'var(--frost-card-main-bg)';
+
+    if (detailLevel === 'ghost') {
+        return (
+            <div
+                ref={containerRef}
+                id={`prompt-card-${node.id}`}
+                className="prompt-node absolute flex flex-col items-center select-none"
+                style={{
+                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
+                    left: 0,
+                    top: 0,
+                    zIndex: effectiveStackZIndex,
+                    width: cardWidth,
+                    height: cardHeight,
+                    opacity: 0.8,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleMouseDown}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect?.();
+                }}
+            >
+                <div
+                    className="relative w-full h-full overflow-hidden border border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] flex flex-col justify-between p-2"
+                >
+                    <div className="text-[10px] text-[var(--text-secondary)] font-bold truncate">
+                        {pickByDocumentLanguage(node.prompt, node.originalPrompt) || 'Prompt Node'}
+                    </div>
+                    <div className="text-[8px] text-[var(--text-tertiary)] truncate">
+                        {pickByDocumentLanguage(node.prompt, node.originalPrompt) || 'Ghost Details'}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (isSlowLoading) {
         return (

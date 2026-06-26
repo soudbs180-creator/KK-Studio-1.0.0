@@ -9,6 +9,13 @@ import {
   ScrollText,
   Globe,
   Wand2,
+  Zap,
+  Split,
+  Gauge,
+  Bot,
+  Cloud,
+  Cpu,
+  User,
 } from 'lucide-react';
 
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -16,21 +23,28 @@ import { type AppLanguage, pickByLanguage } from '../../context/LocaleContext';
 
 export type CanonicalSettingsViewId =
   | 'dashboard'
-  | 'api-management'
-  | 'consumption-records'
-  | 'storage-settings'
-  | 'system-logs'
-  | 'user-profile'
-  | 'appearance-motion'
+  | 'generation-mode'
+  | 'capability-sources'
+  | 'provider-routes'
   | 'browser-assistant'
-  | 'ai-management';
+  | 'canvas-performance'
+  | 'ai-takeover'
+  | 'data-sync'
+  | 'dev-diagnostics'
+  | 'user-profile'
+  | 'appearance-motion';
 
 export type LegacySettingsViewId =
   | 'admin-console'
   | 'credit-models'
   | 'exchange-rates'
   | 'admin-system'
-  | 'cost-estimation';
+  | 'cost-estimation'
+  | 'api-management'
+  | 'consumption-records'
+  | 'storage-settings'
+  | 'system-logs'
+  | 'ai-management';
 
 export type SettingsViewId = CanonicalSettingsViewId | LegacySettingsViewId;
 export type SettingsNavSectionId = 'workspace' | 'system';
@@ -103,11 +117,11 @@ interface SettingsNavItemDefinition {
 const SHELL_COPY = {
   'zh-CN': {
     workbenchTitle: '设置',
-    workbenchDescription: '统一管理 API、计费、日志和存储。',
+    workbenchDescription: '统一管理 API、能力来源、路由策略和画布性能。',
     emptySearchLabel: '没有匹配的导航入口。',
     mobileHomeKicker: '移动设置',
     mobileHomeTitle: '四个核心入口',
-    mobileHomeDescription: '保留总览、供应商、计费和错误四个入口。',
+    mobileHomeDescription: '保留总览、提供商、计费和错误四个入口。',
     mobileUsageLabel: '计费',
     mobileErrorsLabel: '错误',
     mobileErrorsDescription: '错误、告警与排障信号。',
@@ -117,7 +131,7 @@ const SHELL_COPY = {
   },
   'en-US': {
     workbenchTitle: 'Settings',
-    workbenchDescription: 'Manage API, billing, logs, and storage from one place.',
+    workbenchDescription: 'Manage API, capability sources, routing policies, and canvas performance.',
     emptySearchLabel: 'No navigation entries matched.',
     mobileHomeKicker: 'Mobile Settings',
     mobileHomeTitle: 'Four core entries',
@@ -133,33 +147,45 @@ const SHELL_COPY = {
 
 export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   dashboard: '',
-  'api-management': 'api-management',
-  'consumption-records': 'consumption-records',
-  'storage-settings': 'storage-settings',
-  'system-logs': 'system-logs',
+  'generation-mode': 'generation-mode',
+  'capability-sources': 'capability-sources',
+  'provider-routes': 'provider-routes',
+  'browser-assistant': 'browser-assistant',
+  'canvas-performance': 'canvas-performance',
+  'ai-takeover': 'ai-takeover',
+  'data-sync': 'data-sync',
+  'dev-diagnostics': 'dev-diagnostics',
   'user-profile': 'user-profile',
   'appearance-motion': 'appearance-motion',
-  'browser-assistant': 'browser-assistant',
-  'ai-management': 'ai-management',
 };
 
 export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
-  'admin-console': 'api-management',
-  'admin-system': 'api-management',
-  'credit-models': 'api-management',
-  'exchange-rates': 'api-management',
-  'cost-estimation': 'consumption-records',
+  'admin-console': 'capability-sources',
+  'admin-system': 'capability-sources',
+  'credit-models': 'capability-sources',
+  'exchange-rates': 'capability-sources',
+  'cost-estimation': 'capability-sources',
+  'api-management': 'capability-sources',
+  'consumption-records': 'capability-sources',
+  'storage-settings': 'data-sync',
+  'system-logs': 'dev-diagnostics',
+  'ai-management': 'ai-takeover',
 };
 
 export const LEGACY_SETTINGS_ROUTE_REDIRECTS: Array<{
   path: string;
   target: CanonicalSettingsViewId;
 }> = [
-  { path: 'cost-estimation', target: 'consumption-records' },
-  { path: 'credit-models', target: 'api-management' },
-  { path: 'exchange-rates', target: 'api-management' },
-  { path: 'admin-console', target: 'api-management' },
-  { path: 'admin-system/*', target: 'api-management' },
+  { path: 'api-management', target: 'capability-sources' },
+  { path: 'consumption-records', target: 'capability-sources' },
+  { path: 'storage-settings', target: 'data-sync' },
+  { path: 'system-logs', target: 'dev-diagnostics' },
+  { path: 'ai-management', target: 'ai-takeover' },
+  { path: 'cost-estimation', target: 'capability-sources' },
+  { path: 'credit-models', target: 'capability-sources' },
+  { path: 'exchange-rates', target: 'capability-sources' },
+  { path: 'admin-console', target: 'capability-sources' },
+  { path: 'admin-system/*', target: 'capability-sources' },
 ];
 
 export const SETTINGS_LEGACY_ROUTE_REDIRECTS = LEGACY_SETTINGS_ROUTE_REDIRECTS.map(({ path, target }) => ({
@@ -172,73 +198,109 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Overview',
     titleZh: '设置总览',
     titleEn: 'Settings Overview',
-    descriptionZh: '先看状态，再进入具体设置页。',
-    descriptionEn: 'Review status before opening a detailed settings page.',
-    primaryActionLabelZh: '打开 API 工作台',
-    primaryActionLabelEn: 'Open API Workspace',
-    primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '系统状态',
-    statusSummaryLabelEn: 'System status',
+    descriptionZh: '查看系统健康状态，以及各核心子模块的快捷入口。',
+    descriptionEn: 'Review system health status and quick links to core sub-modules.',
+    primaryActionLabelZh: '配置能力来源',
+    primaryActionLabelEn: 'Configure Capability Sources',
+    primaryActionTarget: 'capability-sources',
+    statusSummaryLabelZh: '能力树健康度',
+    statusSummaryLabelEn: 'Capability Tree Health',
   },
-  'api-management': {
-    eyebrow: 'Provider Settings',
-    titleZh: '供应商配置',
-    titleEn: 'Provider Settings',
-    descriptionZh: '管理您的本地 API、供应商通道和计费限额。',
-    descriptionEn: 'Manage local APIs, provider channels, and billing limit policies.',
-    primaryActionLabelZh: '配置本地 API',
-    primaryActionLabelEn: 'Configure local API',
-    primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '通道状态',
-    statusSummaryLabelEn: 'Channel status',
+  'generation-mode': {
+    eyebrow: 'Routing Strategy',
+    titleZh: '生成模式',
+    titleEn: 'Generation Mode',
+    descriptionZh: '选择优先通道，以针对网络、算力和积分情况选择最佳生成路由。',
+    descriptionEn: 'Select preferred channel routing for generation tasks.',
+    primaryActionLabelZh: '配置能力来源',
+    primaryActionLabelEn: 'Configure Capability Sources',
+    primaryActionTarget: 'capability-sources',
+    statusSummaryLabelZh: '路由状态',
+    statusSummaryLabelEn: 'Routing state',
   },
-  'ai-management': {
-    eyebrow: 'AI Settings',
-    titleZh: 'AI 管理',
-    titleEn: 'AI Management',
-    descriptionZh: '配置核心大模型能力预设，并扩展定制化的 AI 助手 Skill。',
-    descriptionEn: 'Configure core LLM capability presets and extend custom AI assistant Skills.',
+  'capability-sources': {
+    eyebrow: 'Capability Inputs',
+    titleZh: '能力来源',
+    titleEn: 'Capability Sources',
+    descriptionZh: '管理 API 密钥、官方 OAuth 授权、本地 Runner 以及网页会员连接。',
+    descriptionEn: 'Manage API keys, official OAuth credentials, local runners, and web memberships.',
+    primaryActionLabelZh: '配置 Provider 路由',
+    primaryActionLabelEn: 'Configure Provider Routes',
+    primaryActionTarget: 'provider-routes',
+    statusSummaryLabelZh: '接入状态',
+    statusSummaryLabelEn: 'Input status',
+  },
+  'provider-routes': {
+    eyebrow: 'Task Dispatch',
+    titleZh: 'Provider 路由',
+    titleEn: 'Provider Routes',
+    descriptionZh: '分配各个业务任务（图片/视频/文本/PPT等）的具体执行 Provider 路由。',
+    descriptionEn: 'Allocate executive routes for each business task (image/video/text/PPT).',
+    primaryActionLabelZh: '查看开发者诊断',
+    primaryActionLabelEn: 'Open Diagnostics',
+    primaryActionTarget: 'dev-diagnostics',
+    statusSummaryLabelZh: '分发状态',
+    statusSummaryLabelEn: 'Dispatch status',
+  },
+  'browser-assistant': {
+    eyebrow: 'Browser Automation',
+    titleZh: '浏览器助手',
+    titleEn: 'Browser Assistant',
+    descriptionZh: '配置本地浏览器驱动、CDP 连接状态与安全授权策略。',
+    descriptionEn: 'Configure local browser daemon, CDP extension connection, and security scopes.',
+    primaryActionLabelZh: '查看开发者诊断',
+    primaryActionLabelEn: 'Open Diagnostics',
+    primaryActionTarget: 'dev-diagnostics',
+    statusSummaryLabelZh: '助手连接状态',
+    statusSummaryLabelEn: 'Assistant status',
+  },
+  'canvas-performance': {
+    eyebrow: 'Canvas Optimization',
+    titleZh: '画布性能',
+    titleEn: 'Canvas Performance',
+    descriptionZh: '调整画布绘制等级（LOD）与视口优化策略，以在高负载时保证极致流畅。',
+    descriptionEn: 'Tune canvas Level-of-Detail and viewport policies for peak framerate.',
     primaryActionLabelZh: '返回设置总览',
-    primaryActionLabelEn: 'Back to Settings Overview',
+    primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
-    statusSummaryLabelZh: '配置状态',
-    statusSummaryLabelEn: 'Configuration status',
+    statusSummaryLabelZh: '流畅度评估',
+    statusSummaryLabelEn: 'Smoothness grade',
   },
-  'consumption-records': {
-    eyebrow: 'Billing',
-    titleZh: '计费账本',
-    titleEn: 'Billing',
-    descriptionZh: '查看充值、消耗和账本。',
-    descriptionEn: 'Review recharges, spend, and ledger activity.',
-    primaryActionLabelZh: '查看供应商配置',
-    primaryActionLabelEn: 'Open Provider Settings',
-    primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '账本状态',
-    statusSummaryLabelEn: 'Ledger status',
+  'ai-takeover': {
+    eyebrow: 'AI Governance',
+    titleZh: 'AI 接管',
+    titleEn: 'AI Takeover',
+    descriptionZh: '管理 AI Control Plane 接管深度，并分配低、中、高风险任务的执行策略。',
+    descriptionEn: 'Manage AI Control Plane takeover scopes and assign safety policy tiers.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '接管深度',
+    statusSummaryLabelEn: 'Takeover depth',
   },
-  'storage-settings': {
-    eyebrow: 'Storage',
-    titleZh: '存储维护',
-    titleEn: 'Storage',
-    descriptionZh: '管理模式、容量和修复动作。',
-    descriptionEn: 'Manage modes, capacity, and repair actions.',
-    primaryActionLabelZh: '查看存储模式',
-    primaryActionLabelEn: 'Review storage mode',
-    primaryActionTarget: 'storage-settings',
-    statusSummaryLabelZh: '存储状态',
-    statusSummaryLabelEn: 'Storage status',
+  'data-sync': {
+    eyebrow: 'Data & Sync',
+    titleZh: '数据与同步',
+    titleEn: 'Data & Sync',
+    descriptionZh: '管理 IndexedDB 本地缓存、云端 Workspace 存储空间以及导出清理逻辑。',
+    descriptionEn: 'Manage IndexedDB caches, cloud workspaces, sync pipelines, and exports.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '同步状态',
+    statusSummaryLabelEn: 'Sync status',
   },
-  'system-logs': {
-    eyebrow: 'Logs',
-    titleZh: '日志',
-    titleEn: 'Logs',
-    descriptionZh: '查看错误、告警和诊断信号。',
-    descriptionEn: 'Inspect errors, warnings, and diagnostic signals.',
-    primaryActionLabelZh: '返回供应商配置',
-    primaryActionLabelEn: 'Back to Provider Settings',
-    primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '日志状态',
-    statusSummaryLabelEn: 'Log status',
+  'dev-diagnostics': {
+    eyebrow: 'Developer Tools',
+    titleZh: '开发者诊断',
+    titleEn: 'Developer Diagnostics',
+    descriptionZh: '实时查阅 ProviderRouteEngine 路由决策、BrowserActionRouter 执行链和性能参数。',
+    descriptionEn: 'Trace real-time ProviderRouteEngine decisions, browser automation sequences, and core metrics.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '系统警报',
+    statusSummaryLabelEn: 'System alert',
   },
   'user-profile': {
     eyebrow: 'Profile',
@@ -256,25 +318,13 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Appearance',
     titleZh: '外观与动态',
     titleEn: 'Appearance & Motion',
-    descriptionZh: '统一调节毛玻璃透明度、模糊强度和动态强度。',
-    descriptionEn: 'Tune glass transparency, blur, and motion intensity from one system surface.',
+    descriptionZh: '调整系统主题颜色、磨砂玻璃透明度及特效动效切换，保障在低性能设备上的运行。',
+    descriptionEn: 'Customize UI theme, glassmorphism transparency, and layout animations.',
     primaryActionLabelZh: '返回设置总览',
-    primaryActionLabelEn: 'Back to Settings Overview',
+    primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
-    statusSummaryLabelZh: '界面系统',
-    statusSummaryLabelEn: 'UI system',
-  },
-  'browser-assistant': {
-    eyebrow: 'Browser Assistant',
-    titleZh: '浏览器助手与多端控制',
-    titleEn: 'Browser Assistant & Multi-device Control',
-    descriptionZh: '管理本地浏览器守护进程、Chrome 插件连通状态及网页控制多端服务。',
-    descriptionEn: 'Manage browser daemon, Chrome extension connectivity, and multi-device Web controls.',
-    primaryActionLabelZh: '开始连通性测试',
-    primaryActionLabelEn: 'Start connectivity doctor',
-    primaryActionTarget: 'browser-assistant',
-    statusSummaryLabelZh: '多端连接状态',
-    statusSummaryLabelEn: 'Multi-device status',
+    statusSummaryLabelZh: '动效状态',
+    statusSummaryLabelEn: 'Motion state',
   },
 };
 
@@ -283,90 +333,111 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'dashboard',
     labelZh: '总览',
     labelEn: 'Overview',
-    descriptionZh: '状态、入口、活动。',
-    descriptionEn: 'Status, entries, activity.',
+    descriptionZh: '系统健康、快捷入口。',
+    descriptionEn: 'System health, quick actions.',
     icon: LayoutDashboard,
     section: 'workspace',
     path: SETTINGS_PATHS.dashboard,
     keywords: ['总览', '状态', 'overview', 'status'],
   },
   {
-    id: 'consumption-records',
-    labelZh: '计费账本',
-    labelEn: 'Billing',
-    descriptionZh: '充值、消耗、账本。',
-    descriptionEn: 'Recharge, spend, ledger.',
-    icon: Coins,
+    id: 'generation-mode',
+    labelZh: '生成模式',
+    labelEn: 'Generation Mode',
+    descriptionZh: '路由倾向、自动/本地优先。',
+    descriptionEn: 'Auto/local/cloud preferences.',
+    icon: Zap,
     section: 'workspace',
-    path: SETTINGS_PATHS['consumption-records'],
-    featureFlag: 'billing',
-    keywords: ['计费', '账单', '消费', '消耗', '用量', '积分记录', '充值记录', '消费记录', '积分明细', 'API消耗', '消费明细', '账本明细', 'billing', 'recharge', 'cost', 'spend', 'balance'],
+    path: SETTINGS_PATHS['generation-mode'],
+    keywords: ['生成模式', '本地优先', '云端优先', '平台积分', '回退云端', 'generation', 'mode', 'route'],
   },
   {
-    id: 'api-management',
-    labelZh: '供应商配置',
-    labelEn: 'Provider Settings',
-    descriptionZh: '管理您的本地 API 通道与服务供应商。',
-    descriptionEn: 'Filter API, provider, or platform entries.',
+    id: 'capability-sources',
+    labelZh: '能力来源',
+    labelEn: 'Capability Sources',
+    descriptionZh: 'API 密钥、OAuth 认证。',
+    descriptionEn: 'API keys, OAuth tokens.',
     icon: KeyRound,
     section: 'workspace',
-    path: SETTINGS_PATHS['api-management'],
-    keywords: ['供应商', '接口', '渠道', '密钥', 'api设置', 'api工作台', '接口设置', '接口管理', '模型配置', '模型设置', '供应商配置', '密钥管理', '模型列表', 'provider', 'api', 'key', 'token'],
+    path: SETTINGS_PATHS['capability-sources'],
+    keywords: ['能力来源', 'api设置', '密钥', 'oauth', '本地模型', '会员', 'provider', 'api', 'key'],
   },
   {
-    id: 'ai-management',
-    labelZh: 'AI 管理',
-    labelEn: 'AI Management',
-    descriptionZh: '能力预设、Skill 管理。',
-    descriptionEn: 'Capability presets, Skill management.',
-    icon: Wand2,
+    id: 'provider-routes',
+    labelZh: 'Provider 路由',
+    labelEn: 'Provider Routes',
+    descriptionZh: '图片/视频等任务分发策略。',
+    descriptionEn: 'Dispatch policies for media.',
+    icon: Split,
     section: 'workspace',
-    path: SETTINGS_PATHS['ai-management'],
-    keywords: ['能力预设', '模型管理', 'skill', 'llm', 'ai', 'ai管理', '助手'],
-  },
-  {
-    id: 'storage-settings',
-    labelZh: '存储',
-    labelEn: 'Storage',
-    descriptionZh: '模式、容量、清理。',
-    descriptionEn: 'Modes, capacity, cleanup.',
-    icon: HardDrive,
-    section: 'system',
-    path: SETTINGS_PATHS['storage-settings'],
-    keywords: ['存储', '容量', '空间', '资源存储', '清理缓存', '清理', '清空数据', 'storage', 'clean'],
-  },
-  {
-    id: 'appearance-motion',
-    labelZh: '外观与动态',
-    labelEn: 'Appearance & Motion',
-    descriptionZh: '透明、模糊、动态。',
-    descriptionEn: 'Glass, blur, motion.',
-    icon: Palette,
-    section: 'system',
-    path: SETTINGS_PATHS['appearance-motion'],
-    keywords: ['外观', '动态', '毛玻璃', '透明', 'appearance', 'theme', 'motion'],
-  },
-  {
-    id: 'system-logs',
-    labelZh: '日志',
-    labelEn: 'Logs',
-    descriptionZh: '错误、告警、排障。',
-    descriptionEn: 'Errors, warnings, triage.',
-    icon: ScrollText,
-    section: 'system',
-    path: SETTINGS_PATHS['system-logs'],
-    keywords: ['日志', '错误', '告警', '排障', 'logs', 'error', 'warning'],
+    path: SETTINGS_PATHS['provider-routes'],
+    keywords: ['provider路由', '分发策略', '决策', '任务分发', '图片生成走哪里', 'routes', 'dispatch'],
   },
   {
     id: 'browser-assistant',
     labelZh: '浏览器助手',
     labelEn: 'Browser Assistant',
-    descriptionZh: '多端控制、插件下载、网页价格抓取。',
-    descriptionEn: 'Multi-device, extension, price extraction.',
+    descriptionZh: '网页提取、安全授权、高风险操作。',
+    descriptionEn: 'Web extraction, confirmation scopes.',
     icon: Globe,
     section: 'system',
     path: SETTINGS_PATHS['browser-assistant'],
-    keywords: ['浏览器助手', '多端控制', '插件', '连接', 'browser', 'extension', 'browser assistant', 'browser bridge', 'chrome bridge', '浏览器接管', '网页直通'],
+    keywords: ['浏览器助手', 'opencli', '插件', '连接', '安全确认', 'browser', 'extension'],
+  },
+  {
+    id: 'canvas-performance',
+    labelZh: '画布性能',
+    labelEn: 'Canvas Performance',
+    descriptionZh: '画质与流畅度平衡（LOD）。',
+    descriptionEn: 'Framerate vs quality trade-offs.',
+    icon: Gauge,
+    section: 'system',
+    path: SETTINGS_PATHS['canvas-performance'],
+    keywords: ['画布性能', '流畅度', 'lod', '缩略图', '不渲染', '性能模式', 'canvas', 'performance', 'fps'],
+  },
+  {
+    id: 'ai-takeover',
+    labelZh: 'AI 接管',
+    labelEn: 'AI Takeover',
+    descriptionZh: '权限分级、接管模式。',
+    descriptionEn: 'AI permissions, advisory scopes.',
+    icon: Bot,
+    section: 'system',
+    path: SETTINGS_PATHS['ai-takeover'],
+    keywords: ['ai接管', '接管模式', '权限分级', '低风险', '高风险确认', 'ai', 'takeover'],
+  },
+  {
+    id: 'data-sync',
+    labelZh: '数据与同步',
+    labelEn: 'Data & Sync',
+    descriptionZh: '本地 IndexedDB 缓存、云同步。',
+    descriptionEn: 'IndexedDB quota, cloud workspace.',
+    icon: HardDrive,
+    section: 'system',
+    path: SETTINGS_PATHS['data-sync'],
+    keywords: ['数据与同步', '缓存', '同步', '导出', '手机端同步', 'indexeddb', 'sync', 'cache'],
+  },
+  {
+    id: 'dev-diagnostics',
+    labelZh: '开发者诊断',
+    labelEn: 'Developer Diagnostics',
+    descriptionZh: '决策日志、执行链、API 检查。',
+    descriptionEn: 'Decision logs, action trace.',
+    icon: Cpu,
+    section: 'system',
+    path: SETTINGS_PATHS['dev-diagnostics'],
+    keywords: ['开发者诊断', '诊断', '日志', '健康检查', '安全边界', 'dev', 'diagnostics', 'logs'],
+  },
+  {
+    id: 'appearance-motion',
+    labelZh: '外观与动态',
+    labelEn: 'Appearance & Motion',
+    descriptionZh: '主题切换、玻璃特效与动效调节。',
+    descriptionEn: 'Theme preferences, glass effects, animations.',
+    icon: Palette,
+    section: 'workspace',
+    path: SETTINGS_PATHS['appearance-motion'],
+    keywords: ['外观', '动效', '主题', '外观与动态', '毛玻璃', 'opacity', 'motion'],
   },
 ];
 
@@ -404,12 +475,12 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
   const topLevelPath = currentPath.split('/')[0] as SettingsViewId | undefined;
 
   if (!currentPath) return 'dashboard';
-  if (currentPath.startsWith('api-management')) return 'api-management';
-  if (currentPath.startsWith('ai-management')) return 'ai-management';
+  if (currentPath.startsWith('api-management')) return 'capability-sources';
+  if (currentPath.startsWith('ai-management')) return 'ai-takeover';
   if (currentPath.startsWith('appearance-motion')) return 'appearance-motion';
   if (currentPath.startsWith('user-profile')) return 'user-profile';
-  if (currentPath.startsWith('storage-settings')) return 'storage-settings';
-  if (currentPath.startsWith('system-logs')) return 'system-logs';
+  if (currentPath.startsWith('storage-settings')) return 'data-sync';
+  if (currentPath.startsWith('system-logs')) return 'dev-diagnostics';
   if (currentPath.startsWith('browser-assistant')) return 'browser-assistant';
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);

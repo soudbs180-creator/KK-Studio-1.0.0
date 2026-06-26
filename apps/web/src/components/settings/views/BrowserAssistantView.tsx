@@ -230,6 +230,46 @@ export const BrowserAssistantView: React.FC = () => {
   const [daemonLatency, setDaemonLatency] = useState<number | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   
+  // 核心能力树浏览器助手设置
+  const [enableBrowserAssistant, setEnableBrowserAssistant] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_enabled') !== 'false';
+  });
+  const [allowReadWebpages, setAllowReadWebpages] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_allow_read_webpages') !== 'false';
+  });
+  const [allowExtractImages, setAllowExtractImages] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_allow_extract_images') !== 'false';
+  });
+  const [allowUploadFiles, setAllowUploadFiles] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_allow_upload_files') !== 'false';
+  });
+  const [allowMembershipGeneration, setAllowMembershipGeneration] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_allow_membership_generation') !== 'false';
+  });
+  const [highRiskConfirmationRequired, setHighRiskConfirmationRequired] = useState<boolean>(() => {
+    return localStorage.getItem('kk_browser_high_risk_confirm_required') !== 'false';
+  });
+
+  // 保存这些状态的 useEffect 监听
+  useEffect(() => {
+    localStorage.setItem('kk_browser_enabled', String(enableBrowserAssistant));
+  }, [enableBrowserAssistant]);
+  useEffect(() => {
+    localStorage.setItem('kk_browser_allow_read_webpages', String(allowReadWebpages));
+  }, [allowReadWebpages]);
+  useEffect(() => {
+    localStorage.setItem('kk_browser_allow_extract_images', String(allowExtractImages));
+  }, [allowExtractImages]);
+  useEffect(() => {
+    localStorage.setItem('kk_browser_allow_upload_files', String(allowUploadFiles));
+  }, [allowUploadFiles]);
+  useEffect(() => {
+    localStorage.setItem('kk_browser_allow_membership_generation', String(allowMembershipGeneration));
+  }, [allowMembershipGeneration]);
+  useEffect(() => {
+    localStorage.setItem('kk_browser_high_risk_confirm_required', String(highRiskConfirmationRequired));
+  }, [highRiskConfirmationRequired]);
+  
   // 演示区 Tab
   const [playgroundTab, setPlaygroundTab] = useState<'extract' | 'generate' | 'pipeline'>('extract');
 
@@ -1601,6 +1641,191 @@ export const BrowserAssistantView: React.FC = () => {
       />
 
       <SettingsCardGridContainer>
+        {/* 核心配置卡片：挂载在能力树 */}
+        <div className="dashboard-grid-card settings-browser-section-card settings-browser-section-card--wide a-card-span-4-col">
+          <div className="settings-browser-section-card__header">
+            <div>
+              <div className="settings-browser-section-card__kicker">能力树控制</div>
+              <h3 className="settings-browser-section-card__title">浏览器助手核心设置</h3>
+            </div>
+            <SettingsBadge tone="emerald">
+              <span>核心开关</span>
+            </SettingsBadge>
+          </div>
+          <p className="settings-browser-section-card__description">
+            配置本地浏览器助手运行时的核心安全与权限边界。高风险行为将受到严格的权限卫士拦截。
+          </p>
+
+          <div className="settings-browser-feature-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(285px, 1fr))', gap: '16px', marginTop: '16px' }}>
+            {/* 核心开关 1: 启用桌面端本地浏览器助手 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <Globe size={13} className="settings-browser-feature-card__icon" data-tone="info" />
+                  启用桌面端本地浏览器助手
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEnableBrowserAssistant(!enableBrowserAssistant)}
+                  className="settings-browser-toggle"
+                  data-state={enableBrowserAssistant ? 'enabled' : 'disabled'}
+                  aria-pressed={enableBrowserAssistant}
+                >
+                  {enableBrowserAssistant ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                是否允许通过本地守护进程连接和接管本地 Chrome 浏览器。
+              </p>
+            </div>
+
+            {/* 核心开关 2: 允许读取网页 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <Info size={13} className="settings-browser-feature-card__icon" data-tone="info" />
+                  允许读取网页
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAllowReadWebpages(!allowReadWebpages)}
+                  className="settings-browser-toggle"
+                  data-state={allowReadWebpages ? 'enabled' : 'disabled'}
+                  aria-pressed={allowReadWebpages}
+                >
+                  {allowReadWebpages ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                允许 AI 助手读取当前活动标签页的 HTML DOM 结构及可见文本。
+              </p>
+            </div>
+
+            {/* 核心开关 3: 允许提取图片 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <Globe size={13} className="settings-browser-feature-card__icon" data-tone="info" />
+                  允许提取网页素材
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAllowExtractImages(!allowExtractImages)}
+                  className="settings-browser-toggle"
+                  data-state={allowExtractImages ? 'enabled' : 'disabled'}
+                  aria-pressed={allowExtractImages}
+                >
+                  {allowExtractImages ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                允许提取活动标签页的背景图、产品主图等媒体资源。
+              </p>
+            </div>
+
+            {/* 核心开关 4: 允许上传文件 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <Info size={13} className="settings-browser-feature-card__icon" data-tone="info" />
+                  允许上传文件
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAllowUploadFiles(!allowUploadFiles)}
+                  className="settings-browser-toggle"
+                  data-state={allowUploadFiles ? 'enabled' : 'disabled'}
+                  aria-pressed={allowUploadFiles}
+                >
+                  {allowUploadFiles ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                允许浏览器助手代表您上传本地导出的图片、海报及素材包。
+              </p>
+            </div>
+
+            {/* 核心开关 5: 允许会员网站生成 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <Globe size={13} className="settings-browser-feature-card__icon" data-tone="info" />
+                  允许会员网站生成
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAllowMembershipGeneration(!allowMembershipGeneration)}
+                  className="settings-browser-toggle"
+                  data-state={allowMembershipGeneration ? 'enabled' : 'disabled'}
+                  aria-pressed={allowMembershipGeneration}
+                >
+                  {allowMembershipGeneration ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                是否允许调用您在本机登录的会员网站服务进行图像和媒体生成。
+              </p>
+            </div>
+
+            {/* 核心开关 6: 高风险操作必须逐次确认 */}
+            <div className="settings-browser-feature-card">
+              <div className="settings-browser-feature-card__header">
+                <span className="settings-browser-feature-card__title">
+                  <AlertCircle size={13} className="settings-browser-feature-card__icon" data-tone="warning" />
+                  高风险操作必须逐次确认
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHighRiskConfirmationRequired(!highRiskConfirmationRequired)}
+                  className="settings-browser-toggle"
+                  data-state={highRiskConfirmationRequired ? 'enabled' : 'disabled'}
+                  aria-pressed={highRiskConfirmationRequired}
+                >
+                  {highRiskConfirmationRequired ? (
+                    <ToggleRight size={22} className="settings-browser-toggle__icon" />
+                  ) : (
+                    <ToggleLeft size={22} className="settings-browser-toggle__icon" />
+                  )}
+                </button>
+              </div>
+              <p className="settings-browser-feature-card__description">
+                对涉及发布、购买、删除或修改账号设置等敏感操作，必须逐次弹出手动确认框。
+              </p>
+            </div>
+          </div>
+
+          {/* 警示说明框 */}
+          <div className="settings-browser-notice" data-tone="warning" style={{ marginTop: '16px' }}>
+            <div className="settings-browser-notice__content">
+              <AlertCircle size={16} className="settings-browser-feature-card__icon" data-tone="warning" />
+              <div className="settings-browser-notice__text">
+                <span className="settings-browser-notice__title">高安全边界规则（AGENTS.md 规范）：</span>
+                <span>发布、购买、删除、修改账号设置等高风险操作必须由用户逐次确认，绝对不允许 AI 代理擅自执行。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 状态检测卡片 1：本地守护进程 */}
         <div className="dashboard-grid-card settings-browser-status-card" data-status={daemonStatus}>
           <div className="settings-browser-status-card__content">

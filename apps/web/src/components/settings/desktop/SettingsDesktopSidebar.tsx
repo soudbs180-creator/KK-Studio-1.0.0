@@ -146,14 +146,14 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         </div>
       );
     }
-    if (itemId === 'api-management') {
+    if (itemId === 'capability-sources') {
       return (
         <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {channelStats.officialCount} 个官方直连 / {channelStats.activeProviders} 个中转就绪
         </div>
       );
     }
-    if (itemId === 'consumption-records') {
+    if (itemId === 'user-profile') {
       return (
         <div className="mt-1 text-[11px] leading-4 flex items-center justify-between">
           <span className="text-[var(--text-secondary)] truncate mr-1">{pick('今日消耗', 'Today Cost')}</span>
@@ -161,7 +161,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         </div>
       );
     }
-    if (itemId === 'system-logs') {
+    if (itemId === 'dev-diagnostics') {
       const isHealthy = importantLogCount === 0;
       return (
         <div className="mt-1 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
@@ -172,7 +172,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         </div>
       );
     }
-    if (itemId === 'storage-settings') {
+    if (itemId === 'data-sync') {
       return (
         <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {storedImages} 张图 · {storageUsageMb.toFixed(1)} MB / 1 GB

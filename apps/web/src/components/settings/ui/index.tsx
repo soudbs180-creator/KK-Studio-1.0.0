@@ -381,7 +381,7 @@ export const SettingToggle: React.FC<{
 
 // SettingSelect 选择框组件 (简体中文注释：重构为自定义 iOS 风格 Dropdown，支持毛玻璃、淡入微动效和点击外部自动收起，以消除原生 Select 的白色突兀外观)
 export const SettingSelect: React.FC<{
-  label: string;
+  label?: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;

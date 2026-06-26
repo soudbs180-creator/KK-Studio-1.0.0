@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAITakeover } from '../context/AITakeoverContext';
+import { useLocale } from '../../../context/LocaleContext';
 import { useAssetStore } from '../../assets/assetStore';
 import { ensureFileUploaded } from '../../assets/lazyUpload';
 import { estimateTokens, getModelContextLimit } from '../../../utils/contextHelper';
@@ -57,6 +58,7 @@ const getUploadStateText = (state: string) => {
 };
 
 export const AIAssistantDock: React.FC = () => {
+  const { pick } = useLocale();
   const {
     aiTakeoverMode,
     setAiTakeoverMode,
@@ -570,58 +572,93 @@ export const AIAssistantDock: React.FC = () => {
         </div>
 
         {shouldShowRunTimeline && (
-          <div className="ai-takeover-run-timeline mx-4 mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950/55 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
-            <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-500 mb-2">
-              <span className="font-bold text-zinc-300">接管时间线</span>
-              {currentRun && (
-                <span className="font-mono truncate max-w-[150px]" title={currentRun.id}>
-                  {currentRun.status} - {currentRun.id.slice(-8)}
-                </span>
-              )}
+          <div className="ai-takeover-control-plane mx-4 mb-3 rounded-xl border border-purple-500/20 bg-zinc-950/70 p-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.3)] space-y-3.5 animate-in fade-in duration-300">
+            {/* 1. Objective / Goal */}
+            <div className="space-y-1">
+              <div className="text-[9px] font-black text-purple-400 uppercase tracking-widest">
+                {pick('当前控制目标', 'Current Objective')}
+              </div>
+              <div className="text-xs font-semibold text-white leading-relaxed truncate">
+                {currentRun?.userMessage || pendingPlan?.reply || pick('执行多步骤接管任务...', 'Executing orchestrated workflow...')}
+              </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-1.5">
-              {visibleRunTimeline.map(step => {
-                const label = step.id === 'verification' ? verificationStepLabel : step.label;
-                return (
-                  <div
-                    key={step.id}
-                    className={`ai-takeover-run-timeline__step min-w-0 rounded-lg border px-1.5 py-1.5 text-center transition-colors ${
-                      step.status === 'done'
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                        : step.status === 'active'
-                          ? 'border-purple-500/40 bg-purple-500/10 text-purple-200'
-                          : step.status === 'needs_confirmation'
-                            ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                            : step.status === 'failed'
-                              ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
-                              : step.status === 'cancelled'
-                                ? 'border-zinc-700 bg-zinc-900/80 text-zinc-500'
-                                : 'border-zinc-800 bg-zinc-900/40 text-zinc-500'
-                    }`}
-                    data-status={step.status}
-                    title={`${label}: ${step.description}${step.detail ? ` - ${step.detail}` : ''}`}
-                  >
-                    <div className="flex items-center justify-center h-4 mb-1">
-                      {step.status === 'done' ? (
-                        <CheckCircle size={13} />
-                      ) : step.status === 'active' ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : step.status === 'needs_confirmation' ? (
-                        <AlertTriangle size={13} />
-                      ) : step.status === 'failed' ? (
-                        <AlertCircle size={13} />
-                      ) : (
-                        <span className="block h-2 w-2 rounded-full bg-current opacity-55" />
+            {/* 2. Tasks Breakdown & Timeline */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[9px] text-zinc-500">
+                <span className="font-bold">{pick('任务拆分执行链', 'Orchestration Timeline')}</span>
+                {currentRun && (
+                  <span className="font-mono text-[8px] text-zinc-400">
+                    ID: {currentRun.id.slice(-6).toUpperCase()} ({currentRun.status})
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {visibleRunTimeline.map((step, idx) => {
+                  const label = step.id === 'verification' ? verificationStepLabel : step.label;
+                  const isActive = step.status === 'active';
+                  const isDone = step.status === 'done';
+                  const isFailed = step.status === 'failed';
+                  const isPendingConfirm = step.status === 'needs_confirmation';
+
+                  return (
+                    <div
+                      key={step.id}
+                      className={`p-2 rounded-lg border flex flex-col gap-1 transition-all ${
+                        isDone
+                          ? 'border-emerald-500/20 bg-emerald-500/5 text-[var(--text-primary)]'
+                          : isActive
+                            ? 'border-purple-500/30 bg-purple-500/10 text-[var(--text-primary)] animate-pulse'
+                            : isPendingConfirm
+                              ? 'border-amber-500/30 bg-amber-500/10 text-[var(--text-primary)]'
+                              : isFailed
+                                ? 'border-rose-500/30 bg-rose-500/10 text-[var(--text-primary)]'
+                                : 'border-zinc-800 bg-zinc-900/20 text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="text-zinc-500">#{idx + 1}</span>
+                          <span>{label}</span>
+                        </div>
+                        <span className={`px-1 rounded text-[8px] font-bold ${
+                          isDone ? 'bg-emerald-500/20 text-emerald-400' :
+                          isActive ? 'bg-purple-500/20 text-purple-400' :
+                          isPendingConfirm ? 'bg-amber-500/20 text-amber-400' :
+                          isFailed ? 'bg-rose-500/20 text-rose-400' :
+                          'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {getRunTimelineStatusText(step.status)}
+                        </span>
+                      </div>
+
+                      {step.description && (
+                        <p className="text-[9px] text-[var(--text-tertiary)] leading-tight pl-3">
+                          {step.description}
+                        </p>
+                      )}
+
+                      {/* Displaying detailed failure reason inline if failed */}
+                      {isFailed && step.detail && (
+                        <div className="mt-1 p-1 rounded bg-rose-950/40 text-[8px] text-rose-300 font-mono pl-2 border-l border-rose-500 break-words">
+                          {step.detail}
+                        </div>
+                      )}
+
+                      {/* Active Capabilities Badge */}
+                      {isActive && step.id === 'executor' && (
+                        <div className="flex items-center gap-1 mt-1 pl-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                          <span className="text-[8px] text-purple-300 font-mono">
+                            {pick('调用能力: Local Runner / OpenCLI', 'Active Cap: Local Runner / OpenCLI')}
+                          </span>
+                        </div>
                       )}
                     </div>
-                    <div className="truncate text-[8px] font-bold leading-none">{label}</div>
-                    <div className="mt-1 truncate text-[8px] opacity-75 leading-none">
-                      {getRunTimelineStatusText(step.status)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

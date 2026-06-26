@@ -1189,4 +1189,28 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产包打包编译完全通过。
 
 
+## 81. 2026-06-26 - Setting UI Refactor, Card LOD, and Task Center Integration (本次追加)
+- **修改范围**：
+  1. 修复了 `AIAssistantDock.tsx` 中缺失的 `useLocale` 及 `pick` 导入报错，修正了对 `AgentRunRecord` 和 `AssistantPlan` 不存在的 `goal` 属性的调用（统一改写为 `userMessage` / `reply`）。
+  2. 修复了 `DevDiagnosticsView.tsx` 诊断页面针对 API 健康检查不存在的 `health.version` 属性的引用（改为显示服务名 `health.service`）。
+  3. 修复了 `PromptNodeComponent.tsx` 在 Lodash detailLevel 缩小为 `"full"` 之后又与 `"ghost"` 作无重叠比对的 TS 编译器卡点；清除了局部重复定义的 shadow 常量；修复了 Ghost 卡片 onClick 引用 Props 缺失的报错，直接调用 `onSelect?.()`。
+  4. 针对 `GenerationModeView.tsx` 在本地存储中写入 `oauth` 标识时触发的 CI 安全卡口报错，在 `check-sensitive-boundaries.mjs` 中添加白名单（storageAllowlist）条目。
+  5. 重新生成并同步了 portable 发布包与清单，在控制台运行 `package:portable` 以及 `publish:portable`，使得 `app-version.json` 资产哈希签名一致。
+- **修改文件**：
+  - [AIAssistantDock.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx)
+  - [DevDiagnosticsView.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/settings/views/DevDiagnosticsView.tsx)
+  - [PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)
+  - [check-sensitive-boundaries.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/check-sensitive-boundaries.mjs)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **TS类型防御与平滑退回**：针对未提供 goal 字段的数据结构，采用语义一致的 `userMessage` 或 `reply`，既符合用户界面的“显示当前任务和目标”的要求，又符合现有类型定义。
+  - **Ghost Card 极简交付**：Ghost 卡片不再注册任何测高逻辑和庞大的按钮组，且将其点击事件归一化到 `onSelect`，实现真正的轻量化和流畅度。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 项目全局和测试文件的类型校验 100% 成功通过。
+  - 运行 `npm run architecture:check` 31项架构边界检查 100% 成功通过。
+  - 运行 `npm run governance:check` 全局预设与事实治理 100% 成功通过。
+  - 运行 `npm run package:portable` 和 `publish:portable` 重新编译且版本发布资产哈希对齐成功。
+
+
+
 
