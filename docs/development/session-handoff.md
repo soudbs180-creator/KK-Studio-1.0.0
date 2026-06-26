@@ -786,3 +786,15 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产包构建打包完全通过。
   - 经由浏览器子代理（Browser Subagent）进行自动化交互重载测试，确证大画布不论大位移/小位移平移或大幅缩放，卡片在交互期间和停止后都能秒级完美渲染显示，控制台无 “Maximum update depth exceeded” 或组件崩溃报错。
 
+
+## 51. 2026-06-26 - Restore Startup Progress Bar Visibility (本次追加)
+- **修改范围**：
+  - 恢复了主画布以及应用加载时，屏幕中间进度条（Startup Loading Progress Bar）的显示状态。
+- **修改文件**：
+  - [AppStartupScreen.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/common/AppStartupScreen.tsx)
+- **当前设计决策**：
+  - **移除了容器的强制隐藏样式**：在 `AppStartupScreen.tsx` 组件的根容器内联 style 属性中，移除了之前无意中被设置的 `display: 'none'` 属性。这解除了在 React 接管首屏渲染后，启动指示器容器被完全隐蔽从而导致首屏陷入纯黑的体验缺陷，使其恢复成原本设计的高端毛玻璃与渐变过渡百分比进度条样式。
+- **已运行验证**：
+  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过，包括 AppStartupScreen 的本地化和静态正则契约测试。
+  - 运行 `npm run typecheck` 100% 成功通过。
+  - 运行 `npm run architecture:check` 100% 成功通过。

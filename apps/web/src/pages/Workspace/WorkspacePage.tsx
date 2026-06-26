@@ -4744,6 +4744,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     updateGroup,
     visibleGroups,
     shouldFreezeRender,
+    isCanvasTransforming,
+    isNodeDragActive,
   ]);
 
   const renderedCanvasItems = React.useMemo(() => (
