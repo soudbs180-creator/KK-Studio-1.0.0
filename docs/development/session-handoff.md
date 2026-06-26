@@ -742,5 +742,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run build` Vite 生产包打包构建完全通过。
   - 运行浏览器仿真测试（Browser Subagent）滚动缩放与背景拖拽背景，确认在 active transforming 变换交互期间，卡片全程清晰可见，没有任何消失或跳跃现象。
 
-
-
+## 48. 2026-06-26 - Canvas isSlowLoading fitToAll Deadlock and Image Loading Fix (本次追加)
+- **修改范围**：修复了在画布定位、平移、缩放或触发自适应聚焦（fitToAll）时，卡片有概率永久死锁在 `isSlowLoading === true` 的 Pulse 灰色窄占位块状态以及图片无法正常加载的严重缺陷。
+- **修改文件**：
+  - [PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+- **当前设计决策**：
+  - 将 `timer` 局部变量声明移至 `useEffect` 外层闭包作用域中。
+  - 在 `handleFitToAll` 触发、重新注册定时器之前，显式调用 `clearTimeout(timer)` 达到防抖和阻断多余定时器并发的目的。
+  - 在 `useEffect` 的 cleanup 回调中，除注销 window 事件监听外，补充执行 `clearTimeout(timer)` 以及 `setIsSlowLoading(false)`。这确保了在卡片位置变动导致重装或组件卸载时，加载状态会被立刻且彻底地复位为正常的卡片态，从而解除渲染锁死。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 类型校验 100% 成功通过。
+  - 运行 `npm run test:unit`（1605 个单元测试用例）100% 成功通过。
+  - 运行 `npm run build` Vite 生产包构建打包 100% 成功通过。
+  - 经由浏览器子代理进行自动化复测，验证在大画布自动整理或定位重组后，主副卡片全部在 1.2s 延迟内恢复正常的文本和图片内容。

@@ -171,6 +171,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const [isSlowLoading, setIsSlowLoading] = useState(false);
 
     useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+
         const handleFitToAll = (e: Event) => {
             const customEvent = e as CustomEvent<{ centerX: number; centerY: number }>;
             if (!customEvent.detail) return;
@@ -184,18 +186,26 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 渐进延迟，系数为 0.2ms/px，限制最大延迟为 1200ms
             const delay = Math.min(1200, distance * 0.2);
             
+            if (timer) {
+                clearTimeout(timer);
+            }
+            
             setIsSlowLoading(true);
             
-            const timer = setTimeout(() => {
+            timer = setTimeout(() => {
                 setIsSlowLoading(false);
+                timer = null;
             }, delay);
-            
-            return () => clearTimeout(timer);
         };
         
         window.addEventListener('kk-fit-to-all', handleFitToAll);
         return () => {
             window.removeEventListener('kk-fit-to-all', handleFitToAll);
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            setIsSlowLoading(false);
         };
     }, [position.x, position.y]);
     useEffect(() => {
