@@ -40,10 +40,10 @@ test('landing page keeps KK Studio brand on current-only landing classes', () =>
   assert.match(landingSource, /className="kk-landing-root"/);
   assert.match(landingSource, /useLocale/);
   assert.match(landingSource, /KK Studio/);
-  assert.match(landingSource, /Multimodal AI Canvas/);
-  assert.match(landingSource, /FeatureNarrative/);
-  assert.match(landingSource, /ProcessTimeline/);
-  assert.match(landingSource, /LandingCTA/);
+  assert.match(landingSource, /AI-native creative workspace/);
+  assert.match(landingSource, /IntentGate/);
+  assert.match(landingSource, /Planner/);
+  assert.match(landingSource, /ToolRegistry/);
   assert.match(landingSource, /Services/);
   assert.doesNotMatch(landingSource, /New Genre|newgenre_static/);
   assert.doesNotMatch(landingSource, /(?<![A-Za-z0-9])ng-/);
@@ -51,7 +51,7 @@ test('landing page keeps KK Studio brand on current-only landing classes', () =>
   assert.match(combinedCss, /\.kk-landing-root\s*\{/);
   assert.match(combinedCss, /--kk-landing-/);
   assert.match(combinedCss, /min-height:\s*100(?:dvh|%)\s*(?:!important)?;/);
-  assert.match(combinedCss, /\.kk-work-card\s*\{/);
+  assert.match(combinedCss, /\.kk-landing-work-card\s*\{/);
   assert.match(combinedCss, /touch-action:\s*pan-y;/);
   assert.doesNotMatch(combinedCss, /New Genre|newgenre_static/);
   assert.doesNotMatch(combinedCss, /(?<![A-Za-z0-9])ng-|--ng-/);

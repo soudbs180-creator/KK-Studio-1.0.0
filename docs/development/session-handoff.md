@@ -1638,3 +1638,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行全量 `npm run verify:changes` 100% 成功通过，0 错误 0 Regression。其中包含了 1610+ 项单元与集成测试、Playwright 移动与桌面设置页面冒烟测试、AI Takeover 冒烟测试以及 Canvas 性能基准测试。
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+## 100. 2026-06-27 - 还原介绍页 New Genre 炫彩渐变艺术风格 (本次追加)
+- **修改范围**：
+  - 恢复介绍页（Landing page）为重构前用户设计的 “New Genre” 样式，替换掉在 #51 提交中被强行重置的极简白老模板。
+  - 精细而又安全地将 restored 页面和 CSS 样式里的 `ng-` / `--ng-` 前缀名映射替换为 `kk-landing-` 前缀名，从根本上解决了正则大范围替换导致的 `padding` -> `paddikk-landing` 及 `landing` -> `kk-landikk-landing-` 单词拼写和逻辑损坏 Bug。
+  - 移除了 CSS 文件中指向已被废弃清理的 `newgenre_static` 静态资源的自定义字体 `@font-face` 加载，消除了敏感字与静态目录合规性校验隐患，让字体优雅回退至系统 Inter 等内置字体集。
+  - 重新调整了 `tests/unit/kk-landing-auth-contract.test.ts` 契约测试以完美对齐 New Genre 前端样式，并确保契约 100% 通过。
+- **修改文件**：
+  - [KkLandingPage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/KkLandingPage.tsx) [MODIFY]
+  - [landingStyles.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/landingStyles.css) [MODIFY]
+  - [landingReferenceOverrides.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/landingReferenceOverrides.css) [MODIFY]
+  - [kk-landing-auth-contract.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/kk-landing-auth-contract.test.ts) [MODIFY]
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md) [MODIFY]
+- **当前设计决策**：
+  - **单词边界正则保护**：使用 `\bng-` 进行精细的前缀重写，彻底避免了子字串包含污染，确保 `landing`、`padding` 等其他健康词汇不被匹配改写。
+  - **移除废弃资产引用**：在样式表中完全移除了对已经下线的 `newgenre_static` 目录中 woff2 字体的请求，消除了 Vercel/Vite 侧的环境缺失加载隐患。
+- **已运行验证**：
+  - 运行本地单元契约测试 `kk-landing-auth-contract.test.ts` 100% 成功通过。
+  - 运行全量 `npm run verify:changes` 成功通过。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
