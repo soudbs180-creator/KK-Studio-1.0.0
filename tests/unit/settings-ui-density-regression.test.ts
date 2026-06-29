@@ -209,6 +209,7 @@ test('settings workbench uses frosted glass tokens and blur layers', () => {
 
 test('settings desktop grids adapt before cards and field copy become cramped', () => {
   const cssSource = readSource('apps/web/src/styles/settings.css');
+  const baseCssSource = readSource('apps/web/src/styles/base.css');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.match(
@@ -247,4 +248,36 @@ test('settings desktop grids adapt before cards and field copy become cramped', 
     dashboardSource,
     /@media \(min-width: 900px\) \{[\s\S]*\.dashboard-command-center \{[\s\S]*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
   );
+  assert.match(
+    dashboardSource,
+    /\.dashboard-command-center > \.dashboard-panel \{[\s\S]*height:\s*auto\s*!important;[\s\S]*max-height:\s*none\s*!important;/,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /\.dashboard-panel__glow \{[^}]*inset:\s*-\d+px\s+-\d+px\s+auto\s+auto;/,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /\.dashboard-panel__glow \{[^}]*transform:\s*translate\(/,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /\.dashboard-panel__glow \{[^}]*filter:\s*blur\(/,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /\.dashboard-panel__glow \{[^}]*height:\s*180px;/,
+  );
+
+  for (const rowSpan of ['2', '3', '4']) {
+    const rowSelector = `\\.dashboard-grid-card\\.a-card-span-${rowSpan}-row`;
+    assert.doesNotMatch(
+      baseCssSource,
+      new RegExp(`${rowSelector}\\s*\\{[\\s\\S]*?(?:^|\\n)\\s*height:\\s*\\d+px\\s*!important;`),
+    );
+    assert.doesNotMatch(
+      baseCssSource,
+      new RegExp(`${rowSelector}\\s*\\{[\\s\\S]*?max-height:\\s*\\d+px\\s*!important;`),
+    );
+  }
 });

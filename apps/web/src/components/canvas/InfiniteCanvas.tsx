@@ -720,8 +720,6 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
     }, [emitTransformChange, settleInteractionPhase]);
 
-    const mousePositionRef = useRef<{ clientX: number; clientY: number } | null>(null);
-
     // Zoom controls
     const zoomIn = useCallback(() => {
         const currentTransform = syncTransformRef.current;
@@ -730,14 +728,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        let centerX = rect.width / 2;
-        let centerY = rect.height / 2;
-
-        // 🚀 若鼠标在画布内，以鼠标位置为中心缩放，体验极大提升
-        if (mousePositionRef.current) {
-            centerX = mousePositionRef.current.clientX - rect.left;
-            centerY = mousePositionRef.current.clientY - rect.top;
-        }
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
 
         const scaleRatio = newScale / currentTransform.scale;
         const newX = centerX - (centerX - currentTransform.x) * scaleRatio;
@@ -768,14 +760,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        let centerX = rect.width / 2;
-        let centerY = rect.height / 2;
-
-        // 🚀 若鼠标在画布内，以鼠标位置为中心缩放，体验极大提升
-        if (mousePositionRef.current) {
-            centerX = mousePositionRef.current.clientX - rect.left;
-            centerY = mousePositionRef.current.clientY - rect.top;
-        }
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
 
         const scaleRatio = newScale / currentTransform.scale;
         const newX = centerX - (centerX - currentTransform.x) * scaleRatio;
@@ -1007,16 +993,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const container = containerRef.current;
         if (!container) return;
 
-        const handleMouseMoveTracker = (e: MouseEvent) => {
-            mousePositionRef.current = { clientX: e.clientX, clientY: e.clientY };
-        };
-        const handleMouseLeaveTracker = () => {
-            mousePositionRef.current = null;
-        };
-
         container.addEventListener('wheel', handleWheel, { passive: false });
-        container.addEventListener('mousemove', handleMouseMoveTracker, { passive: true });
-        container.addEventListener('mouseleave', handleMouseLeaveTracker, { passive: true });
         // Touch Listeners (Passive: false to allow preventDefault)
         container.addEventListener('touchstart', handleTouchStart, { passive: false });
         container.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -1030,8 +1007,6 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
         return () => {
             container.removeEventListener('wheel', handleWheel);
-            container.removeEventListener('mousemove', handleMouseMoveTracker);
-            container.removeEventListener('mouseleave', handleMouseLeaveTracker);
             container.removeEventListener('touchstart', handleTouchStart);
             container.removeEventListener('touchmove', handleTouchMove);
             container.removeEventListener('touchend', handleTouchEnd);

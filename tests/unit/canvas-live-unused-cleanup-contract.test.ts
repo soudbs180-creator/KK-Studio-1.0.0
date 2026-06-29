@@ -21,3 +21,14 @@ test('InfiniteCanvas keeps public optional props without retaining unused destru
   assert.match(source, /onResetView,/);
   assert.match(source, /onImageDrop,/);
 });
+
+test('InfiniteCanvas toolbar zoom anchors to the viewport center, not stale mouse coordinates', () => {
+  const source = readSource('apps/web/src/components/canvas/InfiniteCanvas.tsx');
+  const zoomControlsStart = source.indexOf('// Zoom controls');
+  const resetViewStart = source.indexOf('const resetView', zoomControlsStart);
+  const zoomControlsSource = source.slice(zoomControlsStart, resetViewStart);
+
+  assert.ok(zoomControlsStart >= 0, 'zoom controls section should exist');
+  assert.ok(resetViewStart > zoomControlsStart, 'resetView should follow zoom controls');
+  assert.doesNotMatch(zoomControlsSource, /mousePositionRef\.current/);
+});

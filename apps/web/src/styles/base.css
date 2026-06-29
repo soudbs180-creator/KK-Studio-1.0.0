@@ -9738,7 +9738,7 @@ body:not(.dark-mode) .settings-log-group-badge {
   width: 100%;
   max-width: 100%;
   /* 简体中文注释：使用 visible 确保在产生滑动条时即使发生极微小的宽度自适应偏差，最右侧卡片边缘也绝对不会被裁切掉 */
-  overflow-x: visible !important;
+  overflow-x: hidden;
 }
 
 @media (min-width: 768px) {
@@ -9893,23 +9893,23 @@ body:not(.dark-mode) .settings-log-group-badge {
 
   /* 2行跨度大卡片高度：2 * H_A + gap_16 = 276px */
   .dashboard-grid-card.a-card-span-2-row {
-    height: 276px !important;
+    height: auto !important;
     min-height: 276px !important;
-    max-height: 276px !important;
+    max-height: none !important;
   }
 
   /* 3行跨度大卡片高度：3 * H_A + 2 * gap_16 = 422px */
   .dashboard-grid-card.a-card-span-3-row {
-    height: 422px !important;
+    height: auto !important;
     min-height: 422px !important;
-    max-height: 422px !important;
+    max-height: none !important;
   }
 
   /* 4行跨度大卡片高度：4 * H_A + 3 * gap_16 = 568px */
   .dashboard-grid-card.a-card-span-4-row {
-    height: 568px !important;
+    height: auto !important;
     min-height: 568px !important;
-    max-height: 568px !important;
+    max-height: none !important;
   }
 }
 

@@ -595,13 +595,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       <style>{`
         .dashboard-command-center {
           display: grid;
+          align-items: start;
           gap: 14px;
+          grid-auto-rows: auto;
           grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+          overflow-x: clip;
         }
 
         .dashboard-command-center > .dashboard-panel {
+          align-self: start;
           width: 100%;
+          height: auto !important;
+          min-height: 0 !important;
           max-width: 100%;
+          max-height: none !important;
+          grid-row: auto !important;
         }
 
         .dashboard-panel {
@@ -610,9 +618,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           box-sizing: border-box;
           display: flex;
           min-width: 0;
-          min-height: 100%;
+          min-height: 0;
           flex-direction: column;
-          overflow: hidden;
+          overflow: clip;
           scrollbar-width: none;
           -ms-overflow-style: none;
           outline: none;
@@ -664,12 +672,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-panel__glow {
           position: absolute;
-          inset: -80px -80px auto auto;
-          width: 180px;
-          height: 180px;
+          top: 0;
+          right: 0;
+          width: 128px;
+          height: 128px;
           border-radius: 999px;
-          background: rgb(var(--dashboard-tone-rgb) / 0.18);
-          filter: blur(34px);
+          background: radial-gradient(circle, rgb(var(--dashboard-tone-rgb) / 0.22) 0%, rgb(var(--dashboard-tone-rgb) / 0.12) 42%, transparent 72%);
           pointer-events: none;
         }
 

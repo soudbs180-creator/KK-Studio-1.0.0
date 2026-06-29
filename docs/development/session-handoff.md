@@ -1676,4 +1676,37 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
-
+## 102. 2026-06-29 - Fix Deployed Canvas Zoom Stability and Settings Dashboard Card Overflow (本次追加)
+- **修改范围**：
+  - 对 `https://kkai.plus/` 与本地 `http://127.0.0.1:3000/` 进行对比检查，确认线上 build hash 与当前本地 HEAD `f9b500d` 一致，问题可在本地同源代码上复现与验证。
+  - 修复无限画布工具栏缩放按钮使用陈旧鼠标位置作为缩放锚点的问题；按钮缩放统一以画布容器几何中心为锚点，wheel 缩放仍保留指针位置语义。
+  - 修复设置页 dashboard 卡片固定像素高度、负 inset / blur 发光层污染 `scrollWidth` / `scrollHeight`、以及内容被固定框裁切的问题。
+  - 补充 canvas toolbar zoom 与 settings dashboard density 的源码契约回归测试。
+- **修改文件**：
+  - `apps/web/src/components/canvas/InfiniteCanvas.tsx`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/src/styles/base.css`
+  - `tests/unit/canvas-live-unused-cleanup-contract.test.ts`
+  - `tests/unit/settings-ui-density-regression.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 工具栏缩放按钮不再读取 `mousePositionRef.current`，避免鼠标离开画布后点击缩放导致视口围绕旧坐标跳变，进而触发可视裁剪后看起来像“卡片丢失”。
+  - Settings dashboard 的跨行卡片只保留 `min-height` 下限，不再使用固定 `height/max-height` 锁死内容；dashboard 内卡片额外覆盖为 `height:auto`、`max-height:none`、`grid-row:auto`。
+  - dashboard 发光层改为盒内 `radial-gradient`，尺寸收敛到 128px，并移除负 inset、translate 和 `filter: blur()`，避免装饰层参与滚动尺寸计算。
+- **已运行验证**：
+  - `node --test tests/unit/canvas-live-unused-cleanup-contract.test.ts`
+  - `node --test tests/unit/settings-ui-density-regression.test.ts`
+  - `npm run typecheck`
+  - `npm run architecture:check`
+  - `npm run governance:check`
+  - `npm run build`
+  - `npm run verify:desktop-settings-smoke`
+  - `npm run verify:canvas-performance`
+  - 浏览器实测本地 `/settings`：dashboard 7 张卡片，`overflowCount: 0`，grid `overflowX: 0`，发光层 computed style 为 `filter: none`、`width/height: 128px`。
+  - 浏览器实测本地工作区：工具栏连续缩放 50%-100% 过程中示例卡片数量保持 2，viewport transform 的 x/y 锚点保持中心 `640/360`。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`；本次变更集中在画布缩放与设置页布局，已运行相关单测、架构/治理、typecheck、build、设置页 smoke 与 canvas performance。
+- **风险与下一步**：
+  - 线上仍需重新部署后才会应用本地修复；当前 `kkai.plus` 检测到的资源仍是部署版本。
+  - 若大规模历史画布仍出现“丢卡”，下一步应针对真实大画布数据继续检查 culling buffer 与持久化 transform，而不是设置页布局链路。
+  - 运行 `npm run agents:commit` 固化本地 Git 提交。
