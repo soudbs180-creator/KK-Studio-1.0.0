@@ -177,9 +177,26 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setStage('session_ready');
     applyServiceStage('session_ready');
 
+    const triggerStageAdvancement = () => {
+      const startupSmokeHoldMs = resolveStartupSmokeHoldMs();
+      const profileReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 0;
+      const workspaceReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 120;
+
+      clearScheduledWork();
+
+      profileTimer = window.setTimeout(() => {
+        setStageSafely('profile_ready');
+      }, profileReadyDelayMs);
+
+      workspaceTimer = window.setTimeout(() => {
+        setStageSafely('workspace_ready');
+      }, workspaceReadyDelayMs);
+    };
+
     if (localOnlyRuntime) {
       setHealthState('ready');
       setLastStartupWarning(null);
+      triggerStageAdvancement();
     } else if (!isTempUser) {
       setHealthState('checking');
       
@@ -203,6 +220,8 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return;
         }
 
+        triggerStageAdvancement();
+
         if (isKkApiSelfHostedCoreReadyFromHealth(health)) {
           setLastStartupWarning(null);
           return;
@@ -225,19 +244,8 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } else {
       setHealthState('ready');
       setLastStartupWarning(null);
+      triggerStageAdvancement();
     }
-
-    const startupSmokeHoldMs = resolveStartupSmokeHoldMs();
-    const profileReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 0;
-    const workspaceReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 120;
-
-    profileTimer = window.setTimeout(() => {
-      setStageSafely('profile_ready');
-    }, profileReadyDelayMs);
-
-    workspaceTimer = window.setTimeout(() => {
-      setStageSafely('workspace_ready');
-    }, workspaceReadyDelayMs);
 
     return () => {
       cancelled = true;

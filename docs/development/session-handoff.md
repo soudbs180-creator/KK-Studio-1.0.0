@@ -1780,3 +1780,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 106. 2026-06-29 - Optimize App Startup Stage Transition Timing (本次追加)
+- **修改范围**：
+  1. 重构了 `AppStartupContext.tsx` 里的初始化时序。将原无条件执行的 120ms 定时推进逻辑封装为 `triggerStageAdvancement()`。
+  2. 针对 `localOnlyRuntime` 和临时用户直接 Mount 推进；针对需要 API 健康检查的普通用户，只有在健康检查 Race 成功返回且 `reachable = true` 时，才会触发启动推进定时器。
+  3. **时序安全解耦**：彻底解决了 API 在检查超时或连接断开期间，因 120ms 强推 `workspace_ready` 产生的黑屏及黑屏对 Warning 报错遮挡的时序竞态缺陷。在硬性离线/挂载失败时，可以保证页面能停留渲染加载进度与红色的错误提示卡片。
+- **修改文件**：
+  - [AppStartupContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/AppStartupContext.tsx)
+- **当前设计决策**：
+  - **健康度与加载体验绑定**：强绑定 API 首屏健康就绪状态到工作区推进器上，消除时序冲突。
+- **已运行验证**：
+  - 运行单测 `app-startup-coordinator.test.ts` 100% 通过（2/2 用例全绿）。
+  - 运行全量 `npm run verify:changes` 100% 成功通过（含 Playwright 浏览器冒烟测试及性能 benchmark）。
+- **未运行验证及原因**：
+  - 无。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
