@@ -527,8 +527,10 @@ ${optResult.optimizedPromptZh}
 
       case 'image_to_video': {
         const refImageId = intentResult.extracted.referenceImageNodeId;
+        const duration = intentResult.extracted.duration || 4;
+        const motion = intentResult.extracted.motion || 'pan';
         reply = `### 🎬 准备为您生成视频版...
-已将生成模式切换至【视频】模式，并准备好以选定图片作为参考执行生成任务。`;
+        已将生成模式切换至【视频】模式，并准备好以选定图片作为参考，以时长 **${duration}秒** 及运镜方式【${motion}】执行生成任务。`;
         
         actions.push({
           type: 'changeMode',
@@ -537,9 +539,14 @@ ${optResult.optimizedPromptZh}
         actions.push({
           type: 'startGeneration',
           payload: {
-            prompt: 'generate video version',
+            prompt: `generate video version, motion: ${motion}`,
             count: 1,
-            options: { referenceImageNodeId: refImageId }
+            mode: 'video',
+            options: {
+              referenceImageNodeId: refImageId,
+              duration,
+              motion
+            }
           }
         });
         break;
@@ -630,6 +637,34 @@ ${optResult.optimizedPromptZh}
         break;
       }
 
+      case 'generate_audio': {
+        const duration = intentResult.extracted.duration || 30;
+        const genre = intentResult.extracted.genre || 'ambient lofi';
+        let promptText = userInput
+          .replace(/(开始生成|直接生成|出图|跑图|生成音乐|生成音频|做段音乐|搞个音效|创作音乐|做段bgm|bgm|音乐|音频|音效)/g, '')
+          .trim();
+        if (!promptText) {
+          promptText = 'a relaxing ambient background music';
+        }
+        reply = `### 🎵 准备为您生成音乐/音效
+        我将生成一段时长为 **${duration}秒**，风格为【${genre}】的音频。提示词设定为：「${promptText}」。
+        此操作涉及额度消耗，已为您准备好执行计划，请确认：`;
+        
+        actions.push({
+          type: 'startGeneration',
+          payload: {
+            prompt: promptText,
+            count: 1,
+            mode: 'audio',
+            options: {
+              duration,
+              genre
+            }
+          }
+        });
+        break;
+      }
+
       case 'generate_images': {
         const count = intentResult.extracted.count || 4;
         const refImageId = intentResult.extracted.referenceImageNodeId;
@@ -703,6 +738,7 @@ ${optResult.optimizedPromptZh}
               aspectRatio,
               layoutPreset,
               outputGroup,
+              productCategory: intentResult.extracted.productCategory,
               idempotencyKey: batchPlanId
             }
           });
@@ -721,6 +757,7 @@ ${optResult.optimizedPromptZh}
                 taskDomain,
                 aspectRatio,
                 layoutPreset,
+                productCategory: intentResult.extracted.productCategory,
                 promptStrategy: {
                   mode: 'single_template',
                   rawUserStyle: userInput,

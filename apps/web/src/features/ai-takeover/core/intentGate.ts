@@ -134,8 +134,55 @@ function inferAspectRatio(input: string): string | undefined {
   const lower = input.toLowerCase();
   if (lower.includes('小红书')) return '4:5';
   if (lower.includes('短视频') || lower.includes('抖音') || lower.includes('手机壁纸') || lower.includes('9:16') || lower.includes('竖屏')) return '9:16';
-  if (lower.includes('电影') || lower.includes('横屏') || lower.includes('16:9') || lower.includes('电脑壁纸') || lower.includes('横屏海报')) return '16:9';
+  if (lower.includes('电影') || lower.includes('横屏') || lower.includes('16:9') || lower.includes('电脑壁纸') || lower.includes('横屏海报')) {
+    if (lower.includes('超宽') || lower.includes('带鱼屏') || lower.includes('21:9')) return '21:9';
+    return '16:9';
+  }
+  if (lower.includes('超宽屏') || lower.includes('带鱼屏') || lower.includes('21:9') || lower.includes('电影画幅')) return '21:9';
   if (lower.includes('电商主图') || lower.includes('头像') || lower.includes('1:1') || lower.includes('正方形')) return '1:1';
+  if (lower.includes('单反') || lower.includes('相机') || lower.includes('经典画幅') || lower.includes('相册') || lower.includes('3:2')) return '3:2';
+  if (lower.includes('pad') || lower.includes('平板') || lower.includes('ipad') || lower.includes('4:3')) return '4:3';
+  if (lower.includes('电脑屏幕') || lower.includes('办公本') || lower.includes('16:10')) return '16:10';
+  return undefined;
+}
+
+function extractDuration(input: string, fallback = 4): number {
+  const minMatch = input.match(/(\d+)\s*(?:分钟|min)/i);
+  if (minMatch) return parseInt(minMatch[1], 10) * 60;
+  
+  const secMatch = input.match(/(\d+)\s*(?:秒|s|seconds?)/i);
+  return secMatch ? Math.max(1, parseInt(secMatch[1], 10)) : fallback;
+}
+
+function extractVideoMotion(input: string): string | undefined {
+  const lower = input.toLowerCase();
+  if (lower.includes('环绕') || lower.includes('orbit') || lower.includes('circle')) return 'orbit';
+  if (lower.includes('放大') || lower.includes('缩小') || lower.includes('拉近') || lower.includes('拉远') || lower.includes('zoom') || lower.includes('推进')) return 'zoom';
+  if (lower.includes('向左') || lower.includes('向右') || lower.includes('平移') || lower.includes('pan') || lower.includes('左右')) return 'pan';
+  if (lower.includes('向上') || lower.includes('向下') || lower.includes('tilt') || lower.includes('上下')) return 'tilt';
+  return undefined;
+}
+
+function extractAudioGenre(input: string): string | undefined {
+  const lower = input.toLowerCase();
+  if (lower.includes('爵士') || lower.includes('jazz')) return 'jazz';
+  if (lower.includes('摇滚') || lower.includes('rock')) return 'rock';
+  if (lower.includes('民谣') || lower.includes('folk')) return 'folk';
+  if (lower.includes('lofi') || lower.includes('低保真')) return 'lofi';
+  if (lower.includes('流行') || lower.includes('pop')) return 'pop';
+  if (lower.includes('电子') || lower.includes('electro') || lower.includes('edm')) return 'edm';
+  if (lower.includes('古风') || lower.includes('国风') || lower.includes('chinese')) return 'chinese_traditional';
+  if (lower.includes('环境') || lower.includes('白噪音') || lower.includes('ambient') || lower.includes('白噪')) return 'ambient';
+  return undefined;
+}
+
+function extractProductCategory(input: string): string | undefined {
+  const lower = input.toLowerCase();
+  if (/鞋|shoes?/i.test(lower)) return 'footwear';
+  if (/衣服|男装|女装|服饰|外套|裙|apparel|clothes/i.test(lower)) return 'apparel';
+  if (/化妆品|美妆|口红|护肤|面霜|睫毛|眼影|cosmetics|beauty|skincare/i.test(lower)) return 'cosmetics';
+  if (/数码|手机|电脑|耳机|相机|平板|电子|electronics|digital|phone/i.test(lower)) return 'electronics';
+  if (/食品|饮料|零食|咖啡|茶|饮料|酒|food|beverage|snack/i.test(lower)) return 'food_beverage';
   return undefined;
 }
 
@@ -209,7 +256,8 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   }
 
   const isEditRequest = /背景换成|换背景|背景改为|更高级|电商主图|主图|做成电商主图/i.test(lowerInput);
-  const isVideoRequest = /视频版|生成视频|图生视频/i.test(lowerInput);
+  const isVideoRequest = /视频版|生成视频|图生视频|视频/i.test(lowerInput);
+  const isAudioRequest = /(?:生成|制作|做|搞|创作).*(?:音乐|音频|音效|bgm)|(?:音乐|音频|音效|bgm).*(?:生成|制作|创作)/i.test(lowerInput);
   const isResearchRequest = /研究.*并生成|分析.*风格|视觉方案|出一组图|研究.*风格/i.test(cleanInput);
 
   if (isResearchRequest) {
@@ -257,16 +305,36 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   }
 
   if (isVideoRequest && refImageNodeId) {
+    const duration = extractDuration(cleanInput, 4);
+    const motion = extractVideoMotion(cleanInput);
     return {
       intent: 'image_to_video',
       confidence: 0.95,
       extracted: {
         referenceImageNodeId: refImageNodeId,
-        count: 1
+        count: 1,
+        duration,
+        motion
       },
       risk: 'cost',
       needsConfirmation: true,
       reason: '识别到图生视频指令，使用选定或最近的图片作为参考图进行视频生成。'
+    };
+  }
+
+  if (isAudioRequest) {
+    const duration = extractDuration(cleanInput, 30);
+    const genre = extractAudioGenre(cleanInput) || 'ambient lofi';
+    return {
+      intent: 'generate_audio',
+      confidence: 0.95,
+      extracted: {
+        duration,
+        genre
+      },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到音频/音乐生成指令。'
     };
   }
 
@@ -282,6 +350,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
         aspectRatio,
         layoutPreset,
         fileIds: allSelectedImageIds,
+        productCategory: extractProductCategory(cleanInput),
         outputGroup: {
           label: 'AI ecommerce batch',
           color: '#ffffff',
@@ -615,7 +684,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   const isBatchTransformRequest = /生成|出图|跑图|风格化|修改|改成|处理|重绘|重做|换成|调整/.test(lowerInput)
     || shouldTreatAsGeneration(cleanInput);
   if (isFolderBatchRequest && isBatchTransformRequest) {
-    const aspectRatio = extractAspectRatio(cleanInput);
+    const aspectRatio = inferAspectRatio(cleanInput);
     const layoutPreset = extractLayoutPreset(cleanInput) || 'grid';
     const taskDomain = extractTaskDomain(cleanInput);
     return {
@@ -626,6 +695,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
         taskDomain,
         aspectRatio,
         layoutPreset,
+        productCategory: extractProductCategory(cleanInput),
         outputGroup: {
           label: taskDomain === 'ecommerce' ? 'AI ecommerce batch' : 'AI batch output',
           color: '#ffffff',

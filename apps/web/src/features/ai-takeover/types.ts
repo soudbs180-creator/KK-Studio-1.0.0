@@ -20,6 +20,7 @@ export type AssistantIntent =
   | 'optimize_prompt'              // 优化提示词（绝不自动生成图片）
   | 'write_prompt'                 // 写提示词
   | 'generate_images'              // 开始生图
+  | 'generate_audio'               // 生成音乐/音效
   | 'image_edit_missing_selection' // 提示选择参考图
   | 'image_to_video'               // 图生视频
   | 'research_to_canvas'           // 品牌研究进画布
@@ -71,6 +72,10 @@ export interface IntentResult {
     outputGroup?: AssistantOutputGroupPlan;
     surface?: 'workspace' | 'library' | 'favorites' | string;
     referenceImageNodeId?: string;
+    duration?: number;
+    motion?: string;
+    genre?: string;
+    productCategory?: string;
   };
   risk: 'none' | 'low' | 'cost' | 'upload' | 'destructive';
   needsConfirmation: boolean;      // 是否需要强确认卡片
@@ -82,11 +87,11 @@ export type AssistantAction =
   | { type: 'sendMessage'; payload: { text: string } }
   | { type: 'optimizePromptLocally'; payload: { subject: string; templateId?: string; style?: string } }
   | { type: 'fillPrompt'; payload: { prompt: string; negativePrompt?: string; modelId?: string } }
-  | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string } }
+  | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string; mode?: string } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
   | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
   | { type: 'generation.retryJob'; payload: { jobId?: string; target?: 'latest_failed' } }
-  | { type: 'ecommerce.createBatchTransformJob'; payload: { imageIds?: string[]; rawUserRequest: string; aspectRatio?: string; layoutPreset?: AssistantBatchLayoutPreset; outputGroup?: AssistantOutputGroupPlan; idempotencyKey?: string } }
+  | { type: 'ecommerce.createBatchTransformJob'; payload: { imageIds?: string[]; rawUserRequest: string; aspectRatio?: string; layoutPreset?: AssistantBatchLayoutPreset; outputGroup?: AssistantOutputGroupPlan; productCategory?: string; idempotencyKey?: string } }
   | { type: 'locateCard'; payload: { keyword: string } }
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
@@ -138,6 +143,7 @@ export interface BatchGenerationPlan {
   taskDomain?: AssistantBatchTaskDomain;
   aspectRatio?: AspectRatio | string;
   layoutPreset?: AssistantBatchLayoutPreset;
+  productCategory?: string;
   promptStrategy: {
     mode: 'single_template' | 'per_image_filename' | 'per_image_ai';
     templateId?: string;

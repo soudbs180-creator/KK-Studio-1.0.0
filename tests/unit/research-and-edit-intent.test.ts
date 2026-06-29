@@ -56,6 +56,19 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     const res2 = analyzeIntent('做一个手机壁纸，关于星空', ctx);
     assert.equal(res2.intent, 'generate_images');
     assert.equal(res2.extracted.aspectRatio, '9:16');
+
+    // 细分比例测试
+    const res3 = analyzeIntent('做一个单反相机复古照片', ctx);
+    assert.equal(res3.extracted.aspectRatio, '3:2');
+
+    const res4 = analyzeIntent('设计带鱼屏超宽屏幕壁纸', ctx);
+    assert.equal(res4.extracted.aspectRatio, '21:9');
+
+    const res5 = analyzeIntent('制作一个办公本桌面壁纸', ctx);
+    assert.equal(res5.extracted.aspectRatio, '16:10');
+
+    const res6 = analyzeIntent('制作平板iPad适用的壁纸', ctx);
+    assert.equal(res6.extracted.aspectRatio, '4:3');
   });
 
   it('P1: analyzeIntent should route edit request properly with reference image selection', () => {
@@ -94,6 +107,12 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     const ctxEmpty: any = { canvas: { selectedNodeIds: [], promptNodes: [], imageNodes: [] } };
     const resEmpty = analyzeIntent('背景换成雪山', ctxEmpty);
     assert.equal(resEmpty.intent, 'image_edit_missing_selection');
+
+    // 细粒度视频测试
+    const resVideo = analyzeIntent('生成一段5秒的环绕运镜视频', ctxWithImg);
+    assert.equal(resVideo.intent, 'image_to_video');
+    assert.equal(resVideo.extracted.duration, 5);
+    assert.equal(resVideo.extracted.motion, 'orbit');
   });
 
   it('P1: analyzeIntent should route multi-image ecommerce redraw to batch transform', () => {
@@ -107,10 +126,14 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
         ]
       }
     };
-    const res = analyzeIntent('做成电商主图', ctxMulti);
+    const res = analyzeIntent('做成电商主图，这是几双运动鞋的背景重绘', ctxMulti);
     assert.equal(res.intent, 'batch_generate_from_folder');
     assert.equal(res.extracted.taskDomain, 'ecommerce');
     assert.deepEqual(res.extracted.fileIds, ['img_1', 'img_2']);
+    assert.equal(res.extracted.productCategory, 'footwear');
+
+    const resCosmetics = analyzeIntent('把这些化妆品口红做成电商主图', ctxMulti);
+    assert.equal(resCosmetics.extracted.productCategory, 'cosmetics');
   });
 
   it('P2: analyzeIntent should route brand research to research_to_canvas', () => {
@@ -158,5 +181,22 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     const searchRes = knowledgeStore.searchProject('咖啡');
     assert.ok(searchRes.length > 0);
     assert.match(searchRes[0].title, /极简咖啡品牌风格/);
+  });
+
+  it('P2: analyzeIntent and LocalBrain should handle audio generation properly', async () => {
+    const ctx: any = { canvas: { promptNodes: [], imageNodes: [], selectedNodeIds: [] }, settings: {} };
+    const res = analyzeIntent('生成一段30秒的爵士风格背景音乐', ctx);
+    assert.equal(res.intent, 'generate_audio');
+    assert.equal(res.extracted.duration, 30);
+    assert.equal(res.extracted.genre, 'jazz');
+
+    const brain = new LocalAssistantBrain();
+    const plan = await brain.plan('生成一段30秒的爵士风格背景音乐', ctx);
+    assert.equal(plan.intent, 'generate_audio');
+    assert.equal(plan.actions.length, 1);
+    assert.equal(plan.actions[0].type, 'startGeneration');
+    assert.equal((plan.actions[0] as any).payload.mode, 'audio');
+    assert.equal((plan.actions[0] as any).payload.options.duration, 30);
+    assert.equal((plan.actions[0] as any).payload.options.genre, 'jazz');
   });
 });

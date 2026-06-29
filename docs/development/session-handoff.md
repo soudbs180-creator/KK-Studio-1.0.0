@@ -1758,3 +1758,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 105. 2026-06-29 - Enhance Intent Gate and Local Brain Decision Capabilities (本次追加)
+- **修改范围**：
+  1. 优化了 `intentGate.ts`：扩展了 `inferAspectRatio` 对 `3:2`、`4:3`、`16:10`、`21:9` 等画幅比例的 NLP 识别推断；实现了视频运镜方式（平移/缩放/环绕）与时长的参数提取；新增了音频/音乐生成 `generate_audio` 意图提取；并在批量电商重绘中集成了鞋服、美妆、数码等商品细分子品类（`productCategory`）提取。
+  2. 重构了 `localBrain.ts`：为视频生成注入了时长 `duration` 与运镜方式 `motion` Payload；为批量生成（电商及普通）增加了 `productCategory` 解析支持；新增了音频/音乐生成意图 `generate_audio` 的 Action 映射。
+  3. 补齐并更新了 `types.ts` 中的 TypeScript 声明：为 `AssistantIntent` 增加 `generate_audio`，在 `IntentResult` 的 `extracted` 属性中扩展了字段，并对动作中 `mode` 和 `productCategory` 参数做类型对齐，通过编译检查。
+  4. 补齐并扩充了 `research-and-edit-intent.test.ts` 中的断言测试。
+- **修改文件**：
+  - [intentGate.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/core/intentGate.ts)
+  - [localBrain.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/core/localBrain.ts)
+  - [types.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/features/ai-takeover/types.ts)
+  - [research-and-edit-intent.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/research-and-edit-intent.test.ts)
+- **当前设计决策**：
+  - **意图与细粒度参数深度提取**：通过正则与 NLP 分词多路配合，打通了音频/视频与商品重绘时的细分提取能力，避免了过去对复杂场景的一刀切判断，大幅提升本地接管的决策灵敏度。
+  - **TS 严格安全类型校验**：对意图的提取属性从底层接口开始升级强对齐，在核心 compiler 中抹平缺口，保障了 monorepo 中多层能力调度的类型合规性。
+- **已运行验证**：
+  - 运行单测 `research-and-edit-intent.test.ts` 100% 通过（共 7 个大用例全绿）。
+  - 运行全量 `npm run verify:changes` 100% 通过，0 编译错误，0 测试回归。
+- **未运行验证及原因**：
+  - 无。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
