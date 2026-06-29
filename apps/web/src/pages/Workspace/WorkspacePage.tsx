@@ -38,7 +38,6 @@ import {
   type PromptGroupLayoutPresentationState,
   type PromptGroupRenderItem,
   type SaveRenderItem,
-  type ScheduledImageLoadState,
   type WorkflowUtilityCanvasNode,
 } from '../../app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
@@ -121,6 +120,7 @@ import { useVisibleCanvasItems, useVisibleCanvasItemsNew } from '../../app/useVi
 import { useCanvasSpatialIndex } from '../../app/useCanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 import { CanvasLayerRenderer } from '../../components/canvas/CanvasLayerRenderer';
+import { buildViewportImageLoadScheduling } from '../../canvas/largeCanvasVirtualization';
 import type { CachedCardMeta } from '../../services/storage/offlineDb';
 import { syncService } from '../../services/system/syncService';
 
@@ -294,7 +294,6 @@ import {
 // import { syncService } from '../../services/system/syncService'; // [FIX] Dynamic Import
 import { saveOriginalImage, normalizePersistableMediaSource } from '../../services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from '../../services/image/imageLoader';
-import { ImageQuality } from '../../services/image/imageQuality';
 import { calculateImageHash } from '../../utils/imageUtils';
 import { useImageGeneration } from '../../hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
@@ -4027,112 +4026,14 @@ export const AppContent: React.FC<AppContentProps> = () => {
   ]);
 
   const imageLoadSchedulingById = React.useMemo(() => {
-    const scheduling = new Map<string, ScheduledImageLoadState>();
-    if (!activeCanvas) return scheduling;
-
-    const scale = canvasTransform.scale || 1;
-    const viewportLeft = -canvasTransform.x / scale;
-    const viewportTop = -canvasTransform.y / scale;
-    const viewportRight = (window.innerWidth - canvasTransform.x) / scale;
-    const viewportBottom = (window.innerHeight - canvasTransform.y) / scale;
-    const viewportCenterX = (viewportLeft + viewportRight) / 2;
-    const viewportCenterY = (viewportTop + viewportBottom) / 2;
-
-    const viewportImages: Array<{ node: GeneratedImage; distance: number }> = [];
-    const aboveViewportImages: Array<{ node: GeneratedImage; distance: number }> = [];
-    const belowViewportImages: GeneratedImage[] = [];
-    const lateralImages: Array<{ node: GeneratedImage; distance: number }> = [];
-
-    activeCanvas.imageNodes.forEach((node) => {
-      if (collapsedCanvasGroupNodeIds.has(node.id)) {
-        return;
-      }
-
-      const width = 800;
-      const height = 1200;
-      const left = node.position.x - width / 2;
-      const top = node.position.y - height;
-      const right = left + width;
-      const bottom = top + height;
-      const intersectsViewport = !(left > viewportRight || right < viewportLeft || top > viewportBottom || bottom < viewportTop);
-
-      if (intersectsViewport) {
-        viewportImages.push({
-          node,
-          distance: Math.abs(node.position.x - viewportCenterX) + Math.abs(node.position.y - viewportCenterY),
-        });
-        return;
-      }
-
-      if (bottom < viewportTop) {
-        aboveViewportImages.push({
-          node,
-          distance: viewportTop - bottom,
-        });
-        return;
-      }
-
-      if (top > viewportBottom) {
-        belowViewportImages.push(node);
-        return;
-      }
-
-      lateralImages.push({
-        node,
-        distance: Math.min(
-          Math.abs(left - viewportRight),
-          Math.abs(right - viewportLeft)
-        ),
-      });
+    return buildViewportImageLoadScheduling({
+      imageNodes: visibleImageNodes,
+      collapsedCanvasGroupNodeIds,
+      canvasTransform,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
     });
-
-    viewportImages
-      .sort((left, right) => left.distance - right.distance)
-      .forEach(({ node }, index) => {
-        scheduling.set(node.id, {
-          loadBand: 0,
-          loadPriority: 1400 - index,
-          prefetchQuality: ImageQuality.PREVIEW,
-        });
-      });
-
-    aboveViewportImages
-      .sort((left, right) => left.distance - right.distance)
-      .forEach(({ node }, index) => {
-        scheduling.set(node.id, {
-          loadBand: 1,
-          loadPriority: 1100 - index,
-          prefetchQuality: ImageQuality.THUMBNAIL,
-        });
-      });
-
-    lateralImages
-      .sort((left, right) => left.distance - right.distance)
-      .forEach(({ node }, index) => {
-        scheduling.set(node.id, {
-          loadBand: 1,
-          loadPriority: 1000 - index,
-          prefetchQuality: ImageQuality.THUMBNAIL,
-        });
-      });
-
-    const orderedBelowViewportImages = [...belowViewportImages].sort((left, right) => left.position.y - right.position.y);
-    const belowSegmentSize = Math.max(1, Math.ceil(orderedBelowViewportImages.length / 3));
-
-    orderedBelowViewportImages.forEach((node, index) => {
-      const segment = Math.min(2, Math.floor(index / belowSegmentSize));
-      const loadBand = (segment === 0 ? 1 : segment === 1 ? 2 : 3) as 1 | 2 | 3;
-      const priorityBase = segment === 0 ? 900 : segment === 1 ? 700 : 500;
-
-      scheduling.set(node.id, {
-        loadBand,
-        loadPriority: priorityBase - (index % belowSegmentSize),
-        prefetchQuality: loadBand === 1 ? ImageQuality.THUMBNAIL : ImageQuality.MICRO,
-      });
-    });
-
-    return scheduling;
-  }, [activeCanvas, canvasTransform.scale, canvasTransform.x, canvasTransform.y, collapsedCanvasGroupNodeIds]);
+  }, [visibleImageNodes, canvasTransform.scale, canvasTransform.x, canvasTransform.y, collapsedCanvasGroupNodeIds]);
 
   useEffect(() => {
     if (!activeCanvas) return;

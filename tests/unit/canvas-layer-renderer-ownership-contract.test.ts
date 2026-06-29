@@ -18,8 +18,9 @@ test('large-project canvas underlay only receives standalone image card metas', 
 
 test('CanvasLayerRenderer refuses to paint prompt shells over the React prompt-group layer', () => {
   const source = readSource('apps/web/src/components/canvas/CanvasLayerRenderer.tsx');
+  const helperSource = readSource('apps/web/src/canvas/largeCanvasVirtualization.ts');
 
-  assert.match(source, /if \(meta\.type !== 'image'\) return;/);
+  assert.match(helperSource, /if \(meta\.type === 'image'\)/);
   assert.doesNotMatch(source, /type === 'prompt'/);
   assert.doesNotMatch(source, /fillText\('PROMPT CARD'/);
 });

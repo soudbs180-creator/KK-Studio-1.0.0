@@ -1797,3 +1797,39 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 107. 2026-06-29 - Bound 10k Canvas Virtualization and Image Scheduling Work
+- **修改范围**：
+  1. 修复大画布拖拽、缩放时的全量卡片扫描瓶颈：`CanvasLayerRenderer` 不再在每一帧对全部 `cardMetas` 做 `forEach` 过滤，而是先建立 image-only lookup，再只按 `visibleCardIds` 选择当前可绘制的独立图片卡片。
+  2. 修复资源调度在缩放/平移时扫描全部历史图片的问题：`WorkspacePage` 的 `imageLoadSchedulingById` 改为只对 `visibleImageNodes` 进行视口附近排序和质量等级调度，避免 10000+ 历史卡片在每次 transform 变化时阻塞主线程。
+  3. 新增 `largeCanvasVirtualization` 纯函数模块，将 10k 画布的可见绘制选择和图片加载调度抽出为可测试契约，防止后续重新引入全量扫描。
+  4. 补充 10k 画布虚拟化契约测试和性能基准，覆盖低缩放、大量缓存卡片、可见集合绘制、近视口资源调度等场景。
+  5. 非破坏性探测 `https://kkai.plus/`，确认线上当前入口脚本为 `/assets/index-CiDicRPZ.js`，本地最新 build 产物为 `apps/web/dist/assets/index-DllbDeNY.js`，线上尚未包含本次本地修复。
+- **修改文件**：
+  - `apps/web/src/canvas/largeCanvasVirtualization.ts`
+  - `apps/web/src/components/canvas/CanvasLayerRenderer.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `tests/unit/canvas-10k-virtualization-contract.test.ts`
+  - `tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `tests/benchmark/canvas-performance.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - Canvas 缓存绘制层只服务独立图片缩略图，不接管 prompt group 主卡、副卡、停靠布局或虚线连接的视觉所有权。
+  - 大画布模式下，缩放和拖拽路径必须和总卡片数解耦；每帧工作量应随可见卡片/近视口候选数量增长，而不是随历史项目总量增长。
+  - 图片加载调度的排序入口使用已经由空间索引裁剪出的 `visibleImageNodes`，避免在 16%-100% 缩放来回切换时反复遍历 10000+ 节点。
+- **已运行验证**：
+  - `npm run agents:status`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-10k-virtualization-contract.test.ts tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `npm run verify:canvas-performance`
+  - `npm run verify:prompt-group-drag`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run architecture:check`
+  - `npm run governance:check`
+  - 线上只读探测 `https://kkai.plus/`：HTTP 200，title 为 `KK Studio - AI Image Workspace`，入口脚本 `/assets/index-CiDicRPZ.js`。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`；本次变更集中在大画布绘制/调度热路径，已运行相关单测、10k 性能基准、prompt group 浏览器拖拽 smoke、typecheck、build、architecture 和 governance。
+  - 未执行生产部署；`kkai.plus` 是生产域名，当前会话没有得到明确发布授权。
+- **风险与下一步**：
+  - 线上必须重新部署后才会应用本地修复；部署后需要用用户真实 10000+ 历史画布复测缩放、拖拽、虚线跟随和资源加载。
+  - 如果部署后仍出现卡片丢失，应继续检查真实数据下 `visiblePromptGroupViews` / `groupView.bounds` 的分组裁剪边界，而不是让 Canvas 缓存层重新绘制分组卡片。
+  - 运行 `npm run agents:commit` 将本次 10k 画布虚拟化修复固化为本地 Git 提交。

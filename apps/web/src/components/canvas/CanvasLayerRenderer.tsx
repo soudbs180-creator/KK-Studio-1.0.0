@@ -1,5 +1,9 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { CachedCardMeta } from '../../services/storage/offlineDb';
+import {
+  buildCanvasLayerMetaLookup,
+  selectCanvasLayerMetasForPaint,
+} from '../../canvas/largeCanvasVirtualization';
 
 interface CanvasLayerRendererProps {
   cardMetas: CachedCardMeta[];
@@ -24,6 +28,8 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
   height,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cardMetaById = React.useMemo(() => buildCanvasLayerMetaLookup(cardMetas), [cardMetas]);
+  const selectedNodeIdSet = React.useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
   // 绘制圆角矩形辅助函数
   const drawRoundRect = (
@@ -62,18 +68,15 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
     ctx.scale(canvasTransform.scale, canvasTransform.scale);
 
     const scale = canvasTransform.scale;
+    const paintMetas = selectCanvasLayerMetasForPaint({
+      cardMetaById,
+      visibleCardIds,
+      selectedNodeIds: selectedNodeIdSet,
+      activeSourceImage,
+    });
 
     // 遍历绘制可见节点
-    cardMetas.forEach((meta) => {
-      // 过滤掉不可见节点以节省绘制开销
-      if (!visibleCardIds.has(meta.id)) return;
-      if (meta.type !== 'image') return;
-      
-      // 过滤掉 React DOM 正在接管渲染的选中/激活态卡片，避免重叠绘制
-      const isSelected = selectedNodeIds.includes(meta.id);
-      const isActive = meta.id === activeSourceImage;
-      if (isSelected || isActive) return;
-
+    paintMetas.forEach((meta) => {
       const { x, y, width: w, height: h, thumbnailUrl } = meta;
       
       // 锚点是 Bottom Center，计算左上角
@@ -166,7 +169,7 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
     });
 
     ctx.restore();
-  }, [cardMetas, visibleCardIds, canvasTransform, selectedNodeIds, activeSourceImage, width, height]);
+  }, [cardMetaById, visibleCardIds, canvasTransform, selectedNodeIdSet, activeSourceImage, width, height]);
 
   // 当尺寸或数据变化时，执行渲染
   useEffect(() => {

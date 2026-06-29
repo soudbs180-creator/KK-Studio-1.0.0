@@ -5,6 +5,12 @@ import { CanvasMeasurementScheduler } from '../../apps/web/src/canvas/CanvasMeas
 import { CanvasConnectorScheduler } from '../../apps/web/src/canvas/CanvasConnectorScheduler';
 import { useCanvasSpatialIndex } from '../../apps/web/src/app/useCanvasSpatialIndex';
 import { useVisibleCanvasItemsNew } from '../../apps/web/src/app/useVisibleCanvasItems';
+import {
+  buildCanvasLayerMetaLookup,
+  buildViewportImageLoadScheduling,
+  selectCanvasLayerMetasForPaint,
+} from '../../apps/web/src/canvas/largeCanvasVirtualization';
+import type { CachedCardMeta } from '../../apps/web/src/services/storage/offlineDb';
 
 // Mock requestAnimationFrame for Node.js test runtime
 if (typeof global !== 'undefined' && !(global as any).requestAnimationFrame) {
@@ -271,4 +277,63 @@ test('CanvasSpatialIndex bucket query and overscan functionality check', () => {
   expect(tightResults.has('image-2')).toBe(false);
 });
 
+test('10000 card canvas virtualization keeps per-frame work bounded to visible candidates', () => {
+  const totalCards = 10000;
+  const metas: CachedCardMeta[] = [];
+  const imageNodes: Array<Pick<DummyImageNode, 'id' | 'position'>> = [];
+  const visibleIds = new Set<string>();
+
+  for (let i = 0; i < totalCards; i++) {
+    const id = `standalone-image-${i}`;
+    const x = (i % 100) * 420;
+    const y = Math.floor(i / 100) * 640;
+
+    metas.push({
+      id,
+      x,
+      y,
+      width: 400,
+      height: 600,
+      type: 'image',
+      thumbnailUrl: `blob:standalone-${i}`,
+      updatedAt: i,
+    });
+    imageNodes.push({ id, position: { x, y } });
+
+    if (i % 125 === 0) {
+      visibleIds.add(id);
+    }
+  }
+
+  const lookup = buildCanvasLayerMetaLookup(metas);
+  const startSelect = performance.now();
+  const paintMetas = selectCanvasLayerMetasForPaint({
+    cardMetaById: lookup,
+    visibleCardIds: visibleIds,
+    selectedNodeIds: new Set(),
+    activeSourceImage: null,
+  });
+  const selectTime = performance.now() - startSelect;
+
+  const nearViewportNodes = imageNodes.filter((node) => visibleIds.has(node.id));
+  const startSchedule = performance.now();
+  const scheduling = buildViewportImageLoadScheduling({
+    imageNodes: nearViewportNodes,
+    collapsedCanvasGroupNodeIds: new Set(),
+    canvasTransform: { x: 0, y: 0, scale: 1 },
+    viewportWidth: 1440,
+    viewportHeight: 960,
+  });
+  const scheduleTime = performance.now() - startSchedule;
+
+  console.log(
+    `[canvas:10000] visibleIds=${visibleIds.size} paintMetas=${paintMetas.length} ` +
+    `select=${selectTime.toFixed(4)}ms schedule=${scheduleTime.toFixed(4)}ms`
+  );
+
+  expect(paintMetas.length).toBe(visibleIds.size);
+  expect(scheduling.size).toBeLessThanOrEqual(nearViewportNodes.length);
+  expect(selectTime).toBeLessThanOrEqual(4);
+  expect(scheduleTime).toBeLessThanOrEqual(6);
+});
 
