@@ -1660,3 +1660,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **下一步计划**：
   - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
 
+## 101. 2026-06-29 - 优化空模型交互通道与移动端导航排版自适应 (本次追加)
+- **修改范围**：
+  - **PromptBar 交互死胡同优化**：修复了在空模型（无可用模型）状态下模型按钮的点击响应，自动通过 `onOpenSettings` 跳转至 API 密钥配置面板，并辅以人性化的 Toast 引导通知，提升了新手配置流程体验。
+  - **介绍页移动端导航响应式优化**：重构了 `landingStyles.css` 媒体查询中 `.kk-landing-nav` 移动端布局，将 Grid 多列网格隐式列对齐优化为 Flex 对齐，消除了因子节点 `display: none` 导致的潜在重叠与折行隐患。
+  - **视觉 UI 滚动适配核对**：配合浏览器子代理，对还原后的 New Genre 介绍页以及工作区各个面板层级进行了桌面端（1440x900）与移动端（375x812）的高精度视觉排版核实，确认无文字溢出或严重重叠。
+- **修改文件**：
+  - [PromptBar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/PromptBar.tsx) [MODIFY]
+  - [landingStyles.css](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/landing/landingStyles.css) [MODIFY]
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md) [MODIFY]
+- **当前设计决策**：
+  - **Flexbox 响应式替代**：将具有隐藏子元素的导航条容器由 CSS Grid 变更为更适合局部隐蔽对齐的 Flex 布局，从布局层面断绝错位可能。
+- **已运行验证**：
+  - 全量 `npm run verify:changes` 成功运行通过。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
+

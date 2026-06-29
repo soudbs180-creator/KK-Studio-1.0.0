@@ -5760,6 +5760,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
                                         e.stopPropagation(); // 🚀 阻止冒泡，防止被 handleClickOutside 误杀
+                                        if (isModelListEmpty) {
+                                            notify.info('请先配置 API 密钥', '暂无可用模型，已自动为您打开 API 设置面板。');
+                                            onOpenSettings?.('api-management');
+                                            return;
+                                        }
                                         if (isMobile) {
                                             textareaRef.current?.blur();
                                         }

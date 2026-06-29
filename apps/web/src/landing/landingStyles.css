@@ -569,7 +569,9 @@
 
 @media (max-width: 980px) {
   .kk-landing-nav {
-    grid-template-columns: auto auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .kk-landing-nav__links {
