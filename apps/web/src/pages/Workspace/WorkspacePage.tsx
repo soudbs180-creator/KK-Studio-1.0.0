@@ -4308,8 +4308,20 @@ export const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (!activeCanvas) return;
     const metas: CachedCardMeta[] = [];
-    activeCanvas.promptNodes.forEach(n => metas.push({ id: n.id, x: n.position.x, y: n.position.y, width: n.width || 360, height: n.height || 200, type: 'prompt', updatedAt: n.timestamp }));
-    activeCanvas.imageNodes.forEach(n => metas.push({ id: n.id, x: n.position.x, y: n.position.y, width: 400, height: 600, type: 'image', thumbnailUrl: n.apiResultUrl || n.url, updatedAt: n.timestamp }));
+    activeCanvas.imageNodes
+      .filter((n) => !n.parentPromptId)
+      .forEach((n) => {
+        metas.push({
+          id: n.id,
+          x: n.position.x,
+          y: n.position.y,
+          width: 400,
+          height: 600,
+          type: 'image',
+          thumbnailUrl: n.apiResultUrl || n.url,
+          updatedAt: n.timestamp,
+        });
+      });
     
     setCardMetas(metas);
 

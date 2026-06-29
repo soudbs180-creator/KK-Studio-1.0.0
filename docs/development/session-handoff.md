@@ -1710,3 +1710,35 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 线上仍需重新部署后才会应用本地修复；当前 `kkai.plus` 检测到的资源仍是部署版本。
   - 若大规模历史画布仍出现“丢卡”，下一步应针对真实大画布数据继续检查 culling buffer 与持久化 transform，而不是设置页布局链路。
   - 运行 `npm run agents:commit` 固化本地 Git 提交。
+
+## 103. 2026-06-29 - Fix Infinite Canvas Prompt Group Cache Layer Ownership
+- **修改范围**：
+  - 修复无限画布大项目模式下 `CanvasLayerRenderer` 与 React prompt-group renderer 同时绘制同一组主卡/副卡导致的多层混叠、黑色 Prompt 壳残留、缩放后卡片错位和虚线跟随错觉问题。
+  - `WorkspacePage.tsx` 构造背景缓存层 `cardMetas` 时不再加入 prompt 主卡，也不再加入带 `parentPromptId` 的分组子图；分组主卡、副卡、连接虚线统一交由 `ImageGenerationGroupRenderer` 和 live scene/regroup layout 渲染。
+  - `CanvasLayerRenderer.tsx` 增加 image-only 防线，若误传 prompt/workflow meta 会直接跳过；同时移除 Canvas 层绘制 `PROMPT CARD` 与 `ID: node...` 文本的旧逻辑。
+  - 新增 `tests/unit/canvas-layer-renderer-ownership-contract.test.ts`，防止缓存层再次抢画 prompt group 卡片。
+- **修改文件**：
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/components/canvas/CanvasLayerRenderer.tsx`
+  - `tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 分组卡片的视觉所有权只能有一个来源：prompt group renderer 负责主卡、副卡、停靠布局和虚线连接；Canvas 缓存层只保留独立图片缩略图的低成本绘制，避免原始节点坐标与停靠视觉坐标打架。
+  - 主卡拖动时副卡跟随仍由 `usePromptGroupLayout` 的 regroup layout 和 live scene store 负责，不改动既有拖拽数学；本次修复切断的是错误的第二视觉层。
+  - `kkai.plus` 当前仍是未部署本次修复的线上版本，部署后需要用真实大画布数据复测缩放、拖拽、虚线跟随和资源加载。
+- **已运行验证**：
+  - `npm run agents:status`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-behavior.test.ts`
+  - `npm run verify:prompt-group-drag`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run architecture:check`
+  - `npm run governance:check`
+  - 浏览器实测本地 `http://127.0.0.1:3000/`：`promptCardTextCount: 0`、`nodeIdTextCount: 0`、`pointerNoneCanvasCount: 1`，未再出现缓存层 `PROMPT CARD / ID: node...` 文本；截图保存于 `temp/playwright/canvas-layer-compare/local-after-fix.png`。
+  - 浏览器实测线上 `https://kkai.plus/`：页面加载后只读 DOM 查询与截图分别在浏览器协议 `Page.getFrameTree` / `Page.getLayoutMetrics` 阶段超时，符合线上旧版本异常卡顿症状。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`；本次变更集中在无限画布缓存层 ownership，已运行新增回归、prompt-group 拖拽契约、浏览器拖拽 smoke、typecheck、build、architecture 与 governance。
+- **风险与下一步**：
+  - 线上必须重新部署后才会应用本地修复；部署后需要在用户真实大画布数据上复测 16%-100% 缩放、主卡拖拽、副卡自动停靠和虚线跟随。
+  - 若部署后仍出现卡片丢失，下一步应继续检查真实数据下的 `visiblePromptGroupViews` / `groupView.bounds` culling，而不是再让 Canvas 缓存层绘制分组卡片。

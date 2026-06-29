@@ -67,13 +67,14 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
     cardMetas.forEach((meta) => {
       // 过滤掉不可见节点以节省绘制开销
       if (!visibleCardIds.has(meta.id)) return;
+      if (meta.type !== 'image') return;
       
       // 过滤掉 React DOM 正在接管渲染的选中/激活态卡片，避免重叠绘制
       const isSelected = selectedNodeIds.includes(meta.id);
       const isActive = meta.id === activeSourceImage;
       if (isSelected || isActive) return;
 
-      const { x, y, width: w, height: h, type, thumbnailUrl } = meta;
+      const { x, y, width: w, height: h, thumbnailUrl } = meta;
       
       // 锚点是 Bottom Center，计算左上角
       const cardX = x - w / 2;
@@ -98,7 +99,7 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
       ctx.shadowOffsetY = 6;
 
       // 卡片底色
-      ctx.fillStyle = type === 'prompt' ? 'rgba(24, 24, 27, 0.75)' : 'rgba(18, 18, 18, 0.6)'; // UI_TOKEN_EXCEPTION
+      ctx.fillStyle = 'rgba(18, 18, 18, 0.6)'; // UI_TOKEN_EXCEPTION
       drawRoundRect(ctx, cardX, cardY, w, h, 24);
       ctx.fill();
 
@@ -109,12 +110,12 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
       ctx.shadowOffsetY = 0;
 
       // 卡片边框
-      ctx.strokeStyle = type === 'prompt' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)'; // UI_TOKEN_EXCEPTION
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'; // UI_TOKEN_EXCEPTION
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       // 3. 绘制图片（图片节点）
-      if (type === 'image' && thumbnailUrl) {
+      if (thumbnailUrl) {
         let img = imageCache.get(thumbnailUrl);
         if (!img) {
           img = new Image();
@@ -162,20 +163,6 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
         }
       }
 
-      // 4. 绘制文字 (如果是提示词卡片且放大比例足够看到文字)
-      if (type === 'prompt' && scale > 0.45) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; // UI_TOKEN_EXCEPTION
-        ctx.font = 'semibold 12px Inter, system-ui, sans-serif';
-        ctx.fillText('PROMPT CARD', cardX + 16, cardY + 32);
-
-        // 简短的提示文本绘制
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; // UI_TOKEN_EXCEPTION
-        ctx.font = '14px Inter, system-ui, sans-serif';
-        
-        // 简易换行绘制 (按字符切分)
-        const text = meta.id; // 可以使用元数据携带的部分 prompt 摘要，为了演示直接展示节点类型
-        ctx.fillText(`ID: ${text.slice(0, 14)}...`, cardX + 16, cardY + 64);
-      }
     });
 
     ctx.restore();
