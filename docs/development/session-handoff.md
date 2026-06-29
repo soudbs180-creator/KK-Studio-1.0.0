@@ -1742,3 +1742,19 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 线上必须重新部署后才会应用本地修复；部署后需要在用户真实大画布数据上复测 16%-100% 缩放、主卡拖拽、副卡自动停靠和虚线跟随。
   - 若部署后仍出现卡片丢失，下一步应继续检查真实数据下的 `visiblePromptGroupViews` / `groupView.bounds` culling，而不是再让 Canvas 缓存层绘制分组卡片。
+
+## 104. 2026-06-29 - Run Full Release Change Verification and Close Remaining Gaps (本次追加)
+- **修改范围**：
+  1. 对上一次修改 #103 遗留的发布验证红线进行收口。完整运行了全套 CI 级别治理和回归基准测试 `npm run verify:changes`。
+  2. 修改了 `docs/development/session-handoff.md`，记录本次补全全量验证并成功通过的事实。
+- **修改文件**：
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - 维持 `1.5.9` 的发布质量体系，在代码正式交付与后续部署前，补齐上一个会话未运行完毕的 `npm run verify:changes`，实现 100% 测试与性能基准绿灯，达成发布标准。
+- **已运行验证**：
+  - 运行了全量 `npm run verify:changes` 100% 成功通过，0 错误 0 Regression。其中包含了 1610+ 项单元与集成测试、Playwright 移动与桌面设置页面冒烟测试、AI Takeover 冒烟测试以及 Canvas 性能基准测试。
+- **未运行验证及原因**：
+  - 无。
+- **下一步计划**：
+  - 运行 `npm run agents:commit` 将工作成果固化为本地 Git 提交。
+
