@@ -1,5 +1,6 @@
 import React from 'react';
 import PromptNodeComponent from '../../../components/canvas/PromptNodeComponent';
+import { isCreditBillingTarget } from '../../../utils/creditBilling';
 import ImageNode from '../../../components/image/ImageCard';
 import type { CanvasCardRenderContext } from './CanvasCardRendererRegistry';
 
@@ -52,89 +53,7 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   const groupView = item.groupView;
   const visibleChildImages = groupView.childImages;
 
-  // 1. Skeleton Level (business skeleton showing prompt and video outline)
-  if (detailLevel === 'skeleton') {
-    const promptWidth = 320;
-    const promptHeight = 180;
-    const promptPos = resolveLivePromptPosition(node) ?? node.position;
-    const left = promptPos.x - promptWidth / 2;
-    const top = promptPos.y - promptHeight;
-    const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
-    const telemetry = node?.telemetry;
-
-    return (
-      <div 
-        className="absolute pointer-events-auto rounded-3xl border border-white/10 bg-zinc-900 flex flex-col p-5 gap-3 shadow-2xl overflow-hidden"
-        style={{
-          left: `${left}px`,
-          top: `${top}px`,
-          width: `${promptWidth}px`,
-          height: `${promptHeight + 100}px`,
-          zIndex: groupStackZIndex,
-          color: '#f4f4f5',
-        }}
-      >
-        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
-          <span>视频生成 SKELETON</span>
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-        </div>
-        <div className="text-xs font-semibold truncate text-zinc-300">
-          {node.prompt || '未命名视频任务'}
-        </div>
-        <div className="flex-1 rounded-xl bg-zinc-800 border border-white/5 flex flex-col items-center justify-center p-3 gap-2">
-          <svg className="w-6 h-6 text-zinc-500 animate-bounce" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <div className="text-[10px] text-zinc-400 font-mono flex flex-col items-center gap-0.5">
-            <span>模型: {node.model || 'Unknown'}</span>
-            <span>渠道: {telemetry?.route?.sourceType || 'api-platform'}</span>
-            <span>时长: {node.videoDuration || '6s'} | 分辨率: {node.resolution || '720P'}</span>
-            <span className="text-indigo-400">预计费用: {telemetry?.cost?.chargedCredits ?? 15} Credits</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Ghost Level
-  if (detailLevel === 'ghost') {
-    const promptWidth = 320;
-    const promptHeight = 150;
-    const promptPos = resolveLivePromptPosition(node) ?? node.position;
-    const left = promptPos.x - promptWidth / 2;
-    const top = promptPos.y - promptHeight;
-    const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
-    const telemetry = node?.telemetry;
-
-    return (
-      <div 
-        className="absolute border border-dashed border-zinc-700/60 bg-zinc-950 pointer-events-auto rounded-3xl p-4 flex flex-col justify-between"
-        style={{
-          left: `${left}px`,
-          top: `${top}px`,
-          width: `${promptWidth}px`,
-          height: `${promptHeight + 100}px`,
-          zIndex: groupStackZIndex,
-          color: '#f4f4f5',
-        }}
-      >
-        <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
-          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/30">视频生成 GHOST</span>
-          <span className="text-indigo-400 font-semibold">{node.isGenerating ? '生成中' : '已就绪'}</span>
-        </div>
-        <div className="text-xs text-zinc-300 font-semibold truncate my-2">
-          {node.prompt || '未命名视频任务'}
-        </div>
-        <div className="flex flex-col gap-1 text-[9px] text-zinc-500 font-mono">
-          <span>模型: {node.model || 'Unknown'}</span>
-          <span>渠道: {telemetry?.route?.sourceType || 'api-platform'}</span>
-          <span>时长: {node.videoDuration || '6s'} | 分辨率: {node.resolution || '720P'}</span>
-          <span>费用: {telemetry?.cost?.chargedCredits ?? 15} Credits | 结果数: {visibleChildImages?.length || 0}</span>
-        </div>
-      </div>
-    );
-  }
-
+  const isCreditModel = isCreditBillingTarget(node);
   // 3. Full / Compact rendering
   const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
   const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
@@ -272,7 +191,8 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
               <ImageNode
                 id={`image-card-${childLayout.childNode.id}`}
                 {...imageProps}
-                detailLevel="full"
+                isCreditModelOverride={isCreditModel}
+                detailLevel={detailLevel}
                 loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
                 loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
                 groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}

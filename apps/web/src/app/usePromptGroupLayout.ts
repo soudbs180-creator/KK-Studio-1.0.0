@@ -515,6 +515,76 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     liveNodePositionByIdRef,
   ]);
 
+function getSubCardStandardOffset(
+  prompt: PromptNode,
+  childImages: GeneratedImage[],
+  image: GeneratedImage,
+  layoutMode: 'grid' | 'row' | 'column'
+): { x: number; y: number } {
+  const index = childImages.findIndex(img => img.id === image.id);
+  if (index === -1) return { x: 0, y: 150 };
+
+  const imageDims = childImages.map(img => {
+    const { width, totalHeight } = getCardDimensions(img.aspectRatio, true);
+    return { w: width, h: totalHeight };
+  });
+
+  const currentDims = imageDims[index];
+
+  if (layoutMode === 'row') {
+    const totalWidth = imageDims.reduce((sum, d) => sum + d.w, 0) + (childImages.length - 1) * 32; // SUB_IMAGE_GAP = 32
+    let currentLeft = -totalWidth / 2;
+    for (let i = 0; i < index; i++) {
+      currentLeft += imageDims[i].w + 32;
+    }
+    return {
+      x: currentLeft + currentDims.w / 2,
+      y: 56 + currentDims.h // PROMPT_TO_SUB_GAP = 56
+    };
+  } else if (layoutMode === 'column') {
+    let currentTop = 56;
+    for (let i = 0; i < index; i++) {
+      currentTop += imageDims[i].h + 32;
+    }
+    return {
+      x: 0,
+      y: currentTop + currentDims.h
+    };
+  } else {
+    // grid
+    const columns = Math.min(20, childImages.length); // SUB_COLUMNS = 20
+    const maxWidth = Math.max(...imageDims.map(d => d.w));
+    const totalWidth = columns * maxWidth + (columns - 1) * 32;
+    const startX = -totalWidth / 2 + maxWidth / 2;
+
+    const rowCount = Math.ceil(childImages.length / columns);
+    const rowMaxHeights: number[] = [];
+    for (let r = 0; r < rowCount; r++) {
+      let maxH = 0;
+      for (let c = 0; c < columns; c++) {
+        const idx = r * columns + c;
+        if (idx < childImages.length) {
+          maxH = Math.max(maxH, imageDims[idx].h);
+        }
+      }
+      rowMaxHeights.push(maxH);
+    }
+
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+
+    let currentTop = 56;
+    for (let r = 0; r < row; r++) {
+      currentTop += rowMaxHeights[r] + 32;
+    }
+
+    return {
+      x: startX + col * (maxWidth + 32),
+      y: currentTop + currentDims.h
+    };
+  }
+}
+
   const applyLiveNodeDeltaToDraggedSet = useCallback((
     ownerId: string,
     nodeIds: string[] | null | undefined,
@@ -545,16 +615,46 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       hasLivePositionChanged = true;
     });
 
+    const isOwnerPrompt = currentPromptNodesById.has(ownerId);
+    const promptNode = currentPromptNodesById.get(ownerId);
+
     companionIds.forEach((nodeId) => {
       const basePosition = resolveCanvasNodePositionForLiveDrag(nodeId);
       if (!basePosition) {
         return;
       }
 
-      const nextPosition = {
+      let nextPosition = {
         x: basePosition.x + delta.x,
         y: basePosition.y + delta.y,
       };
+
+      if (isOwnerPrompt && promptNode) {
+        const imageNode = currentImageNodesById.get(nodeId);
+        if (imageNode) {
+          const childImages = Array.from(currentImageNodesById.values())
+            .filter(img => img.parentPromptId === promptNode.id)
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+          const layoutMode = promptNode.mode === GenerationMode.PPT ? 'column' : 'grid';
+          const offset = getSubCardStandardOffset(promptNode, childImages, imageNode, layoutMode);
+
+          const ownerBase = resolveCanvasNodePositionForLiveDrag(ownerId) || promptNode.position;
+          const ownerNewX = ownerBase.x + delta.x;
+          const ownerNewY = ownerBase.y + delta.y;
+
+          const targetX = ownerNewX + offset.x;
+          const targetY = ownerNewY + offset.y;
+
+          const currentLivePos = nextLivePositions[nodeId] || basePosition;
+
+          nextPosition = {
+            x: currentLivePos.x + (targetX - currentLivePos.x) * 0.18,
+            y: currentLivePos.y + (targetY - currentLivePos.y) * 0.18,
+          };
+        }
+      }
+
       const previousPosition = nextLivePositions[nodeId];
 
       if (!previousPosition || previousPosition.x !== nextPosition.x || previousPosition.y !== nextPosition.y) {
@@ -586,6 +686,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     liveNodePositionByIdRef,
     resolveCanvasNodePositionForLiveDrag,
     syncLiveNodePositionState,
+    currentPromptNodesById,
+    currentImageNodesById,
   ]);
 
   const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {

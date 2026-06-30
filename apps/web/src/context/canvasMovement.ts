@@ -1,6 +1,8 @@
 import type { Canvas } from '../types/index.ts';
+import { type AspectRatio, GenerationMode, type GeneratedImage, type PromptNode } from '../types/index.ts';
 import { snapCanvasPointToGrid } from '../utils/canvasSnapToGrid.ts';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
+import { getCardDimensions } from '../utils/styleUtils.ts';
 
 export type CanvasMoveDelta = { x: number; y: number };
 export type CanvasMoveSource = string | string[] | undefined;
@@ -28,6 +30,76 @@ export function resolveMoveSelectedCanvasNodeIds(
     }
 
     return selectedNodeIds;
+}
+
+function getSubCardStandardOffset(
+  prompt: PromptNode,
+  childImages: GeneratedImage[],
+  image: GeneratedImage,
+  layoutMode: 'grid' | 'row' | 'column'
+): { x: number; y: number } {
+  const index = childImages.findIndex(img => img.id === image.id);
+  if (index === -1) return { x: 0, y: 150 };
+
+  const imageDims = childImages.map(img => {
+    const { width, totalHeight } = getCardDimensions(img.aspectRatio, true);
+    return { w: width, h: totalHeight };
+  });
+
+  const currentDims = imageDims[index];
+
+  if (layoutMode === 'row') {
+    const totalWidth = imageDims.reduce((sum, d) => sum + d.w, 0) + (childImages.length - 1) * 32; // SUB_IMAGE_GAP = 32
+    let currentLeft = -totalWidth / 2;
+    for (let i = 0; i < index; i++) {
+      currentLeft += imageDims[i].w + 32;
+    }
+    return {
+      x: currentLeft + currentDims.w / 2,
+      y: 56 + currentDims.h // PROMPT_TO_SUB_GAP = 56
+    };
+  } else if (layoutMode === 'column') {
+    let currentTop = 56;
+    for (let i = 0; i < index; i++) {
+      currentTop += imageDims[i].h + 32;
+    }
+    return {
+      x: 0,
+      y: currentTop + currentDims.h
+    };
+  } else {
+    // grid
+    const columns = Math.min(20, childImages.length); // SUB_COLUMNS = 20
+    const maxWidth = Math.max(...imageDims.map(d => d.w));
+    const totalWidth = columns * maxWidth + (columns - 1) * 32;
+    const startX = -totalWidth / 2 + maxWidth / 2;
+
+    const rowCount = Math.ceil(childImages.length / columns);
+    const rowMaxHeights: number[] = [];
+    for (let r = 0; r < rowCount; r++) {
+      let maxH = 0;
+      for (let c = 0; c < columns; c++) {
+        const idx = r * columns + c;
+        if (idx < childImages.length) {
+          maxH = Math.max(maxH, imageDims[idx].h);
+        }
+      }
+      rowMaxHeights.push(maxH);
+    }
+
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+
+    let currentTop = 56;
+    for (let r = 0; r < row; r++) {
+      currentTop += rowMaxHeights[r] + 32;
+    }
+
+    return {
+      x: startX + col * (maxWidth + 32),
+      y: currentTop + currentDims.h
+    };
+  }
 }
 
 export function moveSelectedCanvasNodes(input: {
@@ -67,11 +139,33 @@ export function moveSelectedCanvasNodes(input: {
     const imageNodes = canvas.imageNodes.map(node => {
         const isDirectlyMovedImage = selectedSet.has(node.id);
         const isMovingWithPromptGroup = Boolean(node.parentPromptId && movedPromptIds.has(node.parentPromptId));
-        if (isDirectlyMovedImage || isMovingWithPromptGroup) {
+        if (isMovingWithPromptGroup && node.parentPromptId) {
+            const parentPrompt = promptNodes.find(p => p.id === node.parentPromptId);
+            if (parentPrompt) {
+                const childImages = canvas.imageNodes
+                    .filter(img => img.parentPromptId === node.parentPromptId)
+                    .sort((a, b) => a.timestamp - b.timestamp);
+
+                const layoutMode = parentPrompt.mode === GenerationMode.PPT ? 'column' : 'grid';
+                const offset = getSubCardStandardOffset(parentPrompt, childImages, node, layoutMode);
+
+                const finalPos = {
+                    x: parentPrompt.position.x + offset.x,
+                    y: parentPrompt.position.y + offset.y
+                };
+
+                return {
+                    ...node,
+                    position: snapCanvasPointToGrid(finalPos, { enabled: options?.snapToGrid }),
+                    userMoved: node.userMoved,
+                };
+            }
+        }
+        if (isDirectlyMovedImage) {
             return {
                 ...node,
                 position: moveCanvasPoint(node.position, delta, options),
-                userMoved: selectedSet.has(node.id) ? true : node.userMoved,
+                userMoved: true,
             };
         }
         return node;

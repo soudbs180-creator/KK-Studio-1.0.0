@@ -47,6 +47,7 @@ import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
 import { resolveCanvasAutoArrangePositions } from './canvasAutoArrange';
+import { getCardDimensions } from '../utils/styleUtils';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -2323,20 +2324,104 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
-        const positions = resolveCanvasAutoArrangePositions(currentCanvas);
+        const newImageNodes = [...currentCanvas.imageNodes];
+        currentCanvas.promptNodes.forEach(prompt => {
+            const childImages = newImageNodes.filter(image => image.parentPromptId === prompt.id);
+            if (childImages.length === 0) return;
+
+            const targetMode = prompt.mode === GenerationMode.PPT ? 'column' : (state.subCardLayoutMode || 'grid');
+            const imageDims = childImages.map(image => {
+                const { width, totalHeight } = getCardDimensions(image.aspectRatio as AspectRatio, true);
+                return { w: width, h: totalHeight };
+            });
+            const promptCenterX = prompt.position.x;
+            const promptBottom = prompt.position.y;
+
+            if (targetMode === 'row') {
+                const totalWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) + (childImages.length - 1) * 32;
+                let currentLeft = promptCenterX - totalWidth / 2;
+                const subCardsTopY = promptBottom + 56;
+
+                childImages.forEach((image, index) => {
+                    const dims = imageDims[index];
+                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
+                    if (foundIdx !== -1) {
+                        newImageNodes[foundIdx] = {
+                            ...newImageNodes[foundIdx],
+                            position: {
+                                x: currentLeft + dims.w / 2,
+                                y: subCardsTopY + dims.h
+                            }
+                        };
+                    }
+                    currentLeft += dims.w + 32;
+                });
+            } else if (targetMode === 'grid') {
+                const columns = Math.min(20, childImages.length);
+                const maxWidth = Math.max(...imageDims.map(dims => dims.w));
+                const totalWidth = columns * maxWidth + (columns - 1) * 32;
+                const startX = promptCenterX - totalWidth / 2 + maxWidth / 2;
+
+                const rowCount = Math.ceil(childImages.length / columns);
+                const rowMaxHeights: number[] = [];
+                for (let r = 0; r < rowCount; r++) {
+                    let maxH = 0;
+                    for (let c = 0; c < columns; c++) {
+                        const idx = r * columns + c;
+                        if (idx < childImages.length) {
+                            maxH = Math.max(maxH, imageDims[idx].h);
+                        }
+                    }
+                    rowMaxHeights.push(maxH);
+                }
+
+                const rowTopYs: number[] = [];
+                let currentTopY = promptBottom + 56;
+                for (let r = 0; r < rowCount; r++) {
+                    rowTopYs.push(currentTopY);
+                    currentTopY += rowMaxHeights[r] + 32;
+                }
+
+                childImages.forEach((image, index) => {
+                    const col = index % columns;
+                    const row = Math.floor(index / columns);
+                    const dims = imageDims[index];
+                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
+                    if (foundIdx !== -1) {
+                        newImageNodes[foundIdx] = {
+                            ...newImageNodes[foundIdx],
+                            position: {
+                                x: startX + col * (maxWidth + 32),
+                                y: rowTopYs[row] + dims.h
+                            }
+                        };
+                    }
+                });
+            } else {
+                // column
+                let currentTop = promptBottom + 56;
+                childImages.forEach((image, index) => {
+                    const dims = imageDims[index];
+                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
+                    if (foundIdx !== -1) {
+                        newImageNodes[foundIdx] = {
+                            ...newImageNodes[foundIdx],
+                            position: {
+                                x: promptCenterX,
+                                y: currentTop + dims.h
+                            }
+                        };
+                    }
+                    currentTop += dims.h + 32;
+                });
+            }
+        });
 
         setState(prev => {
-            // Recompute from prev so we always use the latest state.
-            const updatedCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? {
-                    ...c,
-                    promptNodes: c.promptNodes.map(pn => ({ ...pn, position: positions[pn.id] || pn.position })),
-                    imageNodes: c.imageNodes.map(img => ({ ...img, position: positions[img.id] || img.position })),
-                    lastModified: Date.now()
-                } : c
+            const newCanvases = prev.canvases.map(c =>
+                c.id === prev.activeCanvasId ? { ...c, imageNodes: newImageNodes, lastModified: Date.now() } : c
             );
-
-            return { ...prev, canvases: updatedCanvases };
+            return { ...prev, canvases: newCanvases };
         });
 
     }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds]);

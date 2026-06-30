@@ -29,6 +29,23 @@ import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLiv
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
 
+const dominantColorCache = new Map<string, string>();
+
+function extractDominantColor(img: HTMLImageElement): string {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '#27272a';
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        return `rgba(${r}, ${g}, ${b}, 0.85)`;
+    } catch (e) {
+        return '#27272a';
+    }
+}
+
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
     return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 1))}…` : text;
@@ -105,6 +122,7 @@ interface ImageNodeProps {
     isCanvasTransforming?: boolean;
     snapToGrid?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] 渲染为垂直聊天流中的标准块
+    isCreditModelOverride?: boolean;
 }
 
 const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
@@ -143,7 +161,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     isCanvasTransforming = false,
     snapToGrid = false,
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
-    isChatMode = false // 🚀 [New] 垂直聊天流标识
+    isChatMode = false, // 🚀 [New] 垂直聊天流标识
+    isCreditModelOverride
 }) => {
     const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
@@ -581,8 +600,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     // Prefer explicit credit metadata so subcards keep the right billing UI even on recovered history.
     const isCreditModel = useMemo(
-        () => isCreditBillingTarget(image),
-        [image.billingMode, image.creditCost, image.model, image.provider]
+        () => isCreditModelOverride !== undefined ? isCreditModelOverride : isCreditBillingTarget(image),
+        [isCreditModelOverride, image]
     );
     const resolvedCreditCost = useMemo(
         () => getResolvedCreditCost(image),
@@ -1415,74 +1434,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         overflow: 'visible',
     } as const;
 
-    if (detailLevel === 'ghost') {
-        const displaySrc = image.url || image.originalUrl || image.apiResultUrl;
-        return (
-            <div
-                ref={containerRef}
-                id={`image-card-${image.id}`}
-                className="image-node absolute flex flex-col items-center select-none"
-                style={{
-                    transform: `translate3d(${snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX}px, ${snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY}px, 0px)`,
-                    left: 0,
-                    top: 0,
-                    zIndex: effectiveStackZIndex,
-                    width: nodeWidth,
-                    height: cardHeight,
-                    opacity: 0.8,
-                    cursor: isDragging ? 'grabbing' : 'grab',
-                }}
-                onMouseDown={handleMouseDown}
-                onTouchStart={handleMouseDown}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if (canHandleCardClick()) onClick?.(image.id);
-                }}
-            >
-                <div
-                    className="relative w-full h-full overflow-hidden border border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] flex flex-col justify-between p-2"
-                >
-                    {/* Ghost Header: Type Icon & Model */}
-                    <div className="flex items-center justify-between w-full text-[9px] text-slate-400">
-                        <span className="flex items-center gap-1 font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            {image.mode === GenerationMode.VIDEO ? '视频' : '图片'}
-                        </span>
-                        <span className="truncate max-w-[80px] text-slate-500 font-medium">
-                            {image.model ? resolveModelDisplayName(image.model, image.modelLabel).slice(0, 10) : 'Image'}
-                        </span>
-                    </div>
-
-                    {/* Image Preview / Prompt */}
-                    <div className="flex-1 w-full my-1 rounded overflow-hidden relative min-h-[40px]">
-                        {displaySrc ? (
-                            <img
-                                src={displaySrc}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover opacity-50 rounded select-none pointer-events-none"
-                                alt=""
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-slate-800/10 rounded">
-                                <span className="text-[8px] text-[var(--text-tertiary)] truncate px-1">{image.prompt || 'Ghost'}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Ghost Footer: Cost & Status */}
-                    <div className="flex items-center justify-between w-full text-[8px] text-[var(--text-secondary)] font-medium">
-                        <span className="text-amber-400">
-                            {isCreditModel ? `${resolvedCreditCost || 10} 积分` : `$${(displayCost || 0.015).toFixed(3)}`}
-                        </span>
-                        <span className="text-slate-500">
-                            {image.isGenerating ? '生成中' : image.error ? '失败' : '完成'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const isColorCardMode = detailLevel === 'ghost' || isCanvasTransforming || isDragging;
 
     if (isSlowLoading) {
         return (
@@ -1579,7 +1531,24 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 aspectRatio: image.aspectRatio.replace(':', '/')
                             }}
                         >
-                            {isAudioLike ? (
+                            {isColorCardMode ? (
+                                <div
+                                    className="absolute inset-0 flex items-center justify-center"
+                                    style={{
+                                        backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)',
+                                    }}
+                                >
+                                    {image.mode === GenerationMode.VIDEO ? (
+                                        <Play size={20} className="text-white/40" />
+                                    ) : (image.mode === GenerationMode.AUDIO) ? (
+                                        <Music size={20} className="text-white/40" />
+                                    ) : (
+                                        <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    )}
+                                </div>
+                            ) : isAudioLike ? (
                                 <div className="absolute inset-0 flex items-center justify-center bg-[var(--frost-card-framework-bg)] text-[var(--accent-coral)]">
                                     <Music size={28} />
                                 </div>
@@ -1747,7 +1716,24 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 >
                                     {/* 🚀 [Optimization] 只要有图可显 (displaySrc)，我们就尝试渲染。
                                 对于新生成的图片 (isNew)，即便曾报错也不进入死循环错误 UI，给浏览器 1-2 次自动重传的机会。 */}
-                                    {((!imgError || isNew) && displaySrc) ? (
+                                    {isColorCardMode ? (
+                                        <div
+                                            className="absolute inset-0 flex items-center justify-center"
+                                            style={{
+                                                backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)',
+                                            }}
+                                        >
+                                            {image.mode === GenerationMode.VIDEO ? (
+                                                <Play size={24} className="text-white/40" />
+                                            ) : (image.mode === GenerationMode.AUDIO) ? (
+                                                <Music size={24} className="text-white/40" />
+                                            ) : (
+                                                <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                    ) : ((!imgError || isNew) && displaySrc) ? (
                                         (image.mode === GenerationMode.AUDIO || displaySrc.endsWith('.mp3') || displaySrc.endsWith('.wav')) ? (
                                             <div className="relative w-full h-full group/audio bg-[var(--frost-card-framework-bg)] flex flex-col items-center justify-center overflow-hidden">
                                                 <Music size={48} className="text-[var(--accent-coral)] opacity-30 mb-4 z-10 pointer-events-none" />
@@ -1838,6 +1824,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     const dims = `${img.naturalWidth}x${img.naturalHeight}`;
                                                     if (onDimensionsUpdate && image.dimensions !== dims) {
                                                         onDimensionsUpdate(image.id, dims);
+                                                    }
+                                                    try {
+                                                        const color = extractDominantColor(img);
+                                                        dominantColorCache.set(image.id, color);
+                                                    } catch (err) {
+                                                        console.warn('[ImageCard2] Failed to extract dominant color:', err);
                                                     }
                                                 }}
                                                 className="w-full h-full block select-none"

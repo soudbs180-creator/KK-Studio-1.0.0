@@ -1425,3 +1425,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 无。
 - **风险与下一步**：
   - 运行 `npm run agents:commit` 固化本地提交，并执行 git push 自动触发部署。
+
+## 113. 2026-06-30 - 大画布卡片拖拽吸附、排版整理与积分色卡交互优化 (本次追加)
+- **修改范围**：
+  1. **拖拽弹性吸附 (Lerp Follow)**：重构了主卡拖动联动逻辑。拖拽主卡时，子副卡在拖拽中以 `Lerp * 0.18` 插值从快到慢跟随吸附在主卡正下方，并在拖动松手提交（commit）时通过网格吸附对齐在标准相对位置，拖动副卡时主卡不位移。
+  2. **色卡模式交互优化**：删除了简陋的黑色 `GHOST` 占位框。实现 onload 时利用 1x1 像素 Canvas 提取并缓存图片主色调；在操作（点击、拖拽、缩放等）进入 LOD 退化时保持原卡片框架，仅以提取的主色调作为纯色块填充（色卡），兼顾视觉一致性与 60FPS 极致性能。
+  3. **计费积分透传**：在 Group 渲染器中提取主卡的积分计费属性并覆盖到副卡上，将副卡底部的费用替换为积分。
+  4. **原地副卡整理**：重构了 `arrangeAllNodes` 中无选中节点时的全局对齐。当用户点击空白处“自动整理”时，主卡物理位置保持不变，仅对其下属副卡在原地进行局部网格排版，间距拉开 56px 互不重叠。
+- **修改文件**：
+  - [ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)
+  - [ImageGenerationGroupRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx)
+  - [VideoGenerationGroupRenderer.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx)
+  - [usePromptGroupLayout.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/usePromptGroupLayout.ts)
+  - [canvasMovement.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/canvasMovement.ts)
+  - [CanvasContext.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/context/CanvasContext.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **基于主色调的高性能色卡**：利用局部 canvas 提取主色调缓存并利用 rgba 进行填充，保留 card 自身 DOM 结构避免高频卸载/挂载造成的 DOM 颠簸和原图尺寸突变。
+  - **物理插值吸附 (Lerp)**：拖动阶段只在 livePositionStore 中进行 Lerp 计算，没有改变 React 的物理 DOM State，拖拽松开时再直接在 `moveSelectedCanvasNodes` 中一键计算并写入标准吸附坐标，杜绝拖拽后主副卡距离偏差被逐渐放大。
+  - **空白整理防漂移**：限制整理作用域在 local children 范围，极大提升了多堆卡片存在时的局部美化体验。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run architecture:check; npm run governance:check; npm run build` 均 100% 成功通过，0 Error。
+- **风险与下一步**：
+  - 运行 `npm run agents:commit` 固化本地提交。
