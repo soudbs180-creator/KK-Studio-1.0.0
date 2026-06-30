@@ -46,7 +46,7 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /if \(!canStartBillingBootstrap\) \{\s*return;\s*\}/,
+    /if \(!isBillingStartupReady\(\)\) \{\s*return;\s*\}/,
   );
   assert.match(
     billingContextSource,
@@ -70,7 +70,7 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /const intervalId = window\.setInterval\(\(\) => \{\s*triggerRefresh\(\);\s*\},\s*BILLING_SYNC_POLL_MS\);/,
+    /intervalId = window\.setInterval\(\(\) => \{\s*triggerRefresh\(\);\s*\},\s*BILLING_SYNC_POLL_MS\);/,
   );
   assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
   assert.doesNotMatch(billingContextSource, /\.from\('user_credits'\)/);

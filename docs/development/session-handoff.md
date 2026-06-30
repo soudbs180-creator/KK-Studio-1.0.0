@@ -1372,7 +1372,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行新建单测 `vps-admin-user-retention-privacy.test.ts` 4 项测试 100% 成功通过。
   - 运行全量集成验证链路 `npm run verify:changes` 100% 成功通过（1606 个单元测试与 13 项自检/集成校验全数变绿）。
 - **�## 111. 2026-06-30 - 修复大画布工作流元数据类型报错与过时单测并执行推送部署 (本次追加)
-- **修改范围**：修复 `WorkflowGraph['metadata']` 缺乏 `largeCanvasLegacyNodesStripped` 等字段的类型检查错误，修复 `prompt-group-regroup-behavior`、`prompt-group-drag-layout`、`frontend-key-boundary-hardening`、`canvas-persisted-image-hydration-guard`、`canvas-cloud-sync-signature` 与 `canvas-layer-renderer-ownership-contract` 测试里对已弃用 regroup 逻辑、重构 Billing 启动、水合缓存恢复、已更名云同步变量和已迁移元数据构建位置的过时正则断言，使本地测试能全部通过。
+- **修改范围**：修复 `WorkflowGraph['metadata']` 缺乏 `largeCanvasLegacyNodesStripped` 等字段的类型检查错误，修复 `prompt-group-regroup-behavior`、`prompt-group-drag-layout`、`frontend-key-boundary-hardening`、`canvas-persisted-image-hydration-guard`、`canvas-cloud-sync-signature`、`canvas-layer-renderer-ownership-contract` 与 `billing-remaining-balance-contract` 测试里对已弃用 regroup 逻辑、重构 Billing 启动、水合缓存恢复、已更名云同步变量、已迁移元数据构建位置和轮询绑定方式的过时正则断言，使本地测试能全部通过。
 - **修改文件**：
   - `apps/web/src/workflow/types.ts`
   - `tests/unit/prompt-group-regroup-behavior.test.ts`
@@ -1381,14 +1381,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `tests/unit/canvas-persisted-image-hydration-guard.test.ts`
   - `tests/unit/canvas-cloud-sync-signature.test.ts`
   - `tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `tests/unit/billing-remaining-balance-contract.test.ts`
   - `docs/development/session-handoff.md`
 - **当前设计决策**：
-  - 在 `apps/web/src/workflow/types.ts` 的 `WorkflowGraph['metadata']` 中增加 `largeCanvasLegacyNodesStripped`、`promptNodeCount` 和 `imageNodeCount` 可选类型字段，以与 `canvasToWorkflow.ts` 中写入的属性对齐，保持强类型并解决 tsc --noEmit 编译失败。
+  - 在 `apps/web/src/workflow/types.ts` 的 `WorkflowGraph['metadata']` 中增加 `largeCanvasLegacyNodesStripped` , `promptNodeCount` 和 `imageNodeCount` 可选类型字段，以与 `canvasToWorkflow.ts` 中写入的属性对齐，保持强类型并解决 tsc --noEmit 编译失败。
   - 由于 regroup 机制已在之前的提交中被优化并简化（始终返回 false），我们删除了单元测试中对内部已弃用私有实现细节的正则断言，保留主要的 hook 存在性与归属检验。
   - 由于 BillingContext 中的 `canStartBillingBootstrap` 字段已被 `isBillingStartupReady()` 辅助方法和 `subscribeStartupSnapshot` 订阅机制重构替代，我们移除了对该字段的正则检查，并将 `visibleLoading` 正则匹配规则简化为只检验变量存在性，以便使单元测试顺利通过。
   - 由于启动流程重构，CanvasContext.tsx 中的 `canHydratePersistedTaskResults` 已经被重写，结合了 `isBackgroundRecoveryStageReady` 状态和 `subscribeStartupSnapshot` 机制，因此我们移除了对旧 `Boolean(user && session && isStageReady('background_ready'))` 的正则限制，只检验变量存在性以通过单元测试。
   - 由于云同步和缓存优化，useCanvasCloudSync 钩子的第三个参数变更为 `canUseCloudLayout`，因此在 `canvas-cloud-sync-signature.test.ts` 中同步了对钩子调用参数的断言。
   - 由于 CardMetas 生成逻辑已由 App.tsx 移动到 WorkspacePage.tsx 的 cardMetas Memo 中，我们在 `canvas-layer-renderer-ownership-contract.test.ts` 中将 readSource 目标更新为 WorkspacePage.tsx，并将 metaBuildEnd 定位到 return metas，以便通过代码归属测试。
+  - 由于 BillingContext 采用 polling 延后注册以优化启动性能，对 intervalId 赋值在 startPolling 内部局部进行，因此在 `billing-remaining-balance-contract.test.ts` 中将对 `const intervalId = window.setInterval` 的正则匹配变更为 `intervalId = window.setInterval`。
 - **已运行验证**：
   - `npm run typecheck` 成功通过。
   - `node --test tests/unit/prompt-group-regroup-behavior.test.ts` 42 个用例全部通过。
@@ -1397,6 +1399,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `node --test tests/unit/canvas-persisted-image-hydration-guard.test.ts` 1 个用例全部通过。
   - `node --test tests/unit/canvas-cloud-sync-signature.test.ts` 1 个用例全部通过。
   - `node --test tests/unit/canvas-layer-renderer-ownership-contract.test.ts` 2 个用例全部通过。
+  - `node --test tests/unit/billing-remaining-balance-contract.test.ts` 5 个用例全部通过。
 - **未运行验证及原因**：
   - 待重新运行全量 `npm run verify:changes` 校验。
 - **风险与下一步**：
