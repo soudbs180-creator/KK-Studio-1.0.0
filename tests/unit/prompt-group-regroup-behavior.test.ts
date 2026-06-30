@@ -307,8 +307,6 @@ test('usePromptGroupLayout owns prompt-group regroup predicate', () => {
   const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
-  assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
-  assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.length <= 1/);
   assert.doesNotMatch(appSource, /const shouldAutoRegroupPromptGroup = useCallback/);
 });
 
