@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CreditTransactionDto } from '../../../../packages/shared/src/index.ts';
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
@@ -30,6 +30,8 @@ export interface CreditTransactionLog {
   created_at: string;
   completed_at?: string | null;
 }
+
+const EMPTY_CREDIT_TRANSACTION_LOGS: CreditTransactionLog[] = [];
 
 export interface CreditConsumeResult {
   success: boolean;
@@ -853,35 +855,51 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     : (renderCachedSnapshot?.balance ?? 0);
   const visibleBillingLogs = hasHydratedCurrentBillingScope
     ? billingLogs
-    : (renderCachedSnapshot?.billingLogs ?? []);
+    : (renderCachedSnapshot?.billingLogs ?? EMPTY_CREDIT_TRANSACTION_LOGS);
   const visibleUsageLogs = hasHydratedCurrentBillingScope
     ? usageLogs
-    : (renderCachedSnapshot?.usageLogs ?? []);
+    : (renderCachedSnapshot?.usageLogs ?? EMPTY_CREDIT_TRANSACTION_LOGS);
   const visibleLoading = activeBillingUserId
     ? ((!hasHydratedCurrentBillingScope && !renderCachedSnapshot) || loading || !canStartBillingBootstrap)
     : false;
+  const contextValue = useMemo<BillingContextType>(() => ({
+    balance: visibleBalance,
+    loading: visibleLoading,
+    refreshing,
+    applyAuthoritativeBalance,
+    recharge,
+    consumeCredits,
+    consumeCreditsDetailed,
+    refundCredits,
+    refundCreditsByTransaction,
+    refreshBilling,
+    adjustBalanceOptimistically,
+    billingLogs: visibleBillingLogs,
+    usageLogs: visibleUsageLogs,
+    fetchLogs,
+    showRechargeModal,
+    setShowRechargeModal,
+  }), [
+    adjustBalanceOptimistically,
+    applyAuthoritativeBalance,
+    consumeCredits,
+    consumeCreditsDetailed,
+    fetchLogs,
+    recharge,
+    refreshing,
+    refundCredits,
+    refundCreditsByTransaction,
+    refreshBilling,
+    setShowRechargeModal,
+    showRechargeModal,
+    visibleBalance,
+    visibleBillingLogs,
+    visibleLoading,
+    visibleUsageLogs,
+  ]);
 
   return (
-    <BillingContext.Provider
-      value={{
-        balance: visibleBalance,
-        loading: visibleLoading,
-        refreshing,
-        applyAuthoritativeBalance,
-        recharge,
-        consumeCredits,
-        consumeCreditsDetailed,
-        refundCredits,
-        refundCreditsByTransaction,
-        refreshBilling,
-        adjustBalanceOptimistically,
-        billingLogs: visibleBillingLogs,
-        usageLogs: visibleUsageLogs,
-        fetchLogs,
-        showRechargeModal,
-        setShowRechargeModal,
-      }}
-    >
+    <BillingContext.Provider value={contextValue}>
       {children}
     </BillingContext.Provider>
   );

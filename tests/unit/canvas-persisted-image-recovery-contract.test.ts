@@ -8,6 +8,7 @@ import * as ts from 'typescript';
 type PersistedImageRecoveryModule = typeof import('../../apps/web/src/context/canvasPersistedImageRecovery.ts');
 type RequiredPersistedImageRecoveryExports = Pick<
   PersistedImageRecoveryModule,
+  | 'buildGeneratedImagesByParentPromptId'
   | 'buildPersistedImageRecoverySignature'
   | 'buildPromptRecoveryEntries'
   | 'resolveImageRecoveryUrlFromMetadata'
@@ -15,6 +16,7 @@ type RequiredPersistedImageRecoveryExports = Pick<
 >;
 
 const typedPersistedImageRecoveryExport: keyof RequiredPersistedImageRecoveryExports = 'buildPromptRecoveryEntries';
+const typedPersistedImageRecoveryIndexExport: keyof RequiredPersistedImageRecoveryExports = 'buildGeneratedImagesByParentPromptId';
 const ROOT_DIR = process.cwd();
 
 
@@ -98,8 +100,10 @@ test('persisted image recovery boundary lives outside CanvasContext', () => {
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.equal(typedPersistedImageRecoveryExport, 'buildPromptRecoveryEntries');
+  assert.equal(typedPersistedImageRecoveryIndexExport, 'buildGeneratedImagesByParentPromptId');
   assert.match(testConfigSource, /tests\/unit\/canvas-persisted-image-recovery-contract\.test\.ts/);
   assert.match(contextSource, /from '\.\/canvasPersistedImageRecovery';/);
+  assert.match(helperSource, /export const buildGeneratedImagesByParentPromptId/);
   assert.match(helperSource, /export const buildPromptRecoveryEntries/);
   assert.match(helperSource, /export const buildPersistedImageRecoverySignature/);
   assert.match(helperSource, /export const resolveImageRecoveryUrlFromMetadata/);
@@ -107,6 +111,21 @@ test('persisted image recovery boundary lives outside CanvasContext', () => {
   assert.doesNotMatch(contextSource, /const buildPromptRecoveryEntries =/);
   assert.doesNotMatch(contextSource, /const buildPersistedImageRecoverySignature =/);
   assert.doesNotMatch(contextSource, /const resolveImageRecoveryUrlFromMetadata =/);
+  assert.doesNotMatch(helperSource, /imageNodes\.filter\(\(imageNode\) => imageNode\.parentPromptId === promptNode\.id\)/);
+});
+
+test('persisted image recovery indexes child images once per canvas', () => {
+  const { buildGeneratedImagesByParentPromptId } = loadPersistedImageRecoveryModuleForBehaviorTest();
+  const indexedImages = buildGeneratedImagesByParentPromptId([
+    { id: 'image-a', parentPromptId: 'prompt-a' },
+    { id: 'image-b', parentPromptId: 'prompt-a' },
+    { id: 'image-c', parentPromptId: 'prompt-b' },
+    { id: 'image-orphan' },
+  ] as never);
+
+  assert.deepEqual(indexedImages.get('prompt-a')?.map((image) => image.id), ['image-a', 'image-b']);
+  assert.deepEqual(indexedImages.get('prompt-b')?.map((image) => image.id), ['image-c']);
+  assert.equal(indexedImages.has(''), false);
 });
 
 test('prompt recovery entries merge completed tasks and persisted tasks without duplicates', () => {
@@ -200,8 +219,14 @@ test('persisted image recovery signature records only missing recovery work', ()
       ],
       imageNodes: [
         {
-          id: 'image-missing-original',
-          prompt: 'thumbnail only',
+          id: 'image-missing-url',
+          prompt: 'needs display recovery',
+          url: '',
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'image-preview-only',
+          prompt: 'preview is already displayable',
           url: 'https://cdn.example.com/thumb.png',
           position: { x: 0, y: 0 },
         },
@@ -222,7 +247,8 @@ test('persisted image recovery signature records only missing recovery work', ()
     },
   ] as never);
 
-  assert.match(signature, /img:canvas-1:image-missing-original/);
+  assert.match(signature, /img:canvas-1:image-missing-url/);
+  assert.doesNotMatch(signature, /img:canvas-1:image-preview-only/);
   assert.match(signature, /prompt:canvas-1:prompt-missing/);
   assert.doesNotMatch(signature, /prompt:canvas-1:prompt-complete/);
 });

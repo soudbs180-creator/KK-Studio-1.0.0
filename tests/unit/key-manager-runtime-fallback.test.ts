@@ -24,15 +24,15 @@ test('keyManager no longer skips local or temp users when hydrating or syncing p
 
   assert.match(
     source,
-    /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;/,
+    /private async loadFromCloud\(options\?: \{ force\?: boolean \}\) \{\s*if \(!this\.userId\) return;/,
   );
   assert.doesNotMatch(
     source,
-    /private async loadFromCloud\(\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*canUseSessionlessLocalUserApiStorage\(\)/,
+    /private async loadFromCloud\(options\?: \{ force\?: boolean \}\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*canUseSessionlessLocalUserApiStorage\(\)/,
   );
   assert.doesNotMatch(
     source,
-    /private async loadFromCloud\(\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*this\.userId\.startsWith\('dev-user-'\)/,
+    /private async loadFromCloud\(options\?: \{ force\?: boolean \}\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*this\.userId\.startsWith\('dev-user-'\)/,
   );
   assert.doesNotMatch(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*console\.log\('\[KeyManager\] Local API temp user payload bridge enabled:', userId\);\s*return;\s*\}/);
   assert.doesNotMatch(source, /private canHydrateCloudState\(\): boolean \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{/);

@@ -18,6 +18,7 @@ import { traceLocalPerformance } from '../services/system/localPerformanceTrace'
 import { CanvasMeasurementScheduler } from '../canvas/CanvasMeasurementScheduler';
 import { buildPromptGroupOverlapMap } from './promptGroupOverlapMap';
 import { canvasLivePositionStore } from './canvasLivePositionStore';
+import { buildPromptChildImagesByPromptId } from './promptGroupChildImages';
 import type {
   Point,
   PromptGroupLayoutPresentationState,
@@ -47,6 +48,7 @@ const PROMPT_GROUP_REGROUP_FAST_MS = 110;
 const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
 const PROMPT_GROUP_REGROUP_TOTAL_MS = PROMPT_GROUP_REGROUP_FAST_MS + PROMPT_GROUP_REGROUP_SLOW_MS;
 const PROMPT_GROUP_REGROUP_SETTLE_MS = 180;
+const PROMPT_GROUP_OVERLAP_LARGE_CANVAS_THRESHOLD = 500;
 
 const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   base: 1,
@@ -73,10 +75,6 @@ export interface UsePromptGroupLayoutDeps {
   promptGroupLayoutStateByIdRef: RefObject<Record<string, PromptGroupLayoutPresentationState>>;
   promptGroupLayoutVersion: number;
   promptNodesById: Map<string, PromptNode> | null | undefined;
-  resolveCurrentPromptChildImages: (
-    promptNode: PromptNode | undefined | null,
-    imageNodes: GeneratedImage[],
-  ) => GeneratedImage[];
   selectNodes: SelectNodes;
   selectedNodeIds: string[] | null | undefined;
   setFocusedGroupId: Dispatch<SetStateAction<string | null>>;
@@ -246,7 +244,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
     promptNodesById,
-    resolveCurrentPromptChildImages,
     selectNodes,
     selectedNodeIds,
     setFocusedGroupId,
@@ -280,18 +277,11 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>(new Set());
 
   const actualChildImagesByPromptId = useMemo(() => {
-    const childMap = new Map<string, GeneratedImage[]>();
-    if (!activeCanvas) return childMap;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
-      if (childImages.length > 0) {
-        childMap.set(promptNode.id, childImages);
-      }
-    });
-
-    return childMap;
-  }, [activeCanvas, resolveCurrentPromptChildImages]);
+    return buildPromptChildImagesByPromptId(
+      activeCanvas?.promptNodes,
+      activeCanvas?.imageNodes,
+    );
+  }, [activeCanvas?.promptNodes, activeCanvas?.imageNodes]);
 
   const actualChildImageIdsByPromptId = useMemo(() => {
     const childIdMap = new Map<string, string[]>();
@@ -306,7 +296,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const expandedSelectedNodeIds = useMemo(
     () => Array.from(new Set(
       currentSelectedNodeIds.flatMap((selectedId) => {
-        const selectedPrompt = activeCanvas?.promptNodes.find((promptNode) => promptNode.id === selectedId);
+        const selectedPrompt = currentPromptNodesById.get(selectedId);
         if (!selectedPrompt) return [selectedId];
 
         return [
@@ -315,7 +305,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         ];
       })
     )),
-    [activeCanvas, actualChildImageIdsByPromptId, currentSelectedNodeIds]
+    [actualChildImageIdsByPromptId, currentPromptNodesById, currentSelectedNodeIds]
   );
 
   const promptGroupNodeIdsById = useMemo(() => {
@@ -590,7 +580,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
           canvasLivePositionStore.setPosition(nodeId, pos);
         }
       });
-      syncLiveNodePositionState();
     }
   }, [
     liveDerivedNodeIdsByOwnerRef,
@@ -1099,7 +1088,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       } else {
         canvasLivePositionStore.setPosition(nodeId, null);
       }
-      syncLiveNodePositionState();
     }
 
     if (!groupId) {
@@ -1157,9 +1145,16 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     if (isNodeDragActive) {
       return currentGroupOverlapMap;
     }
+    if (
+      promptGroupBoundsById.size > PROMPT_GROUP_OVERLAP_LARGE_CANVAS_THRESHOLD
+      && !focusedGroupId
+      && currentGeneratingGroupIds.length === 0
+    ) {
+      return currentGroupOverlapMap;
+    }
 
     return buildPromptGroupOverlapMap(promptGroupBoundsById);
-  }, [currentGroupOverlapMap, isNodeDragActive, promptGroupBoundsById]);
+  }, [currentGeneratingGroupIds.length, currentGroupOverlapMap, focusedGroupId, isNodeDragActive, promptGroupBoundsById]);
 
   useEffect(() => {
     const normalized = Object.keys(computedGroupOverlapMap)
@@ -1175,6 +1170,9 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   }, [computedGroupOverlapMap, setGroupOverlapMap]);
 
   const promptGroupViews = useMemo<PromptGroupView[]>(() => {
+    const smokePerfEnabled = typeof window !== 'undefined' && Boolean((window as any).__KK_LARGE_CANVAS_SMOKE__);
+    const startedAt = smokePerfEnabled ? performance.now() : 0;
+
     if (isNodeDragActive && stablePromptGroupViewsRef.current.length > 0) {
       return stablePromptGroupViewsRef.current;
     }
@@ -1216,6 +1214,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       })
       .filter((groupView): groupView is PromptGroupView => Boolean(groupView));
     stablePromptGroupViewsRef.current = nextPromptGroupViews;
+    if (smokePerfEnabled) {
+      const finishedAt = performance.now();
+      console.log(`[Workspace10k] prompt-group-views count=${nextPromptGroupViews.length} total=${Math.round(finishedAt - startedAt)}`);
+    }
     return nextPromptGroupViews;
   }, [
     activeCanvas,
@@ -1229,10 +1231,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   ]);
 
   const visiblePromptGroupViews = useMemo(() => {
+    const smokePerfEnabled = typeof window !== 'undefined' && Boolean((window as any).__KK_LARGE_CANVAS_SMOKE__);
+    const startedAt = smokePerfEnabled ? performance.now() : 0;
     const promptIdSet = new Set(currentVisiblePromptNodes.map((promptNode) => promptNode.id));
     const imageIdSet = new Set(currentVisibleImageNodes.map((imageNode) => imageNode.id));
 
-    return promptGroupViews
+    const nextVisiblePromptGroupViews = promptGroupViews
       .filter((groupView) => {
         const isPromptVisible = promptIdSet.has(groupView.rootPrompt.id);
         const hasVisibleChild = groupView.childImages.some((imageNode) => imageIdSet.has(imageNode.id));
@@ -1245,6 +1249,13 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         if (orderDiff !== 0) return orderDiff;
         return left.rootPrompt.timestamp - right.rootPrompt.timestamp;
       });
+
+    if (smokePerfEnabled) {
+      const finishedAt = performance.now();
+      console.log(`[Workspace10k] visible-prompt-group-views count=${nextVisiblePromptGroupViews.length} prompts=${currentVisiblePromptNodes.length} images=${currentVisibleImageNodes.length} total=${Math.round(finishedAt - startedAt)}`);
+    }
+
+    return nextVisiblePromptGroupViews;
   }, [currentVisibleImageNodes, currentVisiblePromptNodes, promptGroupViews]);
 
   const standaloneVisibleImageNodes = useMemo(() => {
@@ -1260,17 +1271,9 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     const promptGroups: LiveSceneSnapshot['promptGroups'] = {};
     const nodeRenderPositionById: LiveSceneSnapshot['nodeRenderPositionById'] = {};
 
-    if (!activeCanvas) {
-      return {
-        interactionPhase: liveSceneInteractionPhase,
-        liveNodePositionById: liveNodePositions,
-        nodeRenderPositionById,
-        promptGroups,
-      };
-    }
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = childImagesByPromptId.get(promptNode.id) || [];
+    visiblePromptGroupViews.forEach((groupView) => {
+      const promptNode = groupView.rootPrompt;
+      const childImages = groupView.childImages;
       if (childImages.length === 0) {
         return;
       }
@@ -1308,9 +1311,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       promptGroups,
     };
   }, [
-    activeCanvas,
-    canvasInteractionPhase,
-    childImagesByPromptId,
     isNodeDragActive,
     liveNodePositionVersion,
     liveSceneInteractionPhase,
@@ -1318,6 +1318,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupRegroupLayoutsById,
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
+    visiblePromptGroupViews,
   ]);
 
   const liveSceneRef = useRef(liveSceneState);

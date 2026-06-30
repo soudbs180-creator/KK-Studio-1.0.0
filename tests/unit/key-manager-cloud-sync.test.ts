@@ -61,7 +61,7 @@ test("cloud sync entry points force-refresh the local API payload without skippi
   assert.match(source, /async syncToCloudNow\(\): Promise<void> \{\s*await this\.saveToCloud\(this\.state, \{\s*ignoreBackoff: true,\s*throwOnError: true,\s*\}\);\s*\}/);
   assert.match(
     source,
-    /async refreshFromCloudNow\(\): Promise<void> \{\s*if \(!this\.userId\) \{\s*return;\s*\}\s*await this\.loadFromCloud\(\);\s*\}/,
+    /async refreshFromCloudNow\(options\?: \{ force\?: boolean \}\): Promise<void> \{\s*if \(!this\.userId\) \{\s*return;\s*\}\s*await this\.loadFromCloud\(\{ force: options\?\.force !== false \}\);\s*\}/,
   );
   assert.doesNotMatch(
     source,

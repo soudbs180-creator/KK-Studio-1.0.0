@@ -1142,8 +1142,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         if (e.cancelable) {
             e.preventDefault();
         }
-        onBringToFront?.();
-
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
@@ -1160,6 +1158,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         // If we start dragging an unselected card and NOT holding Shift/Ctrl, 
         // we should select ONLY this card to avoid dragging other selected cards
         if (!isSelected && onSelect) {
+            onBringToFront?.();
             // 检查是否按住了多选键
             const mouseEvent = e as React.MouseEvent;
             const isMultiSelect = mouseEvent.shiftKey || mouseEvent.ctrlKey || mouseEvent.metaKey;

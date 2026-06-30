@@ -97,6 +97,8 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
   });
 
   return React.useMemo(() => {
+    const smokePerfEnabled = typeof window !== 'undefined' && Boolean((window as any).__KK_LARGE_CANVAS_SMOKE__);
+    const startedAt = smokePerfEnabled ? performance.now() : 0;
     if (isCanvasTransforming) {
       return stableVisibleCanvasSceneRef.current;
     }
@@ -135,6 +137,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
 
     // 🚀 核心优化：只查询 viewport 覆盖的 bucket 节点集合，杜绝遍历节点大数组
     const visibleIds = spatialIndex.query(vLeft, vTop, vRight, vBottom);
+    const queriedAt = smokePerfEnabled ? performance.now() : 0;
 
     const rawVisiblePrompts: PromptNode[] = [];
     const rawVisibleImages: GeneratedImage[] = [];
@@ -286,6 +289,11 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
     const nowTimestamp = Date.now();
+
+    if (smokePerfEnabled) {
+      const finishedAt = performance.now();
+      console.log(`[Workspace10k] visible-items ids=${visibleIds.size} rawP=${rawVisiblePrompts.length} rawI=${rawVisibleImages.length} P=${visiblePromptNodes.length} I=${visibleImageNodes.length} query=${Math.round(queriedAt - startedAt)} total=${Math.round(finishedAt - startedAt)}`);
+    }
 
     stableVisibleCanvasSceneRef.current = {
       visiblePromptNodes,

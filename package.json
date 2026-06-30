@@ -57,6 +57,7 @@
     "verify:desktop-settings-smoke": "node scripts/test/verify-desktop-settings-smoke.mjs",
     "verify:ai-takeover-smoke": "node scripts/test/verify-ai-takeover-smoke.mjs",
     "verify:startup-runtime-banner-centering": "node scripts/test/verify-startup-runtime-banner-centering.mjs",
+    "verify:large-canvas-10k": "node scripts/test/verify-large-canvas-10k-smoke.mjs",
     "verify:canvas-performance": "vitest run tests/benchmark/canvas-performance.test.ts",
     "test:unit": "node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none \"tests/unit/*.test.ts\"",
     "test:integration": "node --test --test-isolation=none \"tests/integration/*.test.ts\"",

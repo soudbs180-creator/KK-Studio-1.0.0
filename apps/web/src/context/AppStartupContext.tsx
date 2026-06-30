@@ -131,6 +131,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     let cancelled = false;
     let profileTimer: number | null = null;
     let workspaceTimer: number | null = null;
+    let backgroundTimer: number | null = null;
 
     const setStageSafely = (nextStage: AppStartupStage) => {
       if (cancelled || startupRunIdRef.current !== startupRunId) {
@@ -151,6 +152,9 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       if (workspaceTimer !== null) {
         window.clearTimeout(workspaceTimer);
+      }
+      if (backgroundTimer !== null) {
+        window.clearTimeout(backgroundTimer);
       }
     };
 
@@ -181,6 +185,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const startupSmokeHoldMs = resolveStartupSmokeHoldMs();
       const profileReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 0;
       const workspaceReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 120;
+      const backgroundReadyDelayMs = startupSmokeHoldMs > 0 ? startupSmokeHoldMs : 240;
 
       clearScheduledWork();
 
@@ -191,6 +196,10 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       workspaceTimer = window.setTimeout(() => {
         setStageSafely('workspace_ready');
       }, workspaceReadyDelayMs);
+
+      backgroundTimer = window.setTimeout(() => {
+        setStageSafely('background_ready');
+      }, backgroundReadyDelayMs);
     };
 
     if (localOnlyRuntime) {

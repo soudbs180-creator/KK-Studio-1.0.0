@@ -149,14 +149,17 @@ class AdminModelService {
   private listeners: Array<() => void> = [];
   private loadingPromise: Promise<void> | null = null;
   private lastLoadAttemptAt = 0;
+  private adminCatalogSignature = JSON.stringify({ providers: [], models: [], creditCatalog: [] });
   private modelRefreshHandler: (() => void) | null = null;
   private autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private autoRefreshInitialized = false;
   private broadcastChannel: BroadcastChannel | null = null;
   private backgroundRefreshEnabled = false;
   private startupStage: AppStartupStage = 'background_ready';
+  private deferredUnifiedRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   private static readonly LOAD_RETRY_INTERVAL_MS = 15000;
+  private static readonly DEFERRED_UNIFIED_REFRESH_MS = 30000;
 
   constructor() {
     this.initializeBroadcastRefresh();
@@ -178,6 +181,19 @@ class AdminModelService {
     void this.loadAdminModels(force).catch((error) => {
       console.warn('[AdminModelService] Background refresh failed:', error);
     });
+  }
+
+  private scheduleDeferredUnifiedRefresh(): void {
+    if (this.deferredUnifiedRefreshTimer || typeof window === 'undefined') {
+      return;
+    }
+
+    this.deferredUnifiedRefreshTimer = setTimeout(() => {
+      this.deferredUnifiedRefreshTimer = null;
+      void this.refreshUnifiedModels().catch((error) => {
+        console.warn('[AdminModelService] Deferred unified model refresh failed:', error);
+      });
+    }, AdminModelService.DEFERRED_UNIFIED_REFRESH_MS);
   }
 
   private initializeBroadcastRefresh(): void {
@@ -246,7 +262,7 @@ class AdminModelService {
       reschedule();
     });
 
-    reschedule(getAdminModelAutoRefreshDelay('visible'));
+    reschedule(AdminModelService.DEFERRED_UNIFIED_REFRESH_MS);
   }
 
   setBackgroundRefreshEnabled(enabled: boolean): void {
@@ -272,9 +288,7 @@ class AdminModelService {
     this.setBackgroundRefreshEnabled(isStartupStageReady(stage, 'background_ready'));
 
     if (isStartupStageReady(stage, 'workspace_ready')) {
-      void this.forceLoadAdminModels().catch((error) => {
-        console.warn('[AdminModelService] Deferred startup refresh failed:', error);
-      });
+      this.scheduleDeferredUnifiedRefresh();
     }
   }
 
@@ -475,10 +489,10 @@ class AdminModelService {
             });
           });
 
-        this.providers = Array.from(grouped.values());
+        const nextProviders = Array.from(grouped.values());
 
         const dedupe = new Map<string, AdminModelConfig>();
-        this.providers.forEach((provider) => {
+        nextProviders.forEach((provider) => {
           provider.models.forEach((model) => {
             const key = `${provider.providerId}|${model.id}`;
             if (!dedupe.has(key)) {
@@ -487,8 +501,17 @@ class AdminModelService {
           });
         });
 
-        this.models = Array.from(dedupe.values());
-        this.creditCatalog = buildCreditModelCatalog(this.models);
+        const nextModels = Array.from(dedupe.values());
+        const nextCreditCatalog = buildCreditModelCatalog(nextModels);
+        const nextSignature = this.getAdminCatalogSignature(nextProviders, nextModels, nextCreditCatalog);
+        if (this.adminCatalogSignature === nextSignature) {
+          return;
+        }
+
+        this.providers = nextProviders;
+        this.models = nextModels;
+        this.creditCatalog = nextCreditCatalog;
+        this.adminCatalogSignature = nextSignature;
 
         this.modelRefreshHandler?.();
 
@@ -866,6 +889,7 @@ class AdminModelService {
 
   // === Unified Model Service Logic ===
   private unifiedModels: UnifiedModel[] = [];
+  private unifiedModelsSignature = '[]';
   private unifiedInitialized = false;
   private isRefreshingUnified = false;
 
@@ -877,18 +901,16 @@ class AdminModelService {
     });
 
     this.loadUnifiedFromLocalCache();
-    setTimeout(() => {
-      void this.refreshUnifiedModels();
-    }, 0);
+    this.scheduleDeferredUnifiedRefresh();
 
     this.unifiedInitialized = true;
   }
 
   private loadUnifiedFromLocalCache(): void {
     try {
-      this.unifiedModels = this.mapGlobalModels(keyManager.getGlobalModelList());
-      this.notifyListeners();
-      console.log('[AdminModelService] Loaded unified models from global cache:', this.unifiedModels.length);
+      const nextModels = this.mapGlobalModels(keyManager.getGlobalModelList());
+      const changed = this.applyUnifiedModels(nextModels);
+      console.log('[AdminModelService] Loaded unified models from global cache:', this.unifiedModels.length, changed ? 'changed' : 'unchanged');
     } catch (error) {
       console.error('[AdminModelService] Failed to load local cache for unified models:', error);
     }
@@ -900,10 +922,7 @@ class AdminModelService {
     try {
       await this.loadAdminModels();
       const nextModels = this.mapGlobalModels(keyManager.getGlobalModelList());
-      if (JSON.stringify(this.unifiedModels) !== JSON.stringify(nextModels)) {
-        this.unifiedModels = nextModels;
-        this.notifyListeners();
-      }
+      this.applyUnifiedModels(nextModels);
     } finally {
       this.isRefreshingUnified = false;
     }
@@ -962,6 +981,30 @@ class AdminModelService {
     return Array.from(modelMap.values());
   }
 
+  private getUnifiedModelsSignature(models: UnifiedModel[]): string {
+    return JSON.stringify(models);
+  }
+
+  private getAdminCatalogSignature(
+    providers: AdminProvider[],
+    models: AdminModelConfig[],
+    creditCatalog: CreditModelCatalogEntry[],
+  ): string {
+    return JSON.stringify({ providers, models, creditCatalog });
+  }
+
+  private applyUnifiedModels(nextModels: UnifiedModel[]): boolean {
+    const nextSignature = this.getUnifiedModelsSignature(nextModels);
+    if (this.unifiedModelsSignature === nextSignature) {
+      return false;
+    }
+
+    this.unifiedModels = nextModels;
+    this.unifiedModelsSignature = nextSignature;
+    this.notifyListeners();
+    return true;
+  }
+
   private convertGlobalModel(model: Array<ReturnType<typeof keyManager.getGlobalModelList>[number]>[number]): UnifiedModel {
     const adminModel = model.isSystemInternal ? this.getModel(model.id) : undefined;
 
@@ -1012,4 +1055,3 @@ const hasSystemRouteSuffix = (id: string): boolean => {
 };
 
 export const adminModelService = new AdminModelService();
-

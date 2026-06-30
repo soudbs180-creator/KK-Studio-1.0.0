@@ -70,6 +70,7 @@ test('manual selection grouping stores the default white group glow', () => {
 
 test('App excludes collapsed manual group members from render queues and image prefetch scheduling', () => {
   const source = readSource('apps/web/src/App.tsx');
+  const imageSchedulingHelperSource = readSource('apps/web/src/canvas/largeCanvasVirtualization.ts');
   const viewportMemoStart = source.indexOf('export function useVisibleCanvasItems');
   const sharedPropsStart = source.indexOf('const getSharedImageNodeProps = useCallback');
   const imageSchedulingStart = source.indexOf('const imageLoadSchedulingById = React.useMemo');
@@ -98,7 +99,8 @@ test('App excludes collapsed manual group members from render queues and image p
   assert.notEqual(imageSchedulingStart, -1);
   assert.notEqual(imagePrefetchStart, -1);
   const imageSchedulingSource = source.slice(imageSchedulingStart, imagePrefetchStart);
-  assert.match(imageSchedulingSource, /if \(collapsedCanvasGroupNodeIds\.has\(node\.id\)\) \{\s*return;\s*\}/);
+  assert.match(imageSchedulingSource, /buildViewportImageLoadScheduling\(\{[\s\S]*collapsedCanvasGroupNodeIds/);
+  assert.match(imageSchedulingHelperSource, /if \(collapsedCanvasGroupNodeIds\.has\(node\.id\)\) \{\s*return;\s*\}/);
 
   assert.notEqual(canvasItemsStart, -1);
   assert.notEqual(renderedGroupsStart, -1);

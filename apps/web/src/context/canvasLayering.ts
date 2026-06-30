@@ -6,6 +6,16 @@ export function bringCanvasNodesToFront(canvas: Canvas, nodeIds: string[]): Canv
 
     const promptById = new Map(canvas.promptNodes.map(node => [node.id, node]));
     const imageById = new Map(canvas.imageNodes.map(node => [node.id, node]));
+    const childImageIdsByPromptId = new Map<string, string[]>();
+    canvas.imageNodes.forEach(image => {
+        if (!image.parentPromptId) return;
+        const childIds = childImageIdsByPromptId.get(image.parentPromptId);
+        if (childIds) {
+            childIds.push(image.id);
+            return;
+        }
+        childImageIdsByPromptId.set(image.parentPromptId, [image.id]);
+    });
     const workflowById = new Map(
         (canvas.workflow?.nodes || [])
             .filter(node => isWorkflowUtilityNodeKind(node.kind))
@@ -42,11 +52,7 @@ export function bringCanvasNodesToFront(canvas: Canvas, nodeIds: string[]): Canv
             (prompt.childImageIds || []).filter((id): id is string => Boolean(id))
         );
 
-        canvas.imageNodes.forEach(image => {
-            if (image.parentPromptId === promptId) {
-                childImageIds.add(image.id);
-            }
-        });
+        (childImageIdsByPromptId.get(promptId) || []).forEach(id => childImageIds.add(id));
 
         return Array.from(childImageIds);
     };

@@ -323,6 +323,7 @@ export interface ThirdPartyProvider {
 
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
+const CLOUD_LOAD_COOLDOWN_MS = 30 * 1000;
 
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
@@ -469,6 +470,7 @@ export class KeyManager {
     private authIsTempUser = false;
     private sessionlessLocalUserApiStorageEnabled = false;
     private isSyncing = false;
+    private lastCloudLoadAttemptAt = 0;
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
     private startupStage: AppStartupStage = 'background_ready';
@@ -915,12 +917,21 @@ export class KeyManager {
         }
     }
 
+    private getCloudPayloadStateSignature(): string {
+        return JSON.stringify({
+            slots: this.state.slots,
+            providers: this.providers,
+            providerStorageScope: this.providerStorageScope,
+        });
+    }
+
     private applyCloudPayload(
         rawPayload: unknown,
         options?: {
             preserveLocalProvidersOnEmpty?: boolean;
         }
-    ) {
+    ): boolean {
+        const previousSignature = this.getCloudPayloadStateSignature();
         const previousProviders = [...this.providers];
         const cloudProviders = mergeCloudProvidersWithLocalRuntimeState(
             this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload)),
@@ -953,7 +964,7 @@ export class KeyManager {
 
         let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
         if (!Array.isArray(cloudSlots)) {
-            return;
+            return false;
         }
 
         const rawCloudSlots = cloudSlots;
@@ -965,7 +976,7 @@ export class KeyManager {
 
         if (rawCloudSlots.length > 0 && validCloudSlots.length === 0) {
             console.warn('[KeyManager] Local API user_apis payload is not a key-slot structure, skipping overwrite.');
-            return;
+            return false;
         }
 
         cloudSlots = validCloudSlots;
@@ -1069,8 +1080,15 @@ export class KeyManager {
                 this.clearLegacySlotsForRemovedProvider(provider, { persistState: false });
             });
         this.migrateLegacyIds();
+        const nextSignature = this.getCloudPayloadStateSignature();
+        if (previousSignature === nextSignature) {
+            console.log('[KeyManager] Local API payload refresh unchanged. Keys:', this.state.slots.length);
+            return false;
+        }
+
         console.log('[KeyManager] Local API payload refresh completed (overwrite mode). Keys:', this.state.slots.length);
         this.notifyListeners();
+        return true;
     }
 
     /**
@@ -1079,10 +1097,17 @@ export class KeyManager {
     /**
      * Refresh state from the local API payload bridge for the active user.
      */
-    private async loadFromCloud() {
+    private async loadFromCloud(options?: { force?: boolean }) {
         if (!this.userId) return;
 
         const activeUserId = this.userId;
+        const force = options?.force === true;
+        const now = Date.now();
+        if (!force && this.lastCloudLoadAttemptAt > 0 && now - this.lastCloudLoadAttemptAt < CLOUD_LOAD_COOLDOWN_MS) {
+            console.log('[KeyManager] Skipping local API payload refresh inside cooldown.');
+            return;
+        }
+        this.lastCloudLoadAttemptAt = now;
 
         try {
             this.isSyncing = true;
@@ -1333,12 +1358,12 @@ export class KeyManager {
         });
     }
 
-    async refreshFromCloudNow(): Promise<void> {
+    async refreshFromCloudNow(options?: { force?: boolean }): Promise<void> {
         if (!this.userId) {
             return;
         }
 
-        await this.loadFromCloud();
+        await this.loadFromCloud({ force: options?.force !== false });
     }
 
     private ensureCloudHydration(): void {

@@ -1833,3 +1833,41 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 线上必须重新部署后才会应用本地修复；部署后需要用用户真实 10000+ 历史画布复测缩放、拖拽、虚线跟随和资源加载。
   - 如果部署后仍出现卡片丢失，应继续检查真实数据下 `visiblePromptGroupViews` / `groupView.bounds` 的分组裁剪边界，而不是让 Canvas 缓存层重新绘制分组卡片。
   - 运行 `npm run agents:commit` 将本次 10k 画布虚拟化修复固化为本地 Git 提交。
+
+## 108. 2026-06-30 - Fix 10k Canvas Startup Validation Failures and Contract Drift
+- **修改范围**：
+  1. 收口 10k 画布启动、虚拟化、连接线和资源调度前期改动中的验证失败；修复 `WorkspacePage.tsx` 乱码损坏后导致的 TypeScript 解析失败，并恢复为干净源码后重新应用必要变更。
+  2. 将工作区启动遮罩拆分为 `WorkspaceLoadingOverlay`，模型目录初始化改为后台执行，避免阻塞 `workspace_ready`；KeyManager 通知订阅增加相等性判断，降低大画布无效重渲染。
+  3. 大画布模式下禁用 GPU 背景与 per-mousemove grid glow，连接线层改为 `1px` + `overflow: visible` 的真实坐标 SVG，移除历史 `+5000` 偏移方案。
+  4. Prompt group 生成态检测改为复用 `buildPromptChildImagesByPromptId` 索引，避免在 10000+ 节点画布中按 prompt 反复扫描全部图片。
+  5. 调整契约测试以对齐当前架构：折叠组图片调度过滤由 `largeCanvasVirtualization` helper 负责；大项目云同步、账单空日志、KeyManager 强制刷新和过期 blob 清理均按当前行为断言。
+- **修改文件**：
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `tests/unit/canvas-collapsed-groups-contract.test.ts`
+  - `tests/unit/canvas-layer-renderer-ownership-contract.test.ts`
+  - `tests/unit/canvas-persisted-image-hydration-guard.test.ts`
+  - `tests/unit/canvas-stripped-payload-cache.test.ts`
+  - `tests/unit/frontend-key-boundary-hardening.test.ts`
+  - `tests/unit/key-manager-cloud-sync.test.ts`
+  - `tests/unit/key-manager-wuyin-route-regression.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 大画布热路径继续以“可见集合/索引结果”为边界，避免任何缩放、拖拽、首屏恢复逻辑重新绑定历史总节点数。
+  - 连接线 SVG 不再依赖巨型布局盒和坐标平移，直接使用画布世界坐标，减少大画布下布局盒参与浏览器计算的成本。
+  - 契约测试只约束行为和所有权边界，不再要求调用点保留旧内联实现，避免后续 helper 化重构被误判为回归。
+- **已运行验证**：
+  - `npm run agents:status`
+  - `npm run typecheck`
+  - `npm run test:unit`
+  - `npm run architecture:check`
+  - `npm run governance:check`
+  - `npm run check:encoding`
+  - `git diff --check`
+  - `npm run build`
+  - `npm run verify:changes`
+- **未运行验证及原因**：
+  - 无。
+- **风险与下一步**：
+  - 本次验证已覆盖完整发布级检查；下一步运行 `npm run agents:commit` 固化本地提交。
+  - 若线上部署后仍出现真实 10k 项目卡顿，应继续以 `visiblePromptGroupViews`、空间索引裁剪、云同步布局快照为排查入口，不回退到全量 Canvas 缓存层绘制。

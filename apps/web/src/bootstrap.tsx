@@ -352,7 +352,7 @@ function bootstrap() {
         <LocaleProvider>
           <AuthProvider>
             <App />
-            <SpeedInsights />
+            {(window as any).__KK_LARGE_CANVAS_SMOKE__ ? null : <SpeedInsights />}
           </AuthProvider>
         </LocaleProvider>
       </ErrorBoundary>
@@ -371,23 +371,96 @@ const CDN_NODES = [
   'https://cdn3.kkai.plus'
 ];
 
+const CDN_LATENCY_TIMEOUT_MS = 600;
+const CDN_LATENCY_DEFER_MS = 15000;
+
+function shouldMeasureCdnLatency(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if ((window as any).__KK_LARGE_CANVAS_SMOKE__) {
+    return false;
+  }
+
+  const hostname = window.location.hostname;
+  if (
+    import.meta.env.DEV ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === ''
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 async function measureCdnLatency(nodeUrl: string): Promise<{ nodeUrl: string; latency: number }> {
   const start = performance.now();
+  let timer: number | undefined;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1500);
+    timer = window.setTimeout(() => controller.abort(), CDN_LATENCY_TIMEOUT_MS);
     
     await fetch(`${nodeUrl}/logo.png`, {
       method: 'HEAD',
       mode: 'cors',
+      cache: 'no-store',
       signal: controller.signal
     });
     
-    clearTimeout(timer);
     return { nodeUrl, latency: performance.now() - start };
   } catch {
     return { nodeUrl, latency: 99999 };
+  } finally {
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+    }
   }
+}
+
+function scheduleCdnPreferenceProbe(activeWorker: ServiceWorker) {
+  if (!shouldMeasureCdnLatency()) {
+    return;
+  }
+
+  const runProbe = async () => {
+    if (!navigator.serviceWorker.controller) {
+      return;
+    }
+
+    const results = await Promise.all(CDN_NODES.map(measureCdnLatency));
+    const validResults = results.filter(r => r.latency < 99999);
+
+    if (validResults.length > 0) {
+      validResults.sort((a, b) => a.latency - b.latency);
+      const bestCdn = validResults[0].nodeUrl;
+      console.log('[SW] Speed test completed. Selected best CDN:', bestCdn, 'latency:', validResults[0].latency.toFixed(1), 'ms');
+
+      activeWorker.postMessage({
+        type: 'SW_CDN_SET_PREFERENCE',
+        preference: bestCdn
+      });
+    }
+  };
+
+  const scheduleIdleProbe = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        void runProbe().catch((error) => {
+          console.warn('[SW] Deferred CDN speed test failed:', error);
+        });
+      }, { timeout: 3000 });
+      return;
+    }
+
+    void runProbe().catch((error) => {
+      console.warn('[SW] Deferred CDN speed test failed:', error);
+    });
+  };
+
+  window.setTimeout(scheduleIdleProbe, CDN_LATENCY_DEFER_MS);
 }
 
 function registerGlobalServiceWorker() {
@@ -402,21 +475,7 @@ function registerGlobalServiceWorker() {
         
         const activeWorker = registration.active || registration.waiting || registration.installing;
         if (activeWorker) {
-          const results = await Promise.all(CDN_NODES.map(measureCdnLatency));
-          const validResults = results.filter(r => r.latency < 99999);
-          
-          if (validResults.length > 0) {
-            validResults.sort((a, b) => a.latency - b.latency);
-            const bestCdn = validResults[0].nodeUrl;
-            console.log('[SW] Speed test completed. Selected best CDN:', bestCdn, 'latency:', validResults[0].latency.toFixed(1), 'ms');
-            
-            if (navigator.serviceWorker.controller) {
-              navigator.serviceWorker.controller.postMessage({
-                type: 'SW_CDN_SET_PREFERENCE',
-                preference: bestCdn
-              });
-            }
-          }
+          scheduleCdnPreferenceProbe(activeWorker);
         }
       })
       .catch((error) => {

@@ -246,15 +246,33 @@ export const resolveImageRecoveryUrlFromMetadata = async (
     return undefined;
 };
 
+export const buildGeneratedImagesByParentPromptId = (
+    imageNodes: GeneratedImage[] = []
+): Map<string, GeneratedImage[]> => {
+    const imagesByParentPromptId = new Map<string, GeneratedImage[]>();
+
+    imageNodes.forEach((imageNode) => {
+        const parentPromptId = typeof imageNode.parentPromptId === 'string' ? imageNode.parentPromptId : '';
+        if (!parentPromptId) return;
+
+        const existingImages = imagesByParentPromptId.get(parentPromptId) || [];
+        existingImages.push(imageNode);
+        imagesByParentPromptId.set(parentPromptId, existingImages);
+    });
+
+    return imagesByParentPromptId;
+};
+
 export const buildPersistedImageRecoverySignature = (canvases: Canvas[] = []): string => {
     const tokens: string[] = [];
 
     canvases.forEach((canvas) => {
         const imageNodes = canvas.imageNodes || [];
         const promptNodes = canvas.promptNodes || [];
+        const imagesByParentPromptId = buildGeneratedImagesByParentPromptId(imageNodes);
 
         imageNodes.forEach((imageNode) => {
-            if (!imageNode.url || !imageNode.originalUrl) {
+            if (!imageNode.url) {
                 tokens.push(`img:${canvas.id}:${imageNode.id}`);
             }
         });
@@ -263,7 +281,7 @@ export const buildPersistedImageRecoverySignature = (canvases: Canvas[] = []): s
             const recoveryEntries = buildPromptRecoveryEntries(promptNode);
             if (!recoveryEntries.length) return;
 
-            const existingChildren = imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+            const existingChildren = imagesByParentPromptId.get(promptNode.id) || [];
             const seenResultKeys = new Set<string>();
 
             existingChildren.forEach((imageNode) => {

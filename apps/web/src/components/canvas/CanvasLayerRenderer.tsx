@@ -28,6 +28,9 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
   height,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const liveCanvasTransformRef = useRef(canvasTransform);
+  const drawRef = useRef<() => void>(() => {});
+  const drawFrameRef = useRef<number | null>(null);
   const cardMetaById = React.useMemo(() => buildCanvasLayerMetaLookup(cardMetas), [cardMetas]);
   const selectedNodeIdSet = React.useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
@@ -64,10 +67,11 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
 
     ctx.save();
     // 应用当前画布变换
-    ctx.translate(canvasTransform.x, canvasTransform.y);
-    ctx.scale(canvasTransform.scale, canvasTransform.scale);
+    const liveCanvasTransform = liveCanvasTransformRef.current;
+    ctx.translate(liveCanvasTransform.x, liveCanvasTransform.y);
+    ctx.scale(liveCanvasTransform.scale, liveCanvasTransform.scale);
 
-    const scale = canvasTransform.scale;
+    const scale = liveCanvasTransform.scale;
     const paintMetas = selectCanvasLayerMetasForPaint({
       cardMetaById,
       visibleCardIds,
@@ -169,12 +173,54 @@ export const CanvasLayerRenderer: React.FC<CanvasLayerRendererProps> = ({
     });
 
     ctx.restore();
-  }, [cardMetaById, visibleCardIds, canvasTransform, selectedNodeIdSet, activeSourceImage, width, height]);
+  }, [cardMetaById, visibleCardIds, selectedNodeIdSet, activeSourceImage, width, height]);
 
   // 当尺寸或数据变化时，执行渲染
+  const scheduleDraw = useCallback(() => {
+    if (drawFrameRef.current !== null || typeof window === 'undefined') {
+      return;
+    }
+
+    drawFrameRef.current = window.requestAnimationFrame(() => {
+      drawFrameRef.current = null;
+      drawRef.current();
+    });
+  }, []);
+
   useEffect(() => {
-    draw();
+    drawRef.current = draw;
   }, [draw]);
+
+  useEffect(() => {
+    liveCanvasTransformRef.current = canvasTransform;
+    draw();
+  }, [canvasTransform, draw]);
+
+  useEffect(() => {
+    const handleLiveTransformChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ x: number; y: number; scale: number }>).detail;
+      if (
+        !detail
+        || !Number.isFinite(detail.x)
+        || !Number.isFinite(detail.y)
+        || !Number.isFinite(detail.scale)
+      ) {
+        return;
+      }
+
+      liveCanvasTransformRef.current = detail;
+      scheduleDraw();
+    };
+
+    window.addEventListener('kk-canvas-live-transform', handleLiveTransformChange);
+    return () => {
+      window.removeEventListener('kk-canvas-live-transform', handleLiveTransformChange);
+      if (drawFrameRef.current !== null) {
+        window.cancelAnimationFrame(drawFrameRef.current);
+        drawFrameRef.current = null;
+      }
+    };
+  }, [scheduleDraw]);
 
   return (
     <canvas

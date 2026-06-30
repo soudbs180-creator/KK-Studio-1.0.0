@@ -30,6 +30,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupSource, /applyServiceStage\('session_ready'\);/);
   assert.match(startupSource, /setStageSafely\('profile_ready'\);/);
   assert.match(startupSource, /setStageSafely\('workspace_ready'\);/);
+  assert.match(startupSource, /setStageSafely\('background_ready'\);/);
   assert.match(startupSource, /keyManager\.setStartupStage\(nextStage\);/);
   assert.match(startupSource, /adminModelService\.setStartupStage\(nextStage\);/);
   assert.match(appSource, /const init = async \(\) => \{\s*advanceTo\('session_ready'\);[\s\S]*try \{/);
@@ -48,6 +49,10 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupSource, /legacyFallbackEnabled: legacyFallbackState\.enabled/);
   assert.match(startupSource, /isStageReady: \(requiredStage: AppStartupStage\) => boolean;/);
   assert.match(startupScreenSource, /export const AppStartupScreen/);
+  assert.match(startupScreenSource, /const isReadyFallbackStage = stage === 'workspace_ready' \|\| stage === 'background_ready';/);
+  assert.match(startupScreenSource, /if \(isReadyFallbackStage\) \{\s*setSmoothProgress\(stage === 'background_ready' \? 100 : 90\);\s*return;\s*\}/);
+  assert.match(startupScreenSource, /if \(isReadyFallbackStage\) \{\s*return null;\s*\}/);
+  assert.doesNotMatch(startupScreenSource, /stage === 'workspace_ready' \|\| stage === 'background_ready'\) \{\s*return <div className="fixed inset-0/);
   assert.match(appSource, /import \{ AppStartupProvider, useAppStartup \} from '\.\/context\/AppStartupContext';/);
   assert.match(appSource, /import \{ AuthenticatedAppShell \} from '\.\/app\/AuthenticatedAppShell';/);
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);

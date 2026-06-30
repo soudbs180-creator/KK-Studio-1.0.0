@@ -33,6 +33,18 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
   const { activeCanvas, isMobile, imageCardHeightById, getComputedGroupBounds } = deps;
 
   return useMemo(() => {
+    const smokePerfEnabled = typeof window !== 'undefined' && Boolean((window as any).__KK_LARGE_CANVAS_SMOKE__);
+    const startedAt = smokePerfEnabled ? performance.now() : 0;
+    let stageStartedAt = startedAt;
+    const logStage = (stage: string) => {
+      if (!smokePerfEnabled) {
+        return;
+      }
+      const now = performance.now();
+      console.log(`[Workspace10k] spatial-index:${stage} stage=${Math.round(now - stageStartedAt)} total=${Math.round(now - startedAt)}`);
+      stageStartedAt = now;
+    };
+
     const index = new CanvasSpatialIndex(1000);
     const promptNodeById = new Map<string, PromptNode>();
     const imageNodeById = new Map<string, GeneratedImage>();
@@ -58,6 +70,7 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
       const y = node.position.y - height;
       index.updateNode(node.id, { x, y, width, height });
     });
+    logStage(`prompts:${activeCanvas.promptNodes.length}`);
 
     // 2. 插入 Image 节点
     activeCanvas.imageNodes.forEach((node) => {
@@ -68,6 +81,7 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
       const y = node.position.y - height;
       index.updateNode(node.id, { x, y, width, height });
     });
+    logStage(`images:${activeCanvas.imageNodes.length}`);
 
     // 3. 插入 Workflow 节点
     const workflowNodes = activeCanvas.workflow?.nodes || [];
@@ -81,6 +95,7 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
         index.updateNode(node.id, { x, y, width, height });
       }
     });
+    logStage(`workflow:${workflowNodes.length}`);
 
     // 4. 插入 Group 节点
     activeCanvas.groups.forEach((group) => {
@@ -93,6 +108,7 @@ export function useCanvasSpatialIndex(deps: UseCanvasSpatialIndexDeps): CanvasSp
         index.updateNode(group.id, bounds);
       }
     });
+    logStage(`groups:${activeCanvas.groups.length}`);
 
     return {
       spatialIndex: index,

@@ -21,6 +21,7 @@ import {
     toReferenceImageDataUrl,
 } from '../utils/referenceImageStorage';
 import {
+    buildCanvasLocalPersistenceSignature,
     clearPersistedCanvasStorageSnapshot,
     restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
@@ -32,6 +33,7 @@ import {
     DEFAULT_STATE,
     MAX_CANVASES,
     CanvasContext,
+    CanvasStartupStatusContext,
     createCanvasWorkflow,
     generateId,
     type ArrangeMode,
@@ -102,6 +104,19 @@ export type { ArrangeMode, CanvasContextType, CanvasState, SubCardLayout } from 
 const STORAGE_KEY = 'kk_studio_canvas_state';
 const LOCAL_FOLDER_REFRESH_INTERVAL_MS = 60000;
 const LOCAL_FOLDER_IDLE_GRACE_MS = 45000;
+const STARTUP_GENERATED_PREVIEW_LIMIT = 5;
+const STARTUP_DATA_URL_MIGRATION_LIMIT = 50;
+const LARGE_CANVAS_DATA_URL_MIGRATION_NODE_THRESHOLD = 1000;
+const LARGE_CANVAS_STARTUP_DATA_URL_MIGRATION_LIMIT = 5;
+const LARGE_CANVAS_DATA_URL_MIGRATION_DELAY_MS = 30000;
+const DATA_URL_MIGRATION_BATCH_SIZE = 5;
+const LARGE_CANVAS_DATA_URL_MIGRATION_BATCH_SIZE = 1;
+const PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD = 1000;
+const PERSISTED_IMAGE_RECOVERY_LARGE_IMAGE_LIMIT = 48;
+const PERSISTED_IMAGE_RECOVERY_LARGE_PROMPT_LIMIT = 48;
+const LARGE_CANVAS_LOCAL_PERSISTENCE_NODE_THRESHOLD = 1000;
+const LARGE_CANVAS_DEBOUNCED_SAVE_DELAY_MS = 30000;
+const LARGE_CANVAS_IDLE_SAVE_TIMEOUT_MS = 10000;
 
 const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState => {
     const nextState: CanvasState = {
@@ -147,6 +162,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [isInitRestored, setIsInitRestored] = useState(false);
     const [isShellReady, setIsShellReady] = useState(false);
     const [state, setState] = useState<CanvasState>(DEFAULT_STATE);
+    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+        const active = state.canvases.find(canvas => canvas.id === state.activeCanvasId) || state.canvases[0];
+        console.log(`[Workspace10k] canvas-provider:render:start loading=${isLoading} restored=${isInitRestored} nodes=${(active?.promptNodes?.length || 0) + (active?.imageNodes?.length || 0)}`);
+    }
 
     // Track in-flight save tasks to reduce data loss during refresh.
     const pendingSavesRef = useRef<Set<Promise<void>>>(new Set());
@@ -237,14 +256,18 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         startTransition(() => {
-            setState(prev => ({
-                ...prev,
-                canvases: prev.canvases.map(c => syncCanvasCompatibility({
-                    ...c,
-                    imageNodes: c.imageNodes.map(img => {
+            setState(prev => {
+                let stateChanged = false;
+
+                const canvases = prev.canvases.map(c => {
+                    let canvasChanged = false;
+
+                    const imageNodes = c.imageNodes.map(img => {
                         const storedUrl = hydratedImageMap.get(img.storageId || img.id);
                         let displayUrl = img.url || '';
                         let errorMsg = img.error;
+                        let originalUrl = img.originalUrl;
+
                         if (storedUrl) {
                             if (storedUrl.startsWith('data:')) {
                                 const blob = base64ToBlob(storedUrl);
@@ -261,17 +284,36 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 errorMsg = '本地临时图片已失效';
                             }
                         }
-                        const isExpiredUrl = displayUrl === '' && errorMsg === '本地临时图片已失效';
+
+                        originalUrl = displayUrl === '' && errorMsg === '本地临时图片已失效'
+                            ? ''
+                            : (img.originalUrl || img.apiResultUrl);
+
+                        if (
+                            displayUrl === img.url
+                            && originalUrl === img.originalUrl
+                            && errorMsg === img.error
+                        ) {
+                            return img;
+                        }
+
+                        canvasChanged = true;
                         return {
                             ...img,
                             url: displayUrl,
-                            originalUrl: (displayUrl === '' && errorMsg === '本地临时图片已失效') ? '' : (img.originalUrl || img.apiResultUrl),
+                            originalUrl,
                             error: errorMsg
                         };
-                    }),
-                    promptNodes: c.promptNodes.map(pn => ({
-                        ...pn,
-                        referenceImages: pn.referenceImages?.map(ref => {
+                    });
+
+                    const promptNodes = c.promptNodes.map(pn => {
+                        const referenceImages = pn.referenceImages;
+                        if (!referenceImages || referenceImages.length === 0) {
+                            return pn;
+                        }
+
+                        let promptChanged = false;
+                        const nextReferenceImages = referenceImages.map(ref => {
                             const storedUrl = hydratedImageMap.get(ref.storageId || ref.id);
                             if (storedUrl) {
                                 let finalData = storedUrl;
@@ -289,14 +331,48 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 }
 
                                 if (finalData.startsWith('data:') || finalData.startsWith('http') || finalData.startsWith('blob:') || finalData.length > 20) {
+                                    if (finalMime === ref.mimeType && finalData === ref.data) {
+                                        return ref;
+                                    }
+                                    promptChanged = true;
                                     return { ...ref, mimeType: finalMime, data: finalData };
                                 }
                             }
                             return ref;
-                        }) || []
-                    }))
-                }))
-            }));
+                        });
+
+                        if (!promptChanged) {
+                            return pn;
+                        }
+
+                        canvasChanged = true;
+                        return {
+                            ...pn,
+                            referenceImages: nextReferenceImages,
+                        };
+                    });
+
+                    if (!canvasChanged) {
+                        return c;
+                    }
+
+                    stateChanged = true;
+                    return syncCanvasCompatibility({
+                        ...c,
+                        imageNodes,
+                        promptNodes,
+                    });
+                });
+
+                if (!stateChanged) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    canvases,
+                };
+            });
         });
     }, []);
 
@@ -338,7 +414,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
-        const MAX_GENERATED_LOAD = 5;
         let generatedIdsArray = Array.from(generatedImageIds);
 
         const viewportX = startupState.viewportCenter.x;
@@ -367,8 +442,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         imagesWithDistance.sort((a, b) => a.distance - b.distance);
-        const nearestGeneratedIds = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
-        const remainingGeneratedIds = imagesWithDistance.slice(MAX_GENERATED_LOAD).map(item => item.id);
+        const nearestGeneratedIds = imagesWithDistance.slice(0, STARTUP_GENERATED_PREVIEW_LIMIT).map(item => item.id);
+        const skippedGeneratedHydrationCount = Math.max(0, imagesWithDistance.length - nearestGeneratedIds.length);
         generatedIdsArray = nearestGeneratedIds;
 
         const generatedPreviewMap = new Map<string, string>();
@@ -395,14 +470,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 简体中文注释：将非首屏的其它图片及数据迁移等耗时较长、非核心的任务改到后台异步非阻塞执行
         void (async () => {
             try {
-                if (generatedImageIds.size > MAX_GENERATED_LOAD) {
-                    console.log(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading ${MAX_GENERATED_LOAD} nearest to center first, and recovering the remaining ${remainingGeneratedIds.length} in background`);
+                if (skippedGeneratedHydrationCount > 0) {
+                    console.log(`[CanvasContext] Large generated image set (${generatedImageIds.size}); hydrated ${generatedIdsArray.length} nearest previews and deferred ${skippedGeneratedHydrationCount} images to visible-card scheduling`);
                 }
-                console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} nearest generated images + ${remainingGeneratedIds.length} background generated images`);
+                console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} nearest generated previews`);
 
                 const imageMap = new Map<string, string>(generatedPreviewMap);
                 const finalHydrationMap = new Map<string, string>();
-                const imageIdsArray = Array.from(referenceImageIds).concat(remainingGeneratedIds);
+                const imageIdsArray = Array.from(referenceImageIds);
                 const BATCH_SIZE = 5;
 
                 for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
@@ -431,18 +506,31 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     console.log(`[CanvasContext] Background Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
                 }
 
-                console.log(`[CanvasContext] Successfully loaded ${imageMap.size}/${requiredImageIds.size} required images in background`);
+                console.log(`[CanvasContext] Startup media hydration loaded ${imageMap.size} images; deferred ${skippedGeneratedHydrationCount} generated images`);
 
-                if (imageMap.size < requiredImageIds.size) {
-                    console.debug(`[CanvasContext] ${requiredImageIds.size - imageMap.size} images not found in IndexedDB`);
+                const startupDeferredImageCount = Math.max(0, requiredImageIds.size - imageMap.size);
+                if (startupDeferredImageCount > 0) {
+                    console.debug(`[CanvasContext] ${startupDeferredImageCount} images left for visible-card or recovery scheduling`);
                 }
 
                 let needsMigration = false;
                 const imagesToMigrate: { id: string; url: string }[] = [];
+                let skippedGeneratedDataUrlMigrationCount = 0;
+                const startupCanvasNodeCount = startupState.canvases.reduce((total, canvas) => (
+                    total + (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0)
+                ), 0);
+                const isLargeStartupCanvas = startupCanvasNodeCount > LARGE_CANVAS_DATA_URL_MIGRATION_NODE_THRESHOLD;
+                const startupDataUrlMigrationLimit = isLargeStartupCanvas
+                    ? LARGE_CANVAS_STARTUP_DATA_URL_MIGRATION_LIMIT
+                    : STARTUP_DATA_URL_MIGRATION_LIMIT;
 
                 startupState.canvases.forEach(c => {
                     c.imageNodes.forEach(img => {
                         if (img.url && img.url.startsWith('data:') && !imageMap.has(img.id)) {
+                            if (imagesToMigrate.length >= startupDataUrlMigrationLimit) {
+                                skippedGeneratedDataUrlMigrationCount += 1;
+                                return;
+                            }
                             imagesToMigrate.push({ id: img.id, url: img.url });
                             needsMigration = true;
                         }
@@ -466,30 +554,52 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 });
 
+                if (skippedGeneratedDataUrlMigrationCount > 0) {
+                    console.log(`[CanvasContext] Deferred ${skippedGeneratedDataUrlMigrationCount} data URL image migrations beyond the startup cap`);
+                }
+
                 if (needsMigration) {
-                    console.log(`[CanvasContext] Found ${imagesToMigrate.length} images to migrate. Starting background non-blocking migration...`);
-                    let migratedCount = 0;
-                    const BATCH_SIZE = 5;
-                    const migrationHydrationMap = new Map<string, string>();
-                    for (let i = 0; i < imagesToMigrate.length; i += BATCH_SIZE) {
-                        const batch = imagesToMigrate.slice(i, i + BATCH_SIZE);
-                        await Promise.all(batch.map(async (img) => {
-                            try {
-                                await saveImage(img.id, img.url);
-                                imageMap.set(img.id, img.url);
-                                migrationHydrationMap.set(img.id, img.url);
-                            } catch (err) {
-                                console.error(`[CanvasContext] Background migration failed for ${img.id}:`, err);
+                    const runDataUrlMigration = async () => {
+                        console.log(`[CanvasContext] Found ${imagesToMigrate.length} images to migrate. Starting background non-blocking migration...`);
+                        let migratedCount = 0;
+                        const batchSize = isLargeStartupCanvas
+                            ? LARGE_CANVAS_DATA_URL_MIGRATION_BATCH_SIZE
+                            : DATA_URL_MIGRATION_BATCH_SIZE;
+                        const migrationHydrationMap = new Map<string, string>();
+                        for (let i = 0; i < imagesToMigrate.length; i += batchSize) {
+                            const batch = imagesToMigrate.slice(i, i + batchSize);
+                            await Promise.all(batch.map(async (img) => {
+                                try {
+                                    await saveImage(img.id, img.url);
+                                    imageMap.set(img.id, img.url);
+                                    migrationHydrationMap.set(img.id, img.url);
+                                } catch (err) {
+                                    console.error(`[CanvasContext] Background migration failed for ${img.id}:`, err);
+                                }
+                            }));
+                            migratedCount += batch.length;
+                            const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
+                            onProgress?.(migratePct);
+                            if (isLargeStartupCanvas) {
+                                await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
                             }
-                        }));
-                        migratedCount += batch.length;
-                        const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
-                        onProgress?.(migratePct);
+                        }
+                        if (migrationHydrationMap.size > 0) {
+                            applyStartupHydratedImages(migrationHydrationMap);
+                        }
+                        console.log(`[CanvasContext] Background migration of ${imagesToMigrate.length} images completed.`);
+                    };
+
+                    if (isLargeStartupCanvas) {
+                        console.log(`[CanvasContext] Large canvas data URL migration scheduled after startup for ${imagesToMigrate.length} images`);
+                        window.setTimeout(() => {
+                            void runDataUrlMigration().catch((err) => {
+                                console.error('[CanvasContext] Delayed large-canvas data URL migration failed:', err);
+                            });
+                        }, LARGE_CANVAS_DATA_URL_MIGRATION_DELAY_MS);
+                    } else {
+                        await runDataUrlMigration();
                     }
-                    if (migrationHydrationMap.size > 0) {
-                        applyStartupHydratedImages(migrationHydrationMap);
-                    }
-                    console.log(`[CanvasContext] Background migration of ${imagesToMigrate.length} images completed.`);
                 }
             } catch (err) {
                 console.error('[CanvasContext] Background image recovery error:', err);
@@ -543,28 +653,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
 
             const smoothProgressTo100 = () => {
-                if (isSilent) {
-                    pushLoadingProgress(100);
-                    return Promise.resolve();
+                if (progressTimer !== null) {
+                    clearInterval(progressTimer);
+                    progressTimer = null;
                 }
-                return new Promise<void>((resolve) => {
-                    if (progressTimer !== null) {
-                        clearInterval(progressTimer);
-                    }
-                    let current = progress;
-                    const endTimer = setInterval(() => {
-                        // 简体中文注释：每次加 5~15% 的步长，让剩余部分在几十到两百毫秒内流畅地跑完至 100%
-                        current += Math.random() * 10 + 5;
-                        if (current >= 100) {
-                            current = 100;
-                            pushLoadingProgress(100);
-                            clearInterval(endTimer);
-                            resolve();
-                        } else {
-                            pushLoadingProgress(Math.floor(current));
-                        }
-                    }, 30);
-                });
+                progress = 100;
+                pushLoadingProgress(100);
+                return Promise.resolve();
             };
 
             await traceLocalPerformance('canvas-startup.restore-total', async () => {
@@ -572,6 +667,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const startupState = restoredState
                     ? normalizeRestoredCanvasState(restoredState as CanvasState)
                     : DEFAULT_STATE;
+                const startupCanvasNodeCountForFinalize = startupState.canvases.reduce((total, canvas) => (
+                    total + (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0)
+                ), 0);
+                const isLargeStartupCanvasForFinalize = startupCanvasNodeCountForFinalize > LARGE_CANVAS_DATA_URL_MIGRATION_NODE_THRESHOLD;
 
                 if (restoredState) {
                     startTransition(() => {
@@ -712,9 +811,31 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 // 简体中文注释：所有核心加载任务均完毕，极速平滑飙升到 100% 并延迟 200ms 关闭加载状态
                 await smoothProgressTo100();
                 setTimeout(() => {
+                    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+                        console.log('[Workspace10k] canvas-loading-finalize:start');
+                    }
                     setIsLoading(false);
+                    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+                        console.log('[Workspace10k] canvas-loading-finalize:after-loading');
+                    }
                     hasLoadedSuccessRef.current = true; // 标记首次加载已成功，防止以后重复初始化把进度重置为 0
-                    setIsInitRestored(true); // 🚀 标记项目已彻底同步恢复完毕，解锁后续磁盘/缓存文件保存动作
+                    const unlockPersistence = () => {
+                        setIsInitRestored(true); // 🚀 标记项目已彻底同步恢复完毕，解锁后续磁盘/缓存文件保存动作
+                        if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+                            console.log('[Workspace10k] canvas-loading-finalize:persistence-unlocked');
+                        }
+                    };
+                    if (isLargeStartupCanvasForFinalize) {
+                        window.setTimeout(unlockPersistence, 2500);
+                    } else {
+                        unlockPersistence();
+                    }
+                    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+                        console.log('[Workspace10k] canvas-loading-finalize:after-init-restored');
+                        window.requestAnimationFrame(() => {
+                            console.log('[Workspace10k] canvas-loading-finalize:next-frame');
+                        });
+                    }
                     if (typeof window !== 'undefined') {
                         sessionStorage.setItem('kk_canvas_loaded', 'true');
                     }
@@ -882,11 +1003,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSaveBlockedRef.current = isSaveBlocked;
     }, [state, isSaveBlocked]);
 
-    const localPersistenceToken = useMemo(() => ({
-        canvases: state.canvases,
-        activeCanvasId: state.activeCanvasId,
-        subCardLayoutMode: state.subCardLayoutMode,
-    }), [state.activeCanvasId, state.canvases, state.subCardLayoutMode]);
+    const localPersistenceToken = useMemo(
+        () => buildCanvasLocalPersistenceSignature(
+            state.canvases,
+            state.activeCanvasId,
+            state.subCardLayoutMode
+        ),
+        [state.activeCanvasId, state.canvases, state.subCardLayoutMode]
+    );
+    const isLargeLocalPersistenceCanvas = useMemo(
+        () => state.canvases.some((canvas) => (
+            (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0)
+        ) > LARGE_CANVAS_LOCAL_PERSISTENCE_NODE_THRESHOLD),
+        [state.canvases]
+    );
 
     useCanvasLocalPersistence({
         state,
@@ -897,6 +1027,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isLoadingRef: isSaveBlockedRef,
         urgentSaveRef,
         prepareBeforeUnloadState: markInterruptedSyncPromptGenerations,
+        debouncedSaveDelayMs: isLargeLocalPersistenceCanvas ? LARGE_CANVAS_DEBOUNCED_SAVE_DELAY_MS : undefined,
+        idleSaveTimeoutMs: isLargeLocalPersistenceCanvas ? LARGE_CANVAS_IDLE_SAVE_TIMEOUT_MS : undefined,
     });
 
     // Hydrate Reference Images from IDB (if stripped from localStorage)
@@ -904,14 +1036,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!state.activeCanvasId) return;
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
         if (!currentCanvas) return;
+        const promptNodesWithReferences = currentCanvas.promptNodes.filter((
+            node
+        ): node is PromptNode & { referenceImages: NonNullable<PromptNode['referenceImages']> } => (
+            Boolean(node.referenceImages && node.referenceImages.length > 0)
+        ));
+        if (promptNodesWithReferences.length === 0) {
+            return;
+        }
 
         let hasUpdates = false;
         const updates: { nodeId: string; refs: any[] }[] = [];
 
         const hydrateRefs = async () => {
-            const promises = currentCanvas.promptNodes.map(async (node) => {
-                if (!node.referenceImages || node.referenceImages.length === 0) return;
-
+            const promises = promptNodesWithReferences.map(async (node) => {
                 let nodeUpdated = false;
                 const newRefs = await Promise.all(node.referenceImages.map(async (ref) => {
                     // If data is missing (stripped), try to load from IDB
@@ -956,7 +1094,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         // Delay slighty to defer IO
-        setTimeout(hydrateRefs, 500);
+        const timeoutId = window.setTimeout(hydrateRefs, 500);
+        return () => window.clearTimeout(timeoutId);
 
     }, [state.activeCanvasId]); // Run when canvas changes (or roughly once on load if active ID is set)
 
@@ -1497,10 +1636,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         () => buildPersistedImageRecoverySignature(state.canvases),
         [state.canvases]
     );
+    const persistedRecoveryNodeCount = useMemo(
+        () => state.canvases.reduce(
+            (total, canvas) => total + (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0),
+            0
+        ),
+        [state.canvases]
+    );
+    const shouldDeferPersistedRecoveryForLargeCanvas = persistedRecoveryNodeCount >= PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD;
     const canHydratePersistedTaskResults = Boolean(user && session && isStageReady('background_ready'));
 
     useEffect(() => {
         if (isLoading || !canHydratePersistedTaskResults || !persistedImageRecoverySignature) return;
+        if (shouldDeferPersistedRecoveryForLargeCanvas) return;
 
         let cancelled = false;
 
@@ -1523,6 +1671,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const recoveredNodes: GeneratedImage[] = [];
             const parentUpdates: Record<string, Partial<PromptNode>> = {};
             const isMobileViewport = typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false;
+            const totalRecoveryNodeCount = currentState.canvases.reduce(
+                (total, canvas) => total + (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0),
+                0
+            );
+            const isLargePersistedRecoveryProject = totalRecoveryNodeCount >= PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD;
+            const viewportCenter = currentState.viewportCenter || { x: 0, y: 0 };
 
             for (const canvas of currentState.canvases) {
                 const promptById = new Map((canvas.promptNodes || []).map((promptNode) => [promptNode.id, promptNode] as const));
@@ -1540,8 +1694,24 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     }
                 });
 
-                for (const imageNode of imageNodes) {
-                    if (imageNode.url && imageNode.originalUrl) continue;
+                const recoveryImageNodes = imageNodes
+                    .filter((imageNode) => {
+                        if (!imageNode.url) return true;
+                        return !isLargePersistedRecoveryProject && !imageNode.originalUrl;
+                    })
+                    .sort((left, right) => {
+                        if (!isLargePersistedRecoveryProject) return 0;
+                        const leftDistance = Math.abs((left.position?.x || 0) - viewportCenter.x)
+                            + Math.abs((left.position?.y || 0) - viewportCenter.y);
+                        const rightDistance = Math.abs((right.position?.x || 0) - viewportCenter.x)
+                            + Math.abs((right.position?.y || 0) - viewportCenter.y);
+                        return leftDistance - rightDistance;
+                    });
+                const boundedRecoveryImageNodes = isLargePersistedRecoveryProject
+                    ? recoveryImageNodes.slice(0, PERSISTED_IMAGE_RECOVERY_LARGE_IMAGE_LIMIT)
+                    : recoveryImageNodes;
+
+                for (const imageNode of boundedRecoveryImageNodes) {
 
                     const parentPrompt = imageNode.parentPromptId ? promptById.get(imageNode.parentPromptId) : undefined;
                     const promptTasks = parentPrompt ? (tasksByPromptId.get(parentPrompt.id) || []) : [];
@@ -1562,9 +1732,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 }
 
+                let promptRecoveryProbeCount = 0;
                 for (const promptNode of canvas.promptNodes || []) {
                     const promptTasks = tasksByPromptId.get(promptNode.id) || [];
-                    const existingChildren = (canvas.imageNodes || []).filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+                    const existingChildren = strongOwnedImagesByParentPromptId.get(promptNode.id) || [];
                     const seenResultKeys = new Set<string>();
 
                     existingChildren.forEach((imageNode) => {
@@ -1583,6 +1754,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
 
                     const recoveryEntries = buildPromptRecoveryEntries(promptNode, promptTasks);
+                    if (isLargePersistedRecoveryProject && recoveryEntries.length > 0) {
+                        if (promptRecoveryProbeCount >= PERSISTED_IMAGE_RECOVERY_LARGE_PROMPT_LIMIT) {
+                            continue;
+                        }
+                        promptRecoveryProbeCount += 1;
+                    }
                     const missingEntries = recoveryEntries.filter((entry) => {
                         const identity = buildTaskResultIdentity({
                             taskId: entry.taskId,
@@ -1717,7 +1894,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => {
             cancelled = true;
         };
-    }, [addImageNodes, canHydratePersistedTaskResults, isLoading, persistedImageRecoverySignature, updateNodes]);
+    }, [
+        addImageNodes,
+        canHydratePersistedTaskResults,
+        isLoading,
+        persistedImageRecoverySignature,
+        shouldDeferPersistedRecoveryForLargeCanvas,
+        updateNodes,
+    ]);
 
     const addWorkflowNode = useCallback((node: WorkflowNode) => {
         if (!isWorkflowUtilityNodeKind(node.kind)) {
@@ -2972,8 +3156,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateGroup,
         setNodeTags,
         isReady: isShellReady,
-        isLoading,
-        loadingProgress,
         setViewportCenter,
         migrateNodes,
         mergeCanvasInto,
@@ -2990,14 +3172,23 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
-        isShellReady, isLoading, loadingProgress, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
+        isShellReady, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
         addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings
     ]);
+    const startupStatusValue = React.useMemo(() => ({
+        isLoading,
+        loadingProgress,
+    }), [isLoading, loadingProgress]);
+    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+        console.log(`[Workspace10k] canvas-provider:render:context-ready loading=${isLoading} restored=${isInitRestored}`);
+    }
 
     return (
-        <CanvasContext.Provider value={contextValue}>
-            {children}
-        </CanvasContext.Provider>
+        <CanvasStartupStatusContext.Provider value={startupStatusValue}>
+            <CanvasContext.Provider value={contextValue}>
+                {children}
+            </CanvasContext.Provider>
+        </CanvasStartupStatusContext.Provider>
     );
 };
 
@@ -3006,3 +3197,5 @@ export const useCanvas = () => {
     if (!context) throw new Error('useCanvas must be used within CanvasProvider');
     return context;
 };
+
+export const useCanvasStartupStatus = () => useContext(CanvasStartupStatusContext);

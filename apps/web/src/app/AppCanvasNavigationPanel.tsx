@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Minus, Plus, Minimize2, Map } from 'lucide-react';
+import { buildMinimapSpatialIndex, selectMinimapVisibleNodes } from './minimapSpatialIndex';
 
 // 简体中文：定义导航面板 of Props 接口
 interface AppCanvasNavigationPanelProps {
@@ -89,13 +90,10 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const scale = canvasTransform.scale || 1;
 
   // 3. 获取所有可见卡片的绝对位置
-  const promptNodes = activeCanvas?.promptNodes || [];
-  const imageNodes = activeCanvas?.imageNodes || [];
-
-  const visibleNodes = [
-    ...promptNodes.filter((n: any) => !n.hiddenInCanvas),
-    ...imageNodes,
-  ];
+  const minimapSpatialIndex = React.useMemo(
+    () => buildMinimapSpatialIndex(activeCanvas?.promptNodes, activeCanvas?.imageNodes),
+    [activeCanvas?.promptNodes, activeCanvas?.imageNodes],
+  );
 
   // 4. 确定大画布容器的实际尺寸，使用缓存值
   const containerWidth = containerSize.width;
@@ -136,6 +134,11 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   const safeTotalWidth = totalWidth <= 0 || isNaN(totalWidth) ? 1 : totalWidth;
   const safeTotalHeight = totalHeight <= 0 || isNaN(totalHeight) ? 1 : totalHeight;
+
+  const visibleNodes = React.useMemo(
+    () => selectMinimapVisibleNodes(minimapSpatialIndex, minX, minY, maxX, maxY),
+    [minimapSpatialIndex, minX, minY, maxX, maxY],
+  );
 
   // 7. 计算等比例缩放至小地图 (200x90) 的比例因子
   const scaleMiniX = miniWidth / safeTotalWidth;
@@ -586,17 +589,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
             {/* 渲染视口范围内的卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
             {visibleNodes
-              .filter((node: any) => {
-                const isImage = node.url || node.storageId;
-                const w = isImage ? 380 : 500;
-                const h = isImage ? 380 : 300;
-                return (
-                  node.position.x + w >= minX &&
-                  node.position.x <= maxX &&
-                  node.position.y + h >= minY &&
-                  node.position.y <= maxY
-                );
-              })
               .map((node: any) => {
                 const isImage = node.url || node.storageId;
                 const w = isImage ? 380 : 500;

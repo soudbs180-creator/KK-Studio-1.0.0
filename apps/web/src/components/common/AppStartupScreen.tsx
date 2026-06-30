@@ -80,26 +80,17 @@ export const AppStartupScreen: React.FC<{
   const activeItem = getActiveStartupItem(stage);
   const loadingText = pickByResolvedLanguage(language, activeItem.label.zh, activeItem.label.en);
   const localizedWarning = localizeUserFacingText(warning) || warning;
+  const isReadyFallbackStage = stage === 'workspace_ready' || stage === 'background_ready';
 
   const [smoothProgress, setSmoothProgress] = React.useState(0);
 
   React.useEffect(() => {
-    const target = stageTargetMap[stage] || 20;
-
-    if (stage === 'background_ready') {
-      const interval = window.setInterval(() => {
-        setSmoothProgress((prev) => {
-          if (prev >= 100) {
-            window.clearInterval(interval);
-            return 100;
-          }
-          const step = Math.max((100 - prev) * 0.15, 1);
-          const next = prev + step;
-          return next >= 100 ? 100 : next;
-        });
-      }, 16);
-      return () => window.clearInterval(interval);
+    if (isReadyFallbackStage) {
+      setSmoothProgress(stage === 'background_ready' ? 100 : 90);
+      return;
     }
+
+    const target = stageTargetMap[stage] || 20;
 
     const interval = window.setInterval(() => {
       setSmoothProgress((prev) => {
@@ -113,7 +104,7 @@ export const AppStartupScreen: React.FC<{
     }, 30);
 
     return () => window.clearInterval(interval);
-  }, [stage]);
+  }, [isReadyFallbackStage, stage]);
 
   const progress = Math.min(Math.round(smoothProgress), 100);
   const eyebrow = pickByResolvedLanguage(language, '启动中', 'Starting up');
@@ -127,8 +118,8 @@ export const AppStartupScreen: React.FC<{
     '正在确认会话、加载个人设置，并准备创作画布。',
     'Confirming your session, loading profile settings, and preparing the creative canvas.',
   );
-  if (stage === 'workspace_ready' || stage === 'background_ready') {
-    return <div className="fixed inset-0 bg-[#09090b] z-[99999]" />; // UI_TOKEN_EXCEPTION
+  if (isReadyFallbackStage) {
+    return null;
   }
 
   return (

@@ -22,6 +22,8 @@ export function useCanvasLocalPersistence<T>(params: {
     isLoadingRef: MutableRefObject<boolean>;
     urgentSaveRef: MutableRefObject<boolean>;
     prepareBeforeUnloadState: (state: T) => T;
+    debouncedSaveDelayMs?: number;
+    idleSaveTimeoutMs?: number;
 }): void {
     const {
         state,
@@ -32,6 +34,8 @@ export function useCanvasLocalPersistence<T>(params: {
         isLoadingRef,
         urgentSaveRef,
         prepareBeforeUnloadState,
+        debouncedSaveDelayMs,
+        idleSaveTimeoutMs,
     } = params;
     const localPersistenceToken = persistenceToken ?? state;
     const hasSkippedInitialDebouncedSaveRef = useRef(false);
@@ -59,15 +63,18 @@ export function useCanvasLocalPersistence<T>(params: {
         const isUrgentSave = urgentSaveRef.current;
         urgentSaveRef.current = false;
 
+        const saveDelayMs = isUrgentSave ? 0 : (debouncedSaveDelayMs ?? 600);
+        const idleTimeoutMs = isUrgentSave ? 500 : (idleSaveTimeoutMs ?? 1500);
+
         timer = window.setTimeout(() => {
             const requestIdleCallback = browserWindow.requestIdleCallback;
             if (requestIdleCallback) {
-                idleCallbackHandle = requestIdleCallback(saveState, { timeout: isUrgentSave ? 500 : 1500 });
+                idleCallbackHandle = requestIdleCallback(saveState, { timeout: idleTimeoutMs });
                 return;
             }
 
             saveState();
-        }, isUrgentSave ? 0 : 600);
+        }, saveDelayMs);
 
         return () => {
             if (timer !== undefined) {
@@ -77,7 +84,7 @@ export function useCanvasLocalPersistence<T>(params: {
                 browserWindow.cancelIdleCallback?.(idleCallbackHandle);
             }
         };
-    }, [isLoading, localPersistenceToken, stateRef, storageKey, urgentSaveRef]);
+    }, [debouncedSaveDelayMs, idleSaveTimeoutMs, isLoading, localPersistenceToken, stateRef, storageKey, urgentSaveRef]);
 
     useEffect(() => {
         const handleSave = (source: 'visibility' | 'beforeunload') => {

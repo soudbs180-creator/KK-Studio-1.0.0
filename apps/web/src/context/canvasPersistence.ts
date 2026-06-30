@@ -208,3 +208,24 @@ export const buildCanvasFileSystemPersistenceSignature = (
         (canvas.drawings || []).length,
     ].join(':')).join('|')}`
 );
+
+export const buildCanvasLocalPersistenceSignature = (
+    canvases: Canvas[] = [],
+    activeCanvasId?: string,
+    subCardLayoutMode?: string
+): string => (
+    [
+        String(activeCanvasId || ''),
+        String(subCardLayoutMode || ''),
+        canvases.map((canvas) => [
+            canvas.id,
+            canvas.name,
+            canvas.folderName || '',
+            canvas.lastModified || 0,
+            canvas.promptNodes.length,
+            canvas.imageNodes.length,
+            (canvas.groups || []).length,
+            (canvas.drawings || []).length,
+        ].join(':')).join('|'),
+    ].join('::')
+);

@@ -45,6 +45,7 @@ import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
 import { getCollapsedCanvasGroupNodeIds } from '../../app/collapsedCanvasGroups';
 import { resolveFollowUpDraftPosition } from '../../app/followUpDraftPosition';
+import { buildPromptChildImagesByPromptId } from '../../app/promptGroupChildImages';
 import { buildPromptGroupRenderLayout } from '../../app/promptGroupRenderLayout';
 import { useAppPromptBarProps } from '../../app/useAppPromptBarProps';
 import { useCanvasViewport } from '../../hooks/useCanvasViewport';
@@ -269,7 +270,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 
 // Lucide icons replaced with SVGs
 import { toolRegistryInstance } from '../../features/ai-assistant-runtime';
-import { CanvasProvider, useCanvas } from '../../context/CanvasContext';
+import { CanvasProvider, useCanvas, useCanvasStartupStatus } from '../../context/CanvasContext';
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { AppearanceMotionProvider } from '../../context/AppearanceMotionContext';
 import { KkUIProvider } from '@kk/ui/web';
@@ -353,6 +354,100 @@ const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
   projectManagerScale: 1,
   hideZoomControl: false,
   projectManagerOffset: 0,
+};
+
+const WorkspaceLoadingOverlay: React.FC = () => {
+  const { isLoading, loadingProgress } = useCanvasStartupStatus();
+  const [isFirstScreenMediaLoading, setIsFirstScreenMediaLoading] = useState(true);
+
+  const displayLoadingProgress = React.useMemo(() => {
+    if (isLoading) {
+      return Math.min(98, loadingProgress);
+    }
+    if (isFirstScreenMediaLoading) {
+      return 99;
+    }
+    return 100;
+  }, [isLoading, loadingProgress, isFirstScreenMediaLoading]);
+
+  useEffect(() => {
+    if (isLoading) {
+      setIsFirstScreenMediaLoading(true);
+      return;
+    }
+
+    let active = true;
+    let initialTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+
+    const checkFirstScreenImages = () => {
+      if (!active) return;
+
+      const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[data-native-drag-source="true"]'));
+      const pendingImages = images.filter(img => img.src && !img.complete);
+
+      if (pendingImages.length === 0) {
+        setIsFirstScreenMediaLoading(false);
+        return;
+      }
+
+      let loadedCount = 0;
+      const total = pendingImages.length;
+
+      const onImageDone = () => {
+        loadedCount++;
+        if (loadedCount >= total) {
+          checkFirstScreenImages();
+        }
+      };
+
+      pendingImages.forEach(img => {
+        img.addEventListener('load', onImageDone, { once: true });
+        img.addEventListener('error', onImageDone, { once: true });
+      });
+    };
+
+    initialTimer = setTimeout(() => {
+      checkFirstScreenImages();
+    }, 50);
+
+    timeoutTimer = setTimeout(() => {
+      if (active) {
+        setIsFirstScreenMediaLoading(false);
+      }
+    }, 2500);
+
+    return () => {
+      active = false;
+      if (initialTimer) clearTimeout(initialTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    };
+  }, [isLoading]);
+
+  if (!isLoading && !isFirstScreenMediaLoading) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+      <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
+        <div className="mb-4 text-sm font-medium text-white/95 text-left">
+          正在加载画布
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out"
+              style={{ width: `${displayLoadingProgress}%` }}
+            />
+          </div>
+          <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
+            {displayLoadingProgress}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const AppContent: React.FC<AppContentProps> = () => {
@@ -509,8 +604,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
-    isLoading,
-    loadingProgress,
     setViewportCenter, // 简体中文注释：迁移时保留当前视口中心，避免画布跳动。
     state, // 简体中文注释：迁移功能需要读取完整画布列表。
     migrateNodes, // 简体中文注释：将选中的节点迁移到其他项目。
@@ -521,73 +614,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
     clearCanvasDrawings,
     unlinkNodes
   } = useCanvas();
-
-  // 简体中文注释：跟踪首屏图片与多媒体加载状态，合流数据与视图加载体验
-  const [isFirstScreenMediaLoading, setIsFirstScreenMediaLoading] = useState(true);
-
-  const displayLoadingProgress = React.useMemo(() => {
-    if (isLoading) {
-      return Math.min(98, loadingProgress);
-    }
-    if (isFirstScreenMediaLoading) {
-      return 99;
-    }
-    return 100;
-  }, [isLoading, loadingProgress, isFirstScreenMediaLoading]);
-
-  useEffect(() => {
-    if (isLoading) {
-      setIsFirstScreenMediaLoading(true);
-      return;
-    }
-
-    let active = true;
-    let initialTimer: NodeJS.Timeout | null = null;
-    let timeoutTimer: NodeJS.Timeout | null = null;
-
-    const checkFirstScreenImages = () => {
-      if (!active) return;
-
-      const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[data-native-drag-source="true"]'));
-      const pendingImages = images.filter(img => img.src && !img.complete);
-
-      if (pendingImages.length === 0) {
-        setIsFirstScreenMediaLoading(false);
-      } else {
-        let loadedCount = 0;
-        const total = pendingImages.length;
-
-        const onImageDone = () => {
-          loadedCount++;
-          if (loadedCount >= total) {
-            checkFirstScreenImages();
-          }
-        };
-
-        pendingImages.forEach(img => {
-          img.addEventListener('load', onImageDone, { once: true });
-          img.addEventListener('error', onImageDone, { once: true });
-        });
-      }
-    };
-
-    initialTimer = setTimeout(() => {
-      checkFirstScreenImages();
-    }, 50);
-
-    timeoutTimer = setTimeout(() => {
-      if (active) {
-        setIsFirstScreenMediaLoading(false);
-      }
-    }, 2500);
-
-    return () => {
-      active = false;
-      if (initialTimer) clearTimeout(initialTimer);
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-    };
-  }, [isLoading]);
-
   const updatePromptNodeRef = useRef(updatePromptNode);
   useLayoutEffect(() => {
     updatePromptNodeRef.current = updatePromptNode;
@@ -720,9 +746,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
     setViewportCenter,
   });
 
+  const measurementCanvasNodeCount = (activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0);
+  const isLargeMeasurementCanvas = measurementCanvasNodeCount >= 80;
+
   useEffect(() => {
-    CanvasMeasurementScheduler.setLocked(isCanvasTransforming);
-  }, [isCanvasTransforming]);
+    CanvasMeasurementScheduler.setLocked(isCanvasTransforming || isLargeMeasurementCanvas);
+  }, [isCanvasTransforming, isLargeMeasurementCanvas]);
 
   const handleToggleGrid = () => setShowGrid(prev => !prev);
   const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
@@ -1050,8 +1079,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   useEffect(() => {
     const unsubscribe = keyManager.subscribe(() => {
-      setKeyStats(keyManager.getStats());
-      setProviders(keyManager.getProviders());
+      const nextKeyStats = keyManager.getStats();
+      setKeyStats(prev => (
+        prev.total === nextKeyStats.total
+        && prev.valid === nextKeyStats.valid
+        && prev.invalid === nextKeyStats.invalid
+        && prev.disabled === nextKeyStats.disabled
+        && prev.rateLimited === nextKeyStats.rateLimited
+          ? prev
+          : nextKeyStats
+      ));
+
+      const nextProviders = keyManager.getProviders();
+      setProviders(prev => (
+        JSON.stringify(prev) === JSON.stringify(nextProviders)
+          ? prev
+          : nextProviders
+      ));
     });
     return unsubscribe;
   }, []);
@@ -1236,16 +1280,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (authLoading) return;
     let active = true;
-    let backgroundReadyTimer: number | null = null;
 
     const init = async () => {
       advanceTo('session_ready');
+      void adminModelService.initializeUnifiedModels().catch(error => {
+        console.warn('[App] Deferred model bootstrap failed:', error);
+      });
       try {
-        // 0. Initialize the local model surface first. Hosted catalog refreshes
-        // stay deferred until the startup coordinator reaches background_ready.
-        await adminModelService.initializeUnifiedModels();
-        if (!active) return;
-
         // 1. Sync User ID
         const authenticatedUserId = startupAuthenticatedUserId;
 
@@ -1364,9 +1405,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     return () => {
       active = false;
-      if (backgroundReadyTimer !== null) {
-        window.clearTimeout(backgroundReadyTimer);
-      }
     };
   }, [advanceTo, authLoading, startupAuthenticatedUserId]);
 
@@ -3559,6 +3597,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
     };
   }, [activeCanvas, imageNodesById, isMobile, promptNodesById]);
 
+  const generatingChildImagesByPromptId = React.useMemo(
+    () => buildPromptChildImagesByPromptId(activeCanvas?.promptNodes, activeCanvas?.imageNodes),
+    [activeCanvas?.promptNodes, activeCanvas?.imageNodes]
+  );
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
     if (!activeCanvas) {
@@ -3568,7 +3610,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     const nextGeneratingGroupIds = activeCanvas.promptNodes
       .filter((promptNode) => {
-        const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
+        const childImages = generatingChildImagesByPromptId.get(promptNode.id) || [];
         return Boolean(promptNode.isGenerating) || childImages.some((imageNode) => imageNode.isGenerating);
       })
       .map((promptNode) => promptNode.id)
@@ -3580,7 +3622,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
     generatingGroupStateSignatureRef.current = signature;
     setGeneratingGroupIds(nextGeneratingGroupIds);
-  }, [activeCanvas, resolveCurrentPromptChildImages]);
+  }, [activeCanvas, generatingChildImagesByPromptId]);
 
   const maxPersistedCanvasLayer = React.useMemo(() => {
     if (!activeCanvas) return 0;
@@ -3935,7 +3977,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
     promptNodesById,
-    resolveCurrentPromptChildImages,
     selectNodes,
     selectedNodeIds,
     setFocusedGroupId,
@@ -4207,11 +4248,22 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   // 当画布节点数据变动时向 Worker 发送重建索引请求（用于后台排版整理计算）
   useEffect(() => {
-    if (!activeCanvas) return;
-    const metas: CachedCardMeta[] = [];
-    activeCanvas.imageNodes
-      .filter((n) => !n.parentPromptId)
-      .forEach((n) => {
+    if (!activeCanvas) {
+      setCardMetas([]);
+      return;
+    }
+
+    let idleId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const rebuildVisibleMetas = () => {
+      const sourceImages = isLargeProject ? visibleImageNodes : activeCanvas.imageNodes;
+      const metas: CachedCardMeta[] = [];
+      sourceImages.forEach((n) => {
+        if (n.parentPromptId) {
+          return;
+        }
+
         metas.push({
           id: n.id,
           x: n.position.x,
@@ -4223,14 +4275,30 @@ export const AppContent: React.FC<AppContentProps> = () => {
           updatedAt: n.timestamp,
         });
       });
-    
-    setCardMetas(metas);
 
-    workerRef.current?.postMessage({
-      type: 'REBUILD_INDEX',
-      payload: { nodes: metas }
-    });
-  }, [activeCanvas]);
+      setCardMetas(metas);
+
+      workerRef.current?.postMessage({
+        type: 'REBUILD_INDEX',
+        payload: { nodes: metas }
+      });
+    };
+
+    if ('requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(rebuildVisibleMetas, { timeout: 250 });
+    } else {
+      timeoutId = setTimeout(rebuildVisibleMetas, 0);
+    }
+
+    return () => {
+      if (idleId !== null && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [activeCanvas, isLargeProject, visibleImageNodes]);
 
 
 
@@ -5388,12 +5456,13 @@ const isRectIntersecting = (
       chrome={workspaceChrome}
     >
       <GpuBackground
+        enabled={!isLargeProject}
         opacity={0.4}
         showConnections={true}
         mode={backgroundMode}
       />
       {/* 简体中文：空画布欢迎态，仅在桌面端且画布节点完全为空时渲染 */}
-      {isCanvasEmpty && !isMobile && !isLoading && (
+      {isCanvasEmpty && !isMobile && isReady && (
         <EmptyCanvasWelcome
           onApplyWorkflowTemplate={(templateId) => {
             void handleApplyWorkflowTemplate(templateId);
@@ -5638,6 +5707,7 @@ const isRectIntersecting = (
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
         cardPositions={cardPositionsVal}
+        reducePointerEffects={isLargeProject}
         backgroundOverlay={
           isLargeProject && (
             <CanvasLayerRenderer
@@ -5739,10 +5809,8 @@ const isRectIntersecting = (
           className="absolute top-0 left-0 pointer-events-none"
           shapeRendering="geometricPrecision"
           style={{
-            width: '10000px',
-            height: '10000px',
-            left: '-5000px',
-            top: '-5000px',
+            width: '1px',
+            height: '1px',
             overflow: 'visible',
             zIndex: CONNECTOR_LAYER_Z_INDEX,
           }}
@@ -5780,15 +5848,15 @@ const isRectIntersecting = (
             const promptPosition = resolveConnectorRenderPosition(pn.id, pn.position);
             if (!sourcePosition || !promptPosition) return null;
 
-            // Source: Image Bottom Center (+5000 offset)
-            const startX = sourcePosition.x + 5000;
-            const startY = sourcePosition.y + 5000;
+            // Source: Image Bottom Center.
+            const startX = sourcePosition.x;
+            const startY = sourcePosition.y;
 
-            // Target: Prompt Top Center (+5000 offset)
+            // Target: Prompt Top Center.
             // Use exact height if available, otherwise estimate
             const height = pn.height || getPromptHeight(pn.prompt);
-            const endX = promptPosition.x + 5000;
-            const endY = (promptPosition.y - height) + 5000;
+            const endX = promptPosition.x;
+            const endY = promptPosition.y - height;
 
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
@@ -5857,13 +5925,12 @@ const isRectIntersecting = (
             const sourcePosition = resolveConnectorRenderPosition(sourceNode.id, sourceNode.position);
             if (!sourcePosition) return null;
 
-            // Position + 5000 Offset
-            const startX = sourcePosition.x + 5000;
-            const startY = sourcePosition.y + 5000;
+            const startX = sourcePosition.x;
+            const startY = sourcePosition.y;
 
             // Pending Node Position (Bottom Center)
-            const endX = pendingPosition.x + 5000;
-            const endY = (pendingPosition.y - 140) + 5000;
+            const endX = pendingPosition.x;
+            const endY = pendingPosition.y - 140;
 
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
@@ -5934,11 +6001,11 @@ const isRectIntersecting = (
             const targetPosition = resolveConnectorRenderPosition(targetNode.id, targetNode.position);
             if (!targetPosition) return null;
 
-            const startX = (sourcePromptPosition?.x || sourceImagePosition?.x || sourceUtilityPosition?.x || 0) + 5000;
-            const startY = (sourcePromptPosition?.y || sourceImagePosition?.y || sourceUtilityPosition?.y || 0) + 5000;
+            const startX = sourcePromptPosition?.x || sourceImagePosition?.x || sourceUtilityPosition?.x || 0;
+            const startY = sourcePromptPosition?.y || sourceImagePosition?.y || sourceUtilityPosition?.y || 0;
             const targetHeight = targetNode.height || 176;
-            const endX = targetPosition.x + 5000;
-            const endY = (targetPosition.y - targetHeight) + 5000;
+            const endX = targetPosition.x;
+            const endY = targetPosition.y - targetHeight;
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
             const strokeColor = targetNode.kind === 'preview'
               ? '#38bdf8'
@@ -6182,29 +6249,7 @@ const isRectIntersecting = (
         </div>
       )}
 
-      {(isLoading || isFirstScreenMediaLoading) && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
-            {/* 简体中文注释：标题文字 */}
-            <div className="mb-4 text-sm font-medium text-white/95 text-left">
-              正在加载画布
-            </div>
-            <div className="flex items-center gap-3">
-              {/* 简体中文注释：淡蓝色进度条轨道 */}
-              <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out" 
-                  style={{ width: `${displayLoadingProgress}%` }}
-                />
-              </div>
-              {/* 简体中文注释：进度百分比数值 */}
-              <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
-                {displayLoadingProgress}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      <WorkspaceLoadingOverlay />
 
       <React.Suspense fallback={null}>
         <WindowManager

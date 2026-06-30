@@ -139,18 +139,26 @@ export const AIAssistantDock: React.FC = () => {
     anchor?: ReferenceMentionAnchor;
   }>({ open: false, query: '', start: 0, end: 0 });
 
-  const referenceMentionTabs = React.useMemo(() => buildReferenceMentionTabs({
-    assistantImages: images,
-    assistantFiles: files,
-    promptNodes: activeCanvas?.promptNodes || [],
-    imageNodes: activeCanvas?.imageNodes || [],
-    favorites: favoriteItems,
-  }), [
+  const shouldBuildReferenceMentionTabs = mentionState.open;
+  const referenceMentionTabs = React.useMemo(() => {
+    if (!shouldBuildReferenceMentionTabs) {
+      return [];
+    }
+
+    return buildReferenceMentionTabs({
+      assistantImages: images,
+      assistantFiles: files,
+      promptNodes: activeCanvas?.promptNodes || [],
+      imageNodes: activeCanvas?.imageNodes || [],
+      favorites: favoriteItems,
+    });
+  }, [
     activeCanvas?.imageNodes,
     activeCanvas?.promptNodes,
     favoriteItems,
     files,
     images,
+    shouldBuildReferenceMentionTabs,
   ]);
 
   // 滚动至最新消息

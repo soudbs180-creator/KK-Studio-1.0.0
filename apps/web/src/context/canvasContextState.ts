@@ -71,8 +71,6 @@ export interface CanvasContextType {
     updateGroup: (group: CanvasGroup) => void;
     setNodeTags: (ids: string[], tags: string[]) => void;
     isReady: boolean;
-    isLoading: boolean;
-    loadingProgress: number;
     setViewportCenter: (center: { x: number; y: number }) => void;
     migrateNodes: (nodeIds: string[], targetCanvasId: string) => void;
     mergeCanvasInto: (sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
@@ -100,6 +98,16 @@ export interface CanvasContextType {
 }
 
 export const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
+
+export interface CanvasStartupStatusContextType {
+    isLoading: boolean;
+    loadingProgress: number;
+}
+
+export const CanvasStartupStatusContext = createContext<CanvasStartupStatusContextType>({
+    isLoading: true,
+    loadingProgress: 0,
+});
 
 export const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 

@@ -19,9 +19,10 @@ export async function refreshModelLibraryData(options?: { force?: boolean }): Pr
     lastRefreshStartedAt = now;
 
     refreshPromise = (async () => {
+        const force = options?.force === true;
         const results = await Promise.allSettled([
-            keyManager.refreshFromCloudNow(),
-            adminModelService.forceLoadAdminModels(),
+            keyManager.refreshFromCloudNow({ force }),
+            force ? adminModelService.forceLoadAdminModels() : adminModelService.loadAdminModels(false),
         ]);
 
         results.forEach((result, index) => {

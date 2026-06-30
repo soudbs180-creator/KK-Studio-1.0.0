@@ -4523,7 +4523,33 @@ const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; 
     return <NormalChatSidebar {...props} />;
 };
 
-const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
+const CollapsedDesktopChatSidebar: React.FC<Pick<ChatSidebarProps, 'onToggle' | 'workspaceSurface'>> = ({
+    onToggle,
+    workspaceSurface,
+}) => {
+    if (workspaceSurface && workspaceSurface !== 'workspace') {
+        return null;
+    }
+
+    return (
+        <button
+            onClick={onToggle}
+            id="btn-desktop-ai-assistant"
+            data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
+            className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
+            style={{
+                zIndex: KK_LAYER.drawer,
+                borderWidth: '1px 0 1px 1px',
+                borderStyle: 'solid',
+            }}
+            title="展开 AI 助手"
+        >
+            <ChevronLeft size={16} className="text-[var(--text-secondary)] transition-transform group-hover:-translate-x-0.5" />
+        </button>
+    );
+};
+
+const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
     const {
         activeCanvas,
         addPromptNode,
@@ -4592,6 +4618,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
         </AITakeoverProvider>
 
     );
+};
+
+const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
+    if (!props.isOpen && !props.isMobile) {
+        return (
+            <CollapsedDesktopChatSidebar
+                onToggle={props.onToggle}
+                workspaceSurface={props.workspaceSurface}
+            />
+        );
+    }
+
+    return <ChatSidebarLoaded {...props} />;
 };
 
 export default ChatSidebar;

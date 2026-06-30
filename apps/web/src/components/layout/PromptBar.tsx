@@ -81,6 +81,7 @@ const PROMPT_TEXTAREA_MAX_ROWS = 6;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 const MODEL_MENU_SKELETON_COUNT = 3;
+const INITIAL_MODEL_LIBRARY_BOOTSTRAP_DELAY_MS = 30000;
 const PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR = '[data-prompt-bar-mobile-model-layer="true"]';
 const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '[data-kk-mobile-overlay-layer="true"], [data-prompt-bar-mobile-model-layer="true"]';
 const PROMPT_BAR_DEEP_DROPDOWN_LAYER = KK_LAYER.dropdown;
@@ -1500,9 +1501,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
         setModelMenuLoadingState('bootstrapping_without_cache');
 
-        void (async () => {
+        const bootstrapTimer = window.setTimeout(() => {
+            void (async () => {
             try {
-                await refreshModelLibraryData({ force: true });
+                await refreshModelLibraryData({ force: false });
                 if (!active) {
                     return;
                 }
@@ -1519,10 +1521,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     current === 'bootstrapping_without_cache' ? 'idle' : current
                 ));
             }
-        })();
+            })();
+        }, INITIAL_MODEL_LIBRARY_BOOTSTRAP_DELAY_MS);
 
         return () => {
             active = false;
+            window.clearTimeout(bootstrapTimer);
         };
     }, [availableModels.length, canBrowseSystemCreditModels]);
 
@@ -2144,20 +2148,28 @@ const PromptBar: React.FC<PromptBarProps> = ({
         target.style.height = `${newHeight}px`;
     }, []);
 
-    const referenceMentionTabs = useMemo(() => buildReferenceMentionTabs({
-        promptBarReferences: config.referenceImages,
-        assistantImages: assetImages,
-        assistantFiles: assetFiles,
-        promptNodes: activeCanvas?.promptNodes || [],
-        imageNodes: activeCanvas?.imageNodes || [],
-        favorites: favoriteItems,
-    }), [
+    const shouldBuildReferenceMentionTabs = mentionState.open;
+    const referenceMentionTabs = useMemo(() => {
+        if (!shouldBuildReferenceMentionTabs) {
+            return [];
+        }
+
+        return buildReferenceMentionTabs({
+            promptBarReferences: config.referenceImages,
+            assistantImages: assetImages,
+            assistantFiles: assetFiles,
+            promptNodes: activeCanvas?.promptNodes || [],
+            imageNodes: activeCanvas?.imageNodes || [],
+            favorites: favoriteItems,
+        });
+    }, [
         activeCanvas?.imageNodes,
         activeCanvas?.promptNodes,
         assetFiles,
         assetImages,
         config.referenceImages,
         favoriteItems,
+        shouldBuildReferenceMentionTabs,
     ]);
 
     const closeReferenceMentionPanel = useCallback(() => {

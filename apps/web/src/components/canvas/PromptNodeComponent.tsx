@@ -1080,9 +1080,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             onSelect();
             return;
         }
-        onBringToFront?.();
         // Only select if not already selected (Preserve Group)
         if (!isSelected) {
+            onBringToFront?.();
             onSelect();
         }
 
