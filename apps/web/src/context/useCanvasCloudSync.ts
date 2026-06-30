@@ -5,6 +5,11 @@ import {
     getCachedStrippedCanvases,
     hasLocalOnlyCanvasMedia,
 } from './canvasPersistence';
+import {
+    getLatestStartupSnapshot,
+    isStartupStageReady,
+    subscribeStartupSnapshot,
+} from '../services/system/appStartup';
 
 type CanvasCloudSyncNodeSnapshot = {
     type: 'prompt' | 'image';
@@ -40,6 +45,10 @@ const buildCanvasCloudSyncNodeSnapshot = (canvases: Canvas[]): Map<string, Canva
 
     return snapshot;
 };
+
+const isWorkspaceStartupReady = (): boolean => (
+    isStartupStageReady(getLatestStartupSnapshot().stage, 'workspace_ready')
+);
 
 export function useCanvasCloudSync(canvases: Canvas[], isLoading: boolean, enabled: boolean): void {
     const cloudMediaSyncWarningShownRef = useRef(false);
@@ -84,13 +93,37 @@ export function useCanvasCloudSync(canvases: Canvas[], isLoading: boolean, enabl
     useEffect(() => {
         if (!enabled || isLoading || canvases.length === 0 || previousCloudSyncSignatureRef.current) return;
 
-        if (isLargeProject && !hasCloudSyncLocalOnlyMedia) {
-            previousLargeProjectSnapshotRef.current = buildCanvasCloudSyncNodeSnapshot(canvases);
-            previousCloudSyncSignatureRef.current = `large:${totalCardsCount}`;
-            return;
+        let cancelled = false;
+        let unsubscribe: (() => void) | null = null;
+
+        const initializeSignature = () => {
+            if (cancelled || previousCloudSyncSignatureRef.current || !isWorkspaceStartupReady()) {
+                return;
+            }
+
+            if (isLargeProject && !hasCloudSyncLocalOnlyMedia) {
+                previousLargeProjectSnapshotRef.current = buildCanvasCloudSyncNodeSnapshot(canvases);
+                previousCloudSyncSignatureRef.current = `large:${totalCardsCount}`;
+            } else {
+                previousCloudSyncSignatureRef.current = buildCanvasCloudSyncSignature(canvases);
+            }
+
+            unsubscribe?.();
+            unsubscribe = null;
+        };
+
+        initializeSignature();
+
+        if (!previousCloudSyncSignatureRef.current) {
+            unsubscribe = subscribeStartupSnapshot(() => {
+                initializeSignature();
+            });
         }
 
-        previousCloudSyncSignatureRef.current = buildCanvasCloudSyncSignature(canvases);
+        return () => {
+            cancelled = true;
+            unsubscribe?.();
+        };
     }, [enabled, hasCloudSyncLocalOnlyMedia, isLargeProject, isLoading, totalCardsCount, canvases]);
 
     useEffect(() => {
@@ -108,7 +141,17 @@ export function useCanvasCloudSync(canvases: Canvas[], isLoading: boolean, enabl
 
         cloudMediaSyncWarningShownRef.current = false;
 
-        const timer = setTimeout(() => {
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let unsubscribe: (() => void) | null = null;
+
+        const scheduleSave = () => {
+            if (cancelled || timer || !isWorkspaceStartupReady()) {
+                return;
+            }
+
+            timer = setTimeout(() => {
+                timer = null;
             previousCloudSyncSignatureRef.current = canvasCloudSyncSignature;
 
             if (isLargeProject) {
@@ -176,8 +219,26 @@ export function useCanvasCloudSync(canvases: Canvas[], isLoading: boolean, enabl
             import('../services/system/syncService')
                 .then(({ syncService }) => syncService.saveLayout(cloudSyncLayoutPayload))
                 .catch(error => console.error('[CanvasContext] Cloud save failed', error));
-        }, 3000);
+            }, 3000);
 
-        return () => clearTimeout(timer);
+            unsubscribe?.();
+            unsubscribe = null;
+        };
+
+        scheduleSave();
+
+        if (!timer && !isWorkspaceStartupReady()) {
+            unsubscribe = subscribeStartupSnapshot(() => {
+                scheduleSave();
+            });
+        }
+
+        return () => {
+            cancelled = true;
+            if (timer) {
+                clearTimeout(timer);
+            }
+            unsubscribe?.();
+        };
     }, [canvasCloudSyncSignature, cloudSyncLayoutPayload, enabled, hasCloudSyncLocalOnlyMedia, isLoading, canvases.length, isLargeProject, canvases]);
 }

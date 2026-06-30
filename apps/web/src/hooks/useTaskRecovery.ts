@@ -10,6 +10,11 @@ import {
 import { keyManager } from '../services/auth/keyManager';
 import { resolveProviderRuntime } from '../services/api/providerStrategy';
 import { normalizePersistentResultUrl } from '../utils/imageResultPersistence';
+import {
+  getLatestStartupSnapshot,
+  isStartupStageReady,
+  subscribeStartupSnapshot,
+} from '../services/system/appStartup';
 
 interface TaskRecoveryState {
   isLoading: boolean;
@@ -20,6 +25,10 @@ interface TaskRecoveryState {
 type RecoveryReason = 'initial' | 'visibility' | 'online' | 'manual';
 
 const RECOVERY_THROTTLE_MS = 30_000;
+
+const isBackgroundStartupReady = (): boolean => (
+  isStartupStageReady(getLatestStartupSnapshot().stage, 'background_ready')
+);
 
 type LlmServiceModule = typeof import('../features/generation/generateService');
 
@@ -162,6 +171,9 @@ export function useTaskRecovery(
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) return;
 
+    let started = false;
+    let unsubscribeStartup: (() => void) | null = null;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         void recoverTasks('visibility');
@@ -172,14 +184,34 @@ export function useTaskRecovery(
       void recoverTasks('online');
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
+    const startRecovery = () => {
+      if (started || !isBackgroundStartupReady()) {
+        return;
+      }
 
-    void recoverTasks('initial');
+      started = true;
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('online', handleOnline);
+
+      void recoverTasks('initial');
+      unsubscribeStartup?.();
+      unsubscribeStartup = null;
+    };
+
+    startRecovery();
+
+    if (!started) {
+      unsubscribeStartup = subscribeStartupSnapshot(() => {
+        startRecovery();
+      });
+    }
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
+      unsubscribeStartup?.();
+      if (started) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('online', handleOnline);
+      }
     };
   }, [recoverTasks, enabled]);
 

@@ -12,7 +12,6 @@ import {
 } from '../types';
 import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
-import { useAppStartup } from '../context/AppStartupContext';
 import { calculateCost, resolveImageCost } from '../services/billing/costService';
 import {
   buildGenerationAttemptRequestId,
@@ -316,8 +315,6 @@ export const useImageGeneration = (options: {
   } = useCanvas();
   
   const { refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance } = useBilling();
-  const { isStageReady } = useAppStartup();
-  const canStartBackgroundRecovery = isStageReady('background_ready');
   const [isGenerating, setIsGenerating] = useState(false);
   
   const activeCanvasRef = useRef(activeCanvas);
@@ -1486,7 +1483,7 @@ export const useImageGeneration = (options: {
     }
   }, [addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
-  useTaskRecovery(activeCanvas, pollTaskStatus, canStartBackgroundRecovery);
+  useTaskRecovery(activeCanvas, pollTaskStatus, true);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

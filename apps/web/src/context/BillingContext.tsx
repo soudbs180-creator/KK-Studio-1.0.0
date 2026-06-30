@@ -13,7 +13,11 @@ import {
   createBillingRuntimeGuard,
 } from './billingRuntimeGuard';
 import { useAuth } from './AuthContext';
-import { useAppStartup } from './AppStartupContext';
+import {
+  getLatestStartupSnapshot,
+  isStartupStageReady,
+  subscribeStartupSnapshot,
+} from '../services/system/appStartup';
 
 export interface CreditTransactionLog {
   id: string;
@@ -32,6 +36,9 @@ export interface CreditTransactionLog {
 }
 
 const EMPTY_CREDIT_TRANSACTION_LOGS: CreditTransactionLog[] = [];
+const isBillingStartupReady = (): boolean => (
+  isStartupStageReady(getLatestStartupSnapshot().stage, 'background_ready')
+);
 
 export interface CreditConsumeResult {
   success: boolean;
@@ -274,7 +281,6 @@ export const useBilling = () => useContext(BillingContext);
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isTempUser } = useAuth();
-  const { isStageReady } = useAppStartup();
   const billingFeatureEnabled = KKAI_FEATURE_FLAGS.billing;
   const billingRuntime = createBillingRuntimeGuard({
     userId: user?.id,
@@ -293,7 +299,6 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const apiAccessToken = session?.access_token;
   const activeBillingUserId = billingRuntime.activeBillingUserId;
   const hasVisibleBillingSeed = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
-  const canStartBillingBootstrap = isStageReady('background_ready');
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const balanceRefreshPromiseRef = useRef<Promise<number | undefined> | null>(null);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
@@ -338,7 +343,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return 0;
     }
 
-    if (!canStartBillingBootstrap) {
+    if (!isBillingStartupReady()) {
       return undefined;
     }
 
@@ -370,7 +375,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
       return undefined;
     }
-  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser]);
 
   const loadCreditTransactions = useCallback(async (updateBalance = true): Promise<number | undefined> => {
     if (!billingRuntime.shouldBootstrapBilling) {
@@ -387,7 +392,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return undefined;
     }
 
-    if (!canStartBillingBootstrap) {
+    if (!isBillingStartupReady()) {
       return undefined;
     }
 
@@ -428,7 +433,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
       return undefined;
     }
-  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, applyTransactionRows, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, applyTransactionRows]);
 
   const refreshBalanceOnly = useCallback(async (): Promise<number | undefined> => {
     if (balanceRefreshPromiseRef.current) {
@@ -458,7 +463,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    if (!canStartBillingBootstrap) {
+    if (!isBillingStartupReady()) {
       return;
     }
     if (refreshPromiseRef.current) {
@@ -504,7 +509,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     refreshPromiseRef.current = refreshPromise;
     return refreshPromise;
-  }, [billingRuntime.shouldBootstrapBilling, refreshBalanceOnly, loadCreditTransactions, canStartBillingBootstrap, hasVisibleBillingSeed]);
+  }, [billingRuntime.shouldBootstrapBilling, refreshBalanceOnly, loadCreditTransactions, hasVisibleBillingSeed]);
 
   const refreshBillingRef = useRef(refreshBilling);
   useEffect(() => {
@@ -533,7 +538,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     realtimeRefreshTimerRef.current = window.setTimeout(() => {
       realtimeRefreshTimerRef.current = null;
-      if (!canStartBillingBootstrap) {
+      if (!isBillingStartupReady()) {
         return;
       }
 
@@ -550,7 +555,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         silent: true,
       });
     }, delayMs);
-  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap, refreshBilling]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, refreshBilling]);
 
   useEffect(() => {
     refreshPromiseRef.current = null;
@@ -615,9 +620,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     let cancelled = false;
+    let started = false;
+    let unsubscribeStartup: (() => void) | null = null;
 
     const init = async () => {
+      if (started) {
+        return;
+      }
+
       if (!billingRuntime.shouldBootstrapBilling || !user || isTempUser) {
+        started = true;
         setHydratedUserId((prev) => prev === null ? prev : null);
         setBalance((prev) => prev === 0 ? prev : 0);
         setBillingLogs((prev) => prev.length === 0 ? prev : []);
@@ -628,10 +640,11 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
-      if (!canStartBillingBootstrap) {
+      if (!isBillingStartupReady()) {
         return;
       }
 
+      started = true;
       const cachedSnapshot = activeBillingUserId ? readBillingSnapshot(activeBillingUserId) : null;
       if (!cachedSnapshot) {
         setLoading(true);
@@ -649,10 +662,17 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     void init();
 
+    if (!started) {
+      unsubscribeStartup = subscribeStartupSnapshot(() => {
+        void init();
+      });
+    }
+
     return () => {
       cancelled = true;
+      unsubscribeStartup?.();
     };
-  }, [billingRuntime.shouldBootstrapBilling, activeBillingUserId, user?.id, isTempUser, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, activeBillingUserId, user?.id, isTempUser, refreshBilling]);
 
   useEffect(() => {
     const userId = String(user?.id || '').trim();
@@ -661,10 +681,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       || !userId
       || isTempUser
       || typeof window === 'undefined'
-      || !canStartBillingBootstrap
     ) {
       return;
     }
+
+    let started = false;
+    let unsubscribeStartup: (() => void) | null = null;
 
     const triggerRefresh = () => {
       scheduleRealtimeRefresh(0, logsLoadedRef.current ? 'full' : 'balance');
@@ -676,24 +698,48 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
 
-    const intervalId = window.setInterval(() => {
-      triggerRefresh();
-    }, BILLING_SYNC_POLL_MS);
+    let intervalId: number | null = null;
 
-    window.addEventListener('focus', triggerRefresh);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    triggerRefresh();
+    const startPolling = () => {
+      if (started || !isBillingStartupReady()) {
+        return;
+      }
+
+      started = true;
+      intervalId = window.setInterval(() => {
+        triggerRefresh();
+      }, BILLING_SYNC_POLL_MS);
+
+      window.addEventListener('focus', triggerRefresh);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      triggerRefresh();
+      unsubscribeStartup?.();
+      unsubscribeStartup = null;
+    };
+
+    startPolling();
+
+    if (!started) {
+      unsubscribeStartup = subscribeStartupSnapshot(() => {
+        startPolling();
+      });
+    }
 
     return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', triggerRefresh);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribeStartup?.();
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+      if (started) {
+        window.removeEventListener('focus', triggerRefresh);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
       if (realtimeRefreshTimerRef.current !== null) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
       }
     };
-  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, scheduleRealtimeRefresh, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, scheduleRealtimeRefresh]);
 
   useEffect(() => () => {
     if (realtimeRefreshTimerRef.current !== null && typeof window !== 'undefined') {
@@ -860,7 +906,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ? usageLogs
     : (renderCachedSnapshot?.usageLogs ?? EMPTY_CREDIT_TRANSACTION_LOGS);
   const visibleLoading = activeBillingUserId
-    ? ((!hasHydratedCurrentBillingScope && !renderCachedSnapshot) || loading || !canStartBillingBootstrap)
+    ? ((!hasHydratedCurrentBillingScope && !renderCachedSnapshot) || loading)
     : false;
   const contextValue = useMemo<BillingContextType>(() => ({
     balance: visibleBalance,

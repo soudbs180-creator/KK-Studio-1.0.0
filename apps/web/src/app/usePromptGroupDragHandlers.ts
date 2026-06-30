@@ -107,11 +107,18 @@ export function usePromptGroupDragHandlers({
       return;
     }
 
+    const shouldRegroup = shouldAutoRegroupPromptGroup(node, childImages, sourceNodeId);
+    if (!shouldRegroup) {
+      clearPromptGroupRegroup(node.id);
+      moveSelectedNodesImmediate(delta, sourceNodeId, { snapToGrid });
+      return;
+    }
+
     commitPromptGroupDrag(
       node,
       childImages,
       finalPosition,
-      shouldAutoRegroupPromptGroup(node, childImages, sourceNodeId),
+      shouldRegroup,
     );
   }, [
     clearPromptGroupRegroup,

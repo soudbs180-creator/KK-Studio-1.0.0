@@ -1888,3 +1888,47 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 无。
 - **风险与下一步**：
   - 运行 `npm run agents:commit` 固化本地提交并确认工作区干净。
+
+## 110. 2026-06-30 - Fix 10k Canvas Drag Zoom Startup and Settings Layout
+- **修改范围**：
+  1. 对 `https://kkai.plus/` 做只读检查，并与本地工作区对比。当前线上入口可访问但停留在 Landing 页；`/app`、`/workspace`、`/settings`、`/canvas` 返回 404；登录按钮在 headless 检查中未跳转。线上日志显示 build `1.5.9|2026-06-29T02:04:43.873Z|stable|production|86ea8b650f90710f931b5406f5af7542ee185753|86ea8b6`，未包含本次本地修复。
+  2. 修复 10k 大画布启动阶段的主线程阻塞与全量兼容 workflow 同步问题。大画布不再把历史 prompt/image 节点重新合并进 workflow graph，只保留 utility workflow 节点，避免启动阶段 O(N^2) 扫描。
+  3. 收紧工作区启动与大画布渲染热路径：启动上下文拆分 actions-only 订阅，模型目录、云同步、任务恢复、账单上下文等避免在大画布首屏反复触发全页重渲染；大项目下跳过非必要侧栏/托盘渲染和 viewport center 状态写入。
+  4. 修复 Prompt 主卡拖拽时副卡与虚线不跟随的问题。普通主卡拖拽不再进入 regroup 提交流程，而是通过 `moveSelectedNodesImmediate` 原子移动 prompt、子图与绘图节点，并在大画布下立即触发持久化保存。
+  5. 修复缩放后的资源调度和 10k smoke 验证漂移。10k smoke 现在验证首屏/缩放后 surface 数量、主卡拖动后副卡停靠、连接虚线跟随，并在超时场景保存 debugger stack。
+  6. 修复设置页 dashboard 卡片在 shell 受限桌面宽度下的挤压、标题截断、内容越界和空框比例问题，扩展 3 列断点并允许关键标签两行包裹。
+- **修改文件**：
+  - `apps/web/src/app/usePromptGroupDragHandlers.ts`
+  - `apps/web/src/app/usePromptGroupLayout.ts`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/src/context/AppStartupContext.tsx`
+  - `apps/web/src/context/BillingContext.tsx`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/context/useCanvasCloudSync.ts`
+  - `apps/web/src/hooks/useImageGeneration.ts`
+  - `apps/web/src/hooks/useTaskRecovery.ts`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/workflow/adapters/canvasToWorkflow.ts`
+  - `scripts/test/verify-large-canvas-10k-smoke.mjs`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 大画布热路径必须以可视集合和近视口候选为边界，启动、缩放、拖拽、资源调度和兼容同步都不能重新绑定历史总节点数。
+  - Prompt group 的视觉所有权继续由 live prompt group renderer 负责；拖拽提交只负责原子更新真实节点坐标，不再用 regroup 逻辑重排正常主卡拖动。
+  - 设置页 dashboard 在带左侧设置导航的桌面 shell 中按实际内容宽度响应，而不是只按浏览器 viewport 宽度强行进入 4 列。
+- **已运行验证**：
+  - `npm run agents:status`
+  - `git diff --check`（仅提示 `WorkspacePage.tsx` 下次 Git 触碰时 CRLF 将替换为 LF，无空白错误）
+  - `npx tsc --noEmit --pretty false --ignoreDeprecations 6.0 --project apps/web/tsconfig.json`
+  - `npm run verify:large-canvas-10k`
+  - `npm run verify:prompt-group-drag`
+  - `npm run verify:mobile-settings-smoke`
+  - `npm run verify:desktop-settings-smoke`（并行首跑超时，单独重跑通过）
+  - `npm run architecture:check`
+  - `npm run governance:check`
+  - `npm run build`
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`；本次变更集中在大画布启动/缩放/拖拽和设置页布局，已运行对应 browser smoke、typecheck、architecture/governance 和 production build。完整发布前仍建议补跑全量 verify。
+- **风险与下一步**：
+  - 线上 `kkai.plus` 仍是旧部署，必须重新部署后才会看到本地修复；部署后需要用用户真实大画布数据复测 16%-100% 缩放、主卡拖拽、副卡自动停靠、虚线跟随和资源加载。
+  - 若部署后真实数据仍出现丢卡，应继续检查 `visiblePromptGroupViews`、group bounds 裁剪、真实图片资源恢复队列和云端布局快照，不回退到全量 DOM/缓存层绘制。
+  - 运行 `npm run agents:commit` 固化本地提交。

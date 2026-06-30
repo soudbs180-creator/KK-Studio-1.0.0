@@ -97,7 +97,12 @@ import {
     normalizePersistentResultUrl,
 } from '../utils/imageResultPersistence';
 import { useAuth } from './AuthContext';
-import { useAppStartup } from './AppStartupContext';
+import {
+    getLatestStartupSnapshot,
+    isStartupStageReady,
+    subscribeStartupSnapshot,
+    type AppStartupStage,
+} from '../services/system/appStartup';
 
 export type { ArrangeMode, CanvasContextType, CanvasState, SubCardLayout } from './canvasContextState';
 
@@ -113,6 +118,10 @@ const DATA_URL_MIGRATION_BATCH_SIZE = 5;
 const LARGE_CANVAS_DATA_URL_MIGRATION_BATCH_SIZE = 1;
 const PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD = 1000;
 const PERSISTED_IMAGE_RECOVERY_LARGE_IMAGE_LIMIT = 48;
+
+const isLatestStartupStageReady = (requiredStage: AppStartupStage): boolean => (
+    isStartupStageReady(getLatestStartupSnapshot().stage, requiredStage)
+);
 const PERSISTED_IMAGE_RECOVERY_LARGE_PROMPT_LIMIT = 48;
 const LARGE_CANVAS_LOCAL_PERSISTENCE_NODE_THRESHOLD = 1000;
 const LARGE_CANVAS_DEBOUNCED_SAVE_DELAY_MS = 30000;
@@ -155,7 +164,6 @@ const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState =
 
 export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, session, isTempUser } = useAuth();
-    const { isStageReady } = useAppStartup();
     const [isLoading, setIsLoading] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState(0);
     // 简体中文注释：标记当前首次初始化（包含本地物理文件夹数据和 IndexedDB）是否已经完全恢复完毕
@@ -171,6 +179,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const pendingSavesRef = useRef<Set<Promise<void>>>(new Set());
     const stateRef = useRef(state);
     const lastUserActivityAtRef = useRef<number>(Date.now());
+    const cloudLoadStartedRef = useRef(false);
+    const viewportCenterRef = useRef(DEFAULT_STATE.viewportCenter);
 
     // 简体中文注释：防回退黄金法则，保存首次画布初始化加载是否成功完成的标志，防止重复执行 init() 造成进度回退
     const hasLoadedSuccessRef = useRef(false);
@@ -180,6 +190,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     useEffect(() => {
         stateRef.current = state;
+        viewportCenterRef.current = state.viewportCenter || viewportCenterRef.current;
     }, [state]);
 
     // 简体中文注释：水合激活与 sessionStorage 缓存读取。
@@ -900,25 +911,21 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
 
-    const canLoadCloudLayout = Boolean(
+    const canUseCloudLayout = Boolean(
         shouldEnableWorkspaceCloudSync()
         && user
         && session
         && !isTempUser
-        && isStageReady('profile_ready')
     );
-    const canSaveCloudLayout = Boolean(
-        shouldEnableWorkspaceCloudSync()
-        && user
-        && session
-        && !isTempUser
-        && isStageReady('workspace_ready')
-    );
+
+    useEffect(() => {
+        cloudLoadStartedRef.current = false;
+    }, [user?.id]);
 
     // Cloud sync: load and merge on init.
     useEffect(() => {
         const loadCloud = async () => {
-            if (!canLoadCloudLayout) return;
+            if (!canUseCloudLayout) return;
 
             try {
                 const { syncService } = await import('../services/system/syncService');
@@ -990,11 +997,40 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         };
 
-        if (!isLoading && canLoadCloudLayout) loadCloud();
-    }, [isLoading, canLoadCloudLayout]);
+        if (isLoading || !canUseCloudLayout || cloudLoadStartedRef.current) {
+            return;
+        }
+
+        let cancelled = false;
+        let unsubscribe: (() => void) | null = null;
+
+        const maybeLoadCloud = () => {
+            if (cancelled || cloudLoadStartedRef.current || !isLatestStartupStageReady('profile_ready')) {
+                return;
+            }
+
+            cloudLoadStartedRef.current = true;
+            void loadCloud();
+            unsubscribe?.();
+            unsubscribe = null;
+        };
+
+        maybeLoadCloud();
+
+        if (!cloudLoadStartedRef.current) {
+            unsubscribe = subscribeStartupSnapshot(() => {
+                maybeLoadCloud();
+            });
+        }
+
+        return () => {
+            cancelled = true;
+            unsubscribe?.();
+        };
+    }, [isLoading, canUseCloudLayout]);
 
     const isSaveBlocked = !isInitRestored;
-    useCanvasCloudSync(state.canvases, isLoading, canSaveCloudLayout);
+    useCanvasCloudSync(state.canvases, isLoading, canUseCloudLayout);
     const isSaveBlockedRef = useRef(isSaveBlocked);
     // Mark operations that need an urgent flush and should bypass the 200ms debounce.
     const urgentSaveRef = useRef(false);
@@ -1644,7 +1680,39 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         [state.canvases]
     );
     const shouldDeferPersistedRecoveryForLargeCanvas = persistedRecoveryNodeCount >= PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD;
-    const canHydratePersistedTaskResults = Boolean(user && session && isStageReady('background_ready'));
+    const [isBackgroundRecoveryStageReady, setIsBackgroundRecoveryStageReady] = useState(() => (
+        isLatestStartupStageReady('background_ready')
+    ));
+
+    useEffect(() => {
+        if (!user || !session) {
+            setIsBackgroundRecoveryStageReady(false);
+            return;
+        }
+
+        if (shouldDeferPersistedRecoveryForLargeCanvas || isLatestStartupStageReady('background_ready')) {
+            setIsBackgroundRecoveryStageReady(isLatestStartupStageReady('background_ready'));
+            return;
+        }
+
+        setIsBackgroundRecoveryStageReady(false);
+
+        const unsubscribe = subscribeStartupSnapshot((snapshot) => {
+            if (isStartupStageReady(snapshot.stage, 'background_ready')) {
+                setIsBackgroundRecoveryStageReady(true);
+                unsubscribe();
+            }
+        });
+
+        return unsubscribe;
+    }, [session, shouldDeferPersistedRecoveryForLargeCanvas, user]);
+
+    const canHydratePersistedTaskResults = Boolean(
+        user
+        && session
+        && !shouldDeferPersistedRecoveryForLargeCanvas
+        && isBackgroundRecoveryStageReady
+    );
 
     useEffect(() => {
         if (isLoading || !canHydratePersistedTaskResults || !persistedImageRecoverySignature) return;
@@ -2848,6 +2916,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 options,
             });
             if (movedCanvas === currentCanvas) return prev;
+            urgentSaveRef.current = true;
 
             const newCanvases = prev.canvases.map(c =>
                 c.id === prev.activeCanvasId ? { ...movedCanvas, lastModified: Date.now() } : c
@@ -2959,10 +3028,18 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             x: Math.round(center.x),
             y: Math.round(center.y),
         };
+        viewportCenterRef.current = roundedCenter;
         setState(prev => (
             prev.viewportCenter.x === roundedCenter.x && prev.viewportCenter.y === roundedCenter.y
                 ? prev
-                : { ...prev, viewportCenter: roundedCenter }
+                : (() => {
+                    const active = prev.canvases.find((canvas) => canvas.id === prev.activeCanvasId) || prev.canvases[0];
+                    const activeNodeCount = (active?.promptNodes?.length || 0) + (active?.imageNodes?.length || 0);
+                    if (activeNodeCount >= PERSISTED_IMAGE_RECOVERY_LARGE_CANVAS_THRESHOLD) {
+                        return prev;
+                    }
+                    return { ...prev, viewportCenter: roundedCenter };
+                })()
         ));
     }, []);
 

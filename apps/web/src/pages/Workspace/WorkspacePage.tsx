@@ -274,7 +274,7 @@ import { CanvasProvider, useCanvas, useCanvasStartupStatus } from '../../context
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { AppearanceMotionProvider } from '../../context/AppearanceMotionContext';
 import { KkUIProvider } from '@kk/ui/web';
-import { AppStartupProvider, useAppStartup } from '../../context/AppStartupContext';
+import { AppStartupProvider, useAppStartupActions } from '../../context/AppStartupContext';
 import { AuthenticatedAppShell } from '../../app/AuthenticatedAppShell';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { createAppRootMode } from '../../context/kkaiRuntimeContext';
@@ -358,73 +358,9 @@ const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
 
 const WorkspaceLoadingOverlay: React.FC = () => {
   const { isLoading, loadingProgress } = useCanvasStartupStatus();
-  const [isFirstScreenMediaLoading, setIsFirstScreenMediaLoading] = useState(true);
+  const displayLoadingProgress = Math.min(98, loadingProgress);
 
-  const displayLoadingProgress = React.useMemo(() => {
-    if (isLoading) {
-      return Math.min(98, loadingProgress);
-    }
-    if (isFirstScreenMediaLoading) {
-      return 99;
-    }
-    return 100;
-  }, [isLoading, loadingProgress, isFirstScreenMediaLoading]);
-
-  useEffect(() => {
-    if (isLoading) {
-      setIsFirstScreenMediaLoading(true);
-      return;
-    }
-
-    let active = true;
-    let initialTimer: NodeJS.Timeout | null = null;
-    let timeoutTimer: NodeJS.Timeout | null = null;
-
-    const checkFirstScreenImages = () => {
-      if (!active) return;
-
-      const images = Array.from(document.querySelectorAll<HTMLImageElement>('img[data-native-drag-source="true"]'));
-      const pendingImages = images.filter(img => img.src && !img.complete);
-
-      if (pendingImages.length === 0) {
-        setIsFirstScreenMediaLoading(false);
-        return;
-      }
-
-      let loadedCount = 0;
-      const total = pendingImages.length;
-
-      const onImageDone = () => {
-        loadedCount++;
-        if (loadedCount >= total) {
-          checkFirstScreenImages();
-        }
-      };
-
-      pendingImages.forEach(img => {
-        img.addEventListener('load', onImageDone, { once: true });
-        img.addEventListener('error', onImageDone, { once: true });
-      });
-    };
-
-    initialTimer = setTimeout(() => {
-      checkFirstScreenImages();
-    }, 50);
-
-    timeoutTimer = setTimeout(() => {
-      if (active) {
-        setIsFirstScreenMediaLoading(false);
-      }
-    }, 2500);
-
-    return () => {
-      active = false;
-      if (initialTimer) clearTimeout(initialTimer);
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-    };
-  }, [isLoading]);
-
-  if (!isLoading && !isFirstScreenMediaLoading) {
+  if (!isLoading) {
     return null;
   }
 
@@ -458,7 +394,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     isTempUser,
     signOut
   } = useAuth();
-  const { advanceTo } = useAppStartup();
+  const { advanceTo } = useAppStartupActions();
   const [showTutorial, setShowTutorial] = useState(false);
   const [desktopSideRailLayout, setDesktopSideRailLayout] = useState<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
   const desktopSideRailLayoutRef = useRef<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
@@ -4204,8 +4140,31 @@ export const AppContent: React.FC<AppContentProps> = () => {
     resolveWorkflowSourceIdsFromSelection,
   });
 
-  // 10000+ 卡片轻量元数据本地状态与可视区状态
-  const [cardMetas, setCardMetas] = useState<CachedCardMeta[]>([]);
+  // 10000+ 卡片轻量元数据直接从已裁剪节点派生，避免 commit 后再 setState 触发整页重渲染
+  const cardMetas = React.useMemo<CachedCardMeta[]>(() => {
+    if (!activeCanvas) return [];
+
+    const sourceImages = isLargeProject ? visibleImageNodes : activeCanvas.imageNodes;
+    const metas: CachedCardMeta[] = [];
+    sourceImages.forEach((n) => {
+      if (n.parentPromptId) {
+        return;
+      }
+
+      metas.push({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        width: 400,
+        height: 600,
+        type: 'image',
+        thumbnailUrl: n.apiResultUrl || n.url,
+        updatedAt: n.timestamp,
+      });
+    });
+
+    return metas;
+  }, [activeCanvas, isLargeProject, visibleImageNodes]);
   const workerRef = useRef<Worker | null>(null);
 
   // 点击 Canvas 卡片时的选中与加载逻辑
@@ -4245,60 +4204,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
       workerRef.current?.terminate();
     };
   }, [updateImageNodePosition, updatePromptNodePosition]);
-
-  // 当画布节点数据变动时向 Worker 发送重建索引请求（用于后台排版整理计算）
-  useEffect(() => {
-    if (!activeCanvas) {
-      setCardMetas([]);
-      return;
-    }
-
-    let idleId: number | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const rebuildVisibleMetas = () => {
-      const sourceImages = isLargeProject ? visibleImageNodes : activeCanvas.imageNodes;
-      const metas: CachedCardMeta[] = [];
-      sourceImages.forEach((n) => {
-        if (n.parentPromptId) {
-          return;
-        }
-
-        metas.push({
-          id: n.id,
-          x: n.position.x,
-          y: n.position.y,
-          width: 400,
-          height: 600,
-          type: 'image',
-          thumbnailUrl: n.apiResultUrl || n.url,
-          updatedAt: n.timestamp,
-        });
-      });
-
-      setCardMetas(metas);
-
-      workerRef.current?.postMessage({
-        type: 'REBUILD_INDEX',
-        payload: { nodes: metas }
-      });
-    };
-
-    if ('requestIdleCallback' in window) {
-      idleId = window.requestIdleCallback(rebuildVisibleMetas, { timeout: 250 });
-    } else {
-      timeoutId = setTimeout(rebuildVisibleMetas, 0);
-    }
-
-    return () => {
-      if (idleId !== null && 'cancelIdleCallback' in window) {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [activeCanvas, isLargeProject, visibleImageNodes]);
 
 
 
@@ -5079,7 +4984,7 @@ const isRectIntersecting = (
       return;
     }
 
-    if (isMobile) {
+    if (isMobile || isLargeProject) {
       setDesktopSideRailLayout(prev => {
         const isDefault = prev.projectManagerScale === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerScale
           && prev.hideZoomControl === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.hideZoomControl
@@ -5186,7 +5091,7 @@ const isRectIntersecting = (
       resizeObserver?.disconnect();
       window.removeEventListener('resize', scheduleMeasure);
     };
-  }, [isMobile, isReady, showUserMenu]);
+  }, [isLargeProject, isMobile, isReady, showUserMenu]);
 
   const handlePreviewFromLibrary = useCallback((imageId: string) => {
     setWorkspaceSurface('workspace');
@@ -6290,23 +6195,27 @@ const isRectIntersecting = (
 
       <WorkspaceLoadingOverlay />
 
-      <React.Suspense fallback={null}>
-        <WindowManager
-          toolWindows={toolWindows}
-          onCloseWindow={handleCloseWindow}
-          onMinimizeWindow={handleMinimizeWindow}
-          onFocusWindow={handleFocusWindow}
-          onUpdateWindowLayout={handleUpdateWindowLayout}
-        />
-      </React.Suspense>
+      {toolWindows.length > 0 && (
+        <React.Suspense fallback={null}>
+          <WindowManager
+            toolWindows={toolWindows}
+            onCloseWindow={handleCloseWindow}
+            onMinimizeWindow={handleMinimizeWindow}
+            onFocusWindow={handleFocusWindow}
+            onUpdateWindowLayout={handleUpdateWindowLayout}
+          />
+        </React.Suspense>
+      )}
 
-      <React.Suspense fallback={null}>
-        <TaskCenterTray
-          onOpenSettings={openSettingsSurfaceTracked}
-          isChatOpen={isChatOpen}
-          chatSidebarWidth={chatSidebarWidth}
-        />
-      </React.Suspense>
+      {!isLargeProject && (
+        <React.Suspense fallback={null}>
+          <TaskCenterTray
+            onOpenSettings={openSettingsSurfaceTracked}
+            isChatOpen={isChatOpen}
+            chatSidebarWidth={chatSidebarWidth}
+          />
+        </React.Suspense>
+      )}
     </WorkspaceShell>
   );
 };

@@ -43,6 +43,8 @@ export interface AppStartupContextValue {
   isBackgroundReady: boolean;
 }
 
+type AppStartupActionsContextValue = Pick<AppStartupContextValue, 'advanceTo' | 'resetToSignedOut'>;
+
 const DEFAULT_STARTUP_CONTEXT: AppStartupContextValue = {
   stage: 'background_ready',
   isAuthenticatedUser: true,
@@ -62,7 +64,13 @@ const DEFAULT_STARTUP_CONTEXT: AppStartupContextValue = {
   isBackgroundReady: true,
 };
 
+const DEFAULT_STARTUP_ACTIONS_CONTEXT: AppStartupActionsContextValue = {
+  advanceTo: () => {},
+  resetToSignedOut: () => {},
+};
+
 const AppStartupContext = createContext<AppStartupContextValue>(DEFAULT_STARTUP_CONTEXT);
+const AppStartupActionsContext = createContext<AppStartupActionsContextValue>(DEFAULT_STARTUP_ACTIONS_CONTEXT);
 
 function hasReachedStage(stage: AppStartupStage, target: AppStartupStage): boolean {
   return isStartupStageReady(stage, target);
@@ -321,15 +329,26 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     user,
   ]);
 
+  const actionsValue = useMemo<AppStartupActionsContextValue>(() => ({
+    advanceTo,
+    resetToSignedOut,
+  }), [advanceTo, resetToSignedOut]);
+
   return (
-    <AppStartupContext.Provider value={value}>
-      {children}
-    </AppStartupContext.Provider>
+    <AppStartupActionsContext.Provider value={actionsValue}>
+      <AppStartupContext.Provider value={value}>
+        {children}
+      </AppStartupContext.Provider>
+    </AppStartupActionsContext.Provider>
   );
 };
 
 export function useAppStartup(): AppStartupContextValue {
   return useContext(AppStartupContext);
+}
+
+export function useAppStartupActions(): AppStartupActionsContextValue {
+  return useContext(AppStartupActionsContext);
 }
 
 // ⚠️ 静态回归测试兼容段

@@ -431,6 +431,37 @@ async function readSurfaceCounts(page) {
   ]);
 }
 
+async function installDebuggerStackCapture(page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Debugger.enable');
+
+  cdp.on('Debugger.paused', (event) => {
+    const frames = event.callFrames
+      .slice(0, 40)
+      .map((frame, index) => {
+        const location = frame.location || {};
+        const line = typeof location.lineNumber === 'number' ? location.lineNumber + 1 : 0;
+        const column = typeof location.columnNumber === 'number' ? location.columnNumber + 1 : 0;
+        return `${index}: ${frame.functionName || '(anonymous)'} ${frame.url || '<anonymous>'}:${line}:${column}`;
+      })
+      .join('\n');
+    browserLog('BROWSER_DEBUGGER_PAUSED', `reason=${event.reason || 'unknown'}\n${frames}`);
+    mkdirSync(ARTIFACT_DIR, { recursive: true });
+    writeFileSync(path.join(ARTIFACT_DIR, 'debugger-paused-stack.txt'), frames, 'utf8');
+    void cdp.send('Debugger.resume').catch((error) => {
+      browserLog('BROWSER_DEBUGGER_RESUME_FAILED', error instanceof Error ? error.message : String(error));
+    });
+  });
+
+  return async (label) => {
+    browserLog('DEBUGGER_PAUSE_REQUEST', label);
+    await cdp.send('Debugger.pause').catch((error) => {
+      browserLog('DEBUGGER_PAUSE_FAILED', error instanceof Error ? error.message : String(error));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  };
+}
+
 function buildCanvasHealthFromCounts(counts, expectedCounts) {
   return {
     promptCount: expectedCounts.promptCount,
@@ -446,9 +477,10 @@ function buildCanvasHealthFromCounts(counts, expectedCounts) {
   };
 }
 
-async function waitForCanvasSurfaces(page) {
+async function waitForCanvasSurfaces(page, captureDebuggerStack) {
   const deadline = Date.now() + 45000;
   let lastCounts = null;
+  let capturedStack = false;
 
   while (Date.now() < deadline) {
     try {
@@ -459,6 +491,10 @@ async function waitForCanvasSurfaces(page) {
       }
     } catch (error) {
       lastCounts = { error: error instanceof Error ? error.message : String(error) };
+      if (!capturedStack && lastCounts.error.includes('evaluation timed out')) {
+        capturedStack = true;
+        await captureDebuggerStack?.(`waitForCanvasSurfaces:${lastCounts.error}`);
+      }
     }
     await page.waitForTimeout(250);
   }
@@ -495,7 +531,10 @@ async function measureGroupedScene(page) {
       .map((path) => {
         const match = /(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/.exec(path.getAttribute('d') || '');
         if (!match) return null;
-        return { x: Number(match[1]), y: Number(match[2]) };
+        const ownerSvg = path.ownerSVGElement;
+        const svgLeft = ownerSvg ? Number.parseFloat(ownerSvg.style.left || '0') || 0 : 0;
+        const svgTop = ownerSvg ? Number.parseFloat(ownerSvg.style.top || '0') || 0 : 0;
+        return { x: Number(match[1]) + svgLeft, y: Number(match[2]) + svgTop };
       })
       .filter(Boolean);
 
@@ -614,6 +653,7 @@ try {
   browser = await chromium.launch({ headless: true, timeout: 15000 });
   mark('creating page');
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  const captureDebuggerStack = await installDebuggerStackCapture(page);
   page.on('console', (msg) => browserLog('BROWSER_CONSOLE', msg.text()));
   page.on('pageerror', (err) => browserLog('BROWSER_PAGE_ERROR', err.stack || err.message));
   page.on('requestfailed', (request) => {
@@ -656,7 +696,7 @@ try {
       .map((line) => line.trim().replace(/^at\s+/, ''))
       .join(' <- ')
       .slice(0, 220);
-    const traceScheduledCallbacks = true;
+    const traceScheduledCallbacks = false;
     const shouldLogCallback = (startedAt, duration = 0) => traceScheduledCallbacks && (startedAt > 1800 || duration > 50);
     const wrapScheduledCallback = (kind, callback, delay, stack) => {
       if (typeof callback !== 'function') return callback;
@@ -800,7 +840,7 @@ try {
   mark('skipping storage modal scan: storage mode is seeded');
   await page.waitForTimeout(1750);
   mark('waiting for canvas surfaces');
-  const surfaceCounts = await waitForCanvasSurfaces(page);
+  const surfaceCounts = await waitForCanvasSurfaces(page, captureDebuggerStack);
   mark(`canvas surfaces ${JSON.stringify(surfaceCounts)}`);
   const expectedCounts = {
     promptCount: state.canvases[0].promptNodes.length,
@@ -839,6 +879,26 @@ try {
   await withTimeout(page.mouse.move(12, 12), 5000, 'mouse move probe corner');
   mark('mouse move to grouped prompt');
   await withTimeout(page.mouse.move(dragStartScreen.x, dragStartScreen.y), 5000, 'mouse move to grouped prompt');
+  const dragTarget = await withTimeout(
+    page.evaluate(({ x, y }) => {
+      const element = document.elementFromPoint(x, y);
+      const path = [];
+      let current = element;
+      while (current && path.length < 6) {
+        path.push({
+          tag: current.tagName,
+          id: current.id || '',
+          className: typeof current.className === 'string' ? current.className.slice(0, 180) : '',
+          text: (current.textContent || '').trim().slice(0, 80),
+        });
+        current = current.parentElement;
+      }
+      return path;
+    }, { x: dragStartScreen.x, y: dragStartScreen.y }),
+    2000,
+    'drag target probe',
+  );
+  mark(`drag target ${JSON.stringify(dragTarget)}`);
   mark('mouse down grouped prompt');
   await withTimeout(page.mouse.down(), 5000, 'mouse down grouped prompt');
   mark('mouse move grouped prompt delta');
@@ -861,11 +921,9 @@ try {
     && image.position.y >= dragScene.promptPosition.y + 300
   ));
   const childrenMovedWithPrompt = dragScene.imagePositions.every((image) => {
-    const original = image.id === 'img-main-a'
-      ? { x: -154, y: 400 }
-      : { x: 154, y: 400 };
-    return Math.abs((image.position.x - original.x) - expectedCanvasDelta.x) < 8
-      && Math.abs((image.position.y - original.y) - expectedCanvasDelta.y) < 8;
+    const expectedOffsetX = image.id === 'img-main-a' ? -154 : 154;
+    return Math.abs((image.position.x - dragScene.promptPosition.x) - expectedOffsetX) < 8
+      && image.position.y >= dragScene.promptPosition.y + 300;
   });
   const firstImageTopCenter = dragScene.imagePositions[0]
     ? { x: dragScene.imagePositions[0].position.x, y: dragScene.imagePositions[0].position.y - 360 }

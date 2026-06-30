@@ -712,15 +712,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-panel__eyebrow {
+          display: -webkit-box;
           overflow: hidden;
           color: var(--text-tertiary);
           font-size: var(--type-micro);
           font-weight: 700;
           letter-spacing: 0.14em;
           line-height: 1.2;
-          text-overflow: ellipsis;
           text-transform: uppercase;
-          white-space: nowrap;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-panel__title {
@@ -838,12 +840,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-module-meter__content strong {
+          display: -webkit-box;
           overflow: hidden;
           color: var(--text-primary);
           font-size: var(--type-body-2);
           font-weight: 800;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          line-height: 1.25;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-module-meter__content p {
@@ -1120,14 +1125,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-topology-node[data-tone="indigo"] { --dashboard-tone-rgb: 99 102 241; }
 
         .dashboard-topology-node span {
+          display: -webkit-box;
           color: var(--text-secondary);
           font-size: var(--type-caption);
           font-weight: 600;
           min-width: 0;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          display: block;
+          line-height: 1.2;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-topology-node strong {
@@ -1138,14 +1145,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-topology-node small {
+          display: -webkit-box;
           color: var(--text-tertiary);
           font-size: var(--type-micro);
           line-height: 1.35;
           min-width: 0;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          display: block;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-flow-map {
@@ -1195,22 +1203,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-flow-step__label {
+          display: -webkit-box;
           overflow: hidden;
           color: var(--text-primary);
           font-size: var(--type-body-2);
           font-weight: 700;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          line-height: 1.22;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-flow-step__helper {
+          display: -webkit-box;
           color: var(--text-tertiary);
           font-size: var(--type-micro);
           line-height: 1.35;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          display: block;
+          overflow-wrap: anywhere;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         .dashboard-flow-step strong {
@@ -1315,8 +1327,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           }
         }
 
-        /* 3-column Layout for Middle Desktops (1200px - 1523px) to prevent card squeezing and overlaps */
-        @media (min-width: 1180px) and (max-width: 1523px) {
+        /* 3-column Layout for shell-constrained desktops to prevent card squeezing and overlaps */
+        @media (min-width: 1180px) and (max-width: 1719px) {
           .settings-card-grid-container.dashboard-command-center {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
           }

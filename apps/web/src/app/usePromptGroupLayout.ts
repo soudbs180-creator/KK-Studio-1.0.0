@@ -1132,14 +1132,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   ]);
 
   const shouldAutoRegroupPromptGroup = useCallback((
-    promptNode: PromptNode,
-    childImages: GeneratedImage[],
-    sourceNodeId: string,
-  ) => (
-    sourceNodeId === promptNode.id
-    && currentSelectedNodeIds.length <= 1
-    && childImages.length > 0
-  ), [currentSelectedNodeIds.length]);
+    _promptNode: PromptNode,
+    _childImages: GeneratedImage[],
+    _sourceNodeId: string,
+  ) => false, []);
 
   const computedGroupOverlapMap = useMemo(() => {
     if (isNodeDragActive) {
