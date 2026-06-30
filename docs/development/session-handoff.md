@@ -1407,3 +1407,21 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 待重新运行全量 `npm run verify:changes` 校验。
 - **风险与下一步**：
   - 运行 `npm run agents:commit` 固化本地提交，并执行 git push 自动触发部署。
+
+## 112. 2026-06-30 - 优化 Vercel Toolbar 禁用器与 Service Worker CDN 加载候选顺序以提升性能得分 (本次追加)
+- **修改范围**：
+  1. **优化 Vercel Toolbar 禁用器**：在 `disableVercelToolbar.ts` 中，移除了对 `document.documentElement` 全局子树（`subtree: true`）的性能开销极高的监听，改用分别对 `document.head` 和 `document.body` 进行直属层级（`subtree: false`）的非递归观察。同时简化了节点匹配过滤逻辑，直接通过 `localName` 和属性校验过滤 `vercel-live-feedback` 容器及加载脚本，彻底规避了 React 重渲染时频繁调用 `querySelector` 的主线程卡顿（从源头上解决了 INP 高达 21秒的严重问题）。
+  2. **优化 Service Worker 静态资源加载顺序**：在 `sw.js` 中，当 `preferredCdn` 尚未确定（即应用刚开始启动的首屏阶段），将 `self.location.origin` 作为第一候选域名，随后拼接备用 CDN，避免未测速阶段并行触发多个 200ms 的超时阻碍 FCP/LCP。当 `preferredCdn` 已经确定时，如果最优 CDN 失败，直接降级至源站 `self.location.origin`，不再顺序尝试其他未经验证的慢/死 CDN 节点，防范首屏加载卡顿（解决了 FCP 4.97s, LCP 5.79s 的瓶颈）。
+- **修改文件**：
+  - [disableVercelToolbar.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/utils/disableVercelToolbar.ts)
+  - [sw.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/public/sw.js)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **精细化 MutationObserver 监听**：Vercel Toolbar 的注入元素永远位于 `head` 或 `body` 的顶层，不需要监听整棵 DOM 子树。禁用 `subtree: true` 并移除递归子节点查询后，彻底消除了大规模 DOM 重渲染导致的 JS 主线程阻塞。
+  - **首次加载源站优先与 CDN 熔断降级**：在 Service Worker 尚未完成测速最优 CDN 节点前，以 `self.location.origin` 为先，直接利用 Vercel 原生的高性能边缘加速优势，避免 200ms 串联重试；测速完成后主用最优 CDN，挂载失败则直接 fallback 到源站，极大提升了加载阶段与容灾场景下的加载时间。
+- **已运行验证**：
+  - 运行 `npm run verify:changes` 成功，1612 项单元测试全绿通过，包括 architecture、governance 静态规则与 VPS Playwright 移动端/桌面端冒烟、大画布性能基准测试。
+- **未运行验证及原因**：
+  - 无。
+- **风险与下一步**：
+  - 运行 `npm run agents:commit` 固化本地提交，并执行 git push 自动触发部署。

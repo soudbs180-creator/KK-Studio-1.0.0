@@ -75,20 +75,18 @@ self.addEventListener('fetch', (event) => {
       const pathname = url.pathname;
       const candidates = [];
 
-      // 4.1 加入测速最优的 CDN 节点
       if (preferredCdn) {
+        // 如果已经通过测速确定了最优 CDN，优先使用它
         candidates.push(preferredCdn);
-      }
-
-      // 4.2 加入默认备用的 CDN 节点（过滤掉当前的 preferredCdn，避免重复）
-      DEFAULT_CDN_NODES.forEach(node => {
-        if (node !== preferredCdn) {
+        // 如果最优 CDN 失败，直接降级至源站，避免依次尝试其他未测速 CDN 导致连续超时
+        candidates.push(self.location.origin);
+      } else {
+        // 在测速完成前（即首次加载页面时），直接优先使用源站，确保首屏加载速度
+        candidates.push(self.location.origin);
+        DEFAULT_CDN_NODES.forEach(node => {
           candidates.push(node);
-        }
-      });
-
-      // 4.3 最终的回源降级：同源本地域名
-      candidates.push(self.location.origin);
+        });
+      }
 
       // 5. 依次拉取尝试，带超时熔断
       const now = Date.now();

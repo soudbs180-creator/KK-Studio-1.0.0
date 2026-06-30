@@ -41,17 +41,6 @@ function removeInjectedToolbar() {
   });
 }
 
-function matchesToolbarNode(node: Node) {
-  if (!(node instanceof Element)) {
-    return false;
-  }
-
-  return node.matches(TOOLBAR_HOST_SELECTOR)
-    || node.matches(TOOLBAR_SCRIPT_SELECTOR)
-    || node.querySelector(TOOLBAR_HOST_SELECTOR) !== null
-    || node.querySelector(TOOLBAR_SCRIPT_SELECTOR) !== null;
-}
-
 export function disableVercelToolbar() {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
@@ -60,19 +49,45 @@ export function disableVercelToolbar() {
   ensureToolbarHideStyle();
   removeInjectedToolbar();
 
-  // Vercel can inject the toolbar after the app boots, so keep stripping it out.
-  const observer = new MutationObserver((records) => {
-    const hasToolbarInsertion = records.some((record) =>
-      Array.from(record.addedNodes).some((node) => matchesToolbarNode(node))
-    );
+  const handleMutations = (records: MutationRecord[]) => {
+    let shouldRemove = false;
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element) {
+          // 只通过比对标签名称以及 script src 快速过滤，避免执行高吞吐下的全局 querySelector 导致 INP 阻塞
+          if (
+            node.localName === TOOLBAR_HOST_SELECTOR ||
+            (node.localName === 'script' && node.getAttribute('src')?.includes('vercel.live'))
+          ) {
+            shouldRemove = true;
+            break;
+          }
+        }
+      }
+      if (shouldRemove) break;
+    }
 
-    if (hasToolbarInsertion) {
+    if (shouldRemove) {
       removeInjectedToolbar();
     }
-  });
+  };
 
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+  const observer = new MutationObserver(handleMutations);
+
+  // Vercel toolbar 节点只会在 head 或 body 直属层级下进行动态插入。
+  // 通过将 subtree 设为 false，彻底避免对 React 内部组件树千万级 DOM 深度变化的拦截重算。
+  if (document.head) {
+    observer.observe(document.head, { childList: true, subtree: false });
+  }
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: false });
+  } else {
+    const docObserver = new MutationObserver((_, obs) => {
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: false });
+        obs.disconnect();
+      }
+    });
+    docObserver.observe(document.documentElement, { childList: true, subtree: false });
+  }
 }
