@@ -1871,3 +1871,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 本次验证已覆盖完整发布级检查；下一步运行 `npm run agents:commit` 固化本地提交。
   - 若线上部署后仍出现真实 10k 项目卡顿，应继续以 `visiblePromptGroupViews`、空间索引裁剪、云同步布局快照为排查入口，不回退到全量 Canvas 缓存层绘制。
+
+## 109. 2026-06-30 - Persist 10k Canvas Smoke Health Probe
+- **修改范围**：
+  1. 保留 10k 画布 smoke 模式下的 DOM 健康探针，向 `window.__KK_LARGE_CANVAS_HEALTH__` 写入 prompt/image surface、canvas container、DOM 总量和 minimap 元素统计。
+  2. 探针仅在 `window.__KK_LARGE_CANVAS_SMOKE__` 打开时运行，普通运行时不进入该日志与 DOM 查询路径。
+- **修改文件**：
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 10k smoke 脚本需要可机器读取的健康快照，不依赖人工看日志判断首屏是否真正挂载卡片与小地图。
+  - 调试探针必须受 smoke flag gate 保护，避免生产普通交互引入额外 DOM 查询。
+- **已运行验证**：
+  - `npm run verify:changes`
+- **未运行验证及原因**：
+  - 无。
+- **风险与下一步**：
+  - 运行 `npm run agents:commit` 固化本地提交并确认工作区干净。

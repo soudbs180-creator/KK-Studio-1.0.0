@@ -656,7 +656,7 @@ try {
       .map((line) => line.trim().replace(/^at\s+/, ''))
       .join(' <- ')
       .slice(0, 220);
-    const traceScheduledCallbacks = false;
+    const traceScheduledCallbacks = true;
     const shouldLogCallback = (startedAt, duration = 0) => traceScheduledCallbacks && (startedAt > 1800 || duration > 50);
     const wrapScheduledCallback = (kind, callback, delay, stack) => {
       if (typeof callback !== 'function') return callback;

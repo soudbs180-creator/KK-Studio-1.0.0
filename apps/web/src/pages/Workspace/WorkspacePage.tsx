@@ -4824,6 +4824,12 @@ const isRectIntersecting = (
         }),
     ];
 
+    if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+      const groupItems = items.filter((item) => item.kind === 'prompt-group').length;
+      const imageItems = items.filter((item) => item.kind === 'image').length;
+      console.log(`[Workspace10k] canvas-render-items total=${items.length} groups=${groupItems} images=${imageItems}`);
+    }
+
     stableCanvasRenderItemsRef.current = items;
     return items;
   }, [
@@ -4858,6 +4864,12 @@ const isRectIntersecting = (
     scale: canvasTransform.scale,
     canvasPerformanceProfile,
   });
+
+  if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+    const groupItems = renderedItems.filter((item) => item.kind === 'prompt-group').length;
+    const imageItems = renderedItems.filter((item) => item.kind === 'image').length;
+    console.log(`[Workspace10k] rendered-items total=${renderedItems.length} groups=${groupItems} images=${imageItems}`);
+  }
 
   const stableRenderedVisibleGroupsRef = useRef<any[]>([]);
 
@@ -4939,6 +4951,33 @@ const isRectIntersecting = (
       </React.Fragment>
     ))
   ), [canvasNodeRendererRegistry, renderedItems]);
+
+  if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
+    console.log(`[Workspace10k] rendered-canvas-elements count=${renderedCanvasItems.length} visibleGroups=${renderedVisibleGroups.length}`);
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !(window as any).__KK_LARGE_CANVAS_SMOKE__) return;
+
+    const publishHealth = () => {
+      const promptSurfaces = document.querySelectorAll('[id^="prompt-card-"]').length;
+      const imageSurfaces = document.querySelectorAll('[id^="image-card-"]').length;
+      const minimapRects = document.querySelectorAll('[data-minimap-card="true"], .kk-minimap-card').length;
+      const health = {
+        promptSurfaces,
+        imageSurfaces,
+        hasCanvasContainer: Boolean(document.getElementById('canvas-container')),
+        totalElements: document.getElementsByTagName('*').length,
+        imageElements: document.images.length,
+        minimapRects,
+      };
+      (window as any).__KK_LARGE_CANVAS_HEALTH__ = health;
+      console.log(`[Workspace10k] dom-health prompts=${promptSurfaces} images=${imageSurfaces} elements=${health.totalElements} img=${health.imageElements} minimap=${minimapRects}`);
+    };
+
+    const frame = window.requestAnimationFrame(publishHealth);
+    return () => window.cancelAnimationFrame(frame);
+  }, [renderedCanvasItems, renderedVisibleGroups]);
 
   useEffect(() => {
     if (!isReady || !activeCanvas || !canvasRef.current) return;
