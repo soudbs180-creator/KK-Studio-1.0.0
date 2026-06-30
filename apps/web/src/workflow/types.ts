@@ -51,6 +51,9 @@ export interface WorkflowGraph<TNode extends WorkflowNodeBase = WorkflowNodeBase
     source?: 'legacy-canvas' | 'workflow-native';
     generatedAt?: number;
     featureFlag?: string;
+    largeCanvasLegacyNodesStripped?: boolean;
+    promptNodeCount?: number;
+    imageNodeCount?: number;
   };
 }
 

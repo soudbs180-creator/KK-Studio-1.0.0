@@ -1932,3 +1932,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 线上 `kkai.plus` 仍是旧部署，必须重新部署后才会看到本地修复；部署后需要用用户真实大画布数据复测 16%-100% 缩放、主卡拖拽、副卡自动停靠、虚线跟随和资源加载。
   - 若部署后真实数据仍出现丢卡，应继续检查 `visiblePromptGroupViews`、group bounds 裁剪、真实图片资源恢复队列和云端布局快照，不回退到全量 DOM/缓存层绘制。
   - 运行 `npm run agents:commit` 固化本地提交。
+
+## 111. 2026-06-30 - 修复大画布工作流元数据类型报错并执行推送部署 (本次追加)
+- **修改范围**：修复 `WorkflowGraph['metadata']` 缺乏 `largeCanvasLegacyNodesStripped` 等字段的类型检查错误，进行本地 verify 校验，并最终执行 Git 推送部署。
+- **修改文件**：
+  - `apps/web/src/workflow/types.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 在 `apps/web/src/workflow/types.ts` 的 `WorkflowGraph['metadata']` 中增加 `largeCanvasLegacyNodesStripped`、`promptNodeCount` 和 `imageNodeCount` 可选类型字段，以与 `canvasToWorkflow.ts` 中写入的属性对齐，保持强类型并解决 tsc --noEmit 编译失败。
+- **已运行验证**：
+  - `npm run typecheck` 成功通过。
+- **未运行验证及原因**：
+  - 待重新运行全量 `npm run verify:changes` 校验。
+- **风险与下一步**：
+  - 运行 `npm run agents:commit` 固化本地提交，并执行 git push 自动触发部署。
