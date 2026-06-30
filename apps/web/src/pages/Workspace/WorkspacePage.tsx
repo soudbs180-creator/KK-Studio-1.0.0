@@ -2064,22 +2064,34 @@ export const AppContent: React.FC<AppContentProps> = () => {
   });
   const { tryStartGenerationSubmission } = useGenerationSubmitGuard();
 
+  // 只有在卡片数 >= 80 (大型/巨型项目) 时才启用大项目延迟加载防抖机制，保障极限操作下的性能
+  const isLargeProject = React.useMemo(() => {
+    return ((activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0)) >= 80;
+  }, [activeCanvas]);
+
   // 简体中文：通过时间（200ms）与位移（250px）双重节流，优化交互期间（平移、缩放、拖拽）的重绘机制，保证高频平移流畅度的同时杜绝卡片丢失与白屏
   const lastInteractionRef = useRef({ time: 0, x: 0, y: 0, scale: 1 });
   const shouldFreezeRender = React.useMemo(() => {
+    // 1. 如果不是大型项目，操作复杂度很低，我们绝对不冻结任何渲染，保证流畅与卡片完全同步
+    if (!isLargeProject) {
+      lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
+      return false;
+    }
+
     if (!isCanvasTransforming && !isNodeDragActive) {
       lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
       return false;
     }
 
-    // 🚀 如果 scale 发生了改变，说明是在进行画布缩放，此时绝不能 Freeze，否则会导致视口改变但渲染不更新（卡片丢失、位置错位）
-    if (canvasTransform.scale !== lastInteractionRef.current.scale) {
+    // 2. 缩放时绝不冻结，保证卡片位置计算与网格对齐实时贴紧鼠标，防止位置错位漂移
+    if (canvasTransform.scale !== lastInteractionRef.current.scale || canvasInteractionPhase === 'zoom') {
       lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
       return false;
     }
 
-    // 🚀 新增：如果当前交互阶段是缩放，也绝不能 Freeze，以解决滚动缩放防抖时状态未更新导致的误冻结问题
-    if (canvasInteractionPhase === 'zoom') {
+    // 3. 拖拽单个卡片时，也只在卡片极多（如 > 150）的极限场景下冻结；否则不予冻结以防止联动卡片位移滞后
+    const cardCount = (activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0);
+    if (isNodeDragActive && cardCount < 150) {
       lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
       return false;
     }
@@ -2096,12 +2108,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
     return false;
-  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale, canvasInteractionPhase]);
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale, canvasInteractionPhase, isLargeProject, activeCanvas]);
 
   // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
   // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
-  // 同时，只有在卡片数 >= 80 (大型/巨型项目) 时才启用大项目延迟加载防抖机制，保障极限操作下的性能
-  const isLargeProject = ((activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0)) >= 80;
   const shouldPauseLoading = shouldFreezeRender && isLargeProject;
 
   useEffect(() => {

@@ -1449,3 +1449,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check; npm run governance:check; npm run build` 均 100% 成功通过，0 Error。
 - **风险与下一步**：
   - 运行 `npm run agents:commit` 固化本地提交。
+
+## 114. 2026-06-30 - 修复缩放卡片错位与可视裁剪导致主副卡丢失的缺陷 (本次追加)
+- **修改范围**：
+  1. **卡组同生共死强力挂载保护**：重构了 `useVisibleCanvasItemsNew`，加入了卡组内卡片递归扩散的强制可见保护。主卡可见时强制其子图片副卡全部保留渲染，副卡可见时强制其父主卡也保留渲染，且在拖拽期间将选中节点的联动副卡/主卡强制可见，彻底从机制上消灭了拖拽或裁剪导致的卡片丢失 Bug。
+  2. **自适应放宽重绘冻结**：重构了 `WorkspacePage.tsx` 中的 `shouldFreezeRender` 计算。在项目卡片总数少于 80 张（非超大项目）或在缩放交互阶段（zoom）时完全不冻结渲染。在大项目且拖拽卡片时，仅在卡片数超 150 且平移时才受限应用冻结，确保缩放时卡片内联 CSS 样式实时得到重绘计算更新，彻底解决了缩放时卡片位置发生变化的漂移跳变。
+- **修改文件**：
+  - [useVisibleCanvasItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/useVisibleCanvasItems.ts)
+  - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
+  - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
+- **当前设计决策**：
+  - **基于卡组联合的可视裁剪保护**：将裁剪精细度从“单卡片”层级升维到“卡组”层级，防止卡组被可视区拆散而卸载。
+  - **非大项目免冻结渲染**：小画布没有渲染负担，实时重绘能够确保 transform 位移数据绝对同步，杜绝亚像素 snapping 错位。
+- **已运行验证**：
+  - 运行 `npm run typecheck` 成功通过。
+  - 运行 `npm run architecture:check; npm run governance:check; npm run build` 均 100% 成功通过，0 Error。
+- **风险与下一步**：
+  - 运行 `npm run agents:commit` 固化本地提交。

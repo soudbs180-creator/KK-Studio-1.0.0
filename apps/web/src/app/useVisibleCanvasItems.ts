@@ -186,34 +186,82 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       }
     });
 
-    // 强制把 selected 与正在编辑的 draft 节点加入可见集合，防 unmount 状态丢失
-    selectedNodeIds.forEach((id) => {
-      if (!visibleIds.has(id)) {
+    // 强制卡组同生共死保护与选中项/拖拽项强制挂载
+    const mustRenderIds = new Set<string>(selectedNodeIds);
+    if (draftNodeId) {
+      mustRenderIds.add(draftNodeId);
+    }
+
+    // 拖拽期间强制保留选中卡片名下的所有联动副卡/主卡
+    if (isNodeDragActive) {
+      selectedNodeIds.forEach((id) => {
         const promptNode = promptNodeById.get(id);
         if (promptNode) {
-          rawVisiblePrompts.push(promptNode);
-          return;
+          Array.from(imageNodeById.values())
+            .filter((img) => img.parentPromptId === promptNode.id)
+            .forEach((img) => mustRenderIds.add(img.id));
+        } else {
+          const img = imageNodeById.get(id);
+          if (img && img.parentPromptId) {
+            mustRenderIds.add(img.parentPromptId);
+          }
         }
+      });
+    }
 
-        const imageNode = imageNodeById.get(id);
-        if (imageNode) {
-          rawVisibleImages.push(imageNode);
-          return;
-        }
+    // 递归扩散：同组卡组卡片强行绑定可见（主卡可见 => 子卡全可见；子卡可见 => 父主卡可见）
+    const collectGroupCohorts = () => {
+      let changed = false;
+      const currentVisibleIds = new Set<string>([
+        ...rawVisiblePrompts.map((p) => p.id),
+        ...rawVisibleImages.map((img) => img.id),
+        ...mustRenderIds,
+      ]);
 
-        const workflowNode = workflowNodeById.get(id);
-        if (workflowNode) {
-          rawVisibleWorkflows.push(workflowNode);
+      currentVisibleIds.forEach((id) => {
+        const prompt = promptNodeById.get(id);
+        if (prompt) {
+          Array.from(imageNodeById.values())
+            .filter((img) => img.parentPromptId === prompt.id)
+            .forEach((img) => {
+              if (!mustRenderIds.has(img.id)) {
+                mustRenderIds.add(img.id);
+                changed = true;
+              }
+            });
+        } else {
+          const img = imageNodeById.get(id);
+          if (img && img.parentPromptId) {
+            if (!mustRenderIds.has(img.parentPromptId)) {
+              mustRenderIds.add(img.parentPromptId);
+              changed = true;
+            }
+          }
         }
+      });
+
+      if (changed) {
+        collectGroupCohorts();
+      }
+    };
+
+    collectGroupCohorts();
+
+    // 补齐到 rawVisible 数组中
+    mustRenderIds.forEach((id) => {
+      const p = promptNodeById.get(id);
+      if (p && !rawVisiblePrompts.some((item) => item.id === id)) {
+        rawVisiblePrompts.push(p);
+      }
+      const img = imageNodeById.get(id);
+      if (img && !rawVisibleImages.some((item) => item.id === id)) {
+        rawVisibleImages.push(img);
+      }
+      const wf = workflowNodeById.get(id);
+      if (wf && !rawVisibleWorkflows.some((item) => item.id === id)) {
+        rawVisibleWorkflows.push(wf);
       }
     });
-
-    if (draftNodeId && !visibleIds.has(draftNodeId)) {
-      const promptNode = promptNodeById.get(draftNodeId);
-      if (promptNode) {
-        rawVisiblePrompts.push(promptNode);
-      }
-    }
 
     // A. 筛选并排序 Prompt 节点
     const visiblePromptNodes = rawVisiblePrompts
