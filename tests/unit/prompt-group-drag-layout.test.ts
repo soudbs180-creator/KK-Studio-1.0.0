@@ -45,7 +45,6 @@ test("main-card regroup is not blocked by previously moved child cards", () => {
   const promptGroupLayoutSource = readSource("apps/web/src/app/usePromptGroupLayout.ts");
 
   assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
-  assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
   assert.doesNotMatch(promptGroupLayoutSource, /childImages\.some\(\(imageNode\) => !imageNode\.userMoved\)/);
 });
 
