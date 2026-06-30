@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('large-project canvas underlay only receives standalone image card metas', () => {
-  const appSource = readSource('apps/web/src/App.tsx');
+  const appSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const metaBuildStart = appSource.indexOf('const sourceImages = isLargeProject ? visibleImageNodes : activeCanvas.imageNodes;');
-  const metaBuildEnd = appSource.indexOf('setCardMetas(metas);', metaBuildStart);
+  const metaBuildEnd = appSource.indexOf('return metas;', metaBuildStart);
 
   assert.notEqual(metaBuildStart, -1);
   assert.notEqual(metaBuildEnd, -1);
