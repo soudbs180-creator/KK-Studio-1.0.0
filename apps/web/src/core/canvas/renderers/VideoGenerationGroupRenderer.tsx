@@ -1,6 +1,6 @@
 import React from 'react';
 import PromptNodeComponent from '../../../components/canvas/PromptNodeComponent';
-import { isCreditBillingTarget } from '../../../utils/creditBilling';
+import { resolvePromptGroupCreditDisplay } from '../../../utils/creditBilling';
 import ImageNode from '../../../components/image/ImageCard';
 import type { CanvasCardRenderContext } from './CanvasCardRendererRegistry';
 
@@ -53,7 +53,7 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   const groupView = item.groupView;
   const visibleChildImages = groupView.childImages;
 
-  const isCreditModel = isCreditBillingTarget(node);
+  const promptGroupCreditDisplay = resolvePromptGroupCreditDisplay(node);
   // 3. Full / Compact rendering
   const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
   const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
@@ -191,7 +191,8 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
               <ImageNode
                 id={`image-card-${childLayout.childNode.id}`}
                 {...imageProps}
-                isCreditModelOverride={isCreditModel}
+                isCreditModelOverride={promptGroupCreditDisplay.isCreditModel}
+                creditCostOverride={promptGroupCreditDisplay.creditCost}
                 detailLevel={detailLevel}
                 loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
                 loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}

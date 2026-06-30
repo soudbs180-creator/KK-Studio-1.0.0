@@ -46,7 +46,6 @@ import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } 
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
-import { resolveCanvasAutoArrangePositions } from './canvasAutoArrange';
 import { getCardDimensions } from '../utils/styleUtils';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
@@ -2424,7 +2423,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return { ...prev, canvases: newCanvases };
         });
 
-    }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds]);
+    }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds, state.subCardLayoutMode]);
 
     // --- File System Implementation ---
 

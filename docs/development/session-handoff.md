@@ -1466,3 +1466,34 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run architecture:check; npm run governance:check; npm run build` 均 100% 成功通过，0 Error。
 - **风险与下一步**：
   - 运行 `npm run agents:commit` 固化本地提交。
+
+## 115. 2026-06-30 - 修复卡组副卡积分显示与可见性补齐性能隐患
+- **修改范围**：
+  1. 修复卡组副卡计费展示口径：主卡显示积分时，副卡 footer 继承同一积分口径并显示 `消耗 10 积分`，不再回退到 `费用 $...`。
+  2. 将卡组可见性补齐中的子卡查找从“每个主卡重复扫描全部图片”改为单次构建 `promptId -> child image ids` 索引，降低大画布可见性计算开销。
+  3. 修复 `arrangeAllNodes` 对 `state.subCardLayoutMode` 的 React 依赖遗漏，避免切换副卡排列模式后整理使用旧模式。
+  4. 新增回归测试覆盖副卡积分继承、可见性索引和整理依赖。
+- **修改文件**：
+  - `apps/web/src/utils/creditBilling.ts`
+  - `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`
+  - `apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx`
+  - `apps/web/src/components/image/ImageCard2.tsx`
+  - `apps/web/src/app/useVisibleCanvasItems.ts`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `tests/unit/prompt-group-card-optimization-regression.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 新增 `resolvePromptGroupCreditDisplay` 作为卡组级积分展示合同，显式 `billingMode: 'currency'` 仍优先保持费用口径；缺少历史计费元数据但主卡按默认积分展示时，副卡继承 `DEFAULT_PROMPT_GROUP_CREDIT_COST = 10`。
+  - `ImageCard2` 优先使用图片自身积分成本，图片无有效积分成本时才使用主卡传下来的 `creditCostOverride`，兼容历史恢复数据和新生成数据。
+  - 可见性补齐只为当前计算周期构建一次 `childImageIdsByPromptId`，保留主副卡同生共死挂载策略，同时避免按可见主卡数量重复全量扫描图片节点。
+- **已运行验证**：
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-card-optimization-regression.test.ts` 通过。
+  - `npm run typecheck` 通过。
+  - `npm run verify:prompt-group-drag` 通过，预览文本中副卡均显示 `消耗 10 积分`。
+  - `npm run verify:canvas-performance` 通过。
+  - `npm run build` 通过。
+  - `npm run verify:large-canvas-10k` 通过，主卡拖动时 `childrenMovedWithPrompt` 与 `connectorFollows` 均为 true。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`，本次改动集中在卡组 UI 与可见性路径，已运行覆盖该路径的类型检查、生产构建、拖拽 smoke、大画布 smoke 与性能基准。
+- **风险与下一步**：
+  - 低风险。若后续产品决定普通本地 API 主卡不应默认显示积分，需要同步调整主卡 footer 与 `resolvePromptGroupCreditDisplay` 的默认策略，避免主副卡口径再次分叉。

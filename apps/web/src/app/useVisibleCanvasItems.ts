@@ -143,6 +143,17 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     const rawVisibleImages: GeneratedImage[] = [];
     const rawVisibleWorkflows: WorkflowUtilityCanvasNode[] = [];
     const rawVisibleGroups: CanvasGroup[] = [];
+    const childImageIdsByPromptId = new Map<string, string[]>();
+
+    imageNodeById.forEach((imageNode) => {
+      if (!imageNode.parentPromptId) return;
+      const currentIds = childImageIdsByPromptId.get(imageNode.parentPromptId);
+      if (currentIds) {
+        currentIds.push(imageNode.id);
+        return;
+      }
+      childImageIdsByPromptId.set(imageNode.parentPromptId, [imageNode.id]);
+    });
 
     // O(1) 过滤与搜集可视卡片并做二次精确几何裁剪过滤
     visibleIds.forEach((id) => {
@@ -197,9 +208,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       selectedNodeIds.forEach((id) => {
         const promptNode = promptNodeById.get(id);
         if (promptNode) {
-          Array.from(imageNodeById.values())
-            .filter((img) => img.parentPromptId === promptNode.id)
-            .forEach((img) => mustRenderIds.add(img.id));
+          childImageIdsByPromptId.get(promptNode.id)?.forEach((imageId) => mustRenderIds.add(imageId));
         } else {
           const img = imageNodeById.get(id);
           if (img && img.parentPromptId) {
@@ -221,14 +230,12 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
       currentVisibleIds.forEach((id) => {
         const prompt = promptNodeById.get(id);
         if (prompt) {
-          Array.from(imageNodeById.values())
-            .filter((img) => img.parentPromptId === prompt.id)
-            .forEach((img) => {
-              if (!mustRenderIds.has(img.id)) {
-                mustRenderIds.add(img.id);
-                changed = true;
-              }
-            });
+          childImageIdsByPromptId.get(prompt.id)?.forEach((imageId) => {
+            if (!mustRenderIds.has(imageId)) {
+              mustRenderIds.add(imageId);
+              changed = true;
+            }
+          });
         } else {
           const img = imageNodeById.get(id);
           if (img && img.parentPromptId) {

@@ -1,7 +1,10 @@
-import { type GeneratedImage} from '../types';
+import { type GeneratedImage, type PromptNode } from '../types';
 import { getModelCredits, isCreditBasedModel } from '../services/model/modelPricing';
 
-type CreditBillingTarget = Pick<GeneratedImage, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'keySlotId'>;
+type CreditBillingTarget = Pick<GeneratedImage, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'keySlotId'>
+  & Partial<Pick<PromptNode, 'executionLane'>>;
+
+export const DEFAULT_PROMPT_GROUP_CREDIT_COST = 10;
 
 const hasPositiveNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -49,4 +52,28 @@ export const getResolvedCreditCost = (
   }
 
   return getModelCredits(String(target.model || ''), target.imageSize);
+};
+
+export const resolvePromptGroupCreditDisplay = (
+  target: Partial<CreditBillingTarget>
+): { isCreditModel: boolean; creditCost?: number } => {
+  if (target.billingMode === 'currency') {
+    return { isCreditModel: false };
+  }
+
+  const explicitCredit = isCreditBillingTarget(target as CreditBillingTarget);
+  const mainCardDefaultCredit = !target.keySlotId && target.executionLane !== 'local-user-api';
+  const isCreditModel = explicitCredit
+    || target.executionLane === 'cloud-credit-model'
+    || mainCardDefaultCredit;
+
+  if (!isCreditModel) {
+    return { isCreditModel: false };
+  }
+
+  const resolvedCost = getResolvedCreditCost(target as Pick<GeneratedImage, 'creditCost' | 'model' | 'imageSize'>);
+  return {
+    isCreditModel: true,
+    creditCost: hasPositiveNumber(resolvedCost) ? resolvedCost : DEFAULT_PROMPT_GROUP_CREDIT_COST,
+  };
 };

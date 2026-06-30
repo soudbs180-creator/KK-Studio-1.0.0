@@ -123,6 +123,7 @@ interface ImageNodeProps {
     snapToGrid?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] 渲染为垂直聊天流中的标准块
     isCreditModelOverride?: boolean;
+    creditCostOverride?: number;
 }
 
 const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
@@ -162,7 +163,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     snapToGrid = false,
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false, // 🚀 [New] 垂直聊天流标识
-    isCreditModelOverride
+    isCreditModelOverride,
+    creditCostOverride
 }) => {
     const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
@@ -603,10 +605,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         () => isCreditModelOverride !== undefined ? isCreditModelOverride : isCreditBillingTarget(image),
         [isCreditModelOverride, image]
     );
-    const resolvedCreditCost = useMemo(
-        () => getResolvedCreditCost(image),
-        [image.creditCost, image.imageSize, image.model]
-    );
+    const resolvedCreditCost = useMemo(() => {
+        const imageCreditCost = getResolvedCreditCost(image);
+        if (imageCreditCost > 0) {
+            return imageCreditCost;
+        }
+
+        const overrideCreditCost = typeof creditCostOverride === 'number' && Number.isFinite(creditCostOverride)
+            ? creditCostOverride
+            : 0;
+        return overrideCreditCost > 0 ? overrideCreditCost : 0;
+    }, [creditCostOverride, image.creditCost, image.imageSize, image.model]);
     const isCompactFooter = footerDensity !== 'normal';
     const isTightFooter = footerDensity === 'tight';
     const minimumFooterDensity: FooterDensity = nodeWidth < 260 ? 'compact' : 'normal';
@@ -2275,7 +2284,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         prev.isVisible === next.isVisible &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.snapToGrid === next.snapToGrid &&
-        prev.isNew === next.isNew
+        prev.isNew === next.isNew &&
+        prev.creditCostOverride === next.creditCostOverride
     );
 });
 
