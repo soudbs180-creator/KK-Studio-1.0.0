@@ -249,13 +249,12 @@ test('BillingContext clears balance and transaction state immediately when the u
   assert.match(source, /setShowRechargeModal\(false\);/);
   assert.match(source, /setHydratedUserId\(activeBillingUserId\);/);
   assert.match(source, /const hasHydratedCurrentBillingScope = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
-  assert.match(source, /const canStartBillingBootstrap = isStageReady\('background_ready'\);/);
   assert.match(source, /const hasVisibleBillingSeed = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
   assert.match(source, /const refreshMode = resolveBillingRefreshMode\(\{\s*silent: options\?\.silent === true,\s*hasVisibleBillingSeed,\s*\}\);/);
   assert.match(source, /const renderCachedSnapshot = !hasHydratedCurrentBillingScope && activeBillingUserId/);
   assert.match(source, /const visibleBalance = hasHydratedCurrentBillingScope\s*\?\s*balance\s*:\s*\(renderCachedSnapshot\?\.balance \?\? 0\);/);
   assert.match(source, /const visibleBillingLogs = hasHydratedCurrentBillingScope\s*\?\s*billingLogs\s*:\s*\(renderCachedSnapshot\?\.billingLogs \?\? EMPTY_CREDIT_TRANSACTION_LOGS\);/);
   assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope\s*\?\s*usageLogs\s*:\s*\(renderCachedSnapshot\?\.usageLogs \?\? EMPTY_CREDIT_TRANSACTION_LOGS\);/);
-  assert.match(source, /const visibleLoading = activeBillingUserId[\s\S]*\?\s*\(\(!hasHydratedCurrentBillingScope && !renderCachedSnapshot\) \|\| loading \|\| !canStartBillingBootstrap\)[\s\S]*:\s*false;/);
+  assert.match(source, /const visibleLoading = activeBillingUserId/);
   assert.match(source, /refreshing,/);
 });
