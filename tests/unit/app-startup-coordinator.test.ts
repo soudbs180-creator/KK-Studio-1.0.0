@@ -53,7 +53,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupScreenSource, /if \(isReadyFallbackStage\) \{\s*setSmoothProgress\(stage === 'background_ready' \? 100 : 90\);\s*return;\s*\}/);
   assert.match(startupScreenSource, /if \(isReadyFallbackStage\) \{\s*return null;\s*\}/);
   assert.doesNotMatch(startupScreenSource, /stage === 'workspace_ready' \|\| stage === 'background_ready'\) \{\s*return <div className="fixed inset-0/);
-  assert.match(appSource, /import \{ AppStartupProvider, useAppStartup \} from '\.\/context\/AppStartupContext';/);
+  assert.match(appSource, /import \{ AppStartupProvider \} from '\.\/context\/AppStartupContext';/);
   assert.match(appSource, /import \{ AuthenticatedAppShell \} from '\.\/app\/AuthenticatedAppShell';/);
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
   assert.match(appSource, /<AuthenticatedAppShell/);
