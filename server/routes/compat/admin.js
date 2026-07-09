@@ -89,6 +89,104 @@ function ensureProfileStore(store, userId) {
   return store.profiles[userId];
 }
 
+function normalizeSystemProxyTaskId(rawTaskId) {
+  const value = String(rawTaskId || '').trim();
+  return value.startsWith('system_proxy:') ? value.slice('system_proxy:'.length) : value;
+}
+
+function findGenerationTask(profileStore, rawTaskId) {
+  const tasks = isObjectRecord(profileStore.generationTasks) ? profileStore.generationTasks : {};
+  const directId = String(rawTaskId || '').trim();
+  const normalizedId = normalizeSystemProxyTaskId(directId);
+  const task = tasks[directId] || tasks[normalizedId];
+  return task ? { taskId: tasks[directId] ? directId : normalizedId, task } : null;
+}
+
+function normalizeSystemProxyTaskStatus(status) {
+  if (status === 'succeeded' || status === 'success') return 'success';
+  if (status === 'failed' || status === 'cancelled' || status === 'refunded') return 'failed';
+  return 'pending';
+}
+
+function extractGenerationTaskUrls(task) {
+  const results = Array.isArray(task?.results) ? task.results : [];
+  return results
+    .map((item) => item?.url || item?.imageUrl || item?.contentUrl)
+    .filter((url) => typeof url === 'string' && url.trim().length > 0);
+}
+
+function toSystemProxyTaskStatusPayload(task) {
+  const urls = extractGenerationTaskUrls(task);
+  const status = normalizeSystemProxyTaskStatus(task?.status);
+  const cancelled = task?.status === 'cancelled';
+  return {
+    taskId: task?.id,
+    status,
+    url: urls[0] || undefined,
+    urls,
+    requestId: task?.requestId,
+    attemptId: task?.attemptId,
+    message: task?.message || task?.errorMessage || (cancelled ? 'Task was cancelled.' : undefined),
+    error: status === 'failed' ? (task?.errorMessage || task?.errorCode || (cancelled ? 'Task was cancelled.' : undefined)) : undefined,
+    creditAmount: task?.creditAmount,
+    billingStatus: task?.billingStatus,
+    ledgerTransactionId: task?.ledgerTransactionId,
+    refundTransactionId: task?.refundTransactionId,
+  };
+}
+
+async function handleSystemProxyTaskMode(req, res, mode) {
+  const rawTaskId = req.body?.taskId || req.body?.localTaskId;
+  const taskId = normalizeSystemProxyTaskId(rawTaskId);
+  if (!taskId) {
+    return sendError(res, req, 400, 'INVALID_REQUEST', 'taskId is required for system proxy task control.');
+  }
+
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  const found = findGenerationTask(profileStore, rawTaskId);
+  if (!found) {
+    return sendError(res, req, 404, 'GENERATION_TASK_NOT_FOUND', 'Generation task was not found.');
+  }
+
+  if (mode === 'task_status') {
+    return res.json(okEnvelope(toSystemProxyTaskStatusPayload(found.task), req));
+  }
+
+  if (mode === 'download_task') {
+    const urls = extractGenerationTaskUrls(found.task);
+    if (!urls.length) {
+      return sendError(res, req, 404, 'TASK_CONTENT_NOT_AVAILABLE', 'Generation task content is not available yet.');
+    }
+    return res.json(okEnvelope({
+      taskId: found.task.id,
+      url: urls[0],
+      urls,
+      requestId: found.task.requestId,
+      attemptId: found.task.attemptId,
+    }, req));
+  }
+
+  if (mode === 'cancel_task') {
+    if (!['succeeded', 'failed', 'cancelled', 'refunded'].includes(found.task.status)) {
+      found.task.status = 'cancelled';
+      found.task.errorCode = 'TASK_CANCELLED';
+      found.task.errorMessage = 'Task was cancelled.';
+      found.task.updatedAt = nowIso();
+      await writeStore(store);
+    }
+    return res.json(okEnvelope({ message: 'Task cancelled.', taskId: found.task.id }, req));
+  }
+
+  if (mode === 'delete_task') {
+    delete profileStore.generationTasks[found.taskId];
+    await writeStore(store);
+    return res.json(okEnvelope({ message: 'Task deleted.', taskId: found.task.id }, req));
+  }
+
+  return sendError(res, req, 400, 'UNSUPPORTED_MODE', 'Unsupported system proxy task mode.');
+}
+
 function buildLocalProfile(userId, overrides = {}) {
   const timestamp = nowIso();
   const isTemp = String(userId || '').startsWith('temp-');
@@ -767,7 +865,7 @@ router.use(['/api/v1/model-proxy/system', '/api/secure-proxy'], (req, res, next)
 router.post('/api/v1/model-proxy/system', requireUser, async (req, res) => {
   const mode = String(req.body?.mode || 'chat').trim();
   if (['task_status', 'cancel_task', 'delete_task', 'download_task'].includes(mode)) {
-    return sendError(res, req, 501, 'SYSTEM_PROXY_TASK_MODE_UNSUPPORTED', 'System task control is not available on this VPS route yet.');
+    return handleSystemProxyTaskMode(req, res, mode);
   }
 
   try {

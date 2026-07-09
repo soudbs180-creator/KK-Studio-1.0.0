@@ -156,6 +156,21 @@ const resolveRetryJob = (input: RetryJobInput) => {
   return { job: latestFailedJob, resolvedFrom: 'latest_failed' as const };
 };
 
+const requireGenerationJob = (jobId: string) => {
+  const job = durableGenerationQueue.getJob(jobId);
+  if (!job) {
+    throw new Error(`generation job not found: ${jobId}`);
+  }
+  return job;
+};
+
+const capabilityUnavailable = (message: string, setupAction = 'open-workspace') => ({
+  success: false as const,
+  code: 'CAPABILITY_UNAVAILABLE' as const,
+  message,
+  setupAction
+});
+
 export const generationTools: AgentToolDefinition[] = [
   // 1. startGeneration - 启动绘图
   {
@@ -277,12 +292,14 @@ export const generationTools: AgentToolDefinition[] = [
     handler: async (input: any, ctx) => {
       const { onGenerate, notify } = ctx;
 
-      if (onGenerate) {
-        onGenerate();
-        notify.success('AI 接管：已帮您发起生成任务', '');
-      } else {
+      if (typeof onGenerate !== 'function') {
         notify.warning('未绑定发送功能', '');
+        return capabilityUnavailable('Prompt composer submit handler is not bound.');
       }
+
+      onGenerate();
+      notify.success('AI 接管：已帮您发起生成任务', '');
+      return { status: 'submitted' };
     }
   },
 
@@ -446,8 +463,19 @@ export const generationTools: AgentToolDefinition[] = [
       required: ['jobId']
     },
     handler: async (input: { jobId: string }, ctx) => {
+      requireGenerationJob(input.jobId);
       durableGenerationQueue.pauseJob(input.jobId);
-      ctx.notify.success('任务已暂停', `批量生图任务 ${input.jobId} 已暂停。`);
+      const job = requireGenerationJob(input.jobId);
+      if (job.status === 'paused') {
+        ctx.notify.success('任务已暂停', `批量生图任务 ${input.jobId} 已暂停。`);
+      } else {
+        ctx.notify.warning?.('任务未暂停', `任务 ${input.jobId} 当前状态为 ${job.status}，无需暂停。`);
+      }
+      return {
+        id: job.id,
+        status: job.status,
+        promptCount: job.prompts.length
+      };
     }
   },
 
@@ -464,8 +492,19 @@ export const generationTools: AgentToolDefinition[] = [
       required: ['jobId']
     },
     handler: async (input: { jobId: string }, ctx) => {
+      requireGenerationJob(input.jobId);
       durableGenerationQueue.resumeJob(input.jobId);
-      ctx.notify.success('任务已恢复', `批量生图任务 ${input.jobId} 已恢复并开始继续生图。`);
+      const job = requireGenerationJob(input.jobId);
+      if (job.status === 'queued' || job.status === 'running') {
+        ctx.notify.success('任务已恢复', `批量生图任务 ${input.jobId} 已恢复并开始继续生图。`);
+      } else {
+        ctx.notify.warning?.('任务未恢复', `任务 ${input.jobId} 当前状态为 ${job.status}，无需恢复。`);
+      }
+      return {
+        id: job.id,
+        status: job.status,
+        promptCount: job.prompts.length
+      };
     }
   },
 
@@ -568,8 +607,15 @@ export const generationTools: AgentToolDefinition[] = [
       required: ['jobId']
     },
     handler: async (input: { jobId: string }, ctx) => {
+      requireGenerationJob(input.jobId);
       durableGenerationQueue.cancelJob(input.jobId);
+      const job = requireGenerationJob(input.jobId);
       ctx.notify?.success?.('任务已取消', `批量生图任务 ${input.jobId} 已取消。`);
+      return {
+        id: job.id,
+        status: job.status,
+        promptCount: job.prompts.length
+      };
     }
   },
   {

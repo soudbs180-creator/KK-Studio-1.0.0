@@ -45,6 +45,103 @@ function isObjectRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+const VALID_ASSET_KINDS = new Set(['image', 'video', 'audio', 'document']);
+
+function parseAssetDataUrl(rawDataUrl, fallbackMimeType) {
+  const dataUrl = String(rawDataUrl || '').trim();
+  const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,([\s\S]*)$/);
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = String(match[1] || fallbackMimeType || '').trim().toLowerCase();
+  if (!mimeType || !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mimeType)) {
+    return null;
+  }
+
+  const isBase64 = match[2] === ';base64';
+  const payload = match[3] || '';
+  try {
+    const buffer = isBase64
+      ? Buffer.from(payload, 'base64')
+      : Buffer.from(decodeURIComponent(payload), 'utf8');
+    if (buffer.length <= 0) {
+      return null;
+    }
+    return {
+      base64: buffer.toString('base64'),
+      buffer,
+      mimeType,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAssetId(rawId, userId, contentBase64) {
+  const normalized = String(rawId || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 96);
+  if (normalized.length >= 3) {
+    return normalized;
+  }
+
+  return `asset_${crypto
+    .createHash('sha1')
+    .update(`${userId}:${contentBase64}:${Date.now()}`)
+    .digest('hex')
+    .slice(0, 24)}`;
+}
+
+function toPublicAssetRecord(asset) {
+  if (!isObjectRecord(asset)) {
+    return asset;
+  }
+  const { contentBase64, ...publicAsset } = asset;
+  return publicAsset;
+}
+
+function addAssetIdReference(refs, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) {
+    return;
+  }
+
+  refs.add(value);
+}
+
+function collectAssetReferences(value, refs, key = '') {
+  if (typeof value === 'string') {
+    const assetUrlPattern = /\/api\/v1\/assets\/([^/?#]+)\/content/g;
+    let match;
+    while ((match = assetUrlPattern.exec(value)) !== null) {
+      try {
+        addAssetIdReference(refs, decodeURIComponent(match[1]));
+      } catch {
+        addAssetIdReference(refs, match[1]);
+      }
+    }
+
+    if (['storageId', 'assetId', 'originalAssetId', 'thumbnailAssetId', 'cloudAssetId'].includes(key)) {
+      addAssetIdReference(refs, value);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectAssetReferences(item, refs, key));
+    return;
+  }
+
+  if (isObjectRecord(value)) {
+    Object.entries(value).forEach(([childKey, childValue]) => {
+      collectAssetReferences(childValue, refs, childKey);
+    });
+  }
+}
+
 function defaultStore() {
   return {
     version: 1,
@@ -583,7 +680,27 @@ router.put('/api/v1/workspaces/layout', requireUser, async (req, res) => {
 });
 
 router.delete('/api/v1/workspaces/layout/cloud-images', requireUser, async (req, res) => {
-  return res.json(okEnvelope({ deletedCount: 0, preservedLayout: true }, req));
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  const assets = Array.isArray(profileStore.assets) ? profileStore.assets : [];
+  const referencedAssetIds = new Set();
+
+  collectAssetReferences(profileStore.workspaceLayout || { canvases: [] }, referencedAssetIds);
+
+  const beforeCount = assets.length;
+  profileStore.assets = assets.filter((asset) => {
+    if (!isObjectRecord(asset) || asset.kind !== 'image') {
+      return true;
+    }
+    return referencedAssetIds.has(String(asset.id));
+  });
+
+  const deletedCount = beforeCount - profileStore.assets.length;
+  if (deletedCount > 0) {
+    await writeStore(store);
+  }
+
+  return res.json(okEnvelope({ deletedCount, preservedLayout: true }, req));
 });
 
 router.put('/api/v1/workspaces/:workspaceId/workflows/:workflowId', requireUser, async (req, res) => {
@@ -621,7 +738,72 @@ router.get('/api/v1/assets', requireUser, async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
   let items = ensureProfileStore(store, req.userId).assets || [];
   if (kind) items = items.filter((item) => item.kind === kind);
-  return res.json(okEnvelope({ items: items.slice(0, limit) }, req));
+  return res.json(okEnvelope({ items: items.slice(0, limit).map(toPublicAssetRecord) }, req));
+});
+
+router.post('/api/v1/assets', requireUser, async (req, res) => {
+  const kind = String(req.body?.kind || '').trim();
+  if (!VALID_ASSET_KINDS.has(kind)) {
+    return sendError(res, req, 400, 'ASSET_KIND_INVALID', 'Asset kind must be image, video, audio, or document.');
+  }
+
+  const parsed = parseAssetDataUrl(req.body?.dataUrl, req.body?.mimeType);
+  if (!parsed) {
+    return sendError(res, req, 400, 'ASSET_DATA_INVALID', 'A valid data URL asset payload is required.');
+  }
+
+  const store = await readStore();
+  const profileStore = ensureProfileStore(store, req.userId);
+  if (!Array.isArray(profileStore.assets)) {
+    profileStore.assets = [];
+  }
+
+  const assetId = normalizeAssetId(req.body?.id, req.userId, parsed.base64);
+  const now = nowIso();
+  const storagePath = `/api/v1/assets/${encodeURIComponent(assetId)}/content`;
+  const asset = {
+    id: assetId,
+    kind,
+    storagePath,
+    mimeType: parsed.mimeType,
+    sizeBytes: Number.isFinite(Number(req.body?.sizeBytes)) && Number(req.body?.sizeBytes) > 0
+      ? Number(req.body.sizeBytes)
+      : parsed.buffer.length,
+    metadata: isObjectRecord(req.body?.metadata) ? req.body.metadata : {},
+    createdAt: now,
+    updatedAt: now,
+    contentBase64: parsed.base64,
+  };
+
+  const existingIndex = profileStore.assets.findIndex((item) => item.id === assetId);
+  if (existingIndex >= 0) {
+    const existing = profileStore.assets[existingIndex];
+    profileStore.assets[existingIndex] = {
+      ...asset,
+      createdAt: existing.createdAt || asset.createdAt,
+    };
+  } else {
+    profileStore.assets.unshift(asset);
+  }
+
+  await writeStore(store);
+  const publicAsset = toPublicAssetRecord(existingIndex >= 0 ? profileStore.assets[existingIndex] : asset);
+  return res.status(201).json(okEnvelope({ asset: publicAsset, url: publicAsset.storagePath }, req));
+});
+
+router.get('/api/v1/assets/:assetId/content', requireUser, async (req, res) => {
+  const store = await readStore();
+  const assetId = String(req.params.assetId || '').trim();
+  const asset = (ensureProfileStore(store, req.userId).assets || []).find((item) => item.id === assetId);
+  if (!asset || !asset.contentBase64) {
+    return sendError(res, req, 404, 'ASSET_NOT_FOUND', 'Asset was not found.');
+  }
+
+  const buffer = Buffer.from(asset.contentBase64, 'base64');
+  res.setHeader('Content-Type', asset.mimeType || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+  res.setHeader('Content-Length', String(buffer.length));
+  return res.end(buffer);
 });
 
 router.post('/api/v1/generation-tasks', requireUser, async (req, res) => {

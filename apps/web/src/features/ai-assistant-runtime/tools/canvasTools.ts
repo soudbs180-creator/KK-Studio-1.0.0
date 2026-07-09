@@ -6,6 +6,13 @@ import { resolveAgentNodeArrangeUpdates } from '../canvas/agentCanvasLayout.ts';
 const getContextSelectedNodeIds = (ctx: any): string[] =>
   ctx?.selectedNodeIds || ctx?.activeCanvas?.selectedNodeIds || [];
 
+const capabilityUnavailable = (message: string, setupAction = 'open-workspace') => ({
+  success: false as const,
+  code: 'CAPABILITY_UNAVAILABLE' as const,
+  message,
+  setupAction
+});
+
 export const canvasTools: AgentToolDefinition[] = [
   // 1. fillPrompt - 填充提示词到卡片
   {
@@ -207,7 +214,18 @@ export const canvasTools: AgentToolDefinition[] = [
     handler: async (input: { prompts: string[]; imageUrl?: string; model?: string; aspectRatio?: string }, ctx) => {
       const { prompts, imageUrl } = input;
       const { addPromptNode, addPromptNodes, addImageNodes, getNextCardPosition, notify, activeCanvas } = ctx;
-      if (!prompts || prompts.length === 0) return;
+      if (!prompts || prompts.length === 0) {
+        return {
+          success: false as const,
+          code: 'INVALID_INPUT' as const,
+          message: 'canvas.createPromptCards requires at least one prompt.'
+        };
+      }
+
+      if (typeof addPromptNodes !== 'function' && typeof addPromptNode !== 'function') {
+        notify.warning('未检测到节点挂载能力', '无法在画布上创建提示词卡片。');
+        return capabilityUnavailable('Canvas prompt node creation handler is not bound.');
+      }
 
       const lastPos = typeof getNextCardPosition === 'function'
         ? getNextCardPosition()
@@ -274,6 +292,11 @@ export const canvasTools: AgentToolDefinition[] = [
         await addImageNodes(imageNodes);
       }
       notify.success('卡片已批量创建', `已成功在画布中生成了 ${prompts.length} 个大纲占位卡片。`);
+      return {
+        status: 'created',
+        count: prompts.length,
+        imageCount: imageNodes.length
+      };
     }
   },
   {
@@ -292,7 +315,9 @@ export const canvasTools: AgentToolDefinition[] = [
     handler: async (input: { prompt?: string; url: string; mimeType?: string }, ctx) => {
       const { prompt, url, mimeType } = input;
       const { addAudioNode, addPromptNode, getNextCardPosition, notify } = ctx;
-      const pos = getNextCardPosition();
+      const pos = typeof getNextCardPosition === 'function'
+        ? getNextCardPosition()
+        : { x: 100, y: 100 };
 
       // 底层性能优化：使用原生 Audio 对象在后台异步抓取音频时长，避免 UI 渲染后的二次排版抖动
       let duration = 0;
@@ -355,8 +380,14 @@ export const canvasTools: AgentToolDefinition[] = [
 
       if (done) {
         notify.success('音频节点生成成功', `已挂载音频卡片至画布 (时长: ${duration.toFixed(1)}s)。`);
+        return {
+          status: 'created',
+          nodeId: node.id,
+          duration
+        };
       } else {
         notify.warning('未检测到节点挂载能力', '无法在画布上创建音频节点。');
+        return capabilityUnavailable('Canvas audio node creation handler is not bound.');
       }
     }
   }

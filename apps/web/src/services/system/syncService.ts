@@ -12,6 +12,53 @@ const isOnline = (): boolean => {
   return typeof navigator !== 'undefined' ? navigator.onLine : true;
 };
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const mimeType = blob.type || 'application/octet-stream';
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+async function createThumbnailBlob(blob: Blob): Promise<{ blob: Blob; fallback: boolean }> {
+  if (!blob.type.startsWith('image/') || typeof document === 'undefined' || typeof Image === 'undefined') {
+    return { blob, fallback: true };
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('THUMBNAIL_IMAGE_LOAD_FAILED'));
+      img.src = objectUrl;
+    });
+    const maxSide = 512;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+    const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+    const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return { blob, fallback: true };
+    }
+    context.drawImage(image, 0, 0, width, height);
+    const thumbnail = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, blob.type || 'image/png', 0.82);
+    });
+    return thumbnail ? { blob: thumbnail, fallback: false } : { blob, fallback: true };
+  } catch {
+    return { blob, fallback: true };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 /**
  * 本地优先的云端同步服务
  * 
@@ -254,8 +301,45 @@ export const syncService = {
   },
 
   async uploadImagePair(id: string, blob: Blob): Promise<{ original: string, thumbnail: string }> {
-    void id; void blob;
-    throw new Error('Cloud image sync is disabled until server-backed asset upload is implemented.');
+    if (!shouldEnableWorkspaceCloudSync()) {
+      throw new Error('Workspace cloud sync is disabled.');
+    }
+    if (!isOnline()) {
+      throw new Error('Workspace cloud sync is offline.');
+    }
+
+    const uploadAsset = async (
+      role: 'original' | 'thumbnail',
+      assetBlob: Blob,
+      metadata: Record<string, unknown> = {},
+    ): Promise<string> => {
+      const response = await kkWebApiClient.createAsset({
+        id: `${id}-${role}`,
+        kind: 'image',
+        mimeType: assetBlob.type || blob.type || 'image/png',
+        dataUrl: await blobToDataUrl(assetBlob),
+        sizeBytes: assetBlob.size,
+        metadata: {
+          pairId: id,
+          role,
+          ...metadata,
+        },
+      });
+      if (!response.success) {
+        throw new Error(response.error?.message || `Failed to upload ${role} asset.`);
+      }
+      if (!response.data) {
+        throw new Error(`Failed to upload ${role} asset.`);
+      }
+      return response.data.url || response.data.asset.storagePath;
+    };
+
+    const original = await uploadAsset('original', blob);
+    const thumbnailBlob = await createThumbnailBlob(blob);
+    const thumbnail = await uploadAsset('thumbnail', thumbnailBlob.blob, {
+      thumbnailFallback: thumbnailBlob.fallback,
+    });
+    return { original, thumbnail };
   }
 };
 

@@ -470,6 +470,29 @@ test('ToolRegistry: generation.retryJob without jobId retries the latest failed 
   }
 });
 
+test('ToolRegistry: generation queue controls reject missing jobs instead of reporting fake success', async () => {
+  durableGenerationQueue.clearAllJobs();
+  const successMessages: string[] = [];
+  const mockCtx = {
+    runId: 'run-missing-queue-control',
+    notify: {
+      success: (title: string) => successMessages.push(title),
+      warning: () => {}
+    }
+  };
+
+  for (const toolName of ['generation.pauseJob', 'generation.resumeJob', 'generation.cancelJob']) {
+    await assert.rejects(
+      async () => {
+        await toolRegistryInstance.execute(toolName, { jobId: 'missing-job-id' }, mockCtx);
+      },
+      /generation job not found: missing-job-id/,
+    );
+  }
+
+  assert.deepEqual(successMessages, []);
+});
+
 test('ToolRegistry: assets.resolveOriginals returns selected original source summary', async () => {
   const result = await toolRegistryInstance.execute('assets.resolveOriginals', { scope: 'selected_cards' }, {
     selectedNodeIds: ['img-1'],
@@ -641,6 +664,58 @@ test('ToolRegistry: ui.openToolWindow calls openToolWindowInstance in ctx', asyn
   assert.deepEqual(openedOptions, { width: 500 });
 });
 
+test('ToolRegistry: UI action tools report capability_unavailable when host handlers are missing', async () => {
+  const successMessages: string[] = [];
+  const baseCtx = {
+    runId: 'run-ui-capability-missing',
+    notify: {
+      success: (title: string) => successMessages.push(title),
+      warning: () => {}
+    }
+  };
+
+  const cases: Array<{ toolName: string; input: any }> = [
+    { toolName: 'locateApiCard', input: { idOrName: 'deepseek' } },
+    { toolName: 'openSettings', input: { tab: 'api-management' } },
+    { toolName: 'ui.navigateToSurface', input: { surface: 'workspace' } },
+    { toolName: 'fillInputPrompt', input: { prompt: 'optimized prompt' } },
+    { toolName: 'changeMode', input: { mode: 'image' } },
+    { toolName: 'ui.switchPptEditorMode', input: { mode: 'outline' } },
+    { toolName: 'submitPromptComposer', input: {} },
+    { toolName: 'ui.openToolWindow', input: { toolId: 'calculator' } },
+    { toolName: 'ui.pinTool', input: { toolId: 'calculator', pinned: true } },
+    { toolName: 'ui.updateWindowLayout', input: { instanceId: 'missing-window', x: 10 } },
+    { toolName: 'audio.playbackControl', input: { nodeId: 'missing-audio', action: 'PLAY' } }
+  ];
+
+  for (const item of cases) {
+    const result = await toolRegistryInstance.execute(item.toolName, item.input, baseCtx);
+    assert.equal(result.success, false, `${item.toolName} must not be logged as a successful action`);
+    assert.equal(result.code, 'CAPABILITY_UNAVAILABLE');
+  }
+
+  assert.deepEqual(successMessages, []);
+});
+
+test('ToolRegistry: canvas creation tools report capability_unavailable when canvas mutators are missing', async () => {
+  const successMessages: string[] = [];
+  const result = await toolRegistryInstance.execute('canvas.createAudioCard', {
+    prompt: 'voice over',
+    url: 'https://example.test/audio.mp3'
+  }, {
+    runId: 'run-canvas-capability-missing',
+    getNextCardPosition: () => ({ x: 100, y: 100 }),
+    notify: {
+      success: (title: string) => successMessages.push(title),
+      warning: () => {}
+    }
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'CAPABILITY_UNAVAILABLE');
+  assert.deepEqual(successMessages, []);
+});
+
 test('ToolRegistry: ui.updateWindowLayout calls updateToolWindowLayout in ctx', async () => {
   const originalRaf = (globalThis as any).requestAnimationFrame;
   (globalThis as any).requestAnimationFrame = (cb: () => void) => {
@@ -717,5 +792,3 @@ test('ToolRegistry: generation.createAudioTask returns capability_unavailable an
   assert.equal(latestLog.toolName, 'generation.createAudioTask');
   assert.equal(latestLog.status, 'setup_required'); // 因为 code 是 'CAPABILITY_UNAVAILABLE' 我们按 'setup_required' 或 'failed' 进行记录
 });
-
-

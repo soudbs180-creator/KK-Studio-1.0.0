@@ -15,3 +15,17 @@ export interface AssetDto {
 export interface AssetListDto {
   items: AssetDto[];
 }
+
+export interface CreateAssetRequestDto {
+  id?: EntityId;
+  kind: AssetKind;
+  mimeType: string;
+  dataUrl: string;
+  sizeBytes?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateAssetResponseDto {
+  asset: AssetDto;
+  url: string;
+}

@@ -1546,3 +1546,44 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 未运行完整 `npm run verify:changes`。本次是运行环境、版本事实、治理脚本和单测契约收敛，已覆盖 AGENTS 要求的架构、治理、类型、构建，加跑完整单测、编码检查和针对性回归；完整发布链路可在准备发布或部署前再跑。
 - **风险与下一步**：
   - 低风险。当前环境没有系统 npm，已临时使用本地下载的 npm CLI 和 bundled Node 完成验证；后续机器可安装正式 Node/npm 或恢复 corepack，减少接手时的环境绕行成本。
+
+## 117. 2026-07-10 - 严审 AI 工具、云资产与系统任务控制真实落地链路
+- **修改范围**：
+  1. **云资产上传从空壳改为真实链路**：新增共享 `createAsset` 契约、服务端 `/api/v1/assets` 创建/列表/内容读取接口，并将 `syncService.uploadImagePair` 接到真实资产上传与缩略图生成路径；生成运行时在 `workspaceCloudSync` 关闭时安静跳过云上传，不再制造预期外失败噪音。
+  2. **云图片清理从固定返回 0 改为真实清理**：`/api/v1/workspaces/layout/cloud-images` 现在会扫描当前画布布局中的资产 URL 与 `storageId` 引用，只删除未被布局引用的 image 资产，并保留布局数据。
+  3. **AI 工具假成功收口**：生成队列 `pause/resume/cancel` 对缺失 Job 明确报错；UI、工具窗口、输入框、PPT 编辑器、音频控制和画布创建类工具在宿主能力未接入时返回 `CAPABILITY_UNAVAILABLE`，不再只弹警告却写成功审计。
+  4. **system proxy 任务控制不再 501**：`/api/v1/model-proxy/system` 的 `task_status/cancel_task/delete_task/download_task` 接入本地 `generationTasks`，支持真实查询、下载、取消、删除和明确 404。
+  5. **回归保护**：新增云资产同步/清理契约测试、system proxy task mode 契约测试，并扩展 ToolRegistry 测试覆盖“缺宿主能力不能假成功”。
+- **修改文件**：
+  - `apps/web/src/app/useGenerationRuntime.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/uiTools.ts`
+  - `apps/web/src/services/system/syncService.ts`
+  - `packages/shared/src/contracts/client/kk-api-client.ts`
+  - `packages/shared/src/contracts/dto/asset-library.ts`
+  - `server/index.js`
+  - `server/routes/compat/admin.js`
+  - `server/routes/compat/workspace.js`
+  - `tests/unit/ai-assistant-tool-registry.test.ts`
+  - `tests/unit/system-proxy-task-mode-contract.test.ts`
+  - `tests/unit/workspace-cloud-asset-sync-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - `workspaceCloudSync` 仍保持 feature flag 关闭，避免在未做用户迁移确认前改变默认画布持久化行为；但 flag 打开后已有真实资产上传与布局 API 可用。
+  - 工具执行审计统一使用 `success: false + CAPABILITY_UNAVAILABLE` 表示宿主未接线，让 TaskCenter/AgentRuntime 能把“需要接入能力”和“已成功执行”区分开。
+  - system proxy 异步任务控制先落在当前 VPS 兼容层已有的本地 `generationTasks` 表，避免新增平行任务系统；外部 provider 任务仍由既有 BYOK/Wuyin 异步网关处理。
+- **已运行验证**：
+  - `npm run agents:status` 已在接手期通过，起始工作区干净。
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ai-assistant-tool-registry.test.ts` 通过。
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/workspace-cloud-asset-sync-contract.test.ts` 通过。
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/system-proxy-task-mode-contract.test.ts` 通过。
+  - `npm run architecture:check` 通过。
+  - `npm run governance:check` 通过。
+  - `npm run typecheck` 通过。
+  - `npm run build` 通过。
+  - `npm run test:unit` 通过，1626 项单测全绿。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`。本次是缺陷修复与契约补强，已覆盖 AGENTS 要求的架构、治理、类型、构建，并额外跑完整单测；完整发布链路可在准备发布或部署前再跑。
+- **风险与下一步**：
+  - 中低风险。云同步默认仍关闭，风险主要集中在开启后大图通过 JSON data URL 上传的体积上限；后续若打开该 flag，建议补分片/直传存储策略与 UI 开关说明。

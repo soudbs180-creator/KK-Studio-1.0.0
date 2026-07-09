@@ -258,6 +258,7 @@ function createApp() {
   // 简体中文注释：限制图像生成、影子生成与编辑路由（含大 base64 数据）的请求体最大为 10mb
   app.use('/api/v1/generate', express.json({ limit: '10mb', verify: captureRawJsonBody }));
   app.use('/api/v1/generate/async', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+  app.use('/api/v1/assets', express.json({ limit: '10mb', verify: captureRawJsonBody }));
   app.use('/api/generate/image', express.json({ limit: '10mb', verify: captureRawJsonBody }));
   app.use('/api/generate/edit', express.json({ limit: '10mb', verify: captureRawJsonBody }));
 

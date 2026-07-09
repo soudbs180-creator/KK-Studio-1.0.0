@@ -21,6 +21,13 @@ const applyPendingLayoutUpdates = (updateToolWindowLayout: Function) => {
   pendingLayoutUpdates.clear();
 };
 
+const capabilityUnavailable = (message: string, setupAction = 'open-workspace') => ({
+  success: false as const,
+  code: 'CAPABILITY_UNAVAILABLE' as const,
+  message,
+  setupAction
+});
+
 // ==========================================
 // 2. 原生音频控制总线 (Exclusive Audio Broker)
 // ==========================================
@@ -122,6 +129,10 @@ export const uiTools: AgentToolDefinition[] = [
     },
     handler: async (input: { selector: string }) => {
       const { selector } = input;
+      if (typeof document === 'undefined' || typeof window === 'undefined') {
+        return capabilityUnavailable('DOM highlight host is not available.');
+      }
+
       setTimeout(() => {
         const el = document.querySelector(selector) as HTMLElement;
         if (el) {
@@ -138,6 +149,10 @@ export const uiTools: AgentToolDefinition[] = [
           }
         }
       }, 200);
+      return {
+        status: 'scheduled',
+        selector
+      };
     }
   },
 
@@ -157,17 +172,27 @@ export const uiTools: AgentToolDefinition[] = [
       const { idOrName } = input;
       const { notify } = ctx;
       
-      const locateFn = (window as any).__KK_LOCATE_API_CARD__;
-      if (locateFn) {
-        const ok = locateFn(idOrName);
-        if (ok) {
-          notify.success(`已为您定位到供应商卡片: ${idOrName}`, '');
-        } else {
-          notify.warning(`未找到匹配的供应商卡片: ${idOrName}`, '');
-        }
-      } else {
+      const locateFn = typeof window !== 'undefined' ? (window as any).__KK_LOCATE_API_CARD__ : null;
+      if (typeof locateFn !== 'function') {
         notify.warning('API 定位功能未就绪，请先进入设置页面', '');
+        return capabilityUnavailable('API provider card locator is not bound.', 'open-settings');
       }
+
+      const ok = locateFn(idOrName);
+      if (!ok) {
+        notify.warning(`未找到匹配的供应商卡片: ${idOrName}`, '');
+        return {
+          success: false as const,
+          code: 'NOT_FOUND' as const,
+          message: `API provider card not found: ${idOrName}`
+        };
+      }
+
+      notify.success(`已为您定位到供应商卡片: ${idOrName}`, '');
+      return {
+        status: 'located',
+        idOrName
+      };
     }
   },
 
@@ -187,11 +212,16 @@ export const uiTools: AgentToolDefinition[] = [
       const { tab } = input;
       const { onOpenSettings, notify } = ctx;
 
-      if (onOpenSettings) {
-        onOpenSettings(tab);
-      } else {
+      if (typeof onOpenSettings !== 'function') {
         notify.warning('无法打开设置面板');
+        return capabilityUnavailable('Settings host handler is not bound.', 'open-settings');
       }
+
+      onOpenSettings(tab);
+      return {
+        status: 'opened',
+        tab
+      };
     }
   },
 
@@ -227,49 +257,63 @@ export const uiTools: AgentToolDefinition[] = [
           if (focusWorkspace) {
             focusWorkspace();
             notify.success('已为您跳转至主画布工作区', '');
+            return { status: 'navigated', surface };
           } else {
             notify.warning('无法执行画布跳转');
+            return capabilityUnavailable('Workspace focus host handler is not bound.');
           }
-          break;
         case 'library':
           if (openLibrarySurface) {
             openLibrarySurface();
             notify.success('已为您打开素材库', '');
+            return { status: 'navigated', surface };
           } else {
             notify.warning('无法执行素材库跳转');
+            return capabilityUnavailable('Library surface host handler is not bound.');
           }
-          break;
         case 'favorites':
           if (openFavoritesSurface) {
             openFavoritesSurface();
             notify.success('已为您打开收藏夹', '');
+            return { status: 'navigated', surface };
           } else {
             notify.warning('无法执行收藏夹跳转');
+            return capabilityUnavailable('Favorites surface host handler is not bound.');
           }
-          break;
         case 'profile':
           if (openProfileSurface) {
             openProfileSurface('main');
             notify.success('已为您打开个人中心', '');
+            return { status: 'navigated', surface };
           } else {
             notify.warning('无法执行个人中心跳转');
+            return capabilityUnavailable('Profile surface host handler is not bound.');
           }
-          break;
         case 'settings':
           if (onOpenSettings) {
             onOpenSettings('dashboard');
             notify.success('已为您打开系统设置', '');
+            return { status: 'navigated', surface };
           } else {
             notify.warning('无法执行设置跳转');
+            return capabilityUnavailable('Settings surface host handler is not bound.', 'open-settings');
           }
-          break;
         case 'admin':
+          if (typeof window === 'undefined') {
+            notify.warning('无法执行后台跳转');
+            return capabilityUnavailable('Browser navigation host is not available.');
+          }
           window.history.pushState(null, '', '/admin');
           window.dispatchEvent(new CustomEvent('kk-app-locationchange'));
           notify.success('已为您跳转到后台管理页面', '');
-          break;
+          return { status: 'navigated', surface };
         default:
           notify.warning(`未知的跳转表面: ${surface}`);
+          return {
+            success: false as const,
+            code: 'INVALID_INPUT' as const,
+            message: `Unknown surface: ${surface}`
+          };
       }
     }
   },
@@ -290,15 +334,19 @@ export const uiTools: AgentToolDefinition[] = [
       const { prompt } = input;
       const { setConfig, notify } = ctx;
 
-      if (setConfig) {
-        setConfig((prev: any) => ({
-          ...prev,
-          prompt: prompt
-        }));
-        notify.success('输入框已填入优化提示词', '');
-      } else {
+      if (typeof setConfig !== 'function') {
         notify.warning('未绑定输入配置', '');
+        return capabilityUnavailable('Prompt input host config setter is not bound.');
       }
+
+      setConfig((prev: any) => ({
+        ...prev,
+        prompt: prompt
+      }));
+      notify.success('输入框已填入优化提示词', '');
+      return {
+        status: 'filled'
+      };
     }
   },
 
@@ -318,15 +366,20 @@ export const uiTools: AgentToolDefinition[] = [
       const { mode } = input;
       const { setConfig, notify } = ctx;
 
-      if (setConfig) {
-        setConfig((prev: any) => ({
-          ...prev,
-          mode: mode
-        }));
-        notify.success(`已切换至【${mode === 'image' ? '图片' : mode === 'video' ? '视频' : mode === 'audio' ? '音频' : mode === 'ppt' ? 'PPT' : '电商'}】模式`, '');
-      } else {
+      if (typeof setConfig !== 'function') {
         notify.warning('未绑定输入配置', '');
+        return capabilityUnavailable('Generation mode host config setter is not bound.');
       }
+
+      setConfig((prev: any) => ({
+        ...prev,
+        mode: mode
+      }));
+      notify.success(`已切换至【${mode === 'image' ? '图片' : mode === 'video' ? '视频' : mode === 'audio' ? '音频' : mode === 'ppt' ? 'PPT' : '电商'}】模式`, '');
+      return {
+        status: 'changed',
+        mode
+      };
     }
   },
 
@@ -363,10 +416,17 @@ export const uiTools: AgentToolDefinition[] = [
     },
     handler: async (input: { mode: 'thumbnail' | 'outline' }, ctx) => {
       const { setPptEditorMode, notify } = ctx;
-      if (typeof setPptEditorMode === 'function') {
-        setPptEditorMode(input.mode);
+      if (typeof setPptEditorMode !== 'function') {
+        notify.warning('PPT 编辑器模式切换能力未接入', '');
+        return capabilityUnavailable('PPT editor mode host handler is not bound.');
       }
+
+      setPptEditorMode(input.mode);
       notify.success('编辑器模式已切换', `已成功切换为 PPT ${input.mode === 'outline' ? '大纲' : '缩略图'}编辑模式。`);
+      return {
+        status: 'changed',
+        mode: input.mode
+      };
     }
   },
   {
@@ -384,10 +444,17 @@ export const uiTools: AgentToolDefinition[] = [
     },
     handler: async (input: { toolId: string; url?: string; options?: any }, ctx) => {
       const { openToolWindowInstance, notify } = ctx;
-      if (typeof openToolWindowInstance === 'function') {
-        await openToolWindowInstance(input.toolId, input.url, input.options);
+      if (typeof openToolWindowInstance !== 'function') {
+        notify.warning('工具窗口能力未接入', '');
+        return capabilityUnavailable('Tool window host handler is not bound.');
       }
+
+      await openToolWindowInstance(input.toolId, input.url, input.options);
       notify.success('工具窗口已打开', `工具 ${input.toolId} 窗口实例创建成功。`);
+      return {
+        status: 'opened',
+        toolId: input.toolId
+      };
     }
   },
   {
@@ -404,10 +471,17 @@ export const uiTools: AgentToolDefinition[] = [
     },
     handler: async (input: { toolId: string; pinned: boolean }, ctx) => {
       const { togglePinTool, notify } = ctx;
-      if (typeof togglePinTool === 'function') {
-        togglePinTool(input.toolId, input.pinned);
+      if (typeof togglePinTool !== 'function') {
+        notify.warning('工具常驻能力未接入', '');
+        return capabilityUnavailable('Tool pin host handler is not bound.');
       }
+
+      togglePinTool(input.toolId, input.pinned);
       notify.success(input.pinned ? '工具已常驻' : '已取消工具常驻', '');
+      return {
+        status: input.pinned ? 'pinned' : 'unpinned',
+        toolId: input.toolId
+      };
     }
   },
   {
@@ -428,18 +502,26 @@ export const uiTools: AgentToolDefinition[] = [
     },
     handler: async (input: { instanceId: string; x?: number; y?: number; width?: number; height?: number; minimized?: boolean }, ctx) => {
       const { updateToolWindowLayout, notify } = ctx;
-      if (typeof updateToolWindowLayout === 'function') {
-        // 双缓冲合并最新状态到 rAF 渲染缓冲池中
-        const existing = pendingLayoutUpdates.get(input.instanceId) || {};
-        pendingLayoutUpdates.set(input.instanceId, { ...existing, ...input });
-
-        if (!layoutAnimationFrameId) {
-          layoutAnimationFrameId = requestAnimationFrame(() => applyPendingLayoutUpdates(updateToolWindowLayout));
-        }
+      if (typeof updateToolWindowLayout !== 'function') {
+        notify.warning('工具窗口布局能力未接入', '');
+        return capabilityUnavailable('Tool window layout host handler is not bound.');
       }
+
+      // 双缓冲合并最新状态到 rAF 渲染缓冲池中
+      const existing = pendingLayoutUpdates.get(input.instanceId) || {};
+      pendingLayoutUpdates.set(input.instanceId, { ...existing, ...input });
+
+      if (!layoutAnimationFrameId) {
+        layoutAnimationFrameId = requestAnimationFrame(() => applyPendingLayoutUpdates(updateToolWindowLayout));
+      }
+
       if (input.minimized !== undefined) {
         notify.success(input.minimized ? '已最小化窗口' : '已还原窗口', '');
       }
+      return {
+        status: 'scheduled',
+        instanceId: input.instanceId
+      };
     }
   },
   {
@@ -458,10 +540,14 @@ export const uiTools: AgentToolDefinition[] = [
       const { controlAudioPlayback, notify } = ctx;
       
       // 毫秒级原生排他性播放，消除重音叠音
-      const broker = (window as any).__KK_AUDIO_BROKER__;
+      const broker = typeof window !== 'undefined' ? (window as any).__KK_AUDIO_BROKER__ : null;
+      let handled = false;
       if (broker) {
         if (input.action === 'PLAY') {
-          broker.play(input.nodeId);
+          if (broker.instances?.has(input.nodeId)) {
+            broker.play(input.nodeId);
+            handled = true;
+          }
         } else if (input.action === 'PAUSE' || input.action === 'STOP') {
           const target = broker.instances.get(input.nodeId);
           if (target) {
@@ -471,14 +557,27 @@ export const uiTools: AgentToolDefinition[] = [
                 target.currentTime = 0;
               }
             } catch {}
+            handled = true;
           }
         }
       }
 
       if (typeof controlAudioPlayback === 'function') {
         controlAudioPlayback(input.nodeId, input.action);
+        handled = true;
       }
+
+      if (!handled) {
+        notify.warning('音频播放控制能力未接入', '');
+        return capabilityUnavailable('Audio playback host handler is not bound.');
+      }
+
       notify.success(`音频指令 ${input.action} 执行成功`, '');
+      return {
+        status: 'controlled',
+        nodeId: input.nodeId,
+        action: input.action
+      };
     }
   }
 ];

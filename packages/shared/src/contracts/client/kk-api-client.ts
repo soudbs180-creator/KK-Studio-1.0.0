@@ -14,6 +14,8 @@ import type {
 import type {
   AssetKind,
   AssetListDto,
+  CreateAssetRequestDto,
+  CreateAssetResponseDto,
 } from "../dto/asset-library.ts";
 import type {
   AuthSessionDto,
@@ -363,6 +365,10 @@ export interface KkApiClient {
     input?: { kind?: AssetKind; cursor?: string; limit?: number },
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AssetListDto>>;
+  createAsset(
+    input: CreateAssetRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<CreateAssetResponseDto>>;
   createGenerationTask(
     input: CreateGenerationTaskRequestDto,
     options?: ApiClientRequestOptions,
@@ -1432,6 +1438,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         path,
         {
           method: "GET",
+        },
+        options,
+      );
+    },
+
+    createAsset(input, options) {
+      return requestJson<CreateAssetResponseDto>(
+        config,
+        "api/v1/assets",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
         },
         options,
       );

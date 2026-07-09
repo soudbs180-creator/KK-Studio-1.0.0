@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 
 import type { CreditConsumeResult, CreditRefundResult } from '../context/BillingContext';
+import { shouldEnableWorkspaceCloudSync } from './kkaiFeatureFlags';
 import { keyManager } from '../services/auth/keyManager';
 import {
   buildGenerationBillingAttempt,
@@ -1496,6 +1497,10 @@ export function useGenerationRuntime({
   }, []);
 
   const scheduleRetryGeneratedMediaCloudSync = useCallback((params: ScheduleRetryGeneratedMediaCloudSyncParams): void => {
+    if (!shouldEnableWorkspaceCloudSync()) {
+      return;
+    }
+
     const shouldSyncImageMedia = params.currentMode === GenerationMode.IMAGE
       || params.currentMode === GenerationMode.PPT
       || params.currentMode === GenerationMode.ECOMMERCE;
@@ -1515,7 +1520,7 @@ export function useGenerationRuntime({
         const id = `${Date.now()}_${params.index}`;
         await syncService.uploadImagePair(id, blob);
       } catch (e) {
-        console.warn('Cloud image sync skipped because no real upload backend is configured yet.', e);
+        console.warn('Cloud image sync failed and will rely on local media persistence.', e);
       }
     }).catch(() => { });
   }, []);
