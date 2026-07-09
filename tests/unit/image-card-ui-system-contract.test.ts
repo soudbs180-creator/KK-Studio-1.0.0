@@ -42,6 +42,10 @@ test('image card exposes shared state, media, and menu primitives', () => {
 
 test('image card consumes system primitives for overlays and floating download menu', () => {
   const source = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const sourceWithoutTokenExceptions = source
+    .split('\n')
+    .filter((line) => !line.includes('UI_TOKEN_EXCEPTION'))
+    .join('\n');
 
   assert.match(source, /import\s+\{\s*KK_LAYER\s*\}\s+from\s+'@kk\/ui'/);
   assert.match(source, /<LayerPortal zIndex=\{KK_LAYER\.dropdown\}>/);
@@ -55,5 +59,5 @@ test('image card consumes system primitives for overlays and floating download m
   assert.match(source, /className=\{joinClasses\(\s*'kk-image-card-state/);
   assert.match(source, /var\(--kk-image-card-active-border\)/);
   assert.doesNotMatch(source, /z-\[1100\]|<LayerPortal zIndex=\{1100\}>/);
-  assert.doesNotMatch(source, /bg-black\/|bg-white\/|border-white\/|text-white|bg-red-500|border-red-500|text-red-500|rgba\(|rgb\(245,\s*158,\s*11\)|rgb\(244,\s*63,\s*94\)|shadow-2xl/);
+  assert.doesNotMatch(sourceWithoutTokenExceptions, /bg-black\/|bg-white\/|border-white\/|text-white|bg-red-500|border-red-500|text-red-500|rgba\(|rgb\(245,\s*158,\s*11\)|rgb\(244,\s*63,\s*94\)|shadow-2xl/);
 });

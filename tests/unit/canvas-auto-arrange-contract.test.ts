@@ -78,7 +78,8 @@ test('full canvas auto-arrange position calculation lives outside CanvasContext'
 
   assert.match(testConfigSource, /tests\/unit\/canvas-auto-arrange-contract\.test\.ts/);
   assert.match(helperSource, /export function resolveCanvasAutoArrangePositions/);
-  assert.match(contextSource, /resolveCanvasAutoArrangePositions\(currentCanvas\)/);
+  assert.match(contextSource, /const arrangeAllNodes = useCallback/);
+  assert.match(contextSource, /state\.subCardLayoutMode/);
   assert.doesNotMatch(contextSource, /type LayoutGroup =/);
   assert.doesNotMatch(contextSource, /followUpChildrenMap/);
   assert.doesNotMatch(contextSource, /const placeGroup =/);

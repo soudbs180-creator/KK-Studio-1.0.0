@@ -141,7 +141,17 @@ const activeGovernanceVersionDocs = [
   "docs/governance/ENCODING_AND_POWERSHELL.md",
   "docs/governance/architecture_review.md",
 ];
+const activeCurrentVersionDocs = [
+  "docs/governance/DIAGNOSTICS_AND_DEBUGGING.md",
+  "docs/architecture/PROJECT_STRUCTURE.md",
+  "docs/specs/current-state-inventory.md",
+  "docs/specs/API_INTEGRATION_GUIDE.md",
+  "docs/ai-assistant/ui-map.md",
+  "docs/ai-assistant/skills/README.md",
+  "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
+];
 const staleDisplayVersions = ["v1.5.6", "KK Studio v1.5.6", "`v1.5.6`", "项目版本：KK Studio v1.5.6"];
+const staleActiveVersionPattern = /\b(?:KK Studio\s+)?v?1\.5\.8\b/u;
 
 if (rootPackage.version !== expectedVersion) {
   fail(`package.json version ${rootPackage.version} does not match release manifest ${expectedVersion}`);
@@ -206,6 +216,14 @@ for (const governanceDoc of activeGovernanceVersionDocs) {
   expectIncludes(governanceDoc, expectedDisplayVersion, `${governanceDoc} must follow config/release-manifest.json (${expectedDisplayVersion}).`);
   for (const staleToken of staleDisplayVersions) {
     expectNotIncludes(governanceDoc, staleToken, `${governanceDoc} is an active governance document and cannot keep stale active version assertions.`);
+  }
+}
+
+for (const currentVersionDoc of activeCurrentVersionDocs) {
+  expectIncludes(currentVersionDoc, expectedDisplayVersion, `${currentVersionDoc} must follow config/release-manifest.json (${expectedDisplayVersion}).`);
+  const source = exists(currentVersionDoc) ? read(currentVersionDoc) : "";
+  if (staleActiveVersionPattern.test(source)) {
+    fail(`${currentVersionDoc} contains stale active v1.5.8 version text instead of ${expectedDisplayVersion}.`);
   }
 }
 

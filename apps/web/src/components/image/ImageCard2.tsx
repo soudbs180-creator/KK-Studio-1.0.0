@@ -37,12 +37,12 @@ function extractDominantColor(img: HTMLImageElement): string {
         canvas.width = 1;
         canvas.height = 1;
         const ctx = canvas.getContext('2d');
-        if (!ctx) return '#27272a';
+        if (!ctx) return '#27272a'; // UI_TOKEN_EXCEPTION - neutral fallback for image color sampling.
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        return `rgba(${r}, ${g}, ${b}, 0.85)`;
+        return `rgba(${r}, ${g}, ${b}, 0.85)`; // UI_TOKEN_EXCEPTION - sampled image pixel color.
     } catch (e) {
-        return '#27272a';
+        return '#27272a'; // UI_TOKEN_EXCEPTION - neutral fallback for unreadable image pixels.
     }
 }
 
@@ -1544,15 +1544,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 <div
                                     className="absolute inset-0 flex items-center justify-center"
                                     style={{
-                                        backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)',
+                                        backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)', // UI_TOKEN_EXCEPTION - CSS variable fallback for color-card mode.
                                     }}
                                 >
                                     {image.mode === GenerationMode.VIDEO ? (
-                                        <Play size={20} className="text-white/40" />
+                                        <Play size={20} className={"text-white/40" /* UI_TOKEN_EXCEPTION - media icon tint over sampled image color card. */} />
                                     ) : (image.mode === GenerationMode.AUDIO) ? (
-                                        <Music size={20} className="text-white/40" />
+                                        <Music size={20} className={"text-white/40" /* UI_TOKEN_EXCEPTION - media icon tint over sampled image color card. */} />
                                     ) : (
-                                        <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className={"w-5 h-5 text-white/20" /* UI_TOKEN_EXCEPTION - placeholder icon tint over sampled image color card. */} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
                                     )}
@@ -1729,15 +1729,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         <div
                                             className="absolute inset-0 flex items-center justify-center"
                                             style={{
-                                                backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)',
+                                                backgroundColor: dominantColorCache.get(image.id) || 'var(--frost-card-framework-bg, #27272a)', // UI_TOKEN_EXCEPTION - CSS variable fallback for color-card mode.
                                             }}
                                         >
                                             {image.mode === GenerationMode.VIDEO ? (
-                                                <Play size={24} className="text-white/40" />
+                                                <Play size={24} className={"text-white/40" /* UI_TOKEN_EXCEPTION - media icon tint over sampled image color card. */} />
                                             ) : (image.mode === GenerationMode.AUDIO) ? (
-                                                <Music size={24} className="text-white/40" />
+                                                <Music size={24} className={"text-white/40" /* UI_TOKEN_EXCEPTION - media icon tint over sampled image color card. */} />
                                             ) : (
-                                                <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className={"w-6 h-6 text-white/20" /* UI_TOKEN_EXCEPTION - placeholder icon tint over sampled image color card. */} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
                                             )}

@@ -35,6 +35,16 @@ function readJsonIfExists(relativePath) {
   return source ? JSON.parse(source) : null;
 }
 
+function toPackageLockTarget(packageTarget) {
+  if (!packageTarget || !packageTarget.endsWith("package.json")) {
+    return null;
+  }
+
+  return packageTarget === "package.json"
+    ? "package-lock.json"
+    : packageTarget.replace(/package\.json$/u, "package-lock.json");
+}
+
 function fail(message) {
   failures.push(`[version:check] ${message}`);
 }
@@ -101,6 +111,34 @@ for (const target of workspacePackageTargets) {
   const pkg = readJsonIfExists(target);
   if (pkg && pkg.version !== expectedVersion) {
     fail(`${target} version is ${pkg.version}, expected ${expectedVersion}`);
+  }
+}
+
+const packageLockTargets = Array.from(new Set([
+  "package-lock.json",
+  "server/package-lock.json",
+  "apps/mobile/package-lock.json",
+  ...[
+    targets.rootPackage,
+    serverPackageTarget,
+    ...workspacePackageTargets,
+  ]
+    .map(toPackageLockTarget)
+    .filter(Boolean),
+]));
+
+for (const target of packageLockTargets) {
+  const packageLock = readJsonIfExists(target);
+  if (!packageLock) {
+    continue;
+  }
+
+  const lockRootVersion = packageLock.packages?.[""]?.version;
+  if (packageLock.version && packageLock.version !== expectedVersion) {
+    fail(`${target} version is ${packageLock.version}, expected ${expectedVersion}`);
+  }
+  if (lockRootVersion && lockRootVersion !== expectedVersion) {
+    fail(`${target} packages[""].version is ${lockRootVersion}, expected ${expectedVersion}`);
   }
 }
 

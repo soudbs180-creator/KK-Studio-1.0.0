@@ -1,4 +1,6 @@
 import { readSource } from '../support/workspacePaths.js';
+import { moveSelectedCanvasNodes } from "../../apps/web/src/context/canvasMovement.ts";
+import type { Canvas } from "../../apps/web/src/types/index.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -36,9 +38,27 @@ test("prompt-group layout repair skips active drags and manually moved cards", (
 });
 
 test("dragged image cards mark manual layout overrides in canvas state", () => {
-  const canvasMovementSource = readSource("apps/web/src/context/canvasMovement.ts");
+  const canvas = {
+    promptNodes: [],
+    imageNodes: [
+      {
+        id: "image-1",
+        position: { x: 10, y: 20 },
+        userMoved: false,
+      },
+    ],
+    drawings: [],
+    workflow: undefined,
+  } as unknown as Canvas;
 
-  assert.match(canvasMovementSource, /userMoved: selectedSet\.has\(node\.id\) \? true : node\.userMoved/);
+  const result = moveSelectedCanvasNodes({
+    canvas,
+    selectedNodeIds: ["image-1"],
+    delta: { x: 5, y: 7 },
+  });
+
+  assert.deepEqual(result.imageNodes[0]?.position, { x: 15, y: 27 });
+  assert.equal(result.imageNodes[0]?.userMoved, true);
 });
 
 test("main-card regroup is not blocked by previously moved child cards", () => {

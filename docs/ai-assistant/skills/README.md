@@ -1,6 +1,6 @@
 # AI 助手可执行 Skills 目录 (docs/ai-assistant/skills/)
 
-本目录包含 KK Studio v1.5.8 中所有经过验证的 AI 助手和 Agent 可执行技能规约 (Skills)。
+本目录包含 KK Studio v1.5.9 中所有经过验证的 AI 助手和 Agent 可执行技能规约 (Skills)。
 
 每一个文件描述了一个具体功能、它的触发词、调用工具以及执行与恢复步骤，供 Agent 执行任务时读取，也供 `check-skills-consistency.mjs` 静态校验工具和敏感边界校验校验使用。
 

@@ -60,6 +60,15 @@ test("version governance checks internal package versions against the release ma
   assert.match(versionCheckSource, /packages\/shared\/package\.json/);
 });
 
+test("version governance checks adjacent package-lock root versions", () => {
+  const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
+
+  assert.match(versionCheckSource, /packageLockTargets/);
+  assert.match(versionCheckSource, /apps\/mobile\/package-lock\.json/);
+  assert.match(versionCheckSource, /packages\?\.\[""\]\?\.version/);
+  assert.match(versionCheckSource, /expectedVersion/);
+});
+
 test("version governance compares release metadata without requiring local build commit freshness", () => {
   const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
 
@@ -101,4 +110,22 @@ test("current facts governance blocks stale active governance document versions"
     assert.match(source, new RegExp(manifest.displayVersion || `v${manifest.version}`));
     assert.doesNotMatch(source, /KK Studio v1\.5\.6|项目版本：KK Studio v1\.5\.6|`v1\.5\.6`/);
   }
+});
+
+test("current facts governance blocks stale active architecture and AI assistant versions", () => {
+  const currentFactsSource = readSource("scripts/governance/check-current-facts.mjs");
+
+  for (const docPath of [
+    "docs/governance/DIAGNOSTICS_AND_DEBUGGING.md",
+    "docs/architecture/PROJECT_STRUCTURE.md",
+    "docs/specs/current-state-inventory.md",
+    "docs/specs/API_INTEGRATION_GUIDE.md",
+    "docs/ai-assistant/ui-map.md",
+    "docs/ai-assistant/skills/README.md",
+    "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
+  ]) {
+    assert.match(currentFactsSource, new RegExp(docPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.match(currentFactsSource, /staleActiveVersionPattern/);
 });

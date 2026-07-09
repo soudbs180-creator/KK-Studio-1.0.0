@@ -54,8 +54,9 @@ test('visible canvas items preserve interaction state during transforms', () => 
   const source = visibleItemsSource();
 
   assert.match(source, /if \(isNodeDragActive\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
+  assert.match(source, /const mustRenderIds = new Set<string>\(selectedNodeIds\)/);
+  assert.match(source, /if \(draftNodeId\) \{\s*mustRenderIds\.add\(draftNodeId\);/);
   assert.match(source, /selectedNodeIds\.forEach\(\(id\) => \{/);
-  assert.match(source, /if \(draftNodeId && !visibleIds\.has\(draftNodeId\)\)/);
 });
 
 test('WorkspacePage uses the spatial-index visible-items path directly', () => {

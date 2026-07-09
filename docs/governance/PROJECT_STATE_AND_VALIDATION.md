@@ -84,7 +84,7 @@ npm run build
 ### Scope
 
 - 将 Agent 入口文档重写为当前事实和修改边界，移除旧版本主动口径。
-- 将项目状态文档收敛到 KK Studio v1.5.8。
+- 将项目状态文档收敛为当前事实基线。
 - 增加 `governance:current`，阻止旧版本、旧入口和旧后端描述重新成为当前事实。
 
 ### Files touched

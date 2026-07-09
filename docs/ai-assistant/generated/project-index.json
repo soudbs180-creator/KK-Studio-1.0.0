@@ -5,8 +5,8 @@
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
     "title": "AI Assistant Roadmap — KK Studio v1.5.9",
     "summary": "Last updated: 2026-06-26",
-    "contentHash": "d22d50ea8f9bd531f5e298f9f6f8dc34",
-    "updatedAt": "2026-06-26T15:40:40.946Z"
+    "contentHash": "71324667c5a2abfaa340c4ab08f92002",
+    "updatedAt": "2026-07-09T18:30:22.854Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -95,7 +95,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "本文件维护 KK Studio v1.5.9 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
-    "contentHash": "aa2a94a7f00d85440ab6ac56375a4da0",
-    "updatedAt": "2026-06-26T07:39:09.494Z"
+    "contentHash": "e0b12e153f2f9712163bc0c4e6bb5f64",
+    "updatedAt": "2026-07-09T18:30:22.853Z"
   }
 ]
