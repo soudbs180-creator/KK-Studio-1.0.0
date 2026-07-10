@@ -30,14 +30,12 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
         data-slot="header"
         className="absolute top-0 left-0 right-0 z-20 min-h-0"
       >
-        {/* 简体中文：极致柔和的 ease-scrim 顶栏渐变底板，限制在 Header 蓝色区实际高度内，pointer-events-none 防止阻碍卡片操作 */}
-        <div 
-          className="absolute inset-0 -z-10 pointer-events-none"
-          style={{
-            background: 'var(--mobile-header-scrim-bg)'
-          }}
+        <div
+          data-testid="mobile-header-scrim"
+          aria-hidden="true"
+          className="kk-mobile-header-scrim pointer-events-none absolute inset-x-0 top-0"
         />
-        <div style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="relative" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           {header}
         </div>
       </div>

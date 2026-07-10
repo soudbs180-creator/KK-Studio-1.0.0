@@ -18,7 +18,7 @@ test('prompt bar mobile chrome exposes shared layer tokens and primitives', () =
 
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle\s*\{/);
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle:hover\s*\{/);
-  assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-capsule\s*\{[\s\S]*height:\s*30px/);
+  assert.match(cssSource, /\.kk-prompt-bar-mobile-home-indicator\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*5px/);
   assert.match(cssSource, /\.kk-prompt-bar-mobile-expanded\s*\{[\s\S]*kk-prompt-bar-mobile-expand/);
   assert.match(cssSource, /@keyframes kk-prompt-bar-mobile-expand/);
   assert.match(cssSource, /\.dark \.kk-prompt-bar-mobile-collapse-handle\s*\{/);
@@ -33,6 +33,12 @@ test('prompt bar mobile chrome consumes semantic layer selectors instead of raw 
   assert.match(promptBarSource, /target\.closest\(PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR\)/);
   assert.match(promptBarSource, /className=\{`kk-prompt-bar-mobile-collapse-handle /);
   assert.match(promptBarSource, /kk-prompt-bar-mobile-collapse-handle--embedded/);
+  assert.match(promptBarSource, /data-mobile-composer-gesture="swipe-up"/);
+  assert.match(promptBarSource, /deltaY >= 18 \|\| Math\.abs\(deltaY\) <= 8/);
+  assert.match(promptBarSource, /gesture\.startY - e\.clientY >= 18/);
+  assert.match(promptBarSource, /setPointerCapture\(e\.pointerId\)/);
+  assert.match(promptBarSource, /kk-prompt-bar-mobile-home-indicator/);
+  assert.doesNotMatch(promptBarSource, /kk-prompt-bar-mobile-collapse-capsule/);
   assert.match(promptBarSource, /style=\{\{ zIndex: KK_LAYER\.promptComposer \}\}/);
   assert.match(promptBarSource, /style=\{\{[\s\S]*zIndex: KK_LAYER\.promptComposer,/);
   assert.match(detailSource, /import\s+\{\s*KK_LAYER\s*\}\s+from\s+'@kk\/ui'/);

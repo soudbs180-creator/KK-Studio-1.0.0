@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, ChevronUp, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -1250,6 +1250,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const assetFiles = useAssetStore(state => state.files);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const mobileComposerGestureRef = useRef<{ startY: number; latestY: number } | null>(null);
     // Track composition state so IME input is not interrupted by background sync.
     const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -4107,29 +4108,85 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     type="button"
                     id="prompt-bar-container"
                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.expandMobileComposer.uiAction}
+                    data-mobile-composer-gesture="swipe-up"
                     className={`kk-prompt-bar-mobile-collapse-handle ${isEmbeddedMobileComposer ? 'kk-prompt-bar-mobile-collapse-handle--embedded' : ''}`}
                     style={{ zIndex: KK_LAYER.promptComposer }}
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsExpanded(true);
                     }}
+                    onPointerDown={(e) => {
+                        if (e.pointerType === 'touch') return;
+                        e.stopPropagation();
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        mobileComposerGestureRef.current = {
+                            startY: e.clientY,
+                            latestY: e.clientY,
+                        };
+                    }}
+                    onPointerMove={(e) => {
+                        if (e.pointerType === 'touch') return;
+                        const gesture = mobileComposerGestureRef.current;
+                        if (!gesture) return;
+                        gesture.latestY = e.clientY;
+                    }}
+                    onPointerUp={(e) => {
+                        if (e.pointerType === 'touch') return;
+                        const gesture = mobileComposerGestureRef.current;
+                        mobileComposerGestureRef.current = null;
+                        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                            e.currentTarget.releasePointerCapture(e.pointerId);
+                        }
+                        if (gesture && gesture.startY - e.clientY >= 18) {
+                            e.stopPropagation();
+                            setIsExpanded(true);
+                        }
+                    }}
+                    onPointerCancel={(e) => {
+                        if (e.pointerType === 'touch') return;
+                        mobileComposerGestureRef.current = null;
+                    }}
                     onTouchStart={(e) => {
                         e.stopPropagation();
-                        // 简体中文注释：在移动端触摸展开时，必须调用 preventDefault 阻止后续 click 事件的分发，
-                        // 否则浏览器延迟触发的 click 会穿透击中新展开面板底部的“模型选择按钮”，导致面板一展开就自动进入模型库。
+                        const touch = e.touches[0];
+                        if (!touch) return;
+                        mobileComposerGestureRef.current = {
+                            startY: touch.clientY,
+                            latestY: touch.clientY,
+                        };
+                    }}
+                    onTouchMove={(e) => {
+                        e.stopPropagation();
+                        const touch = e.touches[0];
+                        const gesture = mobileComposerGestureRef.current;
+                        if (!touch || !gesture) return;
+                        gesture.latestY = touch.clientY;
+                        if (gesture.startY - gesture.latestY > 4) {
+                            e.preventDefault();
+                        }
+                    }}
+                    onTouchEnd={(e) => {
+                        e.stopPropagation();
                         e.preventDefault();
-                        setIsExpanded(true);
+                        const gesture = mobileComposerGestureRef.current;
+                        const endY = e.changedTouches[0]?.clientY ?? gesture?.latestY;
+                        mobileComposerGestureRef.current = null;
+                        if (!gesture || endY === undefined) return;
+
+                        const deltaY = gesture.startY - endY;
+                        if (deltaY >= 18 || Math.abs(deltaY) <= 8) {
+                            setIsExpanded(true);
+                        }
+                    }}
+                    onTouchCancel={() => {
+                        mobileComposerGestureRef.current = null;
                     }}
                     title={pick('展开输入栏', 'Expand input bar')}
                     aria-label={pick('展开创作提示词输入框', 'Expand creative prompt input')}
                     aria-expanded={false}
                 >
                     {isEmbeddedMobileComposer ? (
-                        <span className="kk-prompt-bar-mobile-collapse-capsule" aria-hidden="true">
-                            <Sparkles size={15} aria-hidden="true" />
-                            <span>{pick('输入创作提示词', 'Enter a creative prompt')}</span>
-                            <ChevronUp size={16} aria-hidden="true" />
-                        </span>
+                        <span className="kk-prompt-bar-mobile-home-indicator" aria-hidden="true" />
                     ) : (
                         <span className="sr-only">{pick('展开输入栏', 'Expand input bar')}</span>
                     )}

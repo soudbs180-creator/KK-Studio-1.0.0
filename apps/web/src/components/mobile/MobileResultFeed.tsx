@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, ArrowLeft, ChevronsDown, Copy, Download, Trash2 } from 'lucide-react';
+import { Search, X, ArrowLeft, ChevronsDown, Copy, Download, Trash2, LayoutGrid, Rows } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -713,20 +713,17 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchStart={stopMobileResultControlEvent}
               onTouchEnd={stopMobileResultControlEvent}
             >
-              <p className="text-[11px] leading-relaxed text-[var(--text-primary)] font-medium">
-                {pick('点击结果查看提示词和操作。', 'Tap a result for prompt and actions.')}
+              <p className="text-[11px] leading-none text-[var(--text-primary)] font-semibold">
+                {pick('生成结果', 'Generated results')}
               </p>
               <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                 {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
               </div>
             </div>
-            {/* 简体中文：打包模式切换与回底按钮的一体化磨砂圆角容器，通过 pointer-events-auto 和事件冒泡拦截，彻底杜绝穿模点击 */}
+            {/* 简体中文：紧凑模式切换坞与独立回底按钮共用一层视觉外壳，触控目标保持 44px。 */}
             <div 
               data-testid="mobile-result-view-controls"
-              className="kk-result-panel kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto rounded-full border text-[11px] font-medium"
-              style={{
-                boxShadow: 'var(--kk-result-panel-shadow)',
-              }}
+              className="kk-result-panel kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto text-[11px] font-medium"
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
               onClick={stopMobileResultControlEvent}
@@ -734,7 +731,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchEnd={stopMobileResultControlEvent}
             >
               {/* 模式切换胶囊 */}
-              <div className="kk-result-view-mode-group flex rounded-full bg-[var(--kk-result-control-bg)] text-[11px] font-medium text-[var(--text-primary)]">
+              <div className="kk-result-view-mode-group flex text-[11px] font-medium text-[var(--text-primary)]">
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -744,13 +741,16 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                       e.preventDefault();
                       onViewModeChange(mode);
                     }}
-                    className={`kk-result-view-mode-button rounded-full transition-all ${
-                      viewMode === mode 
-                        ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-white font-bold shadow-sm' 
-                        : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
+                    title={mode === 'detail' ? pick('详细视图', 'Detail view') : pick('标准视图', 'Standard view')}
+                    aria-pressed={viewMode === mode}
+                    className={`kk-result-view-mode-button ${
+                      viewMode === mode
+                        ? 'kk-result-view-mode-button--active'
+                        : ''
                     }`}
                   >
-                    {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
+                    {mode === 'detail' ? <Rows size={13} aria-hidden="true" /> : <LayoutGrid size={13} aria-hidden="true" />}
+                    <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}</span>
                   </button>
                 ))}
               </div>
@@ -764,9 +764,10 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}
-                className="kk-result-icon-control kk-result-view-scroll-control flex items-center justify-center rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)]"
+                aria-label={pick('回到底部', 'Scroll to Bottom')}
+                className="kk-result-view-scroll-control flex items-center justify-center text-[var(--text-primary)]"
               >
-                <ChevronsDown size={16} />
+                <ChevronsDown size={15} aria-hidden="true" />
               </button>
             </div>
           </>

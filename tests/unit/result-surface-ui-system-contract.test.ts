@@ -17,7 +17,8 @@ test('result surfaces consume shared KK result tokens and 44px interaction primi
   assert.match(tokenSource, /--kk-result-control-primary-bg:/);
   assert.match(tokenSource, /--kk-result-bottom-scrim-bg:/);
   assert.match(tokenSource, /\.kk-result-view-controls\s*\{[\s\S]*height:\s*var\(--kk-touch-target-min\)/);
-  assert.match(tokenSource, /\.kk-result-view-mode-button\s*\{[\s\S]*min-width:\s*48px/);
+  assert.match(tokenSource, /\.kk-result-view-mode-button\s*\{[\s\S]*min-width:\s*62px/);
+  assert.match(tokenSource, /\.kk-result-view-mode-button--active\s*\{[\s\S]*var\(--kk-result-view-active-bg\)/);
   assert.match(tokenSource, /\.kk-result-surface/);
   assert.match(tokenSource, /\.kk-lightbox-backdrop\s*\{[\s\S]*rgb\(var\(--kk-result-overlay-rgb\) \/ var\(--kk-lightbox-backdrop-opacity/);
   assert.match(tokenSource, /\.kk-result-control\s*\{[\s\S]*min-height:\s*var\(--kk-touch-target-min\)/);
@@ -33,6 +34,8 @@ test('result surfaces consume shared KK result tokens and 44px interaction primi
 
   assert.match(feedSource, /kk-result-history-header/);
   assert.match(feedSource, /kk-result-bottom-bar/);
+  assert.match(feedSource, /<LayoutGrid size=\{13\}/);
+  assert.match(feedSource, /<Rows size=\{13\}/);
   assert.match(feedSource, /var\(--kk-result-bottom-scrim-bg\)/);
   assert.match(feedSource, /transform var\(--kk-motion-panel\) var\(--kk-motion-ease-standard\)/);
   assert.doesNotMatch(feedSource, /rgba\(20,\s*20,\s*22|rgba\(10,\s*10,\s*12|border-red-500\/20|text-red-400/);

@@ -32,6 +32,8 @@ test('MobileAppShell keeps the adaptive three-layer slot contract and stays tab-
   assert.match(shellSource, /overlays\?:\s*ReactNode;/);
   assert.match(shellSource, /data-testid="mobile-app-shell"/);
   assert.match(shellSource, /data-slot="header"/);
+  assert.match(shellSource, /data-testid="mobile-header-scrim"/);
+  assert.match(shellSource, /kk-mobile-header-scrim/);
   assert.match(shellSource, /data-slot="feed"/);
   assert.match(shellSource, /data-slot="composer"/);
   assert.match(shellSource, /data-slot="overlays"/);

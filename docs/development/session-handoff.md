@@ -1977,3 +1977,37 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 未调用真实付费 Provider、生产 OAuth 或真实账单；零数据状态已实测，非零数据由确定性单元测试覆盖。
 - **风险与下一步**：
   - 低风险。当前物理工作区仍有其他 Agent 的手机输入栏相关未提交改动，本次提交必须按路径隔离，不能使用会执行 `git add .` 的全量提交守卫。
+
+## 128. 2026-07-11 - 收紧手机输入手势并优化结果区渐变
+- **修改范围**：
+  1. 手机端折叠输入区移除图标、文字和大胶囊，只保留 64x5px 的系统式底部指示条；实际按钮继续保持 44px 触控区和完整无障碍名称。
+  2. 输入区新增轻触与上滑展开手势：触摸上滑 18px 或轻触可展开，Pointer 手势同步支持自动化和非触屏设备；向下滑动不会误展开。
+  3. 结果区“标准 / 详细 / 回到底部”改为带网格、列表图标的紧凑分段控制坞，统一使用语义 Token、44px 触控目标和减少动态策略；左侧状态改为“生成结果 / 数量”两行，修复 360px 窄屏换行拥挤。
+  4. 手机 Header 的主题渐变从 Header 自身延伸 72px 进入内容区，浅色使用白色、深色使用黑色，从实色平滑过渡到透明，消除顶部硬切边。
+- **修改文件**：
+  - `apps/web/src/components/layout/PromptBar.tsx`
+  - `apps/web/src/components/mobile/MobileAppShell.tsx`
+  - `apps/web/src/components/mobile/MobileResultFeed.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `tests/unit/mobile-app-shell-contract.test.ts`
+  - `tests/unit/mobile-home-three-zone-contract.test.ts`
+  - `tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts`
+  - `tests/unit/result-surface-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 手机底部输入入口采用“可视指示条与可交互区域分离”的系统手势模型，不再用可见文案占用结果浏览空间；点击和键盘仍作为无障碍后备入口。
+  - 结果视图使用分段控件表达互斥模式，回到底部作为独立命令放在同一外壳末端；不通过缩小按钮高度换取紧凑度。
+  - Header 和结果区遮罩均由主题 Token 驱动，不在组件中新增颜色或全局层级例外。
+- **已运行验证**：
+  - 相关契约测试 14/14 通过；根 TypeScript、架构 TypeScript、服务端 58 文件检查和 480 个测试文件语义检查全部通过。
+  - `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run build`、`npm run verify:changes` 全部通过。
+  - 完整测试汇总：单元 1656 项（1654 通过、2 跳过）、集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3。
+  - Codex 应用内浏览器实测 `511x820` 与 `360x800`：折叠态无可见输入文字，底部仅保留细条；轻触展开与收起正常，标准/详细模式切换正常，360px 下左右两组信息保持两行对齐且无横向溢出，Header 深色渐变连续进入内容区。
+  - 浏览器控制台无新增 UI error；仅存在环境中既有的 Provider Key 缺失回退 warning。视口覆盖已在验收后恢复。
+  - `git diff --check` 通过。
+- **未运行验证及原因**：
+  - 发布 smoke 的独立 Playwright Chromium 可执行文件不可用，相关脚本按设计使用 HTTP 与源码 fallback 契约；本轮移动端视觉和交互已由 Codex 应用内浏览器执行真实页面截图、DOM 与点击验证。
+  - 未调用真实付费 Provider、生产 OAuth 或真实账单，本次变更不涉及生成路由和数据契约。
+- **风险与下一步**：
+  - 低风险。上滑手势使用 18px 阈值并限制在底部 44px 手势区，后续若扩大手势热区，应避免拦截结果流正常纵向滚动。
+  - 生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 日志伪造告警，应作为独立依赖升级任务处理。
