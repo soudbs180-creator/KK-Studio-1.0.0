@@ -60,6 +60,8 @@ export interface CanvasVectorElementDto {
   fillColor?: string;
   text?: string;
   fontSize?: number;
+  bindingNodeId?: EntityId;
+  bindingGroupId?: EntityId;
 }
 
 export interface CanvasNoteNodeDto {

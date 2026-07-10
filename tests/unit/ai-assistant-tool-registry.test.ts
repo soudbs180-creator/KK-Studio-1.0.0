@@ -22,6 +22,7 @@ test('工具注册表：已注册工具清单检查', () => {
   assert.ok(toolRegistryInstance.getTool('canvas.arrangeNodes'));
   assert.ok(toolRegistryInstance.getTool('canvas.createCard'));
   assert.ok(toolRegistryInstance.getTool('canvas.convertDrawingsToNote'));
+  assert.ok(toolRegistryInstance.getTool('canvas.rasterizeNote'));
   assert.ok(toolRegistryInstance.getTool('workflow.createPanel'));
   assert.ok(toolRegistryInstance.getTool('workflow.controlPanel'));
   assert.ok(toolRegistryInstance.getTool('assets.resolveOriginals'));
@@ -336,6 +337,28 @@ test('ToolRegistry: drawing conversion delegates to the reversible note conversi
 
   assert.deepEqual(drawingIds, ['drawing-1']);
   assert.equal(result.nodeId, 'note-1');
+});
+
+test('ToolRegistry: notebook rasterization returns an ephemeral Blob result', async () => {
+  const blob = new Blob(['png'], { type: 'image/png' });
+  const result = await toolRegistryInstance.execute('canvas.rasterizeNote', {
+    nodeId: 'note-1',
+    scale: 2,
+  }, {
+    rasterizeNote: async () => ({
+      blob,
+      mimeType: 'image/png',
+      width: 640,
+      height: 480,
+      sourceNodeIds: ['image-1'],
+    }),
+  });
+
+  assert.equal(result.status, 'rasterized');
+  assert.equal(result.blob, blob);
+  assert.equal(result.mimeType, 'image/png');
+  assert.equal(result.width, 640);
+  assert.deepEqual(result.sourceNodeIds, ['image-1']);
 });
 
 test('ToolRegistry: workflow panel executes enabled steps through the registry bridge', async () => {

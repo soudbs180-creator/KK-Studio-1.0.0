@@ -47,11 +47,12 @@ import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
 import { createCanvasCardPresentation, resolvePromptCardKind } from './canvasPresentationMigration';
-import { convertCanvasDrawingsToNote } from './canvasNotes.ts';
+import { convertCanvasDrawingsToNote, restoreCanvasNoteToDrawings } from './canvasNotes.ts';
 import { createCanvasCardNodes, type CanvasCardFactoryResult, type CanvasCreateCardInput } from './canvasCardFactory.ts';
 import { getCardDimensions } from '../utils/styleUtils';
 import { getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../canvas/canvasSceneGeometry.ts';
 import { requestCanvasBoundsFocus } from '../canvas/canvasViewportEvents.ts';
+import { rasterizeCanvasNote } from '../canvas/canvasNoteRasterizer.ts';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -3384,6 +3385,24 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     }, [updateCanvas]);
 
+    const editNoteNode = useCallback((id: string): string[] => {
+        const note = stateRef.current.canvases
+            .find(canvas => canvas.id === stateRef.current.activeCanvasId)
+            ?.noteNodes?.find(candidate => candidate.id === id);
+        if (!note) return [];
+        const drawingIds = note.elements.map(element => element.id);
+        pushToHistory();
+        updateCanvas(canvas => restoreCanvasNoteToDrawings(canvas, id));
+        return drawingIds;
+    }, [pushToHistory, updateCanvas]);
+
+    const rasterizeNote = useCallback(async (id: string, scale = 1) => {
+        const note = stateRef.current.canvases
+            .find(canvas => canvas.id === stateRef.current.activeCanvasId)
+            ?.noteNodes?.find(candidate => candidate.id === id);
+        return note ? rasterizeCanvasNote(note, { scale }) : null;
+    }, []);
+
     const deleteNoteNode = useCallback((id: string) => {
         pushToHistory();
         updateCanvas(canvas => ({
@@ -3425,7 +3444,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addCanvasDrawing,
         deleteCanvasDrawing,
         clearCanvasDrawings,
-        convertDrawingsToNote,
+        convertDrawingsToNote, editNoteNode, rasterizeNote,
         updateNoteNodePosition,
         deleteNoteNode,
     }), [
@@ -3438,7 +3457,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
         isShellReady, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
         addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings,
-        convertDrawingsToNote, updateNoteNodePosition, deleteNoteNode
+        convertDrawingsToNote, editNoteNode, rasterizeNote, updateNoteNodePosition, deleteNoteNode
     ]);
     const startupStatusValue = React.useMemo(() => ({
         isLoading,

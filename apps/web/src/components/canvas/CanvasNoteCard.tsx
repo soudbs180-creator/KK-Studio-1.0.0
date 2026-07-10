@@ -3,6 +3,7 @@ import type { CanvasNoteNode, CanvasDrawing } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
 import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 import CanvasDrawingsLayer from './CanvasDrawingsLayer.tsx';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export interface CanvasNoteCardProps {
   note: CanvasNoteNode;
@@ -10,6 +11,7 @@ export interface CanvasNoteCardProps {
   zoomScale: number;
   onSelect: () => void;
   onDelete: () => void;
+  onEdit: () => void;
   onPositionChange: (position: { x: number; y: number }) => void;
   detailLevel?: CanvasCardDetailLevel;
 }
@@ -20,6 +22,7 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
   zoomScale,
   onSelect,
   onDelete,
+  onEdit,
   onPositionChange,
   detailLevel = 'full',
 }) => {
@@ -58,15 +61,28 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
         }}
       >
         <span className="truncate text-xs font-medium text-zinc-200">{note.title}</span>
-        <button
-          type="button"
-          aria-label="Delete notebook card"
-          className="h-7 w-7 text-zinc-500 hover:text-red-300"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => { event.stopPropagation(); onDelete(); }}
-        >
-          &times;
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label="Edit notebook card"
+            title="Edit notebook card"
+            className="flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-zinc-200"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => { event.stopPropagation(); onEdit(); }}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Delete notebook card"
+            title="Delete notebook card"
+            className="flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-red-300"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => { event.stopPropagation(); onDelete(); }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <svg width={note.width} height={note.height - 36} viewBox={`0 36 ${note.width} ${note.height - 36}`}>
         <CanvasDrawingsLayer drawings={drawings} />

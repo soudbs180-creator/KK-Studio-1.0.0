@@ -3,6 +3,7 @@ import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, ty
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
 import type { CanvasCardFactoryResult, CanvasCreateCardInput } from './canvasCardFactory.ts';
+import type { CanvasNoteRasterResult } from '../canvas/canvasNoteRasterizer.ts';
 
 export const MAX_CANVASES = 10;
 
@@ -99,6 +100,8 @@ export interface CanvasContextType {
     deleteCanvasDrawing: (id: string) => void;
     clearCanvasDrawings: () => void;
     convertDrawingsToNote: (drawingIds: string[], title?: string) => CanvasNoteNode | null;
+    editNoteNode: (id: string) => string[];
+    rasterizeNote: (id: string, scale?: number) => Promise<CanvasNoteRasterResult | null>;
     updateNoteNodePosition: (id: string, position: { x: number; y: number }) => void;
     deleteNoteNode: (id: string) => void;
 }

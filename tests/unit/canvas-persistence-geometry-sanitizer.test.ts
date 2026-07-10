@@ -15,7 +15,10 @@ import {
   getCanvasViewportStorageKey,
   isValidCanvasViewportTransform,
 } from '../../apps/web/src/canvas/canvasViewportPersistence.ts';
-import { convertCanvasDrawingsToNote } from '../../apps/web/src/context/canvasNotes.ts';
+import {
+  convertCanvasDrawingsToNote,
+  restoreCanvasNoteToDrawings,
+} from '../../apps/web/src/context/canvasNotes.ts';
 import { getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../../apps/web/src/canvas/canvasSceneGeometry.ts';
 
 class MemoryStorage {
@@ -322,4 +325,10 @@ test('drawing conversion moves vectors into an editable notebook card', () => {
   assert.deepEqual(converted.noteNodes?.[0].sourceNodeIds, ['image-1']);
   assert.notDeepEqual(converted.noteNodes?.[0].elements[0].points, source.drawings[0].points);
   assert.equal(source.drawings.length, 1);
+
+  const restored = restoreCanvasNoteToDrawings(converted, 'note-1', { now: 20 });
+  assert.equal(restored.noteNodes?.length, 0);
+  assert.deepEqual(restored.drawings[0].points, source.drawings[0].points);
+  assert.equal(restored.drawings[0].bindingNodeId, 'image-1');
+  assert.equal(restored.lastModified, 20);
 });

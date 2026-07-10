@@ -69,6 +69,7 @@ interface AITakeoverProviderProps {
   createCard?: (input: any) => any;
   convertDrawingsToNote?: (drawingIds: string[], title?: string) => any;
   updateWorkflowNode?: (id: string, updates: any) => void;
+  rasterizeNote?: (id: string, scale?: number) => Promise<any>;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
   arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column') => void;
@@ -107,6 +108,7 @@ export function AITakeoverProvider({
   createCard,
   convertDrawingsToNote,
   updateWorkflowNode,
+  rasterizeNote,
   executeGeneration,
   getNextCardPosition,
   arrangeAllNodes,
@@ -226,6 +228,7 @@ export function AITakeoverProvider({
       createCard,
       convertDrawingsToNote,
       updateWorkflowNode,
+      rasterizeNote,
       executeGeneration,
       getNextCardPosition,
       arrangeAllNodes,
@@ -258,7 +261,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
 
 
   // 发送消息

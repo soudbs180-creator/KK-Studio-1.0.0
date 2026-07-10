@@ -2193,3 +2193,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根与 shared TypeScript 通过；卡片 Shell、PPT、音频、多图、迁移、连线、电商和几何定向测试 23/23 通过；483 个测试文件语义检查通过；可见项精度、UI Token、z-index 检查通过；Vite 生产构建通过（2437 modules）；`git diff --check` 通过。
 - **未运行验证及原因**：无头 Chrome 的全新用户配置只能进入未登录落地页，不能复用应用内浏览器的登录画布会话，因此本阶段未伪报画布截图验收；最终响应式阶段继续使用可用会话验收。未调用真实付费 Provider。
 - **风险与下一步**：低到中风险。下一阶段统一画板 Pointer Events，补记事本重新进入编辑、来源图片绑定与 AI 按需栅格化，保持矢量数据为持久化事实源。
+
+## 136. 2026-07-11 - 统一画板 Pointer Events 与矢量记事本回编辑
+
+- **修改范围**：画板交互统一为 Pointer Events、pointer capture 和共享坐标转换，覆盖鼠标、触摸与触控笔；框选内容继续以矢量元素移动进记事本卡，并保留来源节点/分组绑定；记事本卡新增回编辑入口，可原坐标恢复画板元素并进入选择工具；AI 新增 `canvas.rasterizeNote`，仅在需要参考图时生成临时 PNG Blob，不持久化 Base64。
+- **修改文件**：`packages/shared/src/contracts/dto/workspace-canvas.ts`、`apps/web/src/canvas/canvasCoordinates.ts`、`apps/web/src/canvas/canvasNoteRasterizer.ts`、`apps/web/src/components/canvas/CanvasDrawingInteractionOverlay.tsx`、`apps/web/src/components/canvas/CanvasNoteCard.tsx`、`apps/web/src/context/canvasNotes.ts`、`apps/web/src/context/CanvasContext.tsx`、`apps/web/src/context/canvasContextState.ts`、`apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts`、`apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx`、`apps/web/src/components/layout/ChatSidebar.tsx`、`apps/web/src/pages/Workspace/WorkspacePage.tsx`、`tests/unit/canvas-note-pointer-contract.test.ts`、`tests/unit/canvas-persistence-geometry-sanitizer.test.ts`、`tests/unit/ai-assistant-tool-registry.test.ts`。
+- **当前设计决策**：矢量元素是记事本的持久化事实源；转换和回编辑都是可撤销的场景变更，禁止复制出第二份画板内容；来源绑定随矢量元素移动；栅格结果仅作为一次 AI 工具执行产物，审计和持久化不保存大字符串。
+- **已运行验证**：根 TypeScript 与 shared TypeScript 均通过；Pointer Events、画板 UI、记事本迁移/恢复、卡片工厂和 ToolRegistry 定向测试 49/49 通过；`git diff --check` 通过。
+- **未运行验证及原因**：本阶段尚未运行生产构建、完整浏览器多视口、10k 性能及全量 `verify:changes`，留待响应式阶段完成后统一执行；当前环境无 `npm` 可执行文件，验证使用项目 Node 运行时直接调用底层入口。
+- **风险与下一步**：低到中风险。下一阶段只调整桌面/平板响应式表面、输入区与工具轨；手机结果流保持不变，并复核设置页持久化能力与画布入口契约不冲突。

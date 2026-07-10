@@ -304,6 +304,27 @@ export const canvasTools: AgentToolDefinition[] = [
     },
   },
   {
+    name: 'canvas.rasterizeNote',
+    description: 'Rasterize an editable notebook card on demand for AI reference without persisting Base64.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string' },
+        scale: { type: 'number' },
+      },
+      required: ['nodeId'],
+    },
+    handler: async (input: { nodeId: string; scale?: number }, ctx) => {
+      if (typeof ctx.rasterizeNote !== 'function') {
+        return capabilityUnavailable('Notebook rasterization handler is not bound.');
+      }
+      const result = await ctx.rasterizeNote(input.nodeId, input.scale);
+      if (!result) return { success: false as const, code: 'INVALID_INPUT' as const, message: `Notebook card not found: ${input.nodeId}` };
+      return { status: 'rasterized', nodeId: input.nodeId, ...result };
+    },
+  },
+  {
     name: 'workflow.createPanel',
     description: 'Create an editable workflow panel card through the canonical card factory.',
     permission: 'safe',

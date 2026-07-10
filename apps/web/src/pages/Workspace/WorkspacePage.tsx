@@ -556,6 +556,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     deleteCanvasDrawing,
     clearCanvasDrawings,
     convertDrawingsToNote,
+    editNoteNode,
     updateNoteNodePosition,
     deleteNoteNode,
     unlinkNodes
@@ -5782,37 +5783,6 @@ const isRectIntersecting = (
           }}
           promptNodes={activeCanvas?.promptNodes || []}
           imageNodes={activeCanvas?.imageNodes || []}
-          onAddReferenceImage={async (img) => {
-            let finalImg = { ...img };
-            if (img.data && !img.storageId) {
-              try {
-                // 计算手绘图形的 Hash 值作为 storageId
-                const storageId = await calculateImageHash(img.data);
-                const fullDataUrl = `data:${img.mimeType || 'image/png'};base64,${img.data}`;
-                
-                // 将图片存入 IndexedDB，避免大图 base64 撑爆 localStorage
-                const storage = await import('../../services/storage/imageStorage');
-                await storage.saveImage(storageId, fullDataUrl);
-                
-                // 如果本地物理文件系统句柄存在，同步保存至文件系统
-                const { fileSystemService } = await import('../../services/storage/fileSystemService');
-                const handle = fileSystemService.getGlobalHandle();
-                if (handle) {
-                  await fileSystemService.saveReferenceImage(handle, storageId, img.data, img.mimeType || 'image/png');
-                }
-                
-                // 补充 storageId，以便在 localStorage 存储时，只保留 storageId 并擦除 base64 占用的空间
-                finalImg = { ...img, storageId };
-              } catch (e) {
-                console.error('[App] 保存框选参考图到本地存储失败:', e);
-              }
-            }
-
-            setConfig(prev => ({
-              ...prev,
-              referenceImages: [...prev.referenceImages, finalImg]
-            }));
-          }}
         />
 
         <svg
@@ -6076,6 +6046,14 @@ const isRectIntersecting = (
             detailLevel={canvasPerformanceProfile.cardDetailLevel}
             onSelect={() => selectNodes([note.id], 'replace')}
             onDelete={() => deleteNoteNode(note.id)}
+            onEdit={() => {
+              const drawingIds = editNoteNode(note.id);
+              if (drawingIds.length > 0) {
+                setCanvasMode('board');
+                setActiveDrawingTool('select');
+                clearSelection();
+              }
+            }}
             onPositionChange={(position) => updateNoteNodePosition(note.id, position)}
           />
         ))}

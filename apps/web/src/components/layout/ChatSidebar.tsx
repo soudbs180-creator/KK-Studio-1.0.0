@@ -4560,6 +4560,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
         createCard,
         convertDrawingsToNote,
         updateWorkflowNode,
+        rasterizeNote,
         getNextCardPosition,
         selectedNodeIds,
         arrangeAllNodes,
@@ -4592,6 +4593,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
             createCard={createCard}
             convertDrawingsToNote={convertDrawingsToNote}
             updateWorkflowNode={updateWorkflowNode}
+            rasterizeNote={rasterizeNote}
             executeGeneration={executeGeneration}
             getNextCardPosition={getNextCardPosition}
             arrangeAllNodes={arrangeAllNodes}
