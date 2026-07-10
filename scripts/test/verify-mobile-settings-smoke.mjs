@@ -602,12 +602,18 @@ try {
 
   const mobileSurface = page.getByTestId('mobile-workspace-surface');
   const mobileShell = page.getByTestId('mobile-app-shell');
+  const mobileComposerTrigger = page.getByRole('button', { name: /展开创作提示词输入框|Expand creative prompt input/i });
   const mobileComposerInput = page.locator('[data-mobile-composer-section="primary-input"] textarea');
   const seededResultTile = page.getByTestId('mobile-result-tile-image-ecom');
   const resultTile = page.locator('[data-testid^="mobile-result-tile-"]').first();
 
   await assertVisible(mobileSurface, 'Mobile workspace surface did not render.');
   await assertVisible(mobileShell, 'Mobile app shell did not render.');
+  await assertVisible(mobileComposerTrigger, 'Collapsed mobile prompt capsule did not render by default.');
+  if (await mobileComposerInput.count() !== 0) {
+    throw new Error('Mobile prompt input should not mount before the collapsed capsule is expanded.');
+  }
+  await mobileComposerTrigger.click();
   await assertVisible(mobileComposerInput, 'Mobile prompt composer input is not visible in the primary workspace.');
   try {
     await seededResultTile.waitFor({ state: 'visible', timeout: 3000 });

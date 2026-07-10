@@ -1255,7 +1255,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [mobileCategory, setMobileCategory] = useState<string>('featured');
     const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
-    const [isExpanded, setIsExpanded] = useState(() => !isMobile || mobileShellMode === 'embedded');
+    const [isExpanded, setIsExpanded] = useState(() => !isMobile);
     const [mentionState, setMentionState] = useState<{
         open: boolean;
         query: string;
@@ -4122,13 +4122,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     }}
                     title={pick('展开输入栏', 'Expand input bar')}
                     aria-label={pick('展开创作提示词输入框', 'Expand creative prompt input')}
+                    aria-expanded={false}
                 >
                     {isEmbeddedMobileComposer ? (
-                        <>
+                        <span className="kk-prompt-bar-mobile-collapse-capsule" aria-hidden="true">
                             <Sparkles size={15} aria-hidden="true" />
                             <span>{pick('输入创作提示词', 'Enter a creative prompt')}</span>
                             <ChevronUp size={16} aria-hidden="true" />
-                        </>
+                        </span>
                     ) : (
                         <span className="sr-only">{pick('展开输入栏', 'Expand input bar')}</span>
                     )}
@@ -4154,7 +4155,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         return (
             <div
                 id="prompt-bar-container"
-                className={`input-bar ios-mobile-prompt ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full`}
+                className={`input-bar ios-mobile-prompt kk-prompt-bar-mobile-expanded ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full`}
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{

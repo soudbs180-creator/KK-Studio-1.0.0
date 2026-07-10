@@ -1789,3 +1789,43 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。Provider 调用计数目前以 KeySlot 的累计计数为准，第三方 Provider 只提供累计 Tokens 和最近延迟；后续服务端若增加统一用量 DTO，可把概况切到服务端权威的跨设备统计。
   - 生产依赖审计仍保留 1 个既有中危 `morgan` 告警，需作为独立依赖升级处理。
+
+## 123. 2026-07-11 - 精简手机任务栏、提示词胶囊与结果底栏
+- **修改范围**：
+  1. 手机工作区不再挂载任务中心状态条，移除 `MobileAppShell`、`MobileWorkspaceSurface`、`AppMobileWorkspace` 的 `taskCenter` 插槽及 `TaskCenterTray` 的 mobile summary / bottom sheet 分支；桌面任务中心与后台生成队列保持不变。
+  2. 手机提示词输入默认折叠为居中的细胶囊：触控区域保持 44px，视觉胶囊高度 30px；点击后再挂载完整输入面板，并使用项目 `--kk-motion-panel` 与标准缓动执行展开动画。
+  3. 将结果底栏“标准/详细/回底部”压缩为统一 44px 高度，移除重复外层 padding，并将底栏改为垂直居中；左侧说明收紧为稳定两行，确保 360px 窄屏和控件中心线完全一致。
+  4. 更新移动 smoke 与 UI 契约，覆盖默认折叠、点击展开、三段式手机壳、桌面专属任务中心和结果底栏固定尺寸。
+- **修改文件**：
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/app/AppMobileWorkspace.tsx`
+  - `apps/web/src/components/mobile/MobileAppShell.tsx`
+  - `apps/web/src/components/mobile/MobileWorkspaceSurface.tsx`
+  - `apps/web/src/components/workspace/TaskCenterTray.tsx`
+  - `apps/web/src/components/layout/PromptBar.tsx`
+  - `apps/web/src/components/mobile/MobileResultFeed.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `scripts/test/verify-mobile-settings-smoke.mjs`
+  - `tests/unit/mobile-app-shell-contract.test.ts`
+  - `tests/unit/mobile-home-three-zone-contract.test.ts`
+  - `tests/unit/mobile-result-feed-detail-contract.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+  - `tests/unit/mobile-task-center-layout-contract.test.ts`
+  - `tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts`
+  - `tests/unit/result-surface-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 手机主页固定为 Header、结果流、Composer 三段结构，不再为任务队列占用持续可见的第四行；任务执行状态继续由 AI 接管运行时和持久队列管理，桌面保留完整任务中心。
+  - 视觉胶囊与可点击区域分离：30px 负责轻量视觉，44px 负责无障碍触控；展开动画只使用共享时长和缓动 Token，系统减少动画时自动降为 0ms。
+  - 结果视图按钮不能通过缩小触控面积换取密度，模式按钮和回底按钮均保持 44px，只移除容器叠加造成的额外高度。
+- **已运行验证**：
+  - 针对性回归 24/24 通过；全量单元测试 1655 项中 1653 通过、2 跳过、0 失败。
+  - `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run build` 与 `npm run verify:changes` 全部通过。
+  - `verify:changes` 同时通过集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3、OpenAPI 和编码检查。
+  - Codex 应用内浏览器实测 `435x662` 与 `360x800`：手机任务中心节点为 0，默认视觉胶囊 184x30px、触控区高 44px；结果控制组与左侧两行信息均高 44px、中心偏差 0px、无横向溢出或重叠；展开动画为 260ms 标准缓动，展开输入区可正常编辑，浏览器日志无 error/warning。
+  - `git diff --check` 通过。
+- **未运行验证及原因**：
+  - 发布 smoke 的独立 Playwright Chromium 不可用，脚本使用 HTTP/源码降级契约；本次手机主页已通过 Codex 应用内浏览器执行真实 DOM、点击、动画样式、几何和截图验证。
+- **风险与下一步**：
+  - 低风险。手机端不再提供独立任务列表入口，长任务仍可通过 AI 接管面板或桌面任务中心管理；若后续需要手机任务管理，应放入功能菜单二级页，不能重新占用主页常驻空间。
+  - 生产依赖审计仍保留 1 个既有中危 `morgan` 告警，需作为独立依赖升级处理。

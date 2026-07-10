@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect } from 'react';
 import {
   Play,
   Pause,
@@ -31,7 +30,6 @@ interface TaskCenterTrayProps {
   onOpenSettings?: (view?: any) => void;
   isChatOpen?: boolean;
   chatSidebarWidth?: number;
-  variant?: 'desktop' | 'mobile';
 }
 
 // 自定义非生图任务结构
@@ -63,15 +61,11 @@ const isSetupRequiredError = (value: string) => {
 export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   onOpenSettings,
   isChatOpen = false,
-  chatSidebarWidth = 320,
-  variant = 'desktop'
+  chatSidebarWidth = 320
 }) => {
   const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
-  const [showMobileCompletion, setShowMobileCompletion] = useState(false);
-  const previousActiveCountRef = useRef(0);
-  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   
   // 生图队列任务
   const [generationJobs, setGenerationJobs] = useState<GenerationBatchJob[]>(() => 
@@ -128,9 +122,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         return [newTask, ...prev];
       });
 
-      if (variant === 'desktop') {
-        setIsOpen(true);
-      }
+      setIsOpen(true);
     };
 
     const handleUpdateTask = (e: Event) => {
@@ -159,7 +151,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
       window.removeEventListener('task-center:add', handleAddTask);
       window.removeEventListener('task-center:update', handleUpdateTask);
     };
-  }, [variant]);
+  }, []);
 
   // 组合生图队列任务和自定义任务为统一的任务列表
   const allCombinedTasks = [
@@ -210,37 +202,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   const activeRunningCount = allCombinedTasks.filter(
     (t) => t.status === 'running' || t.status === 'queued'
   ).length;
-  const failedTaskCount = allCombinedTasks.filter(
-    (task) => task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors'
-  ).length;
-  const pausedTaskCount = allCombinedTasks.filter((task) => task.status === 'paused').length;
-
-  useEffect(() => {
-    if (variant !== 'mobile') return;
-
-    const previousCount = previousActiveCountRef.current;
-    previousActiveCountRef.current = activeRunningCount;
-    if (activeRunningCount > 0) {
-      setShowMobileCompletion(false);
-      return;
-    }
-    if (previousCount <= 0 || failedTaskCount > 0) return;
-
-    setShowMobileCompletion(true);
-    const timer = window.setTimeout(() => setShowMobileCompletion(false), 4000);
-    return () => window.clearTimeout(timer);
-  }, [activeRunningCount, failedTaskCount, variant]);
-
-  useEffect(() => {
-    if (variant !== 'mobile' || !isOpen) return;
-    mobileCloseButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, variant]);
 
   const handlePause = (task: typeof allCombinedTasks[0]) => {
     if (task.isGenerationJob) {
@@ -451,165 +412,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         return null;
     }
   };
-
-  if (variant === 'mobile') {
-    const shouldShow = activeRunningCount > 0 || pausedTaskCount > 0 || failedTaskCount > 0 || showMobileCompletion;
-    if (!shouldShow) return null;
-
-    const focusTask = allCombinedTasks.find((task) => task.status === 'failed' || task.status === 'completed_with_errors')
-      || allCombinedTasks.find((task) => task.status === 'running' || task.status === 'queued')
-      || allCombinedTasks.find((task) => task.status === 'paused')
-      || allCombinedTasks[0];
-    const summaryProgress = focusTask?.progress ?? (showMobileCompletion ? 100 : 0);
-    const summaryLabel = failedTaskCount > 0
-      ? `${failedTaskCount} 个任务需要处理`
-      : activeRunningCount > 0
-        ? `${activeRunningCount} 个任务进行中`
-        : pausedTaskCount > 0
-          ? `${pausedTaskCount} 个任务已暂停`
-          : '生成任务已完成';
-
-    return (
-      <div data-testid="mobile-task-center" className="px-3 pb-2">
-        <button
-          type="button"
-          data-testid="mobile-task-center-summary"
-          onClick={() => setIsOpen(true)}
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-shell-bg)] px-3 text-left shadow-[var(--mobile-clay-shadow)] transition-colors active:bg-[var(--mobile-clay-active-bg)]"
-          aria-label="打开任务状态列表"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--mobile-clay-muted-surface-bg)] text-[var(--text-secondary)]">
-            {focusTask ? getTaskIcon(focusTask.type) : <CheckCircle2 size={16} />}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--text-primary)]">
-              <span className="truncate">{summaryLabel}</span>
-              <span className="shrink-0 tabular-nums text-[var(--text-secondary)]">{summaryProgress}%</span>
-            </span>
-            <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-[var(--mobile-clay-muted-surface-bg)]">
-              <span
-                className={`block h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${failedTaskCount > 0 ? 'bg-rose-500' : showMobileCompletion ? 'bg-emerald-500' : 'bg-sky-500'}`}
-                style={{ width: `${summaryProgress}%` }}
-              />
-            </span>
-          </span>
-          <ChevronUp size={16} className="shrink-0 text-[var(--text-tertiary)]" />
-        </button>
-
-        {isOpen && typeof document !== 'undefined' && createPortal(
-          <div
-            data-testid="mobile-task-center-sheet"
-            data-kk-mobile-overlay-layer="true"
-            className="fixed inset-0 flex flex-col justify-end"
-            style={{ zIndex: KK_LAYER.modal }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="任务状态列表"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 cursor-default bg-[var(--mobile-clay-overlay-bg)]"
-              onClick={() => setIsOpen(false)}
-              aria-label="关闭任务状态列表"
-            />
-            <section className="relative flex max-h-[72dvh] flex-col overflow-hidden rounded-t-lg border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-shell-bg)] pb-[env(safe-area-inset-bottom)] shadow-[var(--mobile-clay-shadow)]">
-              <header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--mobile-clay-border)] px-4">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-[var(--text-primary)]">任务状态列表</h2>
-                  <p className="mt-0.5 text-[11px] text-[var(--text-tertiary)]">{allCombinedTasks.length} 个任务</p>
-                </div>
-                <button
-                  ref={mobileCloseButtonRef}
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--text-secondary)] active:bg-[var(--mobile-clay-active-bg)]"
-                  aria-label="关闭任务状态列表"
-                  title="关闭"
-                >
-                  <X size={20} />
-                </button>
-              </header>
-
-              <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-3">
-                {allCombinedTasks.map((task) => {
-                  const isRunning = task.status === 'running' || task.status === 'queued';
-                  const isFailed = task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors';
-                  const isPaused = task.status === 'paused';
-                  return (
-                    <article key={task.id} className="rounded-lg border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] p-3">
-                      <div className="flex items-start gap-3">
-                        <span className="mt-0.5 shrink-0">{getTaskIcon(task.type)}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="truncate text-xs font-semibold text-[var(--text-primary)]">{task.name}</h3>
-                            {getStatusDisplay(task.status)}
-                          </div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--mobile-clay-surface-bg)]">
-                              <div
-                                className={`h-full rounded-full ${isFailed ? 'bg-rose-500' : task.status === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}`}
-                                style={{ width: `${task.progress ?? 0}%` }}
-                              />
-                            </div>
-                            <span className="min-w-8 text-right text-[10px] tabular-nums text-[var(--text-tertiary)]">{task.progress ?? 0}%</span>
-                          </div>
-                          {task.error && <p className="mt-2 text-[11px] text-rose-400">{task.error}</p>}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex justify-end gap-1 border-t border-[var(--mobile-clay-border)] pt-2">
-                        {isRunning && (
-                          <button type="button" onClick={() => handlePause(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--text-secondary)] active:bg-[var(--mobile-clay-active-bg)]" aria-label="暂停任务" title="暂停任务">
-                            <Pause size={18} />
-                          </button>
-                        )}
-                        {isPaused && (
-                          <button type="button" onClick={() => handleResume(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-emerald-400 active:bg-[var(--mobile-clay-active-bg)]" aria-label="恢复任务" title="恢复任务">
-                            <Play size={18} />
-                          </button>
-                        )}
-                        {isFailed && task.canRetry && (
-                          <button type="button" onClick={() => handleRetry(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-sky-400 active:bg-[var(--mobile-clay-active-bg)]" aria-label="重试失败任务" title="重试失败任务">
-                            <RotateCw size={18} />
-                          </button>
-                        )}
-                        {isFailed && (
-                          <button type="button" onClick={() => handleCopyError(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-amber-400 active:bg-[var(--mobile-clay-active-bg)]" aria-label="复制任务错误" title="复制任务错误">
-                            <Copy size={18} />
-                          </button>
-                        )}
-                        {isFailed && task.requiresSetup && (
-                          <button type="button" onClick={() => onOpenSettings?.('api-management')} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--text-secondary)] active:bg-[var(--mobile-clay-active-bg)]" aria-label="去配置 API" title="去配置 API">
-                            <Settings size={18} />
-                          </button>
-                        )}
-                        {task.status === 'completed' && task.isGenerationJob && (
-                          <button type="button" onClick={() => handleLocate(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-sky-400 active:bg-[var(--mobile-clay-active-bg)]" aria-label="定位生成结果" title="定位生成结果">
-                            <Eye size={18} />
-                          </button>
-                        )}
-                        {isRunning && (
-                          <button type="button" onClick={() => handleCancel(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-rose-400 active:bg-[var(--mobile-clay-active-bg)]" aria-label="取消任务" title="取消任务">
-                            <X size={18} />
-                          </button>
-                        )}
-                        {(task.status === 'completed' || isFailed) && (
-                          <button type="button" onClick={() => handleDelete(task)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--text-tertiary)] active:bg-[var(--mobile-clay-active-bg)]" aria-label="清理任务记录" title="清理任务记录">
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          </div>,
-          document.body
-        )}
-      </div>
-    );
-  }
 
   return (
     <div

@@ -613,7 +613,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
       {/* 底部悬浮操作与模式切换控制区，多选模式下切换为批量操作栏 */}
       <div 
-        className={`kk-result-bottom-bar absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pt-4 select-none pointer-events-none transition-[opacity,transform] transform ${
+        className={`kk-result-bottom-bar absolute bottom-0 inset-x-0 z-20 flex items-center justify-between gap-3 px-4 pt-4 select-none pointer-events-none transition-[opacity,transform] transform ${
           isInputActive 
             ? 'opacity-0 pointer-events-none translate-y-6' 
             : 'opacity-100'
@@ -706,7 +706,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
           // 简体中文：常规模式下的切换胶囊和计数器
           <>
             <div 
-              className="min-w-0 flex touch-manipulation flex-col gap-0.5 pointer-events-auto"
+              className="flex min-h-11 min-w-0 touch-manipulation flex-col justify-center gap-0.5 pointer-events-auto"
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
               onClick={stopMobileResultControlEvent}
@@ -714,7 +714,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchEnd={stopMobileResultControlEvent}
             >
               <p className="text-[11px] leading-relaxed text-[var(--text-primary)] font-medium">
-                {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
+                {pick('点击结果查看提示词和操作。', 'Tap a result for prompt and actions.')}
               </p>
               <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                 {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
@@ -722,7 +722,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             </div>
             {/* 简体中文：打包模式切换与回底按钮的一体化磨砂圆角容器，通过 pointer-events-auto 和事件冒泡拦截，彻底杜绝穿模点击 */}
             <div 
-              className="kk-result-panel flex shrink-0 touch-manipulation items-center gap-1.5 pointer-events-auto rounded-full border p-1 text-[11px] font-medium"
+              data-testid="mobile-result-view-controls"
+              className="kk-result-panel kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto rounded-full border text-[11px] font-medium"
               style={{
                 boxShadow: 'var(--kk-result-panel-shadow)',
               }}
@@ -733,7 +734,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchEnd={stopMobileResultControlEvent}
             >
               {/* 模式切换胶囊 */}
-              <div className="flex rounded-full bg-[var(--kk-result-control-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)]">
+              <div className="kk-result-view-mode-group flex rounded-full bg-[var(--kk-result-control-bg)] text-[11px] font-medium text-[var(--text-primary)]">
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -743,7 +744,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                       e.preventDefault();
                       onViewModeChange(mode);
                     }}
-                    className={`min-h-9 rounded-full px-3 py-1 transition-all ${
+                    className={`kk-result-view-mode-button rounded-full transition-all ${
                       viewMode === mode 
                         ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-white font-bold shadow-sm' 
                         : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
@@ -763,7 +764,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}
-                className="kk-result-icon-control flex items-center justify-center rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] !w-10 !h-10 !min-w-0 !min-h-0"
+                className="kk-result-icon-control kk-result-view-scroll-control flex items-center justify-center rounded-full text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)]"
               >
                 <ChevronsDown size={16} />
               </button>

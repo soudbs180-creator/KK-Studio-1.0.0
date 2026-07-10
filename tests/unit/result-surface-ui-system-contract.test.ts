@@ -16,6 +16,8 @@ test('result surfaces consume shared KK result tokens and 44px interaction primi
   assert.match(tokenSource, /--kk-result-control-bg:/);
   assert.match(tokenSource, /--kk-result-control-primary-bg:/);
   assert.match(tokenSource, /--kk-result-bottom-scrim-bg:/);
+  assert.match(tokenSource, /\.kk-result-view-controls\s*\{[\s\S]*height:\s*var\(--kk-touch-target-min\)/);
+  assert.match(tokenSource, /\.kk-result-view-mode-button\s*\{[\s\S]*min-width:\s*48px/);
   assert.match(tokenSource, /\.kk-result-surface/);
   assert.match(tokenSource, /\.kk-lightbox-backdrop\s*\{[\s\S]*rgb\(var\(--kk-result-overlay-rgb\) \/ var\(--kk-lightbox-backdrop-opacity/);
   assert.match(tokenSource, /\.kk-result-control\s*\{[\s\S]*min-height:\s*var\(--kk-touch-target-min\)/);

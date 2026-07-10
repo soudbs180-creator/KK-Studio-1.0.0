@@ -57,6 +57,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /api-model-center-provider-pool/);
   assert.match(scriptSource, /api-model-center-preset-directory/);
   assert.match(scriptSource, /mobileComposerInput/);
+  assert.match(scriptSource, /mobileComposerTrigger/);
+  assert.match(scriptSource, /Mobile prompt input should not mount before/);
   assert.match(scriptSource, /modelCenterLayoutMetrics/);
   assert.match(scriptSource, /directoryGap/);
   assert.doesNotMatch(scriptSource, /mobile-settings-home/);

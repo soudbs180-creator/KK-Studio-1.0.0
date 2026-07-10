@@ -119,6 +119,10 @@ test('mobile result bottom controls stop touch and pointer events before they re
   assert.match(feedSource, /const stopMobileResultControlEvent = \(event: React\.SyntheticEvent\) => \{/);
   assert.match(feedSource, /onPointerDown=\{stopMobileResultControlEvent\}/);
   assert.match(feedSource, /kk-result-bottom-bar/);
+  assert.match(feedSource, /data-testid="mobile-result-view-controls"/);
+  assert.match(feedSource, /kk-result-view-controls/);
+  assert.match(feedSource, /kk-result-view-mode-button/);
+  assert.match(feedSource, /items-center justify-between gap-3/);
   assert.match(feedSource, /className="w-full flex touch-manipulation items-center justify-between gap-3 pointer-events-auto py-1"/);
   assert.match(feedSource, /kk-result-control kk-result-danger-control flex touch-manipulation items-center gap-1 rounded-full/);
   assert.match(feedSource, /handleBatchDelete\(\);/);
@@ -127,4 +131,3 @@ test('mobile result bottom controls stop touch and pointer events before they re
   assert.match(detailSource, /onTouchMove=\{stopMobileActionPropagation\}/);
   assert.match(detailSource, /onTouchEnd=\{stopMobileActionPropagation\}/);
 });
-

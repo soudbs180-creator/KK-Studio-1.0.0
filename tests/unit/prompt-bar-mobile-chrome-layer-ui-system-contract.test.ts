@@ -18,6 +18,9 @@ test('prompt bar mobile chrome exposes shared layer tokens and primitives', () =
 
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle\s*\{/);
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle:hover\s*\{/);
+  assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-capsule\s*\{[\s\S]*height:\s*30px/);
+  assert.match(cssSource, /\.kk-prompt-bar-mobile-expanded\s*\{[\s\S]*kk-prompt-bar-mobile-expand/);
+  assert.match(cssSource, /@keyframes kk-prompt-bar-mobile-expand/);
   assert.match(cssSource, /\.dark \.kk-prompt-bar-mobile-collapse-handle\s*\{/);
 });
 

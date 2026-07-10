@@ -40,16 +40,17 @@ function createImage(overrides: Partial<GeneratedImage> = {}): GeneratedImage {
 }
 
 describe('mobile home adaptive zone contract', () => {
-  test('mobile shell inserts the task center in normal flow instead of sticky stacking', () => {
+  test('mobile shell uses header, feed, and composer zones without task-center chrome', () => {
     const shellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
     const surfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
-    assert.match(shellSource, /gridTemplateRows:\s*taskCenter \? 'minmax\(0, 1fr\) auto auto' : 'minmax\(0, 1fr\) auto'/);
+    assert.match(shellSource, /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/);
+    assert.doesNotMatch(shellSource, /taskCenter/);
     assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
     assert.doesNotMatch(shellSource, /min-h-dvh/);
     assert.doesNotMatch(shellSource, /sticky top-0/);
     assert.doesNotMatch(shellSource, /sticky bottom-0/);
-    assert.match(surfaceSource, /data-mobile-home-shell="adaptive-four-zone"/);
+    assert.match(surfaceSource, /data-mobile-home-shell="adaptive-three-zone"/);
     assert.doesNotMatch(surfaceSource, /grid-cols-\[minmax\(0,1fr\)_56px\]/);
   });
 
@@ -100,8 +101,10 @@ describe('mobile home adaptive zone contract', () => {
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
     assert.match(
       promptBarSource,
-      /const \[isExpanded, setIsExpanded\] = useState\(\(\) => !isMobile \|\| mobileShellMode === 'embedded'\);/,
+      /const \[isExpanded, setIsExpanded\] = useState\(\(\) => !isMobile\);/,
     );
+    assert.match(promptBarSource, /kk-prompt-bar-mobile-collapse-capsule/);
+    assert.match(promptBarSource, /kk-prompt-bar-mobile-expanded/);
     assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);
     assert.match(promptBarSource, /data-mobile-composer-section="primary-input"/);
     assert.match(promptBarSource, /import MobileEmbeddedAdvancedDrawer from '\.\/prompt-bar\/MobileEmbeddedAdvancedDrawer';/);

@@ -3,7 +3,6 @@ import React, { type ReactNode } from 'react';
 interface MobileAppShellProps {
   header: ReactNode;
   feed: ReactNode;
-  taskCenter?: ReactNode;
   composer: ReactNode;
   overlays?: ReactNode;
 }
@@ -11,12 +10,11 @@ interface MobileAppShellProps {
 const MobileAppShell: React.FC<MobileAppShellProps> = ({
   header,
   feed,
-  taskCenter,
   composer,
   overlays,
 }) => {
   const shellStyle = {
-    gridTemplateRows: taskCenter ? 'minmax(0, 1fr) auto auto' : 'minmax(0, 1fr) auto',
+    gridTemplateRows: 'minmax(0, 1fr) auto',
     '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 76px)',
     '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
     '--mobile-tabbar-total-height': '0px',
@@ -49,12 +47,6 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
           {feed}
         </div>
       </main>
-
-      {taskCenter ? (
-        <div data-slot="task-center" className="z-20 min-h-0">
-          {taskCenter}
-        </div>
-      ) : null}
 
       <div
         data-slot="composer"
