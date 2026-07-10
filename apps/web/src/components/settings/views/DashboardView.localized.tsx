@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowRight,
+  CircleGauge,
+  Cloud,
   Coins,
   Cpu,
   Globe,
@@ -9,6 +11,7 @@ import {
   KeyRound,
   Layers,
   LayoutDashboard,
+  Laptop,
   Monitor,
   ScrollText,
   Sparkles,
@@ -17,6 +20,7 @@ import {
 } from 'lucide-react';
 
 import { useBilling } from '../../../context/BillingContext';
+import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';
 import keyManager from '../../../services/auth/keyManager';
 import { getTodayCosts } from '../../../services/billing/costService';
@@ -45,6 +49,15 @@ import {
   getSettingsViewMeta,
 } from '../settingsRegistry';
 import { SETTINGS_DASHBOARD_ACTIONS } from '../settingsModuleActions';
+import {
+  applyPerformancePreset,
+  getActivePerformancePreset,
+  readCanvasPerformanceMode,
+  readQuickGenerationRoute,
+  setQuickGenerationRoute,
+  SETTINGS_QUICK_PREFERENCES_EVENT,
+  type QuickGenerationRoute,
+} from '../settingsQuickPreferences';
 import { ProgressBar, StatusBadge } from '../ui/index';
 
 interface DashboardViewProps {
@@ -271,6 +284,7 @@ const ModuleMeter: React.FC<{
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
+  const { preferences, setPreferences } = useAppearanceMotion();
   const registryLanguage = locale.startsWith('zh') ? 'zh-CN' : 'en-US';
   const dashboardMeta = useMemo(
     () => getSettingsViewMeta('dashboard', registryLanguage),
@@ -310,6 +324,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [storedImages, setStoredImages] = useState(0);
   const [storageSnapshotPending, setStorageSnapshotPending] = useState(true);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
+  const [routePreference, setRoutePreference] = useState<QuickGenerationRoute>(readQuickGenerationRoute);
+  const [canvasMode, setCanvasMode] = useState(readCanvasPerformanceMode);
   const storageSnapshotTimerRef = useRef<number | null>(null);
   const storageSnapshotIdleRef = useRef<number | null>(null);
 
@@ -448,6 +464,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   useEffect(() => () => {
     cancelScheduledStorageSnapshotRefresh();
   }, [cancelScheduledStorageSnapshotRefresh]);
+
+  useEffect(() => {
+    const refreshPreferences = () => {
+      setRoutePreference(readQuickGenerationRoute());
+      setCanvasMode(readCanvasPerformanceMode());
+    };
+    window.addEventListener(SETTINGS_QUICK_PREFERENCES_EVENT, refreshPreferences);
+    window.addEventListener('storage', refreshPreferences);
+    return () => {
+      window.removeEventListener(SETTINGS_QUICK_PREFERENCES_EVENT, refreshPreferences);
+      window.removeEventListener('storage', refreshPreferences);
+    };
+  }, []);
 
   const todayUsageLogs = useMemo(
     () => usageLogs.filter((log) => isSameLocalDay(log.created_at)),
@@ -589,6 +618,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const latestUsageLabel = latestUsage
     ? latestUsage.model_name || latestUsage.model_id || latestUsage.description || pick('未知模型', 'Unknown model')
     : pick('暂无请求', 'No requests yet');
+  const activePerformancePreset = getActivePerformancePreset(preferences, canvasMode);
+  const performanceOptions: Array<{ id: WebPerformanceMode; label: string; description: string }> = [
+    { id: 'fast', label: pick('快速', 'Fast'), description: pick('优先操作响应', 'Prioritize responsiveness') },
+    { id: 'balanced', label: pick('正常', 'Normal'), description: pick('性能与质感均衡', 'Balanced performance') },
+    { id: 'visual', label: pick('性能', 'Performance'), description: pick('完整特效与画质', 'Full effects and quality') },
+  ];
+  const selectRoutePreference = (route: QuickGenerationRoute) => {
+    setQuickGenerationRoute(route);
+    setRoutePreference(route);
+  };
+  const selectPerformancePreset = (mode: WebPerformanceMode) => {
+    applyPerformancePreset(mode, setPreferences);
+    setCanvasMode(readCanvasPerformanceMode());
+  };
 
   return (
     <SettingsViewShell>

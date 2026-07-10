@@ -48,6 +48,7 @@ export type LegacySettingsViewId =
 
 export type SettingsViewId = CanonicalSettingsViewId | LegacySettingsViewId;
 export type SettingsNavSectionId = 'workspace' | 'system';
+export type SettingsModuleId = 'overview' | 'ai' | 'system';
 
 export interface SettingsNavSection {
   id: SettingsNavSectionId;
@@ -62,6 +63,15 @@ export interface SettingsNavItem {
   section: SettingsNavSectionId;
   path: string;
   keywords?: string[];
+}
+
+export interface SettingsModule {
+  id: SettingsModuleId;
+  label: string;
+  description: string;
+  icon: ComponentType<{ size?: number; className?: string }>;
+  target: CanonicalSettingsViewId;
+  views: CanonicalSettingsViewId[];
 }
 
 export interface SettingsViewMetaEntry {
@@ -320,11 +330,11 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Account status',
   },
   'appearance-motion': {
-    eyebrow: 'Appearance',
-    titleZh: '外观与动态',
-    titleEn: 'Appearance & Motion',
-    descriptionZh: '调整系统主题颜色、磨砂玻璃透明度及特效动效切换，保障在低性能设备上的运行。',
-    descriptionEn: 'Customize UI theme, glassmorphism transparency, and layout animations.',
+    eyebrow: 'Advanced Performance',
+    titleZh: '高级性能设置',
+    titleEn: 'Advanced Performance',
+    descriptionZh: '统一管理体验档位、外观动态和画布性能；修改细节后快捷档位会标记为手动。',
+    descriptionEn: 'Manage experience presets, appearance, motion, and canvas performance in one place.',
     primaryActionLabelZh: '返回设置总览',
     primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
@@ -358,10 +368,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'capability-sources',
-    labelZh: '能力来源',
-    labelEn: 'Capability Sources',
-    descriptionZh: 'API 密钥、OAuth 认证。',
-    descriptionEn: 'API keys, OAuth tokens.',
+    labelZh: 'API 配置',
+    labelEn: 'API Configuration',
+    descriptionZh: '官方直连与中转站 API。',
+    descriptionEn: 'Official and relay API connections.',
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['capability-sources'],
@@ -369,10 +379,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'provider-routes',
-    labelZh: 'Provider 路由',
-    labelEn: 'Provider Routes',
-    descriptionZh: '图片/视频等任务分发策略。',
-    descriptionEn: 'Dispatch policies for media.',
+    labelZh: '能力路由',
+    labelEn: 'Capability Routing',
+    descriptionZh: '图片、视频等任务的默认执行能力。',
+    descriptionEn: 'Default capabilities for image, video, and other tasks.',
     icon: Split,
     section: 'workspace',
     path: SETTINGS_PATHS['provider-routes'],
@@ -424,8 +434,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'dev-diagnostics',
-    labelZh: '开发者诊断',
-    labelEn: 'Developer Diagnostics',
+    labelZh: '系统运行诊断',
+    labelEn: 'Runtime Diagnostics',
     descriptionZh: '决策日志、执行链、API 检查。',
     descriptionEn: 'Decision logs, action trace.',
     icon: Cpu,
@@ -435,10 +445,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'appearance-motion',
-    labelZh: '外观与动态',
-    labelEn: 'Appearance & Motion',
-    descriptionZh: '主题切换、玻璃特效与动效调节。',
-    descriptionEn: 'Theme preferences, glass effects, animations.',
+    labelZh: '高级性能',
+    labelEn: 'Advanced Performance',
+    descriptionZh: '快捷档位、外观动态与画布细节。',
+    descriptionEn: 'Presets, appearance, motion, and canvas details.',
     icon: Palette,
     section: 'workspace',
     path: SETTINGS_PATHS['appearance-motion'],
@@ -522,6 +532,60 @@ export function getSettingsNavItems(language: AppLanguage): SettingsNavItem[] {
       path: item.path,
       keywords: item.keywords,
     }));
+}
+
+export function getSettingsModules(language: AppLanguage): SettingsModule[] {
+  return [
+    {
+      id: 'overview',
+      label: pickByLanguage(language, '总览', 'Overview'),
+      description: pickByLanguage(language, '路由偏好、体验模式与运行状态。', 'Routing, experience, and system state.'),
+      icon: LayoutDashboard,
+      target: 'dashboard',
+      views: ['dashboard', 'generation-mode'],
+    },
+    {
+      id: 'ai',
+      label: pickByLanguage(language, 'AI 设置', 'AI Settings'),
+      description: pickByLanguage(language, '接管、API、浏览器助手与能力路由。', 'Takeover, API, browser assistant, and routing.'),
+      icon: Bot,
+      target: 'ai-takeover',
+      views: ['ai-takeover', 'capability-sources', 'browser-assistant', 'provider-routes'],
+    },
+    {
+      id: 'system',
+      label: pickByLanguage(language, '系统设置', 'System Settings'),
+      description: pickByLanguage(language, '同步、高级性能与运行诊断。', 'Sync, advanced performance, and diagnostics.'),
+      icon: Cpu,
+      target: 'data-sync',
+      views: ['data-sync', 'appearance-motion', 'canvas-performance', 'dev-diagnostics'],
+    },
+  ];
+}
+
+export function getSettingsModuleId(view: CanonicalSettingsViewId): SettingsModuleId | null {
+  if (view === 'user-profile') return null;
+  if (view === 'dashboard' || view === 'generation-mode') return 'overview';
+  if (view === 'ai-takeover' || view === 'capability-sources' || view === 'browser-assistant' || view === 'provider-routes') {
+    return 'ai';
+  }
+  return 'system';
+}
+
+export function getSettingsModuleItems(
+  language: AppLanguage,
+  moduleId: SettingsModuleId,
+): SettingsNavItem[] {
+  const module = getSettingsModules(language).find((item) => item.id === moduleId);
+  if (!module) return [];
+
+  const visibleViews = moduleId === 'overview'
+    ? ['dashboard']
+    : moduleId === 'system'
+      ? ['data-sync', 'appearance-motion', 'dev-diagnostics']
+      : module.views;
+
+  return getSettingsNavItems(language).filter((item) => visibleViews.includes(item.id));
 }
 
 export function getSettingsViewMeta(

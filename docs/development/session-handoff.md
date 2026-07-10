@@ -1829,3 +1829,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。手机端不再提供独立任务列表入口，长任务仍可通过 AI 接管面板或桌面任务中心管理；若后续需要手机任务管理，应放入功能菜单二级页，不能重新占用主页常驻空间。
   - 生产依赖审计仍保留 1 个既有中危 `morgan` 告警，需作为独立依赖升级处理。
+
+## 124. 2026-07-11 - 收紧桌面任务中心为顶部状态轨
+- **修改范围**：
+  1. 桌面任务中心折叠态改为顶部细状态轨，取消任务创建时自动展开，减少对无限画布操作区的持续遮挡。
+  2. 展开态继续保留完整任务列表，并补齐展开/收起的无障碍名称、标准动效和减少动态适配。
+- **修改文件**：
+  - `apps/web/src/components/workspace/TaskCenterTray.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `tests/unit/mobile-task-center-layout-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 手机端继续不挂载任务中心；桌面折叠态只提供不侵占画布内容的状态轨，用户主动展开后才显示任务详情。
+  - 任务中心动效使用现有 UI Token，并遵循系统减少动态设置。
+- **已运行验证**：
+  - `tests/unit/mobile-task-center-layout-contract.test.ts` 2/2 通过。
+- **未运行验证及原因**：
+  - 本条为接手时已有改动的同步固化，未重复运行完整项目验证；完整验证由后续无限画布重构统一执行。
+- **风险与下一步**：
+  - 低风险。后续画布响应式重构需继续验证顶部状态轨与欢迎层、导航和输入区的避让关系。

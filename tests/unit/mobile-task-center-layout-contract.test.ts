@@ -19,12 +19,21 @@ test('mobile workspace omits task-center chrome while desktop keeps the fixed tr
 
 test('task center remains desktop-only and does not retain mobile summary or sheet markup', () => {
   const tray = readSource('apps/web/src/components/workspace/TaskCenterTray.tsx');
+  const tokens = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   assert.match(tray, /data-testid="desktop-task-center"/);
+  assert.match(tray, /className="kk-task-center-host/);
+  assert.match(tray, /data-state=\{isOpen \? ['"]open['"] : ['"]collapsed['"]\}/);
+  assert.match(tray, /aria-label="展开任务状态列表"/);
+  assert.match(tray, /className="kk-task-center-rail"/);
+  assert.doesNotMatch(tray, /setCustomTasks[\s\S]{0,620}setIsOpen\(true\)/);
   assert.doesNotMatch(tray, /mobile-task-center/);
   assert.doesNotMatch(tray, /variant\?:\s*'desktop'\s*\|\s*'mobile'/);
   assert.doesNotMatch(tray, /createPortal\(/);
   assert.match(tray, /zIndex:\s*KK_LAYER\.floatingPanel/);
   assert.match(tray, /isSetupRequiredError/);
   assert.doesNotMatch(tray, /z-\[1000\]/);
+  assert.match(tokens, /\.kk-task-center-morph\[data-state='open'\]/);
+  assert.match(tokens, /\.kk-task-center-rail[\s\S]{0,320}background: var\(--accent-green\)/);
+  assert.match(tokens, /\.kk-task-center-panel[\s\S]{0,180}kk-task-center-panel-enter/);
 });

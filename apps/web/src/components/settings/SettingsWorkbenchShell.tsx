@@ -6,9 +6,12 @@ import type { Supplier } from '../../services/billing/supplierService';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
 import { pickByLanguage, useLocale } from '../../context/LocaleContext';
+import { useBilling } from '../../context/BillingContext';
+import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import SettingsDesktopSidebar from './desktop/SettingsDesktopSidebar';
 import SettingsDesktopWorkbenchHeader from './desktop/SettingsDesktopWorkbenchHeader';
 import SettingsMobileDashboard from './SettingsMobileDashboard';
+import SettingsModuleNavigator from './SettingsModuleNavigator';
 import {
   deriveApiManagementListStateFromPath,
   isApiManagementEditorRoute,
@@ -17,13 +20,11 @@ import {
   buildSettingsPath,
   getCurrentSettingsViewId,
   getSettingsNavItems,
-  getSettingsNavSections,
-  getSettingsSearchPlaceholder,
+  getSettingsModuleId,
+  getSettingsModules,
   getSettingsShellCopy,
   resolveCanonicalSettingsViewId,
-  matchSettingsNavItem,
   type CanonicalSettingsViewId,
-  type SettingsNavItem,
   type SettingsViewId,
 } from './settingsRegistry';
 import { renderSettingsRouteElements } from './settingsRouteConfig';
@@ -118,7 +119,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
     return (
       <div
         role="group"
-        className="flex flex-col gap-1 rounded-[18px] border p-1 w-[38px] h-[70px] shrink-0 items-center justify-between"
+        className="flex h-16 w-[38px] shrink-0 flex-col items-center justify-between gap-1 rounded-[16px] border p-1"
         style={{
           borderColor: 'var(--settings-nav-glass-border, rgba(255, 255, 255, 0.08))', // UI_TOKEN_EXCEPTION
           background: 'var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65))', // UI_TOKEN_EXCEPTION
@@ -197,20 +198,14 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
 };
 
 const SettingsDesktopShell: React.FC<{
-  items: SettingsNavItem[];
   activeView: CanonicalSettingsViewId;
-  navQuery: string;
-  onQueryChange: (value: string) => void;
   onNavigate: (view: CanonicalSettingsViewId) => void;
   onRefreshCurrentView: () => void;
   onClose: () => void;
   initialSupplier: Supplier | null;
   contentRefreshKey: number;
 }> = ({
-  items,
   activeView,
-  navQuery,
-  onQueryChange,
   onNavigate,
   onRefreshCurrentView,
   onClose,
@@ -218,18 +213,19 @@ const SettingsDesktopShell: React.FC<{
   contentRefreshKey,
 }) => {
   const location = useLocation();
-  const { language, pick } = useLocale();
+  const { language, locale, pick } = useLocale();
+  const { balance, loading: billingLoading } = useBilling();
   const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
   const shellCopy = getSettingsShellCopy(language);
-  const sections = getSettingsNavSections(language);
-
-  const filteredItems = items.filter((item) => matchSettingsNavItem(item, navQuery));
+  const modules = getSettingsModules(language);
+  const activeModuleId = getSettingsModuleId(activeView);
 
   const accountName = user?.email || user?.phone || pick('当前账户', 'Current account');
   const accountMeta = !authLoading && !checkingAdmin && isAdmin
     ? pick('管理员', 'Administrator')
     : pick('标准账户', 'Standard account');
   const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
+  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const desktopScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -242,16 +238,11 @@ const SettingsDesktopShell: React.FC<{
     <div className="settings-shell settings-shell--desktop" onClick={(event) => event.stopPropagation()}>
       <section className="settings-shell-desktop">
         <SettingsDesktopSidebar
-          items={filteredItems}
-          sections={sections}
-          activeView={activeView}
-          navQuery={navQuery}
-          searchPlaceholder={getSettingsSearchPlaceholder(activeView, language)}
-          onQueryChange={onQueryChange}
+          modules={modules}
+          activeModuleId={activeModuleId}
           onNavigate={onNavigate}
           title={shellCopy.workbenchTitle}
           description={shellCopy.workbenchDescription}
-          emptyLabel={shellCopy.emptySearchLabel}
           accountBlock={(
             <div className="flex items-center gap-2 w-full">
               <button
@@ -260,7 +251,7 @@ const SettingsDesktopShell: React.FC<{
                 data-state={activeView === 'user-profile' ? 'active' : 'idle'}
                 data-accent="profile"
                 aria-current={activeView === 'user-profile' ? 'page' : undefined}
-                className="settings-account-card flex flex-1 h-[70px] items-center gap-3 rounded-[18px] border px-3.5 py-2 text-left cursor-pointer"
+                className="settings-account-card flex h-16 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[16px] border px-3 py-2 text-left"
                 onClick={() => onNavigate('user-profile')}
                 style={{
                   boxSizing: 'border-box',
@@ -271,7 +262,11 @@ const SettingsDesktopShell: React.FC<{
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-[var(--settings-nav-text-primary)]">{accountName}</span>
-                  <span className="mt-1 block truncate text-xs text-[var(--settings-nav-text-secondary)]">{accountMeta}</span>
+                  <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] text-[var(--settings-nav-text-secondary)]">
+                    <span className="truncate">{accountMeta}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="settings-account-card__balance shrink-0">{remainingBalanceDisplay}</span>
+                  </span>
                 </span>
               </button>
               <div className="shrink-0 flex items-center justify-center">
@@ -290,6 +285,7 @@ const SettingsDesktopShell: React.FC<{
           />
 
           <main ref={desktopScrollContainerRef} className="settings-shell-page settings-shell-page--desktop">
+            <SettingsModuleNavigator activeView={activeView} onNavigate={onNavigate} />
             <Suspense fallback={<ViewFallback />}>
               <Routes>
                 {renderSettingsRouteElements({
@@ -441,14 +437,17 @@ const SettingsMobileShell: React.FC<{
         {location.pathname === '/settings' || location.pathname === '/settings/' ? (
           <SettingsMobileDashboard onNavigate={onNavigate} />
         ) : (
-          <Suspense fallback={<ViewFallback />}>
-            <Routes>
-              {renderSettingsRouteElements({
-                initialSupplier,
-                onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
-              })}
-            </Routes>
-          </Suspense>
+          <>
+            <SettingsModuleNavigator activeView={activeView} onNavigate={onNavigate} />
+            <Suspense fallback={<ViewFallback />}>
+              <Routes>
+                {renderSettingsRouteElements({
+                  initialSupplier,
+                  onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
+                })}
+              </Routes>
+            </Suspense>
+          </>
         )}
       </div>
     </div>
@@ -525,22 +524,16 @@ export const SettingsRouterShell: React.FC<{
   initialView: SettingsViewId;
   isMobile: boolean;
 }> = ({ initialSupplier, onClose, initialView, isMobile }) => {
-  const { language } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const activeView = getCurrentSettingsViewId(location.pathname);
-  const [navQuery, setNavQuery] = useState('');
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
   const nestedApiEditorRoute = isApiManagementEditorRoute(location.pathname);
   const nestedApiListState = useMemo(
     () => deriveApiManagementListStateFromPath(location.pathname),
     [location.pathname],
   );
-  const navItems = useMemo(() => getSettingsNavItems(language), [language]);
-
-  useEffect(() => {
-    setNavQuery('');
-  }, [initialView]);
+  void initialView;
 
   const handleNavigate = (view: CanonicalSettingsViewId) => {
     navigate(buildSettingsPath(view));
@@ -563,10 +556,7 @@ export const SettingsRouterShell: React.FC<{
     />
   ) : (
     <SettingsDesktopShell
-      items={navItems}
       activeView={activeView}
-      navQuery={navQuery}
-      onQueryChange={setNavQuery}
       onNavigate={handleNavigate}
       onRefreshCurrentView={() => setContentRefreshKey((current) => current + 1)}
       onClose={onClose}

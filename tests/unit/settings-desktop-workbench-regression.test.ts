@@ -18,8 +18,10 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(shellSource, /import SettingsDesktopWorkbenchHeader from '\.\/desktop\/SettingsDesktopWorkbenchHeader';/);
   assert.match(shellSource, /<SettingsDesktopSidebar/);
   assert.match(shellSource, /<SettingsDesktopWorkbenchHeader/);
-  assert.match(shellSource, /const sections = getSettingsNavSections\(language\);/);
-  assert.match(shellSource, /sections=\{sections\}/);
+  assert.match(shellSource, /const modules = getSettingsModules\(language\);/);
+  assert.match(shellSource, /const activeModuleId = getSettingsModuleId\(activeView\);/);
+  assert.match(shellSource, /modules=\{modules\}/);
+  assert.match(shellSource, /activeModuleId=\{activeModuleId\}/);
   assert.match(shellSource, /<SettingsLanguageToggle compact \/>/);
   assert.doesNotMatch(shellSource, /const headerMeta = getSettingsViewMeta\(activeView, language\);/);
   assert.doesNotMatch(shellSource, /languageControl=<\{?<SettingsLanguageToggle \/>/);
@@ -37,7 +39,7 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(shellSource, /<button[\s\S]*data-testid="settings-account-block"/);
   assert.match(shellSource, /aria-pressed=\{language === 'zh-CN'\}/);
   assert.match(shellSource, /aria-pressed=\{language === 'en-US'\}/);
-  assert.match(sidebarSource, /aria-label=\{searchPlaceholder\}/);
+  assert.match(sidebarSource, /aria-label=\{pick\('切换设置模块', 'Switch settings module'\)\}/);
   assert.doesNotMatch(shellSource, /navigate\(buildSettingsPath\('api-management'\)\);/);
   assert.match(shellSource, /renderSettingsRouteElements\(/);
   assert.match(shellSource, /refreshKey:\s*contentRefreshKey/);
@@ -48,9 +50,9 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(routeConfigSource, /export function renderSettingsRouteElements/);
   assert.doesNotMatch(shellSource, /settings-toolbar-search/);
   assert.doesNotMatch(shellSource, /System Active/);
-  assert.match(sidebarSource, /filteredNavItems\.filter\(\(item\) => item\.section === section\.id\)/);
-  assert.match(sidebarSource, /item\.description/);
-  assert.match(sidebarSource, /section\.label/);
+  assert.match(sidebarSource, /modules\.filter\(\(module\) => module\.id !== activeModuleId\)/);
+  assert.match(sidebarSource, /module\.description/);
+  assert.match(sidebarSource, /renderModuleStatus\(module\.id\)/);
   assert.doesNotMatch(headerSource, /SettingsBadge/);
   assert.doesNotMatch(headerSource, /Current surface/);
   assert.doesNotMatch(headerSource, /Primary next step/);
@@ -80,15 +82,21 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
 
-test('desktop settings sidebar keeps navigation search visible and renders filtered entries', () => {
+test('desktop settings sidebar exposes the other top-level modules without duplicating the active module', () => {
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
-  assert.match(shellSource, /items=\{filteredItems\}/);
-  assert.doesNotMatch(shellSource, /items=\{items\}/);
-  assert.doesNotMatch(sidebarSource, /style=\{\{\s*display: 'none'\s*\}\}/);
-  assert.match(sidebarSource, /const filteredNavItems = useMemo\(\(\) => \{\s*return items;\s*\}, \[items\]\);/);
-  assert.match(sidebarSource, /const sectionItems = filteredNavItems\.filter\(\(item\) => item\.section === section\.id\);/);
+  assert.match(shellSource, /<SettingsDesktopSidebar[\s\S]*modules=\{modules\}/);
+  assert.doesNotMatch(sidebarSource, /type="search"/);
+  assert.match(sidebarSource, /const visibleModules = useMemo\(/);
+  assert.match(sidebarSource, /module\.id !== activeModuleId/);
+  assert.match(sidebarSource, /data-settings-module=\{module\.id\}/);
+  assert.match(sidebarSource, /onClick=\{\(\) => onNavigate\(module\.target\)\}/);
+  assert.match(registrySource, /export function getSettingsModules/);
+  assert.match(registrySource, /id: 'overview'/);
+  assert.match(registrySource, /id: 'ai'/);
+  assert.match(registrySource, /id: 'system'/);
 });
 
 test('settings workbench flattens cramped nested containers and clips rounded surfaces cleanly', () => {

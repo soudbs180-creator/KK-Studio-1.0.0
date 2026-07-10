@@ -6,7 +6,6 @@ import {
   Trash2,
   X,
   ChevronUp,
-  ChevronDown,
   CheckCircle2,
   AlertTriangle,
   Loader2,
@@ -122,7 +121,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         return [newTask, ...prev];
       });
 
-      setIsOpen(true);
     };
 
     const handleUpdateTask = (e: Event) => {
@@ -416,61 +414,39 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   return (
     <div
       data-testid="desktop-task-center"
-      className="fixed top-4 flex flex-col items-center pointer-events-none"
+      className="kk-task-center-host fixed top-0 flex flex-col items-center pointer-events-none"
       style={{
         left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
-        transform: 'translateX(-50%)',
-        transition: 'left 0.3s ease-out',
         zIndex: KK_LAYER.floatingPanel
       }}
     >
-      {/* 1. 悬浮底栏胶囊（折叠状态） */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-full border shadow-2xl backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95"
-          style={{
-            background: 'var(--frost-card-framework-bg, rgba(18, 18, 20, 0.85))', // UI_TOKEN_EXCEPTION
-            border: '1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.1))', // UI_TOKEN_EXCEPTION
-            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)', // UI_TOKEN_EXCEPTION
-          }}
-        >
-          <div className="relative">
-            <div className={`w-2 h-2 rounded-full ${activeRunningCount > 0 ? 'bg-sky-400 animate-ping' : 'bg-emerald-400'}`} />
-            {activeRunningCount > 0 && (
-              <div className="absolute top-0 left-0 w-2 h-2 rounded-full bg-sky-400" />
-            )}
-          </div>
-          
-          <span className="text-xs font-semibold text-white/90">
-            {activeRunningCount > 0 ? `${activeRunningCount} 个任务运行中` : '任务状态列表'}
-          </span>
+      <div
+        className="kk-task-center-morph pointer-events-auto"
+        data-state={isOpen ? 'open' : 'collapsed'}
+      >
+        {!isOpen && (
+          <button
+            type="button"
+            aria-label="展开任务状态列表"
+            aria-expanded="false"
+            aria-controls="desktop-task-center-panel"
+            onClick={() => setIsOpen(true)}
+            className="kk-task-center-trigger"
+            title="展开任务状态列表"
+          >
+            <span
+              className="kk-task-center-rail"
+              data-active={activeRunningCount > 0 ? 'true' : 'false'}
+              aria-hidden="true"
+            />
+          </button>
+        )}
 
-          <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
-            {allCombinedTasks.slice(0, 3).map((task) => (
-              <div key={task.id} className="opacity-70">
-                {getTaskIcon(task.type)}
-              </div>
-            ))}
-            {allCombinedTasks.length > 3 && (
-              <span className="text-[10px] text-gray-400">+{allCombinedTasks.length - 3}</span>
-            )}
-          </div>
-
-          <ChevronDown size={14} className="text-gray-400" />
-        </button>
-      )}
-
-      {/* 2. 展开抽屉面板 */}
-      {isOpen && (
-        <div
-          className="pointer-events-auto w-[min(520px,calc(100vw-24px))] max-h-[380px] rounded-lg border shadow-3xl backdrop-blur-2xl flex flex-col overflow-hidden transition-all duration-300"
-          style={{
-            background: 'var(--frost-card-framework-bg, rgba(18, 18, 20, 0.95))', // UI_TOKEN_EXCEPTION
-            border: '1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.15))', // UI_TOKEN_EXCEPTION
-            boxShadow: '0 24px 64px 0 rgba(0, 0, 0, 0.6)', // UI_TOKEN_EXCEPTION
-          }}
-        >
+        {isOpen && (
+          <div
+            id="desktop-task-center-panel"
+            className="kk-task-center-panel flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
           {/* 面板头部 */}
           <div className="flex justify-between items-center px-5 py-4 border-b border-white/10 bg-white/2">
             <div className="flex items-center gap-2">
@@ -494,6 +470,8 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                aria-label="收起任务状态列表"
+                title="收起任务状态列表"
               >
                 <ChevronUp size={16} />
               </button>
@@ -707,8 +685,9 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
               })
             )}
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

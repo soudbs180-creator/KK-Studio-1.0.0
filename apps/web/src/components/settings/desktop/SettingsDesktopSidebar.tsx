@@ -1,290 +1,155 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 
-import type {
-  CanonicalSettingsViewId,
-  SettingsNavItem,
-  SettingsNavSection,
-} from '../settingsRegistry';
-
-import { useBilling } from '../../../context/BillingContext';
 import { useLocale } from '../../../context/LocaleContext';
 import keyManager from '../../../services/auth/keyManager';
-import { getStorageUsage, getAllImageIds } from '../../../services/storage/imageStorage';
-import { getTodayLogs, subscribeToLogs, LogLevel } from '../../../services/system/systemLogService';
-import { formatRemainingCredits } from '../../../services/billing/remainingBalance';
+import { getAllImageIds, getStorageUsage } from '../../../services/storage/imageStorage';
+import { getTodayLogs, LogLevel, subscribeToLogs } from '../../../services/system/systemLogService';
+import type {
+  CanonicalSettingsViewId,
+  SettingsModule,
+  SettingsModuleId,
+} from '../settingsRegistry';
 import { SETTINGS_SHELL_ACTIONS } from '../settingsModuleActions';
 
-type SettingsDesktopSidebarViewId = CanonicalSettingsViewId;
-
 interface SettingsDesktopSidebarProps {
-  items: SettingsNavItem[];
-  sections: SettingsNavSection[];
-  activeView: SettingsDesktopSidebarViewId;
-  navQuery: string;
-  searchPlaceholder: string;
-  onQueryChange: (value: string) => void;
-  onNavigate: (view: SettingsDesktopSidebarViewId) => void;
+  modules: SettingsModule[];
+  activeModuleId: SettingsModuleId | null;
+  onNavigate: (view: CanonicalSettingsViewId) => void;
   title: string;
   description: string;
-  emptyLabel: string;
   accountBlock?: React.ReactNode;
 }
 
 const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
-  items: rawItems,
-  sections,
-  activeView,
-  navQuery,
-  searchPlaceholder,
-  onQueryChange,
+  modules,
+  activeModuleId,
   onNavigate,
   title,
   description,
-  emptyLabel,
   accountBlock,
 }) => {
   const { pick } = useLocale();
-
-  const items = useMemo(() => {
-    return rawItems;
-  }, [rawItems]);
-
-  // 1. API 状态统计
   const [channelStats, setChannelStats] = useState(() => {
     const slots = keyManager.getSlots();
     const providers = keyManager.getProviders();
-    const officialCount = slots.filter(s => !s.disabled && s.status === 'valid').length;
-    const activeProviders = providers.filter(p => p.isActive && p.status === 'active').length;
-    return { officialCount, activeProviders };
+    return {
+      officialCount: slots.filter((slot) => !slot.disabled && slot.status === 'valid').length,
+      activeProviders: providers.filter((provider) => provider.isActive && provider.status === 'active').length,
+    };
   });
-
-  // 2. 计费余额统计
-  const { balance } = useBilling();
-  const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
-
-  // 3. 日志统计
   const [logs, setLogs] = useState(() => getTodayLogs());
-  const importantLogCount = useMemo(() => 
-    logs.filter(log => log.level === LogLevel.CRITICAL || log.level === LogLevel.ERROR || log.level === LogLevel.WARNING).length
-  , [logs]);
-
-  // 4. 存储统计
   const [storageUsageMb, setStorageUsageMb] = useState(0);
   const [storedImages, setStoredImages] = useState(0);
 
-  // 订阅 keyManager 变更
   useEffect(() => {
     const updateStats = () => {
       const slots = keyManager.getSlots();
       const providers = keyManager.getProviders();
-      const officialCount = slots.filter(s => !s.disabled && s.status === 'valid').length;
-      const activeProviders = providers.filter(p => p.isActive && p.status === 'active').length;
-      setChannelStats({ officialCount, activeProviders });
+      setChannelStats({
+        officialCount: slots.filter((slot) => !slot.disabled && slot.status === 'valid').length,
+        activeProviders: providers.filter((provider) => provider.isActive && provider.status === 'active').length,
+      });
     };
     updateStats();
     return keyManager.subscribe(updateStats);
   }, []);
 
-  // 订阅日志变更
   useEffect(() => {
     setLogs(getTodayLogs());
     return subscribeToLogs((next) => setLogs(next));
   }, []);
 
-  // 获取存储大小
   useEffect(() => {
     const refreshStorage = async () => {
-      try {
-        const [bytes, imageIds] = await Promise.all([
-          getStorageUsage().catch(() => 0),
-          getAllImageIds().catch(() => []),
-        ]);
-        setStorageUsageMb(bytes / (1024 * 1024));
-        setStoredImages(imageIds.length);
-      } catch {}
+      const [bytes, imageIds] = await Promise.all([
+        getStorageUsage().catch(() => 0),
+        getAllImageIds().catch(() => []),
+      ]);
+      setStorageUsageMb(bytes / (1024 * 1024));
+      setStoredImages(imageIds.length);
     };
     void refreshStorage();
-    const timer = setInterval(refreshStorage, 5000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => void refreshStorage(), 5_000);
+    return () => window.clearInterval(timer);
   }, []);
 
-  const filteredNavItems = useMemo(() => {
-    return items;
-  }, [items]);
+  const importantLogCount = useMemo(
+    () => logs.filter((log) => (
+      log.level === LogLevel.CRITICAL
+      || log.level === LogLevel.ERROR
+      || log.level === LogLevel.WARNING
+    )).length,
+    [logs],
+  );
+  const visibleModules = useMemo(
+    () => modules.filter((module) => module.id !== activeModuleId),
+    [activeModuleId, modules],
+  );
 
-  // Map route ids to sidebar accent tokens; CSS owns the visual treatment.
-  const getSidebarItemAccent = (itemId: string) => {
-    switch (itemId) {
-      case 'dashboard':
-        return 'overview';
-      case 'consumption-records':
-        return 'billing';
-      case 'api-management':
-        return 'api';
-      case 'ai-management':
-        return 'ai-management';
-      case 'storage-settings':
-        return 'storage';
-      case 'system-logs':
-        return 'logs';
-      case 'browser-assistant':
-        return 'browser-assistant';
-      case 'appearance-motion':
-        return 'appearance';
-      default:
-        return 'default';
+  const renderModuleStatus = (moduleId: SettingsModuleId) => {
+    if (moduleId === 'overview') {
+      return pick('本地优先 · 快捷策略', 'Local first · quick controls');
     }
-  };
-
-  // Render lightweight live status for each navigation card.
-  const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId) => {
-    if (itemId === 'dashboard') {
-      return (
-        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
-          {pick('工作区健康和总览面板就绪', 'Workspace health & overview panel ready')}
-        </div>
-      );
+    if (moduleId === 'ai') {
+      const routes = channelStats.officialCount + channelStats.activeProviders;
+      return pick(`${routes} 条能力链路已配置`, `${routes} capability routes configured`);
     }
-    if (itemId === 'capability-sources') {
-      return (
-        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
-          {channelStats.officialCount} 个官方直连 / {channelStats.activeProviders} 个中转就绪
-        </div>
-      );
+    if (importantLogCount > 0) {
+      return pick(`${importantLogCount} 项运行告警`, `${importantLogCount} runtime warnings`);
     }
-    if (itemId === 'user-profile') {
-      return (
-        <div className="mt-1 text-[11px] leading-4 flex items-center justify-between">
-          <span className="text-[var(--text-secondary)] truncate mr-1">{pick('今日消耗', 'Today Cost')}</span>
-          <span className="settings-sidebar-card__balance text-xs shrink-0">{remainingBalanceDisplay}</span>
-        </div>
-      );
-    }
-    if (itemId === 'dev-diagnostics') {
-      const isHealthy = importantLogCount === 0;
-      return (
-        <div className="mt-1 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
-          <span className="settings-sidebar-card__status-dot h-2 w-2 rounded-full shrink-0" data-state={isHealthy ? 'healthy' : 'warning'} />
-          <span className="settings-sidebar-card__status-text truncate" data-state={isHealthy ? 'healthy' : 'warning'}>
-            {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
-          </span>
-        </div>
-      );
-    }
-    if (itemId === 'data-sync') {
-      return (
-        <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
-          {storedImages} 张图 · {storageUsageMb.toFixed(1)} MB / 1 GB
-        </div>
-      );
-    }
-    return null;
+    return pick(
+      `${storedImages} 张资源 · ${storageUsageMb.toFixed(1)} MB`,
+      `${storedImages} assets · ${storageUsageMb.toFixed(1)} MB`,
+    );
   };
 
   return (
     <aside
-      className="settings-shell-nav flex h-full min-h-0 shrink-0 flex-col border-r pl-2 pr-2 py-5"
+      className="settings-shell-nav flex h-full min-h-0 shrink-0 flex-col border-r px-3 py-5"
       style={{
         width: 'var(--settings-sidebar-width)',
         borderColor: 'var(--settings-nav-glass-border)',
         background: 'var(--settings-nav-glass-bg)',
       }}
     >
-      <div className="settings-shell-nav__title px-3 pb-4">
+      <div className="settings-shell-nav__title px-2 pb-5">
         <h1 className="text-sm font-semibold text-[var(--settings-nav-text-primary)]">{title}</h1>
         <p className="mt-1 text-[11px] leading-5 text-[var(--settings-nav-text-secondary)]">{description}</p>
       </div>
 
-      <label className="settings-shell-nav__search mx-2 mb-4">
-        <Search size={14} aria-hidden="true" />
-        <input
-          type="search"
-          value={navQuery}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label={searchPlaceholder}
-          className="w-full min-w-0 bg-transparent text-sm outline-none"
-          data-settings-shell-action={SETTINGS_SHELL_ACTIONS.filterNavigation.uiAction}
-        />
-      </label>
-
-      <nav className="sidebar-card-list min-h-0 flex-1 space-y-3.5 overflow-y-auto pl-2 pr-3">
-        {filteredNavItems.length === 0 ? (
-          <div
-            className="settings-shell-empty rounded-[18px] border px-4 py-3 text-[12px] leading-6"
-            style={{
-              borderColor: 'var(--settings-border-subtle)',
-              background: 'var(--settings-surface-overlay)',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            {emptyLabel}
-          </div>
-        ) : (
-          sections.map((section) => {
-            const sectionItems = filteredNavItems.filter((item) => item.section === section.id);
-            if (sectionItems.length === 0) {
-              return null;
-            }
-
+      <nav className="sidebar-card-list min-h-0 flex-1" aria-label={pick('切换设置模块', 'Switch settings module')}>
+        <div className="settings-shell-nav__group-label px-2 pb-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--settings-nav-text-tertiary)]">
+          {pick('切换模块', 'Switch module')}
+        </div>
+        <div className="settings-shell-nav__group-list space-y-2.5">
+          {visibleModules.map((module) => {
+            const Icon = module.icon;
             return (
-              <section key={section.id} className="settings-shell-nav__group space-y-2">
-                <div
-                  className="settings-shell-nav__group-label px-1 text-[9px] font-semibold uppercase tracking-[0.2em]"
-                  style={{ color: 'var(--settings-nav-text-tertiary)' }}
-                >
-                  {section.label}
-                </div>
-
-                <div className="settings-shell-nav__group-list space-y-2.5">
-                  {sectionItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeView === item.id;
-                    const accent = getSidebarItemAccent(item.id);
-
-                    return (
-                      <div key={item.id} className="relative w-full">
-                        {isActive && (
-                          <span className="settings-sidebar-card__active-rail" aria-hidden="true" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => onNavigate(item.id)}
-                          title={item.description}
-                          className="settings-sidebar-card w-full"
-                          aria-current={isActive ? 'page' : undefined}
-                          data-state={isActive ? 'active' : 'idle'}
-                          data-accent={accent}
-                          data-settings-shell-action={SETTINGS_SHELL_ACTIONS.navigateModule.uiAction}
-                        >
-                          <div className="flex w-full items-center gap-3 min-w-0 pr-6">
-                            <span className="card-avatar-icon shrink-0">
-                              <Icon size={20} />
-                            </span>
-                            <div className="flex flex-col min-w-0 flex-1 text-left">
-                              <span className="truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">
-                                {item.label}
-                              </span>
-                              {renderCardStatusInfo(item.id) || (
-                                <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
-                                  {item.description}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <span className="settings-sidebar-card__active-chevron">
-                            <ChevronRight size={13} />
-                          </span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
+              <button
+                key={module.id}
+                type="button"
+                onClick={() => onNavigate(module.target)}
+                title={module.description}
+                className="settings-sidebar-card w-full"
+                data-state="idle"
+                data-accent={module.id === 'ai' ? 'ai-management' : module.id === 'system' ? 'storage' : 'overview'}
+                data-settings-module={module.id}
+                data-ai-settings-target={module.target}
+                data-settings-shell-action={SETTINGS_SHELL_ACTIONS.navigateModule.uiAction}
+              >
+                <span className="card-avatar-icon shrink-0"><Icon size={20} /></span>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">{module.label}</span>
+                  <span className="mt-1 block truncate text-[11px] leading-4 font-medium text-[var(--text-secondary)]">
+                    {renderModuleStatus(module.id)}
+                  </span>
+                </span>
+                <span className="settings-sidebar-card__active-chevron"><ChevronRight size={13} /></span>
+              </button>
             );
-          })
-        )}
+          })}
+        </div>
       </nav>
 
       {accountBlock ? <div className="mt-4">{accountBlock}</div> : null}
