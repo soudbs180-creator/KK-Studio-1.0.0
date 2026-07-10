@@ -1,6 +1,7 @@
 
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import type { CanvasSceneBounds } from '@kk/shared';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import {
     getCanvasDeviceTier,
@@ -8,6 +9,12 @@ import {
     type CanvasDeviceTier,
     type CanvasInteractionPhase,
 } from '../../canvas/performanceProfile';
+import {
+    CANVAS_MIN_SCALE,
+    createCanvasFitTransform,
+    doesViewportIntersectScene,
+    isValidCanvasViewportTransform,
+} from '../../canvas/canvasViewportPersistence.ts';
 
 export interface InfiniteCanvasHandle {
     zoomIn: () => void;
@@ -33,7 +40,8 @@ interface InfiniteCanvasProps {
     onCanvasDoubleClick?: () => void; // [NEW] Called when double clicking empty canvas area
     onAutoArrange?: () => void; // Called when arrange button is clicked
     onResetView?: () => void; // Called when ESC is pressed (定位最新)
-    cardPositions?: { x: number; y: number }[]; // For auto-arrange calculation
+    sceneBounds?: CanvasSceneBounds[];
+    viewStorageKey?: string;
     onMouseDown?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
     onMouseUp?: (e: React.MouseEvent) => void;
@@ -66,20 +74,6 @@ interface CachedCanvasRect {
     height: number;
 }
 
-const MIN_RESTORED_CANVAS_VIEW_SCALE = 0.35;
-
-const isValidTransform = (value: any): value is Transform => {
-    if (!value || typeof value !== 'object') return false;
-    const { x, y, scale } = value;
-    return Number.isFinite(x)
-        && Number.isFinite(y)
-        && Number.isFinite(scale)
-        && Math.abs(x) <= 200000
-        && Math.abs(y) <= 200000
-        && scale >= MIN_RESTORED_CANVAS_VIEW_SCALE
-        && scale <= 3;
-};
-
 const snapTransformForText = (t: Transform): Transform => {
     // Keep translate on whole CSS pixels to avoid corner clipping artifacts
     // on rounded cards when canvas is heavily zoomed/panned.
@@ -95,7 +89,7 @@ const buildViewportTransform = (nextTransform: Transform, _preferGpu: boolean = 
     return `translate(${nextTransform.x}px, ${nextTransform.y}px) scale(${nextTransform.scale})`;
 };
 
-const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop, backgroundOverlay, reducePointerEffects = false }, ref) => {
+const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, sceneBounds = [], viewStorageKey = 'kk_canvas_view:default:desktop', onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop, backgroundOverlay, reducePointerEffects = false }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
@@ -110,6 +104,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     // 🚀 实时坐标追踪 Ref (解决 React 状态异步延迟，确保 getCurrentTransform 永远返回物理最新值)
     const syncTransformRef = useRef<Transform>({ x: 0, y: 0, scale: 1 });
+    const sceneBoundsRef = useRef(sceneBounds);
     const callbackRef = useRef({
         onTransformChange,
         onInteractionChange,
@@ -149,6 +144,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const gridGlowPointerInsideRef = useRef(false);
     const gridGlowCurrentRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
     const gridGlowTargetRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
+
+    useEffect(() => {
+        sceneBoundsRef.current = sceneBounds;
+    }, [sceneBounds]);
 
     useEffect(() => {
         callbackRef.current = {
@@ -401,27 +400,33 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         gridGlowTargetRef.current = initialGlow;
         applyGridGlow(initialGlow.x, initialGlow.y, initialGlow.opacity, initialGlow.scale);
 
-        // Try to load saved view
+        // Restore only a view that still intersects the current scene.
         try {
-            const savedView = localStorage.getItem('kk_canvas_view');
+            const savedView = localStorage.getItem(viewStorageKey) || localStorage.getItem('kk_canvas_view');
             if (savedView) {
                 const parsed = JSON.parse(savedView);
-                if (isValidTransform(parsed)) {
+                if (
+                    isValidCanvasViewportTransform(parsed)
+                    && doesViewportIntersectScene(parsed, rect, sceneBoundsRef.current)
+                ) {
                     setTransform(parsed);
                     syncTransformRef.current = parsed;
                     emitTransformChange(parsed);
                     return;
                 }
 
-                localStorage.removeItem('kk_canvas_view');
+                localStorage.removeItem(viewStorageKey);
             }
         } catch (e) {
             console.error("Failed to load canvas view", e);
-            localStorage.removeItem('kk_canvas_view');
+            localStorage.removeItem(viewStorageKey);
         }
 
-        // Fallback to center
-        const initialTransform = {
+        const initialTransform = createCanvasFitTransform(sceneBoundsRef.current, rect, {
+            padding: 72,
+            minScale: CANVAS_MIN_SCALE,
+            maxScale: 1,
+        }) || {
             x: rect.width / 2,
             y: rect.height / 2,
             scale: 1
@@ -429,7 +434,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         setTransform(initialTransform);
         syncTransformRef.current = initialTransform;
         emitTransformChange(initialTransform);
-    }, [applyGridGlow, emitTransformChange, readContainerRect]);
+    }, [applyGridGlow, emitTransformChange, readContainerRect, viewStorageKey]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -462,10 +467,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     // Save view to localStorage on change (debounced)
     useEffect(() => {
         const timer = setTimeout(() => {
-            localStorage.setItem('kk_canvas_view', JSON.stringify(transform));
+            localStorage.setItem(viewStorageKey, JSON.stringify(transform));
         }, 500);
         return () => clearTimeout(timer);
-    }, [transform]);
+    }, [transform, viewStorageKey]);
 
     useEffect(() => {
         callbackRef.current.onInteractionChange?.(interactionStateRef.current);
@@ -851,18 +856,18 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     // ✅ 缩放到全览所有卡片
     const fitToAll = useCallback(() => {
         const container = containerRef.current;
-        if (!container || !cardPositions || cardPositions.length === 0) {
+        if (!container || sceneBounds.length === 0) {
             resetView();
             return;
         }
 
         // 计算所有卡片的边界
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        cardPositions.forEach(pos => {
-            minX = Math.min(minX, pos.x - 200); // 估算卡片宽度
-            maxX = Math.max(maxX, pos.x + 200);
-            minY = Math.min(minY, pos.y - 400); // 估算卡片高度
-            maxY = Math.max(maxY, pos.y + 100);
+        sceneBounds.forEach(bounds => {
+            minX = Math.min(minX, bounds.x);
+            maxX = Math.max(maxX, bounds.x + bounds.width);
+            minY = Math.min(minY, bounds.y);
+            maxY = Math.max(maxY, bounds.y + bounds.height);
         });
 
         const contentWidth = maxX - minX;
@@ -896,7 +901,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 detail: { centerX, centerY }
             }));
         }
-    }, [cardPositions, emitLiveTransformChange, emitTransformChange, resetView]);
+    }, [sceneBounds, emitLiveTransformChange, emitTransformChange, resetView]);
 
     // Expose methods to parent
     useImperativeHandle(ref, () => ({

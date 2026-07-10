@@ -1,4 +1,4 @@
-import type { Canvas, CanvasGroup, WorkflowNode } from '../types';
+import type { Canvas, CanvasGroup, CanvasNoteNode, WorkflowNode } from '../types';
 
 const MAX_CANVAS_COORDINATE = 200000;
 const MIN_PROMPT_HEIGHT = 32;
@@ -57,6 +57,18 @@ const sanitizeWorkflowNode = (node: WorkflowNode): WorkflowNode => ({
   height: sanitizeOptionalDimension(node.height, MIN_WORKFLOW_CARD_HEIGHT, MAX_WORKFLOW_CARD_HEIGHT),
 });
 
+const sanitizeNoteNode = (node: CanvasNoteNode): CanvasNoteNode => ({
+  ...node,
+  position: sanitizePosition(node.position),
+  width: sanitizeOptionalDimension(node.width, MIN_PROMPT_WIDTH, MAX_PROMPT_WIDTH) ?? 320,
+  height: sanitizeOptionalDimension(node.height, MIN_PROMPT_HEIGHT, MAX_PROMPT_HEIGHT) ?? 240,
+  elements: (node.elements || []).map((element) => ({
+    ...element,
+    points: (element.points || []).map(sanitizePosition),
+    width: sanitizeOptionalDimension(element.width, 1, 96) ?? 1,
+  })),
+});
+
 export const sanitizePersistedCanvas = (canvas: Canvas): Canvas => ({
   ...canvas,
   promptNodes: (canvas.promptNodes || []).map((node) => ({
@@ -78,6 +90,7 @@ export const sanitizePersistedCanvas = (canvas: Canvas): Canvas => ({
     points: (drawing.points || []).map(sanitizePosition),
     width: sanitizeOptionalDimension(drawing.width, 1, 96) ?? 1,
   })),
+  noteNodes: (canvas.noteNodes || []).map(sanitizeNoteNode),
   workflow: canvas.workflow
     ? {
       ...canvas.workflow,

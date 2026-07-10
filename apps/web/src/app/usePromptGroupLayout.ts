@@ -637,7 +637,9 @@ function getSubCardStandardOffset(
             .filter(img => img.parentPromptId === promptNode.id)
             .sort((a, b) => a.timestamp - b.timestamp);
 
-          const layoutMode = promptNode.mode === GenerationMode.PPT ? 'column' : subCardLayoutMode;
+          const layoutMode = promptNode.mode === GenerationMode.PPT
+            ? 'column'
+            : (promptNode.presentation?.layoutMode || subCardLayoutMode);
           const offset = getSubCardStandardOffset(promptNode, childImages, imageNode, layoutMode);
 
           const ownerBase = resolveCanvasNodePositionForLiveDrag(ownerId) || promptNode.position;

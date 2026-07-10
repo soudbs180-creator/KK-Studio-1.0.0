@@ -153,7 +153,7 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
     focusedGroupId,
     generatingGroupIds,
     canvasScale: zoomScale,
-    layoutMode: subCardLayoutMode,
+    layoutMode: node.presentation?.layoutMode || subCardLayoutMode,
     promptGroupLayoutState,
     regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
     imageCardHeightById,

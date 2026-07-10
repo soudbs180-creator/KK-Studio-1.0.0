@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { type Canvas, type PromptNode, type GeneratedImage, AspectRatio, type CanvasGroup, type CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
+import { type Canvas, type PromptNode, type GeneratedImage, AspectRatio, type CanvasGroup, type CanvasDrawing, type CanvasNoteNode, GenerationMode, KnownModel, type WorkflowNode, type WorkflowPanelNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
 import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, clearAllImages, normalizePersistableMediaSource } from '../services/storage/imageStorage';
@@ -46,6 +46,8 @@ import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } 
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
+import { createCanvasCardPresentation, resolvePromptCardKind } from './canvasPresentationMigration';
+import { convertCanvasDrawingsToNote } from './canvasNotes.ts';
 import { getCardDimensions } from '../utils/styleUtils';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
@@ -1284,9 +1286,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id });
 
         try {
+            const presentableNode = node.presentation
+                ? node
+                : {
+                    ...node,
+                    presentation: createCanvasCardPresentation(
+                        resolvePromptCardKind(node, node.childImageIds?.length || 0),
+                        'column',
+                        node.mode === GenerationMode.ECOMMERCE || node.mode === GenerationMode.PPT ? 'wide' : 'standard',
+                    ),
+                };
             // [Defensive fix] Add the node to state first so the UI shows it immediately.
             updateCanvas(canvas => {
-                const nextCanvas = addCanvasPromptNode(canvas, node);
+                const nextCanvas = addCanvasPromptNode(canvas, presentableNode);
                 if (nextCanvas === canvas) {
                     console.warn(`[CanvasContext] Skip duplicate promptNodeID: ${node.id}`);
                 }
@@ -1994,6 +2006,26 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateCanvas(canvas => deleteCanvasWorkflowNode(canvas, id));
     }, [pushToHistory, updateCanvas]);
 
+    const createWorkflowPanel = useCallback((title: string = 'Workflow'): WorkflowPanelNode => {
+        const now = Date.now();
+        const node: WorkflowPanelNode = {
+            id: `workflow-panel-${now.toString(36)}`,
+            kind: 'workflow-panel',
+            position: state.viewportCenter,
+            width: 420,
+            height: 420,
+            presentation: createCanvasCardPresentation('workflow-panel', 'column', 'wide'),
+            data: {
+                title,
+                status: 'idle',
+                steps: [],
+                outputNodeIds: [],
+            },
+        };
+        addWorkflowNode(node);
+        return node;
+    }, [addWorkflowNode, state.viewportCenter]);
+
 
     const deleteImageNode = useCallback((id: string) => {
         pushToHistory();
@@ -2332,7 +2364,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const childImages = newImageNodes.filter(image => image.parentPromptId === prompt.id);
             if (childImages.length === 0) return;
 
-            const targetMode = prompt.mode === GenerationMode.PPT ? 'column' : (state.subCardLayoutMode || 'grid');
+            const targetMode = prompt.mode === GenerationMode.PPT ? 'column' : mode;
             const imageDims = childImages.map(image => {
                 const { width, totalHeight } = getCardDimensions(image.aspectRatio as AspectRatio, true);
                 return { w: width, h: totalHeight };
@@ -2422,12 +2454,27 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         setState(prev => {
             const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? { ...c, imageNodes: newImageNodes, lastModified: Date.now() } : c
+                c.id === prev.activeCanvasId
+                    ? {
+                        ...c,
+                        promptNodes: c.promptNodes.map(prompt => ({
+                            ...prompt,
+                            presentation: createCanvasCardPresentation(
+                                prompt.presentation?.kind || resolvePromptCardKind(prompt, prompt.childImageIds?.length || 0),
+                                prompt.mode === GenerationMode.PPT ? 'column' : mode,
+                                prompt.presentation?.size || 'standard',
+                                prompt.presentation?.diagnostic,
+                            ),
+                        })),
+                        imageNodes: newImageNodes,
+                        lastModified: Date.now(),
+                    }
+                    : c
             );
             return { ...prev, canvases: newCanvases };
         });
 
-    }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds, state.subCardLayoutMode]);
+    }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds]);
 
     // --- File System Implementation ---
 
@@ -3297,12 +3344,42 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     }, [updateCanvas, pushToHistory]);
 
+    const convertDrawingsToNote = useCallback((drawingIds: string[], title?: string): CanvasNoteNode | null => {
+        let createdNote: CanvasNoteNode | null = null;
+        pushToHistory();
+        updateCanvas(canvas => {
+            const nextCanvas = convertCanvasDrawingsToNote(canvas, drawingIds, { title });
+            createdNote = nextCanvas.noteNodes?.[nextCanvas.noteNodes.length - 1] || null;
+            return nextCanvas;
+        });
+        return createdNote;
+    }, [pushToHistory, updateCanvas]);
+
+    const updateNoteNodePosition = useCallback((id: string, position: { x: number; y: number }) => {
+        updateCanvas(canvas => ({
+            ...canvas,
+            noteNodes: (canvas.noteNodes || []).map(note => (
+                note.id === id ? { ...note, position, updatedAt: Date.now() } : note
+            )),
+            lastModified: Date.now(),
+        }));
+    }, [updateCanvas]);
+
+    const deleteNoteNode = useCallback((id: string) => {
+        pushToHistory();
+        updateCanvas(canvas => ({
+            ...canvas,
+            noteNodes: (canvas.noteNodes || []).filter(note => note.id !== id),
+            lastModified: Date.now(),
+        }));
+    }, [pushToHistory, updateCanvas]);
+
     // [Performance] Cache the context value so high-frequency state like viewportCenter does not rerender every consumer.
     const contextValue = React.useMemo(() => ({
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes, // Batch update
-        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode,
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
@@ -3328,17 +3405,21 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         urgentUpdatePromptNode,
         addCanvasDrawing,
         deleteCanvasDrawing,
-        clearCanvasDrawings
+        clearCanvasDrawings,
+        convertDrawingsToNote,
+        updateNoteNodePosition,
+        deleteNoteNode,
     }), [
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes,
-        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode,
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
         isShellReady, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
-        addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings
+        addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings,
+        convertDrawingsToNote, updateNoteNodePosition, deleteNoteNode
     ]);
     const startupStatusValue = React.useMemo(() => ({
         isLoading,

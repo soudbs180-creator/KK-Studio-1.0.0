@@ -150,7 +150,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
     focusedGroupId,
     generatingGroupIds,
     canvasScale: zoomScale,
-    layoutMode: node.mode === 'ppt' ? 'column' : subCardLayoutMode,
+    layoutMode: node.mode === 'ppt' ? 'column' : (node.presentation?.layoutMode || subCardLayoutMode),
     promptGroupLayoutState,
     regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
     imageCardHeightById,

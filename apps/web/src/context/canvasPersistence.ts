@@ -2,6 +2,11 @@ import type { Canvas, PromptNode } from '../types';
 import { normalizeReferenceImagesStorage } from '../utils/referenceImageStorage.ts';
 import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer.ts';
 import { sanitizePersistedCanvases } from './canvasGeometrySanitizer.ts';
+import {
+    getCanvasMigrationBackupKey,
+    getCanvasMigrationSummaryKey,
+    migrateCanvasPresentations,
+} from './canvasPresentationMigration.ts';
 
 export interface CanvasStorageStateLike {
     canvases: Canvas[];
@@ -105,9 +110,21 @@ export const restoreCanvasStateFromLocalStorage = (
         }
 
         const parsed = JSON.parse(stored) as CanvasStorageStateLike;
+        const migration = migrateCanvasPresentations(sanitizePersistedCanvases(parsed.canvases));
+        if (migration.changed) {
+            const backupKey = getCanvasMigrationBackupKey(storageKey);
+            if (!localStorage.getItem(backupKey)) {
+                localStorage.setItem(backupKey, stored);
+            }
+            const summary = {
+                ...migration.summary,
+                backupKey,
+            };
+            localStorage.setItem(getCanvasMigrationSummaryKey(storageKey), JSON.stringify(summary));
+        }
         return {
             ...parsed,
-            canvases: sanitizePersistedCanvases(parsed.canvases),
+            canvases: migration.canvases,
         };
     } catch (error) {
         console.error('[CanvasProvider] Failed to parse stored state (Resetting):', error);

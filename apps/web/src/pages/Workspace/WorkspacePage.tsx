@@ -2,6 +2,8 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, start
 import InfiniteCanvas, { type InfiniteCanvasHandle } from '../../components/canvas/InfiniteCanvas';
 import CanvasDrawingsLayer from '../../components/canvas/CanvasDrawingsLayer';
 import CanvasDrawingInteractionOverlay from '../../components/canvas/CanvasDrawingInteractionOverlay';
+import CanvasNoteCard from '../../components/canvas/CanvasNoteCard.tsx';
+import WorkflowPanelCard from '../../components/canvas/WorkflowPanelCard.tsx';
 import { PenTool, Type, Shapes, Palette, Trash, Scissors } from 'lucide-react';
 import ImageNode from '../../components/image/ImageCard';
 import PromptNodeComponent from '../../components/canvas/PromptNodeComponent';
@@ -41,6 +43,8 @@ import {
   type WorkflowUtilityCanvasNode,
 } from '../../app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
+import { getCanvasSceneBounds } from '../../canvas/canvasSceneGeometry.ts';
+import { getCanvasViewportStorageKey } from '../../canvas/canvasViewportPersistence.ts';
 import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
 import { getCollapsedCanvasGroupNodeIds } from '../../app/collapsedCanvasGroups';
@@ -537,8 +541,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
     arrangeAllNodes,
     moveSelectedNodesImmediate,
     addWorkflowNode,
+    updateWorkflowNode,
     updateWorkflowNodePosition,
     deleteWorkflowNode,
+    createWorkflowPanel,
     isReady,
     setViewportCenter, // 简体中文注释：迁移时保留当前视口中心，避免画布跳动。
     state, // 简体中文注释：迁移功能需要读取完整画布列表。
@@ -548,6 +554,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
     addCanvasDrawing,
     deleteCanvasDrawing,
     clearCanvasDrawings,
+    convertDrawingsToNote,
+    updateNoteNodePosition,
+    deleteNoteNode,
     unlinkNodes
   } = useCanvas();
   const updatePromptNodeRef = useRef(updatePromptNode);
@@ -3756,22 +3765,28 @@ export const AppContent: React.FC<AppContentProps> = () => {
     [activeCanvas?.groups],
   );
 
-  const cardPositionsVal = React.useMemo(() => {
-    return [
-      ...(activeCanvas?.promptNodes
-        .filter((n: any) => !collapsedCanvasGroupNodeIds.has(n.id))
-        .filter((n: any) => !n.hiddenInCanvas)
-        .filter((n: any) => !(
-          n.mode === GenerationMode.ECOMMERCE
-          && n.ecommerce?.frameworkId
-          && n.ecommerce.kind === 'a-plus-group'
-        ))
-        .map((n: any) => n.position) || []),
-      ...(activeCanvas?.imageNodes
-        .filter((n: any) => !collapsedCanvasGroupNodeIds.has(n.id))
-        .map((n: any) => n.position) || [])
-    ];
-  }, [activeCanvas, collapsedCanvasGroupNodeIds]);
+  const canvasSceneBounds = React.useMemo(() => {
+    const excludedNodeIds = new Set(collapsedCanvasGroupNodeIds);
+    activeCanvas?.promptNodes.forEach((node) => {
+      if (
+        node.mode === GenerationMode.ECOMMERCE
+        && node.ecommerce?.frameworkId
+        && node.ecommerce.kind === 'a-plus-group'
+      ) {
+        excludedNodeIds.add(node.id);
+      }
+    });
+    return getCanvasSceneBounds(activeCanvas, {
+      isMobile,
+      imageHeightById: imageCardHeightById,
+      excludedNodeIds,
+    });
+  }, [activeCanvas, collapsedCanvasGroupNodeIds, imageCardHeightById, isMobile]);
+
+  const canvasViewStorageKey = React.useMemo(
+    () => getCanvasViewportStorageKey(activeCanvas?.id || 'default', 'desktop'),
+    [activeCanvas?.id],
+  );
 
   const handleCanvasClick = React.useCallback(() => {
     clearSelection();
@@ -5302,7 +5317,14 @@ const isRectIntersecting = (
         onApplyWorkflowTemplate={(templateId) => {
           void handleApplyWorkflowTemplate(templateId);
         }}
-        onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
+        onAddWorkflowUtilityCard={(kind) => {
+          if (kind === 'workflow-panel') {
+            const panel = createWorkflowPanel();
+            selectNodes([panel.id], 'replace');
+            return;
+          }
+          handleAddWorkflowUtilityCard(kind);
+        }}
         isUserMenuOpen={showUserMenu}
         onOpenMarkdownImport={() => setShowMarkdownModal(true)}
         onOpenMermaidImport={() => setShowMermaidModal(true)}
@@ -5663,7 +5685,8 @@ const isRectIntersecting = (
         showGrid={canvasMode === 'board' ? false : showGrid}
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
-        cardPositions={cardPositionsVal}
+        sceneBounds={canvasSceneBounds}
+        viewStorageKey={canvasViewStorageKey}
         reducePointerEffects={isLargeProject}
         backgroundOverlay={
           isLargeProject && (
@@ -5727,6 +5750,10 @@ const isRectIntersecting = (
           activeWidth={activeDrawingWidth}
           drawings={activeCanvas?.drawings || []}
           addCanvasDrawing={addCanvasDrawing}
+          onConvertDrawingsToNote={(drawingIds) => {
+            const note = convertDrawingsToNote(drawingIds);
+            if (note) selectNodes([note.id], 'replace');
+          }}
           promptNodes={activeCanvas?.promptNodes || []}
           imageNodes={activeCanvas?.imageNodes || []}
           onAddReferenceImage={async (img) => {
@@ -6012,6 +6039,31 @@ const isRectIntersecting = (
 
 
         {/* 2. Canvas items */}
+        {(activeCanvas?.noteNodes || []).map((note) => (
+          <CanvasNoteCard
+            key={note.id}
+            note={note}
+            selected={selectedNodeIds.includes(note.id)}
+            zoomScale={canvasTransform.scale}
+            onSelect={() => selectNodes([note.id], 'replace')}
+            onDelete={() => deleteNoteNode(note.id)}
+            onPositionChange={(position) => updateNoteNodePosition(note.id, position)}
+          />
+        ))}
+        {(activeCanvas?.workflow?.nodes || [])
+          .filter((node): node is import('../../types').WorkflowPanelNode => node.kind === 'workflow-panel')
+          .map((node) => (
+            <WorkflowPanelCard
+              key={node.id}
+              node={node}
+              selected={selectedNodeIds.includes(node.id)}
+              zoomScale={canvasTransform.scale}
+              onSelect={() => selectNodes([node.id], 'replace')}
+              onDelete={() => deleteWorkflowNode(node.id)}
+              onPositionChange={(position) => updateWorkflowNodePosition(node.id, position)}
+              onDataChange={(data) => updateWorkflowNode(node.id, { data })}
+            />
+          ))}
         {renderedVisibleGroups}
         {renderedCanvasItems}
 

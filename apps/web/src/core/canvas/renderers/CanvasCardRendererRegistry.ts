@@ -8,6 +8,7 @@ import AssetCardRenderer from './AssetCardRenderer';
 import WorkflowCardRenderer from './WorkflowCardRenderer';
 import AgentCardRenderer from './AgentCardRenderer';
 import ExportCardRenderer from './ExportCardRenderer';
+import UnknownCardRenderer from './UnknownCardRenderer';
 
 export type CanvasCardKind =
   | 'image-generation-group'
@@ -20,7 +21,8 @@ export type CanvasCardKind =
   | 'asset-card'
   | 'workflow-card'
   | 'agent-card'
-  | 'export-card';
+  | 'export-card'
+  | 'unknown-card';
 
 export type CardDisplayPattern =
   | 'prompt-result-group'
@@ -101,6 +103,7 @@ class CanvasCardRendererRegistry {
     this.register('workflow-card', createPolicy('workflow-card', 'workflow-utility-card'), WorkflowCardRenderer);
     this.register('agent-card', createPolicy('agent-card', 'workflow-utility-card'), AgentCardRenderer);
     this.register('export-card', createPolicy('export-card', 'workflow-utility-card'), ExportCardRenderer);
+    this.register('unknown-card', createPolicy('unknown-card', 'standalone-task-card'), UnknownCardRenderer);
   }
 
 
@@ -118,7 +121,7 @@ class CanvasCardRendererRegistry {
   }
 
   resolveCardKind(node: any): CanvasCardKind {
-    if (!node) return 'image-generation-group';
+    if (!node || node.presentation?.kind === 'unknown') return 'unknown-card';
     
     // According to GenerationMode (IMAGE=1, VIDEO=2, AUDIO=3, PPT=4, ECOMMERCE=5)
     const mode = node.mode;

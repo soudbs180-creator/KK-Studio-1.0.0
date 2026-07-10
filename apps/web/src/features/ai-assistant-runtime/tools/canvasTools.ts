@@ -164,7 +164,21 @@ export const canvasTools: AgentToolDefinition[] = [
       const mode = input?.mode || 'grid';
       const nodeIds = Array.isArray(input?.nodeIds) ? input.nodeIds.filter(Boolean) : [];
 
-      if (nodeIds.length > 0 && typeof ctx.updateNodes === 'function' && ctx.activeCanvas) {
+      if (nodeIds.length > 0) {
+        if (!ctx.activeCanvas) {
+          throw new Error('canvas.arrangeNodes requires an active canvas when nodeIds are provided.');
+        }
+        const supportedNodeIds = new Set([
+          ...(ctx.activeCanvas.promptNodes || []).map((node: any) => node.id),
+          ...(ctx.activeCanvas.imageNodes || []).map((node: any) => node.id),
+        ]);
+        const missingNodeIds = nodeIds.filter((nodeId) => !supportedNodeIds.has(nodeId));
+        if (missingNodeIds.length > 0) {
+          throw new Error(`canvas.arrangeNodes cannot resolve nodeIds: ${missingNodeIds.join(', ')}`);
+        }
+        if (typeof ctx.updateNodes !== 'function') {
+          throw new Error('canvas.arrangeNodes requires updateNodes when nodeIds are provided.');
+        }
         const updates = resolveAgentNodeArrangeUpdates(ctx.activeCanvas, nodeIds, {
           mode,
           preset: input.preset,

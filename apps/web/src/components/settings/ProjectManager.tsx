@@ -753,6 +753,18 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
                         添加工作流卡片
                     </div>
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            handleAddUtilityCardWithSafety('workflow-panel');
+                            setShowWorkflowDropdown(false);
+                        }}
+                        className="mb-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-main-bg)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--toolbar-hover)]"
+                    >
+                        <Network size={16} className="text-blue-400" />
+                        工作流面板
+                    </button>
                     <div className="grid grid-cols-3 gap-1.5">
                         <button
                             data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowPreviewCard.uiAction}

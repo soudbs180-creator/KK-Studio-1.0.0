@@ -1,6 +1,7 @@
 import type { Canvas, GeneratedImage, PromptNode } from '../types/index.ts';
 import { GenerationMode, type AspectRatio } from '../types/index.ts';
 import { getCardDimensions } from '../utils/styleUtils.ts';
+import { createCanvasCardPresentation } from './canvasPresentationMigration.ts';
 
 export type CanvasSubCardLayout = 'row' | 'grid' | 'column';
 
@@ -77,6 +78,16 @@ const AUTO_ARRANGE_GROUP_GAP_Y = 120;
 const AUTO_ARRANGE_SUB_COLUMNS = 20;
 const AUTO_ARRANGE_SUB_IMAGE_GAP = 32;
 const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56;
+
+const withPromptLayout = (prompt: PromptNode, mode: CanvasSubCardLayout): PromptNode => ({
+    ...prompt,
+    presentation: createCanvasCardPresentation(
+        prompt.presentation?.kind || 'prompt-result-group',
+        mode,
+        prompt.presentation?.size || 'standard',
+        prompt.presentation?.diagnostic,
+    ),
+});
 
 const getImageDims = (aspectRatio?: string) => {
     const { width, totalHeight } = getCardDimensions(aspectRatio as AspectRatio, true);
@@ -179,6 +190,9 @@ export function arrangeSingleSelectedPromptChildren(
     return {
         canvas: {
             ...canvas,
+            promptNodes: canvas.promptNodes.map(candidate => (
+                candidate.id === prompt.id ? withPromptLayout(candidate, targetMode) : candidate
+            )),
             imageNodes: canvas.imageNodes.map(image =>
                 newImagePositions[image.id]
                     ? { ...image, position: newImagePositions[image.id] }
@@ -449,9 +463,11 @@ export function arrangeSelectedGroupedNodes(
     return {
         canvas: {
             ...canvas,
-            promptNodes: canvas.promptNodes.map(prompt =>
-                arrangedPositions[prompt.id] ? { ...prompt, position: arrangedPositions[prompt.id] } : prompt
-            ),
+            promptNodes: canvas.promptNodes.map(prompt => (
+                arrangedPositions[prompt.id]
+                    ? withPromptLayout({ ...prompt, position: arrangedPositions[prompt.id] }, mode)
+                    : prompt
+            )),
             imageNodes: canvas.imageNodes.map(image =>
                 arrangedPositions[image.id] ? { ...image, position: arrangedPositions[image.id] } : image
             ),
@@ -677,9 +693,11 @@ export function arrangeSelectedRootNodes(
     return {
         canvas: {
             ...canvas,
-            promptNodes: canvas.promptNodes.map(prompt =>
-                newPositions[prompt.id] ? { ...prompt, position: newPositions[prompt.id] } : prompt
-            ),
+            promptNodes: canvas.promptNodes.map(prompt => (
+                newPositions[prompt.id]
+                    ? withPromptLayout({ ...prompt, position: newPositions[prompt.id] }, mode)
+                    : prompt
+            )),
             imageNodes: canvas.imageNodes.map(image => {
                 if (newPositions[image.id]) {
                     return { ...image, position: newPositions[image.id] };

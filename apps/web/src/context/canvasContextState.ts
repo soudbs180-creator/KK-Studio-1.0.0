@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, type CanvasDrawing, type WorkflowNode } from '../types';
+import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, type CanvasDrawing, type CanvasNoteNode, type WorkflowNode, type WorkflowPanelNode } from '../types';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
 
@@ -92,9 +92,13 @@ export interface CanvasContextType {
     updateWorkflowNode: (id: string, updates: Partial<WorkflowNode>) => void;
     updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
     deleteWorkflowNode: (id: string) => void;
+    createWorkflowPanel: (title?: string) => WorkflowPanelNode;
     addCanvasDrawing: (drawing: CanvasDrawing) => void;
     deleteCanvasDrawing: (id: string) => void;
     clearCanvasDrawings: () => void;
+    convertDrawingsToNote: (drawingIds: string[], title?: string) => CanvasNoteNode | null;
+    updateNoteNodePosition: (id: string, position: { x: number; y: number }) => void;
+    deleteNoteNode: (id: string) => void;
 }
 
 export const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
@@ -121,7 +125,9 @@ export const DEFAULT_CANVAS: Canvas = {
     imageNodes: [],
     groups: [] as CanvasGroup[],
     drawings: [] as CanvasDrawing[],
+    noteNodes: [],
     workflow: createCanvasWorkflow(),
+    presentationVersion: 2,
     lastModified: Date.now()
 };
 

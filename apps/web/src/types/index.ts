@@ -1,4 +1,8 @@
-import type { GenerationTelemetry } from '@kk/shared';
+import type {
+  CanvasCardPresentation,
+  CanvasNoteNodeDto,
+  GenerationTelemetry,
+} from '@kk/shared';
 
 export const AspectRatio = {
   AUTO: 'auto', // Auto match
@@ -398,6 +402,7 @@ export interface GeneratedImage {
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
+  presentation?: CanvasCardPresentation;
 }
 
 export type Provider =
@@ -1030,6 +1035,7 @@ export interface PromptNode {
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
+  presentation?: CanvasCardPresentation;
 }
 
 export interface CanvasGroup {
@@ -1057,6 +1063,8 @@ export interface CanvasDrawing {
   bindingNodeId?: string;
   bindingGroupId?: string;
 }
+
+export type CanvasNoteNode = CanvasNoteNodeDto;
 
 export interface AgentWorkflowData {
   title?: string;
@@ -1106,6 +1114,23 @@ export interface StoryboardWorkflowData {
   [key: string]: unknown;
 }
 
+export interface WorkflowPanelStep {
+  id: string;
+  label: string;
+  enabled: boolean;
+  parameters: Record<string, string | number | boolean>;
+  status?: 'idle' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface WorkflowPanelData {
+  title: string;
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  steps: WorkflowPanelStep[];
+  outputNodeIds: string[];
+  error?: string;
+}
+
 export type PromptWorkflowNode = import('../workflow/types').WorkflowNodeBase<
   'prompt',
   PromptNode
@@ -1138,6 +1163,10 @@ export type StoryboardWorkflowNode = import('../workflow/types').WorkflowNodeBas
   'storyboard',
   StoryboardWorkflowData
 >;
+export type WorkflowPanelNode = import('../workflow/types').WorkflowNodeBase<
+  'workflow-panel',
+  WorkflowPanelData
+>;
 
 export type WorkflowNode =
   | PromptWorkflowNode
@@ -1147,7 +1176,8 @@ export type WorkflowNode =
   | SaveWorkflowNode
   | VideoInputWorkflowNode
   | VideoAnalyzeWorkflowNode
-  | StoryboardWorkflowNode;
+  | StoryboardWorkflowNode
+  | WorkflowPanelNode;
 
 export type CanvasWorkflow = import('../workflow/types').WorkflowGraph<WorkflowNode>;
 
@@ -1159,7 +1189,9 @@ export interface Canvas {
   imageNodes: GeneratedImage[];
   groups: CanvasGroup[];
   drawings: CanvasDrawing[];
+  noteNodes?: CanvasNoteNode[];
   workflow?: CanvasWorkflow;
+  presentationVersion?: number;
   lastModified: number;
 }
 

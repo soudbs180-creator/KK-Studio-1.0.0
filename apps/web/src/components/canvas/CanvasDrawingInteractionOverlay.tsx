@@ -13,6 +13,7 @@ interface CanvasDrawingInteractionOverlayProps {
     drawings: CanvasDrawing[];
     addCanvasDrawing: (drawing: CanvasDrawing) => void;
     onAddReferenceImage: (img: any) => void;
+    onConvertDrawingsToNote?: (drawingIds: string[]) => void;
     promptNodes?: any[];
     imageNodes?: any[];
 }
@@ -154,6 +155,7 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
     drawings,
     addCanvasDrawing,
     onAddReferenceImage,
+    onConvertDrawingsToNote,
     promptNodes = [],
     imageNodes = [],
 }) => {
@@ -437,6 +439,12 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
                     });
 
                     if (selectedDrawings.length > 0) {
+                        if (onConvertDrawingsToNote) {
+                            onConvertDrawingsToNote(selectedDrawings.map((drawing) => drawing.id));
+                            notify.success('已创建记事本卡片', '框选内容已移动到可继续编辑的矢量卡片。');
+                            pointsRef.current = [];
+                            return;
+                        }
                         try {
                             // 调用原生同步 Canvas 绘图逻辑，性能高出数个数量级
                             const base64 = exportSelectedAreaToPngSync(xMin, yMin, wVal, hVal, selectedDrawings);

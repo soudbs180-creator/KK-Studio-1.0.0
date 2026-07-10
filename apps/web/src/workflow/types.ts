@@ -1,3 +1,5 @@
+import type { CanvasCardPresentation } from '@kk/shared';
+
 export const WORKFLOW_GRAPH_VERSION = 1 as const;
 
 export type WorkflowNodeKind =
@@ -8,7 +10,8 @@ export type WorkflowNodeKind =
   | 'storyboard'
   | 'agent'
   | 'preview'
-  | 'save';
+  | 'save'
+  | 'workflow-panel';
 
 export type WorkflowEdgeRole =
   | 'input'
@@ -31,6 +34,7 @@ export interface WorkflowNodeBase<
   zIndex?: number;
   tags?: string[];
   label?: string;
+  presentation?: CanvasCardPresentation;
   data: TData;
 }
 

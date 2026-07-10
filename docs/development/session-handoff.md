@@ -2082,3 +2082,30 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。点击展开、轻触和 18px 上滑手势逻辑未修改，键盘 focus-visible 仍有明确横条焦点环。
   - 工作区仍保留另一任务的画布持久化、共享契约和 OpenSpec 未提交改动；本轮提交必须继续按路径隔离，不能调用内部执行 `git add .` 的全量 `agents:commit`。
+## 132. 2026-07-11 - 启动无限画布 V2 并修复工作流类型错误
+
+- **修改范围**：
+  1. 增加 V2 卡型、卡片展示、布局方向、连接端口、场景 bounds、视口快照、矢量记事本与迁移摘要共享契约；旧画布首次恢复时完成几何清洗、展示迁移、布局推断及版本化备份。
+  2. InfiniteCanvas 改用真实卡片 bounds 执行全览，视口按 `canvasId + responsiveSurface` 持久化，恢复时拒绝离开场景的缓存视图，并统一支持 `0.1-3` 缩放。
+  3. Prompt 卡组优先读取各自的 `presentation.layoutMode`；局部与全局整理持久化目标卡组方向，横向使用左右端口，纵向/网格使用上下端口，避免单卡操作污染所有卡组。
+  4. 增加 CanvasCardShell 与未知卡诊断回退；增加矢量记事本卡、框选笔画移动转卡、Pointer Events 拖动；增加独立 workflow-panel、步骤增删/排序/启停/参数编辑和运行状态控制，并在左侧工作流菜单提供入口。
+  5. 修复 `WorkflowUtilityNodeKind` 扩展后 Workspace handler 参数不兼容的 TS2322 错误；`canvas.arrangeNodes` 指定缺失 ID 时明确报错，禁止退化为全画布整理。
+- **修改文件**：
+  - `packages/shared/src/contracts/dto/workspace-canvas.ts`
+  - `apps/web/src/canvas/canvasSceneGeometry.ts`
+  - `apps/web/src/canvas/canvasViewportPersistence.ts`
+  - `apps/web/src/components/canvas/CanvasCardShell.tsx`
+  - `apps/web/src/components/canvas/CanvasNoteCard.tsx`
+  - `apps/web/src/components/canvas/WorkflowPanelCard.tsx`
+  - `apps/web/src/components/canvas/InfiniteCanvas.tsx`
+  - `apps/web/src/context/canvasPresentationMigration.ts`
+  - `apps/web/src/context/canvasNotes.ts`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/components/settings/ProjectManager.tsx`
+  - `tests/unit/canvas-persistence-geometry-sanitizer.test.ts`
+  - `openspec/changes/canvas-card-system-v2/`
+- **当前设计决策**：保留自研画布与现有移动结果流；设置页只增加工作流面板入口，不改 Provider、模型或生成参数链路；统一 Shell 先覆盖新卡与诊断回退，复杂 Prompt/Image 业务卡后续分阶段迁入。
+- **已运行验证**：根 TypeScript `tsc --noEmit` 通过；shared/ui/api-client 构建通过；Vite 生产构建通过；完整 `architecture:check` 与 `governance:check` 等价脚本链通过；画布、排版、AI ToolRegistry、设置契约定向测试 54/54 通过；`git diff --check` 通过；Codex 应用内浏览器验证移动结果流及 `1440x900` 桌面画布均无控制台错误，桌面画布渲染 15 张 Prompt 卡且当前视口可见 3 张。
+- **未运行验证及原因**：未运行完整 `verify:changes`，当前环境没有 npm 可执行文件；已直接运行本次相关的架构、治理、类型、构建和定向测试入口。未调用真实付费 Provider。
+- **风险与下一步**：V2 仍需把所有 Prompt/Image/PPT/电商/音频业务渲染器逐步迁入 CanvasCardShell，统一 UI 与 AI 排版服务，补 `canvas.createCard`、`canvas.convertDrawingsToNote`、`workflow.createPanel` 工具及 AITakeover 上下文，完成平板横屏画布和桌面输入/工具轨压缩。

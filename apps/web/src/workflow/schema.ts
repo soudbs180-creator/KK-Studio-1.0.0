@@ -1,7 +1,7 @@
 import type { WorkflowEdge, WorkflowNodeBase, WorkflowNodeKind } from './types';
 
 export const LEGACY_WORKFLOW_NODE_KINDS = ['prompt', 'image'] as const;
-export const WORKFLOW_UTILITY_NODE_KINDS = ['preview', 'save', 'agent'] as const;
+export const WORKFLOW_UTILITY_NODE_KINDS = ['preview', 'save', 'agent', 'workflow-panel'] as const;
 export const WORKFLOW_HIGH_RISK_NODE_KINDS = ['video-input', 'video-analyze', 'storyboard'] as const;
 
 export type LegacyWorkflowNodeKind = typeof LEGACY_WORKFLOW_NODE_KINDS[number];
