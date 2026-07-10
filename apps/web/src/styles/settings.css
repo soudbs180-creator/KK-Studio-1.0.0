@@ -3797,7 +3797,7 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
 
 /* Settings v2 information architecture: module switcher, focused overview, shared mobile rhythm. */
 .settings-panel {
-  --settings-sidebar-width: 232px;
+  --settings-sidebar-width: 232px !important;
 }
 
 .settings-panel .settings-module-context {
@@ -3916,6 +3916,12 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
 .settings-panel .settings-account-card__balance {
   color: var(--settings-status-text);
   font-variant-numeric: tabular-nums;
+}
+
+.settings-panel .settings-account-card {
+  height: 64px !important;
+  min-height: 64px !important;
+  padding: 8px 10px !important;
 }
 
 .settings-panel .dashboard-command-center--focused {

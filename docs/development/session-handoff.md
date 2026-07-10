@@ -1930,3 +1930,50 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 日志伪造告警，应作为独立依赖升级处理。
   - 后续若扩展任务轨状态，可增加失败/暂停的非颜色提示，但不得恢复常驻文字胶囊或任务创建自动展开。
+
+## 127. 2026-07-11 - 按直接批注完成设置中心三模块重构
+- **修改范围**：
+  1. 设置中心一级信息架构收敛为“总览 / AI 设置 / 系统设置”。桌面左侧移除搜索，只展示另外两个可切换模块；当前模块及其子功能在右侧上下文导航中呈现，避免同一入口重复出现。
+  2. AI 设置固定为“AI 接管 -> API 配置 -> 浏览器助手 -> 能力路由”，系统设置固定为“数据与同步 -> 高级性能 -> 系统运行诊断”；全部入口补充稳定的 `data-ai-settings-target`，供 AI 接管快速定位。
+  3. 桌面总览重构为快捷策略、AI 能力链路、今日消耗、系统状态四区；本地/服务器优先与快速/正常/性能三档直接写入现有路由和外观运行时，默认路由改为本地优先。
+  4. 手机总览只保留余额、今日消耗、网页登录、可用路由四个判断指标，并接续两组快捷策略、AI/系统两张模块卡和底部用户余额；账户卡与中英文胶囊高度统一为 64px。
+  5. `appearance-motion` 保留 canonical 路由标识，但产品名称改为“高级性能设置”；网页动效与画布渲染策略合并到同页，细节偏离预设后总览显示“手动”。
+- **修改文件**：
+  - `apps/web/src/components/settings/SettingsMobileDashboard.tsx`
+  - `apps/web/src/components/settings/SettingsModuleNavigator.tsx`
+  - `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`
+  - `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+  - `apps/web/src/components/settings/settingsQuickPreferences.ts`
+  - `apps/web/src/components/settings/settingsRegistry.ts`
+  - `apps/web/src/components/settings/views/AppearanceMotionView.tsx`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/src/components/settings/views/GenerationModeView.tsx`
+  - `apps/web/src/core/routing/ProviderRouteEngine.ts`
+  - `apps/web/src/styles/settings.css`
+  - `scripts/architecture/check-settings-ui-system.mjs`
+  - `tests/unit/dashboard-settings-overview-regression.test.ts`
+  - `tests/unit/mobile-settings-overview-metrics.test.ts`
+  - `tests/unit/mobile-settings-taxonomy.test.ts`
+  - `tests/unit/settings-desktop-workbench-regression.test.ts`
+  - `tests/unit/settings-module-action-catalog-contract.test.ts`
+  - `tests/unit/settings-shell-scroll-regression.test.ts`
+  - `tests/unit/settings-sidebar-ui-system-contract.test.ts`
+  - `tests/unit/settings-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - `appearance-motion` 继续作为兼容路由和持久化键，显示名称统一为“高级性能”；不新增平行设置路由。
+  - 手机保留真实 Billing、KeyManager 与 Browser Bridge 数据源，但只把四个最有判断价值的指标放在首屏；详细数据继续留在对应模块。
+  - AI 接管只通过现有设置路由与稳定目标属性定位，不建立新的设置执行通道。
+- **已运行验证**：
+  - `architecture:check` 全部通过；`governance:check` 的 10 项治理脚本全部通过。
+  - 根类型检查、架构类型检查、服务端 58 文件语法检查、480 个测试文件语义检查全部通过。
+  - 生产构建通过，Vite 完成 2424 个模块转换。
+  - 设置相关回归 28/28 通过；移动/桌面设置 smoke 与 AI 接管 smoke 均通过 fallback 契约。
+  - 应用内浏览器实测 `390x844`：4 个指标、5 个 radio、2 张模块卡和账户栏完整渲染，无横向溢出；本地/服务器切换可用并恢复本地优先。
+  - 应用内浏览器实测 `1440x900`：侧栏 232px、账户与语言胶囊均为 64px、搜索入口 0、总览面板 4、无横向溢出；AI/系统模块切换后当前模块从左侧消失，右侧分别显示 4/3 个有序子功能。
+  - 高级性能页实测三档网页性能、外观动态、画布策略和高级画布入口均可达；浏览器控制台无 error/warning，`git diff --check` 通过。
+- **未运行验证及原因**：
+  - 独立 Playwright Chromium 可执行文件仍不可用，三项发布 smoke 使用 HTTP 与源码契约 fallback；真实桌面和手机交互已由 Codex 应用内浏览器覆盖。
+  - 未调用真实付费 Provider、生产 OAuth 或真实账单；零数据状态已实测，非零数据由确定性单元测试覆盖。
+- **风险与下一步**：
+  - 低风险。当前物理工作区仍有其他 Agent 的手机输入栏相关未提交改动，本次提交必须按路径隔离，不能使用会执行 `git add .` 的全量提交守卫。

@@ -330,9 +330,9 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Account status',
   },
   'appearance-motion': {
-    eyebrow: 'Appearance',
-    titleZh: '外观与动态',
-    titleEn: 'Appearance & Motion',
+    eyebrow: 'Advanced Performance',
+    titleZh: '高级性能设置',
+    titleEn: 'Advanced Performance',
     descriptionZh: '统一管理体验档位、外观动态和画布性能；修改细节后快捷档位会标记为手动。',
     descriptionEn: 'Manage experience presets, appearance, motion, and canvas performance in one place.',
     primaryActionLabelZh: '返回设置总览',
@@ -445,8 +445,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'appearance-motion',
-    labelZh: '外观与动态',
-    labelEn: 'Appearance & Motion',
+    labelZh: '高级性能',
+    labelEn: 'Advanced Performance',
     descriptionZh: '快捷档位、外观动态与画布细节。',
     descriptionEn: 'Presets, appearance, motion, and canvas details.',
     icon: Palette,
@@ -585,7 +585,10 @@ export function getSettingsModuleItems(
       ? ['data-sync', 'appearance-motion', 'dev-diagnostics']
       : module.views;
 
-  return getSettingsNavItems(language).filter((item) => visibleViews.includes(item.id));
+  const items = getSettingsNavItems(language);
+  return visibleViews
+    .map((view) => items.find((item) => item.id === view))
+    .filter((item): item is SettingsNavItem => Boolean(item));
 }
 
 export function getSettingsViewMeta(
