@@ -73,6 +73,45 @@ export const getCanvasSceneBounds = (
   ));
 };
 
+export const getCanvasSceneBoundsForNodeIds = (
+  canvas: Canvas | null | undefined,
+  nodeIds: readonly string[],
+): CanvasSceneBounds[] => {
+  if (!canvas || nodeIds.length === 0) return [];
+
+  const included = new Set(nodeIds);
+  canvas.groups.forEach((group) => {
+    if (!included.has(group.id)) return;
+    group.nodeIds.forEach((nodeId) => included.add(nodeId));
+  });
+  canvas.promptNodes.forEach((prompt) => {
+    if (!included.has(prompt.id)) return;
+    canvas.imageNodes.forEach((image) => {
+      if (image.parentPromptId === prompt.id) included.add(image.id);
+    });
+  });
+
+  const bounds: CanvasSceneBounds[] = [];
+  canvas.promptNodes.forEach((prompt) => {
+    if (included.has(prompt.id) && !prompt.hiddenInCanvas) bounds.push(getPromptSceneBounds(prompt));
+  });
+  canvas.imageNodes.forEach((image) => {
+    if (included.has(image.id)) bounds.push(getImageSceneBounds(image));
+  });
+  (canvas.workflow?.nodes || []).forEach((node) => {
+    if (included.has(node.id)) {
+      bounds.push(boundsFromBottomCenter(node.position, node.width || 284, node.height || 176));
+    }
+  });
+  (canvas.noteNodes || []).forEach((note) => {
+    if (included.has(note.id)) bounds.push(boundsFromBottomCenter(note.position, note.width, note.height));
+  });
+  canvas.groups.forEach((group) => {
+    if (included.has(group.id) && !group.hidden) bounds.push(group.bounds);
+  });
+  return bounds;
+};
+
 export const unionCanvasSceneBounds = (
   bounds: readonly CanvasSceneBounds[],
 ): CanvasSceneBounds | null => {

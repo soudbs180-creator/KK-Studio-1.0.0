@@ -2,6 +2,7 @@
 
 import type { AgentToolDefinition } from './ToolRegistry.ts';
 import { resolveAgentNodeArrangeUpdates } from '../canvas/agentCanvasLayout.ts';
+import { requestCanvasBoundsFocus } from '../../../canvas/canvasViewportEvents.ts';
 
 const getContextSelectedNodeIds = (ctx: any): string[] =>
   ctx?.selectedNodeIds || ctx?.activeCanvas?.selectedNodeIds || [];
@@ -186,6 +187,7 @@ export const canvasTools: AgentToolDefinition[] = [
           gap: input.gap
         });
         ctx.updateNodes(updates);
+        requestCanvasBoundsFocus(updates.bounds);
         ctx.notify?.success?.('画布已整理', `已按 ${input.preset || mode} 模式整理 ${nodeIds.length} 个节点。`);
         return {
           status: 'arranged',

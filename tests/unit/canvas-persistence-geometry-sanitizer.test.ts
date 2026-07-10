@@ -16,6 +16,7 @@ import {
   isValidCanvasViewportTransform,
 } from '../../apps/web/src/canvas/canvasViewportPersistence.ts';
 import { convertCanvasDrawingsToNote } from '../../apps/web/src/context/canvasNotes.ts';
+import { getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../../apps/web/src/canvas/canvasSceneGeometry.ts';
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -259,6 +260,37 @@ test('fit transform uses exact scene bounds and centers the result', () => {
   assert.equal(fitted.scale, 1);
   assert.equal(fitted.x, 200);
   assert.equal(fitted.y, 100);
+});
+
+test('selection bounds include child cards when only the prompt root is selected', () => {
+  const bounds = getCanvasSceneBoundsForNodeIds({
+    id: 'canvas-1',
+    name: 'Selection bounds',
+    promptNodes: [{
+      id: 'prompt-1',
+      prompt: 'root',
+      position: { x: 0, y: 200 },
+      height: 200,
+      childImageIds: ['image-1'],
+      timestamp: 1,
+    }],
+    imageNodes: [{
+      id: 'image-1',
+      url: 'blob:image',
+      prompt: '',
+      position: { x: 500, y: 600 },
+      parentPromptId: 'prompt-1',
+      aspectRatio: '1:1',
+      timestamp: 1,
+    }],
+    groups: [],
+    drawings: [],
+    lastModified: 1,
+  } as any, ['prompt-1']);
+
+  assert.equal(bounds.length, 2);
+  assert.equal((unionCanvasSceneBounds(bounds)?.x || 0) < 0, true);
+  assert.equal((unionCanvasSceneBounds(bounds)?.width || 0) > 600, true);
 });
 
 test('drawing conversion moves vectors into an editable notebook card', () => {

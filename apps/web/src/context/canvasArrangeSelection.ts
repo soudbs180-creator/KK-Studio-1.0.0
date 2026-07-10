@@ -1,6 +1,7 @@
 import type { Canvas, GeneratedImage, PromptNode } from '../types/index.ts';
 import { GenerationMode, type AspectRatio } from '../types/index.ts';
 import { getCardDimensions } from '../utils/styleUtils.ts';
+import { arrangeCanvasLayoutItems } from '../canvas/canvasLayoutService.ts';
 import { createCanvasCardPresentation } from './canvasPresentationMigration.ts';
 
 export type CanvasSubCardLayout = 'row' | 'grid' | 'column';
@@ -628,57 +629,20 @@ export function arrangeSelectedRootNodes(
         return null;
     }
 
-    const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
-    const newPositions: Record<string, { x: number; y: number }> = {};
-
-    if (strategy === 'matrix') {
-        roots.sort((a, b) => {
-            if (Math.abs(a.visualCy - b.visualCy) > 200) return a.visualCy - b.visualCy;
-            return a.visualCx - b.visualCx;
-        });
-
-        const avgX = roots.reduce((sum, root) => sum + root.x, 0) / roots.length;
-        const avgY = roots.reduce((sum, root) => sum + root.y, 0) / roots.length;
-        const maxWidth = Math.max(...roots.map(root => root.width));
-        const maxHeight = Math.max(...roots.map(root => root.height));
-        const cellWidth = maxWidth + SELECTED_ROOT_GAP;
-        const cellHeight = maxHeight + SELECTED_ROOT_GAP;
-        const gridWidth = SELECTED_ROOT_GRID_COLUMNS * cellWidth;
-        const rows = Math.ceil(roots.length / SELECTED_ROOT_GRID_COLUMNS);
-        const gridHeight = rows * cellHeight;
-        const startX = avgX - gridWidth / 2 + cellWidth / 2;
-        const startY = avgY - gridHeight / 2 + cellHeight;
-
-        roots.forEach((root, index) => {
-            const col = index % SELECTED_ROOT_GRID_COLUMNS;
-            const row = Math.floor(index / SELECTED_ROOT_GRID_COLUMNS);
-            newPositions[root.id] = {
-                x: startX + col * cellWidth,
-                y: startY + row * cellHeight,
-            };
-        });
-    } else if (strategy === 'column') {
-        roots.sort((a, b) => a.visualCy - b.visualCy);
-        const avgX = roots.reduce((sum, root) => sum + root.x, 0) / roots.length;
-        const topY = Math.min(...roots.map(root => root.visualCy - root.height / 2));
-        let currentY = topY;
-
-        roots.forEach(root => {
-            currentY += root.height;
-            newPositions[root.id] = { x: avgX, y: currentY };
-            currentY += SELECTED_ROOT_GAP;
-        });
-    } else {
-        roots.sort((a, b) => a.visualCx - b.visualCx);
-        const avgCy = roots.reduce((sum, root) => sum + root.visualCy, 0) / roots.length;
-        let currentLeft = Math.min(...roots.map(root => root.visualCx - root.width / 2));
-
-        roots.forEach(root => {
-            const newX = currentLeft + root.width / 2;
-            newPositions[root.id] = { x: newX, y: avgCy + root.height / 2 };
-            currentLeft += root.width + SELECTED_ROOT_GAP;
-        });
-    }
+    const { positions: newPositions } = arrangeCanvasLayoutItems(
+        roots.map(root => ({
+            id: root.id,
+            position: { x: root.x, y: root.y },
+            width: root.width,
+            height: root.height,
+            visualCenter: { x: root.visualCx, y: root.visualCy },
+        })),
+        {
+            mode,
+            gap: SELECTED_ROOT_GAP,
+            columns: SELECTED_ROOT_GRID_COLUMNS,
+        },
+    );
 
     const rootById = new Map(roots.map(root => [root.id, root]));
     const getRootDelta = (rootId: string) => {

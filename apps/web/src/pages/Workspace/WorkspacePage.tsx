@@ -2914,10 +2914,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const handleAutoArrange = useCallback(() => {
     arrangeAllNodes();
     // 简体中文：整理后延迟调用 fitToAll，使得视口平滑对齐卡片，防止“卡片丢失”视觉错觉
-    setTimeout(() => {
-      handleFitToAll();
-    }, 150);
-  }, [arrangeAllNodes, handleFitToAll]);
+    if (selectedNodeIds.length === 0) {
+      setTimeout(() => {
+        handleFitToAll();
+      }, 150);
+    }
+  }, [arrangeAllNodes, handleFitToAll, selectedNodeIds.length]);
 
   // 简体中文：包装可编辑 PPT 导出任务以支持统一任务中心
   const handleExportPptPackageWithTaskCenter = useCallback(async (node: PromptNode) => {

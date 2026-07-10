@@ -1,4 +1,6 @@
+import type { CanvasSceneBounds } from '@kk/shared';
 import type { AspectRatio, Canvas, GeneratedImage, PromptNode } from '../../../types.ts';
+import { arrangeCanvasLayoutItems, resolveCanvasLayoutBounds } from '../../../canvas/canvasLayoutService.ts';
 import { getCardDimensions } from '../../../utils/styleUtils.ts';
 
 export type AgentNodeLayoutMode = 'grid' | 'row' | 'column';
@@ -14,9 +16,10 @@ export interface AgentNodeArrangeOptions {
 export interface AgentNodeArrangeUpdates {
   promptNodes: { id: string; updates: Partial<PromptNode> }[];
   imageNodes: { id: string; updates: Partial<GeneratedImage> }[];
+  bounds?: CanvasSceneBounds | null;
 }
 
-const PROMPT_WIDTH = 360;
+const PROMPT_WIDTH = 320;
 const DEFAULT_PROMPT_HEIGHT = 180;
 const GROUP_PADDING = 48;
 
@@ -94,35 +97,31 @@ export function resolveAgentNodeArrangeUpdates(
     : options.preset === 'compact-grid'
       ? 24
       : 48;
-  const columns = resolveColumns(items.length, options);
-  const baseX = Math.min(...items.map(item => item.x - item.width / 2));
-  const baseY = Math.min(...items.map(item => item.y - item.height));
+  const mode = options.mode
+    || (options.preset && options.preset !== 'compact-grid' ? options.preset : 'grid');
+  const columns = resolveColumns(items.length, { ...options, mode });
+  const { positions, bounds } = arrangeCanvasLayoutItems(
+    items.map((item) => ({
+      id: item.id,
+      position: { x: item.x, y: item.y },
+      width: item.width,
+      height: item.height,
+    })),
+    { mode, gap, columns },
+  );
   const promptNodes: AgentNodeArrangeUpdates['promptNodes'] = [];
   const imageNodes: AgentNodeArrangeUpdates['imageNodes'] = [];
-  let y = baseY;
 
-  for (let start = 0; start < items.length; start += columns) {
-    const rowItems = items.slice(start, start + columns);
-    const rowHeight = Math.max(...rowItems.map(item => item.height));
-    let x = baseX;
+  items.forEach((item) => {
+    const position = positions[item.id];
+    if (item.kind === 'prompt') {
+      promptNodes.push({ id: item.id, updates: { position } });
+    } else {
+      imageNodes.push({ id: item.id, updates: { position } });
+    }
+  });
 
-    rowItems.forEach((item) => {
-      const position = {
-        x: x + item.width / 2,
-        y: y + item.height
-      };
-      if (item.kind === 'prompt') {
-        promptNodes.push({ id: item.id, updates: { position } });
-      } else {
-        imageNodes.push({ id: item.id, updates: { position } });
-      }
-      x += item.width + gap;
-    });
-
-    y += rowHeight + gap;
-  }
-
-  return { promptNodes, imageNodes };
+  return { promptNodes, imageNodes, bounds };
 }
 
 export function resolveAgentGroupBounds(
@@ -134,15 +133,20 @@ export function resolveAgentGroupBounds(
     return { x: 0, y: 0, width: 320, height: 180 };
   }
 
-  const minX = Math.min(...items.map(item => item.x - item.width / 2));
-  const maxX = Math.max(...items.map(item => item.x + item.width / 2));
-  const minY = Math.min(...items.map(item => item.y - item.height));
-  const maxY = Math.max(...items.map(item => item.y));
+  const bounds = resolveCanvasLayoutBounds(items.map((item) => ({
+    id: item.id,
+    position: { x: item.x, y: item.y },
+    width: item.width,
+    height: item.height,
+  })));
+  if (!bounds) {
+    return { x: 0, y: 0, width: 320, height: 180 };
+  }
 
   return {
-    x: minX - GROUP_PADDING,
-    y: minY - GROUP_PADDING,
-    width: Math.max(240, maxX - minX + GROUP_PADDING * 2),
-    height: Math.max(140, maxY - minY + GROUP_PADDING * 2)
+    x: bounds.x - GROUP_PADDING,
+    y: bounds.y - GROUP_PADDING,
+    width: Math.max(240, bounds.width + GROUP_PADDING * 2),
+    height: Math.max(140, bounds.height + GROUP_PADDING * 2)
   };
 }

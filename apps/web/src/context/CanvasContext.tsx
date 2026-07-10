@@ -49,6 +49,8 @@ import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSel
 import { createCanvasCardPresentation, resolvePromptCardKind } from './canvasPresentationMigration';
 import { convertCanvasDrawingsToNote } from './canvasNotes.ts';
 import { getCardDimensions } from '../utils/styleUtils';
+import { getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../canvas/canvasSceneGeometry.ts';
+import { requestCanvasBoundsFocus } from '../canvas/canvasViewportEvents.ts';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -2325,6 +2327,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         canvases: newCanvases,
                         subCardLayoutMode: singlePromptArrange.subCardLayoutMode
                     }));
+                    requestCanvasBoundsFocus(unionCanvasSceneBounds(
+                        getCanvasSceneBoundsForNodeIds(singlePromptArrange.canvas, selectedIds),
+                    ));
                     return;
                 }
 
@@ -2338,6 +2343,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         canvases: newCanvases,
                         subCardLayoutMode: selectedRootArrange.subCardLayoutMode,
                     }));
+                    requestCanvasBoundsFocus(unionCanvasSceneBounds(
+                        getCanvasSceneBoundsForNodeIds(selectedRootArrange.canvas, selectedIds),
+                    ));
                     return;
                 }
 
@@ -2351,6 +2359,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         canvases: newCanvases,
                         subCardLayoutMode: selectedGroupedArrange.subCardLayoutMode
                     }));
+                    requestCanvasBoundsFocus(unionCanvasSceneBounds(
+                        getCanvasSceneBoundsForNodeIds(selectedGroupedArrange.canvas, selectedIds),
+                    ));
                     return;
                 }
 

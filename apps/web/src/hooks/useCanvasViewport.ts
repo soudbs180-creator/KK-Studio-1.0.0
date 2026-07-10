@@ -3,6 +3,8 @@ import { type InfiniteCanvasHandle } from '../components/canvas/InfiniteCanvas';
 import { type CanvasInteractionPhase } from '../canvas/liveScene';
 import { type WorkflowUtilityCanvasNode } from '../app/appCanvasTypes';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
+import { createCanvasFitTransform } from '../canvas/canvasViewportPersistence.ts';
+import { CANVAS_FOCUS_BOUNDS_EVENT } from '../canvas/canvasViewportEvents.ts';
 
 export interface UseCanvasViewportProps {
   canvasRef: React.RefObject<InfiniteCanvasHandle | null>;
@@ -28,6 +30,43 @@ export function useCanvasViewport({
   const [isCanvasTransforming, setIsCanvasTransforming] = useState(false);
   const [canvasInteractionPhase, setCanvasInteractionPhase] = useState<CanvasInteractionPhase>('idle');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const viewAnimationFrameRef = React.useRef<number | null>(null);
+
+  const animateToView = useCallback((target: { x: number; y: number; scale: number }, durationMs = 220) => {
+    if (viewAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(viewAnimationFrameRef.current);
+      viewAnimationFrameRef.current = null;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const start = canvas.getCurrentTransform();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion || durationMs <= 0) {
+      canvas.setView(target.x, target.y, target.scale);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / durationMs);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      canvas.setView(
+        start.x + (target.x - start.x) * eased,
+        start.y + (target.y - start.y) * eased,
+        start.scale + (target.scale - start.scale) * eased,
+      );
+      if (progress < 1) {
+        viewAnimationFrameRef.current = requestAnimationFrame(step);
+      } else {
+        viewAnimationFrameRef.current = null;
+      }
+    };
+    viewAnimationFrameRef.current = requestAnimationFrame(step);
+  }, [canvasRef]);
+
+  useEffect(() => () => {
+    if (viewAnimationFrameRef.current !== null) cancelAnimationFrame(viewAnimationFrameRef.current);
+  }, []);
 
   // 同步视口中心到 CanvasContext 中，用于优先级加载
   useEffect(() => {
@@ -42,11 +81,15 @@ export function useCanvasViewport({
   useEffect(() => {
     const handleCenterOnNode = (e: Event) => {
       const { x, y, nodeId } = (e as CustomEvent).detail;
-      setCanvasTransform((prev) => ({
-        ...prev,
-        x: window.innerWidth / 2 - x * prev.scale,
-        y: window.innerHeight / 2 - y * prev.scale,
-      }));
+      const rect = canvasRef.current?.getCanvasRect();
+      const current = canvasRef.current?.getCurrentTransform();
+      if (rect && current) {
+        animateToView({
+          x: rect.width / 2 - x * current.scale,
+          y: rect.height / 2 - y * current.scale,
+          scale: current.scale,
+        });
+      }
       setTimeout(() => {
         const el = document.querySelector(`#prompt-card-${nodeId}`) as HTMLElement;
         if (el) {
@@ -59,7 +102,26 @@ export function useCanvasViewport({
     };
     window.addEventListener('canvas-center-on-node', handleCenterOnNode);
     return () => window.removeEventListener('canvas-center-on-node', handleCenterOnNode);
-  }, []);
+  }, [animateToView, canvasRef]);
+
+  useEffect(() => {
+    const handleFocusBounds = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const rect = canvasRef.current?.getCanvasRect();
+      if (!rect || !detail?.bounds) return;
+      const target = createCanvasFitTransform([detail.bounds], {
+        width: rect.width,
+        height: rect.height,
+      }, {
+        padding: 56,
+        minScale: detail.minScale ?? 0.5,
+        maxScale: detail.maxScale ?? 1.15,
+      });
+      if (target) animateToView(target, detail.durationMs ?? 220);
+    };
+    window.addEventListener(CANVAS_FOCUS_BOUNDS_EVENT, handleFocusBounds);
+    return () => window.removeEventListener(CANVAS_FOCUS_BOUNDS_EVENT, handleFocusBounds);
+  }, [animateToView, canvasRef]);
 
   // 干净的平滑导航定位逻辑
   const handleNavigateToNode = useCallback((targetX: number, targetY: number, id?: string) => {
@@ -77,7 +139,7 @@ export function useCanvasViewport({
     const newY = screenCenterY - targetY * targetScale;
 
     // 命令式更新: 通知 InfiniteCanvas 移动
-    canvasRef.current?.setView(newX, newY, targetScale);
+    animateToView({ x: newX, y: newY, scale: targetScale });
 
     // 保持本地状态同步
     setCanvasTransform({
@@ -90,7 +152,7 @@ export function useCanvasViewport({
       setHighlightedId(id);
       setTimeout(() => setHighlightedId(null), 3000); // 高亮 3 秒
     }
-  }, [canvasRef]);
+  }, [animateToView]);
 
   // 重置视图：优先选中选中的组，否则退回到最新节点
   const handleResetView = useCallback(() => {

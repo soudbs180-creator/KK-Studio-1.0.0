@@ -1313,6 +1313,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     height: cardHeight,
                     opacity: 0.8,
                     cursor: isDragging ? 'grabbing' : 'grab',
+                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleMouseDown}
@@ -1385,7 +1386,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     willChange: isDragging ? 'left, top' : 'auto',
-                    transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
                     pointerEvents: 'auto',
                     touchAction: 'none'
                 }}
@@ -1555,7 +1556,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 opacity: 1,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 willChange: isDragging ? 'left, top' : 'auto',
-                transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
                 pointerEvents: 'auto',
                 touchAction: 'none'
             }}

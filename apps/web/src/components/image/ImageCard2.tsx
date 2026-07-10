@@ -1504,7 +1504,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
                     willChange: isDragging ? 'transform' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'
@@ -1659,7 +1659,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
                     willChange: isDragging ? 'transform' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'

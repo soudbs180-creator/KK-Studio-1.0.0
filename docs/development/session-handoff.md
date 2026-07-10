@@ -2109,3 +2109,30 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根 TypeScript `tsc --noEmit` 通过；shared/ui/api-client 构建通过；Vite 生产构建通过；完整 `architecture:check` 与 `governance:check` 等价脚本链通过；画布、排版、AI ToolRegistry、设置契约定向测试 54/54 通过；`git diff --check` 通过；Codex 应用内浏览器验证移动结果流及 `1440x900` 桌面画布均无控制台错误，桌面画布渲染 15 张 Prompt 卡且当前视口可见 3 张。
 - **未运行验证及原因**：未运行完整 `verify:changes`，当前环境没有 npm 可执行文件；已直接运行本次相关的架构、治理、类型、构建和定向测试入口。未调用真实付费 Provider。
 - **风险与下一步**：V2 仍需把所有 Prompt/Image/PPT/电商/音频业务渲染器逐步迁入 CanvasCardShell，统一 UI 与 AI 排版服务，补 `canvas.createCard`、`canvas.convertDrawingsToNote`、`workflow.createPanel` 工具及 AITakeover 上下文，完成平板横屏画布和桌面输入/工具轨压缩。
+
+## 133. 2026-07-11 - 统一画布排版服务与选区聚焦
+
+- **修改范围**：
+  1. 新增纯几何 `canvasLayoutService`，UI 框选整理与 AI `canvas.arrangeNodes` 共用 row、column、grid 的排序、间距、列数和真实 bounds 计算；AI preset 现在会实际决定方向。
+  2. 选区整理后按真实 Prompt、全部关联副卡、图片、工作流和记事本 bounds 聚焦，缩放限制为 0.5-1.15；只有无选区的显式全览继续调用 `fitToAll`。
+  3. 修复 `canvas-center-on-node` 仅更新 Hook 状态但未驱动 InfiniteCanvas 的问题；视口使用 220ms 缓动并遵守 reduced-motion。
+  4. 主卡、图片卡和统一 Shell 的非拖拽位置变化采用 220ms 平滑过渡，拖拽期间禁用，避免横纵切换瞬移。
+- **修改文件**：
+  - `apps/web/src/canvas/canvasLayoutService.ts`
+  - `apps/web/src/canvas/canvasSceneGeometry.ts`
+  - `apps/web/src/canvas/canvasViewportEvents.ts`
+  - `apps/web/src/context/canvasArrangeSelection.ts`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/features/ai-assistant-runtime/canvas/agentCanvasLayout.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts`
+  - `apps/web/src/hooks/useCanvasViewport.ts`
+  - `apps/web/src/components/canvas/PromptNodeComponent.tsx`
+  - `apps/web/src/components/image/ImageCard2.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `tests/unit/canvas-layout-service.test.ts`
+  - `tests/unit/canvas-persistence-geometry-sanitizer.test.ts`
+  - `openspec/changes/canvas-card-system-v2/tasks.md`
+- **当前设计决策**：布局服务保持底部中心坐标契约，不引入 DOM；UI 和 AI 可传不同列数/间距策略，但最终位置与 bounds 必须由同一内核生成。选区整理使用局部聚焦，禁止退化成远景全览。
+- **已运行验证**：根 TypeScript `tsc --noEmit` 通过；排版、AI ToolRegistry、迁移、几何和视口定向测试 51/51 通过；`git diff --check` 通过。
+- **未运行验证及原因**：本阶段提交前尚未运行生产构建和浏览器验收，将在后续卡片工厂阶段合并执行；当前运行环境没有 `npm` 可执行文件，脚本使用项目 Node 运行时直接执行。
+- **风险与下一步**：低风险。下一阶段扩展 `CanvasRuntimeState` 和统一卡片工厂，注册 `canvas.createCard`、`canvas.convertDrawingsToNote`、`workflow.createPanel`，并确保旧创建工具仅作为兼容别名委托新工厂。
