@@ -352,6 +352,32 @@ body.dark-mode .zoom-slider {
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+.kk-desktop-composer-compact {
+  height: 68px;
+  min-height: 68px;
+  border-radius: 12px;
+}
+
+.kk-desktop-composer-compact .input-bar-textarea {
+  background: var(--frost-card-sub-bg);
+  border: 1px solid var(--frost-card-sub-border);
+  line-height: 22px;
+}
+
+.kk-desktop-composer-expanded > .input-bar-inner {
+  max-height: min(320px, 30dvh);
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kk-desktop-composer-compact,
+  .kk-desktop-composer-expanded {
+    transition-duration: 0ms !important;
+  }
+}
+
 .prompt-bar-footer-frost {
   position: relative;
   isolation: isolate;

@@ -98,6 +98,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const [isDragging, setIsDragging] = useState(false);
     const dragStart = useRef({ x: 0, y: 0 });
     const lastTransform = useRef({ x: 0, y: 0 });
+    const touchGestureRef = useRef<{
+        startDistance: number;
+        worldAnchor: { x: number; y: number };
+    } | null>(null);
 
     const isDraggingRef = useRef(false);
     const [isZooming, setIsZooming] = useState(false);
@@ -954,6 +958,27 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     // Touch Handling (Mirroring Mouse Logic)
     const handleTouchStart = useCallback((e: TouchEvent) => {
+        if (e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault();
+            const [first, second] = [e.touches[0], e.touches[1]];
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const center = {
+                x: (first.clientX + second.clientX) / 2 - rect.left,
+                y: (first.clientY + second.clientY) / 2 - rect.top,
+            };
+            const current = syncTransformRef.current;
+            touchGestureRef.current = {
+                startDistance: Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)),
+                worldAnchor: {
+                    x: (center.x - current.x) / current.scale,
+                    y: (center.y - current.y) / current.scale,
+                },
+            };
+            isDraggingRef.current = false;
+            activateInteractionPhase('zoom');
+            return;
+        }
         if (e.touches.length === 1) {
             const touch = e.touches[0];
             isDraggingRef.current = true; // 🚀 [移动端优化] 使用 ref 标记
@@ -969,6 +994,30 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     // 🚀 [移动端性能优化] 触控拖动时直接操作 DOM，与鼠标拖动保持一致
     // 避免每帧 setState 造成 React 重绘，实现 60fps 丝滑滑动
     const handleTouchMove = useCallback((e: TouchEvent) => {
+        const pinch = touchGestureRef.current;
+        if (pinch && e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault();
+            const [first, second] = [e.touches[0], e.touches[1]];
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const distance = Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY));
+            const center = {
+                x: (first.clientX + second.clientX) / 2 - rect.left,
+                y: (first.clientY + second.clientY) / 2 - rect.top,
+            };
+            const currentScale = syncTransformRef.current.scale;
+            const scale = Math.min(3, Math.max(0.1, currentScale * (distance / pinch.startDistance)));
+            pinch.startDistance = distance;
+            const newTransform = {
+                x: Math.round(center.x - pinch.worldAnchor.x * scale),
+                y: Math.round(center.y - pinch.worldAnchor.y * scale),
+                scale,
+            };
+            syncTransformRef.current = newTransform;
+            if (viewportRef.current) viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
+            emitLiveTransformChange(newTransform);
+            return;
+        }
         if (!isDraggingRef.current) return;
         if (e.touches.length === 1) {
             if (e.cancelable) e.preventDefault();
@@ -994,23 +1043,36 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     }, [emitLiveTransformChange]);
 
     // 🚀 [移动端优化] touchEnd 时才提交 React state 同步最终位置
-    const handleTouchEnd = useCallback(() => {
+    const handleTouchEnd = useCallback((event: TouchEvent) => {
         if (zoomIndicatorTimeoutRef.current) {
             clearTimeout(zoomIndicatorTimeoutRef.current);
             zoomIndicatorTimeoutRef.current = null;
         }
+        const wasPinching = touchGestureRef.current !== null;
         const wasDragging = isDraggingRef.current;
-        if (wasDragging) {
+        if (wasPinching || wasDragging) {
             const finalTransform = syncTransformRef.current;
-            if (finalTransform.x !== lastTransform.current.x || finalTransform.y !== lastTransform.current.y) {
-                setTransform({ ...finalTransform });
-                emitTransformChange(finalTransform);
-                emitLiveTransformChange(finalTransform);
+            setTransform({ ...finalTransform });
+            emitTransformChange(finalTransform);
+            emitLiveTransformChange(finalTransform);
+        }
+        if (wasPinching) {
+            touchGestureRef.current = null;
+            settleInteractionPhase('zoom');
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                isDraggingRef.current = true;
+                dragStart.current = { x: touch.clientX, y: touch.clientY };
+                lastTransform.current = { x: syncTransformRef.current.x, y: syncTransformRef.current.y };
+                activateInteractionPhase('pan');
+                return;
             }
+        }
+        if (wasDragging) {
             isDraggingRef.current = false;
             settleInteractionPhase('pan');
         }
-    }, [emitLiveTransformChange, emitTransformChange, settleInteractionPhase]);
+    }, [activateInteractionPhase, emitLiveTransformChange, emitTransformChange, settleInteractionPhase]);
 
     // Setup event listeners
     useEffect(() => {
@@ -1022,6 +1084,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         container.addEventListener('touchstart', handleTouchStart, { passive: false });
         container.addEventListener('touchmove', handleTouchMove, { passive: false });
         container.addEventListener('touchend', handleTouchEnd);
+        container.addEventListener('touchcancel', handleTouchEnd);
 
         // 🚀 使用 passive 监听器提升滚动/移动性能
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
@@ -1036,6 +1099,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             container.removeEventListener('touchstart', handleTouchStart);
             container.removeEventListener('touchmove', handleTouchMove);
             container.removeEventListener('touchend', handleTouchEnd);
+            container.removeEventListener('touchcancel', handleTouchEnd);
 
             window.removeEventListener('mousemove', handleMouseMove);
             if (!reducePointerEffects) {
@@ -1102,7 +1166,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 }}
                 style={{ 
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    contain: 'layout style' // 开启浏览器渲染隔离
+                    contain: 'layout style', // 开启浏览器渲染隔离
+                    touchAction: 'none',
                 }}
             >
                 {/* 拖拽悬停效果 - 只显示边框高亮，不显示提示文本 */}

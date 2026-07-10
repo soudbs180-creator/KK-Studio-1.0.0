@@ -100,8 +100,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onAutoArrange,
     canvasMode = 'normal',
     showSnapToGrid = false,
-    desktopScale = 1,
-    desktopOffset = 0,
     isUserMenuOpen = false,
     onOpenMarkdownImport,
     onOpenMermaidImport,
@@ -517,7 +515,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
     }, [activeCanvas, mergeCanvasInto, state.canvases]);
 
-    const desktopIconButtonClass = 'group relative flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-secondary)] transition-all active:scale-95 hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]';
+    const desktopIconButtonClass = 'group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-all active:scale-95 hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]';
     const dropdownPositionStyle = isMobile
         ? { top: 'calc(100% + 10px)', left: 0, width: 'min(92vw, 340px)' }
         : undefined;
@@ -1031,15 +1029,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         setIsCollapsed(false);
                     }
                 }}
-                className={`fixed left-4 z-50 flex flex-col items-center select-none transition-all duration-300 ease-out ${isCollapsed ? 'cursor-pointer w-2.5 h-24 opacity-60 hover:opacity-100 hover:scale-y-105' : 'w-14 opacity-100'}`}
+                className={`fixed left-3 z-50 flex w-11 flex-col items-center select-none transition-opacity duration-200 ${isCollapsed ? 'h-24 cursor-pointer opacity-60 hover:opacity-100' : 'opacity-100'}`}
                 style={{ 
                     top: '50%',
-                    transform: `translateY(calc(-50% + ${desktopOffset}px)) scale(${desktopScale})`,
-                    transformOrigin: 'left center',
+                    transform: 'translateY(-50%)',
                 }}
             >
                 <div
-                    className={`flex flex-col items-center rounded-2xl transition-all duration-300 ${isCollapsed ? 'w-2 h-full py-3 px-0 justify-center' : 'w-full p-1.5 gap-2'}`}
+                    className={`flex max-h-[calc(100dvh-144px)] flex-col items-center overflow-x-hidden rounded-lg transition-all duration-200 ${isCollapsed ? 'h-full w-2 justify-center px-0 py-3' : 'w-full gap-1 overflow-y-auto p-0.5'}`}
                     style={{
                         background: 'var(--frost-card-framework-bg)',
                         border: '1px solid var(--frost-card-framework-border)',

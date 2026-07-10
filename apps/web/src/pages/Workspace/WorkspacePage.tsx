@@ -120,7 +120,12 @@ import {
 import { useEcommercePartialRedrawRuntime } from '../../app/useEcommercePartialRedrawRuntime';
 import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from '../../app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from '../../app/useEcommerceSubmitRuntime';
-import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../../utils/responsiveSurface';
+import {
+  getCanvasViewportSurfaceKey,
+  isCanvasWorkspaceResultFlow,
+  resolveCanvasWorkspaceSurface,
+  resolveResponsiveSurface,
+} from '../../utils/responsiveSurface';
 import { useVisibleCanvasItems, useVisibleCanvasItemsNew } from '../../app/useVisibleCanvasItems';
 import { useCanvasSpatialIndex } from '../../app/useCanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
@@ -348,18 +353,6 @@ const ProjectManager = lazyWithRetry(() => import('../../components/settings/Pro
 interface AppContentProps {
 }
 
-type DesktopSideRailLayout = {
-  projectManagerScale: number;
-  hideZoomControl: boolean;
-  projectManagerOffset: number;
-};
-
-const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
-  projectManagerScale: 1,
-  hideZoomControl: false,
-  projectManagerOffset: 0,
-};
-
 const WorkspaceLoadingOverlay: React.FC = () => {
   const { isLoading, loadingProgress } = useCanvasStartupStatus();
   const displayLoadingProgress = Math.min(98, loadingProgress);
@@ -400,8 +393,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   } = useAuth();
   const { advanceTo } = useAppStartupActions();
   const [showTutorial, setShowTutorial] = useState(false);
-  const [desktopSideRailLayout, setDesktopSideRailLayout] = useState<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
-  const desktopSideRailLayoutRef = useRef<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
   const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
@@ -918,10 +909,16 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [profileInitialView, setProfileInitialView] = useState<UserProfileView>('main');
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [responsiveSurface, setResponsiveSurface] = useState(() => (
-    typeof window !== 'undefined' ? resolveResponsiveSurface(window.innerWidth) : 'desktop'
-  ));
-  const isMobile = isCompactResponsiveSurface(responsiveSurface);
+  const [responsiveViewport, setResponsiveViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    height: typeof window !== 'undefined' ? window.innerHeight : 900,
+  }));
+  const responsiveSurface = resolveResponsiveSurface(responsiveViewport.width);
+  const canvasWorkspaceSurface = resolveCanvasWorkspaceSurface(
+    responsiveViewport.width,
+    responsiveViewport.height,
+  );
+  const isMobile = isCanvasWorkspaceResultFlow(canvasWorkspaceSurface);
   const [mobileScreen, setMobileScreen] = useState<MobileSurfaceScreen>('home');
   const [mobileActiveResultId, setMobileActiveResultId] = useState<string | null>(null);
 
@@ -934,7 +931,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
 
     const syncMobileViewport = () => {
-      setResponsiveSurface(resolveResponsiveSurface(window.innerWidth));
+      setResponsiveViewport({ width: window.innerWidth, height: window.innerHeight });
     };
 
     syncMobileViewport();
@@ -3788,8 +3785,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
   }, [activeCanvas, collapsedCanvasGroupNodeIds, imageCardHeightById, isMobile]);
 
   const canvasViewStorageKey = React.useMemo(
-    () => getCanvasViewportStorageKey(activeCanvas?.id || 'default', 'desktop'),
-    [activeCanvas?.id],
+    () => getCanvasViewportStorageKey(
+      activeCanvas?.id || 'default',
+      getCanvasViewportSurfaceKey(canvasWorkspaceSurface),
+    ),
+    [activeCanvas?.id, canvasWorkspaceSurface],
   );
 
   const handleCanvasClick = React.useCallback(() => {
@@ -5030,124 +5030,6 @@ const isRectIntersecting = (
         ? '668px'
       : '48px';
 
-  useEffect(() => {
-    desktopSideRailLayoutRef.current = desktopSideRailLayout;
-  }, [desktopSideRailLayout]);
-
-  useLayoutEffect(() => {
-    if (!isReady) {
-      return;
-    }
-
-    if (isMobile || isLargeProject) {
-      setDesktopSideRailLayout(prev => {
-        const isDefault = prev.projectManagerScale === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerScale
-          && prev.hideZoomControl === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.hideZoomControl
-          && prev.projectManagerOffset === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerOffset;
-        if (isDefault) {
-          return prev;
-        }
-        desktopSideRailLayoutRef.current = DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT;
-        return DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT;
-      });
-      return;
-    }
-
-    let frameId: number | null = null;
-
-    const measure = () => {
-      frameId = null;
-
-      const projectManager = document.getElementById('project-manager-container');
-      const desktopChrome = document.querySelector<HTMLElement>('.desktop-left-chrome');
-      const zoomControl = document.querySelector<HTMLElement>('.desktop-zoom-control-shell')
-        ?? document.querySelector<HTMLElement>('.desktop-zoom-rail');
-
-      if (!projectManager || !desktopChrome) {
-        return;
-      }
-
-      const viewportHeight = window.innerHeight;
-      const previousScale = desktopSideRailLayoutRef.current.projectManagerScale || 1;
-      const projectManagerRect = projectManager.getBoundingClientRect();
-      const naturalProjectManagerHeight = projectManagerRect.height > 0
-        ? projectManagerRect.height / previousScale
-        : 0;
-
-      if (naturalProjectManagerHeight <= 0) {
-        return;
-      }
-
-      // 简体中文：检查是否有打开的用户菜单面板
-      const userMenu = document.getElementById('desktop-user-menu-panel');
-      const topChromeBottom = userMenu
-        ? userMenu.getBoundingClientRect().bottom
-        : desktopChrome.getBoundingClientRect().bottom;
-      const topClearance = Math.max(0, topChromeBottom + 16);
-      const topLimitedScale = (viewportHeight - topClearance * 2) / naturalProjectManagerHeight;
-      const boundedScale = Math.max(
-        0.64,
-        Math.min(1, Number.isFinite(topLimitedScale) ? topLimitedScale : 1),
-      );
-      const nextScale = Math.round(boundedScale * 1000) / 1000;
-
-      // 简体中文：计算 projectManager 正常垂直居中（translateY(-50%)）时的 top 坐标
-      const naturalTop = viewportHeight / 2 - (naturalProjectManagerHeight * nextScale) / 2;
-      // 简体中文：只有当 naturalTop 小于 topClearance（即发生遮挡）时，才需要向下移动避让
-      const avoidOffset = Math.max(0, topClearance - naturalTop);
-
-      const projectedProjectManagerBottom = viewportHeight / 2 + (naturalProjectManagerHeight * nextScale) / 2 + avoidOffset;
-      const zoomControlRect = zoomControl?.getBoundingClientRect();
-      const hideZoomControl = Boolean(zoomControlRect && projectedProjectManagerBottom + 12 >= zoomControlRect.top);
-
-      const nextLayout: DesktopSideRailLayout = {
-        projectManagerScale: nextScale,
-        hideZoomControl,
-        projectManagerOffset: avoidOffset,
-      };
-
-      setDesktopSideRailLayout(prev => {
-        const scaleUnchanged = Math.abs(prev.projectManagerScale - nextLayout.projectManagerScale) < 0.005;
-        const offsetUnchanged = Math.abs(prev.projectManagerOffset - nextLayout.projectManagerOffset) < 1;
-        if (scaleUnchanged && prev.hideZoomControl === nextLayout.hideZoomControl && offsetUnchanged) {
-          return prev;
-        }
-
-        desktopSideRailLayoutRef.current = nextLayout;
-        return nextLayout;
-      });
-    };
-
-    const scheduleMeasure = () => {
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId);
-      }
-      frameId = requestAnimationFrame(measure);
-    };
-
-    const observedElements = [
-      document.getElementById('project-manager-container'),
-      document.querySelector<HTMLElement>('.desktop-left-chrome'),
-      document.querySelector<HTMLElement>('.desktop-zoom-control-shell')
-        ?? document.querySelector<HTMLElement>('.desktop-zoom-rail'),
-    ].filter((element): element is HTMLElement => Boolean(element));
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(scheduleMeasure)
-      : null;
-
-    observedElements.forEach(element => resizeObserver?.observe(element));
-    window.addEventListener('resize', scheduleMeasure);
-    scheduleMeasure();
-
-    return () => {
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId);
-      }
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', scheduleMeasure);
-    };
-  }, [isLargeProject, isMobile, isReady, showUserMenu]);
-
   const handlePreviewFromLibrary = useCallback((imageId: string) => {
     setWorkspaceSurface('workspace');
     handleOpenPreview(imageId);
@@ -5338,8 +5220,6 @@ const isRectIntersecting = (
         onAutoArrange={handleAutoArrange}
         onToggleChat={toggleChatPanel}
         isChatOpen={isChatOpen}
-        desktopScale={desktopSideRailLayout.projectManagerScale}
-        desktopOffset={desktopSideRailLayout.projectManagerOffset}
         workflowTemplates={WORKFLOW_TEMPLATES}
         onApplyWorkflowTemplate={(templateId) => {
           void handleApplyWorkflowTemplate(templateId);

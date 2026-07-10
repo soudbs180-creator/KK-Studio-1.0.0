@@ -2,6 +2,7 @@ import type { MobileResultLayout, ResponsiveSurface, ResultViewMode } from '../t
 
 export const PHONE_MAX_WIDTH = 768;
 export const TABLET_MAX_WIDTH = 1023;
+export type CanvasWorkspaceSurface = 'phone-results' | 'tablet-portrait-results' | 'tablet-landscape-canvas' | 'desktop-canvas';
 const RESULT_GRID_GAP_PX = 12;
 const RESULT_GRID_ROW_HEIGHT_PX = 8;
 const RESULT_GRID_VERTICAL_CHROME_PX = 12;
@@ -26,6 +27,21 @@ export function resolveResponsiveSurface(width: number): ResponsiveSurface {
 
 export function isCompactResponsiveSurface(surface: ResponsiveSurface): boolean {
   return surface !== 'desktop';
+}
+
+export function resolveCanvasWorkspaceSurface(width: number, height: number): CanvasWorkspaceSurface {
+  const surface = resolveResponsiveSurface(width);
+  if (surface === 'phone') return 'phone-results';
+  if (surface === 'desktop') return 'desktop-canvas';
+  return width > height ? 'tablet-landscape-canvas' : 'tablet-portrait-results';
+}
+
+export function isCanvasWorkspaceResultFlow(surface: CanvasWorkspaceSurface): boolean {
+  return surface === 'phone-results' || surface === 'tablet-portrait-results';
+}
+
+export function getCanvasViewportSurfaceKey(surface: CanvasWorkspaceSurface): 'desktop' | 'tablet-landscape' {
+  return surface === 'tablet-landscape-canvas' ? 'tablet-landscape' : 'desktop';
 }
 
 export function isPhoneResponsiveWidth(width: number): boolean {

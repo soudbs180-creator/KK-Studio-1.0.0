@@ -5,6 +5,11 @@ import { type WorkflowUtilityCanvasNode } from '../app/appCanvasTypes';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { createCanvasFitTransform } from '../canvas/canvasViewportPersistence.ts';
 import { CANVAS_FOCUS_BOUNDS_EVENT } from '../canvas/canvasViewportEvents.ts';
+import {
+  canvasScreenPointToWorld,
+  getAvailableCanvasViewport,
+  type CanvasViewportInsets,
+} from '../canvas/canvasAvailableViewport.ts';
 
 export interface UseCanvasViewportProps {
   canvasRef: React.RefObject<InfiniteCanvasHandle | null>;
@@ -31,6 +36,29 @@ export function useCanvasViewport({
   const [canvasInteractionPhase, setCanvasInteractionPhase] = useState<CanvasInteractionPhase>('idle');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const viewAnimationFrameRef = React.useRef<number | null>(null);
+  const canvasTransformRef = React.useRef(canvasTransform);
+  canvasTransformRef.current = canvasTransform;
+
+  const getViewportInsets = useCallback((rect: DOMRect): CanvasViewportInsets => {
+    const rail = document.getElementById('project-manager-container')?.getBoundingClientRect();
+    const topChrome = document.querySelector<HTMLElement>('.desktop-left-chrome')?.getBoundingClientRect();
+    const promptBar = document.getElementById('prompt-bar-container')?.getBoundingClientRect();
+    return {
+      left: rail ? Math.max(0, rail.right - rect.left + 12) : 0,
+      right: 0,
+      top: topChrome ? Math.max(0, topChrome.bottom - rect.top + 12) : 0,
+      bottom: promptBar ? Math.max(0, rect.bottom - promptBar.top + 12) : 0,
+    };
+  }, []);
+
+  const getUsableViewport = useCallback(() => {
+    const rect = canvasRef.current?.getCanvasRect();
+    if (!rect) return null;
+    return {
+      rect,
+      available: getAvailableCanvasViewport(rect, getViewportInsets(rect)),
+    };
+  }, [canvasRef, getViewportInsets]);
 
   const animateToView = useCallback((target: { x: number; y: number; scale: number }, durationMs = 220) => {
     if (viewAnimationFrameRef.current !== null) {
@@ -68,25 +96,46 @@ export function useCanvasViewport({
     if (viewAnimationFrameRef.current !== null) cancelAnimationFrame(viewAnimationFrameRef.current);
   }, []);
 
-  // 同步视口中心到 CanvasContext 中，用于优先级加载
+  const syncViewportCenter = useCallback(() => {
+    const usable = getUsableViewport();
+    const center = usable?.available || {
+      centerX: window.innerWidth / 2,
+      centerY: window.innerHeight / 2,
+    };
+    setViewportCenter(canvasScreenPointToWorld({
+      x: center.centerX,
+      y: center.centerY,
+    }, canvasTransformRef.current));
+  }, [getUsableViewport, setViewportCenter]);
+
   useEffect(() => {
-    // 计算当前画布坐标系下的视口中心
-    const centerX = (window.innerWidth / 2 - canvasTransform.x) / canvasTransform.scale;
-    const centerY = (window.innerHeight / 2 - canvasTransform.y) / canvasTransform.scale;
-    setViewportCenter({ x: centerX, y: centerY });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasTransform]); // 排除 setViewportCenter 以避免无限循环
+    syncViewportCenter();
+  }, [canvasTransform, syncViewportCenter]);
+
+  // Keep creation and focus commands centered in the canvas area not covered by app chrome.
+  useEffect(() => {
+    window.addEventListener('resize', syncViewportCenter);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncViewportCenter) : null;
+    const canvas = document.getElementById('canvas-container');
+    const promptBar = document.getElementById('prompt-bar-container');
+    if (canvas) observer?.observe(canvas);
+    if (promptBar) observer?.observe(promptBar);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncViewportCenter);
+    };
+  }, [canvasRef, syncViewportCenter]);
 
   // 简体中文：AI接管平滑定位画布事件处理器
   useEffect(() => {
     const handleCenterOnNode = (e: Event) => {
       const { x, y, nodeId } = (e as CustomEvent).detail;
-      const rect = canvasRef.current?.getCanvasRect();
+      const usable = getUsableViewport();
       const current = canvasRef.current?.getCurrentTransform();
-      if (rect && current) {
+      if (usable && current) {
         animateToView({
-          x: rect.width / 2 - x * current.scale,
-          y: rect.height / 2 - y * current.scale,
+          x: usable.available.centerX - x * current.scale,
+          y: usable.available.centerY - y * current.scale,
           scale: current.scale,
         });
       }
@@ -102,31 +151,36 @@ export function useCanvasViewport({
     };
     window.addEventListener('canvas-center-on-node', handleCenterOnNode);
     return () => window.removeEventListener('canvas-center-on-node', handleCenterOnNode);
-  }, [animateToView, canvasRef]);
+  }, [animateToView, canvasRef, getUsableViewport]);
 
   useEffect(() => {
     const handleFocusBounds = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      const rect = canvasRef.current?.getCanvasRect();
-      if (!rect || !detail?.bounds) return;
+      const usable = getUsableViewport();
+      if (!usable || !detail?.bounds) return;
       const target = createCanvasFitTransform([detail.bounds], {
-        width: rect.width,
-        height: rect.height,
+        width: usable.available.width,
+        height: usable.available.height,
       }, {
         padding: 56,
         minScale: detail.minScale ?? 0.5,
         maxScale: detail.maxScale ?? 1.15,
       });
-      if (target) animateToView(target, detail.durationMs ?? 220);
+      if (target) animateToView({
+        ...target,
+        x: target.x + usable.available.x,
+        y: target.y + usable.available.y,
+      }, detail.durationMs ?? 220);
     };
     window.addEventListener(CANVAS_FOCUS_BOUNDS_EVENT, handleFocusBounds);
     return () => window.removeEventListener(CANVAS_FOCUS_BOUNDS_EVENT, handleFocusBounds);
-  }, [animateToView, canvasRef]);
+  }, [animateToView, getUsableViewport]);
 
   // 干净的平滑导航定位逻辑
   const handleNavigateToNode = useCallback((targetX: number, targetY: number, id?: string) => {
-    const screenCenterX = window.innerWidth / 2;
-    const screenCenterY = window.innerHeight / 2;
+    const available = getUsableViewport()?.available;
+    const screenCenterX = available?.centerX ?? window.innerWidth / 2;
+    const screenCenterY = available?.centerY ?? window.innerHeight / 2;
 
     // 计算居中目标所需的新位置
     // 我们希望: targetX * scale + transformX = screenCenterX
@@ -152,7 +206,7 @@ export function useCanvasViewport({
       setHighlightedId(id);
       setTimeout(() => setHighlightedId(null), 3000); // 高亮 3 秒
     }
-  }, [animateToView]);
+  }, [animateToView, getUsableViewport]);
 
   // 重置视图：优先选中选中的组，否则退回到最新节点
   const handleResetView = useCallback(() => {

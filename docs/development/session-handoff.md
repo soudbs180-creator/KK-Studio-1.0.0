@@ -2202,3 +2202,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根 TypeScript 与 shared TypeScript 均通过；Pointer Events、画板 UI、记事本迁移/恢复、卡片工厂和 ToolRegistry 定向测试 49/49 通过；`git diff --check` 通过。
 - **未运行验证及原因**：本阶段尚未运行生产构建、完整浏览器多视口、10k 性能及全量 `verify:changes`，留待响应式阶段完成后统一执行；当前环境无 `npm` 可执行文件，验证使用项目 Node 运行时直接调用底层入口。
 - **风险与下一步**：低到中风险。下一阶段只调整桌面/平板响应式表面、输入区与工具轨；手机结果流保持不变，并复核设置页持久化能力与画布入口契约不冲突。
+
+## 137. 2026-07-11 - 完成横屏平板画布与紧凑桌面操作面
+
+- **修改范围**：新增按宽高共同判定的 Workspace 表面，手机与平板竖屏保持结果流，平板横屏进入触控画布，桌面与横屏平板分别持久化视口；InfiniteCanvas 增加双指缩放/平移、触控取消和浏览器手势隔离；桌面输入区默认压缩为 68px 单行，模式、模型、来源图、上传、高级配置与发送入口均可达，展开区限制为 `min(320px, 30dvh)`；左侧工具轨固定 44px 外框和 40px 操作目标，使用内部滚动替代整体缩放；可用视口几何统一避让工具轨、顶部状态区、输入区和聊天侧栏，并驱动工作流创建、节点聚焦和选区聚焦。
+- **修改文件**：`apps/web/src/utils/responsiveSurface.ts`、`apps/web/src/canvas/canvasAvailableViewport.ts`、`apps/web/src/components/canvas/InfiniteCanvas.tsx`、`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/components/settings/ProjectManager.tsx`、`apps/web/src/hooks/useCanvasViewport.ts`、`apps/web/src/pages/Workspace/WorkspacePage.tsx`、`apps/web/src/styles/canvas.css`、`tests/unit/canvas-responsive-v2-contract.test.ts`、`tests/unit/mobile-home-three-zone-contract.test.ts`、`tests/unit/project-manager-unused-cleanup-contract.test.ts`、`openspec/changes/canvas-card-system-v2/tasks.md`。
+- **当前设计决策**：`isMobile` 在 Workspace 中表示“结果流表面”而不是单纯窄屏；设置页和 PromptBar 继续共用既有 `GenerationConfig`、模型能力和 ToolRegistry，不建立平行设置状态；工具轨保持稳定触控尺寸，低高度通过滚动访问全部功能；可用视口中心使用纯几何计算，DOM 仅提供遮挡 inset。
+- **已运行验证**：根 TypeScript 通过；响应式、PromptBar、ProjectManager、手机 Shell 定向回归 41/41 通过；测试语义检查覆盖 485 个文件；画布布局/迁移/可用视口定向测试 19/19 通过；UI Token、z-index、可见区精度、Workspace 体积和设置 UI 治理通过；生产构建通过（2440 modules）；画布性能基线 3/3 通过；移动与桌面设置 smoke 通过降级契约；`git diff --check` 通过。
+- **未运行验证及原因**：真实浏览器多视口截图未完成；当前任务可用工具没有应用内浏览器控制能力，独立 smoke 也报告 `browser-executable-not-found`，因此没有用未登录落地页冒充画布验收。未调用真实付费 Provider。
+- **风险与下一步**：中低风险。下一阶段执行完整架构、治理、类型、构建、全量测试、10k 性能及编码检查；重点关注同步设置页改造引入的外部测试变化，并严格区分本次画布回归与并行改动。

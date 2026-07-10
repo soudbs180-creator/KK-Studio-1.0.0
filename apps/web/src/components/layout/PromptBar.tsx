@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -1256,7 +1256,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [mobileCategory, setMobileCategory] = useState<string>('featured');
     const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
-    const [isExpanded, setIsExpanded] = useState(() => !isMobile);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [mentionState, setMentionState] = useState<{
         open: boolean;
         query: string;
@@ -3411,6 +3411,24 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     // 🚀 [NEW] 计算总成本 (单价 * 数量)
     const totalCreditCost = currentCreditCost * (config.parallelCount || 1);
+
+    const submitPrompt = () => {
+        if (isSystemCreditModel && authLoading) {
+            notify.info('账户状态确认中', '正在校验登录状态，请稍后再试。');
+            return;
+        }
+        if (isSystemCreditModel && !canAccessSystemCreditModels) {
+            notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
+            return;
+        }
+        if (isSystemCreditModel && totalCreditCost > 0 && balance < totalCreditCost) {
+            notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额 ${remainingBalanceDisplay}。`);
+            setShowRechargeModal(true);
+            return;
+        }
+        flushPromptDraftToConfig();
+        onGenerate(promptDraftRef.current);
+    };
     const resolvedCurrentSystemDisplay = selectedModelMeta.resolvedCurrentSystemDisplay;
     const currentModelPrimaryColor = normalizeColor(
         resolvedCurrentSystemDisplay?.colorStart || currentModel?.colorStart,
@@ -5098,18 +5116,148 @@ const PromptBar: React.FC<PromptBarProps> = ({
         );
     }
 
+    if (!isExpanded) {
+        return (
+            <>
+                <div
+                    id="prompt-bar-container"
+                    data-desktop-composer-state="compact"
+                    className="input-bar kk-desktop-composer-compact w-[calc(100vw-32px)] max-w-[760px]"
+                    onDragEnter={handleDragEnter}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    style={{
+                        bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
+                        left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
+                        transform: 'translateX(-50%)',
+                        transition: 'left 0.3s ease-out, height 0.2s ease-out',
+                    }}
+                >
+                    <div className="flex h-[68px] min-w-0 items-center gap-2 px-2.5">
+                        {activeSourceImage ? (
+                            <div className="relative h-10 w-10 shrink-0" title="当前继续创作来源图">
+                                <img src={activeSourceImage.url} alt="来源图" className="h-10 w-10 rounded-lg object-cover" />
+                                <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.clearSource.uiAction}
+                                    className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-coral)] text-white"
+                                    onClick={onClearSource}
+                                    title="取消继续创作"
+                                    aria-label="取消继续创作"
+                                >
+                                    <X size={10} />
+                                </button>
+                            </div>
+                        ) : config.mode !== GenerationMode.ECOMMERCE && (
+                            <button
+                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                className="prompt-bar-liquid-button relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="添加参考图"
+                                aria-label="添加参考图"
+                            >
+                                <Plus size={18} />
+                                {config.referenceImages.length > 0 && (
+                                    <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-[var(--accent-coral)] px-1 text-[10px] leading-4 text-white">
+                                        {config.referenceImages.length}
+                                    </span>
+                                )}
+                            </button>
+                        )}
+                        <button
+                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
+                            className="prompt-bar-liquid-button hidden h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium text-[var(--text-secondary)] sm:flex"
+                            onClick={() => setIsExpanded(true)}
+                            title="展开模式、模型和高级配置"
+                        >
+                            <span className="max-w-36 truncate">{activeModeOption.label} / {displayModelLabel}</span>
+                        </button>
+                        <div className="relative min-w-0 flex-1">
+                            <ReferenceMentionPanel
+                                open={mentionState.open}
+                                query={mentionState.query}
+                                tabs={referenceMentionTabs}
+                                anchor={mentionState.anchor}
+                                onSelect={replaceActiveMentionWithCandidate}
+                                onClose={closeReferenceMentionPanel}
+                            />
+                            <textarea
+                                ref={textareaRef}
+                                value={promptDraft}
+                                onChange={handleInput}
+                                onKeyDown={handleKeyDown}
+                                onPaste={handlePaste}
+                                onFocus={() => {
+                                    favoriteComposerRegistry.markFocused('promptbar');
+                                    setActiveMenu(null);
+                                    onFocus?.();
+                                }}
+                                onBlur={() => {
+                                    flushPromptDraftToConfig();
+                                    onBlur?.();
+                                }}
+                                onCompositionStart={() => { isComposingRef.current = true; }}
+                                onCompositionEnd={handleCompositionEnd}
+                                placeholder="描述要生成的内容..."
+                                className="input-bar-textarea h-10 min-h-10 max-h-10 w-full resize-none overflow-y-auto rounded-lg px-2 py-2 text-sm"
+                                rows={1}
+                            />
+                        </div>
+                        <button
+                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
+                            className="prompt-bar-liquid-button flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                            onClick={() => setIsExpanded(true)}
+                            title="展开高级配置"
+                            aria-label="展开高级配置"
+                        >
+                            <SlidersHorizontal size={17} />
+                        </button>
+                        <CreditSendButton
+                            isCreditModel={isSystemCreditModel}
+                            creditCost={totalCreditCost}
+                            balance={balance}
+                            balanceLoading={billingLoading}
+                            hasPrompt={!!promptDraft.trim()}
+                            colorStart={currentModel?.colorStart}
+                            colorEnd={currentModel?.colorEnd}
+                            textColor={currentModel?.textColor}
+                            ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
+                            className="prompt-bar-liquid-button prompt-bar-liquid-send"
+                            isMobile={false}
+                            parallelCount={config.parallelCount}
+                            onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
+                            onClick={submitPrompt}
+                        />
+                    </div>
+                </div>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={(event) => {
+                        if (event.target.files) processFiles(event.target.files);
+                        event.target.value = '';
+                    }}
+                />
+            </>
+        );
+    }
+
 
     return (
         <>
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
+                data-desktop-composer-state="expanded"
+                className={`input-bar kk-desktop-composer-expanded ${isMobile ? 'ios-mobile-prompt' : ''} ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 style={isMobile ? mobileStyle : { 
-                    bottom: '32px',
+                    bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
                     left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
                     transform: 'translateX(-50%)',
                     transition: 'left 0.3s ease-out'
@@ -5200,6 +5348,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         textareaRef.current?.blur();
                                     }}
                                     title="收起输入面板"
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                            )}
+                            {!isMobile && (
+                                <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
+                                    onClick={() => setIsExpanded(false)}
+                                    title="收起高级配置"
+                                    aria-label="收起高级配置"
                                 >
                                     <ChevronDown size={16} />
                                 </button>

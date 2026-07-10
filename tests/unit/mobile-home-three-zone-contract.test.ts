@@ -101,7 +101,7 @@ describe('mobile home adaptive zone contract', () => {
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
     assert.match(
       promptBarSource,
-      /const \[isExpanded, setIsExpanded\] = useState\(\(\) => !isMobile\);/,
+      /const \[isExpanded, setIsExpanded\] = useState\(false\);/,
     );
     assert.match(promptBarSource, /kk-prompt-bar-mobile-home-indicator/);
     assert.match(promptBarSource, /data-mobile-composer-gesture="swipe-up"/);
