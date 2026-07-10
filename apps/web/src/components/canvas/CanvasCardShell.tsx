@@ -1,12 +1,7 @@
 import React from 'react';
 import type { CanvasCardPresentation } from '@kk/shared';
 import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
-
-const CARD_WIDTH_BY_SIZE: Record<CanvasCardPresentation['size'], number> = {
-  compact: 280,
-  standard: 320,
-  wide: 420,
-};
+import { getCanvasCardWidth } from '../../canvas/canvasCardMetrics.ts';
 
 export interface CanvasCardShellProps {
   id: string;
@@ -31,7 +26,7 @@ export const CanvasCardShell: React.FC<CanvasCardShellProps> = ({
   className = '',
   children,
 }) => {
-  const width = CARD_WIDTH_BY_SIZE[presentation.size];
+  const width = getCanvasCardWidth(presentation);
   const isGhost = detailLevel === 'ghost' || detailLevel === 'skeleton' || detailLevel === 'thumbnail-shell';
   return (
     <section
@@ -52,7 +47,12 @@ export const CanvasCardShell: React.FC<CanvasCardShellProps> = ({
         transition: 'left 220ms ease, top 220ms ease, opacity 180ms ease, border-color 180ms ease',
       }}
     >
-      {children}
+      {isGhost ? (
+        <div className="flex h-full min-h-[96px] items-center justify-between gap-3 px-3 py-2 text-[11px] text-zinc-400">
+          <span className="truncate">{presentation.kind}</span>
+          <span className="shrink-0 text-zinc-600">{detailLevel}</span>
+        </div>
+      ) : children}
     </section>
   );
 };

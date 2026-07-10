@@ -70,7 +70,7 @@ export const createCanvasCardNodes = (
   const now = defaults.now ?? Date.now();
   const idFactory = defaults.idFactory || createDefaultId(now);
   const position = input.position || defaults.position;
-  const layoutMode = input.layoutMode || 'column';
+  const layoutMode = input.layoutMode || (input.kind === 'multi-image' ? 'grid' : 'column');
   const aspectRatio = (input.aspectRatio || AspectRatio.SQUARE) as PromptNode['aspectRatio'];
   const imageSize = (input.imageSize || ImageSize.SIZE_1K) as PromptNode['imageSize'];
   const model = input.model || defaults.model || 'gemini-2.5-flash-image';

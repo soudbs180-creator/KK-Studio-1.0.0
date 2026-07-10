@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { ArrowDown, ArrowUp, Pause, Play, Plus, RotateCcw, Square, Trash2 } from 'lucide-react';
 import type { WorkflowPanelData, WorkflowPanelNode, WorkflowPanelStep } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
+import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 
 interface WorkflowPanelCardProps {
   node: WorkflowPanelNode;
@@ -12,6 +13,7 @@ interface WorkflowPanelCardProps {
   onPositionChange: (position: { x: number; y: number }) => void;
   onDataChange: (data: WorkflowPanelData) => void;
   onCommand: (action: 'run' | 'pause' | 'cancel' | 'retry') => void;
+  detailLevel?: CanvasCardDetailLevel;
 }
 
 const moveStep = (steps: WorkflowPanelStep[], index: number, delta: -1 | 1) => {
@@ -31,6 +33,7 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
   onPositionChange,
   onDataChange,
   onCommand,
+  detailLevel = 'full',
 }) => {
   const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const data = node.data;
@@ -44,6 +47,7 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
       height={node.height || 420}
       zIndex={node.zIndex}
       selected={selected}
+      detailLevel={detailLevel}
       className="pointer-events-auto bg-zinc-950/95"
     >
       <header

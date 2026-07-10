@@ -1,4 +1,5 @@
 import { GenerationMode, type PromptNode } from '../types/index.ts';
+import { getCanvasCardWidth } from '../canvas/canvasCardMetrics.ts';
 
 export const DEFAULT_PROMPT_CARD_WIDTH = 320;
 export const PROMPT_NODE_BOUNDS_WIDTH = 380;
@@ -8,14 +9,14 @@ export function isEcommerceFrameworkPromptNode(node: Pick<PromptNode, 'mode' | '
   return node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';
 }
 
-export function getPromptNodeBaseCardWidth(node: Pick<PromptNode, 'mode' | 'ecommerce'>): number {
+export function getPromptNodeBaseCardWidth(node: Pick<PromptNode, 'mode' | 'ecommerce' | 'presentation'>): number {
   return isEcommerceFrameworkPromptNode(node)
     ? ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH
-    : DEFAULT_PROMPT_CARD_WIDTH;
+    : getCanvasCardWidth(node.presentation);
 }
 
 export function getPromptNodeCardWidth(
-  node: Pick<PromptNode, 'mode' | 'ecommerce'>,
+  node: Pick<PromptNode, 'mode' | 'ecommerce' | 'presentation'>,
   isMobile: boolean,
   viewportWidth?: number,
 ): number {
@@ -31,7 +32,7 @@ export function getPromptNodeCardWidth(
 }
 
 export function getPromptNodeBoundsWidth(
-  node: Pick<PromptNode, 'mode' | 'ecommerce'>,
+  node: Pick<PromptNode, 'mode' | 'ecommerce' | 'presentation'>,
   isMobile: boolean,
 ): number {
   if (isEcommerceFrameworkPromptNode(node)) {
@@ -39,5 +40,5 @@ export function getPromptNodeBoundsWidth(
     return getPromptNodeCardWidth(node, isMobile, viewportWidth);
   }
 
-  return PROMPT_NODE_BOUNDS_WIDTH;
+  return getPromptNodeBaseCardWidth(node);
 }

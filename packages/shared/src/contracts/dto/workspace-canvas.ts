@@ -40,6 +40,10 @@ export interface CanvasCardPresentation {
   size: CanvasCardSizeToken;
   ports: CanvasConnectionPorts;
   diagnostic?: string;
+  view?: {
+    expanded?: boolean;
+    primaryMediaNodeId?: EntityId;
+  };
 }
 
 export interface CanvasVectorPointDto {

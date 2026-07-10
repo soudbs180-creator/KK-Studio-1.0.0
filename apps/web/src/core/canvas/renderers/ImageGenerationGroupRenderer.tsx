@@ -49,6 +49,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   buildPromptGroupRenderLayout,
   visibleImageIdSet,
   handleImageCardHeightChange,
+  totalChildImageCount,
 }) => {
   const node = item.node;
   const groupView = item.groupView;
@@ -74,7 +75,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
       groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
       stackZIndexOverride={stackZIndex}
       shadowBoost={hasShadowBoost}
-      actualChildImageCount={visibleChildImages.length}
+      actualChildImageCount={totalChildImageCount ?? visibleChildImages.length}
       onPositionChange={handleLiveNodePositionChange}
       isSelected={isSelected}
       highlighted={highlightedIdVal === node.id || isGroupFocused}
@@ -157,10 +158,13 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
     resolveLivePromptPosition,
     resolveLiveImagePosition,
   });
+  const isSingleDeckCard = node.presentation?.kind === 'ppt-deck';
+  const renderedChildLayouts = isSingleDeckCard ? [] : childVisualLayouts;
+  const renderedConnectorLayouts = isSingleDeckCard ? [] : groupConnectorLayouts;
 
   return (
     <>
-      {groupConnectorLayouts.length > 0 && (
+      {renderedConnectorLayouts.length > 0 && (
         <svg
           className="absolute top-0 left-0 pointer-events-none"
           shapeRendering="geometricPrecision"
@@ -177,7 +181,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
           }}
         >
           <g>
-            {groupConnectorLayouts
+            {renderedConnectorLayouts
               .filter((segment: any) => visibleImageIdSet.has(segment.imageId))
               .map((segment: any) => (
                 <path
@@ -200,7 +204,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
 
       {renderPromptCard(renderedPromptNode, promptDetailLevel, promptCardZIndex, shadowBoost, isGroupFocused)}
 
-      {childVisualLayouts.map((childLayout: any, childIndex: number) => (
+      {renderedChildLayouts.map((childLayout: any, childIndex: number) => (
         <React.Fragment key={childLayout.childNode.id}>
           <ImageNode
             id={`image-card-${childLayout.childNode.id}`}

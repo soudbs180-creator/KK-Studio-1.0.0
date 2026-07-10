@@ -1444,11 +1444,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     } as const;
 
     const isColorCardMode = detailLevel === 'ghost' || isCanvasTransforming || isDragging;
+    const shellKind = image.presentation?.kind || (image.mode === GenerationMode.AUDIO ? 'audio' : 'media-only');
+    const shellLayoutMode = image.presentation?.layoutMode || 'column';
 
     if (isSlowLoading) {
         return (
             <div
                 ref={containerRef}
+                id={`image-card-${image.id}`}
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
                 data-card-height={cardHeight}
                 style={{
                     position: 'absolute',
@@ -1459,7 +1465,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     pointerEvents: 'none',
                     opacity: 0.8,
                 }}
-                className="gpu-accelerated transition-opacity duration-300"
+                className="canvas-card-shell gpu-accelerated transition-opacity duration-300"
             >
                 <div
                     className="kk-image-card-skeleton w-full h-full rounded-2xl border animate-pulse"
@@ -1486,10 +1492,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             <div
                 ref={containerRef}
                 id={`image-card-${image.id}`}
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
                 data-x={image.position.x}
                 data-y={image.position.y}
                 data-card-height={cardHeight}
-                className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`canvas-card-shell image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
                     zIndex: effectiveStackZIndex,
@@ -1641,10 +1650,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             <div
                 ref={containerRef}
                 id={`image-card-${image.id}`}
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
                 data-x={image.position.x}
                 data-y={image.position.y}
                 data-card-height={cardHeight}
-                className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`canvas-card-shell image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
                     zIndex: effectiveStackZIndex,
@@ -1747,7 +1759,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             <div className="relative w-full h-full group/audio bg-[var(--frost-card-framework-bg)] flex flex-col items-center justify-center overflow-hidden">
                                                 <Music size={48} className="text-[var(--accent-coral)] opacity-30 mb-4 z-10 pointer-events-none" />
                                                 <audio
+                                                    ref={audioRef}
                                                     src={displaySrc}
+                                                    preload="metadata"
                                                     controls
                                                     controlsList="nodownload"
                                                     className="relative z-10 w-11/12 h-10 opacity-80 hover:opacity-100 transition-opacity"

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CanvasCardKind as CanvasPresentationKind } from '@kk/shared';
 import type { CanvasCardDetailLevel } from '../../../canvas/performanceProfile';
 
 import ImageGenerationGroupRenderer from './ImageGenerationGroupRenderer';
@@ -9,10 +10,12 @@ import WorkflowCardRenderer from './WorkflowCardRenderer';
 import AgentCardRenderer from './AgentCardRenderer';
 import ExportCardRenderer from './ExportCardRenderer';
 import UnknownCardRenderer from './UnknownCardRenderer';
+import MultiImageGroupRenderer from './MultiImageGroupRenderer.tsx';
 
 export type CanvasCardKind =
   | 'image-generation-group'
   | 'video-generation-group'
+  | 'multi-image-group'
   | 'ecommerce-task-card'
   | 'ppt-slide-card'
   | 'ppt-deck-card'
@@ -86,6 +89,7 @@ class CanvasCardRendererRegistry {
 
     this.register('image-generation-group', createPolicy('image-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), ImageGenerationGroupRenderer);
     this.register('video-generation-group', createPolicy('video-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), VideoGenerationGroupRenderer);
+    this.register('multi-image-group', createPolicy('multi-image-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), MultiImageGroupRenderer);
     const functionalPromptGroupPolicy = (kind: CanvasCardKind, pattern: CardDisplayPattern) => createPolicy(kind, pattern, {
       hasMainCard: true,
       hasResultCards: true,
@@ -122,6 +126,11 @@ class CanvasCardRendererRegistry {
 
   resolveCardKind(node: any): CanvasCardKind {
     if (!node || node.presentation?.kind === 'unknown') return 'unknown-card';
+    const presentationKind = node.presentation?.kind as CanvasPresentationKind | undefined;
+    if (presentationKind === 'ecommerce') return 'ecommerce-task-card';
+    if (presentationKind === 'ppt-deck') return 'ppt-deck-card';
+    if (presentationKind === 'audio') return 'music-task-card';
+    if (presentationKind === 'multi-image') return 'multi-image-group';
     
     // According to GenerationMode (IMAGE=1, VIDEO=2, AUDIO=3, PPT=4, ECOMMERCE=5)
     const mode = node.mode;
@@ -150,6 +159,7 @@ class CanvasCardRendererRegistry {
     switch (kind) {
       case 'image-generation-group':
       case 'video-generation-group':
+      case 'multi-image-group':
         return 'prompt-result-group';
       case 'ecommerce-task-card':
       case 'music-task-card':

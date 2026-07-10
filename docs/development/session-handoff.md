@@ -2164,3 +2164,32 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根 TypeScript `tsc --noEmit` 通过；卡片工厂、ToolRegistry、单执行链、RuntimeState 和渲染策略定向测试 56/56 通过；482 个测试文件语义检查通过；技能一致性治理通过；Vite 生产构建通过（2435 modules）；`git diff --check` 通过。
 - **未运行验证及原因**：尚未执行完整浏览器多视口与 10k 性能验收，留待卡片渲染及响应式阶段完成后统一执行；未调用真实付费 Provider。
 - **风险与下一步**：中低风险。下一阶段审查 Prompt/Image/PPT/电商/音频/文本/多图实际渲染路径，让业务内容使用统一 Shell 语义且保证失败卡可见，不启用旧静态旁路渲染器。
+
+## 135. 2026-07-11 - 统一业务卡片 Shell 与真实内容渲染
+
+- **修改范围**：
+  1. 提取 280/320/420 卡片尺寸 token，CanvasCardShell、Prompt 实际宽度与场景 bounds 共用；Prompt/Image 所有 full/compact/ghost/skeleton DOM 统一暴露卡型、布局和 LOD 语义。
+  2. 注册表优先读取 V2 presentation；PPT deck 只渲染单个 deck 主卡，继续使用现有真实页面模块、真实缩略图、编辑与导出入口，不再散落页面副卡。
+  3. 多图卡新增折叠堆叠、展开网格和主图轮换；状态持久化到 `presentation.view`，折叠时仅挂载主图以降低 DOM 开销。
+  4. 声音卡继续走 ImageCard 的真实 `<audio>` 播放器，补齐 `audioRef` 与 metadata 预加载，统一播放代理可正确注册；不展示假波形、假时长或假费用。
+  5. 记事本和工作流卡接入 Shell LOD 与可见区裁剪；远景只保留轻量外壳，被选节点始终可见。
+  6. 删除未注册但含假数据的 Ecommerce/PPT/Music 静态旁路渲染器，防止后续误接回主链路。
+- **修改文件**：
+  - `packages/shared/src/contracts/dto/workspace-canvas.ts`
+  - `apps/web/src/canvas/canvasCardMetrics.ts`
+  - `apps/web/src/components/canvas/CanvasCardShell.tsx`
+  - `apps/web/src/components/canvas/PromptNodeComponent.tsx`
+  - `apps/web/src/components/canvas/CanvasNoteCard.tsx`
+  - `apps/web/src/components/canvas/WorkflowPanelCard.tsx`
+  - `apps/web/src/components/image/ImageCard2.tsx`
+  - `apps/web/src/context/canvasCardFactory.ts`
+  - `apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts`
+  - `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`
+  - `apps/web/src/core/canvas/renderers/MultiImageGroupRenderer.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `tests/contract/canvas-card-shell-v2.test.ts`
+  - 删除四个未使用的假业务渲染器文件。
+- **当前设计决策**：Prompt 与 Image 保留成熟交互组件，但必须消费统一尺寸、presentation、LOD 与 Shell DOM 契约；业务渲染器不再创建第二套绝对定位外壳。PPT 页内容属于 deck 卡内部模块，多图折叠状态属于 presentation 持久化状态。
+- **已运行验证**：根与 shared TypeScript 通过；卡片 Shell、PPT、音频、多图、迁移、连线、电商和几何定向测试 23/23 通过；483 个测试文件语义检查通过；可见项精度、UI Token、z-index 检查通过；Vite 生产构建通过（2437 modules）；`git diff --check` 通过。
+- **未运行验证及原因**：无头 Chrome 的全新用户配置只能进入未登录落地页，不能复用应用内浏览器的登录画布会话，因此本阶段未伪报画布截图验收；最终响应式阶段继续使用可用会话验收。未调用真实付费 Provider。
+- **风险与下一步**：低到中风险。下一阶段统一画板 Pointer Events，补记事本重新进入编辑、来源图片绑定与 AI 按需栅格化，保持矢量数据为持久化事实源。

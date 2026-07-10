@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import type { CanvasNoteNode, CanvasDrawing } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
+import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 import CanvasDrawingsLayer from './CanvasDrawingsLayer.tsx';
 
 export interface CanvasNoteCardProps {
@@ -10,6 +11,7 @@ export interface CanvasNoteCardProps {
   onSelect: () => void;
   onDelete: () => void;
   onPositionChange: (position: { x: number; y: number }) => void;
+  detailLevel?: CanvasCardDetailLevel;
 }
 
 export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
@@ -19,6 +21,7 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
   onSelect,
   onDelete,
   onPositionChange,
+  detailLevel = 'full',
 }) => {
   const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const drawings = note.elements as CanvasDrawing[];
@@ -30,6 +33,7 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
       height={note.height}
       zIndex={note.zIndex}
       selected={selected}
+      detailLevel={detailLevel}
       className="pointer-events-auto bg-zinc-950/95"
     >
       <div

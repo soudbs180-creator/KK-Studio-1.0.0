@@ -1245,6 +1245,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
     const showError = Boolean(node.error);
     const isThumbnailShell = detailLevel === 'thumbnail-shell';
+    const shellKind = node.presentation?.kind || (node.childImageIds.length > 0 ? 'prompt-result-group' : 'prompt-only');
+    const shellLayoutMode = node.presentation?.layoutMode || 'column';
     const shellCardShadow = shouldReduceShadow
         ? 'none'
         : (showError
@@ -1303,7 +1305,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             <div
                 ref={containerRef}
                 id={`prompt-card-${node.id}`}
-                className="prompt-node absolute flex flex-col items-center select-none"
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
+                className="canvas-card-shell prompt-node absolute flex flex-col items-center select-none"
                 style={{
                     transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
                     left: 0,
@@ -1340,6 +1345,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
+                id={`prompt-card-${node.id}`}
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
                 style={{
                     position: 'absolute',
                     left: `${snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1) - originX}px`,
@@ -1349,7 +1358,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     pointerEvents: 'none',
                     opacity: 0.8,
                 }}
-                className="gpu-accelerated transition-opacity duration-300"
+                className="canvas-card-shell gpu-accelerated transition-opacity duration-300"
             >
                 <div
                     className="w-full h-full rounded-2xl border animate-pulse"
@@ -1374,9 +1383,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             <div
                 ref={containerRef}
                 id={`prompt-card-${node.id}`}
+                data-card-kind={shellKind}
+                data-layout-mode={shellLayoutMode}
+                data-detail-level={detailLevel}
                 data-x={node.position.x}
                 data-y={node.position.y}
-                className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
+                className={`canvas-card-shell prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
                 style={isChatMode ? {
                     opacity: 1,
                 } : {
@@ -1543,9 +1555,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         <div
             ref={containerRef}
             id={`prompt-card-${node.id}`}
+            data-card-kind={shellKind}
+            data-layout-mode={shellLayoutMode}
+            data-detail-level={detailLevel}
             data-x={node.position.x}
             data-y={node.position.y}
-            className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
+            className={`canvas-card-shell prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
             style={isChatMode ? {
                 opacity: 1,
             } : {

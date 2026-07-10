@@ -4264,9 +4264,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return (
         <div
           id={`image-card-${node.id}`}
+          data-card-kind={node.presentation?.kind || (node.mode === GenerationMode.AUDIO ? 'audio' : 'media-only')}
+          data-layout-mode={node.presentation?.layoutMode || 'column'}
+          data-detail-level="skeleton"
           data-x={node.position.x}
           data-y={node.position.y}
-          className="image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none flex flex-col items-center justify-center"
+          className="canvas-card-shell image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none flex flex-col items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
             handleCanvasNodeSelect(node.id);
@@ -4393,7 +4396,7 @@ const isRectIntersecting = (
     const cardRenderer = canvasCardRendererRegistry.getRenderer(cardKind);
 
     if (cardRenderer) {
-      return cardRenderer({
+      return React.createElement(cardRenderer, {
         item,
         detailLevel: (item.isPlaceholder ? 'skeleton' : item.detailLevel) as any,
         isSelected: selectedNodeIds.includes(node.id),
@@ -4887,6 +4890,26 @@ const isRectIntersecting = (
       </React.Fragment>
     ))
   ), [canvasNodeRendererRegistry, renderedItems]);
+
+  const isAuxiliaryCanvasNodeVisible = useCallback((
+    id: string,
+    position: { x: number; y: number },
+    width: number,
+    height: number,
+  ) => {
+    if (selectedNodeIds.includes(id)) return true;
+    const buffer = Math.max(canvasPerformanceProfile.overscanBuffer * 2.5, 1200);
+    const left = -canvasTransform.x / canvasTransform.scale - buffer;
+    const top = -canvasTransform.y / canvasTransform.scale - buffer;
+    const right = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + buffer;
+    const bottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + buffer;
+    return isRectIntersecting({
+      x: position.x - width / 2,
+      y: position.y - height,
+      width,
+      height,
+    }, { left, top, right, bottom });
+  }, [canvasPerformanceProfile.overscanBuffer, canvasTransform, selectedNodeIds]);
 
   if (typeof window !== 'undefined' && (window as any).__KK_LARGE_CANVAS_SMOKE__) {
     console.log(`[Workspace10k] rendered-canvas-elements count=${renderedCanvasItems.length} visibleGroups=${renderedVisibleGroups.length}`);
@@ -6042,12 +6065,15 @@ const isRectIntersecting = (
 
 
         {/* 2. Canvas items */}
-        {(activeCanvas?.noteNodes || []).map((note) => (
+        {(activeCanvas?.noteNodes || [])
+          .filter((note) => isAuxiliaryCanvasNodeVisible(note.id, note.position, note.width, note.height))
+          .map((note) => (
           <CanvasNoteCard
             key={note.id}
             note={note}
             selected={selectedNodeIds.includes(note.id)}
             zoomScale={canvasTransform.scale}
+            detailLevel={canvasPerformanceProfile.cardDetailLevel}
             onSelect={() => selectNodes([note.id], 'replace')}
             onDelete={() => deleteNoteNode(note.id)}
             onPositionChange={(position) => updateNoteNodePosition(note.id, position)}
@@ -6055,12 +6081,14 @@ const isRectIntersecting = (
         ))}
         {(activeCanvas?.workflow?.nodes || [])
           .filter((node): node is import('../../types').WorkflowPanelNode => node.kind === 'workflow-panel')
+          .filter((node) => isAuxiliaryCanvasNodeVisible(node.id, node.position, node.width || 420, node.height || 420))
           .map((node) => (
             <WorkflowPanelCard
               key={node.id}
               node={node}
               selected={selectedNodeIds.includes(node.id)}
               zoomScale={canvasTransform.scale}
+              detailLevel={canvasPerformanceProfile.cardDetailLevel}
               onSelect={() => selectNodes([node.id], 'replace')}
               onDelete={() => deleteWorkflowNode(node.id)}
               onPositionChange={(position) => updateWorkflowNodePosition(node.id, position)}
