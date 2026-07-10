@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronRight, Globe2, X } from 'lucide-react';
+import { ArrowLeft, Globe2, X } from 'lucide-react';
 import { Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Supplier } from '../../services/billing/supplierService';
@@ -8,9 +8,7 @@ import { resolveAvatarUrl } from '../../utils/presetAvatars';
 import { pickByLanguage, useLocale } from '../../context/LocaleContext';
 import SettingsDesktopSidebar from './desktop/SettingsDesktopSidebar';
 import SettingsDesktopWorkbenchHeader from './desktop/SettingsDesktopWorkbenchHeader';
-import { useBilling } from '../../context/BillingContext';
-import { formatRemainingCredits } from '../../services/billing/remainingBalance';
-import { keyManager } from '../../services/auth/keyManager';
+import SettingsMobileDashboard from './SettingsMobileDashboard';
 import {
   deriveApiManagementListStateFromPath,
   isApiManagementEditorRoute,
@@ -304,140 +302,6 @@ const SettingsDesktopShell: React.FC<{
           </main>
         </div>
       </section>
-    </div>
-  );
-};
-
-// 简体中文：新能力树移动端设置主页 Dashboard，聚合关键指标和 10 个能力模块的导航列表
-import { SettingsHero, SettingsActionButton } from './SettingsScaffold';
-import { LayoutDashboard, ArrowRight } from 'lucide-react';
-
-export const SettingsMobileDashboard: React.FC<{
-  onNavigate: (view: CanonicalSettingsViewId) => void;
-}> = ({ onNavigate }) => {
-  const { locale, pick, language } = useLocale();
-  const { balance, loading: billingLoading } = useBilling();
-  const [stats, setStats] = useState(() => keyManager.getStats());
-  const [activeProviderCount, setActiveProviderCount] = useState(0);
-  const [officialCount, setOfficialCount] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => {
-      const allSlots = keyManager.getSlots();
-      const providers = keyManager.getProviders();
-      const official = allSlots.filter((slot) => {
-        if (!slot.key || slot.disabled) return false;
-        if (slot.baseUrl) return false;
-        if (slot.provider === 'SystemProxy') return false;
-        return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
-      });
-      setStats(keyManager.getStats());
-      setOfficialCount(official.length);
-      setActiveProviderCount(providers.filter((item) => item.isActive).length);
-    };
-    refresh();
-    return keyManager.subscribe(refresh);
-  }, []);
-
-  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
-  const sections = getSettingsNavSections(language);
-  const items = getSettingsNavItems(language);
-
-  const hasAvailableRoute = stats.valid > 0 || activeProviderCount > 0;
-  const channelCount = officialCount + activeProviderCount;
-  const systemReadiness = hasAvailableRoute ? 100 : 42;
-
-  return (
-    <div className="flex flex-col gap-6 p-4 text-[var(--text-primary)]">
-      {/* 顶部 Hero 区域，保持与 Desktop 一致，完美兼容测试 */}
-      <SettingsHero
-        eyebrow="Overview"
-        title={pick('设置总览', 'Settings Overview')}
-        icon={LayoutDashboard}
-        tone="indigo"
-        description={pick(
-          '在移动设备上快速配置能力来源、生成路由与核心参数。',
-          'Configure capability inputs, routes, and performance options.'
-        )}
-        actions={
-          <SettingsActionButton
-            icon={ArrowRight}
-            tone="primary"
-            onClick={() => onNavigate('capability-sources')}
-          >
-            {pick('配置能力来源', 'Configure Capability Sources')}
-          </SettingsActionButton>
-        }
-      />
-
-      {/* 顶部极简状态卡片 */}
-      <div 
-        className="grid grid-cols-3 gap-2 rounded-2xl border p-3 bg-slate-900/40 backdrop-blur-md"
-        style={{ borderColor: 'var(--settings-border-subtle, rgba(255, 255, 255, 0.08))' }} // UI_TOKEN_EXCEPTION
-      >
-        <div className="text-center">
-          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('就绪度', 'Readiness')}</div>
-          <div className="text-sm font-extrabold mt-1 text-emerald-400">{systemReadiness}%</div>
-        </div>
-        <div className="text-center border-x border-white/5">
-          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('API链路', 'Routes')}</div>
-          <div className="text-sm font-extrabold mt-1 text-indigo-400">{channelCount}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-[10px] text-[var(--text-tertiary)]">{pick('当前余额', 'Balance')}</div>
-          <div className="text-xs font-extrabold mt-1 truncate text-amber-400" title={remainingBalanceDisplay}>
-            {remainingBalanceDisplay}
-          </div>
-        </div>
-      </div>
-
-      {/* 设置项能力树分类列表 */}
-      <div className="flex flex-col gap-5">
-        {sections.map((section) => {
-          const sectionItems = items.filter(
-            (item) => item.section === section.id && item.id !== 'dashboard'
-          );
-
-          return (
-            <div key={section.id} className="flex flex-col gap-2">
-              <div className="px-2 text-[10px] font-bold tracking-wider text-[var(--text-tertiary)] uppercase">
-                {section.label}
-              </div>
-              <div 
-                className="flex flex-col rounded-2xl border divide-y overflow-hidden bg-slate-900/20"
-                style={{ 
-                  borderColor: 'var(--settings-border-subtle, rgba(255, 255, 255, 0.08))' // UI_TOKEN_EXCEPTION
-                }}
-              >
-                {sectionItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onNavigate(item.id)}
-                      className="flex items-center justify-between p-3.5 active:bg-white/5 transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
-                          <Icon size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold">{item.label}</div>
-                          <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
-                            {item.description}
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-[var(--text-tertiary)] shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 };

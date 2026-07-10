@@ -52,6 +52,8 @@ test('appearance and motion settings are a canonical route with persistent docum
   assert.match(contextSource, /--kk-ui-glass-opacity/);
   assert.match(contextSource, /--kk-ui-glass-blur/);
   assert.match(contextSource, /--kk-ui-motion-scale/);
+  assert.match(contextSource, /performanceMode/);
+  assert.match(contextSource, /dataset\.kkWebPerformance/);
 
   assert.match(registrySource, /'appearance-motion'/);
   assert.match(registrySource, /titleZh:\s*'外观与动态'/);
@@ -76,6 +78,9 @@ test('appearance and motion view consumes only the shared settings system primit
   assert.match(viewSource, /useAppearanceMotion/);
   assert.match(viewSource, /glassOpacity/);
   assert.match(viewSource, /motionScale/);
+  assert.match(viewSource, /role="radiogroup"/);
+  assert.match(viewSource, /role="radio"/);
+  assert.match(viewSource, /WebPerformanceMode/);
   assert.doesNotMatch(viewSource, /#[0-9a-fA-F]{3,8}/);
   assert.doesNotMatch(viewSource, /rgba?\(/);
   assert.doesNotMatch(viewSource, /hsla?\(/);

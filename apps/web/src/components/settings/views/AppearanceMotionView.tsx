@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Eye, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import { CircleGauge, Eye, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
 
-import { useAppearanceMotion } from '../../../context/AppearanceMotionContext';
+import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsActionButton,
@@ -63,6 +63,38 @@ const AppearanceMotionView: React.FC = () => {
       : preferences.motionScale <= 0.35
         ? pick('低动态', 'Low motion')
         : pick('标准动态', 'Standard motion');
+  const performanceModes: Array<{
+    id: WebPerformanceMode;
+    label: string;
+    description: string;
+  }> = [
+    {
+      id: 'fast',
+      label: pick('快速', 'Fast'),
+      description: pick('减少模糊与转场', 'Less blur and motion'),
+    },
+    {
+      id: 'balanced',
+      label: pick('正常', 'Normal'),
+      description: pick('平衡流畅与质感', 'Balanced experience'),
+    },
+    {
+      id: 'visual',
+      label: pick('质感', 'Visual'),
+      description: pick('保留完整视觉效果', 'Full visual effects'),
+    },
+  ];
+  const selectPerformanceMode = (mode: WebPerformanceMode) => {
+    if (mode === 'fast') {
+      setPreferences({ performanceMode: mode, motionScale: 0.55, glassBlur: 8, glassOpacity: 0.84 });
+      return;
+    }
+    if (mode === 'visual') {
+      setPreferences({ performanceMode: mode, motionScale: 1.15, glassBlur: 28, glassOpacity: 0.72 });
+      return;
+    }
+    setPreferences({ performanceMode: mode, motionScale: 1, glassBlur: 20, glassOpacity: 0.76 });
+  };
 
   return (
     <SettingsViewShell className={SETTINGS_PAGE_CONTAINER_CLASSNAME}>
@@ -81,6 +113,42 @@ const AppearanceMotionView: React.FC = () => {
       />
 
       <div className={SETTINGS_RESPONSIVE_GRID_CLASSNAME}>
+        <SettingsSystemCard
+          className="settings-system-card--wide"
+          title={pick('网页性能', 'Web Performance')}
+          description={pick('统一调整页面动效、玻璃模糊与转场开销。', 'Tune motion, glass blur, and transition cost together.')}
+          icon={CircleGauge}
+          tone="emerald"
+          action={(
+            <SettingsBadge tone="emerald">
+              {systemReducedMotion
+                ? pick('跟随系统减少动态', 'System reduced motion')
+                : performanceModes.find((mode) => mode.id === preferences.performanceMode)?.label}
+            </SettingsBadge>
+          )}
+        >
+          <div
+            className="settings-performance-mode-control"
+            role="radiogroup"
+            aria-label={pick('网页性能模式', 'Web performance mode')}
+          >
+            {performanceModes.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                role="radio"
+                aria-checked={preferences.performanceMode === mode.id}
+                data-state={preferences.performanceMode === mode.id ? 'selected' : 'idle'}
+                className="settings-performance-mode-option"
+                onClick={() => selectPerformanceMode(mode.id)}
+              >
+                <strong>{mode.label}</strong>
+                <span>{mode.description}</span>
+              </button>
+            ))}
+          </div>
+        </SettingsSystemCard>
+
         <SettingsSystemCard
           title={pick('毛玻璃层级', 'Glass Layers')}
           description={pick('控制导航、工具栏和浮层的透明与模糊，不影响正文阅读区域。', 'Controls glass on navigation, toolbars, and floating layers without weakening reading areas.')}

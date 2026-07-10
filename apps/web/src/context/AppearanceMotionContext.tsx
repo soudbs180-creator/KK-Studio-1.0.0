@@ -10,11 +10,14 @@ import React, {
 
 export const APPEARANCE_MOTION_STORAGE_KEY = 'kk_appearance_motion_preferences_v1';
 
+export type WebPerformanceMode = 'fast' | 'balanced' | 'visual';
+
 export interface AppearanceMotionPreferences {
   glassOpacity: number;
   glassBlur: number;
   motionScale: number;
   solidFallback: boolean;
+  performanceMode: WebPerformanceMode;
 }
 
 interface AppearanceMotionContextValue {
@@ -29,6 +32,7 @@ export const DEFAULT_APPEARANCE_MOTION_PREFERENCES: AppearanceMotionPreferences 
   glassBlur: 20,
   motionScale: 1,
   solidFallback: false,
+  performanceMode: 'balanced',
 };
 
 const AppearanceMotionContext = createContext<AppearanceMotionContextValue | undefined>(undefined);
@@ -38,6 +42,10 @@ const clampNumber = (value: unknown, fallback: number, min: number, max: number)
   if (!Number.isFinite(numericValue)) return fallback;
   return Math.min(max, Math.max(min, numericValue));
 };
+
+const normalizePerformanceMode = (value: unknown): WebPerformanceMode => (
+  value === 'fast' || value === 'visual' ? value : 'balanced'
+);
 
 const normalizePreferences = (value: Partial<AppearanceMotionPreferences> = {}): AppearanceMotionPreferences => ({
   glassOpacity: clampNumber(
@@ -59,6 +67,7 @@ const normalizePreferences = (value: Partial<AppearanceMotionPreferences> = {}):
     1.2,
   ),
   solidFallback: Boolean(value.solidFallback),
+  performanceMode: normalizePerformanceMode(value.performanceMode),
 });
 
 const readStoredPreferences = (): AppearanceMotionPreferences => {
@@ -96,9 +105,13 @@ export const applyAppearanceMotionPreferences = (
 
   const root = document.documentElement;
   const reducedMotion = options.systemReducedMotion ?? getSystemReducedMotion();
-  const effectiveMotionScale = reducedMotion ? 0 : preferences.motionScale;
-  const effectiveGlassOpacity = preferences.solidFallback ? 1 : preferences.glassOpacity;
-  const effectiveGlassBlur = preferences.solidFallback ? 0 : preferences.glassBlur;
+  const fastMode = preferences.performanceMode === 'fast';
+  const modeMotionScale = fastMode ? Math.min(preferences.motionScale, 0.55) : preferences.motionScale;
+  const modeGlassOpacity = fastMode ? Math.max(preferences.glassOpacity, 0.84) : preferences.glassOpacity;
+  const modeGlassBlur = fastMode ? Math.min(preferences.glassBlur, 8) : preferences.glassBlur;
+  const effectiveMotionScale = reducedMotion ? 0 : modeMotionScale;
+  const effectiveGlassOpacity = preferences.solidFallback ? 1 : modeGlassOpacity;
+  const effectiveGlassBlur = preferences.solidFallback ? 0 : modeGlassBlur;
 
   root.style.setProperty('--kk-ui-glass-opacity', effectiveGlassOpacity.toFixed(2));
   root.style.setProperty('--kk-ui-glass-blur', `${effectiveGlassBlur.toFixed(0)}px`);
@@ -109,6 +122,7 @@ export const applyAppearanceMotionPreferences = (
       ? 'expressive'
       : 'standard';
   root.dataset.kkUiSolidFallback = String(preferences.solidFallback);
+  root.dataset.kkWebPerformance = preferences.performanceMode;
 };
 
 export const AppearanceMotionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

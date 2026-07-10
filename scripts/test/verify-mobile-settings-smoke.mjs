@@ -684,13 +684,15 @@ try {
 
   await settingsEntry.click();
 
-  const settingsOverviewHeading = page.getByRole('heading', { name: /设置总览|Settings Overview/i });
-  const apiEntry = page.getByRole('button', { name: /\+ 添加 API|\+ Add API/i });
+  const settingsDashboard = page.getByTestId('settings-mobile-dashboard');
+  const settingsOverviewHeading = page.getByRole('heading', { name: /创作系统状态|Creative system status/i });
+  const performanceEntry = page.getByRole('button', { name: /网页性能|Web performance/i });
+  const currentApiEntry = page.getByRole('button', { name: /能力来源|Capability Sources/i });
 
-  const currentApiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace|配置能力来源|Configure Capability Sources/i });
-
-  await assertVisible(settingsOverviewHeading, 'Mobile settings overview did not open by default.');
-  await assertVisible(currentApiEntry, 'Mobile settings overview API action did not render.');
+  await assertVisible(settingsDashboard, 'Mobile settings dashboard did not open by default.');
+  await assertVisible(settingsOverviewHeading, 'Mobile settings operational overview did not render.');
+  await assertVisible(performanceEntry, 'Mobile settings performance control did not render.');
+  await assertVisible(currentApiEntry, 'Mobile settings capability sources entry did not render.');
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-overview.png'),

@@ -1753,3 +1753,39 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 发布前先在预生产数据库应用 `015_unified_media_generation_jobs.sql`，再用两个登录设备验证租约冲突、断网恢复和长视频任务续租；批准首个 ComfyUI 模板时需同时审查模板节点、输入绑定和模型权重许可。
   - 生产依赖审计保留 1 个既有中危告警：`morgan <= 1.10.1` 的日志伪造漏洞。应单独升级并做请求日志回归，不与本次跨层功能提交混合处理。
+
+## 122. 2026-07-11 - 重构移动设置概况与网页性能控制
+- **修改范围**：
+  1. 删除移动设置总览中的宣传式 Hero、配置能力来源 CTA、硬编码 42% 就绪度和蓝色大块列表，拆出独立的 `SettingsMobileDashboard`，改为符合设置系统视觉规范的运行概况与分组导航。
+  2. 运行概况接入真实余额、当日积分消耗与 API 美元成本、API 成功/失败调用数、累计 Tokens、Browser Bridge 已认证账号、最近或最快 API 延迟、可用/异常路由与网页性能档位。
+  3. 将概况聚合提取为纯函数，处理 Provider 与 KeySlot 去重、同日本地账单、Bridge 双端连接守卫和延迟样本回退，避免展示虚构就绪度或静态示例数据。
+  4. 在“外观与动态”增加快速、正常、质感三档网页性能分段控件；档位统一调整动效、玻璃模糊和透明度，并持久化到现有外观偏好与根节点运行变量。
+  5. 更新移动设置 smoke 与契约测试，锁定新概况入口、能力来源导航、性能调整入口、44px 触控下限和真实指标聚合行为。
+- **修改文件**：
+  - `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`
+  - `apps/web/src/components/settings/SettingsMobileDashboard.tsx`
+  - `apps/web/src/components/settings/mobileSettingsOverviewMetrics.ts`
+  - `apps/web/src/components/settings/views/AppearanceMotionView.tsx`
+  - `apps/web/src/context/AppearanceMotionContext.tsx`
+  - `apps/web/src/styles/settings.css`
+  - `scripts/test/verify-mobile-settings-smoke.mjs`
+  - `tests/unit/mobile-settings-overview-metrics.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+  - `tests/unit/settings-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 设置首页只承担运行状态扫描与模块导航，不再放营销式说明和重复 CTA；具体配置继续进入已有能力来源、Provider 路由和外观页面。
+  - 所有指标只读取现有账单、KeyManager、Provider 用量和 Browser Bridge 状态；无样本时明确显示 `0` 或 `--`，不推算虚假健康分数。
+  - 快速模式对实际运行变量设置上限：动效不高于 `0.55`、模糊不高于 `8px`、玻璃透明度不低于 `0.84`；系统减少动态仍拥有更高优先级。
+- **已运行验证**：
+  - 针对性测试 20/20 通过；完整单元测试 1655 项中 1653 通过、2 跳过、0 失败。
+  - `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run build` 与 `npm run verify:changes` 全部通过。
+  - `verify:changes` 同时通过集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3、OpenAPI 和编码检查。
+  - Codex 应用内浏览器实测 `360x800`、`390x844`、`435x662`：无横向溢出或文字截断，顶部栏底部 56px、内容从 76px 开始，导航与性能控件最小触控高度 44px；快速档位实际写入 `motion=0.55`、`blur=8px`、`opacity=0.84`，浏览器日志无 error/warning。
+  - `git diff --check` 通过。
+- **未运行验证及原因**：
+  - 未调用真实付费 Provider 或真实消费账单；当前本地账户无配置数据，UI 正确显示零值与无样本状态，聚合分支由确定性单元测试覆盖。
+  - 发布 smoke 的独立 Playwright Chromium 不可用，脚本使用 HTTP/源码降级契约；本次页面已通过 Codex 应用内浏览器完成真实 DOM、交互、几何和截图验证。
+- **风险与下一步**：
+  - 低风险。Provider 调用计数目前以 KeySlot 的累计计数为准，第三方 Provider 只提供累计 Tokens 和最近延迟；后续服务端若增加统一用量 DTO，可把概况切到服务端权威的跨设备统计。
+  - 生产依赖审计仍保留 1 个既有中危 `morgan` 告警，需作为独立依赖升级处理。
