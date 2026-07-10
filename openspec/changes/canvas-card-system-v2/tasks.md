@@ -7,5 +7,5 @@
 - [ ] Add CanvasCardShell and real content adapters for every supported card kind.
 - [x] Add editable workflow-panel and vector notebook cards.
 - [ ] Add tablet-landscape canvas and compact desktop composer/tool rail.
-- [ ] Expand CanvasRuntimeState and canonical card factory tools.
+- [x] Expand CanvasRuntimeState and canonical card factory tools.
 - [ ] Complete unit, contract, integration, browser, performance, and governance checks.

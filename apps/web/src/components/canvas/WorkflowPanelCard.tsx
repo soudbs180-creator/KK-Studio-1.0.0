@@ -11,6 +11,7 @@ interface WorkflowPanelCardProps {
   onDelete: () => void;
   onPositionChange: (position: { x: number; y: number }) => void;
   onDataChange: (data: WorkflowPanelData) => void;
+  onCommand: (action: 'run' | 'pause' | 'cancel' | 'retry') => void;
 }
 
 const moveStep = (steps: WorkflowPanelStep[], index: number, delta: -1 | 1) => {
@@ -29,15 +30,11 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
   onDelete,
   onPositionChange,
   onDataChange,
+  onCommand,
 }) => {
   const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const data = node.data;
   const updateSteps = (steps: WorkflowPanelStep[]) => onDataChange({ ...data, steps });
-  const setStatus = (status: WorkflowPanelData['status']) => onDataChange({
-    ...data,
-    status,
-    error: status === 'running' ? undefined : data.error,
-  });
 
   return (
     <CanvasCardShell
@@ -95,9 +92,15 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
                 className="h-7 w-full border-0 bg-transparent text-xs text-zinc-200 outline-none"
               />
               <input
-                value={String(step.parameters.prompt || '')}
-                placeholder="Step parameters"
-                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, parameters: { ...item.parameters, prompt: event.target.value } } : item))}
+                placeholder="Tool name"
+                value={String(step.parameters.toolName || '')}
+                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, parameters: { ...item.parameters, toolName: event.target.value } } : item))}
+                className="h-7 w-full border-0 bg-transparent text-[11px] text-zinc-500 outline-none"
+              />
+              <input
+                value={String(step.parameters.input || '')}
+                placeholder="Tool input JSON"
+                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, parameters: { ...item.parameters, input: event.target.value } } : item))}
                 className="h-7 w-full border-0 bg-transparent text-[11px] text-zinc-500 outline-none"
               />
             </div>
@@ -120,10 +123,10 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
       <footer className="flex h-[60px] items-center justify-between border-t border-white/10 px-3">
         <div className="text-[10px] text-zinc-500">{data.outputNodeIds.length} outputs</div>
         <div className="flex items-center gap-1">
-          <button type="button" title="Run" className="h-9 w-9 text-emerald-400" onClick={() => setStatus('running')}><Play className="mx-auto h-4 w-4" /></button>
-          <button type="button" title="Pause" className="h-9 w-9 text-amber-300" onClick={() => setStatus('paused')}><Pause className="mx-auto h-4 w-4" /></button>
-          <button type="button" title="Cancel" className="h-9 w-9 text-zinc-400" onClick={() => setStatus('cancelled')}><Square className="mx-auto h-4 w-4" /></button>
-          {data.status === 'failed' && <button type="button" title="Retry failed workflow" className="h-9 w-9 text-sky-300" onClick={() => setStatus('running')}><RotateCcw className="mx-auto h-4 w-4" /></button>}
+          <button type="button" title="Run" className="h-9 w-9 text-emerald-400" onClick={() => onCommand('run')}><Play className="mx-auto h-4 w-4" /></button>
+          <button type="button" title="Pause" className="h-9 w-9 text-amber-300" onClick={() => onCommand('pause')}><Pause className="mx-auto h-4 w-4" /></button>
+          <button type="button" title="Cancel" className="h-9 w-9 text-zinc-400" onClick={() => onCommand('cancel')}><Square className="mx-auto h-4 w-4" /></button>
+          {data.status === 'failed' && <button type="button" title="Retry failed workflow" className="h-9 w-9 text-sky-300" onClick={() => onCommand('retry')}><RotateCcw className="mx-auto h-4 w-4" /></button>}
         </div>
       </footer>
     </CanvasCardShell>

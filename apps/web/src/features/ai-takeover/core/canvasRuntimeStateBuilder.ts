@@ -1,6 +1,8 @@
 // 简体中文：画布实时运行态构建器 (Canvas Runtime State Builder)
 
 import type { CanvasRuntimeState } from '../types.ts';
+import type { CanvasCardKind, CanvasLayoutMode } from '@kk/shared';
+import { getCanvasSceneBounds, getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../../../canvas/canvasSceneGeometry.ts';
 
 const MAX_RUNTIME_TEXT_LENGTH = 500;
 const LONG_SECRET_PATTERN = /(?:Bearer\s+[a-zA-Z0-9_\-.]+|sk-[a-zA-Z0-9_\-]{8,}|[A-Za-z0-9+/=_-]{80,})/g;
@@ -58,6 +60,10 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   const promptNodes = toArray<Record<string, any>>(activeCanvas?.promptNodes);
   const imageNodes = toArray<Record<string, any>>(activeCanvas?.imageNodes);
   const groups = toArray<Record<string, any>>(activeCanvas?.groups);
+  const noteNodes = toArray<Record<string, any>>(activeCanvas?.noteNodes);
+  const workflowNodes = toArray<Record<string, any>>(activeCanvas?.workflow?.nodes);
+  const workflowPanels = workflowNodes.filter((node) => node?.kind === 'workflow-panel');
+  const drawings = toArray<Record<string, any>>(activeCanvas?.drawings);
   const selectedNodeIdsSafe = toArray(selectedNodeIds).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
   // 2. 提取 viewport 和 transform
@@ -104,12 +110,22 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   for (const node of imageNodes) {
     if (node?.id) nodeById.set(node.id, node);
   }
+  for (const node of noteNodes) {
+    if (node?.id) nodeById.set(node.id, node);
+  }
+  for (const node of workflowNodes) {
+    if (node?.id) nodeById.set(node.id, node);
+  }
 
   const selectedPrompts = promptNodes.filter((n: any) => selectedNodeIdsSet.has(n.id));
   const selectedPromptIds = selectedPrompts.map((n: any) => n.id);
   
   const selectedImages = imageNodes.filter((img: any) => selectedNodeIdsSet.has(img.id));
   const selectedImageIds = selectedImages.map((img: any) => img.id);
+  const selectedNotes = noteNodes.filter((node: any) => selectedNodeIdsSet.has(node.id));
+  const selectedWorkflowPanels = workflowPanels.filter((node: any) => selectedNodeIdsSet.has(node.id));
+  const selectedNoteIds = selectedNotes.map((node: any) => node.id);
+  const selectedWorkflowNodeIds = selectedWorkflowPanels.map((node: any) => node.id);
 
   // 收集选中 prompts 的子图 ID
   const childImageNodeIdsFromSelectedPromptsSet = new Set<string>();
@@ -136,6 +152,37 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       tags
     };
   });
+
+  const cardKinds: Partial<Record<CanvasCardKind, number>> = {};
+  const layoutModes = new Set<CanvasLayoutMode>();
+  const countCard = (kind: CanvasCardKind, layoutMode?: CanvasLayoutMode) => {
+    cardKinds[kind] = (cardKinds[kind] || 0) + 1;
+    if (layoutMode) layoutModes.add(layoutMode);
+  };
+  promptNodes.forEach((node: any) => countCard(
+    node.presentation?.kind || (node.childImageIds?.length ? 'prompt-result-group' : 'prompt-only'),
+    node.presentation?.layoutMode,
+  ));
+  imageNodes.forEach((node: any) => countCard(node.presentation?.kind || 'media-only', node.presentation?.layoutMode));
+  noteNodes.forEach((node: any) => countCard('notebook', node.presentation?.layoutMode));
+  workflowPanels.forEach((node: any) => countCard('workflow-panel', node.presentation?.layoutMode));
+
+  const geometryCanvas = activeCanvas ? {
+    ...activeCanvas,
+    promptNodes: promptNodes.filter((node: any) => node?.position),
+    imageNodes: imageNodes.filter((node: any) => node?.position),
+    noteNodes: noteNodes.filter((node: any) => node?.position),
+    groups: groups.filter((group: any) => group?.bounds),
+    workflow: activeCanvas.workflow ? {
+      ...activeCanvas.workflow,
+      nodes: workflowNodes.filter((node: any) => node?.position),
+    } : undefined,
+  } : undefined;
+  const sceneBounds = unionCanvasSceneBounds(getCanvasSceneBounds(geometryCanvas));
+  const selectionBounds = unionCanvasSceneBounds(
+    getCanvasSceneBoundsForNodeIds(geometryCanvas, selectedNodeIdsSafe),
+  );
+  const selectedDrawingCount = drawings.filter((drawing: any) => selectedNodeIdsSet.has(drawing.id)).length;
 
   // 4. 模拟 recentEvents 列表
   const recentEvents: any[] = [];
@@ -171,6 +218,11 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       promptCount: promptNodes.length,
       imageCount: imageNodes.length,
       groupCount: groups.length,
+      noteCount: noteNodes.length,
+      workflowPanelCount: workflowPanels.length,
+      cardKinds,
+      layoutModes: Array.from(layoutModes),
+      bounds: sceneBounds || undefined,
       lastModified: activeCanvas?.lastModified
     },
     viewport: {
@@ -186,7 +238,16 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       imageNodeIds: selectedImageIds,
       childImageNodeIdsFromSelectedPrompts,
       groupIds: selectedGroupIds,
-      count: selectedNodeIds.length
+      noteNodeIds: selectedNoteIds,
+      workflowNodeIds: selectedWorkflowNodeIds,
+      bounds: selectionBounds || undefined,
+      capabilities: {
+        canArrange: selectedNodeIdsSafe.length > 0,
+        canConvertDrawingsToNote: selectedDrawingCount > 0,
+        canCreateCard: true,
+        canCreateWorkflowPanel: true,
+      },
+      count: selectedNodeIdsSafe.length
     },
     groups: runtimeGroups,
     selectedNodes: {
@@ -205,7 +266,19 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
         apiResultUrlPresent: !!img.apiResultUrl,
         storageIdPresent: !!img.storageId,
         tags: img.tags || []
-      }))
+      })),
+      notes: selectedNotes.map((note: any) => ({
+        id: note.id,
+        title: sanitizeRuntimeText(note.title, 80),
+        elementCount: Array.isArray(note.elements) ? note.elements.length : 0,
+      })),
+      workflowPanels: selectedWorkflowPanels.map((node: any) => ({
+        id: node.id,
+        title: sanitizeRuntimeText(node.data?.title, 80),
+        status: node.data?.status || 'idle',
+        enabledStepCount: toArray(node.data?.steps).filter((step: any) => step.enabled !== false).length,
+        outputCount: toArray(node.data?.outputNodeIds).length,
+      })),
     },
     promptBarInput: config ? {
       prompt: sanitizeRuntimeText(config.prompt),

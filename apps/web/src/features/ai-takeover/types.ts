@@ -1,6 +1,7 @@
 // 简体中文：定义 AI 接管的核心业务类型
 
 import type { AspectRatio, ImageSize, GenerationMode } from '../../types';
+import type { CanvasCardKind, CanvasLayoutMode, CanvasSceneBounds } from '@kk/shared';
 
 export type AssistantBatchTaskDomain = 'general' | 'ecommerce';
 export type AssistantBatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
@@ -354,6 +355,11 @@ export interface CanvasRuntimeState {
     promptCount: number;
     imageCount: number;
     groupCount: number;
+    noteCount: number;
+    workflowPanelCount: number;
+    cardKinds: Partial<Record<CanvasCardKind, number>>;
+    layoutModes: CanvasLayoutMode[];
+    bounds?: CanvasSceneBounds;
     lastModified?: number;
   };
   viewport: {
@@ -369,6 +375,15 @@ export interface CanvasRuntimeState {
     imageNodeIds: string[];
     childImageNodeIdsFromSelectedPrompts: string[];
     groupIds: string[];
+    noteNodeIds: string[];
+    workflowNodeIds: string[];
+    bounds?: CanvasSceneBounds;
+    capabilities: {
+      canArrange: boolean;
+      canConvertDrawingsToNote: boolean;
+      canCreateCard: boolean;
+      canCreateWorkflowPanel: boolean;
+    };
     count: number;
   };
   groups: Array<{
@@ -396,6 +411,14 @@ export interface CanvasRuntimeState {
       apiResultUrlPresent: boolean;
       storageIdPresent: boolean;
       tags?: string[];
+    }>;
+    notes: Array<{ id: string; title: string; elementCount: number }>;
+    workflowPanels: Array<{
+      id: string;
+      title: string;
+      status: string;
+      enabledStepCount: number;
+      outputCount: number;
     }>;
   };
   promptBarInput?: {

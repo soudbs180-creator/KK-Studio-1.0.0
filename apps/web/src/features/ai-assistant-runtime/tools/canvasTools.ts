@@ -3,6 +3,11 @@
 import type { AgentToolDefinition } from './ToolRegistry.ts';
 import { resolveAgentNodeArrangeUpdates } from '../canvas/agentCanvasLayout.ts';
 import { requestCanvasBoundsFocus } from '../../../canvas/canvasViewportEvents.ts';
+import {
+  createCanvasCardNodes,
+  type CanvasCardFactoryResult,
+  type CanvasCreateCardInput,
+} from '../../../context/canvasCardFactory.ts';
 
 const getContextSelectedNodeIds = (ctx: any): string[] =>
   ctx?.selectedNodeIds || ctx?.activeCanvas?.selectedNodeIds || [];
@@ -13,6 +18,44 @@ const capabilityUnavailable = (message: string, setupAction = 'open-workspace') 
   message,
   setupAction
 });
+
+const createCardThroughFactory = async (
+  input: CanvasCreateCardInput,
+  ctx: any,
+): Promise<CanvasCardFactoryResult | null> => {
+  if (typeof ctx.createCard === 'function') {
+    return await ctx.createCard(input);
+  }
+
+  const result = createCanvasCardNodes(input, {
+    canvasId: ctx.activeCanvas?.id || ctx.canvasId || 'default_canvas',
+    position: input.position || ctx.getNextCardPosition?.() || { x: 100, y: 100 },
+    model: input.model || ctx.config?.model || ctx.selectedModel?.id,
+  });
+  const canPersistPrompts = result.promptNodes.length === 0
+    || typeof ctx.addPromptNodes === 'function'
+    || typeof ctx.addPromptNode === 'function';
+  const canPersistImages = result.imageNodes.length === 0 || typeof ctx.addImageNodes === 'function';
+  const canPersistNotes = result.noteNodes.length === 0 || typeof ctx.addNoteNode === 'function';
+  const canPersistWorkflow = result.workflowNodes.length === 0 || typeof ctx.addWorkflowNode === 'function';
+  if (!canPersistPrompts || !canPersistImages || !canPersistNotes || !canPersistWorkflow) return null;
+
+  if (result.promptNodes.length > 0) {
+    if (typeof ctx.addPromptNodes === 'function') {
+      await ctx.addPromptNodes(result.promptNodes);
+    } else {
+      await Promise.all(result.promptNodes.map((node) => ctx.addPromptNode(node)));
+    }
+  }
+  if (result.imageNodes.length > 0) await ctx.addImageNodes(result.imageNodes);
+  if (result.noteNodes.length > 0) await Promise.all(result.noteNodes.map((node) => ctx.addNoteNode(node)));
+  if (result.workflowNodes.length > 0) {
+    result.workflowNodes.forEach((node) => ctx.addWorkflowNode(node));
+  }
+  return result;
+};
+
+const workflowAbortControllers = new Map<string, AbortController>();
 
 export const canvasTools: AgentToolDefinition[] = [
   // 1. fillPrompt - 填充提示词到卡片
@@ -211,6 +254,148 @@ export const canvasTools: AgentToolDefinition[] = [
     }
   },
   {
+    name: 'canvas.createCard',
+    description: 'Create a typed canvas card through the canonical card factory.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['prompt-result-group', 'prompt-only', 'media-only', 'ecommerce', 'ppt-deck', 'audio', 'text', 'notebook', 'multi-image', 'workflow-panel', 'unknown'] },
+        title: { type: 'string' },
+        prompt: { type: 'string' },
+        layoutMode: { type: 'string', enum: ['row', 'column', 'grid'] },
+        aspectRatio: { type: 'string' },
+        imageSize: { type: 'string' },
+        model: { type: 'string' },
+        media: { type: 'array', items: { type: 'object' } },
+        pptSlides: { type: 'array', items: { type: 'string' } },
+        diagnostic: { type: 'string' },
+      },
+      required: ['kind'],
+    },
+    handler: async (input: CanvasCreateCardInput, ctx) => {
+      const result = await createCardThroughFactory(input, ctx);
+      if (!result) return capabilityUnavailable(`Canvas card creation is not bound for kind: ${input.kind}.`);
+      ctx.notify?.success?.('卡片已创建', `已创建 ${input.kind} 卡片。`);
+      return { status: 'created', kind: input.kind, nodeId: result.primaryNodeId };
+    },
+  },
+  {
+    name: 'canvas.convertDrawingsToNote',
+    description: 'Move selected vector drawings into an editable notebook card.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        drawingIds: { type: 'array', items: { type: 'string' } },
+        title: { type: 'string' },
+      },
+      required: ['drawingIds'],
+    },
+    handler: async (input: { drawingIds: string[]; title?: string }, ctx) => {
+      if (typeof ctx.convertDrawingsToNote !== 'function') {
+        return capabilityUnavailable('Canvas drawing conversion handler is not bound.');
+      }
+      const note = await ctx.convertDrawingsToNote(input.drawingIds, input.title);
+      if (!note) {
+        return { success: false as const, code: 'INVALID_INPUT' as const, message: 'No convertible drawings were found.' };
+      }
+      return { status: 'created', kind: 'notebook', nodeId: note.id };
+    },
+  },
+  {
+    name: 'workflow.createPanel',
+    description: 'Create an editable workflow panel card through the canonical card factory.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        steps: { type: 'array', items: { type: 'object' } },
+      },
+    },
+    handler: async (input: { title?: string; steps?: CanvasCreateCardInput['workflowSteps'] }, ctx) => {
+      const result = await createCardThroughFactory({
+        kind: 'workflow-panel',
+        title: input.title,
+        workflowSteps: input.steps,
+      }, ctx);
+      if (!result) return capabilityUnavailable('Workflow panel creation handler is not bound.');
+      return { status: 'created', kind: 'workflow-panel', nodeId: result.primaryNodeId };
+    },
+  },
+  {
+    name: 'workflow.controlPanel',
+    description: 'Run, pause, cancel, or retry an editable workflow panel through ToolRegistry.',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string' },
+        action: { type: 'string', enum: ['run', 'pause', 'cancel', 'retry'] },
+      },
+      required: ['nodeId', 'action'],
+    },
+    handler: async (input: { nodeId: string; action: 'run' | 'pause' | 'cancel' | 'retry' }, ctx) => {
+      const panel = ctx.activeCanvas?.workflow?.nodes?.find((node: any) => node.id === input.nodeId && node.kind === 'workflow-panel');
+      if (!panel || typeof ctx.updateWorkflowNode !== 'function') {
+        return capabilityUnavailable('Workflow panel runtime is not bound.');
+      }
+      const updateData = (data: any) => ctx.updateWorkflowNode(panel.id, { data });
+      if (input.action === 'pause' || input.action === 'cancel') {
+        workflowAbortControllers.get(panel.id)?.abort(input.action);
+        workflowAbortControllers.delete(panel.id);
+        updateData({ ...panel.data, status: input.action === 'pause' ? 'paused' : 'cancelled' });
+        return { status: input.action, nodeId: panel.id };
+      }
+      if (typeof ctx.executeTool !== 'function') {
+        return capabilityUnavailable('Workflow ToolRegistry executor is not bound.');
+      }
+
+      workflowAbortControllers.get(panel.id)?.abort('restart');
+      const controller = new AbortController();
+      workflowAbortControllers.set(panel.id, controller);
+      let steps = (panel.data.steps || []).map((step: any) => ({ ...step }));
+      const candidates = steps.filter((step: any) => step.enabled !== false && (input.action !== 'retry' || step.status === 'failed'));
+      updateData({ ...panel.data, status: 'running', error: undefined, steps });
+      const outputNodeIds = new Set<string>(panel.data.outputNodeIds || []);
+
+      try {
+        for (const candidate of candidates) {
+          if (controller.signal.aborted) break;
+          const index = steps.findIndex((step: any) => step.id === candidate.id);
+          const toolName = String(candidate.parameters?.toolName || '').trim();
+          if (!toolName || toolName.startsWith('workflow.')) {
+            throw new Error(`Workflow step "${candidate.label}" requires a non-workflow toolName.`);
+          }
+          steps[index] = { ...steps[index], status: 'running', error: undefined };
+          updateData({ ...panel.data, status: 'running', steps, outputNodeIds: Array.from(outputNodeIds) });
+          let toolInput: any = candidate.parameters?.input || {};
+          if (typeof toolInput === 'string' && toolInput.trim()) {
+            toolInput = JSON.parse(toolInput);
+          }
+          const output = await ctx.executeTool(toolName, toolInput, { signal: controller.signal });
+          [output?.nodeId, ...(output?.nodeIds || []), ...(output?.resultImageNodeIds || [])]
+            .filter(Boolean)
+            .forEach((nodeId: string) => outputNodeIds.add(nodeId));
+          steps[index] = { ...steps[index], status: 'completed', error: undefined };
+        }
+        const status = controller.signal.aborted
+          ? (String(controller.signal.reason) === 'pause' ? 'paused' : 'cancelled')
+          : 'completed';
+        updateData({ ...panel.data, status, steps, outputNodeIds: Array.from(outputNodeIds) });
+        return { status, nodeId: panel.id, outputNodeIds: Array.from(outputNodeIds) };
+      } catch (error: any) {
+        const runningIndex = steps.findIndex((step: any) => step.status === 'running');
+        if (runningIndex >= 0) steps[runningIndex] = { ...steps[runningIndex], status: 'failed', error: error?.message || String(error) };
+        updateData({ ...panel.data, status: 'failed', error: error?.message || String(error), steps, outputNodeIds: Array.from(outputNodeIds) });
+        throw error;
+      } finally {
+        if (workflowAbortControllers.get(panel.id) === controller) workflowAbortControllers.delete(panel.id);
+      }
+    },
+  },
+  {
     name: 'canvas.createPromptCards',
     description: '在画布上批量创建占位的提示词卡片组',
     permission: 'safe',
@@ -237,6 +422,26 @@ export const canvasTools: AgentToolDefinition[] = [
           message: 'canvas.createPromptCards requires at least one prompt.'
         };
       }
+
+      const start = typeof getNextCardPosition === 'function' ? getNextCardPosition() : { x: 100, y: 100 };
+      const created = await Promise.all(prompts.map((promptText, index) => createCardThroughFactory({
+        kind: imageUrl ? 'prompt-result-group' : 'prompt-only',
+        prompt: promptText,
+        position: { x: start.x + index * 440, y: start.y },
+        model: input.model,
+        aspectRatio: input.aspectRatio,
+        media: imageUrl ? [{ url: imageUrl, prompt: promptText }] : [],
+        layoutMode: 'row',
+      }, ctx)));
+      if (created.some((result) => !result)) {
+        return capabilityUnavailable('Canvas prompt card creation handler is not bound.');
+      }
+      notify.success('卡片已批量创建', `已创建 ${prompts.length} 张卡片。`);
+      return {
+        status: 'created',
+        count: prompts.length,
+        imageCount: created.reduce((sum, result) => sum + (result?.imageNodes.length || 0), 0),
+      };
 
       if (typeof addPromptNodes !== 'function' && typeof addPromptNode !== 'function') {
         notify.warning('未检测到节点挂载能力', '无法在画布上创建提示词卡片。');
@@ -331,6 +536,15 @@ export const canvasTools: AgentToolDefinition[] = [
     handler: async (input: { prompt?: string; url: string; mimeType?: string }, ctx) => {
       const { prompt, url, mimeType } = input;
       const { addAudioNode, addPromptNode, getNextCardPosition, notify } = ctx;
+      const created = await createCardThroughFactory({
+        kind: 'audio',
+        prompt,
+        media: [{ url, mimeType }],
+      }, ctx);
+      if (!created) return capabilityUnavailable('Canvas audio node creation handler is not bound.');
+      notify.success('音频卡片已创建', '播放器将在加载资源后读取真实时长。');
+      return { status: 'created', nodeId: created.primaryNodeId };
+
       const pos = typeof getNextCardPosition === 'function'
         ? getNextCardPosition()
         : { x: 100, y: 100 };

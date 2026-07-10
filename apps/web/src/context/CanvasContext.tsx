@@ -48,6 +48,7 @@ import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
 import { createCanvasCardPresentation, resolvePromptCardKind } from './canvasPresentationMigration';
 import { convertCanvasDrawingsToNote } from './canvasNotes.ts';
+import { createCanvasCardNodes, type CanvasCardFactoryResult, type CanvasCreateCardInput } from './canvasCardFactory.ts';
 import { getCardDimensions } from '../utils/styleUtils';
 import { getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../canvas/canvasSceneGeometry.ts';
 import { requestCanvasBoundsFocus } from '../canvas/canvasViewportEvents.ts';
@@ -2008,25 +2009,32 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateCanvas(canvas => deleteCanvasWorkflowNode(canvas, id));
     }, [pushToHistory, updateCanvas]);
 
-    const createWorkflowPanel = useCallback((title: string = 'Workflow'): WorkflowPanelNode => {
-        const now = Date.now();
-        const node: WorkflowPanelNode = {
-            id: `workflow-panel-${now.toString(36)}`,
-            kind: 'workflow-panel',
+    const createCard = useCallback((input: CanvasCreateCardInput): CanvasCardFactoryResult => {
+        const result = createCanvasCardNodes(input, {
+            canvasId: state.activeCanvasId,
             position: state.viewportCenter,
-            width: 420,
-            height: 420,
-            presentation: createCanvasCardPresentation('workflow-panel', 'column', 'wide'),
-            data: {
-                title,
-                status: 'idle',
-                steps: [],
-                outputNodeIds: [],
-            },
-        };
-        addWorkflowNode(node);
-        return node;
-    }, [addWorkflowNode, state.viewportCenter]);
+        });
+        pushToHistory();
+        updateCanvas(canvas => {
+            let nextCanvas: Canvas = {
+                ...canvas,
+                promptNodes: [...canvas.promptNodes, ...result.promptNodes],
+                imageNodes: [...canvas.imageNodes, ...result.imageNodes],
+                noteNodes: [...(canvas.noteNodes || []), ...result.noteNodes],
+                lastModified: Date.now(),
+            };
+            result.workflowNodes.forEach((node) => {
+                nextCanvas = addCanvasWorkflowNode(nextCanvas, node);
+            });
+            return nextCanvas;
+        });
+        return result;
+    }, [pushToHistory, state.activeCanvasId, state.viewportCenter, updateCanvas]);
+
+    const createWorkflowPanel = useCallback((title: string = 'Workflow'): WorkflowPanelNode => {
+        const result = createCard({ kind: 'workflow-panel', title });
+        return result.workflowNodes[0];
+    }, [createCard]);
 
 
     const deleteImageNode = useCallback((id: string) => {
@@ -3390,7 +3398,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes, // Batch update
-        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel,
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel, createCard,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
@@ -3424,7 +3432,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes,
-        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel,
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode, createWorkflowPanel, createCard,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,

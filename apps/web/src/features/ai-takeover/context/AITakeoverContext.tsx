@@ -13,6 +13,7 @@ import {
   buildAgentRunTimeline,
   type AgentRunRecord,
   type AgentRunTimelineStep,
+  toolRegistryInstance,
 } from '../../ai-assistant-runtime';
 
 type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
@@ -65,6 +66,9 @@ interface AITakeoverProviderProps {
   addPromptNode: (node: any) => Promise<void> | void;
   updatePromptNode: (node: any) => Promise<void> | void;
   updateNodes?: (updates: { promptNodes?: any[]; imageNodes?: any[] }) => void;
+  createCard?: (input: any) => any;
+  convertDrawingsToNote?: (drawingIds: string[], title?: string) => any;
+  updateWorkflowNode?: (id: string, updates: any) => void;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
   arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column') => void;
@@ -100,6 +104,9 @@ export function AITakeoverProvider({
   addPromptNode,
   updatePromptNode,
   updateNodes,
+  createCard,
+  convertDrawingsToNote,
+  updateWorkflowNode,
   executeGeneration,
   getNextCardPosition,
   arrangeAllNodes,
@@ -209,13 +216,16 @@ export function AITakeoverProvider({
 
   // 执行计划（桥接到 AgentRuntime）
   const executePlan = useCallback(async (runId: string) => {
-    const ctx = {
+    const ctx: any = {
       activeCanvas,
       selectedNodeIds: selectedNodeIds || [],
       selectedModel,
       addPromptNode,
       updatePromptNode,
       updateNodes,
+      createCard,
+      convertDrawingsToNote,
+      updateWorkflowNode,
       executeGeneration,
       getNextCardPosition,
       arrangeAllNodes,
@@ -238,6 +248,9 @@ export function AITakeoverProvider({
       setPptEditorMode,
       togglePinTool
     };
+    ctx.executeTool = (toolName: string, input: unknown, extra: Record<string, unknown> = {}) => (
+      toolRegistryInstance.execute(toolName, input, { ...ctx, ...extra })
+    );
 
     setCurrentRun(agentRunStore.getRun(runId) ?? null);
     try {
@@ -245,7 +258,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
 
 
   // 发送消息

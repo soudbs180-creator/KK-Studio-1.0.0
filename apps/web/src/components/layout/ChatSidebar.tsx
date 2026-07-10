@@ -4557,6 +4557,9 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
         addPromptNode,
         updatePromptNode,
         updateNodes,
+        createCard,
+        convertDrawingsToNote,
+        updateWorkflowNode,
         getNextCardPosition,
         selectedNodeIds,
         arrangeAllNodes,
@@ -4586,6 +4589,9 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
             addPromptNode={addPromptNode}
             updatePromptNode={updatePromptNode}
             updateNodes={updateNodes}
+            createCard={createCard}
+            convertDrawingsToNote={convertDrawingsToNote}
+            updateWorkflowNode={updateWorkflowNode}
             executeGeneration={executeGeneration}
             getNextCardPosition={getNextCardPosition}
             arrangeAllNodes={arrangeAllNodes}

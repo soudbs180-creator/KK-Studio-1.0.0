@@ -20,6 +20,10 @@ test('工具注册表：已注册工具清单检查', () => {
   assert.ok(toolRegistryInstance.getTool('canvas.getState'));
   assert.ok(toolRegistryInstance.getTool('canvas.getSelectedNodes'));
   assert.ok(toolRegistryInstance.getTool('canvas.arrangeNodes'));
+  assert.ok(toolRegistryInstance.getTool('canvas.createCard'));
+  assert.ok(toolRegistryInstance.getTool('canvas.convertDrawingsToNote'));
+  assert.ok(toolRegistryInstance.getTool('workflow.createPanel'));
+  assert.ok(toolRegistryInstance.getTool('workflow.controlPanel'));
   assert.ok(toolRegistryInstance.getTool('assets.resolveOriginals'));
   assert.ok(toolRegistryInstance.getTool('assets.zipOriginals'));
   assert.ok(toolRegistryInstance.getTool('generation.createBatchJob'));
@@ -295,6 +299,80 @@ test('ToolRegistry: canvas.createPromptCards can attach Browser Assistant image 
   assert.equal(imageNodes[0].model, 'browser-model');
   assert.equal(imageNodes[0].aspectRatio, '4:5');
   assert.equal(imageNodes[0].canvasId, 'canvas-browser');
+});
+
+test('ToolRegistry: canonical card and workflow tools delegate to CanvasContext factory', async () => {
+  const inputs: any[] = [];
+  const createCard = (input: any) => {
+    inputs.push(input);
+    return {
+      kind: input.kind,
+      primaryNodeId: `${input.kind}-1`,
+      promptNodes: [], imageNodes: [], noteNodes: [], workflowNodes: [],
+    };
+  };
+  const card = await toolRegistryInstance.execute('canvas.createCard', {
+    kind: 'text', prompt: 'AI summary',
+  }, { createCard, notify: { success: () => {} } });
+  const workflow = await toolRegistryInstance.execute('workflow.createPanel', {
+    title: 'Publish flow', steps: [{ label: 'Review' }],
+  }, { createCard, notify: { success: () => {} } });
+
+  assert.equal(card.nodeId, 'text-1');
+  assert.equal(workflow.nodeId, 'workflow-panel-1');
+  assert.deepEqual(inputs.map((input) => input.kind), ['text', 'workflow-panel']);
+});
+
+test('ToolRegistry: drawing conversion delegates to the reversible note conversion handler', async () => {
+  let drawingIds: string[] = [];
+  const result = await toolRegistryInstance.execute('canvas.convertDrawingsToNote', {
+    drawingIds: ['drawing-1'], title: 'Review note',
+  }, {
+    convertDrawingsToNote: (ids: string[]) => {
+      drawingIds = ids;
+      return { id: 'note-1' };
+    },
+  });
+
+  assert.deepEqual(drawingIds, ['drawing-1']);
+  assert.equal(result.nodeId, 'note-1');
+});
+
+test('ToolRegistry: workflow panel executes enabled steps through the registry bridge', async () => {
+  let latestData: any = null;
+  const executed: string[] = [];
+  const panel = {
+    id: 'workflow-1',
+    kind: 'workflow-panel',
+    data: {
+      title: 'Flow',
+      status: 'idle',
+      outputNodeIds: [],
+      steps: [{
+        id: 'step-1',
+        label: 'Create text',
+        enabled: true,
+        status: 'idle',
+        parameters: { toolName: 'canvas.createCard', input: '{"kind":"text","prompt":"summary"}' },
+      }],
+    },
+  };
+  const result = await toolRegistryInstance.execute('workflow.controlPanel', {
+    nodeId: panel.id,
+    action: 'run',
+  }, {
+    activeCanvas: { workflow: { nodes: [panel] } },
+    updateWorkflowNode: (_id: string, updates: any) => { latestData = updates.data; },
+    executeTool: async (name: string) => {
+      executed.push(name);
+      return { nodeId: 'text-1' };
+    },
+  });
+
+  assert.deepEqual(executed, ['canvas.createCard']);
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(result.outputNodeIds, ['text-1']);
+  assert.equal(latestData.steps[0].status, 'completed');
 });
 
 test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job', async () => {

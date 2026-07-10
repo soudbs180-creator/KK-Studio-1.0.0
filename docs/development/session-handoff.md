@@ -2136,3 +2136,31 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根 TypeScript `tsc --noEmit` 通过；排版、AI ToolRegistry、迁移、几何和视口定向测试 51/51 通过；`git diff --check` 通过。
 - **未运行验证及原因**：本阶段提交前尚未运行生产构建和浏览器验收，将在后续卡片工厂阶段合并执行；当前运行环境没有 `npm` 可执行文件，脚本使用项目 Node 运行时直接执行。
 - **风险与下一步**：低风险。下一阶段扩展 `CanvasRuntimeState` 和统一卡片工厂，注册 `canvas.createCard`、`canvas.convertDrawingsToNote`、`workflow.createPanel`，并确保旧创建工具仅作为兼容别名委托新工厂。
+
+## 134. 2026-07-11 - 接通统一卡片工厂与工作流执行链
+
+- **修改范围**：
+  1. 新增唯一 `canvasCardFactory`，覆盖主副卡组、仅主卡、媒体、电商、PPT deck、音频、文本、记事本、多图、工作流面板与未知诊断回退；所有产物统一携带 V2 presentation。
+  2. CanvasContext 新增 `createCard`，以一次历史快照原子写入 Prompt、媒体、记事本和工作流节点；原 `createWorkflowPanel` 委托统一工厂。
+  3. ToolRegistry 新增 `canvas.createCard`、`canvas.convertDrawingsToNote`、`workflow.createPanel`、`workflow.controlPanel`；旧 Prompt/Audio 创建入口作为兼容别名先委托工厂，音频不再运行时伪造时长。
+  4. 工作流面板步骤支持 ToolRegistry 工具名与 JSON 输入，运行、暂停、取消、失败重试通过审计和权限链执行，逐步回写状态和输出节点。
+  5. CanvasRuntimeState 增加卡型统计、布局方向、真实场景/选区 bounds、记事本和工作流状态及选区能力；继续执行凭证与 Base64 脱敏。
+- **修改文件**：
+  - `apps/web/src/context/canvasCardFactory.ts`
+  - `apps/web/src/context/canvasContextState.ts`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts`
+  - `apps/web/src/features/ai-takeover/types.ts`
+  - `apps/web/src/features/ai-takeover/core/canvasRuntimeStateBuilder.ts`
+  - `apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx`
+  - `apps/web/src/components/layout/ChatSidebar.tsx`
+  - `apps/web/src/components/canvas/WorkflowPanelCard.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `tests/unit/canvas-card-factory.test.ts`
+  - `tests/unit/ai-assistant-tool-registry.test.ts`
+  - `tests/unit/canvas-runtime-state-builder.test.ts`
+  - `openspec/changes/canvas-card-system-v2/tasks.md`
+- **当前设计决策**：UI 与 AI 只通过 CanvasContext 工厂创建卡片；工作流步骤只执行明确填写的非 workflow ToolRegistry 工具，缺失工具名时失败并保留错误，不模拟成功。音频时长由真实播放器元数据决定。
+- **已运行验证**：根 TypeScript `tsc --noEmit` 通过；卡片工厂、ToolRegistry、单执行链、RuntimeState 和渲染策略定向测试 56/56 通过；482 个测试文件语义检查通过；技能一致性治理通过；Vite 生产构建通过（2435 modules）；`git diff --check` 通过。
+- **未运行验证及原因**：尚未执行完整浏览器多视口与 10k 性能验收，留待卡片渲染及响应式阶段完成后统一执行；未调用真实付费 Provider。
+- **风险与下一步**：中低风险。下一阶段审查 Prompt/Image/PPT/电商/音频/文本/多图实际渲染路径，让业务内容使用统一 Shell 语义且保证失败卡可见，不启用旧静态旁路渲染器。

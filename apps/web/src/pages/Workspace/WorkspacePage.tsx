@@ -545,6 +545,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     createWorkflowPanel,
+    createCard,
     isReady,
     setViewportCenter, // 简体中文注释：迁移时保留当前视口中心，避免画布跳动。
     state, // 简体中文注释：迁移功能需要读取完整画布列表。
@@ -6064,6 +6065,29 @@ const isRectIntersecting = (
               onDelete={() => deleteWorkflowNode(node.id)}
               onPositionChange={(position) => updateWorkflowNodePosition(node.id, position)}
               onDataChange={(data) => updateWorkflowNode(node.id, { data })}
+              onCommand={(action) => {
+                const executionContext: any = {
+                  activeCanvas,
+                  updateWorkflowNode,
+                  createCard,
+                  convertDrawingsToNote,
+                  notify: {
+                    success: (title: string, message?: string) => void import('../../services/system/notificationService').then(({ notify }) => notify.success(title, message || '')),
+                    error: (title: string, message?: string) => void import('../../services/system/notificationService').then(({ notify }) => notify.error(title, message || '')),
+                  },
+                };
+                executionContext.executeTool = (toolName: string, input: unknown, extra: Record<string, unknown> = {}) => (
+                  toolRegistryInstance.execute(toolName, input, { ...executionContext, ...extra })
+                );
+                void toolRegistryInstance.execute('workflow.controlPanel', {
+                  nodeId: node.id,
+                  action,
+                }, executionContext).catch((error) => {
+                  void import('../../services/system/notificationService').then(({ notify }) => {
+                    notify.error('工作流执行失败', error?.message || String(error));
+                  });
+                });
+              }}
             />
           ))}
         {renderedVisibleGroups}

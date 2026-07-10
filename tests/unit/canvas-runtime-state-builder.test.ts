@@ -184,3 +184,42 @@ test('运行态构建测试：提示词、分组与输入框摘要会脱敏长�
   assert.equal(serialized.includes('data:image/png;base64'), false);
   assert.ok(serialized.includes('***'));
 });
+
+test('CanvasRuntimeState exposes V2 card kinds, workflow state, note selection, and exact bounds', () => {
+  const state = buildCanvasRuntimeState({
+    currentPage: 'canvas',
+    activeCanvas: {
+      id: 'canvas-v2',
+      name: 'V2',
+      promptNodes: [{
+        id: 'prompt-1', prompt: 'deck', childImageIds: [], position: { x: 100, y: 200 }, height: 200,
+        presentation: { version: 2, kind: 'ppt-deck', layoutMode: 'column', size: 'wide', ports: { source: 'bottom', target: 'top' } },
+      }],
+      imageNodes: [],
+      groups: [],
+      drawings: [],
+      noteNodes: [{
+        id: 'note-1', title: 'Review', position: { x: 500, y: 400 }, width: 320, height: 240, elements: [{ id: 'e1' }],
+        presentation: { version: 2, kind: 'notebook', layoutMode: 'column', size: 'standard', ports: { source: 'bottom', target: 'top' } },
+      }],
+      workflow: {
+        nodes: [{
+          id: 'workflow-1', kind: 'workflow-panel', position: { x: 900, y: 500 }, width: 420, height: 420,
+          presentation: { version: 2, kind: 'workflow-panel', layoutMode: 'column', size: 'wide', ports: { source: 'bottom', target: 'top' } },
+          data: { title: 'Flow', status: 'paused', steps: [{ id: 's1', label: 'Run', enabled: true }], outputNodeIds: ['image-1'] },
+        }],
+        edges: [],
+      },
+    },
+    selectedNodeIds: ['note-1', 'workflow-1'],
+  });
+
+  assert.equal(state.canvas.cardKinds['ppt-deck'], 1);
+  assert.equal(state.canvas.noteCount, 1);
+  assert.equal(state.canvas.workflowPanelCount, 1);
+  assert.ok(state.canvas.bounds);
+  assert.deepEqual(state.selection.noteNodeIds, ['note-1']);
+  assert.deepEqual(state.selection.workflowNodeIds, ['workflow-1']);
+  assert.equal(state.selectedNodes.notes[0].elementCount, 1);
+  assert.equal(state.selectedNodes.workflowPanels[0].status, 'paused');
+});

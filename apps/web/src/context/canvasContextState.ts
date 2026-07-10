@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, type CanvasDrawing, type CanvasNoteNode, type WorkflowNode, type WorkflowPanelNode } from '../types';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
+import type { CanvasCardFactoryResult, CanvasCreateCardInput } from './canvasCardFactory.ts';
 
 export const MAX_CANVASES = 10;
 
@@ -93,6 +94,7 @@ export interface CanvasContextType {
     updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
     deleteWorkflowNode: (id: string) => void;
     createWorkflowPanel: (title?: string) => WorkflowPanelNode;
+    createCard: (input: CanvasCreateCardInput) => CanvasCardFactoryResult;
     addCanvasDrawing: (drawing: CanvasDrawing) => void;
     deleteCanvasDrawing: (id: string) => void;
     clearCanvasDrawings: () => void;
