@@ -1011,6 +1011,14 @@
   transform: none;
   box-shadow: none;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kk-prompt-bar-mobile-collapse-handle--embedded:hover,
+.kk-prompt-bar-mobile-collapse-handle--embedded:focus-visible {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
 }
 
 .kk-prompt-bar-mobile-home-indicator {
@@ -1021,11 +1029,17 @@
   background: var(--kk-prompt-bar-mobile-collapse-handle-bg-hover);
   transition:
     background-color var(--kk-motion-standard) var(--kk-motion-ease-standard),
+    box-shadow var(--kk-motion-standard) var(--kk-motion-ease-standard),
     transform var(--kk-motion-fast) var(--kk-motion-ease-standard);
 }
 
-.kk-prompt-bar-mobile-collapse-handle--embedded:hover .kk-prompt-bar-mobile-home-indicator {
+.kk-prompt-bar-mobile-collapse-handle--embedded:hover .kk-prompt-bar-mobile-home-indicator,
+.kk-prompt-bar-mobile-collapse-handle--embedded:focus-visible .kk-prompt-bar-mobile-home-indicator {
   background: var(--text-secondary);
+}
+
+.kk-prompt-bar-mobile-collapse-handle--embedded:focus-visible .kk-prompt-bar-mobile-home-indicator {
+  box-shadow: 0 0 0 2px var(--border-focus);
 }
 
 .kk-prompt-bar-mobile-collapse-handle--embedded:active .kk-prompt-bar-mobile-home-indicator {

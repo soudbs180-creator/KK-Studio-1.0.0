@@ -2060,3 +2060,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。并行设置任务提交后应重新运行全量验证；本轮模式切换由定向契约、构建和真实浏览器覆盖。
   - 提交窗口另有画布契约任务正在修改 `canvasContextState.ts`、`types/index.ts`、`workflow/types.ts` 与共享 `workspace-canvas.ts`；这些内容已从 #130 提交中排除并原样保留在工作区。
+
+## 131. 2026-07-11 - 收敛手机底部提示词横条高亮
+- **修改范围**：
+  1. 折叠态提示词入口继续保留整宽 44px 点击和上滑热区，但外层按钮不再显示 hover、focus 或移动端 tap 高亮。
+  2. hover、键盘 focus 与 active 的视觉反馈全部收敛到中间 64x5px 横条；键盘焦点环保留在横条上，避免丢失无障碍反馈。
+- **修改文件**：
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 维持“可视指示条与可交互区域分离”的手机手势模型；触控面积不缩小，仅限制高亮的视觉边界。
+  - 外层按钮显式关闭 WebKit tap 高亮和焦点外观，中间横条承担 hover、focus 与 active 状态表达。
+- **已运行验证**：
+  - 手机提示词条 UI 契约测试 2/2 通过；UI Token 硬编码颜色检查通过。
+  - Web 生产构建通过，Vite 完成 2427 个模块转换；`git diff --check` 通过。
+  - Codex 应用内浏览器在 `547x820` 实测：外层 547px 宽按钮保持透明、无 outline/box-shadow，底部仅显示中间横条；页面截图无整条高亮。
+- **未运行验证及原因**：
+  - 未运行全量 `verify:changes`；本次为两条局部 CSS 状态规则，已由定向契约、相关架构检查、生产构建和真实浏览器覆盖。
+  - 当前桌面运行时未提供 `npm` 可执行文件，验证使用项目内同一 Node 脚本与 Vite 入口直接执行；`agents:status` 使用守卫脚本入口直接执行。
+- **风险与下一步**：
+  - 低风险。点击展开、轻触和 18px 上滑手势逻辑未修改，键盘 focus-visible 仍有明确横条焦点环。
+  - 工作区仍保留另一任务的画布持久化、共享契约和 OpenSpec 未提交改动；本轮提交必须继续按路径隔离，不能调用内部执行 `git add .` 的全量 `agents:commit`。

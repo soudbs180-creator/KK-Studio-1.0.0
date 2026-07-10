@@ -18,6 +18,18 @@ test('prompt bar mobile chrome exposes shared layer tokens and primitives', () =
 
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle\s*\{/);
   assert.match(cssSource, /\.kk-prompt-bar-mobile-collapse-handle:hover\s*\{/);
+  assert.match(
+    cssSource,
+    /\.kk-prompt-bar-mobile-collapse-handle--embedded\s*\{[\s\S]*-webkit-tap-highlight-color:\s*transparent;/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-prompt-bar-mobile-collapse-handle--embedded:hover,[\s\S]*\.kk-prompt-bar-mobile-collapse-handle--embedded:focus-visible\s*\{[\s\S]*background:\s*transparent;[\s\S]*outline:\s*none;/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-prompt-bar-mobile-collapse-handle--embedded:focus-visible \.kk-prompt-bar-mobile-home-indicator\s*\{[\s\S]*box-shadow:\s*0 0 0 2px var\(--border-focus\);/,
+  );
   assert.match(cssSource, /\.kk-prompt-bar-mobile-home-indicator\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*5px/);
   assert.match(cssSource, /\.kk-prompt-bar-mobile-expanded\s*\{[\s\S]*kk-prompt-bar-mobile-expand/);
   assert.match(cssSource, /@keyframes kk-prompt-bar-mobile-expand/);
