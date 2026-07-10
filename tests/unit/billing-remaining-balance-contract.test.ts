@@ -124,9 +124,8 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 
   assert.ok(dashboardLocalizedSource.includes('selectRemainingBalanceSummary'));
   assert.ok(dashboardLocalizedSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);"));
-  assert.ok(dashboardLocalizedSource.includes('title: pick('));
-  assert.ok(dashboardLocalizedSource.includes("'Balance and recharge')"));
-  assert.ok(dashboardLocalizedSource.includes('value: remainingBalanceDisplay'));
+  assert.ok(dashboardLocalizedSource.includes("label={pick('余额', 'Balance')}"));
+  assert.ok(dashboardLocalizedSource.includes('value={remainingBalanceDisplay}'));
 
   assert.ok(dashboardSource.includes('selectRemainingBalanceSummary'));
   assert.match(dashboardSource, /const remainingBalanceDisplay = formatRemainingCredits\(balance, ['"][^'"]+['"]\);/);

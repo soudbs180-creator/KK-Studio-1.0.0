@@ -4,19 +4,13 @@ import {
   ArrowRight,
   CircleGauge,
   Cloud,
-  Coins,
   Cpu,
   Globe,
   HardDrive,
   KeyRound,
-  Layers,
   LayoutDashboard,
   Laptop,
-  Monitor,
   ScrollText,
-  Sparkles,
-  Wallet,
-  Zap,
 } from 'lucide-react';
 
 import { useBilling } from '../../../context/BillingContext';
@@ -225,23 +219,6 @@ const HealthPill: React.FC<{
   </div>
 );
 
-const FlowStep: React.FC<{
-  label: string;
-  helper: string;
-  value: string;
-  icon: React.ReactNode;
-  tone?: HealthTone;
-}> = ({ label, helper, value, icon, tone = 'indigo' }) => (
-  <div className="dashboard-flow-step" data-tone={tone}>
-    <div className="dashboard-flow-step__icon">{icon}</div>
-    <div className="min-w-0">
-      <div className="dashboard-flow-step__label">{label}</div>
-      <div className="dashboard-flow-step__helper">{helper}</div>
-    </div>
-    <strong>{value}</strong>
-  </div>
-);
-
 const TopologyNode: React.FC<{
   label: string;
   value: string;
@@ -305,14 +282,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => selectRemainingBalanceSummary(billingLogs),
     [billingLogs],
   );
-  const dashboardBalanceCards = [
-    {
-      title: pick('余额与充值', 'Balance and recharge'),
-      value: remainingBalanceDisplay,
-    },
-  ];
-  const dashboardBalanceCard = dashboardBalanceCards[0];
-
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
   const [todayTokens, setTodayTokens] = useState(() => getTodayCosts().totalTokens || 0);
@@ -333,9 +302,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     void fetchLogs();
   }, [fetchLogs]);
 
-  const formatNumber = (value: number, maximumFractionDigits = 0) =>
-    new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value);
-
   const formatCompactNumber = (value: number) =>
     new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
@@ -347,19 +313,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
-
-  const formatDateTime = (value?: string | number | null) => {
-    if (!value) return pick('暂无记录', 'No recent activity');
-    const target = typeof value === 'number' ? new Date(value) : new Date(value);
-    if (Number.isNaN(target.getTime())) return pick('暂无记录', 'No recent activity');
-    return target.toLocaleString(locale, {
-      hour12: false,
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const getStorageModeLabel = (mode: StorageMode | null) => {
     if (mode === 'local') return pick('本地文件夹', 'Local folder');
@@ -588,10 +541,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       + (importantLogCount === 0 ? 25 : 0),
   );
 
-  const peakUsageBucket = useMemo(
-    () => usageBuckets.slice().sort((left, right) => right.amount - left.amount || right.count - left.count)[0] ?? usageBuckets[0],
-    [usageBuckets],
-  );
   const chartPoints = useMemo(
     () => usageBuckets.map((bucket, index) => buildChartPoint(hasUsageSignal ? bucket.linePercentage : 0, index, usageBuckets.length)),
     [hasUsageSignal, usageBuckets],
@@ -1655,8 +1604,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
         badge={<StatusBadge status={heroStatus} label={dashboardStatusSummaryLabel} />}
         description={pick(
-          '总览不再只是入口集合，而是把消耗趋势、供应商路由、浏览器助手、存储、日志和账本状态统一成可判断的图形化驾驶舱。',
-          'Overview is now a visual command center for spend, provider routing, browser assistant, storage, logs, and ledger health.',
+          '先确定本地或服务器执行，再查看插件能力、消耗和系统状态。',
+          'Choose local or server execution, then review plugin capabilities, usage, and system state.',
         )}
         actions={(
           <SettingsActionButton
@@ -1698,309 +1647,122 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         )}
       />
 
-      <SettingsCardGridContainer className="dashboard-grid-container dashboard-command-center">
+      <SettingsCardGridContainer className="dashboard-grid-container dashboard-command-center dashboard-command-center--focused">
         <DashboardPanel
-          className="dashboard-card-consumption a-card-span-2-col a-card-span-2-row"
+          className="dashboard-quick-strategy a-card-span-2-col"
           tone="indigo"
-          icon={<Activity size={18} />}
-          eyebrow={pick('消耗曲线', 'Spend curve')}
-          title={pick('今日累计消耗趋势', 'Today cumulative spend trend')}
-          action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
-          onClick={() => onNavigate('capability-sources')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
+          icon={<CircleGauge size={18} />}
+          eyebrow={pick('快捷策略', 'Quick strategy')}
+          title={pick('默认执行与体验模式', 'Execution and experience')}
+          action={<SettingsBadge tone={activePerformancePreset === 'manual' ? 'amber' : 'indigo'}>{activePerformancePreset === 'manual' ? pick('手动', 'Manual') : pick('自动同步', 'Synced')}</SettingsBadge>}
         >
-          <div className="dashboard-chart-shell">
-            <div className="dashboard-chart" aria-label={pick('今日累计消耗曲线图', 'Today cumulative spend curve chart')}>
-              <div className="dashboard-chart__header">
-                <span className="dashboard-chart__title">{pick('累计曲线 / 分段柱状', 'Cumulative curve / interval bars')}</span>
-                <span className="dashboard-chart__legend">{pick('累计消耗', 'Cumulative spend')}</span>
+          <div className="dashboard-preference-stack">
+            <div className="dashboard-preference-control">
+              <div className="dashboard-preference-control__label">
+                <span>{pick('默认执行位置', 'Default execution')}</span>
+                <strong>{routePreference === 'local' ? pick('本地优先', 'Local first') : pick('服务器优先', 'Server first')}</strong>
               </div>
-              <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img">
-                {[25, 50, 75, 100].map((grid) => {
-                  const y = CHART_BOTTOM - (grid / 100) * CHART_INNER_HEIGHT;
-                  return <line key={grid} className="dashboard-chart__grid" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={y} y2={y} />;
-                })}
-                <line className="dashboard-chart__axis" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={CHART_BOTTOM} y2={CHART_BOTTOM} />
-                {areaPath ? <path className="dashboard-chart__area" d={areaPath} /> : null}
-                {linePath ? <path className="dashboard-chart__line" d={linePath} /> : null}
-                {chartPoints.map((point, index) => (
-                  <circle
-                    key={usageBuckets[index]?.label || index}
-                    className="dashboard-chart__dot"
-                    cx={point.x}
-                    cy={point.y}
-                    r={usageBuckets[index]?.isMajorTick ? 3.2 : 2.1}
-                  />
-                ))}
-              </svg>
-              {!hasUsageSignal ? (
-                <div className="dashboard-chart__empty">
-                  <span>{pick('今天还没有消耗数据，曲线保持基线。', 'No spend data today. The curve stays on baseline.')}</span>
-                </div>
-              ) : null}
-
-              <div className="dashboard-chart-bars">
-                {usageBuckets.map((bucket) => (
-                  <div
-                    key={bucket.label}
-                    className="dashboard-chart-bar"
-                    title={pick(
-                      `${bucket.label} · ${formatNumber(bucket.amount, 2)} 积分 · ${bucket.count} 次`,
-                      `${bucket.label} · ${formatNumber(bucket.amount, 2)} credits · ${bucket.count} calls`,
-                    )}
-                  >
-                    <span className="dashboard-chart-bar__track">
-                      <span
-                        className="dashboard-chart-bar__fill"
-                        style={{
-                          '--bucket-height': `${hasUsageSignal ? bucket.barPercentage : 4}%`,
-                          '--bucket-opacity': bucket.amount > 0 || bucket.count > 0 ? '1' : '0.26',
-                        } as React.CSSProperties}
-                      />
-                    </span>
-                    <small data-major={bucket.isMajorTick ? 'true' : 'false'}>{bucket.label.replace(':00', '')}</small>
-                  </div>
-                ))}
+              <div className="dashboard-segment" role="radiogroup" aria-label={pick('默认执行位置', 'Default execution')}>
+                <button type="button" role="radio" aria-checked={routePreference === 'local'} data-state={routePreference === 'local' ? 'selected' : 'idle'} onClick={() => selectRoutePreference('local')}>
+                  <Laptop size={15} />{pick('本地优先', 'Local first')}
+                </button>
+                <button type="button" role="radio" aria-checked={routePreference === 'cloud'} data-state={routePreference === 'cloud' ? 'selected' : 'idle'} onClick={() => selectRoutePreference('cloud')}>
+                  <Cloud size={15} />{pick('服务器优先', 'Server first')}
+                </button>
               </div>
             </div>
-
-            <div className="dashboard-inline-grid">
-              <div className="dashboard-inline-row">
-                <span>{pick('账单金额', 'Billed')}</span>
-                <strong>
-                  {formatUsd(todayCostUsd)}
-                  <small className="ml-1 text-[var(--text-tertiary)] font-normal">
-                    ({pick(`消耗 ${formatNumber(totalCreditSpend, 1)}`, `${formatNumber(totalCreditSpend, 1)} credits`)})
-                  </small>
-                </strong>
+            <div className="dashboard-preference-control">
+              <div className="dashboard-preference-control__label">
+                <span>{pick('体验模式', 'Experience mode')}</span>
+                <strong>{activePerformancePreset === 'manual' ? pick('手动', 'Manual') : performanceOptions.find((option) => option.id === activePerformancePreset)?.label}</strong>
               </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('峰值时段', 'Peak')}</span>
-                <strong>
-                  {peakUsageBucket && hasUsageSignal ? peakUsageBucket.label.replace(':00', '') : '--'}
-                  <small className="ml-1 text-[var(--text-tertiary)] font-normal">
-                    ({peakUsageBucket && hasUsageSignal ? pick(`${formatNumber(peakUsageBucket.count)}次`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('无', 'None')})
-                  </small>
-                </strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('最近请求', 'Latest')}</span>
-                <strong title={latestUsageLabel}>{latestUsageLabel}</strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('记录时间', 'Time')}</span>
-                <strong>{latestUsage ? formatDateTime(latestUsage.created_at) : pick('等待中', 'Waiting')}</strong>
+              <div className="dashboard-segment dashboard-segment--three" role="radiogroup" aria-label={pick('体验模式', 'Experience mode')}>
+                {performanceOptions.map((option) => (
+                  <button key={option.id} type="button" role="radio" aria-checked={activePerformancePreset === option.id} data-state={activePerformancePreset === option.id ? 'selected' : 'idle'} onClick={() => selectPerformancePreset(option.id)} title={option.description}>
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-api a-card-span-2-row"
+          className="dashboard-card-api"
           tone={hasAvailableRoute ? 'emerald' : 'amber'}
           icon={<KeyRound size={18} />}
-          eyebrow={pick('API 路由图', 'API topology')}
-          title={pick('供应商配置与能力路由', 'Provider settings and capability routing')}
+          eyebrow={pick('插件能力', 'Plugin capabilities')}
+          title={pick('AI 能力链路', 'AI capability routes')}
           action={<SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'amber'}>{hasAvailableRoute ? pick('可用', 'Ready') : pick('待配置', 'Setup')}</SettingsBadge>}
-          onClick={() => onNavigate('capability-sources')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openApiManagement.uiAction}
         >
-          <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('路由准备度', 'Route readiness')}
-              value={hasAvailableRoute ? pick('可分发请求', 'Routing enabled') : pick('需要配置通道', 'Needs channels')}
-              helper={pick('官方密钥、供应商在线状态与异常密钥共同决定路由质量。', 'Route quality combines official keys, provider status, and invalid keys.')}
-              progress={routeReadiness}
-              tone={hasAvailableRoute ? 'emerald' : 'amber'}
-            />
-            <div className="dashboard-topology">
-              <div className="dashboard-topology__rail" aria-label={pick('API 路由信息图', 'API routing infographic')}>
-                <TopologyNode
-                  label={pick('官方 API', 'Official API')}
-                  value={String(officialCount)}
-                  helper={pick('直连密钥', 'Direct keys')}
-                  tone={officialCount > 0 ? 'emerald' : 'amber'}
-                />
-                <TopologyNode
-                  label={pick('供应商', 'Providers')}
-                  value={`${activeProviderCount}/${Math.max(providerCount, 0)}`}
-                  helper={pick('在线/总数', 'Online/total')}
-                  tone={activeProviderCount > 0 ? 'emerald' : providerCount > 0 ? 'amber' : 'rose'}
-                />
-                <TopologyNode
-                  label={pick('覆盖率', 'Coverage')}
-                  value={`${channelCoverage}%`}
-                  helper={pick('可用链路', 'Ready routes')}
-                  tone={channelCoverage >= 70 ? 'emerald' : channelCoverage > 0 ? 'amber' : 'rose'}
-                />
-              </div>
-
-              <div className="dashboard-health-grid">
-                <HealthPill
-                  label={pick('密钥有效', 'Valid keys')}
-                  value={`${stats.valid}/${Math.max(statsTotal, stats.valid)}`}
-                  tone={stats.valid > 0 ? 'emerald' : 'amber'}
-                />
-                <HealthPill
-                  label={pick('异常密钥', 'Invalid keys')}
-                  value={String(statsInvalid)}
-                  tone={statsInvalid > 0 ? 'rose' : 'emerald'}
-                />
-              </div>
-            </div>
+          <ModuleMeter
+            label={pick('能力准备度', 'Capability readiness')}
+            value={hasAvailableRoute ? pick('可以分发任务', 'Ready to dispatch') : pick('需要配置 API', 'API setup required')}
+            helper={pick('模型输入仍可覆盖默认能力路由。', 'A model selected in the prompt can override the default route.')}
+            progress={routeReadiness}
+            tone={hasAvailableRoute ? 'emerald' : 'amber'}
+          />
+          <div className="dashboard-capability-actions">
+            <button type="button" onClick={() => onNavigate('ai-takeover')} data-ai-settings-target="ai-takeover" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openAiManagement.uiAction}><Cpu size={15} /><span>{pick('AI 接管', 'AI Takeover')}</span><strong>{pick('就绪', 'Ready')}</strong></button>
+            <button type="button" onClick={() => onNavigate('capability-sources')} data-ai-settings-target="capability-sources" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openApiManagement.uiAction}><KeyRound size={15} /><span>{pick('API 配置', 'API Configuration')}</span><strong>{channelCount}</strong></button>
+            <button type="button" onClick={() => onNavigate('browser-assistant')} data-ai-settings-target="browser-assistant" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openBrowserAssistant.uiAction}><Globe size={15} /><span>{pick('浏览器助手', 'Browser Assistant')}</span><strong>{browserReadiness}%</strong></button>
           </div>
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-browser a-card-span-2-row"
+          className="dashboard-card-consumption"
           tone="indigo"
-          icon={<Globe size={18} />}
-          eyebrow={pick('浏览器助手图', 'Browser assistant map')}
-          title={pick('本地守护、插件与网页自动化链路', 'Daemon, extension, and web automation pipeline')}
-          action={<SettingsBadge tone={browserReadiness >= 75 ? 'emerald' : 'indigo'}>{`${browserReadiness}%`}</SettingsBadge>}
-          onClick={() => onNavigate('browser-assistant')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openBrowserAssistant.uiAction}
-        >
-          <div className="dashboard-module-stack">
-            <ModuleMeter
-              label={pick('链路准备度', 'Pipeline readiness')}
-              value={browserReadiness >= 75 ? pick('可以进入联调', 'Ready for checks') : pick('需要补齐环境', 'Needs setup')}
-              helper={pick('由 API 路由、存储模式和告警日志共同估算。', 'Estimated from API routing, storage mode, and warning logs.')}
-              progress={browserReadiness}
-              tone={browserReadiness >= 75 ? 'emerald' : browserReadiness >= 50 ? 'amber' : 'indigo'}
-            />
-            <div className="dashboard-flow-map" aria-label={pick('浏览器助手流程图', 'Browser assistant flow diagram')}>
-              <FlowStep
-                icon={<Monitor size={12} />}
-                label={pick('本地守护进程', 'Local daemon')}
-                helper={pick('负责 WSS 控制与本地浏览器桥接', 'WSS control and local bridge')}
-                value={pick('检测', 'Check')}
-                tone="indigo"
-              />
-              <FlowStep
-                icon={<Layers size={12} />}
-                label={pick('Chrome 插件', 'Chrome extension')}
-                helper={pick('承接页面读取、截图与上下文采集', 'Page reading, screenshots, context capture')}
-                value={pick('连接', 'Link')}
-                tone="amber"
-              />
-              <FlowStep
-                icon={<Sparkles size={12} />}
-                label={pick('网页抓取/生图素材', 'Extraction and generation assets')}
-                helper={pick('价格、商品图、提示词素材流入工作流', 'Price, images, and prompts enter the workflow')}
-                value={pick('自动化', 'Automate')}
-                tone="emerald"
-              />
-            </div>
-          </div>
-        </DashboardPanel>
-
-        <DashboardPanel
-          className="dashboard-card-storage"
-          tone={storageMode ? 'emerald' : 'amber'}
-          icon={<HardDrive size={18} />}
-          eyebrow={pick('存储健康', 'Storage health')}
-          title={pick('画布资源与容量', 'Canvas assets and capacity')}
-          action={<SettingsBadge tone={storageMode ? 'emerald' : 'amber'}>{storageModeLabel}</SettingsBadge>}
-          onClick={() => onNavigate('data-sync')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openStorageSettings.uiAction}
-        >
-          <div className="dashboard-module-stack">
-            <div className="dashboard-inline-list">
-              <div className="dashboard-inline-row">
-                <span>{pick('图片资源', 'Image assets')}</span>
-                <strong>{storageSnapshotPending ? pick('更新中', 'Updating') : formatNumber(storedImages)}</strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('已占用', 'Used storage')}</span>
-                <strong>{storageUsageMb.toFixed(1)} MB</strong>
-              </div>
-              <ProgressBar
-                progress={storageProgress}
-                tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'emerald'}
-                showLabel
-              />
-            </div>
-          </div>
-        </DashboardPanel>
-
-        <DashboardPanel
-          className="dashboard-card-logs"
-          tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
-          icon={<ScrollText size={18} />}
-          eyebrow={pick('日志诊断', 'System Logs')}
-          title={pick('错误排障与告警', 'Triage & Diagnostics')}
-          action={(
-            <StatusBadge
-              status={latestLog ? getLogTone(latestLog.level) : 'online'}
-              label={hasCriticalLogs ? pick('存在错误', 'Errors') : importantLogCount > 0 ? pick('关注', 'Watch') : pick('日志稳定', 'Healthy')}
-            />
-          )}
-          onClick={() => onNavigate('dev-diagnostics')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openSystemLogs.uiAction}
-        >
-          <div className="dashboard-module-stack">
-            <div className="dashboard-inline-list">
-              <div className="dashboard-inline-row">
-                <span>{pick('今日告警', 'Alerts today')}</span>
-                <strong>{importantLogCount > 0 ? formatNumber(importantLogCount) : pick('无', 'None')}</strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('最近消息', 'Latest message')}</span>
-                <strong title={latestLog ? latestLog.message : undefined}>
-                  {latestLog ? latestLog.message : pick('当前运行稳定', 'Running stable')}
-                </strong>
-              </div>
-            </div>
-          </div>
-        </DashboardPanel>
-
-        <DashboardPanel
-          className="dashboard-card-billing"
-          tone="amber"
-          icon={<Wallet size={18} />}
-          eyebrow={pick('计费账本', 'Billing')}
-          title={pick('账户交易记录', 'Transaction History')}
-          action={<SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{dashboardBalanceCard.title}</SettingsBadge>}
-          onClick={() => onNavigate('capability-sources')}
+          icon={<Activity size={18} />}
+          eyebrow={pick('今日消耗', 'Spend today')}
+          title={pick('调用趋势', 'Usage trend')}
+          action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
           uiAction={SETTINGS_DASHBOARD_ACTIONS.openConsumptionRecords.uiAction}
         >
-          <div className="dashboard-module-stack">
-            <div className="dashboard-inline-list">
-              <div className="dashboard-inline-row">
-                <span>{pick('最近充值', 'Latest recharge')}</span>
-                <strong>{latestRecharge ? formatDateTime(latestRecharge.created_at) : pick('暂无记录', 'No record')}</strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('今日充值', 'Recharge today')}</span>
-                <strong>{todayRechargeCount > 0 ? formatNumber(todayRechargeCount) : pick('无', 'None')}</strong>
-              </div>
+          <div className="dashboard-chart" aria-label={pick('今日累计消耗曲线图', 'Today cumulative spend curve chart')}>
+            <div className="dashboard-chart__header">
+              <span className="dashboard-chart__title">{formatUsd(todayCostUsd)}</span>
+              <span className="dashboard-chart__legend">{formatCompactNumber(todayTokens)} tokens</span>
             </div>
+            <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img">
+              {[25, 50, 75, 100].map((grid) => {
+                const y = CHART_BOTTOM - (grid / 100) * CHART_INNER_HEIGHT;
+                return <line key={grid} className="dashboard-chart__grid" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={y} y2={y} />;
+              })}
+              <line className="dashboard-chart__axis" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={CHART_BOTTOM} y2={CHART_BOTTOM} />
+              {areaPath ? <path className="dashboard-chart__area" d={areaPath} /> : null}
+              {linePath ? <path className="dashboard-chart__line" d={linePath} /> : null}
+              {chartPoints.map((point, index) => <circle key={usageBuckets[index]?.label || index} className="dashboard-chart__dot" cx={point.x} cy={point.y} r={2.4} />)}
+            </svg>
+            {!hasUsageSignal ? <div className="dashboard-chart__empty"><span>{pick('暂无消耗记录', 'No usage yet')}</span></div> : null}
+          </div>
+          <div className="dashboard-inline-grid">
+            <div className="dashboard-inline-row"><span>{pick('最近请求', 'Latest')}</span><strong title={latestUsageLabel}>{latestUsageLabel}</strong></div>
+            <div className="dashboard-inline-row"><span>{pick('余额', 'Balance')}</span><strong>{remainingBalanceDisplay}</strong></div>
           </div>
         </DashboardPanel>
 
         <DashboardPanel
-          className="dashboard-card-capabilities"
-          tone="indigo"
-          icon={<Cpu size={18} />}
-          eyebrow={pick('能力流', 'Capability flow')}
-          title={pick('模型调用与素材闭环', 'Model calls and assets loop')}
-          action={<SettingsBadge tone="indigo">{pick('闭环', 'Loop')}</SettingsBadge>}
-          onClick={() => onNavigate('ai-takeover')}
-          uiAction={SETTINGS_DASHBOARD_ACTIONS.openAiManagement.uiAction}
+          className="dashboard-card-system"
+          tone={hasCriticalLogs ? 'rose' : 'emerald'}
+          icon={<HardDrive size={18} />}
+          eyebrow={pick('系统状态', 'System state')}
+          title={pick('存储与运行诊断', 'Storage and diagnostics')}
+          action={<StatusBadge status={latestLog ? getLogTone(latestLog.level) : 'online'} label={hasCriticalLogs ? pick('需处理', 'Action needed') : pick('稳定', 'Stable')} />}
         >
-          <div className="dashboard-module-stack">
-            <div className="dashboard-inline-list">
-              <div className="dashboard-inline-row">
-                <span>{pick('今日调用', 'Today calls')}</span>
-                <strong>{formatNumber(todayUsageCount)} 次</strong>
-              </div>
-              <div className="dashboard-inline-row">
-                <span>{pick('消费总计', 'Total spend')}</span>
-                <strong>{formatUsd(todayCostUsd)}</strong>
-              </div>
-            </div>
+          <div className="dashboard-topology__rail dashboard-system-topology">
+            <TopologyNode label={pick('存储', 'Storage')} value={storageSnapshotPending ? '--' : `${storageUsageMb.toFixed(1)} MB`} helper={storageModeLabel} tone={storageMode ? 'emerald' : 'amber'} />
+            <TopologyNode label={pick('资源', 'Assets')} value={storageSnapshotPending ? '--' : String(storedImages)} helper={pick('画布素材', 'Canvas assets')} tone="indigo" />
+            <TopologyNode label={pick('告警', 'Warnings')} value={String(importantLogCount)} helper={pick('今日运行', 'Today')} tone={importantLogCount > 0 ? 'amber' : 'emerald'} />
           </div>
+          <div className="dashboard-health-grid">
+            <HealthPill label={pick('账本状态', 'Ledger')} value={`${ledgerReadiness}%`} tone={ledgerReadiness >= 70 ? 'emerald' : 'amber'} />
+            <HealthPill label={pick('系统健康', 'Health')} value={`${systemReadiness}%`} tone={hasCriticalLogs ? 'rose' : 'emerald'} />
+          </div>
+          <div className="dashboard-system-actions">
+            <button type="button" onClick={() => onNavigate('data-sync')} data-ai-settings-target="data-sync" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openStorageSettings.uiAction}>{pick('数据同步', 'Data Sync')}</button>
+            <button type="button" onClick={() => onNavigate('dev-diagnostics')} data-ai-settings-target="dev-diagnostics" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openSystemLogs.uiAction}>{pick('运行诊断', 'Diagnostics')}</button>
+          </div>
+          <span className="sr-only" data-settings-dashboard-action={SETTINGS_DASHBOARD_ACTIONS.openPrimaryModule.uiAction} />
         </DashboardPanel>
       </SettingsCardGridContainer>
     </SettingsViewShell>

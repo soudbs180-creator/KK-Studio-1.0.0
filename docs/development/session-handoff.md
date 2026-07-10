@@ -1888,3 +1888,45 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 中低风险。当前修复了卡片不可见的共同根因，并打通主卡/副卡的横纵连接；音频专用波形、画板框选转记事本卡、PPT 多页编辑和工作流专用卡仍应在统一渲染契约上分阶段补齐，不能再新增静态旁路渲染器。
   - 待 Playwright 浏览器运行时补齐后，应在 `360x800`、`768x1024`、`1440x900` 三档视口复核框选排版、连接线路径、欢迎层避让和触控拖拽。
+
+## 126. 2026-07-11 - 完成顶部任务轨与设置运行概况治理验收
+- **修改范围**：
+  1. 完成桌面任务中心顶部状态轨的系统验收：默认仅露出绿色细条，新任务不再强制展开；44px 点击区、展开/收起无障碍名称、共享动效 Token 和减少动态适配均保持有效。
+  2. 保留新的“总览 / AI 设置 / 系统设置”三级模块导航，并修复设置侧栏 Props、旧搜索动作、桌面 smoke 与相关回归契约的漂移。
+  3. 将手机设置总览的真实运行指标重新接入模块化界面：剩余额度、今日积分与 API 成本、API 成功/失败、累计 Tokens、OAuth 认证账号、最近/最快 API 延迟、可用/异常路由和网页性能共八项；同时保留本地/服务器优先和快速/正常/性能快捷档位。
+  4. 恢复 `appearance-motion` 的规范入口名称“外观与动态”，性能档位继续作为页面内部能力，不改写既有路由语义；同步桌面总览余额、运行诊断与图标清理契约。
+  5. 删除误触发 pnpm 工具生成的 `pnpm-lock.yaml` 与 `pnpm-workspace.yaml`，项目继续以 `npm@11.12.1` 和 `package-lock.json` 为唯一依赖事实源。
+- **修改文件**：
+  - `apps/web/src/components/settings/SettingsMobileDashboard.tsx`
+  - `apps/web/src/components/settings/settingsRegistry.ts`
+  - `apps/web/src/components/settings/views/AppearanceMotionView.tsx`
+  - `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+  - `apps/web/src/components/settings/views/GenerationModeView.tsx`
+  - `apps/web/src/core/routing/ProviderRouteEngine.ts`
+  - `apps/web/src/styles/settings.css`
+  - `scripts/test/verify-desktop-settings-smoke.mjs`
+  - `tests/unit/billing-remaining-balance-contract.test.ts`
+  - `tests/unit/dashboard-settings-overview-regression.test.ts`
+  - `tests/unit/mobile-settings-overview-metrics.test.ts`
+  - `tests/unit/mobile-settings-taxonomy.test.ts`
+  - `tests/unit/settings-module-action-catalog-contract.test.ts`
+  - `tests/unit/settings-shell-scroll-regression.test.ts`
+  - `tests/unit/settings-sidebar-ui-system-contract.test.ts`
+  - `tests/unit/ui-unused-cleanup-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 桌面任务状态入口与左侧收纳轨使用同一边缘收纳逻辑，但通过绿色/蓝色区分任务状态与画布工具；折叠态只显示状态，不用自动弹层打断创作。
+  - 设置首页同时承担运行状态扫描和高频策略调整，不恢复宣传式 Hero；模块导航负责进入深层配置，实时指标必须来自 Billing、KeyManager、Provider 用量和 Browser Bridge，禁止硬编码健康分数。
+  - `appearance-motion` 保持规范命名，快速档位、网页性能和画布性能在该入口内渐进展开；版本继续以 `config/release-manifest.json` 的 `1.5.9` 为事实源。
+- **已运行验证**：
+  - `npm run verify:changes` 完整通过：架构、治理、依赖审计、类型、OpenAPI、生产构建、全部测试、发布 smoke、编码和画布性能均为 0 失败。
+  - 测试汇总：单元 1656 项（1654 通过、2 跳过）、集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3。
+  - 应用内浏览器实测 `1227x662`：桌面任务轨容器 96x44px，绿色状态条 64x6px 且约一半收纳在屏幕外；旧文字胶囊不可见，展开面板宽 520px、无水平溢出，展开与收起控制均唯一可达。
+  - 应用内浏览器实测 `435x662`：手机设置总览展示 8 项真实指标，单项 202x96px、两列稳定排列，无内部或页面横向溢出；快捷策略控件正常接续，浏览器日志无 error/warning。
+  - `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run build`、相关 21 条设置/任务中心回归与 `git diff --check` 均通过。
+- **未运行验证及原因**：
+  - 独立 Playwright Chromium 仍不可用，发布 smoke 自动使用 HTTP 与源码契约降级；桌面任务轨和手机设置总览已通过 Codex 应用内浏览器执行真实 DOM、点击、几何、截图和日志检查。
+  - 未调用真实付费 Provider、真实消费账单或生产 OAuth 账号；零数据状态已实测，非零统计和 Bridge 断开回退由确定性单元测试覆盖。
+- **风险与下一步**：
+  - 低风险。生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 日志伪造告警，应作为独立依赖升级处理。
+  - 后续若扩展任务轨状态，可增加失败/暂停的非颜色提示，但不得恢复常驻文字胶囊或任务创建自动展开。

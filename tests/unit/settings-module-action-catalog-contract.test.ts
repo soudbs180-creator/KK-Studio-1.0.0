@@ -128,7 +128,7 @@ test('desktop settings shell buttons expose shell action metadata', () => {
   assert.match(headerSource, /data-settings-shell-action=\{SETTINGS_SHELL_ACTIONS\.refreshCurrentView\.uiAction\}/);
   assert.match(headerSource, /data-settings-shell-action=\{SETTINGS_SHELL_ACTIONS\.closeWorkbench\.uiAction\}/);
   assert.match(sidebarSource, /data-settings-shell-action=\{SETTINGS_SHELL_ACTIONS\.navigateModule\.uiAction\}/);
-  assert.match(sidebarSource, /data-settings-shell-action=\{SETTINGS_SHELL_ACTIONS\.filterNavigation\.uiAction\}/);
+  assert.doesNotMatch(sidebarSource, /SETTINGS_SHELL_ACTIONS\.filterNavigation/);
 });
 
 test('segmented settings controls can carry stable settings action metadata', () => {

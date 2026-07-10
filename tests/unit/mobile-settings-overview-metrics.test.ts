@@ -111,7 +111,7 @@ test('mobile settings overview hides OAuth sessions when the bridge is disconnec
   assert.equal(metrics.latencySource, 'fastest');
 });
 
-test('mobile settings dashboard removes the promotional hero and exposes the operational overview and performance control', () => {
+test('mobile settings dashboard exposes four judgment metrics, focused strategy controls, modules, and balance', () => {
   const dashboardSource = readSource('apps/web/src/components/settings/SettingsMobileDashboard.tsx');
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const appearanceSource = readSource('apps/web/src/components/settings/views/AppearanceMotionView.tsx');
@@ -122,11 +122,22 @@ test('mobile settings dashboard removes the promotional hero and exposes the ope
   assert.match(dashboardSource, /创作系统状态/);
   assert.match(dashboardSource, /剩余额度/);
   assert.match(dashboardSource, /今日消耗/);
-  assert.match(dashboardSource, /累计 Tokens/);
   assert.match(dashboardSource, /网页登录/);
-  assert.match(dashboardSource, /当前延迟/);
-  assert.match(dashboardSource, /网页表现/);
-  assert.match(dashboardSource, /onNavigate\('appearance-motion'\)/);
+  assert.match(dashboardSource, /可用路由/);
+  assert.doesNotMatch(dashboardSource, /id: 'calls'/);
+  assert.doesNotMatch(dashboardSource, /id: 'tokens'/);
+  assert.doesNotMatch(dashboardSource, /id: 'latency'/);
+  assert.doesNotMatch(dashboardSource, /id: 'performance'/);
+  assert.match(dashboardSource, /默认执行位置/);
+  assert.match(dashboardSource, /本地优先/);
+  assert.match(dashboardSource, /服务器优先/);
+  assert.match(dashboardSource, /快速/);
+  assert.match(dashboardSource, /正常/);
+  assert.match(dashboardSource, /性能/);
+  assert.match(dashboardSource, /settings-mobile-module-list/);
+  assert.match(dashboardSource, /module\.id !== 'overview'/);
+  assert.match(dashboardSource, /剩余金额/);
+  assert.match(dashboardSource, /data-ai-settings-target/);
   assert.doesNotMatch(dashboardSource, /SettingsHero/);
   assert.doesNotMatch(dashboardSource, /42%/);
   assert.doesNotMatch(shellSource, /SettingsHero/);
@@ -137,8 +148,8 @@ test('mobile settings dashboard removes the promotional hero and exposes the ope
   assert.match(appearanceSource, /'balanced'/);
   assert.match(appearanceSource, /'visual'/);
   assert.match(appearanceContextSource, /data(set)?\.kkWebPerformance|dataset\.kkWebPerformance/);
-  assert.match(settingsStylesSource, /\.settings-mobile-navigation__item[\s\S]*min-height:\s*68px/);
-  assert.match(settingsStylesSource, /\.settings-mobile-performance-button[\s\S]*min-height:\s*var\(--kk-touch-target-min\)/);
+  assert.match(settingsStylesSource, /\.settings-mobile-module-card[\s\S]*min-height:\s*68px/);
+  assert.match(settingsStylesSource, /\.settings-mobile-account-card[\s\S]*min-height:\s*64px/);
   assert.doesNotMatch(dashboardSource, /#[0-9a-fA-F]{3,8}/);
   assert.doesNotMatch(dashboardSource, /z-\[/);
 });

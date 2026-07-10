@@ -17,7 +17,7 @@ export const GenerationModeView: React.FC = () => {
   // 核心模式选择
   const [preferredMode, setPreferredMode] = useState<'auto' | 'local' | 'cloud' | 'platform'>(() => {
     const val = localStorage.getItem('kk_studio_preferred_generation_mode');
-    return (val === 'local' || val === 'cloud' || val === 'platform') ? val : 'auto';
+    return (val === 'auto' || val === 'cloud' || val === 'platform') ? val : 'local';
   });
 
   // 高级用户设置项

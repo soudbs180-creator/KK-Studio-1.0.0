@@ -27,9 +27,11 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   // 验证大卡片布局
   assert.match(source, /dashboard-grid-container/);
   assert.match(source, /dashboard-grid-card/);
-  assert.match(source, /Wallet/);
+  assert.match(source, /LayoutDashboard/);
+  assert.match(source, /Activity/);
   assert.match(source, /KeyRound/);
   assert.match(source, /HardDrive/);
   assert.match(source, /ScrollText/);
-  assert.match(source, /Coins/);
+  assert.doesNotMatch(source, /\bWallet,/);
+  assert.doesNotMatch(source, /\bCoins,/);
 });

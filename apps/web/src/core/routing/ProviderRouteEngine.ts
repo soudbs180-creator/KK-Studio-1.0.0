@@ -42,7 +42,7 @@ export class ProviderRouteEngine {
     const storedPreferredMode = localStorage.getItem('kk_studio_preferred_generation_mode');
     const userPreferredMode = (storedPreferredMode === 'local' || storedPreferredMode === 'cloud' || storedPreferredMode === 'platform')
       ? storedPreferredMode
-      : 'auto';
+      : 'local';
 
     // 4. Check locally resolved keys
     let hasLocalUserKey = false;

@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { CircleGauge, Eye, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { CircleGauge, Eye, Gauge, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';
@@ -18,6 +19,14 @@ import {
   getSettingsStatusSummaryLabel,
   getSettingsViewMeta,
 } from '../settingsRegistry';
+import {
+  applyPerformancePreset,
+  CANVAS_PERFORMANCE_STORAGE_KEY,
+  getActivePerformancePreset,
+  readCanvasPerformanceMode,
+  SETTINGS_QUICK_PREFERENCES_EVENT,
+} from '../settingsQuickPreferences';
+import { SettingSelect } from '../ui/index';
 
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
@@ -39,12 +48,14 @@ const ToggleSwitch: React.FC<{
 
 const AppearanceMotionView: React.FC = () => {
   const { locale, pick } = useLocale();
+  const navigate = useNavigate();
   const {
     preferences,
     systemReducedMotion,
     setPreferences,
     resetPreferences,
   } = useAppearanceMotion();
+  const [canvasPerformanceMode, setCanvasPerformanceMode] = useState(readCanvasPerformanceMode);
 
   const registryLanguage = locale.startsWith('zh') ? 'zh-CN' : 'en-US';
   const viewMeta = useMemo(
@@ -80,21 +91,23 @@ const AppearanceMotionView: React.FC = () => {
     },
     {
       id: 'visual',
-      label: pick('质感', 'Visual'),
-      description: pick('保留完整视觉效果', 'Full visual effects'),
+      label: pick('性能', 'Performance'),
+      description: pick('启用完整特效与画质', 'Full effects and quality'),
     },
   ];
-  const selectPerformanceMode = (mode: WebPerformanceMode) => {
-    if (mode === 'fast') {
-      setPreferences({ performanceMode: mode, motionScale: 0.55, glassBlur: 8, glassOpacity: 0.84 });
-      return;
-    }
-    if (mode === 'visual') {
-      setPreferences({ performanceMode: mode, motionScale: 1.15, glassBlur: 28, glassOpacity: 0.72 });
-      return;
-    }
-    setPreferences({ performanceMode: mode, motionScale: 1, glassBlur: 20, glassOpacity: 0.76 });
+  const activePerformancePreset = getActivePerformancePreset(preferences, readCanvasPerformanceMode());
+  const selectPerformanceMode = (mode: WebPerformanceMode) => applyPerformancePreset(mode, setPreferences);
+  const selectCanvasPerformanceMode = (mode: string) => {
+    window.localStorage.setItem(CANVAS_PERFORMANCE_STORAGE_KEY, mode);
+    setCanvasPerformanceMode(mode);
+    window.dispatchEvent(new CustomEvent(SETTINGS_QUICK_PREFERENCES_EVENT));
   };
+  const canvasPerformanceLabel = {
+    auto: pick('自动调节', 'Auto'),
+    quality: pick('质量优先', 'Quality'),
+    smooth: pick('流畅优先', 'Smooth'),
+    ghost: pick('极限模式', 'Ghost'),
+  }[canvasPerformanceMode] || pick('手动', 'Manual');
 
   return (
     <SettingsViewShell className={SETTINGS_PAGE_CONTAINER_CLASSNAME}>
@@ -123,7 +136,9 @@ const AppearanceMotionView: React.FC = () => {
             <SettingsBadge tone="emerald">
               {systemReducedMotion
                 ? pick('跟随系统减少动态', 'System reduced motion')
-                : performanceModes.find((mode) => mode.id === preferences.performanceMode)?.label}
+                : activePerformancePreset === 'manual'
+                  ? pick('手动', 'Manual')
+                  : performanceModes.find((mode) => mode.id === activePerformancePreset)?.label}
             </SettingsBadge>
           )}
         >
@@ -137,8 +152,8 @@ const AppearanceMotionView: React.FC = () => {
                 key={mode.id}
                 type="button"
                 role="radio"
-                aria-checked={preferences.performanceMode === mode.id}
-                data-state={preferences.performanceMode === mode.id ? 'selected' : 'idle'}
+                aria-checked={activePerformancePreset === mode.id}
+                data-state={activePerformancePreset === mode.id ? 'selected' : 'idle'}
                 className="settings-performance-mode-option"
                 onClick={() => selectPerformanceMode(mode.id)}
               >
@@ -237,6 +252,37 @@ const AppearanceMotionView: React.FC = () => {
               {systemReducedMotion ? pick('跟随系统', 'Following system') : pick('可用', 'Available')}
             </SettingsBadge>
           </SettingsSystemField>
+        </SettingsSystemCard>
+
+        <SettingsSystemCard
+          className="settings-system-card--wide"
+          title={pick('画布性能', 'Canvas Performance')}
+          description={pick('把无限画布的渲染策略纳入同一体验档位；单独修改后总览会显示手动。', 'Keep canvas rendering in the same experience preset; custom changes appear as Manual on overview.')}
+          icon={Gauge}
+          tone="sky"
+          action={<SettingsBadge tone={activePerformancePreset === 'manual' ? 'amber' : 'emerald'}>{canvasPerformanceLabel}</SettingsBadge>}
+        >
+          <SettingsSystemField
+            label={pick('画布渲染策略', 'Canvas rendering')}
+            value={canvasPerformanceLabel}
+            description={pick('自动、质量、流畅和极限模式会影响大画布卡片、连接线与缩略图渲染。', 'Controls cards, connectors, and thumbnail rendering on large canvases.')}
+          >
+            <SettingSelect
+              value={canvasPerformanceMode}
+              onChange={selectCanvasPerformanceMode}
+              options={[
+                { label: pick('自动调节', 'Auto'), value: 'auto' },
+                { label: pick('质量优先', 'Quality'), value: 'quality' },
+                { label: pick('流畅优先', 'Smooth'), value: 'smooth' },
+                { label: pick('极限模式', 'Ghost'), value: 'ghost' },
+              ]}
+            />
+          </SettingsSystemField>
+          <div className="flex justify-end">
+            <SettingsActionButton icon={Gauge} tone="secondary" onClick={() => navigate('/settings/canvas-performance')}>
+              {pick('高级画布细节', 'Advanced canvas details')}
+            </SettingsActionButton>
+          </div>
         </SettingsSystemCard>
 
         <SettingsSystemCard

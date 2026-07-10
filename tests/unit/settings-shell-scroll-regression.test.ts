@@ -80,11 +80,12 @@ test('settings visual tokens use Apple blue accents and soft product-card shadow
   assert.match(cssSource, /\.settings-panel \.settings-reference-card \{[\s\S]*box-shadow: var\(--settings-card-shadow\);/);
 });
 
-test('settings sidebar search keeps the input visually transparent inside the search shell', () => {
+test('settings module sidebar removes the obsolete search input without reviving private search paint', () => {
   const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
   const cssSource = readSource('apps/web/src/index.css');
 
-  assert.match(sidebarSource, /className="w-full min-w-0 bg-transparent text-sm outline-none"/);
+  assert.doesNotMatch(sidebarSource, /type="search"/);
+  assert.doesNotMatch(sidebarSource, /SETTINGS_SHELL_ACTIONS\.filterNavigation/);
   assert.doesNotMatch(
     cssSource,
     /\.settings-panel \.settings-shell-nav__search,\s*[\r\n]+\.settings-panel \.settings-shell-nav__search input \{/,

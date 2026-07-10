@@ -62,5 +62,6 @@ test('legacy DashboardView does not retain unused icon imports', () => {
   assert.doesNotMatch(source, /\bAlertTriangle,/);
   assert.doesNotMatch(source, /\bShieldCheck,/);
   assert.doesNotMatch(source, /\bWallet,/);
-  assert.match(localizedSource, /\bWallet,/);
+  assert.doesNotMatch(localizedSource, /\bWallet,/);
+  assert.doesNotMatch(localizedSource, /\bCoins,/);
 });
