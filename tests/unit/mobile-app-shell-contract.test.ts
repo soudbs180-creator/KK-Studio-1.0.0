@@ -23,6 +23,7 @@ test('MobileAppShell keeps the adaptive three-layer slot contract and stays tab-
   }
 
   const shellSource = readSource(MOBILE_APP_SHELL_PATH);
+  const tokenSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   assert.match(shellSource, /interface MobileAppShellProps\s*\{/);
   assert.match(shellSource, /header:\s*ReactNode;/);
@@ -34,6 +35,7 @@ test('MobileAppShell keeps the adaptive three-layer slot contract and stays tab-
   assert.match(shellSource, /data-slot="header"/);
   assert.match(shellSource, /data-testid="mobile-header-scrim"/);
   assert.match(shellSource, /kk-mobile-header-scrim/);
+  assert.match(tokenSource, /\.kk-mobile-header-scrim\s*\{[\s\S]*height:\s*calc\(100% \+ 32px\)/);
   assert.match(shellSource, /data-slot="feed"/);
   assert.match(shellSource, /data-slot="composer"/);
   assert.match(shellSource, /data-slot="overlays"/);

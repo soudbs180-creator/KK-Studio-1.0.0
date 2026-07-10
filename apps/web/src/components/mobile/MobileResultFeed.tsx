@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, ArrowLeft, ChevronsDown, Copy, Download, Trash2, LayoutGrid, Rows } from 'lucide-react';
+import { Search, X, ArrowLeft, ChevronsDown, Copy, Download, Trash2 } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -720,18 +720,18 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
               </div>
             </div>
-            {/* 简体中文：紧凑模式切换坞与独立回底按钮共用一层视觉外壳，触控目标保持 44px。 */}
+            {/* 简体中文：模式滑块与回底按钮保持独立外壳，避免把命令按钮误读为第三个模式。 */}
             <div 
               data-testid="mobile-result-view-controls"
-              className="kk-result-panel kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto text-[11px] font-medium"
+              className="kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto text-[11px] font-medium"
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
               onClick={stopMobileResultControlEvent}
               onTouchStart={stopMobileResultControlEvent}
               onTouchEnd={stopMobileResultControlEvent}
             >
-              {/* 模式切换胶囊 */}
-              <div className="kk-result-view-mode-group flex text-[11px] font-medium text-[var(--text-primary)]">
+              <div className={`kk-result-view-mode-group kk-result-view-mode-group--${viewMode} flex text-[11px] font-medium text-[var(--text-primary)]`}>
+                <span className="kk-result-view-mode-thumb" aria-hidden="true" />
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -749,13 +749,11 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                         : ''
                     }`}
                   >
-                    {mode === 'detail' ? <Rows size={13} aria-hidden="true" /> : <LayoutGrid size={13} aria-hidden="true" />}
                     <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}</span>
                   </button>
                 ))}
               </div>
 
-              {/* 快速一键滚动回底部的圆形毛玻璃按钮，高度与切换胶囊完全对齐，具备弹性缩放交互动效 */}
               <button
                 type="button"
                 onClick={(e) => {

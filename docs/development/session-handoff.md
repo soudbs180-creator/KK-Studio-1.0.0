@@ -2011,3 +2011,30 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 低风险。上滑手势使用 18px 阈值并限制在底部 44px 手势区，后续若扩大手势热区，应避免拦截结果流正常纵向滚动。
   - 生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 日志伪造告警，应作为独立依赖升级任务处理。
+
+## 129. 2026-07-11 - 完成手机结果模式滑块与独立回底按钮
+- **修改范围**：
+  1. “标准 / 详细”移除网格和列表图标，改为纯文字双段胶囊；激活态使用 36x36px 圆形滑块在两端之间平移，保持开关式视觉反馈。
+  2. “回到底部”从模式胶囊中拆出，使用独立 44x44px 圆形按钮和向下图标，与模式切换保持 8px 间距。
+  3. 手机 Header 主题渐变的额外延伸高度从 72px 收紧到 32px，保留黑白主题平滑过渡，同时避免阴影覆盖第一排结果。
+- **修改文件**：
+  - `apps/web/src/components/mobile/MobileResultFeed.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `tests/unit/mobile-app-shell-contract.test.ts`
+  - `tests/unit/result-surface-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 视图模式继续使用互斥分段控件，圆形滑块只承担当前状态反馈；回底属于命令操作，必须与模式选择保持独立视觉边界。
+  - 两类按钮均保持 44px 触控目标，紧凑度通过内部几何和分组间距实现，不牺牲可访问性。
+  - Header 遮罩继续消费现有主题 Token，仅缩短几何范围，不新增颜色或层级。
+- **已运行验证**：
+  - 移动结果区与 Shell 定向测试 8/8 通过；完整 TypeScript、架构 TypeScript、服务端 58 文件和 480 个测试文件语义检查通过。
+  - `architecture:check`、`governance:check`、OpenAPI 检查和生产构建通过，Vite 完成 2424 个模块转换。
+  - Codex 应用内浏览器实测当前 `547x820` 页面：标准/详细仅显示文字，36px 圆形滑块可从左侧平移到右侧；回底按钮为独立圆形且无粘连；Header 渐变不再覆盖首排卡片主体。
+  - 浏览器没有本轮新增 UI 异常；日志中保留既有 Provider Key 回退 warning 和 AdminModelService 502 环境错误。
+- **未运行验证及原因**：
+  - `verify:changes` 已执行到全量单元测试阶段，因并行任务正在重写 `SettingsDesktopSidebar` 及账户设置文件，出现 3 条与本轮无关的设置侧栏契约失败；定向复跑确认这 3 条均来自并行工作区结构与 #127 测试预期不一致。
+  - 独立 Playwright Chromium 可执行文件仍不可用；本轮目标视口由 Codex 应用内浏览器完成真实截图和交互验证。
+- **风险与下一步**：
+  - 本轮移动 UI 风险低。并行设置任务完成后应重新运行全量单元测试和 `verify:changes`，确认其侧栏契约恢复一致。
+  - 生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 告警。
