@@ -2038,3 +2038,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险与下一步**：
   - 本轮移动 UI 风险低。并行设置任务完成后应重新运行全量单元测试和 `verify:changes`，确认其侧栏契约恢复一致。
   - 生产依赖审计仍保留 1 个既有中危 `morgan <= 1.10.1` 告警。
+
+## 130. 2026-07-11 - 收紧手机双圆模式开关并加入蓝金过渡
+- **修改范围**：
+  1. 模式开关宽度锁定为两个 44px 圆形触控位，总宽 88px；圆形滑块从左到右只平移 44px，解决胶囊过长问题。
+  2. 标准态使用蓝色背景、边框、文字和阴影，详细态使用金色；位移与颜色、边框、阴影在同一 260ms 共享缓动中完成过渡。
+  3. 英文标准标签缩写为 `Std`，确保 44px 圆位内不发生文字溢出；完整含义继续由 title 和无障碍状态表达。
+- **修改文件**：
+  - `apps/web/src/components/mobile/MobileResultFeed.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `tests/unit/result-surface-ui-system-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 开关几何以共享 44px 触控 Token 为唯一基准，外壳宽度、按钮宽度和位移距离不再分别硬编码。
+  - 蓝色表示标准浏览，金色表示详细信息；两种状态均通过浅色/深色语义 Token 适配主题。
+- **已运行验证**：
+  - 移动结果区定向测试 6/6、完整 TypeScript、架构检查和生产构建通过。
+  - Codex 应用内浏览器在 `547x820` 实测：开关宽 88px，蓝色标准圆滑动 44px 后变为金色详细圆，中间过渡帧与终态均正常；回底圆钮保持独立。
+- **未运行验证及原因**：
+  - 全量 `verify:changes` 仍受并行设置任务的 3 条侧栏契约失败阻断；失败文件不属于本轮范围，未跨任务修改。
+- **风险与下一步**：
+  - 低风险。并行设置任务提交后应重新运行全量验证；本轮模式切换由定向契约、构建和真实浏览器覆盖。
+  - 提交窗口另有画布契约任务正在修改 `canvasContextState.ts`、`types/index.ts`、`workflow/types.ts` 与共享 `workspace-canvas.ts`；这些内容已从 #130 提交中排除并原样保留在工作区。

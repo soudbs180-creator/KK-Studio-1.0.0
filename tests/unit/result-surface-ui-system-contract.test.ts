@@ -16,11 +16,16 @@ test('result surfaces consume shared KK result tokens and 44px interaction primi
   assert.match(tokenSource, /--kk-result-control-bg:/);
   assert.match(tokenSource, /--kk-result-control-primary-bg:/);
   assert.match(tokenSource, /--kk-result-bottom-scrim-bg:/);
+  assert.match(tokenSource, /--kk-result-view-standard-bg:/);
+  assert.match(tokenSource, /--kk-result-view-detail-bg:/);
   assert.match(tokenSource, /\.kk-result-view-controls\s*\{[\s\S]*height:\s*var\(--kk-touch-target-min\)/);
   assert.match(tokenSource, /\.kk-result-view-controls\s*\{[\s\S]*gap:\s*var\(--kk-space-2\)/);
-  assert.match(tokenSource, /\.kk-result-view-mode-button\s*\{[\s\S]*min-width:\s*58px/);
+  assert.match(tokenSource, /\.kk-result-view-mode-group\s*\{[\s\S]*width:\s*calc\(var\(--kk-touch-target-min\) \* 2\)/);
+  assert.match(tokenSource, /\.kk-result-view-mode-button\s*\{[\s\S]*min-width:\s*var\(--kk-touch-target-min\)/);
   assert.match(tokenSource, /\.kk-result-view-mode-thumb\s*\{[\s\S]*width:\s*36px;[\s\S]*height:\s*36px;[\s\S]*border-radius:\s*50%/);
-  assert.match(tokenSource, /\.kk-result-view-mode-group--detail \.kk-result-view-mode-thumb\s*\{[\s\S]*translateX\(58px\)/);
+  assert.match(tokenSource, /\.kk-result-view-mode-thumb\s*\{[\s\S]*transition:[\s\S]*transform var\(--kk-motion-panel\) var\(--kk-motion-ease-standard\),[\s\S]*background-color var\(--kk-motion-panel\) var\(--kk-motion-ease-standard\)/);
+  assert.match(tokenSource, /\.kk-result-view-mode-group--detail\s*\{[\s\S]*--kk-result-view-current-bg:\s*var\(--kk-result-view-detail-bg\)/);
+  assert.match(tokenSource, /\.kk-result-view-mode-group--detail \.kk-result-view-mode-thumb\s*\{[\s\S]*translateX\(var\(--kk-touch-target-min\)\)/);
   assert.match(tokenSource, /\.kk-result-view-scroll-control\s*\{[\s\S]*border-radius:\s*50%/);
   assert.match(tokenSource, /\.kk-result-surface/);
   assert.match(tokenSource, /\.kk-lightbox-backdrop\s*\{[\s\S]*rgb\(var\(--kk-result-overlay-rgb\) \/ var\(--kk-lightbox-backdrop-opacity/);

@@ -749,7 +749,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                         : ''
                     }`}
                   >
-                    <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}</span>
+                    <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Std')}</span>
                   </button>
                 ))}
               </div>
