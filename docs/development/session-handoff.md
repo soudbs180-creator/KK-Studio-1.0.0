@@ -1848,3 +1848,43 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 本条为接手时已有改动的同步固化，未重复运行完整项目验证；完整验证由后续无限画布重构统一执行。
 - **风险与下一步**：
   - 低风险。后续画布响应式重构需继续验证顶部状态轨与欢迎层、导航和输入区的避让关系。
+
+## 125. 2026-07-11 - 修复画布卡片渲染并打通横纵自动排版
+- **修改范围**：
+  1. 修复电商、PPT 和声音 Prompt 组被静态占位渲染器接管后缺少世界坐标、选择、拖拽和连线契约，导致卡片堆叠在画布原点或不可见的问题；统一回收到可交互的生成组渲染链路，保留现有 `PromptNodeComponent` 与 `ImageCard` UI。
+  2. 将框选后的行、列、网格整理结果持久化为 `subCardLayoutMode`；横向整理时主卡位于左侧、子卡位于右侧并使用左右锚点连线，纵向与网格继续使用上下锚点，PPT 组固定使用纵向阅读顺序。
+  3. 让静态渲染、拖拽中的实时连接线和自动整理共享相同的方向语义，避免整理完成后卡片与连接线方向不一致。
+  4. 将空画布的大型说明卡改为紧凑的真实工作流入口，并为桌面工具栏、右侧小地图和底部输入区预留安全区域；手机端布局保持原有产品形态。
+  5. 参考 `basketikun/infinite-canvas` 的世界坐标/节点渲染分层和 `tldraw/tldraw` 的选择后命令式整理思想完成架构校正；未复制 AGPL 源码。
+- **修改文件**：
+  - `apps/web/src/app/promptGroupRenderLayout.ts`
+  - `apps/web/src/app/usePromptGroupLayout.ts`
+  - `apps/web/src/canvas/connectorGeometry.ts`
+  - `apps/web/src/context/CanvasContext.tsx`
+  - `apps/web/src/context/canvasArrangeSelection.ts`
+  - `apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts`
+  - `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`
+  - `apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx`
+  - `apps/web/src/landing/EmptyCanvasWelcome.tsx`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/styles/canvas.css`
+  - `tests/contract/card-render-policy.test.ts`
+  - `tests/unit/canvas-arrange-selection-contract.test.ts`
+  - `tests/unit/canvas-connector-layer-contract.test.ts`
+  - `tests/unit/workflow-actions-unused-cleanup-contract.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 卡片类型差异继续由 Prompt 节点和结果卡内部展示承担，画布注册表只决定交互渲染策略，不允许业务卡片绕过绝对定位、选择、拖拽与连接线基础契约。
+  - `row`、`column`、`grid` 是画布选区的持久布局状态，而不是一次性坐标变换；后续新增多图、工作流、记事本或批注卡时复用同一布局与连接线协议。
+  - 工作流入口优先触发已有模板和模型配置动作，不在空画布叠加说明型大面板。
+- **已运行验证**：
+  - 画布定向契约与单元测试 17/17 通过。
+  - TypeScript `tsc --noEmit` 通过，Vite 生产构建通过（2423 modules）。
+  - 完整 `architecture:check` 32 项、`governance:check` 10 项均通过；`git diff --check` 通过。
+  - 全量单元测试共 1656 项，本次画布相关测试全部通过；当前结果为 1 个失败、2 个跳过，其余通过。
+- **未运行验证及原因**：
+  - 独立 Playwright Chromium 缺失，无法执行重构后的浏览器截图复核；重构前已在应用内浏览器确认大型欢迎层会遮挡输入区和小地图，相关几何由响应式 CSS 契约与生产构建覆盖。
+  - 未运行完整 `verify:changes`，因为并行中的设置页修改使 `tests/unit/ui-unused-cleanup-contract.test.ts` 仍要求已移除的 `Wallet` 导入；该失败位于 `DashboardView.localized.tsx`，不属于本次画布修改范围。
+- **风险与下一步**：
+  - 中低风险。当前修复了卡片不可见的共同根因，并打通主卡/副卡的横纵连接；音频专用波形、画板框选转记事本卡、PPT 多页编辑和工作流专用卡仍应在统一渲染契约上分阶段补齐，不能再新增静态旁路渲染器。
+  - 待 Playwright 浏览器运行时补齐后，应在 `360x800`、`768x1024`、`1440x900` 三档视口复核框选排版、连接线路径、欢迎层避让和触控拖拽。

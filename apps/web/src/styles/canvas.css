@@ -267,28 +267,65 @@ body.dark-mode .zoom-slider {
 }
 
 .empty-canvas-welcome-layer {
-  z-index: 700;
-  align-items: flex-start;
-  padding-top: clamp(72px, 10vh, 128px);
-  padding-bottom: clamp(220px, 26vh, 320px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  z-index: 90;
+  inset: clamp(64px, 9vh, 96px) clamp(250px, 21vw, 292px) clamp(136px, 19vh, 176px) clamp(76px, 8vw, 116px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .empty-canvas-welcome-panel {
-  max-height: min(calc(100dvh - 180px), 720px);
-  overflow-y: auto;
+  width: min(100%, 600px);
+  max-height: min(100%, 460px);
+  border-color: var(--frost-card-framework-border);
+  background: var(--frost-card-framework-bg);
+  color: var(--text-primary);
+  box-shadow: var(--frost-card-framework-shadow);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
+  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
   scrollbar-width: thin;
 }
 
-@media (max-height: 760px) {
-  .empty-canvas-welcome-layer {
-    padding-top: 64px;
-    padding-bottom: clamp(180px, 24vh, 260px);
-  }
+.empty-canvas-welcome-panel > header,
+.empty-canvas-workflow-row,
+.empty-canvas-welcome-settings {
+  border-color: var(--frost-card-sub-border);
+}
 
+.empty-canvas-welcome-icon {
+  background: var(--toolbar-active);
+  color: var(--accent-coral);
+}
+
+.empty-canvas-welcome-muted {
+  color: var(--text-secondary);
+}
+
+.empty-canvas-welcome-settings,
+.empty-canvas-workflow-row {
+  background: var(--toolbar-bg);
+  color: var(--text-primary);
+  transition:
+    background-color var(--kk-motion-standard) var(--kk-motion-ease-standard),
+    border-color var(--kk-motion-standard) var(--kk-motion-ease-standard),
+    transform var(--kk-motion-fast) var(--kk-motion-ease-standard);
+}
+
+.empty-canvas-welcome-settings:hover,
+.empty-canvas-workflow-row:hover {
+  border-color: var(--border-focus);
+  background: var(--toolbar-hover);
+}
+
+@media (max-width: 960px) {
+  .empty-canvas-welcome-layer {
+    inset-inline: 76px 20px;
+  }
+}
+
+@media (max-height: 720px) {
   .empty-canvas-welcome-panel {
-    max-height: min(calc(100dvh - 144px), 640px);
+    max-height: min(100%, 360px);
   }
 }
 

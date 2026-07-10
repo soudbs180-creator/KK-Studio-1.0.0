@@ -2301,7 +2301,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     const newCanvases = state.canvases.map(c =>
                         c.id === state.activeCanvasId ? { ...selectedRootArrange.canvas, lastModified: Date.now() } : c
                     );
-                    setState(prev => ({ ...prev, canvases: newCanvases }));
+                    setState(prev => ({
+                        ...prev,
+                        canvases: newCanvases,
+                        subCardLayoutMode: selectedRootArrange.subCardLayoutMode,
+                    }));
                     return;
                 }
 

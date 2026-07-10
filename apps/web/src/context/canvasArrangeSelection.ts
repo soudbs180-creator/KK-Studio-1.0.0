@@ -11,6 +11,7 @@ export type ArrangeSinglePromptChildrenResult = {
 
 export type ArrangeSelectedRootNodesResult = {
     canvas: Canvas;
+    subCardLayoutMode: CanvasSubCardLayout;
 };
 
 export type ArrangeSelectedGroupedNodesResult = {
@@ -57,6 +58,7 @@ type SelectedImagePlacement = {
 };
 
 type SelectedGroupLayout = {
+    layoutMode: CanvasSubCardLayout;
     promptHeight: number;
     width: number;
     height: number;
@@ -111,15 +113,15 @@ export function arrangeSingleSelectedPromptChildren(
     const promptBottom = prompt.position.y;
 
     if (targetMode === 'row') {
-        const totalWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) + (childImages.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
-        let currentLeft = promptCenterX - totalWidth / 2;
-        const subCardsTopY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
+        let currentLeft = promptCenterX + (PROMPT_WIDTH / 2) + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
+        const promptHeight = prompt.height || 200;
+        const promptCenterY = promptBottom - (promptHeight / 2);
 
         childImages.forEach((image, index) => {
             const dims = imageDims[index];
             newImagePositions[image.id] = {
                 x: currentLeft + dims.w / 2,
-                y: subCardsTopY + dims.h,
+                y: promptCenterY + (dims.h / 2),
             };
             currentLeft += dims.w + AUTO_ARRANGE_SUB_IMAGE_GAP;
         });
@@ -340,9 +342,14 @@ export function arrangeSelectedGroupedNodes(
         return {
             ...group,
             layout: {
+                layoutMode,
                 promptHeight,
-                width,
-                height,
+                width: group.prompt && layoutMode === 'row'
+                    ? PROMPT_WIDTH + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + imageLayout.width
+                    : width,
+                height: group.prompt && layoutMode === 'row'
+                    ? Math.max(promptHeight, imageLayout.height)
+                    : height,
                 imageLayoutHeight: imageLayout.height,
                 imagePlacements: imageLayout.placements,
             },
@@ -359,12 +366,7 @@ export function arrangeSelectedGroupedNodes(
         row.rowWidth += (row.groups.length > 0 ? AUTO_ARRANGE_GROUP_GAP_X : 0) + group.layout.width;
         row.groups.push(group);
         row.maxPromptHeight = Math.max(row.maxPromptHeight, group.layout.promptHeight);
-        row.maxTotalHeight = Math.max(
-            row.maxTotalHeight,
-            group.prompt
-                ? row.maxPromptHeight + (group.layout.imageLayoutHeight > 0 ? AUTO_ARRANGE_PROMPT_TO_SUB_GAP + group.layout.imageLayoutHeight : 0)
-                : group.layout.height
-        );
+        row.maxTotalHeight = Math.max(row.maxTotalHeight, group.layout.height);
     };
 
     if (selectionStrategy === 'row') {
@@ -401,6 +403,27 @@ export function arrangeSelectedGroupedNodes(
 
         row.groups.forEach(group => {
             const groupCenterX = currentLeftX + group.layout.width / 2;
+
+            if (group.prompt && group.layout.layoutMode === 'row') {
+                const groupTopY = rowTopY + ((row.maxTotalHeight - group.layout.height) / 2);
+                const promptTopY = groupTopY + ((group.layout.height - group.layout.promptHeight) / 2);
+                arrangedPositions[group.prompt.id] = {
+                    x: currentLeftX + (PROMPT_WIDTH / 2),
+                    y: promptTopY + group.layout.promptHeight,
+                };
+
+                const imageLayoutLeft = currentLeftX + PROMPT_WIDTH + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
+                const imageTopY = groupTopY + ((group.layout.height - group.layout.imageLayoutHeight) / 2);
+                group.layout.imagePlacements.forEach(placement => {
+                    arrangedPositions[placement.id] = {
+                        x: imageLayoutLeft + (group.layout.width - PROMPT_WIDTH - AUTO_ARRANGE_PROMPT_TO_SUB_GAP) / 2 + placement.xOffset,
+                        y: imageTopY + placement.bottomOffset,
+                    };
+                });
+
+                currentLeftX += group.layout.width + AUTO_ARRANGE_GROUP_GAP_X;
+                return;
+            }
 
             if (group.prompt) {
                 arrangedPositions[group.prompt.id] = {
@@ -669,5 +692,6 @@ export function arrangeSelectedRootNodes(
             }),
             lastModified: (options.now ?? Date.now)(),
         },
+        subCardLayoutMode: mode,
     };
 }

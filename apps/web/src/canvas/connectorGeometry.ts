@@ -60,6 +60,16 @@ export function buildDockedVerticalConnectorPath(startX: number, startY: number,
   return `M${startX},${startY} C${startX},${startY + startPullY} ${endX},${endY - endPullY} ${endX},${endY}`;
 }
 
+export function buildDockedHorizontalConnectorPath(startX: number, startY: number, endX: number, endY: number) {
+  const deltaX = endX - startX;
+  const directionX = deltaX === 0 ? 1 : Math.sign(deltaX);
+  const distanceX = Math.abs(deltaX);
+  const startPullX = Math.max(28, Math.min(distanceX * 0.5, 140)) * directionX;
+  const endPullX = Math.max(24, Math.min(distanceX * 0.34, 112)) * directionX;
+
+  return `M${startX},${startY} C${startX + startPullX},${startY} ${endX - endPullX},${endY} ${endX},${endY}`;
+}
+
 export function getSoftConnectorPointAt(startX: number, startY: number, endX: number, endY: number, t: number) {
   const { control1X, control1Y, control2X, control2Y } = getSoftConnectorControlPoints(startX, startY, endX, endY);
 

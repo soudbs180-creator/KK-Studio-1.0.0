@@ -19,3 +19,16 @@ test('workspace connector layer uses a small overflow-visible svg instead of a h
   assert.doesNotMatch(connectorLayer, /top:\s*'-5000px'/);
   assert.doesNotMatch(connectorLayer, /\+\s*5000/);
 });
+
+test('prompt groups route connectors from the selected horizontal or vertical card edges', () => {
+  const geometry = readSource('apps/web/src/canvas/connectorGeometry.ts');
+  const layout = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
+  const workspace = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+  assert.match(geometry, /export function buildDockedHorizontalConnectorPath/);
+  assert.match(layout, /layoutMode: 'grid' \| 'row' \| 'column'/);
+  assert.match(layout, /layoutMode === 'row'/);
+  assert.match(layout, /buildDockedHorizontalConnectorPath/);
+  assert.match(layout, /getPromptNodeBoundsWidth\(node, false\)/);
+  assert.match(workspace, /subCardLayoutMode: state\.subCardLayoutMode/);
+});

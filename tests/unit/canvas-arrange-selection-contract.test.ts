@@ -28,7 +28,7 @@ type CanvasArrangeSelectionModule = {
     selectedIds: string[],
     mode: 'row' | 'grid' | 'column',
     options?: { now?: () => number }
-  ) => { canvas: Canvas } | null;
+  ) => { canvas: Canvas; subCardLayoutMode: 'row' | 'grid' | 'column' } | null;
   arrangeSelectedGroupedNodes: (
     canvas: Canvas,
     selectedIds: string[],
@@ -149,8 +149,8 @@ test('arrangeSingleSelectedPromptChildren lays out one selected prompt children 
   assert.equal(result?.subCardLayoutMode, 'row');
   assert.equal(result?.canvas.lastModified, 123);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 344, y: 519 }],
-    ['image-2', { x: 656, y: 519 }],
+    ['image-1', { x: 856, y: 181.5 }],
+    ['image-2', { x: 1168, y: 181.5 }],
     ['image-3', { x: 1, y: 2 }],
   ]);
 });
@@ -214,6 +214,7 @@ test('arrangeSelectedRootNodes lays out selected standalone images in a row', as
 
   const result = arrangeSelectedRootNodes(source, ['image-1', 'image-2'], 'row', { now: () => 125 });
 
+  assert.equal(result?.subCardLayoutMode, 'row');
   assert.equal(result?.canvas.lastModified, 125);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
     ['image-1', { x: 0, y: 320 }],
@@ -281,12 +282,12 @@ test('arrangeSelectedGroupedNodes lays out a selected prompt child group', async
   assert.equal(result?.subCardLayoutMode, 'row');
   assert.equal(result?.canvas.lastModified, 127);
   assert.deepEqual(result?.canvas.promptNodes.map((prompt) => [prompt.id, prompt.position]), [
-    ['prompt-1', { x: 500, y: 90.5 }],
+    ['prompt-1', { x: 176, y: 300 }],
     ['prompt-2', { x: 900, y: 200 }],
   ]);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 344, y: 509.5 }],
-    ['image-2', { x: 656, y: 509.5 }],
+    ['image-1', { x: 532, y: 381.5 }],
+    ['image-2', { x: 844, y: 381.5 }],
     ['image-3', { x: 1000, y: 600 }],
   ]);
 });

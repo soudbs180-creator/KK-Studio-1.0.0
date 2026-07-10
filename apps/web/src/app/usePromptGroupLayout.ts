@@ -74,6 +74,7 @@ export interface UsePromptGroupLayoutDeps {
   promptGroupLayerById: Map<string, number> | null | undefined;
   promptGroupLayoutStateByIdRef: RefObject<Record<string, PromptGroupLayoutPresentationState>>;
   promptGroupLayoutVersion: number;
+  subCardLayoutMode: 'grid' | 'row' | 'column';
   promptNodesById: Map<string, PromptNode> | null | undefined;
   selectNodes: SelectNodes;
   selectedNodeIds: string[] | null | undefined;
@@ -243,6 +244,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupLayerById,
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
+    subCardLayoutMode,
     promptNodesById,
     selectNodes,
     selectedNodeIds,
@@ -532,14 +534,13 @@ function getSubCardStandardOffset(
   const currentDims = imageDims[index];
 
   if (layoutMode === 'row') {
-    const totalWidth = imageDims.reduce((sum, d) => sum + d.w, 0) + (childImages.length - 1) * 32; // SUB_IMAGE_GAP = 32
-    let currentLeft = -totalWidth / 2;
+    let currentLeft = (getPromptNodeBoundsWidth(prompt, false) / 2) + 56;
     for (let i = 0; i < index; i++) {
       currentLeft += imageDims[i].w + 32;
     }
     return {
       x: currentLeft + currentDims.w / 2,
-      y: 56 + currentDims.h // PROMPT_TO_SUB_GAP = 56
+      y: -((prompt.height || 200) / 2) + (currentDims.h / 2)
     };
   } else if (layoutMode === 'column') {
     let currentTop = 56;
@@ -636,7 +637,7 @@ function getSubCardStandardOffset(
             .filter(img => img.parentPromptId === promptNode.id)
             .sort((a, b) => a.timestamp - b.timestamp);
 
-          const layoutMode = promptNode.mode === GenerationMode.PPT ? 'column' : 'grid';
+          const layoutMode = promptNode.mode === GenerationMode.PPT ? 'column' : subCardLayoutMode;
           const offset = getSubCardStandardOffset(promptNode, childImages, imageNode, layoutMode);
 
           const ownerBase = resolveCanvasNodePositionForLiveDrag(ownerId) || promptNode.position;
@@ -685,6 +686,7 @@ function getSubCardStandardOffset(
     liveDerivedNodeIdsByOwnerRef,
     liveNodePositionByIdRef,
     resolveCanvasNodePositionForLiveDrag,
+    subCardLayoutMode,
     syncLiveNodePositionState,
     currentPromptNodesById,
     currentImageNodesById,

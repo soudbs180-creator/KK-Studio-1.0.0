@@ -3,10 +3,6 @@ import type { CanvasCardDetailLevel } from '../../../canvas/performanceProfile';
 
 import ImageGenerationGroupRenderer from './ImageGenerationGroupRenderer';
 import VideoGenerationGroupRenderer from './VideoGenerationGroupRenderer';
-import EcommerceTaskCardRenderer from './EcommerceTaskCardRenderer';
-import PptSlideCardRenderer from './PptSlideCardRenderer';
-import PptDeckCardRenderer from './PptDeckCardRenderer';
-import MusicTaskCardRenderer from './MusicTaskCardRenderer';
 import BrowserTaskCardRenderer from './BrowserTaskCardRenderer';
 import AssetCardRenderer from './AssetCardRenderer';
 import WorkflowCardRenderer from './WorkflowCardRenderer';
@@ -88,10 +84,18 @@ class CanvasCardRendererRegistry {
 
     this.register('image-generation-group', createPolicy('image-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), ImageGenerationGroupRenderer);
     this.register('video-generation-group', createPolicy('video-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), VideoGenerationGroupRenderer);
-    this.register('ecommerce-task-card', createPolicy('ecommerce-task-card', 'standalone-task-card'), EcommerceTaskCardRenderer);
-    this.register('ppt-slide-card', createPolicy('ppt-slide-card', 'multi-page-card'), PptSlideCardRenderer);
-    this.register('ppt-deck-card', createPolicy('ppt-deck-card', 'multi-page-card'), PptDeckCardRenderer);
-    this.register('music-task-card', createPolicy('music-task-card', 'standalone-media-card'), MusicTaskCardRenderer);
+    const functionalPromptGroupPolicy = (kind: CanvasCardKind, pattern: CardDisplayPattern) => createPolicy(kind, pattern, {
+      hasMainCard: true,
+      hasResultCards: true,
+      atomicGroup: true,
+    });
+
+    // Prompt-backed business cards must keep the shared positioned/interactive group shell.
+    // Their mode-specific UI remains owned by PromptNodeComponent and ImageCard.
+    this.register('ecommerce-task-card', functionalPromptGroupPolicy('ecommerce-task-card', 'standalone-task-card'), ImageGenerationGroupRenderer);
+    this.register('ppt-slide-card', functionalPromptGroupPolicy('ppt-slide-card', 'multi-page-card'), ImageGenerationGroupRenderer);
+    this.register('ppt-deck-card', functionalPromptGroupPolicy('ppt-deck-card', 'multi-page-card'), ImageGenerationGroupRenderer);
+    this.register('music-task-card', functionalPromptGroupPolicy('music-task-card', 'standalone-media-card'), ImageGenerationGroupRenderer);
     this.register('browser-task-card', createPolicy('browser-task-card', 'standalone-task-card'), BrowserTaskCardRenderer);
     this.register('asset-card', createPolicy('asset-card', 'standalone-media-card'), AssetCardRenderer);
     this.register('workflow-card', createPolicy('workflow-card', 'workflow-utility-card'), WorkflowCardRenderer);

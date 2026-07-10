@@ -1,7 +1,8 @@
 import type { CanvasCardDetailLevel } from '../canvas/performanceProfile';
-import { buildDockedVerticalConnectorPath } from '../canvas/connectorGeometry';
+import { buildDockedHorizontalConnectorPath, buildDockedVerticalConnectorPath } from '../canvas/connectorGeometry';
 import type { GeneratedImage, PromptNode } from '../types';
 import { getCardDimensions, FOOTER_HEIGHT } from '../utils/styleUtils';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import type {
   Point,
   PromptGroupLayoutPresentationState,
@@ -15,6 +16,7 @@ interface BuildPromptGroupRenderLayoutArgs {
   focusedGroupId: string | null;
   generatingGroupIds: string[];
   canvasScale: number;
+  layoutMode: 'grid' | 'row' | 'column';
   promptGroupLayoutState: PromptGroupLayoutPresentationState | undefined;
   regroupLayoutsById: Map<string, PromptGroupRegroupLayout>;
   imageCardHeightById: Record<string, number>;
@@ -46,6 +48,7 @@ export function buildPromptGroupRenderLayout({
   focusedGroupId,
   generatingGroupIds,
   canvasScale,
+  layoutMode,
   promptGroupLayoutState,
   regroupLayoutsById,
   imageCardHeightById,
@@ -99,16 +102,38 @@ export function buildPromptGroupRenderLayout({
   const connectorSvgWidth = Math.max(1, (connectorBounds.maxX - connectorBounds.minX) + (connectorCanvasPadding * 2));
   const connectorSvgHeight = Math.max(1, (connectorBounds.maxY - connectorBounds.minY) + (connectorCanvasPadding * 2));
 
-  const groupConnectorLayouts = childVisualLayouts.map((layout) => ({
-    key: `${node.id}-${layout.childNode.id}`,
-    imageId: layout.childNode.id,
-    path: buildDockedVerticalConnectorPath(
-      promptConnectorPosition.x - connectorSvgLeft,
-      promptConnectorPosition.y - connectorSvgTop,
-      layout.visualPosition.x - connectorSvgLeft,
-      (layout.visualPosition.y - layout.resolvedImageHeight) - connectorSvgTop,
-    ),
-  }));
+  const promptWidth = getPromptNodeBoundsWidth(node, false);
+  const promptHeight = node.height || 200;
+  const groupConnectorLayouts = childVisualLayouts.map((layout) => {
+    const isHorizontal = layoutMode === 'row';
+    const startX = isHorizontal
+      ? promptConnectorPosition.x + (promptWidth / 2)
+      : promptConnectorPosition.x;
+    const startY = isHorizontal
+      ? promptConnectorPosition.y - (promptHeight / 2)
+      : promptConnectorPosition.y;
+    const endX = isHorizontal
+      ? layout.visualPosition.x - (layout.renderedWidth / 2)
+      : layout.visualPosition.x;
+    const endY = isHorizontal
+      ? layout.visualPosition.y - (layout.resolvedImageHeight / 2)
+      : layout.visualPosition.y - layout.resolvedImageHeight;
+    const pathBuilder = isHorizontal
+      ? buildDockedHorizontalConnectorPath
+      : buildDockedVerticalConnectorPath;
+
+    return {
+      key: `${node.id}-${layout.childNode.id}`,
+      imageId: layout.childNode.id,
+      orientation: isHorizontal ? 'horizontal' as const : 'vertical' as const,
+      path: pathBuilder(
+        startX - connectorSvgLeft,
+        startY - connectorSvgTop,
+        endX - connectorSvgLeft,
+        endY - connectorSvgTop,
+      ),
+    };
+  });
 
   return {
     node,

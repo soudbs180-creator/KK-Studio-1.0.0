@@ -33,12 +33,13 @@ test('empty canvas welcome stays above workspace chrome without being hidden by 
   assert.match(welcomeSource, /empty-canvas-welcome-panel/);
   assert.match(
     canvasCssSource,
-    /\.empty-canvas-welcome-layer\s*\{[\s\S]*z-index:\s*700;[\s\S]*padding-bottom:\s*clamp\(220px,\s*26vh,\s*320px\);/,
+    /\.empty-canvas-welcome-layer\s*\{[\s\S]*z-index:\s*90;[\s\S]*inset:\s*clamp\(64px,[\s\S]*clamp\(136px,/,
   );
   assert.match(
     canvasCssSource,
-    /\.empty-canvas-welcome-panel\s*\{[\s\S]*max-height:\s*min\(calc\(100dvh - 180px\),\s*720px\);[\s\S]*overflow-y:\s*auto;/,
+    /\.empty-canvas-welcome-panel\s*\{[\s\S]*width:\s*min\(100%,\s*600px\);[\s\S]*max-height:\s*min\(100%,\s*460px\);/,
   );
+  assert.match(welcomeSource, /aria-labelledby="empty-canvas-title"/);
 });
 
 test('empty canvas API settings entry is a semantic command', () => {
@@ -46,7 +47,7 @@ test('empty canvas API settings entry is a semantic command', () => {
 
   assert.match(
     welcomeSource,
-    /<button[\s\S]*type="button"[\s\S]*onClick=\{onOpenSettings\}[\s\S]*配置 API 密钥/,
+    /<button[\s\S]*type="button"[\s\S]*onClick=\{onOpenSettings\}[\s\S]*配置模型/,
   );
   assert.doesNotMatch(welcomeSource, /<div[^>]*onClick=\{onOpenSettings\}/);
 });

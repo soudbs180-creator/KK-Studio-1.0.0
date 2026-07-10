@@ -26,7 +26,7 @@ test("Card Render Policy - 渲染策略与原子卡组默认判定规则验证",
     "createPolicy 必须默认设定 atomicGroup 为 false"
   );
 
-  // 2. 验证仅图片和视频组开启主副卡原子卡组
+  // 2. 验证所有 Prompt-backed 卡型均使用完整主副卡原子组渲染器
   assert.ok(
     source.includes("this.register('image-generation-group', createPolicy('image-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), ImageGenerationGroupRenderer);")
     || (source.includes("image-generation-group") && source.includes("hasMainCard: true") && source.includes("atomicGroup: true")),
@@ -38,4 +38,17 @@ test("Card Render Policy - 渲染策略与原子卡组默认判定规则验证",
     || (source.includes("video-generation-group") && source.includes("hasMainCard: true") && source.includes("atomicGroup: true")),
     "只有视频生成卡组应当被配置为 hasMainCard: true 且 atomicGroup: true"
   );
+
+  for (const kind of ['ecommerce-task-card', 'ppt-slide-card', 'ppt-deck-card', 'music-task-card']) {
+    assert.match(
+      source,
+      new RegExp(`this\\.register\\('${kind}',[\\s\\S]{0,220}ImageGenerationGroupRenderer\\)`),
+      `${kind} 必须复用带世界坐标、选择、拖拽和主副卡联动的功能渲染器`
+    );
+  }
+
+  assert.doesNotMatch(source, /import EcommerceTaskCardRenderer/);
+  assert.doesNotMatch(source, /import PptSlideCardRenderer/);
+  assert.doesNotMatch(source, /import PptDeckCardRenderer/);
+  assert.doesNotMatch(source, /import MusicTaskCardRenderer/);
 });
