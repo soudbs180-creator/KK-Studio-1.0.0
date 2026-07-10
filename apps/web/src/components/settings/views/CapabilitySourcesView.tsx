@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { KeyRound, Server, ShieldCheck, Globe, Cpu } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
@@ -11,13 +12,20 @@ import {
 import ApiSettingsView from '../ApiSettingsView';
 import { getKkApiServerHealth } from '../../../services/api/kkApiServerHealth';
 import { toolRegistryInstance, type BrowserBridgeStatusSnapshot } from '../../../features/ai-assistant-runtime';
+import { isApiManagementEditorRoute } from '../apiManagementRouteState';
 
 export const CapabilitySourcesView: React.FC = () => {
   const { pick } = useLocale();
+  const location = useLocation();
+  const isEditorRoute = isApiManagementEditorRoute(location.pathname);
   const [localRunnerStatus, setLocalRunnerStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
   const [browserBridgeStatus, setBrowserBridgeStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
   
   useEffect(() => {
+    if (isEditorRoute) {
+      return;
+    }
+
     let active = true;
     const check = async () => {
       const [healthResult, bridgeResult] = await Promise.allSettled([
@@ -47,7 +55,11 @@ export const CapabilitySourcesView: React.FC = () => {
       active = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [isEditorRoute]);
+
+  if (isEditorRoute) {
+    return <ApiSettingsView initialSupplier={null} />;
+  }
 
   const statusLabel = (status: 'checking' | 'active' | 'inactive') => {
     if (status === 'active') return pick('已连接', 'Connected');

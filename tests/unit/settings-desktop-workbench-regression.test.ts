@@ -34,6 +34,10 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(shellSource, /pick\('管理员', 'Administrator'\)/);
   assert.match(shellSource, /pick\('标准账户', 'Standard account'\)/);
   assert.match(shellSource, /data-testid="settings-account-block"/);
+  assert.match(shellSource, /<button[\s\S]*data-testid="settings-account-block"/);
+  assert.match(shellSource, /aria-pressed=\{language === 'zh-CN'\}/);
+  assert.match(shellSource, /aria-pressed=\{language === 'en-US'\}/);
+  assert.match(sidebarSource, /aria-label=\{searchPlaceholder\}/);
   assert.doesNotMatch(shellSource, /navigate\(buildSettingsPath\('api-management'\)\);/);
   assert.match(shellSource, /renderSettingsRouteElements\(/);
   assert.match(shellSource, /refreshKey:\s*contentRefreshKey/);

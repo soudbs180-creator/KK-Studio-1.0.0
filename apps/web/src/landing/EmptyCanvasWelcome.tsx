@@ -64,7 +64,11 @@ export const EmptyCanvasWelcome: React.FC<EmptyCanvasWelcomeProps> = ({
             </p>
           </div>
 
-          <div className="p-4 rounded-xl border border-gray-100 bg-[#fffaf0]/80 cursor-pointer hover:border-gray-300 transition-colors" onClick={onOpenSettings}>
+          <button
+            type="button"
+            className="w-full p-4 rounded-xl border border-gray-100 bg-[#fffaf0]/80 cursor-pointer hover:border-gray-300 transition-colors text-left"
+            onClick={onOpenSettings}
+          >
             <div className="flex items-center gap-2 text-[#0a0a0a] font-medium text-xs mb-2">
               <Key size={14} className="text-[#b8a4ed]" />
               <span>{t({ zh: '配置 API 密钥', en: 'API Settings' })}</span>
@@ -72,7 +76,7 @@ export const EmptyCanvasWelcome: React.FC<EmptyCanvasWelcomeProps> = ({
             <p className="text-[11px] text-gray-500 leading-normal font-light">
               {t({ zh: '点击在此处配置并激活您的个人大模型 API 访问密钥。', en: 'Click here to configure and secure your global model API credentials.' })}
             </p>
-          </div>
+          </button>
         </div>
 
         {/* Quick Apply Workflow Templates */}

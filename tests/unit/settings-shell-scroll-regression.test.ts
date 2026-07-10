@@ -32,6 +32,11 @@ test('desktop settings shell keeps a real inner scroll container and viewport-sa
   assert.match(cssSource, /\.settings-shell-main \{[\s\S]*z-index: 1;/);
   assert.match(cssSource, /\.settings-shell-page \{[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/);
   assert.match(cssSource, /\.settings-shell-mobile__topbar \{[\s\S]*backdrop-filter: saturate\(180%\) blur\(20px\);/);
+  assert.match(shellSource, /const desktopScrollContainerRef = useRef<HTMLDivElement \| null>\(null\);/);
+  assert.match(shellSource, /desktopScrollContainerRef\.current\.scrollTop = 0;/);
+  assert.match(shellSource, /scrollContainerRef\.current\.scrollTop = 0;/);
+  assert.match(shellSource, /key=\{location\.pathname\}/);
+  assert.match(shellSource, /\[location\.pathname, contentRefreshKey\]/);
   assert.doesNotMatch(
     cssSource,
     /\.settings-panel \.settings-shell,\s*\.settings-panel \.settings-shell-page--desktop\s*\{[^}]*border: [12]px solid var\(--settings-shell-border\) !important;/,

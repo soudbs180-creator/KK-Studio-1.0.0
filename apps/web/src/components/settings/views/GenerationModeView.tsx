@@ -59,9 +59,11 @@ export const GenerationModeView: React.FC = () => {
 
       <SettingsSection title={pick('基础策略', 'Basic Strategy')}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
+          <button
+            type="button"
+            aria-pressed={preferredMode === 'auto'}
             onClick={() => handleModeChange('auto')}
-            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+            className={`w-full p-4 rounded-xl border cursor-pointer text-left transition-all ${
               preferredMode === 'auto'
                 ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/5 text-[var(--text-primary)]'
                 : 'border-[var(--border-light)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-tertiary)]'
@@ -77,11 +79,13 @@ export const GenerationModeView: React.FC = () => {
                 'Automatically select the optimal generation route based on device and connectivity.'
               )}
             </p>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
+            aria-pressed={preferredMode === 'local'}
             onClick={() => handleModeChange('local')}
-            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+            className={`w-full p-4 rounded-xl border cursor-pointer text-left transition-all ${
               preferredMode === 'local'
                 ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/5 text-[var(--text-primary)]'
                 : 'border-[var(--border-light)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-tertiary)]'
@@ -97,11 +101,13 @@ export const GenerationModeView: React.FC = () => {
                 'Prioritize local API keys, device models, and local browsers.'
               )}
             </p>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
+            aria-pressed={preferredMode === 'cloud'}
             onClick={() => handleModeChange('cloud')}
-            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+            className={`w-full p-4 rounded-xl border cursor-pointer text-left transition-all ${
               preferredMode === 'cloud'
                 ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/5 text-[var(--text-primary)]'
                 : 'border-[var(--border-light)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-tertiary)]'
@@ -117,11 +123,13 @@ export const GenerationModeView: React.FC = () => {
                 'Prioritize cloud relay proxy, remote keys, and cloud processing.'
               )}
             </p>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
+            aria-pressed={preferredMode === 'platform'}
             onClick={() => handleModeChange('platform')}
-            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+            className={`w-full p-4 rounded-xl border cursor-pointer text-left transition-all ${
               preferredMode === 'platform'
                 ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/5 text-[var(--text-primary)]'
                 : 'border-[var(--border-light)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--text-tertiary)]'
@@ -137,7 +145,7 @@ export const GenerationModeView: React.FC = () => {
                 'Dispatch directly through official channels using platform credits.'
               )}
             </p>
-          </div>
+          </button>
         </div>
       </SettingsSection>
 

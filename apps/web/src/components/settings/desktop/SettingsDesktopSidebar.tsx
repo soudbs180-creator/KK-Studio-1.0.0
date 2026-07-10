@@ -203,6 +203,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           value={navQuery}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
           className="w-full min-w-0 bg-transparent text-sm outline-none"
           data-settings-shell-action={SETTINGS_SHELL_ACTIONS.filterNavigation.uiAction}
         />

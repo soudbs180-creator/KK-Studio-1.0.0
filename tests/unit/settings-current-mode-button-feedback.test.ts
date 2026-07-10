@@ -22,3 +22,11 @@ test('storage mode actions stop re-triggering the already active mode', () => {
   assert.match(source, /disabled=\{!supportsLocal \|\| mode === 'local'\}/);
   assert.match(source, /disabled=\{mode === 'browser'\}/);
 });
+
+test('generation routing modes expose keyboard-operable pressed state buttons', () => {
+  const source = readSource('apps/web/src/components/settings/views/GenerationModeView.tsx');
+
+  assert.equal((source.match(/aria-pressed=\{preferredMode ===/g) || []).length, 4);
+  assert.ok((source.match(/type="button"/g) || []).length >= 4);
+  assert.doesNotMatch(source, /<div\s+onClick=\{\(\) => handleModeChange\(/);
+});

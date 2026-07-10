@@ -24,3 +24,18 @@ test('settings shell supports overlay and page presentations while sharing one r
   assert.match(source, /return createPortal\(content, document\.body\);/);
   assert.match(source, /data-testid="settings-page-root"/);
 });
+
+test('nested API editors retain capability sources as the active settings module', () => {
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
+  const capabilitySource = readSource('apps/web/src/components/settings/views/CapabilitySourcesView.tsx');
+
+  assert.match(
+    registrySource,
+    /item\.path === currentPath \|\| currentPath\.startsWith\(`\$\{item\.path\}\/`\)/,
+  );
+  assert.match(capabilitySource, /const isEditorRoute = isApiManagementEditorRoute\(location\.pathname\);/);
+  assert.match(
+    capabilitySource,
+    /if \(isEditorRoute\) \{\s*return <ApiSettingsView initialSupplier=\{null\} \/>;\s*\}/,
+  );
+});

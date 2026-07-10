@@ -1657,3 +1657,46 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - Playwright 浏览器可执行文件不可用，发布链中的浏览器脚本使用 HTTP 与源码契约降级校验；本次实际改动的手机/桌面页面已使用应用内浏览器逐项测量并截图复核。
 - **风险与下一步**：
   - 低风险。建议后续 CI 镜像补齐 Playwright Chromium，使现有移动模型中心几何断言和 AI 接管选择器在发布链中执行真实浏览器路径，而不是仅依赖降级契约。
+
+## 120. 2026-07-10 - 修复设置跨端滚动、API 编辑黑屏与启动反馈缺口
+- **修改范围**：
+  1. 修复手机设置在模块切换和 API 二级页面跳转时继承旧滚动位置的问题；移动滚动容器按路由重建并回顶，桌面设置切换模块或刷新时同步回顶。
+  2. 修复手机端“添加本地 API”后只剩标题和大片黑屏的问题；嵌套 API 编辑路由现在直接渲染编辑器，不再先堆叠能力来源总览与模型中心列表。
+  3. 修复嵌套 API 路由被识别为设置总览的问题，能力来源子路由继续保持“能力来源”标题和导航选中态；设置总览返回按钮改为“返回工作区”。
+  4. 将生成策略卡、空画布 API 配置入口、设置账户入口与语言切换补齐为可键盘操作的语义控件，并为搜索、切换状态和当前页面补齐无障碍名称/状态。
+  5. 登录态确认阶段由纯黑占位改为真实启动反馈；8 秒启动兜底只在实际强制推进时记录警告，避免正常启动产生误报。
+  6. 修复 Vite 监听策略把 `src/components/settings` 与 `src/assets/images` 误判为运行时数据目录的问题；源码继续实时监听，生成数据目录仍保持忽略。
+- **修改文件**：
+  - `apps/web/src/app/AuthenticatedAppShell.tsx`
+  - `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`
+  - `apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx`
+  - `apps/web/src/components/settings/settingsRegistry.ts`
+  - `apps/web/src/components/settings/views/CapabilitySourcesView.tsx`
+  - `apps/web/src/components/settings/views/GenerationModeView.tsx`
+  - `apps/web/src/context/AppStartupContext.tsx`
+  - `apps/web/src/landing/EmptyCanvasWelcome.tsx`
+  - `apps/web/vite.config.ts`
+  - `apps/web/viteWatchPolicy.ts`
+  - `tests/unit/app-startup-coordinator.test.ts`
+  - `tests/unit/settings-current-mode-button-feedback.test.ts`
+  - `tests/unit/settings-desktop-workbench-regression.test.ts`
+  - `tests/unit/settings-dual-entry-regression.test.ts`
+  - `tests/unit/settings-shell-scroll-regression.test.ts`
+  - `tests/unit/vite-watch-policy.test.ts`
+  - `tests/unit/workflow-actions-unused-cleanup-contract.test.ts`
+  - `tests/unit/workspace-auth-gate.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - API 编辑器是独立二级任务，进入后应直接展示当前对象与可编辑字段；能力总览只属于模型中心列表页，避免手机端为进入表单重复滚动长页面。
+  - 路由变化同时使用显式 `scrollTop = 0` 和移动滚动容器路由 key，覆盖浏览器点击自动滚动与 React 路由提交的先后竞态。
+  - Vite 只忽略非源码路径中的工作区数据目录；任何 `src`、`server`、`packages`、`tests`、`scripts`、`config`、`migrations` 代码路径即使含 `settings/images/cache` 同名目录也必须保持监听。
+- **已运行验证**：
+  - 应用内浏览器实测 `390x844` 与 `1440x900`：手机能力来源换页顶部完整、API 编辑器首屏直接可用、桌面 API 编辑器和生成策略页布局正常；策略卡暴露 4 个 `aria-pressed` 按钮，设置搜索、账户和语言控件语义生效。
+  - 启动重载截图确认“正在确认会话”反馈可见，不再出现纯黑无状态首屏。
+  - 针对性回归 20/20 通过；补充完整单测后 `npm run test:unit` 为 1635 项、1633 通过、2 跳过、0 失败。
+  - `npm run verify:changes` 完整通过：架构、治理、依赖审计、类型、规格、生产构建、单元 1635、集成 12/12、契约 9/9、E2E 11/11、拖拽、移动/桌面设置、AI 接管、启动布局、编码和画布性能 3/3 均为 0 失败。
+  - `git diff --check` 通过。
+- **未运行验证及原因**：
+  - 发布脚本中的 Playwright Chromium 仍不可用，相关 smoke 使用 HTTP 与源码契约降级；本次涉及的手机/桌面页面已在应用内浏览器执行真实交互、语义树检查和截图复核。
+- **风险与下一步**：
+  - 低风险。后续可继续把能力来源列表页中较长的供应商预设目录补充分段搜索和虚拟化，但当前接入、编辑、返回与跨端布局链路已可实际使用。

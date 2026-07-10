@@ -119,6 +119,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
   if (compact) {
     return (
       <div
+        role="group"
         className="flex flex-col gap-1 rounded-[18px] border p-1 w-[38px] h-[70px] shrink-0 items-center justify-between"
         style={{
           borderColor: 'var(--settings-nav-glass-border, rgba(255, 255, 255, 0.08))', // UI_TOKEN_EXCEPTION
@@ -128,6 +129,8 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
       >
         <button
           type="button"
+          aria-label={pick('切换为中文', 'Switch to Chinese')}
+          aria-pressed={language === 'zh-CN'}
           className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[10px] font-bold transition-all"
           onClick={() => setLanguage('zh-CN')}
           style={{
@@ -139,6 +142,8 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
         </button>
         <button
           type="button"
+          aria-label={pick('切换为英文', 'Switch to English')}
+          aria-pressed={language === 'en-US'}
           className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[9px] font-bold transition-all"
           onClick={() => setLanguage('en-US')}
           style={{
@@ -154,6 +159,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
 
   return (
     <div
+      role="group"
       className="inline-flex items-center gap-1 rounded-full border p-1"
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
@@ -166,6 +172,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
       </span>
       <button
         type="button"
+        aria-pressed={language === 'zh-CN'}
         className={buttonClassName}
         onClick={() => setLanguage('zh-CN')}
         style={{
@@ -177,6 +184,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
       </button>
       <button
         type="button"
+        aria-pressed={language === 'en-US'}
         className={buttonClassName}
         onClick={() => setLanguage('en-US')}
         style={{
@@ -211,6 +219,7 @@ const SettingsDesktopShell: React.FC<{
   initialSupplier,
   contentRefreshKey,
 }) => {
+  const location = useLocation();
   const { language, pick } = useLocale();
   const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
   const shellCopy = getSettingsShellCopy(language);
@@ -223,6 +232,13 @@ const SettingsDesktopShell: React.FC<{
     ? pick('管理员', 'Administrator')
     : pick('标准账户', 'Standard account');
   const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
+  const desktopScrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (desktopScrollContainerRef.current) {
+      desktopScrollContainerRef.current.scrollTop = 0;
+    }
+  }, [location.pathname, contentRefreshKey]);
 
   return (
     <div className="settings-shell settings-shell--desktop" onClick={(event) => event.stopPropagation()}>
@@ -240,10 +256,12 @@ const SettingsDesktopShell: React.FC<{
           emptyLabel={shellCopy.emptySearchLabel}
           accountBlock={(
             <div className="flex items-center gap-2 w-full">
-              <div
+              <button
+                type="button"
                 data-testid="settings-account-block"
                 data-state={activeView === 'user-profile' ? 'active' : 'idle'}
                 data-accent="profile"
+                aria-current={activeView === 'user-profile' ? 'page' : undefined}
                 className="settings-account-card flex flex-1 h-[70px] items-center gap-3 rounded-[18px] border px-3.5 py-2 text-left cursor-pointer"
                 onClick={() => onNavigate('user-profile')}
                 style={{
@@ -257,7 +275,7 @@ const SettingsDesktopShell: React.FC<{
                   <span className="block truncate text-sm font-semibold text-[var(--settings-nav-text-primary)]">{accountName}</span>
                   <span className="mt-1 block truncate text-xs text-[var(--settings-nav-text-secondary)]">{accountMeta}</span>
                 </span>
-              </div>
+              </button>
               <div className="shrink-0 flex items-center justify-center">
                 <SettingsLanguageToggle compact />
               </div>
@@ -273,7 +291,7 @@ const SettingsDesktopShell: React.FC<{
             onClose={onClose}
           />
 
-          <main className="settings-shell-page settings-shell-page--desktop">
+          <main ref={desktopScrollContainerRef} className="settings-shell-page settings-shell-page--desktop">
             <Suspense fallback={<ViewFallback />}>
               <Routes>
                 {renderSettingsRouteElements({
@@ -464,6 +482,9 @@ const SettingsMobileShell: React.FC<{
 
   useEffect(() => {
     setIsContentBackScrolled(false);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
   }, [location.pathname]);
 
   useEffect(() => {
@@ -522,6 +543,8 @@ const SettingsMobileShell: React.FC<{
             aria-label={
               isApiManagementEditorRoute
                 ? pick('返回 API 管理', 'Back to API management')
+                : activeView === 'dashboard'
+                  ? pick('返回工作区', 'Back to workspace')
                 : pick('返回设置总览', 'Back to settings overview')
             }
           >
@@ -547,6 +570,7 @@ const SettingsMobileShell: React.FC<{
       </div>
 
       <div 
+        key={location.pathname}
         ref={scrollContainerRef}
         className="settings-shell-page settings-shell-page--mobile"
       >

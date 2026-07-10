@@ -115,10 +115,10 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!user) return;
     
     const fallbackTimer = window.setTimeout(() => {
-      console.warn('[AppStartup] Startup timeout backup reached (8s). Forcing ready to prevent infinite loading...');
       startTransition(() => {
         setStage((currentStage) => {
           if (!hasReachedStage(currentStage, 'background_ready')) {
+            console.warn('[AppStartup] Startup timeout backup reached (8s). Forcing ready to prevent infinite loading...');
             setLatestStartupSnapshot('background_ready', user?.id || null);
             return 'background_ready';
           }

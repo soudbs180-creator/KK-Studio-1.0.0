@@ -40,3 +40,13 @@ test('empty canvas welcome stays above workspace chrome without being hidden by 
     /\.empty-canvas-welcome-panel\s*\{[\s\S]*max-height:\s*min\(calc\(100dvh - 180px\),\s*720px\);[\s\S]*overflow-y:\s*auto;/,
   );
 });
+
+test('empty canvas API settings entry is a semantic command', () => {
+  const welcomeSource = readSource('apps/web/src/landing/EmptyCanvasWelcome.tsx');
+
+  assert.match(
+    welcomeSource,
+    /<button[\s\S]*type="button"[\s\S]*onClick=\{onOpenSettings\}[\s\S]*配置 API 密钥/,
+  );
+  assert.doesNotMatch(welcomeSource, /<div[^>]*onClick=\{onOpenSettings\}/);
+});

@@ -491,7 +491,9 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
   }
 
-  const matchedDefinition = SETTINGS_NAV_ITEM_DEFINITIONS.find((item) => item.path === currentPath);
+  const matchedDefinition = SETTINGS_NAV_ITEM_DEFINITIONS.find(
+    (item) => item.path === currentPath || currentPath.startsWith(`${item.path}/`),
+  );
   return matchedDefinition ? coerceEnabledSettingsViewId(matchedDefinition.id) : 'dashboard';
 }
 

@@ -9,6 +9,7 @@ import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo.ts';
 import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData.ts';
+import { shouldIgnoreWatchPath } from './viteWatchPolicy.ts';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,18 +17,6 @@ const __dirname = path.dirname(__filename);
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
 const TURNSTILE_DIAGNOSTIC_ENTRY = path.resolve(__dirname, 'turnstile-diagnostic.html');
-
-const WORKSPACE_DATA_DIRS = new Set([
-    'picture',
-    'video',
-    'refs',
-    'settings',
-    'tags',
-    'originals',
-    'thumbnails',
-    'cache',
-    'images',
-]);
 
 const PRIVATE_IPV4_PATTERNS = [
     /^0\./,
@@ -122,21 +111,6 @@ async function normalizeSupplierBaseUrl(rawBaseUrl: string): Promise<string> {
 
     return parsed.toString().replace(/\/$/, '');
 }
-
-const ALWAYS_IGNORE_SEGMENTS = new Set([
-    '.agents',
-    '.git',
-    '.kk-local',
-    '.tmp-playwright',
-    '.vite',
-    '.vscode',
-    'dist',
-    'node_modules',
-]);
-
-const ALWAYS_IGNORE_FILENAMES = [
-    /^tmp-.*\.(out|err|log)$/i,
-];
 
 const ROOT_WATCH_FILES = new Set([
     '.env',
@@ -294,38 +268,6 @@ function getOutputAssetBasename(fileName: string): string {
 function isDeferredHtmlModulePreload(fileName: string): boolean {
     const basename = getOutputAssetBasename(fileName);
     return DEFERRED_HTML_MODULE_PRELOAD_PREFIXES.some((prefix) => basename.startsWith(prefix));
-}
-
-function shouldIgnoreWatchPath(targetPath: string): boolean {
-    const normalized = targetPath.replace(/\\/g, '/');
-    const segments = normalized.split('/').filter(Boolean);
-    const filename = segments[segments.length - 1]?.toLowerCase() || '';
-
-    if (ALWAYS_IGNORE_FILENAMES.some((pattern) => pattern.test(filename))) {
-        return true;
-    }
-
-    if (
-        segments.some((segment) =>
-            ALWAYS_IGNORE_SEGMENTS.has(segment)
-            || segment.startsWith('recovery_')
-            || segment.startsWith('backup_')
-        )
-    ) {
-        return true;
-    }
-
-    // 🚀 [关键修复] 只要是项目状态文档或本地产生的媒体数据目录，无论其在何层级（包括 src/ 或 public/ 内），均直接忽略
-    if (
-        normalized.endsWith('/project.json')
-        || normalized.includes('/docs/')
-        || segments.some((segment) => WORKSPACE_DATA_DIRS.has(segment))
-    ) {
-        return true;
-    }
-
-    // 默认不忽略，允许 chokidar 递归遍历所有目录，以便深度监听具体文件
-    return false;
 }
 
 function resolveManualChunk(id: string): string | undefined {
