@@ -123,8 +123,10 @@ describe('AI Takeover Real User Path E2E Contract & Flow Tests', () => {
     const brain = new LocalAssistantBrain();
     const plan = await brain.plan('研究极简咖啡品牌风格，并生成 6 张海报', ctx);
     assert.equal(plan.intent, 'research_to_canvas');
-    assert.equal(plan.actions.length, 1);
+    assert.equal(plan.actions.length, 2);
     assert.equal(plan.actions[0].type, 'generation.createBatchJob');
+    assert.equal(plan.actions[1].type, 'knowledge.recordChange');
+    assert.match(plan.reply, /验证通过后/);
 
     const payload = (plan.actions[0] as any).payload;
     assert.equal(payload.options.aspectRatio, '3:4');

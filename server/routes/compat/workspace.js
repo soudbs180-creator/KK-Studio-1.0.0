@@ -12,6 +12,13 @@ const { getPool } = require('../../lib/db');
 const { signJWT, verifyJWT } = require('../../lib/jwt');
 const credits = require('../../lib/credits');
 const dispatcher = require('../../lib/dispatcher');
+const {
+  ClaimGenerationBatchJobRequestSchema,
+  ControlGenerationBatchJobRequestSchema,
+  CreateGenerationBatchJobRequestSchema,
+  GenerationJobStatusSchema,
+  UpdateGenerationBatchJobRequestSchema,
+} = require('@kk/shared');
 
 const router = express.Router();
 
@@ -180,11 +187,73 @@ function ensureProfileStore(store, userId) {
       workspaceLayout: { canvases: [] },
       workflows: {},
       generationTasks: {},
+      generationJobs: {},
       assets: [],
       rechargeSubmissions: {},
     };
   }
   return store.profiles[userId];
+}
+
+function ensureGenerationJobs(profileStore) {
+  if (!isObjectRecord(profileStore.generationJobs)) profileStore.generationJobs = {};
+  return profileStore.generationJobs;
+}
+
+function buildGenerationJobProgress(total) {
+  return {
+    total,
+    queued: total,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    percent: 0,
+    phase: 'queued',
+  };
+}
+
+function toGenerationJobDto(row) {
+  const payload = isObjectRecord(row.payload_json) ? row.payload_json : {};
+  const items = Array.isArray(payload.items)
+    ? payload.items
+    : (Array.isArray(payload.prompts) ? payload.prompts.map((prompt) => ({
+      id: prompt.id,
+      prompt: prompt.prompt,
+      referenceImageNodeId: prompt.referenceImageNodeId,
+      status: 'queued',
+      retryCount: 0,
+      outputs: [],
+    })) : []);
+  const createdAt = new Date(row.created_at || Date.now()).toISOString();
+  const updatedAt = new Date(row.updated_at || row.created_at || Date.now()).toISOString();
+  return {
+    schemaVersion: Number(row.schema_version || 2),
+    id: String(row.job_id || row.id),
+    idempotencyKey: String(row.idempotency_key || ''),
+    workspaceId: String(row.workspace_id || payload.workspaceId || 'default'),
+    modelCode: String(row.model_code || payload.modelCode || ''),
+    taskType: row.task_type || payload.taskType || 'image',
+    status: row.status || 'queued',
+    parameters: payload.parameters || { taskType: row.task_type || 'image' },
+    progress: isObjectRecord(row.progress_json)
+      ? row.progress_json
+      : buildGenerationJobProgress(Number(payload.prompts?.length || 0)),
+    outputs: Array.isArray(row.outputs_json) ? row.outputs_json : [],
+    items,
+    outputGroup: row.output_group_json || payload.outputGroup,
+    createdAt,
+    updatedAt,
+    leaseOwner: row.lease_owner || undefined,
+    leaseExpiresAt: row.lease_expires_at ? new Date(row.lease_expires_at).toISOString() : undefined,
+  };
+}
+
+function mapGenerationJobControlStatus(status, action) {
+  if (action === 'cancel') return 'cancelled';
+  if (action === 'pause' && (status === 'queued' || status === 'running')) return 'paused';
+  if (action === 'resume' && status === 'paused') return 'queued';
+  if (action === 'retry' && (status === 'failed' || status === 'completed_with_errors')) return 'queued';
+  return status;
 }
 
 function buildLocalProfile(userId, overrides = {}) {
@@ -840,6 +909,253 @@ router.get('/api/v1/generation-tasks/:taskId', requireUser, async (req, res) => 
   const task = ensureProfileStore(store, req.userId).generationTasks?.[req.params.taskId];
   if (!task) return sendError(res, req, 404, 'GENERATION_TASK_NOT_FOUND', 'Generation task was not found.');
   return res.json(okEnvelope(task, req));
+});
+
+router.post('/api/v1/generation-jobs', requireUser, async (req, res) => {
+  const parsed = CreateGenerationBatchJobRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return sendError(res, req, 400, 'INVALID_GENERATION_JOB', 'Generation job payload is invalid.', parsed.error.issues);
+  }
+
+  const input = parsed.data;
+  const progress = buildGenerationJobProgress(input.prompts.length);
+  const items = input.prompts.map((prompt) => ({
+    id: prompt.id,
+    prompt: prompt.prompt,
+    referenceImageNodeId: prompt.referenceImageNodeId,
+    status: 'queued',
+    retryCount: 0,
+    outputs: [],
+  }));
+  const persistedPayload = { ...input, items };
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `INSERT INTO public.generation_jobs (
+          user_id, workspace_id, task_type, provider, status, progress, schema_version,
+          idempotency_key, model_code, payload_json, progress_json, outputs_json, output_group_json, updated_at
+        ) VALUES ($1, $2, $3, 'route-engine', 'queued', 0, 2, $4, $5, $6, $7, '[]'::jsonb, $8, NOW())
+        ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+        DO UPDATE SET updated_at = public.generation_jobs.updated_at
+        RETURNING *`,
+        [
+          req.userId,
+          input.workspaceId,
+          input.taskType,
+          input.idempotencyKey,
+          input.modelCode,
+          JSON.stringify(persistedPayload),
+          JSON.stringify(progress),
+          input.outputGroup ? JSON.stringify(input.outputGroup) : null,
+        ],
+      );
+      return res.status(201).json(okEnvelope(toGenerationJobDto(result.rows[0]), req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_CREATE_FAILED', error.message);
+    }
+  }
+
+  const store = await readStore();
+  const jobs = ensureGenerationJobs(ensureProfileStore(store, req.userId));
+  const existing = Object.values(jobs).find((job) => job.idempotencyKey === input.idempotencyKey);
+  if (existing) return res.status(201).json(okEnvelope(existing, req));
+
+  const timestamp = nowIso();
+  const id = `job_${crypto.createHash('sha1').update(`${req.userId}:${input.idempotencyKey}`).digest('hex').slice(0, 24)}`;
+  const job = {
+    schemaVersion: 2,
+    id,
+    idempotencyKey: input.idempotencyKey,
+    workspaceId: input.workspaceId,
+    modelCode: input.modelCode,
+    taskType: input.taskType,
+    status: 'queued',
+    parameters: input.parameters,
+    progress,
+    outputs: [],
+    items,
+    outputGroup: input.outputGroup,
+    prompts: input.prompts,
+    concurrency: input.concurrency,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  jobs[id] = job;
+  await writeStore(store);
+  return res.status(201).json(okEnvelope(job, req));
+});
+
+router.get('/api/v1/generation-jobs', requireUser, async (req, res) => {
+  const rawStatuses = Array.isArray(req.query.status) ? req.query.status : req.query.status ? [req.query.status] : [];
+  const statuses = rawStatuses.filter((status) => GenerationJobStatusSchema.safeParse(status).success);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+  const cursor = req.query.cursor && Number.isFinite(Date.parse(String(req.query.cursor)))
+    ? new Date(String(req.query.cursor)).toISOString()
+    : null;
+
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT * FROM public.generation_jobs
+         WHERE user_id = $1
+           AND ($2::text[] IS NULL OR status = ANY($2::text[]))
+           AND ($3::timestamptz IS NULL OR created_at < $3::timestamptz)
+         ORDER BY created_at DESC
+         LIMIT $4`,
+        [req.userId, statuses.length > 0 ? statuses : null, cursor, limit],
+      );
+      const jobs = result.rows.map(toGenerationJobDto);
+      return res.json(okEnvelope({ jobs, cursor: jobs.length === limit ? jobs[jobs.length - 1].createdAt : undefined }, req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_LIST_FAILED', error.message);
+    }
+  }
+
+  const store = await readStore();
+  let jobs = Object.values(ensureGenerationJobs(ensureProfileStore(store, req.userId)));
+  if (statuses.length > 0) jobs = jobs.filter((job) => statuses.includes(job.status));
+  if (cursor) jobs = jobs.filter((job) => job.createdAt < cursor);
+  jobs = jobs.sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, limit);
+  return res.json(okEnvelope({ jobs, cursor: jobs.length === limit ? jobs[jobs.length - 1].createdAt : undefined }, req));
+});
+
+router.get('/api/v1/generation-jobs/:jobId', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const result = await pool.query('SELECT * FROM public.generation_jobs WHERE job_id::text = $1 AND user_id = $2', [req.params.jobId, req.userId]);
+      if (!result.rows[0]) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+      return res.json(okEnvelope(toGenerationJobDto(result.rows[0]), req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_READ_FAILED', error.message);
+    }
+  }
+  const store = await readStore();
+  const job = ensureGenerationJobs(ensureProfileStore(store, req.userId))[req.params.jobId];
+  if (!job) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+  return res.json(okEnvelope(job, req));
+});
+
+router.patch('/api/v1/generation-jobs/:jobId', requireUser, async (req, res) => {
+  const parsed = UpdateGenerationBatchJobRequestSchema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, req, 400, 'INVALID_GENERATION_JOB_UPDATE', 'Generation job update is invalid.', parsed.error.issues);
+  const input = parsed.data;
+
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `UPDATE public.generation_jobs SET
+          status = COALESCE($3, status),
+          progress = COALESCE($4, progress),
+          progress_json = COALESCE($5::jsonb, progress_json),
+          outputs_json = COALESCE($6::jsonb, outputs_json),
+          lease_owner = COALESCE($7, lease_owner),
+          lease_expires_at = COALESCE($8::timestamptz, lease_expires_at),
+          payload_json = CASE WHEN $9::jsonb IS NULL THEN payload_json ELSE jsonb_set(payload_json, '{items}', $9::jsonb, true) END,
+          updated_at = NOW()
+         WHERE job_id::text = $1 AND user_id = $2
+           AND lease_owner = $7 AND lease_expires_at >= NOW()
+         RETURNING *`,
+        [
+          req.params.jobId,
+          req.userId,
+          input.status || null,
+          input.progress?.percent ?? null,
+          input.progress ? JSON.stringify(input.progress) : null,
+          input.outputs ? JSON.stringify(input.outputs) : null,
+          input.leaseOwner || null,
+          input.leaseExpiresAt || null,
+          input.items ? JSON.stringify(input.items) : null,
+        ],
+      );
+      if (!result.rows[0]) return sendError(res, req, 409, 'GENERATION_JOB_LEASE_CONFLICT', 'A valid generation job lease is required to update progress.');
+      return res.json(okEnvelope(toGenerationJobDto(result.rows[0]), req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_UPDATE_FAILED', error.message);
+    }
+  }
+
+  const store = await readStore();
+  const jobs = ensureGenerationJobs(ensureProfileStore(store, req.userId));
+  const job = jobs[req.params.jobId];
+  if (!job) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+  if (job.leaseOwner !== input.leaseOwner || !job.leaseExpiresAt || Date.parse(job.leaseExpiresAt) < Date.now()) {
+    return sendError(res, req, 409, 'GENERATION_JOB_LEASE_CONFLICT', 'A valid generation job lease is required to update progress.');
+  }
+  jobs[req.params.jobId] = { ...job, ...input, updatedAt: nowIso() };
+  await writeStore(store);
+  return res.json(okEnvelope(jobs[req.params.jobId], req));
+});
+
+router.post('/api/v1/generation-jobs/:jobId/control', requireUser, async (req, res) => {
+  const parsed = ControlGenerationBatchJobRequestSchema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, req, 400, 'INVALID_GENERATION_JOB_CONTROL', 'Generation job control is invalid.', parsed.error.issues);
+
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const existing = await pool.query('SELECT * FROM public.generation_jobs WHERE job_id::text = $1 AND user_id = $2', [req.params.jobId, req.userId]);
+      if (!existing.rows[0]) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+      const nextStatus = mapGenerationJobControlStatus(existing.rows[0].status, parsed.data.action);
+      const result = await pool.query(
+        'UPDATE public.generation_jobs SET status = $3, updated_at = NOW() WHERE job_id::text = $1 AND user_id = $2 RETURNING *',
+        [req.params.jobId, req.userId, nextStatus],
+      );
+      return res.json(okEnvelope(toGenerationJobDto(result.rows[0]), req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_CONTROL_FAILED', error.message);
+    }
+  }
+
+  const store = await readStore();
+  const jobs = ensureGenerationJobs(ensureProfileStore(store, req.userId));
+  const job = jobs[req.params.jobId];
+  if (!job) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+  job.status = mapGenerationJobControlStatus(job.status, parsed.data.action);
+  job.updatedAt = nowIso();
+  await writeStore(store);
+  return res.json(okEnvelope(job, req));
+});
+
+router.post('/api/v1/generation-jobs/:jobId/claim', requireUser, async (req, res) => {
+  const parsed = ClaimGenerationBatchJobRequestSchema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, req, 400, 'INVALID_GENERATION_JOB_CLAIM', 'Generation job claim is invalid.', parsed.error.issues);
+  const { leaseOwner, leaseSeconds } = parsed.data;
+
+  if (isDbEnabled()) {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `UPDATE public.generation_jobs
+         SET lease_owner = $3, lease_expires_at = NOW() + ($4 * INTERVAL '1 second'), updated_at = NOW()
+         WHERE job_id::text = $1 AND user_id = $2
+           AND (lease_expires_at IS NULL OR lease_expires_at < NOW() OR lease_owner = $3)
+         RETURNING *`,
+        [req.params.jobId, req.userId, leaseOwner, leaseSeconds],
+      );
+      if (!result.rows[0]) return sendError(res, req, 409, 'GENERATION_JOB_LEASE_CONFLICT', 'Generation job is already claimed by another client.');
+      return res.json(okEnvelope(toGenerationJobDto(result.rows[0]), req));
+    } catch (error) {
+      return sendError(res, req, 500, 'GENERATION_JOB_CLAIM_FAILED', error.message);
+    }
+  }
+
+  const store = await readStore();
+  const jobs = ensureGenerationJobs(ensureProfileStore(store, req.userId));
+  const job = jobs[req.params.jobId];
+  if (!job) return sendError(res, req, 404, 'GENERATION_JOB_NOT_FOUND', 'Generation job was not found.');
+  const leaseActive = job.leaseExpiresAt && Date.parse(job.leaseExpiresAt) > Date.now();
+  if (leaseActive && job.leaseOwner !== leaseOwner) {
+    return sendError(res, req, 409, 'GENERATION_JOB_LEASE_CONFLICT', 'Generation job is already claimed by another client.');
+  }
+  job.leaseOwner = leaseOwner;
+  job.leaseExpiresAt = new Date(Date.now() + leaseSeconds * 1000).toISOString();
+  job.updatedAt = nowIso();
+  await writeStore(store);
+  return res.json(okEnvelope(job, req));
 });
 
 

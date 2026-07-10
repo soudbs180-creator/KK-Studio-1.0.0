@@ -1,4 +1,11 @@
-// 简体中文：持久化批量任务生成队列 (Durable Generation Queue)
+import type {
+  GenerationJobOutputDto,
+  GenerationJobPhase,
+  GenerationJobProgressDto,
+  GenerationJobStatus,
+  GenerationMediaTaskType,
+  GenerationBatchJobDto,
+} from '@kk/shared';
 
 export interface GenerationBatchOutputGroup {
   groupId?: string;
@@ -13,35 +20,70 @@ export interface GenerationExecutorResult {
   promptNodeId?: string;
   resultImageNodeIds: string[];
   nodeIds?: string[];
+  outputs?: GenerationJobOutputDto[];
+  providerTaskId?: string;
+}
+
+export type GenerationErrorCategory =
+  | 'cancelled'
+  | 'authentication'
+  | 'billing'
+  | 'invalid_input'
+  | 'rate_limit'
+  | 'provider_unavailable'
+  | 'network'
+  | 'unknown';
+
+export interface GenerationQueuePrompt {
+  id: string;
+  prompt: string;
+  referenceImageNodeId?: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  phase: GenerationJobPhase;
+  promptNodeId?: string;
+  resultImageNodeIds?: string[];
+  outputs?: GenerationJobOutputDto[];
+  providerTaskId?: string;
+  error?: string;
+  errorCategory?: GenerationErrorCategory;
+  retryable?: boolean;
+  retryCount: number;
+}
+
+export interface GenerationQueueOptions {
+  taskType: GenerationMediaTaskType;
+  modelId: string;
+  aspectRatio: string;
+  imageSize: string;
+  countPerPrompt: number;
+  concurrency: number;
+  layout: 'grid' | 'row' | 'column';
+  layoutPreset?: 'grid' | 'row' | 'column' | 'compact-grid';
+  columns?: number;
+  gap?: number;
+  durationSeconds?: number;
+  resolution?: string;
+  generateAudio?: boolean;
+  firstFrameAssetId?: string;
+  lastFrameAssetId?: string;
+  motion?: string;
+  voice?: string;
+  lyrics?: string;
+  genre?: string;
 }
 
 export interface GenerationBatchJob {
+  schemaVersion: 2;
   id: string;
   idempotencyKey: string;
   canvasId: string;
-  status: 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  taskType: GenerationMediaTaskType;
+  status: GenerationJobStatus;
+  progress: GenerationJobProgressDto;
+  outputs: GenerationJobOutputDto[];
   createdBy: 'assistant' | 'user';
-  prompts: Array<{
-    id: string;
-    prompt: string;
-    referenceImageNodeId?: string;
-    status: 'queued' | 'running' | 'completed' | 'failed';
-    promptNodeId?: string;
-    resultImageNodeIds?: string[];
-    error?: string;
-    retryCount: number;
-  }>;
-  options: {
-    modelId: string;
-    aspectRatio: string;
-    imageSize: string;
-    countPerPrompt: number;
-    concurrency: number;
-    layout: 'grid' | 'row' | 'column';
-    layoutPreset?: 'grid' | 'row' | 'column' | 'compact-grid';
-    columns?: number;
-    gap?: number;
-  };
+  prompts: GenerationQueuePrompt[];
+  options: GenerationQueueOptions;
   outputGroup?: GenerationBatchOutputGroup;
   arranged?: boolean;
   completionHandled?: boolean;
@@ -49,22 +91,39 @@ export interface GenerationBatchJob {
   updatedAt: number;
 }
 
+interface QueueStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+interface MediaQueueLimits {
+  defaultConcurrency: number;
+  maxConcurrency: number;
+  maxBatchSize: number;
+}
+
 const STORAGE_KEY = 'kk_durable_generation_jobs';
-const DEFAULT_CONCURRENCY = 3;
-const MAX_CONCURRENCY = 8;
-const MAX_BATCH_SIZE = 100;
+const MEDIA_LIMITS: Record<GenerationMediaTaskType, MediaQueueLimits> = {
+  image: { defaultConcurrency: 3, maxConcurrency: 8, maxBatchSize: 100 },
+  video: { defaultConcurrency: 1, maxConcurrency: 2, maxBatchSize: 20 },
+  audio: { defaultConcurrency: 2, maxConcurrency: 4, maxBatchSize: 50 },
+};
 const RETRY_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = 2000;
 const MAX_PERSISTED_JOBS = 50;
 
 export type GenerationQueueListener = (jobs: GenerationBatchJob[]) => void;
+export type GenerationQueueExecutor = (
+  prompt: string,
+  options: GenerationQueueOptions & { referenceImageNodeId?: string },
+  jobId: string,
+  promptId: string,
+  signal: AbortSignal,
+) => Promise<string[] | GenerationExecutorResult>;
 
-const getBrowserStorage = (): Storage | null => {
+const getBrowserStorage = (): QueueStorage | null => {
   try {
-    if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) {
-      return null;
-    }
-
+    if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
     return globalThis.localStorage;
   } catch {
     return null;
@@ -72,16 +131,13 @@ const getBrowserStorage = (): Storage | null => {
 };
 
 const stableStringify = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
-  }
-
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
-    return `{${Object.keys(value as Record<string, unknown>).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`
-    )).join(',')}}`;
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`)
+      .join(',')}}`;
   }
-
   return JSON.stringify(value);
 };
 
@@ -95,136 +151,254 @@ const hashString = (value: string): string => {
 
 const createDeterministicIdempotencyKey = (
   prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }>,
-  options: any,
-  canvasId: string
+  options: unknown,
+  canvasId: string,
 ): string => `batch_${hashString(stableStringify({ canvasId, prompts, options }))}`;
 
-const normalizeConcurrency = (value: unknown): number => {
+const normalizeTaskType = (value: unknown): GenerationMediaTaskType => (
+  value === 'video' || value === 'audio' ? value : 'image'
+);
+
+const normalizeConcurrency = (value: unknown, taskType: GenerationMediaTaskType): number => {
+  const limits = MEDIA_LIMITS[taskType];
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_CONCURRENCY;
-  return Math.min(Math.floor(numeric), MAX_CONCURRENCY);
+  if (!Number.isFinite(numeric) || numeric <= 0) return limits.defaultConcurrency;
+  return Math.min(Math.floor(numeric), limits.maxConcurrency);
 };
 
 const normalizeExecutorResult = (value: string[] | GenerationExecutorResult): GenerationExecutorResult => {
-  if (Array.isArray(value)) {
-    return {
-      resultImageNodeIds: value
-    };
-  }
-
-  const resultImageNodeIds = Array.isArray(value?.resultImageNodeIds)
-    ? value.resultImageNodeIds
-    : [];
-
+  if (Array.isArray(value)) return { resultImageNodeIds: value };
   return {
     promptNodeId: value?.promptNodeId,
-    resultImageNodeIds,
-    nodeIds: value?.nodeIds
+    resultImageNodeIds: Array.isArray(value?.resultImageNodeIds) ? value.resultImageNodeIds : [],
+    nodeIds: Array.isArray(value?.nodeIds) ? value.nodeIds : undefined,
+    outputs: Array.isArray(value?.outputs) ? value.outputs : undefined,
+    providerTaskId: value?.providerTaskId,
   };
+};
+
+const phaseForStatus = (status: GenerationJobStatus): GenerationJobPhase => {
+  if (status === 'queued' || status === 'paused') return 'queued';
+  if (status === 'running') return 'provider_processing';
+  if (status === 'completed' || status === 'completed_with_errors') return 'completed';
+  return 'failed';
+};
+
+const calculateProgress = (job: Pick<GenerationBatchJob, 'prompts' | 'status'>): GenerationJobProgressDto => {
+  const total = job.prompts.length;
+  const completed = job.prompts.filter((item) => item.status === 'completed').length;
+  const failed = job.prompts.filter((item) => item.status === 'failed').length;
+  const running = job.prompts.filter((item) => item.status === 'running').length;
+  const queued = Math.max(0, total - completed - failed - running);
+  return {
+    total,
+    queued,
+    running,
+    completed,
+    failed,
+    percent: total > 0 ? Math.round(((completed + failed) / total) * 100) : 0,
+    phase: phaseForStatus(job.status),
+  };
+};
+
+const classifyGenerationError = (error: unknown): { category: GenerationErrorCategory; retryable: boolean; message: string } => {
+  const message = error instanceof Error ? error.message : String(error || 'Generation failed');
+  const normalized = message.toLowerCase();
+  if (normalized.includes('abort') || normalized.includes('cancel')) {
+    return { category: 'cancelled', retryable: false, message };
+  }
+  if (normalized.includes('unauthor') || normalized.includes('forbidden') || normalized.includes('api key') || normalized.includes('authentication') || normalized.includes('密钥') || normalized.includes('未配置')) {
+    return { category: 'authentication', retryable: false, message };
+  }
+  if (normalized.includes('credit') || normalized.includes('billing') || normalized.includes('balance') || normalized.includes('积分') || normalized.includes('余额')) {
+    return { category: 'billing', retryable: false, message };
+  }
+  if (normalized.includes('invalid') || normalized.includes('validation') || normalized.includes('unsupported') || normalized.includes('参数无效') || normalized.includes('不支持')) {
+    return { category: 'invalid_input', retryable: false, message };
+  }
+  if (normalized.includes('429') || normalized.includes('rate limit')) {
+    return { category: 'rate_limit', retryable: true, message };
+  }
+  if (normalized.includes('network') || normalized.includes('fetch') || normalized.includes('timeout')) {
+    return { category: 'network', retryable: true, message };
+  }
+  if (normalized.includes('provider') || normalized.includes('503') || normalized.includes('502')) {
+    return { category: 'provider_unavailable', retryable: true, message };
+  }
+  return { category: 'unknown', retryable: true, message };
+};
+
+const outputsFromExecution = (
+  taskType: GenerationMediaTaskType,
+  promptId: string,
+  result: GenerationExecutorResult,
+): GenerationJobOutputDto[] => {
+  if (result.outputs?.length) return result.outputs.map((output) => ({ ...output }));
+  const nodeIds = Array.from(new Set([...(result.nodeIds || []), ...result.resultImageNodeIds]));
+  return nodeIds.map((nodeId, index) => ({
+    itemId: `${promptId}_${index}`,
+    taskType,
+    nodeId,
+    promptNodeId: result.promptNodeId,
+    providerTaskId: result.providerTaskId,
+  }));
 };
 
 const getJobOutputNodeIds = (job: GenerationBatchJob): string[] => {
   const includePromptNodes = job.outputGroup?.includePromptNodes !== false;
   const promptNodeIds = includePromptNodes
-    ? job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id))
+    ? job.prompts.map((prompt) => prompt.promptNodeId).filter((id): id is string => Boolean(id))
     : [];
-  const imageNodeIds = job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []);
-
-  return Array.from(new Set([
-    ...promptNodeIds,
-    ...imageNodeIds,
-    ...(job.outputGroup?.nodeIds || [])
-  ]));
+  const resultNodeIds = job.prompts.flatMap((prompt) => prompt.resultImageNodeIds || []);
+  const outputNodeIds = job.outputs.map((output) => output.nodeId).filter((id): id is string => Boolean(id));
+  return Array.from(new Set([...promptNodeIds, ...resultNodeIds, ...outputNodeIds, ...(job.outputGroup?.nodeIds || [])]));
 };
 
-const cloneOutputGroup = (outputGroup?: GenerationBatchOutputGroup): GenerationBatchOutputGroup | undefined => {
-  if (!outputGroup) return undefined;
-
-  return {
+const cloneOutputGroup = (outputGroup?: GenerationBatchOutputGroup): GenerationBatchOutputGroup | undefined => (
+  outputGroup ? {
     ...outputGroup,
     tags: outputGroup.tags ? [...outputGroup.tags] : undefined,
     nodeIds: outputGroup.nodeIds ? [...outputGroup.nodeIds] : undefined,
-  };
-};
+  } : undefined
+);
 
 const cloneJob = (job: GenerationBatchJob): GenerationBatchJob => ({
   ...job,
-  prompts: job.prompts.map(prompt => ({
+  progress: { ...job.progress },
+  outputs: job.outputs.map((output) => ({ ...output })),
+  prompts: job.prompts.map((prompt) => ({
     ...prompt,
     resultImageNodeIds: prompt.resultImageNodeIds ? [...prompt.resultImageNodeIds] : undefined,
+    outputs: prompt.outputs?.map((output) => ({ ...output })),
   })),
   options: { ...job.options },
   outputGroup: cloneOutputGroup(job.outputGroup),
-  arranged: job.arranged,
-  completionHandled: job.completionHandled,
 });
 
 const cloneJobs = (jobs: GenerationBatchJob[]): GenerationBatchJob[] => jobs.map(cloneJob);
 
+const migrateStoredJob = (raw: Partial<GenerationBatchJob> & Record<string, unknown>): GenerationBatchJob | null => {
+  if (!raw.id || !raw.canvasId || !Array.isArray(raw.prompts)) return null;
+  const taskType = normalizeTaskType(raw.taskType || (raw.options as { taskType?: unknown } | undefined)?.taskType);
+  const options = (raw.options || {}) as Partial<GenerationQueueOptions>;
+  const status = (raw.status || 'queued') as GenerationJobStatus;
+  const prompts = raw.prompts.map((item) => {
+    const prompt = item as Partial<GenerationQueuePrompt>;
+    return {
+      id: String(prompt.id || `prompt_${Math.random().toString(36).slice(2, 10)}`),
+      prompt: String(prompt.prompt || ''),
+      referenceImageNodeId: prompt.referenceImageNodeId,
+      status: prompt.status || 'queued',
+      phase: prompt.phase || (prompt.status === 'completed' ? 'completed' : prompt.status === 'failed' ? 'failed' : 'queued'),
+      promptNodeId: prompt.promptNodeId,
+      resultImageNodeIds: prompt.resultImageNodeIds,
+      outputs: prompt.outputs,
+      providerTaskId: prompt.providerTaskId,
+      error: prompt.error,
+      errorCategory: prompt.errorCategory,
+      retryable: prompt.retryable,
+      retryCount: Number(prompt.retryCount || 0),
+    } satisfies GenerationQueuePrompt;
+  });
+  const migrated: GenerationBatchJob = {
+    schemaVersion: 2,
+    id: String(raw.id),
+    idempotencyKey: String(raw.idempotencyKey || `migrated_${raw.id}`),
+    canvasId: String(raw.canvasId),
+    taskType,
+    status,
+    progress: raw.progress || { total: 0, queued: 0, running: 0, completed: 0, failed: 0, percent: 0, phase: 'queued' },
+    outputs: Array.isArray(raw.outputs) ? raw.outputs : prompts.flatMap((prompt) => prompt.outputs || []),
+    createdBy: raw.createdBy === 'user' ? 'user' : 'assistant',
+    prompts,
+    options: {
+      taskType,
+      modelId: options.modelId || 'gemini-2.5-flash',
+      aspectRatio: options.aspectRatio || '1:1',
+      imageSize: options.imageSize || '1K',
+      countPerPrompt: options.countPerPrompt || 1,
+      concurrency: normalizeConcurrency(options.concurrency, taskType),
+      layout: options.layout || 'grid',
+      layoutPreset: options.layoutPreset,
+      columns: options.columns,
+      gap: options.gap,
+      durationSeconds: options.durationSeconds,
+      resolution: options.resolution,
+      generateAudio: options.generateAudio,
+      firstFrameAssetId: options.firstFrameAssetId,
+      lastFrameAssetId: options.lastFrameAssetId,
+      motion: options.motion,
+      voice: options.voice,
+      lyrics: options.lyrics,
+      genre: options.genre,
+    },
+    outputGroup: raw.outputGroup,
+    arranged: raw.arranged,
+    completionHandled: raw.completionHandled,
+    createdAt: Number(raw.createdAt || Date.now()),
+    updatedAt: Number(raw.updatedAt || Date.now()),
+  };
+  migrated.progress = calculateProgress(migrated);
+  return migrated;
+};
+
 export class DurableGenerationQueue {
   private jobs: GenerationBatchJob[] = [];
-  private executor: ((prompt: string, options: any, jobId: string, promptId: string) => Promise<string[] | GenerationExecutorResult>) | null = null;
-  private arrangeHandler: ((nodeIds: string[], layout: any, job?: GenerationBatchJob) => Promise<void>) | null = null;
+  private executor: GenerationQueueExecutor | null = null;
+  private arrangeHandler: ((nodeIds: string[], layout: GenerationQueueOptions, job?: GenerationBatchJob) => Promise<void>) | null = null;
   private completionHandler: ((job: GenerationBatchJob, nodeIds: string[]) => Promise<void>) | null = null;
   private listeners = new Set<GenerationQueueListener>();
   private inFlightTasks = new Set<string>();
+  private abortControllers = new Map<string, AbortController>();
   private processTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private processRequested = false;
+  private readonly storage: QueueStorage | null;
 
-  constructor() {
+  constructor(storage?: QueueStorage | null) {
+    this.storage = storage === undefined ? getBrowserStorage() : storage;
     this.loadJobs();
   }
 
   private loadJobs() {
-    const storage = getBrowserStorage();
-    if (!storage) {
-      this.jobs = [];
-      return;
-    }
-
+    if (!this.storage) return;
     try {
-      const stored = storage.getItem(STORAGE_KEY);
+      const stored = this.storage.getItem(STORAGE_KEY);
       if (stored) {
-        this.jobs = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        this.jobs = Array.isArray(parsed)
+          ? parsed.map((job) => migrateStoredJob(job)).filter((job): job is GenerationBatchJob => Boolean(job))
+          : [];
       }
-    } catch (e) {
-      console.error('[DurableQueue] Failed to load jobs from storage:', e);
+    } catch (error) {
+      console.error('[DurableQueue] Failed to load jobs from storage:', error);
       this.jobs = [];
     }
-
     this.healZombieTasks();
   }
 
   private healZombieTasks() {
     let changed = false;
     for (const job of this.jobs) {
-      if (job.status === 'paused' || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
-        continue;
-      }
-
+      if (['paused', 'cancelled', 'completed', 'completed_with_errors', 'failed'].includes(job.status)) continue;
       let hasRunningPrompt = false;
       for (const promptItem of job.prompts) {
-        if (promptItem.status === 'running') {
-          const taskKey = this.getTaskKey(job.id, promptItem.id);
-          if (!this.inFlightTasks.has(taskKey)) {
-            promptItem.status = 'queued';
-            changed = true;
-          } else {
-            hasRunningPrompt = true;
-          }
+        if (promptItem.status !== 'running') continue;
+        const taskKey = this.getTaskKey(job.id, promptItem.id);
+        if (!this.inFlightTasks.has(taskKey)) {
+          promptItem.status = 'queued';
+          promptItem.phase = 'queued';
+          changed = true;
+        } else {
+          hasRunningPrompt = true;
         }
       }
-
       if (job.status === 'running' && !hasRunningPrompt) {
         job.status = 'queued';
         changed = true;
       }
     }
-
-    if (changed) {
-      this.saveJobs();
-    }
+    if (changed) this.saveJobs();
   }
 
   private notifyListeners() {
@@ -240,25 +414,20 @@ export class DurableGenerationQueue {
 
   private prunePersistedJobs() {
     if (this.jobs.length <= MAX_PERSISTED_JOBS) return;
-    const active = this.jobs.filter(job => job.status === 'queued' || job.status === 'running' || job.status === 'paused');
+    const active = this.jobs.filter((job) => ['queued', 'running', 'paused'].includes(job.status));
     const inactive = this.jobs
-      .filter(job => job.status !== 'queued' && job.status !== 'running' && job.status !== 'paused')
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+      .filter((job) => !['queued', 'running', 'paused'].includes(job.status))
+      .sort((left, right) => right.updatedAt - left.updatedAt);
     this.jobs = [...active, ...inactive].slice(0, MAX_PERSISTED_JOBS);
   }
 
   private saveJobs() {
-    const storage = getBrowserStorage();
+    for (const job of this.jobs) job.progress = calculateProgress(job);
     this.prunePersistedJobs();
-    if (!storage) {
-      this.notifyListeners();
-      return;
-    }
-
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify(this.jobs));
-    } catch (e) {
-      console.error('[DurableQueue] Failed to save jobs to storage:', e);
+      this.storage?.setItem(STORAGE_KEY, JSON.stringify(this.jobs));
+    } catch (error) {
+      console.error('[DurableQueue] Failed to save jobs to storage:', error);
     } finally {
       this.notifyListeners();
     }
@@ -276,7 +445,7 @@ export class DurableGenerationQueue {
     }, 0);
   }
 
-  public registerExecutor(executor: typeof this.executor) {
+  public registerExecutor(executor: GenerationQueueExecutor | null) {
     this.executor = executor;
     this.healZombieTasks();
     this.scheduleProcess();
@@ -299,9 +468,7 @@ export class DurableGenerationQueue {
   public subscribe(listener: GenerationQueueListener): () => void {
     this.listeners.add(listener);
     listener(cloneJobs(this.jobs));
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return () => this.listeners.delete(listener);
   }
 
   public getJob(id: string): GenerationBatchJob | undefined {
@@ -309,132 +476,188 @@ export class DurableGenerationQueue {
     return job ? cloneJob(job) : undefined;
   }
 
+  public mergeRemoteJob(remote: GenerationBatchJobDto): GenerationBatchJob {
+    let job = this.jobs.find((item) => item.idempotencyKey === remote.idempotencyKey);
+    if (!job) {
+      const parameters = remote.parameters as unknown as Record<string, unknown>;
+      const created = this.createJob(
+        remote.items.map((item) => ({
+          id: item.id,
+          prompt: item.prompt,
+          referenceImageNodeId: item.referenceImageNodeId,
+        })),
+        {
+          ...parameters,
+          taskType: remote.taskType,
+          modelId: remote.modelCode,
+          outputGroup: remote.outputGroup,
+        },
+        remote.workspaceId,
+        remote.idempotencyKey,
+      );
+      job = this.findJob(created.id);
+    }
+    if (!job) throw new Error(`Failed to mirror generation job ${remote.id}.`);
+
+    const remoteItems = new Map(remote.items.map((item) => [item.id, item]));
+    job.prompts = job.prompts.map((prompt) => {
+      const item = remoteItems.get(prompt.id);
+      if (!item) return prompt;
+      const status = item.status === 'running' && remote.status === 'running' ? 'queued' : item.status;
+      return {
+        ...prompt,
+        status,
+        phase: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'queued',
+        retryCount: item.retryCount,
+        retryable: item.retryable,
+        error: item.error,
+        errorCategory: item.errorCategory as GenerationErrorCategory | undefined,
+        providerTaskId: item.providerTaskId,
+        outputs: item.outputs.map((output) => ({ ...output })),
+      };
+    });
+    job.status = remote.status === 'running' ? 'queued' : remote.status;
+    job.outputs = remote.outputs.map((output) => ({ ...output }));
+    job.outputGroup = remote.outputGroup ? cloneOutputGroup(remote.outputGroup) : job.outputGroup;
+    job.createdAt = Date.parse(remote.createdAt) || job.createdAt;
+    job.updatedAt = Date.parse(remote.updatedAt) || Date.now();
+    this.saveJobs();
+    if (job.status === 'queued') this.scheduleProcess();
+    return cloneJob(job);
+  }
+
   private findJob(id: string): GenerationBatchJob | undefined {
-    return this.jobs.find(j => j.id === id);
+    return this.jobs.find((job) => job.id === id);
   }
 
   public clearAllJobs() {
+    for (const controller of this.abortControllers.values()) controller.abort();
     this.jobs = [];
     this.inFlightTasks.clear();
+    this.abortControllers.clear();
     this.saveJobs();
   }
 
   public archiveFinishedJobs() {
-    this.jobs = this.jobs.filter(job => (
-      job.status === 'queued' || job.status === 'running' || job.status === 'paused'
-    ));
+    this.jobs = this.jobs.filter((job) => ['queued', 'running', 'paused'].includes(job.status));
     this.saveJobs();
   }
 
   public createJob(
     prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }>,
-    options: any,
+    options: Partial<GenerationQueueOptions> & Record<string, unknown>,
     canvasId: string,
-    idempotencyKey?: string
+    idempotencyKey?: string,
   ): GenerationBatchJob {
     const normalizedPrompts = Array.isArray(prompts) ? prompts : [];
-    if (normalizedPrompts.length === 0) {
-      throw new Error('DurableGenerationQueue requires at least one prompt.');
-    }
-    if (normalizedPrompts.length > MAX_BATCH_SIZE) {
-      throw new Error(`Batch size exceeds maxBatchSize=${MAX_BATCH_SIZE}.`);
+    const taskType = normalizeTaskType(options?.taskType);
+    const limits = MEDIA_LIMITS[taskType];
+    if (normalizedPrompts.length === 0) throw new Error('DurableGenerationQueue requires at least one prompt.');
+    if (normalizedPrompts.length > limits.maxBatchSize) {
+      throw new Error(`Batch size exceeds maxBatchSize=${limits.maxBatchSize} for taskType=${taskType}.`);
     }
 
     const stableIdempotencyKey = typeof idempotencyKey === 'string' && idempotencyKey.trim().length > 0
       ? idempotencyKey.trim()
-      : createDeterministicIdempotencyKey(normalizedPrompts, options || {}, canvasId);
-
-    const existing = this.jobs.find(j => j.idempotencyKey === stableIdempotencyKey);
+      : createDeterministicIdempotencyKey(normalizedPrompts, { ...options, taskType }, canvasId);
+    const existing = this.jobs.find((job) => job.idempotencyKey === stableIdempotencyKey);
     if (existing) {
-      const outputGroup = options?.outputGroup;
-      if (!existing.outputGroup && outputGroup) {
-        existing.outputGroup = outputGroup;
+      if (!existing.outputGroup && options?.outputGroup) {
+        existing.outputGroup = options.outputGroup as GenerationBatchOutputGroup;
         existing.updatedAt = Date.now();
         this.saveJobs();
       }
-      console.log(`[DurableQueue] Idempotency match found for key: ${stableIdempotencyKey}`);
       return cloneJob(existing);
     }
 
+    const now = Date.now();
     const newJob: GenerationBatchJob = {
-      id: 'job_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+      schemaVersion: 2,
+      id: `job_${now}_${Math.random().toString(36).substring(2, 11)}`,
       idempotencyKey: stableIdempotencyKey,
       canvasId,
+      taskType,
       status: 'queued',
+      progress: { total: normalizedPrompts.length, queued: normalizedPrompts.length, running: 0, completed: 0, failed: 0, percent: 0, phase: 'queued' },
+      outputs: [],
       createdBy: 'assistant',
-      prompts: normalizedPrompts.map(p => ({
-        id: p.id,
-        prompt: p.prompt,
-        referenceImageNodeId: p.referenceImageNodeId,
+      prompts: normalizedPrompts.map((prompt) => ({
+        id: prompt.id,
+        prompt: prompt.prompt,
+        referenceImageNodeId: prompt.referenceImageNodeId,
         status: 'queued',
-        retryCount: 0
+        phase: 'queued',
+        retryCount: 0,
       })),
       options: {
-        modelId: options?.modelId || 'gemini-2.5-flash',
-        aspectRatio: options?.aspectRatio || '1:1',
-        imageSize: options?.imageSize || '1K',
-        countPerPrompt: options?.countPerPrompt || 1,
-        concurrency: normalizeConcurrency(options?.concurrency),
-        layout: options?.layout || 'grid',
+        taskType,
+        modelId: String(options?.modelId || 'gemini-2.5-flash'),
+        aspectRatio: String(options?.aspectRatio || '1:1'),
+        imageSize: String(options?.imageSize || '1K'),
+        countPerPrompt: Number(options?.countPerPrompt || 1),
+        concurrency: normalizeConcurrency(options?.concurrency, taskType),
+        layout: options?.layout === 'row' || options?.layout === 'column' ? options.layout : 'grid',
         layoutPreset: options?.layoutPreset,
         columns: options?.columns,
-        gap: options?.gap
+        gap: options?.gap,
+        durationSeconds: options?.durationSeconds,
+        resolution: options?.resolution,
+        generateAudio: options?.generateAudio,
+        firstFrameAssetId: options?.firstFrameAssetId,
+        lastFrameAssetId: options?.lastFrameAssetId,
+        motion: options?.motion,
+        voice: options?.voice,
+        lyrics: options?.lyrics,
+        genre: options?.genre,
       },
-      outputGroup: options?.outputGroup,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      outputGroup: options?.outputGroup as GenerationBatchOutputGroup | undefined,
+      createdAt: now,
+      updatedAt: now,
     };
-
     this.jobs.push(newJob);
     this.saveJobs();
-    
-    // 异步触发队列处理
     this.scheduleProcess();
-    
     return cloneJob(newJob);
   }
 
   public pauseJob(jobId: string) {
     const job = this.findJob(jobId);
-    if (job && (job.status === 'queued' || job.status === 'running')) {
-      job.status = 'paused';
-      // 暂停时将正在运行的子任务重置为 queued
-      job.prompts.forEach(p => {
-        if (p.status === 'running') {
-          p.status = 'queued';
-        }
-      });
-      job.updatedAt = Date.now();
-      this.saveJobs();
-      this.scheduleProcess();
+    if (!job || (job.status !== 'queued' && job.status !== 'running')) return;
+    job.status = 'paused';
+    for (const prompt of job.prompts) {
+      if (prompt.status === 'running') {
+        prompt.status = 'queued';
+        prompt.phase = 'queued';
+      }
     }
+    job.updatedAt = Date.now();
+    this.saveJobs();
   }
 
   public resumeJob(jobId: string) {
     const job = this.findJob(jobId);
-    if (job && job.status === 'paused') {
-      job.status = 'queued';
-      job.updatedAt = Date.now();
-      this.saveJobs();
-      this.scheduleProcess();
-    }
+    if (!job || job.status !== 'paused') return;
+    job.status = 'queued';
+    job.updatedAt = Date.now();
+    this.saveJobs();
+    this.scheduleProcess();
   }
 
   public retryFailedPrompts(jobId: string) {
     const job = this.findJob(jobId);
     if (!job || job.status === 'cancelled') return;
-
-    let hasRetryablePrompt = false;
-    job.prompts.forEach(promptItem => {
-      if (promptItem.status !== 'failed') return;
-      promptItem.status = 'queued';
-      promptItem.retryCount = 0;
-      delete promptItem.error;
-      hasRetryablePrompt = true;
-    });
-
-    if (!hasRetryablePrompt) return;
-
+    let changed = false;
+    for (const prompt of job.prompts) {
+      if (prompt.status !== 'failed' || prompt.retryable === false) continue;
+      prompt.status = 'queued';
+      prompt.phase = 'queued';
+      prompt.retryCount = 0;
+      delete prompt.error;
+      delete prompt.errorCategory;
+      delete prompt.retryable;
+      changed = true;
+    }
+    if (!changed) return;
     job.status = 'queued';
     job.updatedAt = Date.now();
     this.saveJobs();
@@ -443,26 +666,27 @@ export class DurableGenerationQueue {
 
   public cancelJob(jobId: string) {
     const job = this.findJob(jobId);
-    if (job) {
-      job.status = 'cancelled';
-      job.prompts.forEach(p => {
-        if (p.status === 'queued' || p.status === 'running') {
-          p.status = 'failed';
-          p.error = 'Job cancelled by user';
-        }
-      });
-      job.updatedAt = Date.now();
-      this.saveJobs();
+    if (!job || ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(job.status)) return;
+    job.status = 'cancelled';
+    for (const prompt of job.prompts) {
+      if (prompt.status === 'queued' || prompt.status === 'running') {
+        prompt.status = 'failed';
+        prompt.phase = 'failed';
+        prompt.error = 'Job cancelled by user';
+        prompt.errorCategory = 'cancelled';
+        prompt.retryable = false;
+      }
+      this.abortControllers.get(this.getTaskKey(job.id, prompt.id))?.abort();
     }
+    job.updatedAt = Date.now();
+    this.saveJobs();
   }
 
-  // 核心队列调度循环
   public async processQueue() {
     if (this.isProcessing) {
       this.processRequested = true;
       return;
     }
-
     this.isProcessing = true;
     try {
       do {
@@ -471,200 +695,160 @@ export class DurableGenerationQueue {
       } while (this.processRequested);
     } finally {
       this.isProcessing = false;
-      if (this.processRequested) {
-        this.scheduleProcess();
-      }
+      if (this.processRequested) this.scheduleProcess();
     }
   }
 
+  private async handleFinishedJob(job: GenerationBatchJob) {
+    const outputNodeIds = getJobOutputNodeIds(job);
+    if (job.outputGroup) job.outputGroup.nodeIds = outputNodeIds;
+    if (!job.arranged && outputNodeIds.length > 0 && this.arrangeHandler) {
+      try {
+        await this.arrangeHandler(outputNodeIds, job.options, job);
+        job.arranged = true;
+      } catch (error) {
+        console.error('[DurableQueue] Layout auto-arrangement failed:', error);
+      }
+    }
+    if (!job.completionHandled && outputNodeIds.length > 0 && this.completionHandler) {
+      try {
+        await this.completionHandler(job, outputNodeIds);
+        job.completionHandled = true;
+      } catch (error) {
+        console.error('[DurableQueue] Completion handler failed:', error);
+      }
+    }
+    job.updatedAt = Date.now();
+    this.saveJobs();
+  }
+
   private async processQueueOnce() {
-    // 补偿处理已完成但尚未进行排版或收尾的 jobs
-    const completedJobs = this.jobs.filter(j => j.status === 'completed');
-    for (const job of completedJobs) {
-      let changed = false;
-      const outputNodeIds = getJobOutputNodeIds(job);
-      
-      if (!job.arranged && outputNodeIds.length > 0 && this.arrangeHandler) {
-        try {
-          await this.arrangeHandler(outputNodeIds, job.options, job);
-          job.arranged = true;
-          changed = true;
-        } catch (err) {
-          console.error('[DurableQueue] Deferred Layout auto-arrangement failed:', err);
-        }
-      }
-      
-      if (!job.completionHandled && outputNodeIds.length > 0 && this.completionHandler) {
-        try {
-          await this.completionHandler(job, outputNodeIds);
-          job.completionHandled = true;
-          changed = true;
-        } catch (err) {
-          console.error('[DurableQueue] Deferred Completion handler failed:', err);
-        }
-      }
-      
-      if (changed) {
-        job.updatedAt = Date.now();
+    for (const job of this.jobs.filter((item) => (
+      (item.status === 'completed' || item.status === 'completed_with_errors')
+      && (!item.arranged || !item.completionHandled)
+    ))) {
+      await this.handleFinishedJob(job);
+    }
+
+    const runningJobs = this.jobs.filter((job) => job.status === 'running');
+    if (runningJobs.length === 0) {
+      const nextJob = this.jobs.find((job) => job.status === 'queued');
+      if (nextJob) {
+        nextJob.status = 'running';
+        nextJob.updatedAt = Date.now();
         this.saveJobs();
+        runningJobs.push(nextJob);
       }
     }
-
-    const runningJobs = this.jobs.filter(j => j.status === 'running');
-    const queuedJobs = this.jobs.filter(j => j.status === 'queued');
-
-    if (runningJobs.length === 0 && queuedJobs.length > 0) {
-      const nextJob = queuedJobs[0];
-      nextJob.status = 'running';
-      nextJob.updatedAt = Date.now();
-      this.saveJobs();
-      runningJobs.push(nextJob);
-    }
-
     if (runningJobs.length === 0) return;
 
     const currentJob = runningJobs[0];
-    const concurrencyLimit = currentJob.options.concurrency;
-
-    const queuedPrompts = currentJob.prompts.filter(p => p.status === 'queued');
-    const activePrompts = currentJob.prompts.filter(p => p.status === 'running');
-
-    // 检查是否全部子任务都完成了
-    const allPromptsFinished = currentJob.prompts.every(p => p.status === 'completed' || p.status === 'failed');
-    if (allPromptsFinished) {
-      currentJob.status = 'completed';
-      const outputNodeIds = getJobOutputNodeIds(currentJob);
-      if (currentJob.outputGroup) {
-        currentJob.outputGroup.nodeIds = outputNodeIds;
-      }
-      currentJob.updatedAt = Date.now();
-      
-      // 触发自动排版
-      if (outputNodeIds.length > 0 && this.arrangeHandler) {
-        try {
-          await this.arrangeHandler(outputNodeIds, currentJob.options, currentJob);
-          currentJob.arranged = true;
-        } catch (err) {
-          console.error('[DurableQueue] Layout auto-arrangement failed:', err);
-        }
-      }
-
-      if (outputNodeIds.length > 0 && this.completionHandler) {
-        try {
-          await this.completionHandler(currentJob, outputNodeIds);
-          currentJob.completionHandled = true;
-          if (currentJob.outputGroup) {
-            currentJob.outputGroup.nodeIds = outputNodeIds;
-          }
-        } catch (err) {
-          console.error('[DurableQueue] Completion handler failed:', err);
-        }
-      }
-
-      this.saveJobs();
-      // 递归处理下一个 Job
+    const allFinished = currentJob.prompts.every((prompt) => prompt.status === 'completed' || prompt.status === 'failed');
+    if (allFinished) {
+      const completedCount = currentJob.prompts.filter((prompt) => prompt.status === 'completed').length;
+      const failedCount = currentJob.prompts.length - completedCount;
+      currentJob.status = failedCount === 0 ? 'completed' : completedCount === 0 ? 'failed' : 'completed_with_errors';
+      await this.handleFinishedJob(currentJob);
       this.scheduleProcess();
       return;
     }
 
-    // 启动新的并发子任务
-    const activePromptCount = currentJob.prompts.filter(prompt => (
+    const activeCount = currentJob.prompts.filter((prompt) => (
       prompt.status === 'running' || this.inFlightTasks.has(this.getTaskKey(currentJob.id, prompt.id))
     )).length;
-    const availableSlots = concurrencyLimit - activePromptCount;
-    if (availableSlots > 0 && queuedPrompts.length > 0) {
-      const toStart = queuedPrompts
-        .filter(promptItem => !this.inFlightTasks.has(this.getTaskKey(currentJob.id, promptItem.id)))
-        .slice(0, availableSlots);
-      for (const promptItem of toStart) {
-        promptItem.status = 'running';
-        this.executePromptTask(currentJob.id, promptItem.id);
-      }
-      if (toStart.length > 0) {
-        this.saveJobs();
-      }
+    const availableSlots = currentJob.options.concurrency - activeCount;
+    if (availableSlots <= 0) return;
+    const toStart = currentJob.prompts
+      .filter((prompt) => prompt.status === 'queued' && !this.inFlightTasks.has(this.getTaskKey(currentJob.id, prompt.id)))
+      .slice(0, availableSlots);
+    for (const prompt of toStart) {
+      prompt.status = 'running';
+      prompt.phase = 'provider_processing';
+      void this.executePromptTask(currentJob.id, prompt.id);
     }
+    if (toStart.length > 0) this.saveJobs();
   }
 
   private async executePromptTask(jobId: string, promptId: string) {
     const taskKey = this.getTaskKey(jobId, promptId);
     if (this.inFlightTasks.has(taskKey)) return;
-
     const job = this.findJob(jobId);
-    if (!job || (job.status !== 'running' && job.status !== 'queued')) return;
-
-    const promptItem = job.prompts.find(p => p.id === promptId);
-    if (!promptItem || (promptItem.status !== 'running' && promptItem.status !== 'queued')) return;
-
+    const promptItem = job?.prompts.find((prompt) => prompt.id === promptId);
+    if (!job || !promptItem || (job.status !== 'running' && job.status !== 'queued')) return;
     if (!this.executor) {
-      console.warn('[DurableQueue] No executor registered yet. Holding...');
       promptItem.status = 'queued';
+      promptItem.phase = 'queued';
       promptItem.error = 'No executor registered yet';
-      if (job.status === 'running') {
-        job.status = 'queued';
-      }
+      job.status = 'queued';
       this.saveJobs();
       return;
     }
 
-    // 确保把正在执行的子任务状态设为 running 并存盘，因为可能是从 queued 被重新调度的
-    if (promptItem.status !== 'running') {
-      promptItem.status = 'running';
-    }
-    if (job.status !== 'running') {
-      job.status = 'running';
-    }
-
+    promptItem.status = 'running';
+    promptItem.phase = 'provider_processing';
+    job.status = 'running';
+    const controller = new AbortController();
+    this.abortControllers.set(taskKey, controller);
     this.inFlightTasks.add(taskKey);
     try {
-      const executionResult = normalizeExecutorResult(await this.executor(promptItem.prompt, {
-        ...job.options,
-        referenceImageNodeId: promptItem.referenceImageNodeId
-      }, jobId, promptId));
-
+      const result = normalizeExecutorResult(await this.executor(
+        promptItem.prompt,
+        { ...job.options, referenceImageNodeId: promptItem.referenceImageNodeId },
+        jobId,
+        promptId,
+        controller.signal,
+      ));
       const activeJob = this.findJob(jobId);
-      const activePromptItem = activeJob?.prompts.find(p => p.id === promptId);
-      if (!activeJob || activeJob.status === 'cancelled' || !activePromptItem) {
-        return;
-      }
-      activePromptItem.status = 'completed';
-      activePromptItem.promptNodeId = executionResult.promptNodeId;
-      activePromptItem.resultImageNodeIds = executionResult.resultImageNodeIds;
+      const activePrompt = activeJob?.prompts.find((prompt) => prompt.id === promptId);
+      if (!activeJob || activeJob.status === 'cancelled' || !activePrompt) return;
+      const outputs = outputsFromExecution(activeJob.taskType, promptId, result);
+      activePrompt.status = 'completed';
+      activePrompt.phase = 'completed';
+      activePrompt.promptNodeId = result.promptNodeId;
+      activePrompt.resultImageNodeIds = result.resultImageNodeIds;
+      activePrompt.outputs = outputs;
+      activePrompt.providerTaskId = result.providerTaskId;
+      activeJob.outputs = [...activeJob.outputs.filter((output) => output.itemId !== promptId), ...outputs];
       if (activeJob.outputGroup) {
         activeJob.outputGroup.nodeIds = Array.from(new Set([
           ...(activeJob.outputGroup.nodeIds || []),
-          ...(executionResult.nodeIds || []),
-          ...(executionResult.promptNodeId ? [executionResult.promptNodeId] : []),
-          ...executionResult.resultImageNodeIds
+          ...(result.nodeIds || []),
+          ...(result.promptNodeId ? [result.promptNodeId] : []),
+          ...result.resultImageNodeIds,
+          ...outputs.map((output) => output.nodeId).filter((id): id is string => Boolean(id)),
         ]));
       }
-    } catch (err: any) {
-      console.error(`[DurableQueue] Prompt task failed (attempt ${promptItem.retryCount + 1}):`, err);
-      
+    } catch (error) {
       const retryJob = this.findJob(jobId);
-      const retryPromptItem = retryJob?.prompts.find(p => p.id === promptId);
-      if (!retryJob || retryJob.status === 'cancelled' || !retryPromptItem) {
-        return;
-      }
-
-      if (retryPromptItem.retryCount < RETRY_ATTEMPTS && retryJob.status === 'running') {
-        retryPromptItem.retryCount++;
-        retryPromptItem.status = 'queued';
+      const retryPrompt = retryJob?.prompts.find((prompt) => prompt.id === promptId);
+      if (!retryJob || retryJob.status === 'cancelled' || !retryPrompt) return;
+      const classified = classifyGenerationError(error);
+      if (classified.retryable && retryPrompt.retryCount < RETRY_ATTEMPTS && retryJob.status === 'running') {
+        retryPrompt.retryCount += 1;
+        retryPrompt.status = 'queued';
+        retryPrompt.phase = 'queued';
+        retryPrompt.error = classified.message;
+        retryPrompt.errorCategory = classified.category;
+        retryPrompt.retryable = true;
         this.saveJobs();
-        await new Promise(resolve => setTimeout(resolve, RETRY_BACKOFF_MS));
-      } else if (retryPromptItem.retryCount < RETRY_ATTEMPTS && retryJob.status === 'paused') {
-        retryPromptItem.retryCount++;
-        retryPromptItem.status = 'queued';
+        await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+      } else if (classified.retryable && retryPrompt.retryCount < RETRY_ATTEMPTS && retryJob.status === 'paused') {
+        retryPrompt.retryCount += 1;
+        retryPrompt.status = 'queued';
+        retryPrompt.phase = 'queued';
       } else {
-        retryPromptItem.status = 'failed';
-        retryPromptItem.error = err.message || 'Generation failed';
+        retryPrompt.status = 'failed';
+        retryPrompt.phase = 'failed';
+        retryPrompt.error = classified.message;
+        retryPrompt.errorCategory = classified.category;
+        retryPrompt.retryable = classified.retryable;
       }
     } finally {
       this.inFlightTasks.delete(taskKey);
-      job.updatedAt = Date.now();
+      this.abortControllers.delete(taskKey);
+      const activeJob = this.findJob(jobId);
+      if (activeJob) activeJob.updatedAt = Date.now();
       this.saveJobs();
-
-      // 触发队列循环继续调度
       this.scheduleProcess();
     }
   }

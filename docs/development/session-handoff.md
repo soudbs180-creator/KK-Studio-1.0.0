@@ -1700,3 +1700,56 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 发布脚本中的 Playwright Chromium 仍不可用，相关 smoke 使用 HTTP 与源码契约降级；本次涉及的手机/桌面页面已在应用内浏览器执行真实交互、语义树检查和截图复核。
 - **风险与下一步**：
   - 低风险。后续可继续把能力来源列表页中较长的供应商预设目录补充分段搜索和虚拟化，但当前接入、编辑、返回与跨端布局链路已可实际使用。
+
+## 121. 2026-07-10 - 统一媒体超级智能体、移动任务中心与跨端持久队列
+- **修改范围**：
+  1. 将移动端任务中心从桌面固定浮层拆出，改为输入区上方的正常布局状态条与 Portal 底部详情面板；移动端不自动展开，完成后自动收起，失败保留复制错误、API 配置和清理入口，所有操作满足 44px 触控目标并使用 `KK_LAYER`。
+  2. 将 `DurableGenerationQueue` 升级为版本化图片/视频/音频队列，补充媒体并发与批量限制、阶段进度、部分失败、Provider 任务 ID、输出引用、错误分类、取消信号、旧本地队列迁移、确定性画布节点与 IndexedDB/服务端同步。
+  3. 新增 `generation.createVideoJob`、`generation.createAudioJob`，并让兼容 `startGeneration` 按显式 mode 分发；图生视频直接进入视频工具，Provider 能力改为 T2V/I2V/首尾帧/扩展/音频等显式声明。
+  4. 将 Agent 计划升级为带步骤 ID、依赖、幂等键和验证规则的 v2 步骤图；Planner 不再写 KnowledgeStore，`ToolRegistry` 在执行边界强制共享 Zod 输入校验、Run 级确认授权和执行后验证，验证通过后才允许知识更新。
+  5. 扩展 `/api/v1/generation-jobs` 创建、列表、详情、更新、控制和租约领取 API，补充数据库迁移、用户隔离、幂等索引与有效租约写入守卫；登录用户以服务端为权威，游客保持本地队列。
+  6. 增加可选 ComfyUI 适配器，只允许执行仓库审核的版本化模板，禁止 LLM 传入任意 workflow、endpoint 或密钥；同步更新 OpenAPI、Agent Skills、工具注册表与发布 smoke 契约。
+- **修改文件**：
+  - `apps/web/src/components/workspace/TaskCenterTray.tsx`
+  - `apps/web/src/components/mobile/MobileAppShell.tsx`
+  - `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts`
+  - `apps/web/src/features/ai-assistant-runtime/queue/GenerationQueueSync.ts`
+  - `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+  - `apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx`
+  - `apps/web/src/features/ai-takeover/core/localBrain.ts`
+  - `packages/shared/src/contracts/generation/schema.ts`
+  - `packages/shared/src/contracts/dto/generation.ts`
+  - `packages/shared/src/contracts/providers/types.ts`
+  - `packages/shared/src/contracts/client/kk-api-client.ts`
+  - `server/routes/compat/workspace.js`
+  - `server/routes/ai-assistant.js`
+  - `server/lib/dispatcher/adapters/comfyUiWorkflowAdapter.js`
+  - `server/config/comfyui-workflows.json`
+  - `migrations/015_unified_media_generation_jobs.sql`
+  - `docs/specs/openapi.yaml`
+  - `docs/ai-assistant/skills.md`
+  - `docs/ai-assistant/tool-registry.md`
+  - `scripts/test/verify-ai-takeover-smoke.mjs`
+  - `tests/unit/unified-media-generation-queue.test.ts`
+  - `tests/unit/unified-media-generation-server-contract.test.ts`
+  - `tests/unit/agent-tool-execution-boundary.test.ts`
+  - `tests/unit/mobile-task-center-layout-contract.test.ts`
+- **当前设计决策**：
+  - 继续使用唯一的 AI 接管运行时，固定执行链为 `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update`，不建立平行助手。
+  - 图片默认并发 3/最大 8/批量 100，视频默认 1/最大 2/批量 20，音频默认 2/最大 4/批量 50；不可重试的密钥、余额、能力与参数错误不会反复创建失败卡片。
+  - 登录态任务必须先取得当前设备租约才可写进度，数据库和本地回退存储都校验租约所有者与有效期；移动端保持 cloud-first，ComfyUI 仅作为桌面/服务端可选路由。
+  - 本次不升级版本，继续以 `config/release-manifest.json` 的 `1.5.9` 为事实源。
+- **已运行验证**：
+  - 完整 `verify:changes` 通过：架构、治理、类型、OpenAPI、生产构建、全部测试、发布 smoke、编码检查与画布性能均为 0 失败。
+  - 测试汇总：单元 1652（1650 通过、2 跳过）、集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3。
+  - 应用内浏览器实测 `360x800`、`390x844`、`430x932`、`1440x900`：移动 Header、任务条、内容和输入区无横向溢出或互相遮挡；任务条高 53px，详情面板挂载到 `document.body`，关闭与失败操作均为 44x44px；桌面只挂载桌面任务托盘。
+  - `git diff --check` 通过；服务端 58 个文件语法检查与 479 个测试文件语义检查通过；Swagger 校验确认 `docs/specs/openapi.yaml` 有效。
+- **未运行验证及原因**：
+  - 未调用真实付费 Provider 生成图片、视频或音频，因为当前验证账户未配置可用密钥；已验证真实队列创建、确认、缺密钥失败分类、不可重试处理和画布节点幂等。
+  - 未在生产 PostgreSQL 执行迁移，也未连接真实 ComfyUI；适配器清单默认为空，并已验证未审核模板和任意 workflow 输入会被拒绝。
+  - 发布 smoke 的独立 Playwright 浏览器仍不可用，因此脚本使用 HTTP/源码降级契约；本次移动端关键路径已用 Codex 应用内浏览器完成真实交互、几何测量与截图复核。
+- **风险与下一步**：
+  - 发布前先在预生产数据库应用 `015_unified_media_generation_jobs.sql`，再用两个登录设备验证租约冲突、断网恢复和长视频任务续租；批准首个 ComfyUI 模板时需同时审查模板节点、输入绑定和模型权重许可。
+  - 生产依赖审计保留 1 个既有中危告警：`morgan <= 1.10.1` 的日志伪造漏洞。应单独升级并做请求日志回归，不与本次跨层功能提交混合处理。

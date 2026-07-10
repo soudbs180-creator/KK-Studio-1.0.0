@@ -15,7 +15,7 @@ test('mobile component index exports MobileAppShell', () => {
   assert.match(indexSource, /export \{ default as MobileAppShell \} from '\.\/MobileAppShell';/);
 });
 
-test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-bar agnostic', () => {
+test('MobileAppShell keeps the adaptive four-layer slot contract and stays tab-bar agnostic', () => {
   const shellExists = existsSync(workspacePath(MOBILE_APP_SHELL_PATH));
 
   assert.equal(shellExists, true, 'expected MobileAppShell.tsx to exist');
@@ -29,11 +29,13 @@ test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-ba
   assert.match(shellSource, /interface MobileAppShellProps\s*\{/);
   assert.match(shellSource, /header:\s*ReactNode;/);
   assert.match(shellSource, /feed:\s*ReactNode;/);
+  assert.match(shellSource, /taskCenter\?:\s*ReactNode;/);
   assert.match(shellSource, /composer:\s*ReactNode;/);
   assert.match(shellSource, /overlays\?:\s*ReactNode;/);
   assert.match(shellSource, /data-testid="mobile-app-shell"/);
   assert.match(shellSource, /data-slot="header"/);
   assert.match(shellSource, /data-slot="feed"/);
+  assert.match(shellSource, /data-slot="task-center"/);
   assert.match(shellSource, /data-slot="composer"/);
   assert.match(shellSource, /data-slot="overlays"/);
   assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
@@ -42,7 +44,7 @@ test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-ba
   assert.match(shellSource, /env\(safe-area-inset-bottom\)/);
   assert.match(
     shellSource,
-    /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/,
+    /gridTemplateRows:\s*taskCenter \? 'minmax\(0, 1fr\) auto auto' : 'minmax\(0, 1fr\) auto'/,
   );
   assert.doesNotMatch(shellSource, /sticky top-0/);
   assert.doesNotMatch(shellSource, /sticky bottom-0/);

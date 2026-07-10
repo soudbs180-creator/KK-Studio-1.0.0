@@ -169,18 +169,19 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     assert.match(planEmpty.reply, /请选择一张图/);
 
     // 3. 品牌研究
+    const knowledgeCountBeforePlanning = knowledgeStore.searchProject('咖啡').length;
     const planResearch = await brain.plan('研究极简咖啡品牌风格，并生成 6 张海报', ctxEmpty);
     assert.equal(planResearch.intent, 'research_to_canvas');
-    assert.equal(planResearch.actions.length, 1);
-    assert.equal(planResearch.actions[0].type, 'generation.createBatchJob');
+    assert.equal(planResearch.actions.length, 2);
+    const generationAction = planResearch.actions.find((action) => action.type === 'generation.createBatchJob');
+    assert.ok(generationAction);
+    assert.ok(planResearch.actions.some((action) => action.type === 'knowledge.recordChange'));
     
-    const payload = (planResearch.actions[0] as any).payload;
+    const payload = (generationAction as any).payload;
     assert.equal(payload.options.aspectRatio, '3:4');
     assert.match(payload.options.researchBrief, /极简咖啡品牌/);
     
-    const searchRes = knowledgeStore.searchProject('咖啡');
-    assert.ok(searchRes.length > 0);
-    assert.match(searchRes[0].title, /极简咖啡品牌风格/);
+    assert.equal(knowledgeStore.searchProject('咖啡').length, knowledgeCountBeforePlanning);
   });
 
   it('P2: analyzeIntent and LocalBrain should handle audio generation properly', async () => {
@@ -194,9 +195,8 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     const plan = await brain.plan('生成一段30秒的爵士风格背景音乐', ctx);
     assert.equal(plan.intent, 'generate_audio');
     assert.equal(plan.actions.length, 1);
-    assert.equal(plan.actions[0].type, 'startGeneration');
-    assert.equal((plan.actions[0] as any).payload.mode, 'audio');
-    assert.equal((plan.actions[0] as any).payload.options.duration, 30);
-    assert.equal((plan.actions[0] as any).payload.options.genre, 'jazz');
+    assert.equal(plan.actions[0].type, 'generation.createAudioJob');
+    assert.equal((plan.actions[0] as any).payload.durationSeconds, 30);
+    assert.equal((plan.actions[0] as any).payload.genre, 'jazz');
   });
 });

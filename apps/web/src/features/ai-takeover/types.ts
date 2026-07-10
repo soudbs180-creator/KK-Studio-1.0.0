@@ -88,6 +88,8 @@ export type AssistantAction =
   | { type: 'optimizePromptLocally'; payload: { subject: string; templateId?: string; style?: string } }
   | { type: 'fillPrompt'; payload: { prompt: string; negativePrompt?: string; modelId?: string } }
   | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string; mode?: string } }
+  | { type: 'generation.createVideoJob'; payload: { prompt: string; modelId?: string; referenceImageNodeId?: string; durationSeconds?: number; resolution?: string; aspectRatio?: string; generateAudio?: boolean; firstFrameAssetId?: string; lastFrameAssetId?: string; motion?: string; idempotencyKey?: string } }
+  | { type: 'generation.createAudioJob'; payload: { prompt: string; modelId?: string; durationSeconds?: number; voice?: string; lyrics?: string; genre?: string; idempotencyKey?: string } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
   | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
   | { type: 'generation.retryJob'; payload: { jobId?: string; target?: 'latest_failed' } }
@@ -111,15 +113,30 @@ export type AssistantAction =
   | { type: 'browser.openDesktopProject'; payload: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string } }
   | { type: 'browser.checkLocalLlm'; payload: { provider?: string; endpoint?: string; model?: string } }
   | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } }
-  | { type: 'ui.navigateToSurface'; payload: { surface: string } };
+  | { type: 'ui.navigateToSurface'; payload: { surface: string } }
+  | { type: 'knowledge.recordChange'; payload: { title: string; summary: string; source?: 'runtime' | 'user' | 'import' } };
+
+export interface AgentPlanStep {
+  stepId: string;
+  action: AssistantAction;
+  dependsOn: string[];
+  idempotencyKey: string;
+  verification: {
+    required: boolean;
+    rule: 'tool' | 'queue_job' | 'canvas_state' | 'asset_manifest' | 'none';
+  };
+}
 
 // 执行计划
 export interface AssistantPlan {
+  version?: 2;
   id: string;
   reply: string;                   // 机器人的普通文本回答
   intent: AssistantIntent;
   confidence: number;
   actions: AssistantAction[];
+  steps?: AgentPlanStep[];
+  maxReplans?: number;
   requiresConfirmation: boolean;   // 是否需要用户确认
   confirmation?: {
     title: string;
@@ -408,7 +425,7 @@ export interface AgentToolCallLog {
   toolName: string;
   inputSummary: string;
   outputSummary?: string;
-  status: 'success' | 'failed' | 'blocked';
+  status: 'success' | 'failed' | 'blocked' | 'setup_required' | 'verification_failed';
   error?: string;
   startedAt: string;
   completedAt?: string;

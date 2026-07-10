@@ -13,7 +13,7 @@
 
 2. **[批量重绘生图 Skill (batch-generate-to-canvas)](skills/batch-generate-to-canvas.md)**
    - 职责：绑定已导入资源池/图片集合发起批量重绘生成，支持电商紧凑布局、比例提取、输出自动打组，并基于持久化生成队列驱动与控制任务（暂停、恢复、重试失败项、取消，含最近失败 latest_failed 自动定位）。
-   - 关联工具：`generation.createBatchJob`, `ecommerce.createBatchTransformJob`, `generation.retryJob`
+   - 关联工具：`generation.createBatchJob`, `generation.createVideoJob`, `generation.createAudioJob`, `ecommerce.createBatchTransformJob`, `generation.retryJob`
 
 3. **[整理卡片布局 Skill (arrange-selected-cards)](skills/arrange-selected-cards.md)**
    - 职责：对画布上被选中卡片进行智能自动排列。

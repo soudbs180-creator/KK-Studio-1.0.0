@@ -39,17 +39,17 @@ function createImage(overrides: Partial<GeneratedImage> = {}): GeneratedImage {
   } as GeneratedImage;
 }
 
-describe('mobile home three-zone contract', () => {
-  test('mobile shell uses a three-zone grid instead of sticky header/composer stacking', () => {
+describe('mobile home adaptive zone contract', () => {
+  test('mobile shell inserts the task center in normal flow instead of sticky stacking', () => {
     const shellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
     const surfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
-    assert.match(shellSource, /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/);
+    assert.match(shellSource, /gridTemplateRows:\s*taskCenter \? 'minmax\(0, 1fr\) auto auto' : 'minmax\(0, 1fr\) auto'/);
     assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
     assert.doesNotMatch(shellSource, /min-h-dvh/);
     assert.doesNotMatch(shellSource, /sticky top-0/);
     assert.doesNotMatch(shellSource, /sticky bottom-0/);
-    assert.match(surfaceSource, /data-mobile-home-shell="three-zone"/);
+    assert.match(surfaceSource, /data-mobile-home-shell="adaptive-four-zone"/);
     assert.doesNotMatch(surfaceSource, /grid-cols-\[minmax\(0,1fr\)_56px\]/);
   });
 

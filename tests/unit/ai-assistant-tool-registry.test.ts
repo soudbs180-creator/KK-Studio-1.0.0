@@ -305,6 +305,8 @@ test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job
     layoutPreset: 'compact-grid',
     idempotencyKey: 'tool-registry-ecommerce-batch'
   }, {
+    runId: 'run-ecommerce-batch',
+    confirmationGrant: { runId: 'run-ecommerce-batch', confirmed: true, toolNames: ['ecommerce.createBatchTransformJob'] },
     activeCanvas: {
       id: 'canvas-1',
       imageNodes: [
@@ -592,7 +594,10 @@ test('ToolRegistry: browser.extractProduct validates URL before dispatching brid
   await assert.rejects(
     () => toolRegistryInstance.execute('browser.extractProduct', {
       url: 'file:///C:/Users/Administrator/secrets.txt'
-    }, {}),
+    }, {
+      runId: 'run-browser-invalid-url',
+      confirmationGrant: { runId: 'run-browser-invalid-url', confirmed: true, toolNames: ['browser.extractProduct'] }
+    }),
     /Browser Bridge only accepts http or https URLs/
   );
 });
@@ -601,6 +606,8 @@ test('ToolRegistry: disconnected browser.extractProduct returns setup_required i
   const result = await toolRegistryInstance.execute('browser.extractProduct', {
     url: 'https://example.com/item/1'
   }, {
+    runId: 'run-browser-disconnected',
+    confirmationGrant: { runId: 'run-browser-disconnected', confirmed: true, toolNames: ['browser.extractProduct'] },
     browserBridge: {
       execute: async () => ({
         id: 'cmd-test',
@@ -629,7 +636,20 @@ test('ToolRegistry: provider.getModelCapabilities queries properties correctly',
     modelId: 'gemini-2.0-flash-exp'
   }, {});
   assert.equal(resultGemini.modelId, 'gemini-2.0-flash-exp');
-  assert.equal(resultGemini.multimodal, true);
+  assert.equal(resultGemini.multimodal, false);
+  assert.equal(resultGemini.fallback, 'undeclared');
+
+  const resultDeclared = await toolRegistryInstance.execute('provider.getModelCapabilities', {
+    modelId: 'declared-vision-model'
+  }, {
+    getModelRouteMeta: async () => ({
+      modelId: 'declared-vision-model',
+      multimodal: true,
+      image_understanding: true,
+      generationCapabilities: { imageGeneration: true }
+    })
+  });
+  assert.equal(resultDeclared.multimodal, true);
 
   const resultNonExist = await toolRegistryInstance.execute('provider.getModelCapabilities', {
     modelId: 'non-exist-model'
@@ -771,10 +791,14 @@ test('ToolRegistry: optimizePromptLocally performs real local prompt optimizatio
   assert.match(result.optimizedPrompt, /highly detailed/);
 });
 
-test('ToolRegistry: generation.createAudioTask returns capability_unavailable and updates logs to setup_required/failed if generateAudio is missing', async () => {
+test('ToolRegistry: generation.createAudioTask uses the unified durable audio queue', async () => {
   const result = await toolRegistryInstance.execute('generation.createAudioTask', {
     prompt: 'test audio prompt'
   }, {
+    runId: 'run-legacy-audio-tool',
+    confirmationGrant: { runId: 'run-legacy-audio-tool', confirmed: true, toolNames: ['generation.createAudioTask'] },
+    activeCanvas: { id: 'canvas-audio' },
+    selectedModel: { id: 'audio-model' },
     notify: {
       info: () => {},
       success: () => {},
@@ -782,13 +806,12 @@ test('ToolRegistry: generation.createAudioTask returns capability_unavailable an
     }
   });
 
-  assert.equal(result.success, false);
-  assert.equal(result.code, 'CAPABILITY_UNAVAILABLE');
-  assert.equal(result.setupAction, 'open-settings');
+  assert.equal(result.taskType, 'audio');
+  assert.equal(result.status, 'queued');
 
   // 验证日志状态
   const logs = toolRegistryInstance.getLogs();
   const latestLog = logs[logs.length - 1];
   assert.equal(latestLog.toolName, 'generation.createAudioTask');
-  assert.equal(latestLog.status, 'setup_required'); // 因为 code 是 'CAPABILITY_UNAVAILABLE' 我们按 'setup_required' 或 'failed' 进行记录
+  assert.equal(latestLog.status, 'success');
 });

@@ -5,6 +5,162 @@ import type { GenerationTelemetry } from "../../generation/types.ts";
 
 
 export type GenerationTaskType = "image" | "video" | "audio" | "document";
+export type GenerationMediaTaskType = Exclude<GenerationTaskType, "document">;
+export type GenerationJobStatus =
+  | "queued"
+  | "running"
+  | "paused"
+  | "completed"
+  | "completed_with_errors"
+  | "failed"
+  | "cancelled";
+export type GenerationJobPhase =
+  | "preparing"
+  | "queued"
+  | "uploading"
+  | "provider_processing"
+  | "storing"
+  | "placing_on_canvas"
+  | "completed"
+  | "failed";
+
+export interface GenerationPromptInputDto {
+  id: EntityId;
+  prompt: string;
+  referenceAssetIds?: EntityId[];
+  referenceImageNodeId?: EntityId;
+}
+
+export interface ImageGenerationJobParametersDto {
+  taskType: "image";
+  aspectRatio?: string;
+  imageSize?: string;
+  countPerPrompt?: number;
+}
+
+export interface VideoGenerationJobParametersDto {
+  taskType: "video";
+  durationSeconds: number;
+  resolution?: string;
+  aspectRatio?: string;
+  generateAudio?: boolean;
+  firstFrameAssetId?: EntityId;
+  lastFrameAssetId?: EntityId;
+  motion?: string;
+}
+
+export interface AudioGenerationJobParametersDto {
+  taskType: "audio";
+  durationSeconds?: number;
+  voice?: string;
+  lyrics?: string;
+  genre?: string;
+}
+
+export type GenerationJobParametersDto =
+  | ImageGenerationJobParametersDto
+  | VideoGenerationJobParametersDto
+  | AudioGenerationJobParametersDto;
+
+export interface GenerationJobProgressDto {
+  total: number;
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  percent: number;
+  phase: GenerationJobPhase;
+}
+
+export interface GenerationJobOutputDto {
+  itemId: EntityId;
+  taskType: GenerationMediaTaskType;
+  assetId?: EntityId;
+  nodeId?: EntityId;
+  promptNodeId?: EntityId;
+  url?: string;
+  storageId?: EntityId;
+  mimeType?: string;
+  providerTaskId?: string;
+  durationMs?: number;
+}
+
+export interface GenerationJobItemDto {
+  id: EntityId;
+  prompt: string;
+  referenceImageNodeId?: EntityId;
+  status: "queued" | "running" | "completed" | "failed";
+  retryCount: number;
+  retryable?: boolean;
+  error?: string;
+  errorCategory?: string;
+  providerTaskId?: string;
+  outputs: GenerationJobOutputDto[];
+}
+
+export interface GenerationOutputGroupDto {
+  groupId?: EntityId;
+  label: string;
+  color: string;
+  includePromptNodes?: boolean;
+  tags?: string[];
+  nodeIds?: EntityId[];
+}
+
+export interface CreateGenerationBatchJobRequestDto extends IdempotentRequestDto {
+  schemaVersion: 2;
+  workspaceId: EntityId;
+  modelCode: string;
+  taskType: GenerationMediaTaskType;
+  prompts: GenerationPromptInputDto[];
+  parameters: GenerationJobParametersDto;
+  concurrency?: number;
+  outputGroup?: GenerationOutputGroupDto;
+}
+
+export interface GenerationBatchJobDto {
+  schemaVersion: 2;
+  id: EntityId;
+  idempotencyKey: string;
+  workspaceId: EntityId;
+  modelCode: string;
+  taskType: GenerationMediaTaskType;
+  status: GenerationJobStatus;
+  parameters: GenerationJobParametersDto;
+  progress: GenerationJobProgressDto;
+  outputs: GenerationJobOutputDto[];
+  items: GenerationJobItemDto[];
+  outputGroup?: GenerationOutputGroupDto;
+  createdAt: string;
+  updatedAt: string;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
+}
+
+export interface GenerationBatchJobListDto {
+  jobs: GenerationBatchJobDto[];
+  cursor?: string;
+}
+
+export interface UpdateGenerationBatchJobRequestDto {
+  status?: GenerationJobStatus;
+  progress?: GenerationJobProgressDto;
+  outputs?: GenerationJobOutputDto[];
+  items?: GenerationJobItemDto[];
+  leaseOwner: string;
+  leaseExpiresAt?: string;
+}
+
+export type GenerationJobControlAction = "pause" | "resume" | "retry" | "cancel";
+
+export interface ControlGenerationBatchJobRequestDto {
+  action: GenerationJobControlAction;
+}
+
+export interface ClaimGenerationBatchJobRequestDto {
+  leaseOwner: string;
+  leaseSeconds?: number;
+}
 export type GenerationBillingStatus =
   | "pending"
   | "debited"

@@ -79,6 +79,7 @@ export interface MobileWorkspaceSurfaceProps {
   onGenerateEcommerceMobile: (entry: MobileResultEntry) => void;
   onToggleEcommerceSelected: (entry: MobileResultEntry, selected: boolean) => void;
   composer: React.ReactNode;
+  taskCenter?: React.ReactNode;
   overlays?: React.ReactNode;
   isLoading?: boolean;
   workspaceSurface?: 'workspace' | 'library' | 'favorites';
@@ -122,6 +123,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onGenerateEcommerceMobile,
   onToggleEcommerceSelected,
   composer,
+  taskCenter,
   overlays,
   isLoading = false,
   workspaceSurface = 'workspace',
@@ -204,10 +206,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   );
 
   return (
-    <div data-testid="mobile-workspace-surface" data-mobile-home-shell="three-zone" className="relative">
+    <div data-testid="mobile-workspace-surface" data-mobile-home-shell="adaptive-four-zone" className="relative">
       <MobileAppShell
         header={header}
         feed={feed}
+        taskCenter={taskCenter}
         composer={composer}
         overlays={!showDetail ? overlays : null}
       />

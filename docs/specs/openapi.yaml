@@ -370,6 +370,170 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/generation-jobs:
+    post:
+      tags: [Generation Task API]
+      summary: Create an idempotent image, video, or audio batch job
+      operationId: createGenerationBatchJob
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGenerationBatchJobRequest'
+      responses:
+        '201':
+          description: Batch job created or matched by idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Generation Task API]
+      summary: Incrementally list the current user's batch jobs
+      operationId: listGenerationBatchJobs
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - in: query
+          name: status
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/GenerationJobStatus'
+        - in: query
+          name: cursor
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Generation batch job page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/generation-jobs/{jobId}:
+    get:
+      tags: [Generation Task API]
+      summary: Get one user-scoped generation batch job
+      operationId: getGenerationBatchJob
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/GenerationJobId'
+      responses:
+        '200':
+          description: Generation batch job detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Generation Task API]
+      summary: Persist progress under the current client lease
+      operationId: updateGenerationBatchJob
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGenerationBatchJobRequest'
+      responses:
+        '200':
+          description: Updated generation batch job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/generation-jobs/{jobId}/control:
+    post:
+      tags: [Generation Task API]
+      summary: Pause, resume, retry, or cancel a generation batch job
+      operationId: controlGenerationBatchJob
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlGenerationBatchJobRequest'
+      responses:
+        '200':
+          description: Controlled generation batch job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/generation-jobs/{jobId}/claim:
+    post:
+      tags: [Generation Task API]
+      summary: Claim or renew a generation batch job client lease
+      operationId: claimGenerationBatchJob
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimGenerationBatchJobRequest'
+      responses:
+        '200':
+          description: Claimed generation batch job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationBatchJobResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /api/v1/assets:
     get:
       tags: [Asset Library API]
@@ -950,6 +1114,12 @@ components:
       schema:
         type: string
         format: uuid
+    GenerationJobId:
+      in: path
+      name: jobId
+      required: true
+      schema:
+        type: string
     ProviderId:
       in: path
       name: providerId
@@ -1563,6 +1733,359 @@ components:
           const: true
         data:
           $ref: '#/components/schemas/GenerationTask'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    GenerationMediaTaskType:
+      type: string
+      enum: [image, video, audio]
+    GenerationJobStatus:
+      type: string
+      enum: [queued, running, paused, completed, completed_with_errors, failed, cancelled]
+    GenerationJobPhase:
+      type: string
+      enum: [preparing, queued, uploading, provider_processing, storing, placing_on_canvas, completed, failed]
+    GenerationPromptInput:
+      type: object
+      required: [id, prompt]
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        referenceAssetIds:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+        referenceImageNodeId:
+          type: string
+    ImageGenerationJobParameters:
+      type: object
+      required: [taskType]
+      properties:
+        taskType:
+          type: string
+          const: image
+        aspectRatio:
+          type: string
+        imageSize:
+          type: string
+        countPerPrompt:
+          type: integer
+          minimum: 1
+          maximum: 10
+    VideoGenerationJobParameters:
+      type: object
+      required: [taskType, durationSeconds]
+      properties:
+        taskType:
+          type: string
+          const: video
+        durationSeconds:
+          type: integer
+          minimum: 1
+          maximum: 60
+        resolution:
+          type: string
+        aspectRatio:
+          type: string
+        generateAudio:
+          type: boolean
+        firstFrameAssetId:
+          type: string
+        lastFrameAssetId:
+          type: string
+        motion:
+          type: string
+          maxLength: 200
+    AudioGenerationJobParameters:
+      type: object
+      required: [taskType]
+      properties:
+        taskType:
+          type: string
+          const: audio
+        durationSeconds:
+          type: integer
+          minimum: 1
+          maximum: 600
+        voice:
+          type: string
+          maxLength: 200
+        lyrics:
+          type: string
+          maxLength: 20000
+        genre:
+          type: string
+          maxLength: 200
+    GenerationJobParameters:
+      oneOf:
+        - $ref: '#/components/schemas/ImageGenerationJobParameters'
+        - $ref: '#/components/schemas/VideoGenerationJobParameters'
+        - $ref: '#/components/schemas/AudioGenerationJobParameters'
+      discriminator:
+        propertyName: taskType
+    GenerationOutputGroup:
+      type: object
+      required: [label, color]
+      properties:
+        groupId:
+          type: string
+        label:
+          type: string
+          maxLength: 200
+        color:
+          type: string
+          maxLength: 100
+        includePromptNodes:
+          type: boolean
+        tags:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+        nodeIds:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+    CreateGenerationBatchJobRequest:
+      type: object
+      required: [schemaVersion, workspaceId, modelCode, taskType, prompts, parameters, idempotencyKey]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 2
+        workspaceId:
+          type: string
+        modelCode:
+          type: string
+        taskType:
+          $ref: '#/components/schemas/GenerationMediaTaskType'
+        prompts:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/GenerationPromptInput'
+        parameters:
+          $ref: '#/components/schemas/GenerationJobParameters'
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 8
+        outputGroup:
+          $ref: '#/components/schemas/GenerationOutputGroup'
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 255
+    GenerationJobProgress:
+      type: object
+      required: [total, queued, running, completed, failed, percent, phase]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        queued:
+          type: integer
+          minimum: 0
+        running:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        phase:
+          $ref: '#/components/schemas/GenerationJobPhase'
+    GenerationJobOutput:
+      type: object
+      required: [itemId, taskType]
+      properties:
+        itemId:
+          type: string
+        taskType:
+          $ref: '#/components/schemas/GenerationMediaTaskType'
+        assetId:
+          type: string
+        nodeId:
+          type: string
+        promptNodeId:
+          type: string
+        url:
+          type: string
+        storageId:
+          type: string
+        mimeType:
+          type: string
+        providerTaskId:
+          type: string
+        durationMs:
+          type: integer
+          minimum: 0
+    GenerationJobItem:
+      type: object
+      required: [id, prompt, status, retryCount, outputs]
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+          maxLength: 20000
+        referenceImageNodeId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        retryCount:
+          type: integer
+          minimum: 0
+          maximum: 100
+        retryable:
+          type: boolean
+        error:
+          type: string
+          maxLength: 20000
+        errorCategory:
+          type: string
+          maxLength: 100
+        providerTaskId:
+          type: string
+          maxLength: 500
+        outputs:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/GenerationJobOutput'
+    GenerationBatchJob:
+      type: object
+      required: [schemaVersion, id, idempotencyKey, workspaceId, modelCode, taskType, status, parameters, progress, outputs, items, createdAt, updatedAt]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 2
+        id:
+          type: string
+        idempotencyKey:
+          type: string
+        workspaceId:
+          type: string
+        modelCode:
+          type: string
+        taskType:
+          $ref: '#/components/schemas/GenerationMediaTaskType'
+        status:
+          $ref: '#/components/schemas/GenerationJobStatus'
+        parameters:
+          $ref: '#/components/schemas/GenerationJobParameters'
+        progress:
+          $ref: '#/components/schemas/GenerationJobProgress'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenerationJobOutput'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenerationJobItem'
+        outputGroup:
+          $ref: '#/components/schemas/GenerationOutputGroup'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        leaseOwner:
+          type: string
+        leaseExpiresAt:
+          type: string
+          format: date-time
+    UpdateGenerationBatchJobRequest:
+      type: object
+      required: [leaseOwner]
+      properties:
+        status:
+          $ref: '#/components/schemas/GenerationJobStatus'
+        progress:
+          $ref: '#/components/schemas/GenerationJobProgress'
+        outputs:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/GenerationJobOutput'
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/GenerationJobItem'
+        leaseOwner:
+          type: string
+          minLength: 1
+          maxLength: 255
+        leaseExpiresAt:
+          type: string
+          format: date-time
+    ControlGenerationBatchJobRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [pause, resume, retry, cancel]
+    ClaimGenerationBatchJobRequest:
+      type: object
+      required: [leaseOwner]
+      properties:
+        leaseOwner:
+          type: string
+          minLength: 1
+          maxLength: 255
+        leaseSeconds:
+          type: integer
+          minimum: 15
+          maximum: 300
+          default: 60
+    GenerationBatchJobResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/GenerationBatchJob'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    GenerationBatchJobList:
+      type: object
+      required: [jobs]
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenerationBatchJob'
+        cursor:
+          type: string
+          format: date-time
+    GenerationBatchJobListResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/GenerationBatchJobList'
         meta:
           $ref: '#/components/schemas/Meta'
     Asset:

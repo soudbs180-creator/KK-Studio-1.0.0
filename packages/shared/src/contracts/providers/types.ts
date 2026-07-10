@@ -10,6 +10,21 @@ export interface ProviderAuth {
   keyRef: string;      // 例如 'GEMINI_API_KEY', 'VODESHOP_API_KEY'（用 keyRef 描述环境变量名，彻底解耦命名歧义）
 }
 
+export interface ProviderGenerationCapabilities {
+  imageGeneration: boolean;
+  textToVideo: boolean;
+  imageToVideo: boolean;
+  firstLastFrameVideo: boolean;
+  videoExtension: boolean;
+  audioGeneration: boolean;
+  audioSynchronizedVideo: boolean;
+  supportedDurationsSeconds: number[];
+  supportedResolutions: string[];
+  maxConcurrentImage: number;
+  maxConcurrentVideo: number;
+  maxConcurrentAudio: number;
+}
+
 export interface ProviderItem {
   id: string;              // 唯一供应商 ID
   kind: ProviderKind;
@@ -30,4 +45,5 @@ export interface ProviderItem {
     fallbackFile?: string; // 本地 fallback json 文件路径（若 local_fallback）
   };
   capabilities: string[];  // 支持的模态类型：'chat' | 'image' | 'video'
+  generationCapabilities: ProviderGenerationCapabilities;
 }

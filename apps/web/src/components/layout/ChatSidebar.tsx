@@ -267,6 +267,8 @@ const getDurableQueueStatusLabel = (job: GenerationBatchJob): string => {
     if (job.status === 'paused') return '已暂停';
     if (job.status === 'queued') return '排队中';
     if (job.status === 'cancelled') return '已取消';
+    if (job.status === 'completed_with_errors') return '部分完成';
+    if (job.status === 'failed') return '失败';
     if (job.prompts.some(prompt => prompt.status === 'failed')) return '有失败';
     if (job.status === 'completed') return '已完成';
     return '失败';
@@ -287,7 +289,7 @@ const getDurableQueueJobCounts = (job: GenerationBatchJob) => {
     const failed = job.prompts.filter(prompt => prompt.status === 'failed').length;
     const running = job.prompts.filter(prompt => prompt.status === 'running').length;
     const queued = job.prompts.filter(prompt => prompt.status === 'queued').length;
-    const percent = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+    const percent = job.progress?.percent ?? (total > 0 ? Math.round(((completed + failed) / total) * 100) : 0);
     const firstFailure = job.prompts.find(prompt => prompt.status === 'failed' && prompt.error)?.error || '';
 
     return { total, completed, failed, running, queued, percent, firstFailure };

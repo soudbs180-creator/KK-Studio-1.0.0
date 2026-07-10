@@ -391,7 +391,8 @@ function verifySourceContracts() {
     { source: chatSidebarSource, pattern: /data-action="cancel-durable-job"/, label: 'durable queue cancel action' },
     { source: dockSource, pattern: /ai-takeover-run-timeline/, label: 'run timeline surface' },
     { source: dockSource, pattern: /id="ai-takeover-dock-composer-input"/, label: 'dock composer input' },
-    { source: generationToolsSource, pattern: /name: 'generation\.createAudioTask'[\s\S]*notify\.info\(/, label: 'shared notification start state' },
+    { source: generationToolsSource, pattern: /name: 'generation\.createVideoJob'[\s\S]*ctx\.notify\.success\('Video job submitted'/, label: 'video queue notification state' },
+    { source: generationToolsSource, pattern: /name: 'generation\.createAudioJob'[\s\S]*ctx\.notify\.success\('Audio job submitted'/, label: 'audio queue notification state' },
   ];
 
   for (const check of checks) {
@@ -594,4 +595,3 @@ try {
     await closeLocalViteServer(viteServer);
   }
 }
-

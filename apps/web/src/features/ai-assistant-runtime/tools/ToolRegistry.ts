@@ -11,6 +11,12 @@ export interface AgentToolDefinition<Input = any, Output = any> {
   permission: ToolPermission;
   inputSchema: any;
   outputSchema?: any;
+  inputValidator?: { parse: (input: unknown) => Input };
+  verify?: (
+    output: Output,
+    input: Input,
+    ctx: any
+  ) => Promise<boolean | { success: boolean; message?: string }> | boolean | { success: boolean; message?: string };
   handler: (input: Input, ctx: any) => Promise<Output>;
 }
 
@@ -97,8 +103,27 @@ export class AgentToolRegistry {
       throw new Error(`Execution forbidden for tool: ${name}`);
     }
 
+    if (tool.permission === 'confirm' || tool.permission === 'dangerous') {
+      const grant = ctx?.confirmationGrant;
+      const allowedTools = Array.isArray(grant?.toolNames) ? grant.toolNames : [];
+      const authorized = grant?.confirmed === true
+        && grant?.runId === runId
+        && (allowedTools.length === 0 || allowedTools.includes(name));
+      if (!authorized) {
+        const blockedLog: AgentToolCallLog = {
+          ...log,
+          status: 'blocked',
+          error: `Confirmation grant required for tool: ${name}`,
+          completedAt: new Date().toISOString()
+        };
+        this.appendLog(blockedLog);
+        throw new Error(`Confirmation grant required for tool: ${name}`);
+      }
+    }
+
     try {
-      const output = await tool.handler(input, ctx);
+      const validatedInput = tool.inputValidator ? tool.inputValidator.parse(input) : input;
+      const output = await tool.handler(validatedInput, ctx);
       
       // 审计工具执行的输出：如果返回 success === false
       if (output && typeof output === 'object' && (output as any).success === false) {
@@ -115,6 +140,27 @@ export class AgentToolRegistry {
         return output;
       }
 
+      if (tool.verify) {
+        const verification = await tool.verify(output, validatedInput, ctx);
+        const verified = typeof verification === 'boolean' ? verification : verification.success;
+        if (!verified) {
+          const verificationMessage = typeof verification === 'boolean'
+            ? `Verification failed for tool: ${name}`
+            : verification.message || `Verification failed for tool: ${name}`;
+          const failedLog: AgentToolCallLog = {
+            ...log,
+            status: 'verification_failed',
+            outputSummary: redactToolSummary(output),
+            error: verificationMessage,
+            completedAt: new Date().toISOString()
+          };
+          this.appendLog(failedLog);
+          const verificationError = new Error(verificationMessage) as Error & { code?: string };
+          verificationError.code = 'VERIFICATION_FAILED';
+          throw verificationError;
+        }
+      }
+
       const successLog: AgentToolCallLog = {
         ...log,
         outputSummary: redactToolSummary(output),
@@ -123,6 +169,9 @@ export class AgentToolRegistry {
       this.appendLog(successLog);
       return output;
     } catch (e: any) {
+      if (e?.code === 'VERIFICATION_FAILED') {
+        throw e;
+      }
       const safeError = redactToolSummary(e?.message || String(e));
       console.error(`[ToolRegistry] 工具执行异常: ${name}`, safeError);
       

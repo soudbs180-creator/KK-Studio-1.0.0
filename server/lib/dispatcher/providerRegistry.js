@@ -5,6 +5,7 @@ const { z } = require('zod');
 const googleImageAdapter = require('./adapters/googleImageAdapter');
 const wuyinImageAdapter = require('./adapters/wuyinImageAdapter');
 const { OpenAICompatibleImageAdapter } = require('./adapters/openAICompatibleImageAdapter');
+const comfyUiWorkflowAdapter = require('./adapters/comfyUiWorkflowAdapter');
 const { PROVIDER_PROFILES, safeHostname } = require('./providerProfiles');
 
 // 后端直接引入 @kk/shared 共享的 Zod Schema 规范进行强验证，取代局部的冗余同构定义
@@ -18,6 +19,7 @@ const adapterRegistry = {
   suxi: new OpenAICompatibleImageAdapter('suxi'),
   newapi: new OpenAICompatibleImageAdapter('newapi'),
   acedata: new OpenAICompatibleImageAdapter('acedata'),
+  comfyui: comfyUiWorkflowAdapter,
   custom: new OpenAICompatibleImageAdapter('custom')
 };
 
@@ -90,13 +92,29 @@ function normalizeProfileToProviderItem(profile) {
     };
   }
 
+  const generationCapabilities = {
+    imageGeneration: false,
+    textToVideo: false,
+    imageToVideo: false,
+    firstLastFrameVideo: false,
+    videoExtension: false,
+    audioGeneration: false,
+    audioSynchronizedVideo: false,
+    supportedDurationsSeconds: [],
+    supportedResolutions: [],
+    maxConcurrentImage: 0,
+    maxConcurrentVideo: 0,
+    maxConcurrentAudio: 0,
+    ...(profile.generationCapabilities || {}),
+  };
   const capabilities = ['chat'];
-  if (profile.adapterId?.includes('image') || profile.id.includes('wuyin') || profile.id.includes('12ai')) {
+  if (generationCapabilities.imageGeneration) {
     capabilities.push('image');
   }
-  if (profile.adapterId?.includes('video') || profile.id.includes('wuyin') || profile.id.includes('12ai')) {
+  if (generationCapabilities.textToVideo || generationCapabilities.imageToVideo) {
     capabilities.push('video');
   }
+  if (generationCapabilities.audioGeneration) capabilities.push('audio');
 
   return {
     id: profile.id,
@@ -111,7 +129,8 @@ function normalizeProfileToProviderItem(profile) {
     },
     endpoints,
     pricingSource,
-    capabilities
+    capabilities,
+    generationCapabilities
   };
 }
 

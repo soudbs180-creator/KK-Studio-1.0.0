@@ -5,6 +5,7 @@ import type { AssistantPlan, SanitizedProjectContext } from '../types';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
+import { startGenerationQueueSync } from '../../ai-assistant-runtime/queue/GenerationQueueSync.ts';
 import { resolveAgentGroupBounds, resolveAgentNodeArrangeUpdates } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
 import {
   agentRuntimeInstance,
@@ -125,6 +126,8 @@ export function AITakeoverProvider({
   setPptEditorMode,
   togglePinTool
 }: AITakeoverProviderProps) {
+
+  useEffect(() => startGenerationQueueSync(), []);
 
   const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialModel);
@@ -381,14 +384,19 @@ export function AITakeoverProvider({
 
   useEffect(() => {
     // 向队列注册具体的图片生成任务 executor 桥接逻辑
-    durableGenerationQueue.registerExecutor(async (promptText, options, jobId, promptId) => {
+    durableGenerationQueue.registerExecutor(async (promptText, options, jobId, promptId, signal) => {
+      if (signal.aborted) {
+        throw new DOMException('Generation cancelled', 'AbortError');
+      }
       const lastPos = getNextCardPositionRef.current();
       const job = durableGenerationQueue.getJob(jobId);
       const index = job ? job.prompts.findIndex(p => p.id === promptId) : 0;
       const strayDraft = activeCanvasRef.current?.promptNodes?.find((node: any) => node.isDraft);
       const useDraft = index === 0 && strayDraft;
-      const nodeId = useDraft ? strayDraft.id : ('takeover_batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9));
-      const pos = useDraft ? strayDraft.position : {
+      const deterministicNodeId = `takeover_batch_${jobId}_${promptId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const existingQueueNode = activeCanvasRef.current?.promptNodes?.find((node: any) => node.id === deterministicNodeId);
+      const nodeId = useDraft ? strayDraft.id : deterministicNodeId;
+      const pos = useDraft ? strayDraft.position : existingQueueNode?.position || {
         x: lastPos.x + (index >= 0 ? index : 0) * 420,
         y: lastPos.y
       };
@@ -430,18 +438,26 @@ export function AITakeoverProvider({
         isGenerating: true,
         isDraft: false,
         status: 'queued',
+        mode: options.taskType,
+        videoDuration: options.durationSeconds ? `${options.durationSeconds}s` : undefined,
+        videoResolution: options.resolution,
+        videoAudio: options.generateAudio,
+        videoFirstFrameUrl: options.firstFrameAssetId,
+        videoLastFrameUrl: options.lastFrameAssetId,
+        audioDuration: options.durationSeconds ? `${options.durationSeconds}s` : undefined,
+        audioLyrics: options.lyrics,
         referenceImages,
         tags
       };
 
       // 1. 先把准备执行生成的 prompt 节点加入或更新到画布
-      if (useDraft) {
-        console.log('[TakeoverQueue] Found stray draft during queue generation, converting it:', strayDraft.id);
+      if (useDraft || existingQueueNode) {
+        console.log('[TakeoverQueue] Reusing queue prompt node:', nodeId);
         await updatePromptNodeRef.current({
-          ...strayDraft,
+          ...(useDraft ? strayDraft : existingQueueNode),
           ...nodeData
         });
-        setConfig((prev: any) => ({ ...prev, prompt: '', referenceImages: [] }));
+        if (useDraft) setConfig((prev: any) => ({ ...prev, prompt: '', referenceImages: [] }));
       } else {
         console.log('[TakeoverQueue] Creating new node for queue generation:', nodeId);
         await addPromptNodeRef.current(nodeData);
@@ -458,13 +474,21 @@ export function AITakeoverProvider({
       // 3. 轮询监听该卡片的生成状态（isGenerating 变为 false 时代表成功或失败）
       return new Promise<GenerationExecutorResult>((resolve, reject) => {
         let attempts = 0;
+        const cleanup = () => {
+          clearInterval(interval);
+          signal.removeEventListener('abort', handleAbort);
+        };
+        const handleAbort = () => {
+          cleanup();
+          reject(new DOMException('Generation cancelled', 'AbortError'));
+        };
         const interval = setInterval(() => {
           attempts++;
           const currentCanvas = activeCanvasRef.current;
           const node = currentCanvas?.promptNodes?.find((n: any) => n.id === nodeId);
           if (node) {
             if (!node.isGenerating) {
-              clearInterval(interval);
+              cleanup();
               if (node.status === 'failed' || node.error) {
                 reject(new Error(node.error || '生图失败'));
               } else {
@@ -472,20 +496,23 @@ export function AITakeoverProvider({
                 resolve({
                   promptNodeId: nodeId,
                   resultImageNodeIds,
-                  nodeIds: [nodeId, ...resultImageNodeIds]
+                  nodeIds: [nodeId, ...resultImageNodeIds],
+                  providerTaskId: node.jobId
                 } as any);
               }
             }
           } else {
-            clearInterval(interval);
+            cleanup();
             reject(new Error('Prompt node deleted'));
           }
 
           if (attempts > 120) {
-            clearInterval(interval);
+            cleanup();
             reject(new Error('Generation timeout'));
           }
         }, 1000);
+        signal.addEventListener('abort', handleAbort, { once: true });
+        if (signal.aborted) handleAbort();
       });
     });
 

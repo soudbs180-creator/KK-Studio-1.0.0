@@ -12,6 +12,10 @@ export interface AgentRunRecord {
   createdAt: string;
   updatedAt: string;
   nextStep?: string;
+  confirmationGrantedAt?: string;
+  totalSteps?: number;
+  completedStepIds?: string[];
+  replanCount?: number;
 }
 
 const STORAGE_KEY = 'kk_agent_runs_history';
@@ -82,6 +86,9 @@ export class AgentRunStore {
       plan,
       status: plan?.requiresConfirmation ? 'waiting_confirmation' : 'waiting_execution',
       toolCalls: [],
+      totalSteps: Array.isArray(plan?.steps) ? plan.steps.length : Array.isArray(plan?.actions) ? plan.actions.length : 0,
+      completedStepIds: [],
+      replanCount: 0,
       createdAt: now,
       updatedAt: now
     };

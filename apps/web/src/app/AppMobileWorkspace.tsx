@@ -47,6 +47,7 @@ interface AppMobileWorkspaceProps {
   onGenerateEcommerceMobile: (entry: MobileResultEntry) => void;
   onToggleEcommerceSelected: (entry: MobileResultEntry, selected: boolean) => void;
   promptBarProps: AppPromptBarProps;
+  taskCenter?: React.ReactNode;
   overlays?: React.ReactNode;
 }
 
@@ -84,6 +85,7 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
   onGenerateEcommerceMobile,
   onToggleEcommerceSelected,
   promptBarProps,
+  taskCenter,
   overlays,
 }) => {
   const resultEntries = React.useMemo<MobileResultEntry[]>(
@@ -170,6 +172,7 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
           promptBarProps={promptBarProps}
         />
       )}
+      taskCenter={taskCenter}
       overlays={overlays}
     />
   );

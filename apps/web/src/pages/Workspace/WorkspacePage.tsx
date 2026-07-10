@@ -5642,6 +5642,12 @@ const isRectIntersecting = (
           onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
           onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
           promptBarProps={mobilePromptBarProps}
+          taskCenter={(
+            <TaskCenterTray
+              variant="mobile"
+              onOpenSettings={openSettingsSurfaceTracked}
+            />
+          )}
           overlays={workspacePanels}
         />
       </React.Suspense>
@@ -6217,9 +6223,10 @@ const isRectIntersecting = (
         </React.Suspense>
       )}
 
-      {!isLargeProject && (
+      {!isMobile && !isLargeProject && (
         <React.Suspense fallback={null}>
           <TaskCenterTray
+            variant="desktop"
             onOpenSettings={openSettingsSurfaceTracked}
             isChatOpen={isChatOpen}
             chatSidebarWidth={chatSidebarWidth}

@@ -331,7 +331,7 @@ describe('DurableGenerationQueue Tests', () => {
       assert.equal(job.prompts[0].status, 'failed');
       assert.equal(job.prompts[0].retryCount, 3);
       assert.equal(job.prompts[0].error, 'temporary_error');
-      assert.equal(job.status, 'completed');
+      assert.equal(job.status, 'failed');
     } finally {
       // 还原 setTimeout
       globalThis.setTimeout = originalSetTimeout;
@@ -369,7 +369,7 @@ describe('DurableGenerationQueue Tests', () => {
 
       let job = requireJob(queue, createdJob.id);
       assert.equal(callCount, 4);
-      assert.equal(job.status, 'completed');
+      assert.equal(job.status, 'failed');
       assert.equal(job.prompts[0].status, 'failed');
       assert.equal(job.prompts[0].retryCount, 3);
       assert.equal(job.prompts[0].error, 'retry_later');
@@ -465,7 +465,7 @@ describe('DurableGenerationQueue Tests', () => {
 
     snapshot.status = 'failed';
     snapshot.prompts[0].status = 'failed';
-    snapshot.prompts.push({ id: 'p2', prompt: 'external mutation', status: 'failed', retryCount: 99 });
+    snapshot.prompts.push({ id: 'p2', prompt: 'external mutation', status: 'failed', phase: 'failed', retryCount: 99 });
 
     const freshSnapshot = requireJob(queue, createdJob.id);
     assert.equal(freshSnapshot.status, 'queued');

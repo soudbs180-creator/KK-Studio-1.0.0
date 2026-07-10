@@ -8,7 +8,6 @@ import { matchPromptTemplates } from '../prompts/promptMatcher.ts';
 import { optimizePromptLocally } from '../prompts/localPromptOptimizer.ts';
 import { safetyPolicy } from './safetyPolicy.ts';
 import { confirmationPolicy } from './confirmationPolicy.ts';
-import { knowledgeStore } from '../../ai-assistant-runtime/knowledge/KnowledgeStore.ts';
 
 const SETTINGS_VIEW_LABELS: Record<string, string> = {
   dashboard: '设置总览',
@@ -533,20 +532,12 @@ ${optResult.optimizedPromptZh}
         已将生成模式切换至【视频】模式，并准备好以选定图片作为参考，以时长 **${duration}秒** 及运镜方式【${motion}】执行生成任务。`;
         
         actions.push({
-          type: 'changeMode',
-          payload: { mode: 'video' }
-        });
-        actions.push({
-          type: 'startGeneration',
+          type: 'generation.createVideoJob',
           payload: {
             prompt: `generate video version, motion: ${motion}`,
-            count: 1,
-            mode: 'video',
-            options: {
-              referenceImageNodeId: refImageId,
-              duration,
-              motion
-            }
+            referenceImageNodeId: refImageId,
+            durationSeconds: duration,
+            motion
           }
         });
         break;
@@ -603,15 +594,9 @@ ${optResult.optimizedPromptZh}
 
         const promptSet = prompts.slice(0, count);
 
-        knowledgeStore.recordChange({
-          title: researchTitle,
-          summary: `已为 ${subject} 视觉方案设计了研究大纲、3大视觉方向，并规划了 ${count} 张图片的生成方案。`,
-          source: 'runtime'
-        });
-
         reply = `### 🧬 深度品牌研究与视觉规划已完成！
-我已将「${subject}」的视觉研究成果记录并写入 KnowledgeStore。
-已自动在画布上为您新建 **Research Brief 研究卡片**，并将 **${count}** 个视觉生成任务提交至 Durable 队列中开始执行。`;
+确认后，我会在画布上新建 **Research Brief 研究卡片**，并将 **${count}** 个视觉生成任务提交至 Durable 队列。
+生成步骤验证通过后，再把「${subject}」的研究成果写入 KnowledgeStore。`;
 
         actions.push({
           type: 'generation.createBatchJob',
@@ -634,6 +619,14 @@ ${optResult.optimizedPromptZh}
             idempotencyKey: 'research_job_' + Date.now()
           }
         });
+        actions.push({
+          type: 'knowledge.recordChange',
+          payload: {
+            title: researchTitle,
+            summary: `已为 ${subject} 视觉方案设计了研究大纲、3大视觉方向，并规划了 ${count} 张图片的生成方案。`,
+            source: 'runtime'
+          }
+        });
         break;
       }
 
@@ -651,15 +644,11 @@ ${optResult.optimizedPromptZh}
         此操作涉及额度消耗，已为您准备好执行计划，请确认：`;
         
         actions.push({
-          type: 'startGeneration',
+          type: 'generation.createAudioJob',
           payload: {
             prompt: promptText,
-            count: 1,
-            mode: 'audio',
-            options: {
-              duration,
-              genre
-            }
+            durationSeconds: duration,
+            genre
           }
         });
         break;

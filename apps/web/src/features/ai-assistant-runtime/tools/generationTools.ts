@@ -3,6 +3,15 @@
 import type { AgentToolDefinition } from './ToolRegistry.ts';
 import { durableGenerationQueue } from '../queue/DurableGenerationQueue.ts';
 import type { AssistantOutputGroupPlan, BatchGenerationPlan } from '../../ai-takeover/types.ts';
+import {
+  CreateAudioJobToolInputSchema,
+  CreateImageBatchJobToolInputSchema,
+  CreateVideoJobToolInputSchema,
+  GenerationJobControlInputSchema,
+  GenerationRetryJobInputSchema,
+  StartGenerationToolInputSchema,
+  type GenerationMediaTaskType,
+} from '@kk/shared';
 
 type BatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
 
@@ -43,26 +52,6 @@ class SimpleLruCache<K, V> {
 }
 
 const modelCapabilitiesCache = new SimpleLruCache<string, any>(100);
-
-// ==========================================
-// 2. 指数退避重试封装 (Exponential Backoff Retry)
-// ==========================================
-const fetchWithRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    try {
-      return await fn();
-    } catch (err) {
-      attempt++;
-      if (attempt >= maxRetries) {
-        throw err;
-      }
-      const delay = Math.pow(2, attempt) * 500; // 500ms, 1000ms, 2000ms
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error('Retries exhausted');
-};
 
 const normalizeLayoutOptions = (params: {
   count: number;
@@ -105,6 +94,8 @@ const createDefaultOutputGroup = (params: {
 
 const buildQueueOptions = (params: {
   selectedModel: any;
+  taskType?: GenerationMediaTaskType;
+  modelId?: string;
   count: number;
   aspectRatio?: string;
   imageSize?: string;
@@ -115,6 +106,15 @@ const buildQueueOptions = (params: {
   columns?: number;
   gap?: number;
   outputGroup?: AssistantOutputGroupPlan;
+  durationSeconds?: number;
+  resolution?: string;
+  generateAudio?: boolean;
+  firstFrameAssetId?: string;
+  lastFrameAssetId?: string;
+  motion?: string;
+  voice?: string;
+  lyrics?: string;
+  genre?: string;
 }) => {
   const layoutOptions = normalizeLayoutOptions({
     count: params.count,
@@ -125,14 +125,70 @@ const buildQueueOptions = (params: {
   });
 
   return {
-    modelId: params.selectedModel?.id || 'gemini-2.5-flash',
+    taskType: params.taskType || 'image',
+    modelId: params.modelId || params.selectedModel?.id || 'gemini-2.5-flash',
     aspectRatio: params.aspectRatio || '1:1',
     imageSize: params.imageSize || '1K',
     countPerPrompt: params.countPerPrompt || 1,
-    concurrency: params.concurrency || 3,
+    concurrency: params.concurrency,
     ...layoutOptions,
-    outputGroup: params.outputGroup
+    outputGroup: params.outputGroup,
+    durationSeconds: params.durationSeconds,
+    resolution: params.resolution,
+    generateAudio: params.generateAudio,
+    firstFrameAssetId: params.firstFrameAssetId,
+    lastFrameAssetId: params.lastFrameAssetId,
+    motion: params.motion,
+    voice: params.voice,
+    lyrics: params.lyrics,
+    genre: params.genre
   };
+};
+
+const verifyQueuedMediaJob = (output: any, expectedType: GenerationMediaTaskType) => {
+  const persisted = output?.id ? durableGenerationQueue.getJob(output.id) : undefined;
+  return {
+    success: Boolean(persisted && persisted.schemaVersion === 2 && persisted.taskType === expectedType),
+    message: `Generation job verification failed for taskType=${expectedType}`
+  };
+};
+
+const createSingleMediaJob = (input: any, ctx: any, taskType: GenerationMediaTaskType) => {
+  const referenceImageNodeId = input.referenceImageNodeId || input.options?.referenceImageNodeId;
+  const count = taskType === 'image' ? Math.max(1, Number(input.count || 4)) : 1;
+  const prompts = Array.from({ length: count }, (_, index) => ({
+    id: `prompt_item_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}`,
+    prompt: input.prompt,
+    referenceImageNodeId
+  }));
+  const outputGroup = createDefaultOutputGroup({
+    label: count > 1 ? `AI ${taskType} batch output` : `AI ${taskType} output`,
+    tags: referenceImageNodeId ? ['automation', taskType, `source:${referenceImageNodeId}`] : ['automation', taskType]
+  });
+  return durableGenerationQueue.createJob(
+    prompts,
+    buildQueueOptions({
+      selectedModel: ctx.selectedModel,
+      taskType,
+      modelId: input.modelId || input.model,
+      count,
+      aspectRatio: input.aspectRatio || input.options?.aspectRatio || '1:1',
+      imageSize: input.options?.imageSize,
+      concurrency: input.options?.concurrency,
+      outputGroup,
+      durationSeconds: input.durationSeconds || input.options?.durationSeconds || input.options?.duration,
+      resolution: input.resolution || input.options?.resolution,
+      generateAudio: input.generateAudio ?? input.options?.generateAudio,
+      firstFrameAssetId: input.firstFrameAssetId || input.options?.firstFrameAssetId,
+      lastFrameAssetId: input.lastFrameAssetId || input.options?.lastFrameAssetId,
+      motion: input.motion || input.options?.motion,
+      voice: input.voice || input.options?.voice,
+      lyrics: input.lyrics || input.options?.lyrics,
+      genre: input.genre || input.options?.genre
+    }),
+    ctx.activeCanvas?.id || 'default',
+    input.idempotencyKey
+  );
 };
 
 const resolveRetryJob = (input: RetryJobInput) => {
@@ -187,9 +243,21 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['prompt']
     },
-    handler: async (input: { prompt: string; count: number; aspectRatio?: string; referenceImageNodeId?: string }, ctx) => {
-      const { prompt, aspectRatio, referenceImageNodeId } = input;
-      const count = input.count || 4;
+    inputValidator: StartGenerationToolInputSchema,
+    handler: async (input: {
+      prompt: string;
+      count?: number;
+      aspectRatio?: string;
+      referenceImageNodeId?: string;
+      mode?: GenerationMediaTaskType;
+      options?: Record<string, any>;
+      idempotencyKey?: string;
+    }, ctx) => {
+      const explicitMode = input.mode || input.options?.taskType || input.options?.mode;
+      const taskType: GenerationMediaTaskType = explicitMode === 'video' || explicitMode === 'audio' ? explicitMode : 'image';
+      const { prompt, aspectRatio } = input;
+      const referenceImageNodeId = input.referenceImageNodeId || input.options?.referenceImageNodeId;
+      const count = taskType === 'image' ? input.count || 4 : 1;
       const { selectedModel, notify, activeCanvas } = ctx;
 
       try {
@@ -217,10 +285,23 @@ export const generationTools: AgentToolDefinition[] = [
           buildQueueOptions({
             selectedModel,
             count,
-            aspectRatio: aspectRatio || '1:1',
+            taskType,
+            modelId: input.options?.modelId,
+            aspectRatio: aspectRatio || input.options?.aspectRatio || '1:1',
+            concurrency: input.options?.concurrency,
+            durationSeconds: input.options?.durationSeconds || input.options?.duration,
+            resolution: input.options?.resolution,
+            generateAudio: input.options?.generateAudio,
+            firstFrameAssetId: input.options?.firstFrameAssetId,
+            lastFrameAssetId: input.options?.lastFrameAssetId,
+            motion: input.options?.motion,
+            voice: input.options?.voice,
+            lyrics: input.options?.lyrics,
+            genre: input.options?.genre,
             outputGroup
           }),
-          activeCanvas?.id || 'default'
+          activeCanvas?.id || 'default',
+          input.idempotencyKey
         );
 
         notify.success('生图计划已提交', `任务已加入持久化队列 (Job ID: ${job.id})`);
@@ -229,10 +310,67 @@ export const generationTools: AgentToolDefinition[] = [
         notify.error('生图排队触发失败', e.message || '未知异常');
         throw e;
       }
+    },
+    verify: (output: any, input: any) => {
+      const explicitMode = input.mode || input.options?.taskType || input.options?.mode;
+      const taskType: GenerationMediaTaskType = explicitMode === 'video' || explicitMode === 'audio' ? explicitMode : 'image';
+      return verifyQueuedMediaJob(output, taskType);
     }
   },
 
   // 2. startBatchGeneration - 启动批量生成
+  {
+    name: 'generation.createVideoJob',
+    description: 'Create a durable text-to-video or image-to-video generation job.',
+    permission: 'confirm',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        referenceImageNodeId: { type: 'string' },
+        durationSeconds: { type: 'number' },
+        resolution: { type: 'string' },
+        aspectRatio: { type: 'string' },
+        generateAudio: { type: 'boolean' },
+        firstFrameAssetId: { type: 'string' },
+        lastFrameAssetId: { type: 'string' },
+        motion: { type: 'string' }
+      },
+      required: ['prompt']
+    },
+    inputValidator: CreateVideoJobToolInputSchema,
+    handler: async (input: any, ctx) => {
+      const job = createSingleMediaJob(input, ctx, 'video');
+      ctx.notify.success('Video job submitted', `Job ID: ${job.id}`);
+      return job;
+    },
+    verify: (output: any) => verifyQueuedMediaJob(output, 'video')
+  },
+
+  {
+    name: 'generation.createAudioJob',
+    description: 'Create a durable speech, music, or sound generation job.',
+    permission: 'confirm',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        durationSeconds: { type: 'number' },
+        voice: { type: 'string' },
+        lyrics: { type: 'string' },
+        genre: { type: 'string' }
+      },
+      required: ['prompt']
+    },
+    inputValidator: CreateAudioJobToolInputSchema,
+    handler: async (input: any, ctx) => {
+      const job = createSingleMediaJob(input, ctx, 'audio');
+      ctx.notify.success('Audio job submitted', `Job ID: ${job.id}`);
+      return job;
+    },
+    verify: (output: any) => verifyQueuedMediaJob(output, 'audio')
+  },
+
   {
     name: 'startBatchGeneration',
     description: '绑定图片资源文件夹，为每张图片依次拉起重绘生成任务并创建卡片',
@@ -327,6 +465,7 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['prompts']
     },
+    inputValidator: CreateImageBatchJobToolInputSchema,
     handler: async (input: { prompts: any[]; options?: any; idempotencyKey?: string }, ctx) => {
       const { prompts, options, idempotencyKey } = input;
       const { activeCanvas, selectedModel, notify, addPromptNode, getNextCardPosition } = ctx;
@@ -382,7 +521,8 @@ export const generationTools: AgentToolDefinition[] = [
 
       notify.success('批量生成任务已创建', `Job ID: ${job.id} 已加入队列执行。`);
       return job;
-    }
+    },
+    verify: (output: any) => verifyQueuedMediaJob(output, 'image')
   },
 
   // 5. ecommerce.createBatchTransformJob - Ecommerce batch adapter
@@ -462,6 +602,7 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['jobId']
     },
+    inputValidator: GenerationJobControlInputSchema,
     handler: async (input: { jobId: string }, ctx) => {
       requireGenerationJob(input.jobId);
       durableGenerationQueue.pauseJob(input.jobId);
@@ -491,6 +632,7 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['jobId']
     },
+    inputValidator: GenerationJobControlInputSchema,
     handler: async (input: { jobId: string }, ctx) => {
       requireGenerationJob(input.jobId);
       durableGenerationQueue.resumeJob(input.jobId);
@@ -520,6 +662,7 @@ export const generationTools: AgentToolDefinition[] = [
         target: { type: 'string', enum: ['latest_failed'], description: 'Retry the latest failed durable generation job when jobId is omitted.' }
       }
     },
+    inputValidator: GenerationRetryJobInputSchema,
     handler: async (input: RetryJobInput, ctx) => {
       const { job: resolvedJob, resolvedFrom } = resolveRetryJob(input);
 
@@ -572,6 +715,7 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['jobId']
     },
+    inputValidator: GenerationJobControlInputSchema,
     handler: async (input: { jobId: string }) => {
       const job = durableGenerationQueue.getJob(input.jobId);
       if (!job) {
@@ -606,6 +750,7 @@ export const generationTools: AgentToolDefinition[] = [
       },
       required: ['jobId']
     },
+    inputValidator: GenerationJobControlInputSchema,
     handler: async (input: { jobId: string }, ctx) => {
       requireGenerationJob(input.jobId);
       durableGenerationQueue.cancelJob(input.jobId);
@@ -632,28 +777,11 @@ export const generationTools: AgentToolDefinition[] = [
       required: ['prompt']
     },
     handler: async (input: { prompt: string; voice?: string; model?: string }, ctx) => {
-      const { generateAudio, notify } = ctx;
-
-      if (typeof generateAudio !== 'function') {
-        return {
-          success: false,
-          code: 'CAPABILITY_UNAVAILABLE',
-          message: '音频生成功能不可用，请配置 API 密钥或路由。',
-          setupAction: 'open-settings'
-        };
-      }
-
-      notify.info('音频合成中', `正在合成: "${input.prompt.slice(0, 20)}..."`);
-      
-      try {
-        const res = await fetchWithRetry(() => generateAudio(input.prompt, input.voice, input.model), 3);
-        notify.success('音频合成成功', '已生成最新的多媒体音频任务并就绪。');
-        return res;
-      } catch (err: any) {
-        notify.error('音频合成触发失败', err.message || '网络或接口超载异常');
-        throw err;
-      }
-    }
+      const queuedJob = createSingleMediaJob({ ...input, modelId: input.model }, ctx, 'audio');
+      ctx.notify.success('Audio job submitted', `Job ID: ${queuedJob.id}`);
+      return queuedJob;
+    },
+    verify: (output: any) => verifyQueuedMediaJob(output, 'audio')
   },
   {
     name: 'provider.getModelCapabilities',
@@ -683,17 +811,16 @@ export const generationTools: AgentToolDefinition[] = [
           ]);
         }
       } catch (err) {
-        console.warn(`[CapRouter] Failed to retrieve model capability meta, fallback to client matching:`, err);
+        console.warn(`[CapRouter] Failed to retrieve declared model capabilities:`, err);
       }
 
       if (!result) {
-        const id = input.modelId.toLowerCase();
-        const multimodal = id.includes('gemini') || id.includes('gpt-4') || id.includes('claude-3') || id.includes('vl') || id.includes('vision');
         result = {
           modelId: input.modelId,
-          multimodal,
-          image_understanding: multimodal,
-          fallback: true
+          multimodal: false,
+          image_understanding: false,
+          generationCapabilities: null,
+          fallback: 'undeclared'
         };
       }
 

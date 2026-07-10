@@ -5,19 +5,18 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../lib/db');
-const { verifyJWT } = require('../lib/jwt');
+const { resolveRequestUserId } = require('./compat/compatHelper');
 
 /**
  * 验证请求头中的 JWT 令牌，杜绝非法调用和越权审计。
  */
 function verifyAuth(req, res, next) {
-  // 测试环境下允许绕过或使用 mock 鉴权
   if (process.env.NODE_ENV === 'test') {
+    req.userId = 'test-user';
     return next();
   }
 
-  const authHeader = req.headers.authorization;
-  const userId = verifyJWT(authHeader);
+  const userId = resolveRequestUserId(req, { allowTemp: true });
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized', details: '未授权，请提供合法的 Authorization Bearer 凭据' });
   }
@@ -39,13 +38,15 @@ router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
   const pool = getPool();
   try {
     const query = `
-      INSERT INTO public.agent_runs (id, user_message, intent, plan, status, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      INSERT INTO public.agent_runs (id, user_id, user_message, intent, plan, status, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (id) 
       DO UPDATE SET status = EXCLUDED.status, plan = EXCLUDED.plan, updated_at = NOW()
+      WHERE public.agent_runs.user_id = EXCLUDED.user_id
       RETURNING *;
     `;
-    const result = await pool.query(query, [id, userMessage, intent, JSON.stringify(plan), status]);
+    const result = await pool.query(query, [id, req.userId, userMessage, intent, JSON.stringify(plan), status]);
+    if (!result.rows[0]) return res.status(403).json({ error: 'Agent run ownership conflict' });
     res.json({ ok: true, data: result.rows[0] });
   } catch (err) {
     console.error('[后端AI助手] 同步 Runs 失败:', err);
@@ -65,6 +66,8 @@ router.post('/ai-assistant/tool-calls', verifyAuth, async (req, res) => {
 
   const pool = getPool();
   try {
+    const ownedRun = await pool.query('SELECT id FROM public.agent_runs WHERE id = $1 AND user_id = $2', [runId, req.userId]);
+    if (!ownedRun.rows[0]) return res.status(404).json({ error: 'Agent run not found' });
     const query = `
       INSERT INTO public.agent_tool_calls (id, run_id, tool_name, input_summary, output_summary, status, error, started_at, completed_at, idempotency_key)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

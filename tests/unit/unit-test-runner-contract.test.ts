@@ -14,7 +14,7 @@ test('unit test script uses the dedicated Windows-safe runner', () => {
   };
   const runnerSource = readSource('scripts/test/run-unit-suite.cmd');
 
-  assert.equal(packageJson.scripts['test:unit'], 'node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/*.test.ts"');
+  assert.equal(packageJson.scripts['test:unit'], 'node --import ./scripts/test/set-log-level.mjs --test --test-isolation=process "tests/unit/*.test.ts"');
   assert.equal(packageJson.scripts['test:integration'], 'node --test --test-isolation=none "tests/integration/*.test.ts"');
   assert.equal(packageJson.scripts['test:contract'], 'node --test --test-isolation=none "tests/contract/*.test.ts"');
   assert.equal(packageJson.scripts['test:e2e'], 'node --test --test-isolation=none "tests/e2e/*.test.ts"');

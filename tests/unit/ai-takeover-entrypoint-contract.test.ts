@@ -26,5 +26,13 @@ test('generation tools use the shared notification service instead of raw DOM pr
   assert.doesNotMatch(source, /style\.cssText/);
   assert.doesNotMatch(source, /kk-progress-toast/);
   assert.doesNotMatch(source, /linear-gradient\(90deg,\s*#0071e3/);
-  assert.match(source, /notify\.info\('音频合成中'/);
+  assert.match(source, /ctx\.notify\.success\('Audio job submitted'/);
+});
+
+test('durable generation retries reuse deterministic canvas nodes', () => {
+  const source = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
+
+  assert.match(source, /takeover_batch_\$\{jobId\}_\$\{promptId\}/);
+  assert.match(source, /existingQueueNode/);
+  assert.match(source, /useDraft \|\| existingQueueNode/);
 });

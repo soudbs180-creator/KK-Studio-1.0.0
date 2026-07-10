@@ -50,6 +50,12 @@
 
 ### `ecommerce.createBatchTransformJob`
 - **说明**: 将“文件夹/资源池图片全部改成某种电商排版、比例”的自然语言请求适配为批量重绘任务，复用 `generation.createBatchJob` 和 `DurableGenerationQueue`，不模拟 PromptBar 输入。
+
+### `generation.createVideoJob` / `generation.createAudioJob`
+- **权限**: `confirm`。ToolRegistry 必须校验当前 `runId` 的确认授权。
+- **输入**: 使用共享 Zod Schema；视频统一使用 `durationSeconds`、`resolution`、`aspectRatio`、`generateAudio`、首尾帧和 `motion` 参数。
+- **执行**: 两者与图片任务共用版本化 `DurableGenerationQueue`，分别遵循媒体并发和批量上限。
+- **验证**: 返回任务必须持久化且 `taskType` 与工具一致；未声明 Provider 能力时不得通过模型名称猜测。
 - **权限**: `confirm`
 - **默认**: `aspectRatio='4:5'`, `layoutPreset='compact-grid'`, `outputGroup.color='#ffffff'`
 

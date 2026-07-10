@@ -42,7 +42,9 @@ export class LLMBrain {
 - {"type": "fillInputPrompt", "payload": {"prompt": "优化后的英文提示词"}} ：填充提示词到页面输入框。
 - {"type": "fillPrompt", "payload": {"prompt": "提示词"}} ：在画布上修改或新建提示词卡片。
 - {"type": "changeMode", "payload": {"mode": "image" | "video" | "audio" | "ppt" | "ecommerce"}} ：切换模式。
-- {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量}} ：在画布上新建卡片并开始生成。
+- {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量, "mode"?: "image" | "video" | "audio"}} ：兼容单次生成入口，必须使用显式 mode；新计划优先使用下列媒体工具。
+- {"type": "generation.createVideoJob", "payload": {"prompt": "提示词", "referenceImageNodeId"?: string, "durationSeconds": 5, "resolution"?: string, "aspectRatio"?: string, "generateAudio"?: boolean, "firstFrameAssetId"?: string, "lastFrameAssetId"?: string, "motion"?: string}} ：创建真实 T2V/I2V 持久视频任务，必须确认。
+- {"type": "generation.createAudioJob", "payload": {"prompt": "提示词", "durationSeconds"?: number, "voice"?: string, "lyrics"?: string, "genre"?: string}} ：创建语音、音乐或音效持久任务，必须确认。
 - {"type": "submitPromptComposer", "payload": {}} ：帮我发送（点击生图发送键）。
 - {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片（别名: canvas.locateNodes）。
 - {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页面板。
@@ -63,6 +65,9 @@ export class LLMBrain {
 - 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
 - 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
 - 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。
+- 若用户要求“把选中图片生成 5 秒环绕视频”，必须返回 generation.createVideoJob 并显式传递选中图片 ID、durationSeconds: 5 和 motion；不得先调用 changeMode 再依赖 UI 状态。
+- 若用户要求音乐、语音或音效，必须返回 generation.createAudioJob；不得绕过 DurableGenerationQueue 直连 Provider。
+- Provider 未声明对应 T2V、I2V、首尾帧、视频扩展或音频能力时，必须请求能力信息或向用户说明不可用，不得通过模型名称猜测。
 - 你绝对不能输出任意 CSS selector 点击脚本来控制外部网页；外部网页只能通过 browser.* 工具和 Browser Bridge 处理。
 - 其余本地/常规操作指令继续遵循原定逻辑。
 

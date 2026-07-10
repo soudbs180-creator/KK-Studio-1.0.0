@@ -792,7 +792,8 @@ export const AIAssistantDock: React.FC = () => {
               const failed = job.prompts.filter((p: any) => p.status === 'failed').length;
               const running = job.prompts.filter((p: any) => p.status === 'running').length;
               const outputNodeCount = getDurableQueueJobNodeIds(job).length;
-              const percent = Math.round(((completed + failed) / total) * 100);
+              const percent = job.progress?.percent ?? Math.round(((completed + failed) / total) * 100);
+              const mediaLabel = job.taskType === 'video' ? '视频' : job.taskType === 'audio' ? '音频' : '图片';
 
               return (
                 <div key={job.id} className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-900 flex flex-col gap-1.5 text-[9px]">
@@ -802,11 +803,15 @@ export const AIAssistantDock: React.FC = () => {
                       job.status === 'running' ? 'bg-purple-500/20 text-purple-400 animate-pulse' :
                       job.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
                       job.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                      job.status === 'completed_with_errors' ? 'bg-amber-500/20 text-amber-400' :
+                      job.status === 'failed' ? 'bg-rose-500/20 text-rose-400' :
                       'bg-zinc-800 text-zinc-400'
                     }`}>
-                      {job.status === 'running' ? '正在生图' :
+                      {job.status === 'running' ? `正在生成${mediaLabel}` :
                        job.status === 'paused' ? '已暂停' :
                        job.status === 'completed' ? '已完成' :
+                       job.status === 'completed_with_errors' ? '部分完成' :
+                       job.status === 'failed' ? '失败' :
                        job.status === 'cancelled' ? '已取消' : '排队中'}
                     </span>
                   </div>

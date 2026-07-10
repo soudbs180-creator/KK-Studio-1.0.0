@@ -76,8 +76,15 @@ import type {
   UpsertCreditExchangeRateRequestDto,
 } from "../dto/billing.ts";
 import type {
+  ClaimGenerationBatchJobRequestDto,
+  ControlGenerationBatchJobRequestDto,
+  CreateGenerationBatchJobRequestDto,
   CreateGenerationTaskRequestDto,
+  GenerationBatchJobDto,
+  GenerationBatchJobListDto,
+  GenerationJobStatus,
   GenerationTaskDto,
+  UpdateGenerationBatchJobRequestDto,
 } from "../dto/generation.ts";
 import type {
   ActiveCreditModelListDto,
@@ -377,6 +384,33 @@ export interface KkApiClient {
     taskId: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<GenerationTaskDto>>;
+  createGenerationJob(
+    input: CreateGenerationBatchJobRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  listGenerationJobs(
+    input?: { statuses?: GenerationJobStatus[]; cursor?: string; limit?: number },
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobListDto>>;
+  getGenerationJob(
+    jobId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  updateGenerationJob(
+    jobId: string,
+    input: UpdateGenerationBatchJobRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  controlGenerationJob(
+    jobId: string,
+    input: ControlGenerationBatchJobRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  claimGenerationJob(
+    jobId: string,
+    input: ClaimGenerationBatchJobRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationBatchJobDto>>;
   saveWorkflow(
     workspaceId: string,
     workflowId: string,
@@ -1474,6 +1508,65 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         {
           method: "GET",
         },
+        options,
+      );
+    },
+
+    createGenerationJob(input, options) {
+      return requestJson<GenerationBatchJobDto>(
+        config,
+        "api/v1/generation-jobs",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    listGenerationJobs(input, options) {
+      const query = new URLSearchParams();
+      for (const status of input?.statuses || []) query.append("status", status);
+      if (input?.cursor) query.set("cursor", input.cursor);
+      if (typeof input?.limit === "number") query.set("limit", String(input.limit));
+      const path = query.size > 0
+        ? `api/v1/generation-jobs?${query.toString()}`
+        : "api/v1/generation-jobs";
+      return requestJson<GenerationBatchJobListDto>(config, path, { method: "GET" }, options);
+    },
+
+    getGenerationJob(jobId, options) {
+      return requestJson<GenerationBatchJobDto>(
+        config,
+        `api/v1/generation-jobs/${encodeURIComponent(jobId)}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    updateGenerationJob(jobId, input, options) {
+      return requestJson<GenerationBatchJobDto>(
+        config,
+        `api/v1/generation-jobs/${encodeURIComponent(jobId)}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    controlGenerationJob(jobId, input, options) {
+      return requestJson<GenerationBatchJobDto>(
+        config,
+        `api/v1/generation-jobs/${encodeURIComponent(jobId)}/control`,
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    claimGenerationJob(jobId, input, options) {
+      return requestJson<GenerationBatchJobDto>(
+        config,
+        `api/v1/generation-jobs/${encodeURIComponent(jobId)}/claim`,
+        { method: "POST", body: JSON.stringify(input) },
         options,
       );
     },
