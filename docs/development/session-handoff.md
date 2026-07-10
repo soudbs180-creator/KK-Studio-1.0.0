@@ -1618,3 +1618,42 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 未运行完整 `npm run verify:changes`；本次为受限的前端与运行时修复，已覆盖 AGENTS 要求的架构、治理、类型、构建、完整单测和实际页面验证。
 - **风险与下一步**：
   - 低风险。真实网页会员生成仍需要用户在桌面端启动本地守护进程并连接 Chrome Bridge 扩展；该环境未安装桥接服务，因此已验证断开状态和引导，未执行真实外部网页生成。
+
+## 119. 2026-07-10 - 修复移动端模型中心、创作入口与跨端回归空壳
+- **修改范围**：
+  1. 修复手机端模型管理中心在窄屏仍保持双栏、说明文字逐字换行、供应商目录被 `100%` 行高推到远处的问题；移动端改为内容自适应单列，桌面端继续保留双栏管理布局。
+  2. 修复手机工作台默认收起创作输入且仅显示无文案细线的问题；嵌入式移动端默认展开输入区，收起后提供可访问、可点击的“输入创作提示词”入口，并补充稳定的移动端分区标识。
+  3. 为图片与视频生成组补齐 `ghost` / `skeleton` 轻量渲染：远距离视图只保留可选中、可拖拽的提示主卡，不再构建连线、结果卡和视频覆盖层，降低大画布渲染负担。
+  4. 修复桌面设置和 AI 接管冒烟脚本的失效降级契约：设置校验接入当前 `SettingsWorkbenchPanel` / `SettingsWorkbenchShell`，AI Dock 输入改用稳定 ID，清理旧文件路径和乱码 placeholder 断言。
+  5. 扩展移动设置冒烟检查，覆盖首页提示词输入可见性、模型中心单列比例、目录间距和横向溢出，并补充对应单元与契约测试。
+- **修改文件**：
+  - `apps/web/src/components/layout/PromptBar.tsx`
+  - `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`
+  - `apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx`
+  - `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `apps/web/src/styles/settings.css`
+  - `scripts/architecture/check-ui-token-literals.mjs`
+  - `scripts/test/verify-ai-takeover-smoke.mjs`
+  - `scripts/test/verify-desktop-settings-smoke.mjs`
+  - `scripts/test/verify-mobile-settings-smoke.mjs`
+  - `tests/unit/ai-takeover-control-buttons-contract.test.ts`
+  - `tests/unit/mobile-home-three-zone-contract.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+  - `tests/unit/prompt-bar-mobile-chrome-layer-ui-system-contract.test.ts`
+  - `tests/unit/settings-ui-density-regression.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 模型中心只在手机断点切换为单列和自然高度，较宽屏继续使用现有供应商池与预设目录双栏，避免桌面信息密度退化。
+  - 移动端核心创作入口必须首屏可发现；收起状态仍保留完整宽度的语义按钮，不再用无标签装饰线承担功能。
+  - 生成组低细节级别复用 `PromptNodeComponent` 的选择和拖拽能力，只裁掉高成本的子结果与覆盖层，保证性能降级不等于交互失效。
+  - 浏览器冒烟降级契约只绑定稳定选择器、当前组件路径和真实工具注册段，不再依赖中文 placeholder 或已删除文件名。
+- **已运行验证**：
+  - 应用内浏览器实测 `390x844`、`465x650` 手机视口和桌面视口：模型中心无横向溢出，工具栏单列，说明宽度与供应商池一致，目录间距 34px；移动工作台输入区默认可见，收起入口尺寸为 366x46 且位于首屏内；桌面模型中心仍保持双栏。
+  - `npm run verify:changes` 完整通过，覆盖架构、治理、依赖审计、类型、规格、生产构建、单元/集成/契约/E2E、拖拽、移动/桌面设置、AI 接管、启动布局、编码与画布性能。
+  - 测试汇总：单元 1630（1628 通过、2 跳过）、集成 12/12、契约 9/9、E2E 11/11、画布性能 3/3，失败数均为 0。
+  - `npm run check:encoding` 通过；`git diff --check` 通过。
+- **未运行验证及原因**：
+  - Playwright 浏览器可执行文件不可用，发布链中的浏览器脚本使用 HTTP 与源码契约降级校验；本次实际改动的手机/桌面页面已使用应用内浏览器逐项测量并截图复核。
+- **风险与下一步**：
+  - 低风险。建议后续 CI 镜像补齐 Playwright Chromium，使现有移动模型中心几何断言和 AI 接管选择器在发布链中执行真实浏览器路径，而不是仅依赖降级契约。

@@ -75,6 +75,14 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
   );
   assert.match(
     cssSource,
+    /@media \(max-width: 1023px\) \{[\s\S]*\.settings-panel \.settings-model-center-layout \{[\s\S]*height: auto !important;[\s\S]*grid-template-rows: auto !important;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(max-width: 720px\) \{[\s\S]*\.settings-panel \.settings-model-center-toolbar \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) !important;/,
+  );
+  assert.match(
+    cssSource,
     /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-overview-grid \{[\s\S]*grid-template-columns: minmax\(0, 1\.55fr\) minmax\(320px, 0\.95fr\);/,
   );
   assert.match(

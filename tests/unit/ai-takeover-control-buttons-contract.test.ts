@@ -52,6 +52,7 @@ test('AI Takeover durable queue buttons map to one shared action and tool contra
 test('AI Takeover composer and resource buttons share stable local action names', () => {
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const sidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const smokeSource = readSource('scripts/test/verify-ai-takeover-smoke.mjs');
 
   for (const key of [
     'compressContext',
@@ -79,6 +80,8 @@ test('AI Takeover composer and resource buttons share stable local action names'
   }
 
   assert.match(dockSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
+  assert.match(dockSource, /id="ai-takeover-dock-composer-input"/);
+  assert.match(smokeSource, /id="ai-takeover-dock-composer-input"/);
   assert.doesNotMatch(sidebarSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
 });
 

@@ -28,7 +28,8 @@ test('prompt bar mobile chrome consumes semantic layer selectors instead of raw 
 
   assert.match(promptBarSource, /const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '\[data-kk-mobile-overlay-layer="true"\], \[data-prompt-bar-mobile-model-layer="true"\]';/);
   assert.match(promptBarSource, /target\.closest\(PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR\)/);
-  assert.match(promptBarSource, /className="kk-prompt-bar-mobile-collapse-handle"/);
+  assert.match(promptBarSource, /className=\{`kk-prompt-bar-mobile-collapse-handle /);
+  assert.match(promptBarSource, /kk-prompt-bar-mobile-collapse-handle--embedded/);
   assert.match(promptBarSource, /style=\{\{ zIndex: KK_LAYER\.promptComposer \}\}/);
   assert.match(promptBarSource, /style=\{\{[\s\S]*zIndex: KK_LAYER\.promptComposer,/);
   assert.match(detailSource, /import\s+\{\s*KK_LAYER\s*\}\s+from\s+'@kk\/ui'/);

@@ -1085,6 +1085,7 @@ export const AIAssistantDock: React.FC = () => {
             onClose={closeReferenceMentionPanel}
           />
           <textarea
+            id="ai-takeover-dock-composer-input"
             ref={inputRef}
             value={inputVal}
             onChange={e => {

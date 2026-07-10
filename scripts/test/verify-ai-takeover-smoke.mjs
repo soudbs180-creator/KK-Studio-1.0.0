@@ -390,8 +390,8 @@ function verifySourceContracts() {
     { source: chatSidebarSource, pattern: /data-action="locate-durable-job"/, label: 'durable queue locate action' },
     { source: chatSidebarSource, pattern: /data-action="cancel-durable-job"/, label: 'durable queue cancel action' },
     { source: dockSource, pattern: /ai-takeover-run-timeline/, label: 'run timeline surface' },
-    { source: dockSource, pattern: /placeholder="杈撳叆瀵硅瘽鎴栨寚浠わ紙鍥炶溅鍙戦€侊級\.\.\."/u, label: 'dock composer input' },
-    { source: generationToolsSource, pattern: /notify\.info\('闊抽鍚堟垚涓?/u, label: 'shared notification start state' },
+    { source: dockSource, pattern: /id="ai-takeover-dock-composer-input"/, label: 'dock composer input' },
+    { source: generationToolsSource, pattern: /name: 'generation\.createAudioTask'[\s\S]*notify\.info\(/, label: 'shared notification start state' },
   ];
 
   for (const check of checks) {
@@ -594,5 +594,4 @@ try {
     await closeLocalViteServer(viteServer);
   }
 }
-
 

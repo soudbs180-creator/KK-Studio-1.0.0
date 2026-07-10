@@ -858,6 +858,30 @@
   background: var(--kk-prompt-bar-mobile-collapse-handle-bg-hover);
 }
 
+.kk-prompt-bar-mobile-collapse-handle--embedded {
+  position: relative;
+  inset: auto;
+  display: flex;
+  width: calc(100% - 24px);
+  height: 46px;
+  margin: 0 12px 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--frost-card-framework-border);
+  border-radius: 14px;
+  background: var(--frost-card-framework-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  transform: none;
+  box-shadow: var(--frost-card-framework-shadow);
+}
+
+.kk-prompt-bar-mobile-collapse-handle--embedded:hover {
+  background: var(--frost-card-sub-bg);
+}
+
 .dark .kk-prompt-bar-mobile-collapse-handle {
   --kk-prompt-bar-mobile-collapse-handle-bg: rgb(115 115 115 / 0.30);
   --kk-prompt-bar-mobile-collapse-handle-bg-hover: rgb(115 115 115 / 0.50);
@@ -2396,4 +2420,3 @@
   min-width: 0;
   min-height: 0;
 }
-

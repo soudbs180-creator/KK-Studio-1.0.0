@@ -98,6 +98,10 @@ describe('mobile home three-zone contract', () => {
     const footerSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
 
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
+    assert.match(
+      promptBarSource,
+      /const \[isExpanded, setIsExpanded\] = useState\(\(\) => !isMobile \|\| mobileShellMode === 'embedded'\);/,
+    );
     assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);
     assert.match(promptBarSource, /data-mobile-composer-section="primary-input"/);
     assert.match(promptBarSource, /import MobileEmbeddedAdvancedDrawer from '\.\/prompt-bar\/MobileEmbeddedAdvancedDrawer';/);

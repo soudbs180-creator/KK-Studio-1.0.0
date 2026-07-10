@@ -5141,3 +5141,62 @@ body.light-mode :where(
     padding-right: 4px;
   }
 }
+
+/* Mobile model center is a document flow, not a viewport-height split workbench. */
+@media (max-width: 1023px) {
+  .settings-panel [data-testid="settings-model-center"],
+  .settings-panel [data-testid="settings-model-center"] > .settings-section-card {
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .settings-panel [data-testid="settings-model-center"] > .settings-section-card > div:last-child {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    overflow-y: visible !important;
+  }
+
+  .settings-panel .settings-model-center-layout {
+    height: auto !important;
+    min-height: 0 !important;
+    grid-template-rows: auto !important;
+    align-content: start !important;
+  }
+
+  .settings-panel .settings-model-center-pool,
+  .settings-panel .settings-model-center-directory {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-panel .settings-model-center-layout {
+    padding-inline: 0 !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 12px !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar__copy,
+  .settings-panel .settings-model-center-toolbar__actions {
+    width: 100% !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar__actions {
+    justify-content: flex-start !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar__button {
+    flex: 1 1 132px;
+  }
+
+  .settings-panel .settings-model-center-directory {
+    min-width: 0 !important;
+    padding: 24px 0 0 !important;
+  }
+}

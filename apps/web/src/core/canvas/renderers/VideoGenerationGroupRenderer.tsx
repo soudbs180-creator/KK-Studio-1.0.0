@@ -60,6 +60,76 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   const sourceImageNode = node.sourceImageId ? imageNodesById.get(node.sourceImageId) : null;
   const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
 
+  const renderPromptCard = (
+    renderedPromptNode: typeof node,
+    renderedDetailLevel: typeof detailLevel,
+    stackZIndex: number,
+    hasShadowBoost: boolean,
+    isGroupFocused: boolean,
+  ) => (
+    <PromptNodeComponent
+      node={{
+        ...renderedPromptNode,
+        modelLabel: renderedPromptNode.modelLabel || 'Video Model',
+      }}
+      detailLevel={renderedDetailLevel}
+      groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
+      stackZIndexOverride={stackZIndex}
+      shadowBoost={hasShadowBoost}
+      actualChildImageCount={visibleChildImages.length}
+      onPositionChange={handleLiveNodePositionChange}
+      isSelected={isSelected}
+      highlighted={highlightedIdVal === node.id || isGroupFocused}
+      onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
+      onSelect={() => handlePromptGroupNodeSelect(node.id, node.id)}
+      onClickPrompt={getSharedPromptNodeActionProps(renderedPromptNode).onClickPrompt}
+      onConnectStart={handleConnectStart}
+      zoomScale={zoomScale}
+      snapToGrid={snapToGrid}
+      isCanvasTransforming={isCanvasTransforming}
+      isMobile={isMobile}
+      sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
+      ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
+      {...getSharedPromptNodeActionProps(renderedPromptNode)}
+      onLivePositionChange={handleLiveNodePositionChange}
+      onHeightChange={(id, height) => {
+        handlePromptGroupNodeHeightChange(node, id, height);
+      }}
+      onPin={handlePinDraft}
+      onRemoveTag={handlePromptGroupTagRemove}
+      onDragDelta={(delta, sourceNodeId) => {
+        handlePromptGroupDragDelta({
+          node,
+          childImages: visibleChildImages,
+          groupNodeIds,
+          delta,
+          sourceNodeId,
+        });
+      }}
+      onDragCommit={(delta, sourceNodeId, finalPosition) => {
+        handlePromptGroupDragCommit({
+          node,
+          childImages: visibleChildImages,
+          delta,
+          sourceNodeId,
+          finalPosition,
+        });
+      }}
+      canvasTransform={canvasTransform}
+      onDragStateChange={handleCanvasNodeDragStateChange}
+    />
+  );
+
+  if (detailLevel === 'ghost' || detailLevel === 'skeleton') {
+    const lightweightPosition = resolveLivePromptPosition(node) ?? node.position;
+    const lightweightNode = lightweightPosition.x === node.position.x && lightweightPosition.y === node.position.y
+      ? node
+      : { ...node, position: lightweightPosition };
+    const lightweightDetailLevel = detailLevel === 'skeleton' ? 'compact' : 'ghost';
+
+    return renderPromptCard(lightweightNode, lightweightDetailLevel, groupStackZIndex + 20, false, false);
+  }
+
   const {
     isGroupFocused,
     promptDetailLevel,
@@ -130,57 +200,7 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
       )}
 
       {/* Main Prompt Card */}
-      <PromptNodeComponent
-        node={{
-          ...renderedPromptNode,
-          modelLabel: renderedPromptNode.modelLabel || 'Video Model',
-        }}
-        detailLevel={promptDetailLevel}
-        groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
-        stackZIndexOverride={promptCardZIndex}
-        shadowBoost={shadowBoost}
-        actualChildImageCount={visibleChildImages.length}
-        onPositionChange={handleLiveNodePositionChange}
-        isSelected={isSelected}
-        highlighted={highlightedIdVal === node.id || isGroupFocused}
-        onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-        onSelect={() => handlePromptGroupNodeSelect(node.id, node.id)}
-        onClickPrompt={getSharedPromptNodeActionProps(renderedPromptNode).onClickPrompt}
-        onConnectStart={handleConnectStart}
-        zoomScale={zoomScale}
-        snapToGrid={snapToGrid}
-        isCanvasTransforming={isCanvasTransforming}
-        isMobile={isMobile}
-        sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
-        ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
-        {...getSharedPromptNodeActionProps(renderedPromptNode)}
-        onLivePositionChange={handleLiveNodePositionChange}
-        onHeightChange={(id, height) => {
-          handlePromptGroupNodeHeightChange(node, id, height);
-        }}
-        onPin={handlePinDraft}
-        onRemoveTag={handlePromptGroupTagRemove}
-        onDragDelta={(delta, sourceNodeId) => {
-          handlePromptGroupDragDelta({
-            node,
-            childImages: visibleChildImages,
-            groupNodeIds,
-            delta,
-            sourceNodeId,
-          });
-        }}
-        onDragCommit={(delta, sourceNodeId, finalPosition) => {
-          handlePromptGroupDragCommit({
-            node,
-            childImages: visibleChildImages,
-            delta,
-            sourceNodeId,
-            finalPosition,
-          });
-        }}
-        canvasTransform={canvasTransform}
-        onDragStateChange={handleCanvasNodeDragStateChange}
-      />
+      {renderPromptCard(renderedPromptNode, promptDetailLevel, promptCardZIndex, shadowBoost, isGroupFocused)}
 
       {/* Video Result Frames (Atomic Unit Rendering - No internal sub-culling) */}
       {childVisualLayouts.map((childLayout: any, childIndex: number) => {

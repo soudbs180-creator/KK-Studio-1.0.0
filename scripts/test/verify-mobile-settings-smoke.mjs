@@ -602,11 +602,13 @@ try {
 
   const mobileSurface = page.getByTestId('mobile-workspace-surface');
   const mobileShell = page.getByTestId('mobile-app-shell');
+  const mobileComposerInput = page.locator('[data-mobile-composer-section="primary-input"] textarea');
   const seededResultTile = page.getByTestId('mobile-result-tile-image-ecom');
   const resultTile = page.locator('[data-testid^="mobile-result-tile-"]').first();
 
   await assertVisible(mobileSurface, 'Mobile workspace surface did not render.');
   await assertVisible(mobileShell, 'Mobile app shell did not render.');
+  await assertVisible(mobileComposerInput, 'Mobile prompt composer input is not visible in the primary workspace.');
   try {
     await seededResultTile.waitFor({ state: 'visible', timeout: 3000 });
   } catch {
@@ -709,6 +711,39 @@ try {
   await assertVisible(presetDirectory, 'Mobile API preset directory did not render.');
   await assertVisible(addProviderEntry, 'Mobile API local add entry did not render.');
   await assertVisible(proxyProviderEntry, 'Mobile API proxy add entry did not render.');
+  const modelCenterLayoutMetrics = await page.evaluate(() => {
+    const pool = document.querySelector('[data-testid="api-model-center-provider-pool"]');
+    const toolbar = pool?.querySelector('.settings-model-center-toolbar');
+    const toolbarCopy = pool?.querySelector('.settings-model-center-toolbar__copy');
+    const directory = document.querySelector('[data-testid="api-model-center-preset-directory"]');
+    if (!(pool instanceof HTMLElement)
+      || !(toolbar instanceof HTMLElement)
+      || !(toolbarCopy instanceof HTMLElement)
+      || !(directory instanceof HTMLElement)) {
+      return null;
+    }
+    const poolRect = pool.getBoundingClientRect();
+    const copyRect = toolbarCopy.getBoundingClientRect();
+    const directoryRect = directory.getBoundingClientRect();
+    return {
+      poolWidth: poolRect.width,
+      copyWidth: copyRect.width,
+      directoryGap: directoryRect.top - poolRect.bottom,
+      toolbarColumns: getComputedStyle(toolbar).gridTemplateColumns,
+    };
+  });
+  if (!modelCenterLayoutMetrics) {
+    throw new Error('Mobile model center layout metrics could not be measured.');
+  }
+  if (modelCenterLayoutMetrics.copyWidth < modelCenterLayoutMetrics.poolWidth * 0.7) {
+    throw new Error(`Mobile model center copy column is compressed (${modelCenterLayoutMetrics.copyWidth}px of ${modelCenterLayoutMetrics.poolWidth}px).`);
+  }
+  if (modelCenterLayoutMetrics.directoryGap > 96) {
+    throw new Error(`Mobile preset directory is separated by an oversized gap (${modelCenterLayoutMetrics.directoryGap}px).`);
+  }
+  if (/\s/.test(modelCenterLayoutMetrics.toolbarColumns.trim())) {
+    throw new Error(`Mobile model center toolbar still uses multiple columns (${modelCenterLayoutMetrics.toolbarColumns}).`);
+  }
   await addProviderEntry.click();
   await assertVisible(officialEditorBack, 'Mobile local API editor did not open.');
   await officialEditorBack.click();

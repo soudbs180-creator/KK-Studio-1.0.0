@@ -55,6 +55,9 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /settings-model-center/);
   assert.match(scriptSource, /api-model-center-provider-pool/);
   assert.match(scriptSource, /api-model-center-preset-directory/);
+  assert.match(scriptSource, /mobileComposerInput/);
+  assert.match(scriptSource, /modelCenterLayoutMetrics/);
+  assert.match(scriptSource, /directoryGap/);
   assert.doesNotMatch(scriptSource, /mobile-settings-home/);
   assert.doesNotMatch(scriptSource, /mobile-settings-entry-api-management/);
   assert.doesNotMatch(scriptSource, /鏌ョ湅璇婃柇/);
@@ -108,6 +111,9 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /desktop-user-menu-trigger/);
   assert.match(scriptSource, /desktop-user-menu-settings/);
   assert.match(scriptSource, /settings-page-root/);
+  assert.match(scriptSource, /SettingsWorkbenchPanel\.tsx/);
+  assert.match(scriptSource, /SettingsWorkbenchShell\.tsx/);
+  assert.doesNotMatch(scriptSource, /SettingsPanel\.localized\.tsx/);
   assert.match(scriptSource, /api-official-provider-add/);
   assert.match(scriptSource, /api-proxy-provider-add/);
   assert.match(scriptSource, /SETTINGS_API_PATH\}\/official\/new/);

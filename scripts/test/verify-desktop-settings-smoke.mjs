@@ -299,7 +299,8 @@ async function resolveFallbackRoutes(browserPreflight, targetUrl) {
 function verifyDesktopSourceContracts() {
   const appSource = readSource('apps/web/src/App.tsx');
   const appDesktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
-  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
+  const settingsShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
@@ -324,6 +325,7 @@ function verifyDesktopSourceContracts() {
     appSource,
     appDesktopChromeSource,
     settingsPanelSource,
+    settingsShellSource,
     apiSettingsViewSource,
     workbenchSectionsSource,
     dashboardSource,

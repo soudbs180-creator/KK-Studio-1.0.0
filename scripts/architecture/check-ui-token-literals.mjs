@@ -27,7 +27,6 @@ const EXCLUDED_FILES = new Set([
   'apps/web/src/components/modals/StorageSelectionModal.tsx',
   'apps/web/src/components/settings/ApiSettingsView.tsx',
   'apps/web/src/components/mermaid/mermaidTopology.ts',
-  'apps/web/src/components/settings/SettingsPanel.localized.tsx',
   'apps/web/src/components/settings/views/DashboardView.tsx',
   'apps/web/src/components/settings/views/UserProfileView.tsx',
   'apps/web/src/components/settings/ProjectManager.tsx',

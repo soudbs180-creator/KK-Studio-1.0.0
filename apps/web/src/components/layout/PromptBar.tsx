@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, ChevronUp, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -1255,7 +1255,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [mobileCategory, setMobileCategory] = useState<string>('featured');
     const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(() => !isMobile || mobileShellMode === 'embedded');
     const [mentionState, setMentionState] = useState<{
         open: boolean;
         query: string;
@@ -4103,10 +4103,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
     if (isMobile && !isExpanded) {
         return (
             <>
-                <div
+                <button
+                    type="button"
                     id="prompt-bar-container"
                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.expandMobileComposer.uiAction}
-                    className="kk-prompt-bar-mobile-collapse-handle"
+                    className={`kk-prompt-bar-mobile-collapse-handle ${isEmbeddedMobileComposer ? 'kk-prompt-bar-mobile-collapse-handle--embedded' : ''}`}
                     style={{ zIndex: KK_LAYER.promptComposer }}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -4120,7 +4121,18 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         setIsExpanded(true);
                     }}
                     title={pick('展开输入栏', 'Expand input bar')}
-                />
+                    aria-label={pick('展开创作提示词输入框', 'Expand creative prompt input')}
+                >
+                    {isEmbeddedMobileComposer ? (
+                        <>
+                            <Sparkles size={15} aria-hidden="true" />
+                            <span>{pick('输入创作提示词', 'Enter a creative prompt')}</span>
+                            <ChevronUp size={16} aria-hidden="true" />
+                        </>
+                    ) : (
+                        <span className="sr-only">{pick('展开输入栏', 'Expand input bar')}</span>
+                    )}
+                </button>
                 <input
                     type="file"
                     ref={fileInputRef}
@@ -4155,7 +4167,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     {mobileSubView === 'input' && (
                         <>
                             {/* 1. 第一排：模式选择均分 5 列 (4模式 + 1收起) */}
-                            <div className="grid grid-cols-5 gap-1.5 w-full border-b border-[var(--frost-card-sub-border)] pb-2 min-w-0 items-center justify-items-center">
+                            <div data-mobile-composer-section="mode-strip" className="grid grid-cols-5 gap-1.5 w-full border-b border-[var(--frost-card-sub-border)] pb-2 min-w-0 items-center justify-items-center">
                                 {filteredModeOptions.map(option => {
                                     const isSelected = activeModeOption.mode === option.mode;
                                     return (
@@ -4213,7 +4225,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
 
                             {/* 2. 第二排：输入文字和图片一排 (去边框臃肿，平铺) */}
-                            <div className="flex items-start gap-2.5 w-full min-w-0 py-1">
+                            <div data-mobile-composer-section="primary-input" className="flex items-start gap-2.5 w-full min-w-0 py-1">
                                 {/* 左侧：参考图预览和上传按钮组合 */}
                                 {config.mode !== GenerationMode.ECOMMERCE && (
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
