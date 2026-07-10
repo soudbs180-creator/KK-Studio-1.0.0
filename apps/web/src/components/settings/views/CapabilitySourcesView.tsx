@@ -10,30 +10,56 @@ import {
 } from '../SettingsScaffold';
 import ApiSettingsView from '../ApiSettingsView';
 import { getKkApiServerHealth } from '../../../services/api/kkApiServerHealth';
+import { toolRegistryInstance, type BrowserBridgeStatusSnapshot } from '../../../features/ai-assistant-runtime';
 
 export const CapabilitySourcesView: React.FC = () => {
   const { pick } = useLocale();
   const [localRunnerStatus, setLocalRunnerStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
+  const [browserBridgeStatus, setBrowserBridgeStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
   
   useEffect(() => {
     let active = true;
     const check = async () => {
-      try {
-        const health = await getKkApiServerHealth();
-        if (active) {
-          setLocalRunnerStatus(health.reachable ? 'active' : 'inactive');
-        }
-      } catch {
-        if (active) {
-          setLocalRunnerStatus('inactive');
-        }
-      }
+      const [healthResult, bridgeResult] = await Promise.allSettled([
+        getKkApiServerHealth(),
+        toolRegistryInstance.execute('browser.getStatus', {}, {}) as Promise<BrowserBridgeStatusSnapshot>,
+      ]);
+
+      if (!active) return;
+
+      setLocalRunnerStatus(
+        healthResult.status === 'fulfilled' && healthResult.value.reachable ? 'active' : 'inactive'
+      );
+
+      const bridgeConnected = bridgeResult.status === 'fulfilled'
+        && !bridgeResult.value.setupRequired
+        && bridgeResult.value.daemonStatus === 'connected'
+        && bridgeResult.value.extensionStatus === 'connected';
+      setBrowserBridgeStatus(bridgeConnected ? 'active' : 'inactive');
     };
-    check();
+
+    void check();
+    const interval = window.setInterval(() => {
+      void check();
+    }, 4000);
+
     return () => {
       active = false;
+      window.clearInterval(interval);
     };
   }, []);
+
+  const statusLabel = (status: 'checking' | 'active' | 'inactive') => {
+    if (status === 'active') return pick('已连接', 'Connected');
+    if (status === 'inactive') return pick('未连接', 'Offline');
+    return pick('检查中', 'Checking');
+  };
+
+  const statusTone = (status: 'checking' | 'active' | 'inactive') => {
+    if (status === 'active') return 'emerald';
+    if (status === 'inactive') return 'rose';
+    return 'slate';
+  };
 
   return (
     <SettingsViewShell>
@@ -56,8 +82,8 @@ export const CapabilitySourcesView: React.FC = () => {
               <span className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--accent-coral)]">
                 <Server size={16} />
               </span>
-              <SettingsBadge tone={localRunnerStatus === 'active' ? 'emerald' : localRunnerStatus === 'inactive' ? 'rose' : 'slate'}>
-                {localRunnerStatus === 'active' ? pick('已连接', 'Connected') : localRunnerStatus === 'inactive' ? pick('断开', 'Offline') : pick('检查中', 'Checking')}
+              <SettingsBadge tone={statusTone(localRunnerStatus)}>
+                {statusLabel(localRunnerStatus)}
               </SettingsBadge>
             </div>
             <div>
@@ -72,7 +98,7 @@ export const CapabilitySourcesView: React.FC = () => {
               <span className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-sky-400">
                 <Globe size={16} />
               </span>
-              <SettingsBadge tone="emerald">{pick('已就绪', 'Ready')}</SettingsBadge>
+              <SettingsBadge tone={statusTone(browserBridgeStatus)}>{statusLabel(browserBridgeStatus)}</SettingsBadge>
             </div>
             <div>
               <div className="text-xs font-bold text-[var(--text-primary)] mt-2">Chrome Bridge / Web Member</div>

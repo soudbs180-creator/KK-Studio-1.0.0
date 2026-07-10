@@ -79,15 +79,16 @@ export class TaskOrchestrator {
       throw new Error(`Browser action blocked: ${routeDecision.reason}`);
     }
 
-    // 2. Routed execution metadata response
+    // Browser actions must run through the canonical ToolRegistry so the action
+    // keeps its confirmation, bridge status, and audit trail.
     return {
-      success: true,
+      success: false,
       intentType: 'browser',
       data: {
-        message: 'Browser task routed and executing',
-        routeMode: routeDecision.routeMode,
-        reason: routeDecision.reason
+        nextAction: 'browser-assistant',
+        routeMode: routeDecision.routeMode
       },
+      error: 'Browser task requires Browser Assistant. Connect Browser Bridge and confirm the action there.',
       timestamp
     };
   }

@@ -452,7 +452,9 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                             </span>
                         </div>
                         <button
+                            type="button"
                             onClick={onComplete}
+                            aria-label="关闭引导"
                             className="rounded-full p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
                         >
                             <X size={16} />
@@ -483,8 +485,10 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
 
                     <div className="flex justify-between items-center gap-3">
                         <button
+                            type="button"
                             onClick={handlePrev}
                             disabled={displayStepIndex === 0}
+                            aria-label="上一步"
                             className={`flex items-center justify-center w-10 h-10 rounded-full border border-[var(--border-light)] leading-none transition-transform ${displayStepIndex === 0
                                 ? 'opacity-20 cursor-not-allowed'
                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] active:scale-90'
@@ -494,6 +498,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                         </button>
 
                         <button
+                            type="button"
                             onClick={handleNext}
                             className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full text-[14px] font-bold leading-none transition-transform active:scale-[0.98]"
                             style={{

@@ -79,7 +79,7 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
   const primaryAction = isLoggedIn ? onEnterWorkspace : onLoginClick;
   const primaryLabel = isLoggedIn
     ? t({ zh: '进入工作区', en: 'Open workspace' })
-    : t({ zh: '登录', en: 'Sign in' });
+    : t({ zh: '开始创作', en: 'Start creating' });
 
   return (
     <div className="kk-landing-root">
@@ -114,10 +114,10 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
             </h1>
           </div>
 
-          <a className="kk-landing-work-pill" href="#ai-flow">
-            <span>{t({ zh: '查看 AI 流程', en: 'See AI Flow' })}</span>
+          <button type="button" className="kk-landing-work-pill" onClick={primaryAction}>
+            <span>{primaryLabel}</span>
             <ArrowUpRight size={14} strokeWidth={1.7} />
-          </a>
+          </button>
 
           <aside className="kk-landing-hero-card" aria-label={t({ zh: 'AI 接管说明', en: 'AI takeover note' })}>
             <span>{t({ zh: 'AI 接管', en: 'AI takeover' })}</span>

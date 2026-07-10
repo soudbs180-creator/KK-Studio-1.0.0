@@ -1587,3 +1587,34 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 未运行完整 `npm run verify:changes`。本次是缺陷修复与契约补强，已覆盖 AGENTS 要求的架构、治理、类型、构建，并额外跑完整单测；完整发布链路可在准备发布或部署前再跑。
 - **风险与下一步**：
   - 中低风险。云同步默认仍关闭，风险主要集中在开启后大图通过 JSON data URL 上传的体积上限；后续若打开该 flag，建议补分片/直传存储策略与 UI 开关说明。
+## 118. 2026-07-10 - 收敛网页会员桥接状态与首用交互真实性
+- **修改范围**：
+  1. 浏览器会员路由在普通生成入口改为返回 `SETUP_REQUIRED`，明确交由 `Browser Assistant` 的 `ToolRegistry -> Browser Bridge` 链路发起并等待用户确认，不再以普通生成器绕过确认直连网页。
+  2. `CapabilitySourcesView` 改为每 4 秒通过 `browser.getStatus` 读取真实 Browser Bridge 状态；本地守护进程或扩展未连接时显示“未连接/Offline”，不再硬编码“已就绪”。
+  3. 旧 `TaskOrchestrator` 浏览器分支不再把未执行的路由反馈为成功，返回到 Browser Assistant 的明确下一步和错误原因。
+  4. 首页首屏主操作统一为“开始创作”，点击会打开真实登录入口；教程关闭与上一步图标补齐可访问名称。
+- **修改文件**：
+  - `apps/web/src/core/generation/browserMembershipRoute.ts`
+  - `apps/web/src/core/generation/GenerationEngine.ts`
+  - `apps/web/src/core/orchestration/TaskOrchestrator.ts`
+  - `apps/web/src/components/settings/views/CapabilitySourcesView.tsx`
+  - `apps/web/src/components/common/TutorialOverlay.tsx`
+  - `apps/web/src/landing/KkLandingPage.tsx`
+  - `tests/unit/browser-membership-runtime-contract.test.ts`
+  - `tests/unit/capability-tree-runtime.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 网页会员能力保留在唯一的 Browser Assistant 运行时内；普通生成入口只负责清楚地引导，避免产生未获确认的网页操作或假成功状态。
+  - 设置页与 Browser Assistant 复用 `browser.getStatus` 作为状态来源，连通性显示不再依赖静态文案。
+- **已运行验证**：
+  - 新增回归测试先失败后通过：网页会员路由交接、桥接状态、首页入口、教程无障碍和旧浏览器编排器均已覆盖。
+  - `npm run architecture:check` 通过。
+  - `npm run governance:check` 通过。
+  - `npm run typecheck` 通过。
+  - `npm run build` 通过。
+  - `npm run test:unit` 通过。
+  - 本地浏览器验证通过：首屏“开始创作”打开登录面板；临时工作台中的能力来源页在 Browser Bridge 断开时显示 Offline，且控制台无错误。
+- **未运行验证及原因**：
+  - 未运行完整 `npm run verify:changes`；本次为受限的前端与运行时修复，已覆盖 AGENTS 要求的架构、治理、类型、构建、完整单测和实际页面验证。
+- **风险与下一步**：
+  - 低风险。真实网页会员生成仍需要用户在桌面端启动本地守护进程并连接 Chrome Bridge 扩展；该环境未安装桥接服务，因此已验证断开状态和引导，未执行真实外部网页生成。

@@ -7,6 +7,10 @@ import { accountLinkerClient } from '../../features/generation/accountLinkerClie
 import { keyManager } from '../../services/auth/keyManager.ts';
 import { buildSecureProxyUserRouteFromSlotId } from '../../services/model/secureModelProxy.ts';
 import type { GenerationTelemetry } from '@kk/shared';
+import {
+  createBrowserMembershipSetupError,
+  isBrowserMembershipRoute,
+} from './browserMembershipRoute.ts';
 
 export class GenerationEngine {
   private static instance: GenerationEngine;
@@ -24,16 +28,20 @@ export class GenerationEngine {
    * Run a media generation task based on GenerationIntent
    */
   public async generate(intent: GenerationIntent): Promise<any> {
-    const keySlot = this.resolveKeySlot(intent.modelId, intent.preferredKeyId);
-    if (!keySlot) {
-      throw new Error(`No available key resolved for model: ${intent.modelId}`);
-    }
-
     const decision = await providerRouteEngine.decideRoute({
       modelId: intent.modelId,
       taskType: intent.mediaType === 'batch' ? 'image' : (intent.mediaType as any),
       preferredKeyId: intent.preferredKeyId,
     });
+
+    if (isBrowserMembershipRoute(decision.mode)) {
+      throw createBrowserMembershipSetupError(decision.mode);
+    }
+
+    const keySlot = this.resolveKeySlot(intent.modelId, intent.preferredKeyId);
+    if (!keySlot) {
+      throw new Error(`No available key resolved for model: ${intent.modelId}`);
+    }
 
     const routeId = this.buildUserRouteForKeySlot(keySlot);
     const startTime = Date.now();

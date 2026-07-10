@@ -16,6 +16,7 @@ globalThis.fetch = async () => ({ ok: true }) as any;
 import { capabilityRegistry } from '../../apps/web/src/core/capability/capabilityRegistry.ts';
 import { permissionPolicy } from '../../apps/web/src/core/permissions/PermissionPolicy.ts';
 import { taskOrchestrator } from '../../apps/web/src/core/orchestration/TaskOrchestrator.ts';
+import { browserActionRouter } from '../../apps/web/src/core/browser/BrowserActionRouter.ts';
 
 test('CapabilityRegistry registration and listing', async () => {
   const sources = capabilityRegistry.getAllSources();
@@ -63,4 +64,33 @@ test('PermissionPolicy risk assessment', async () => {
 
 test('TaskOrchestrator validation', async () => {
   assert.ok(taskOrchestrator, 'TaskOrchestrator should exist.');
+});
+
+test('TaskOrchestrator does not report an unexecuted browser route as a successful task', async () => {
+  const originalRoute = browserActionRouter.route;
+  browserActionRouter.route = async () => ({
+    allowed: true,
+    requiresConfirm: true,
+    routeMode: 'user-owned-web-provider',
+    reason: 'Browser Bridge confirmation required.'
+  });
+
+  try {
+    const result = await taskOrchestrator.orchestrate({
+      type: 'browser',
+      taskId: 'browser-contract-task',
+      userText: 'Generate an image with my web membership.',
+      targetSite: 'chatgpt',
+      actionType: 'generate-image',
+      requiresLogin: true,
+      usesMembership: true,
+      outputTarget: 'canvas',
+      payload: {}
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.error || '', /Browser Assistant/);
+  } finally {
+    browserActionRouter.route = originalRoute;
+  }
 });
