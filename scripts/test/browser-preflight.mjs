@@ -81,6 +81,21 @@ async function resolveHeadlessShellPath() {
   return null;
 }
 
+async function resolveBrowserExecutablePath() {
+  const headlessShell = await resolveHeadlessShellPath();
+  if (headlessShell) return headlessShell;
+
+  const candidates = [
+    process.env.KK_BROWSER_EXECUTABLE,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  ].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate)) || null;
+}
+
 export async function runBrowserPreflight() {
   const spawnProbe = await runProcessSpawnProbe();
   if (!spawnProbe.ok) {
@@ -90,7 +105,7 @@ export async function runBrowserPreflight() {
     };
   }
 
-  const executablePath = await resolveHeadlessShellPath();
+  const executablePath = await resolveBrowserExecutablePath();
   if (!executablePath) {
     return {
       ok: false,

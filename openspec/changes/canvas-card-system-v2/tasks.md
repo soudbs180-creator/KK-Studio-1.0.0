@@ -8,4 +8,4 @@
 - [x] Add editable workflow-panel and vector notebook cards.
 - [x] Add tablet-landscape canvas and compact desktop composer/tool rail.
 - [x] Expand CanvasRuntimeState and canonical card factory tools.
-- [ ] Complete unit, contract, integration, browser, performance, and governance checks.
+- [x] Complete unit, contract, integration, browser, performance, and governance checks.

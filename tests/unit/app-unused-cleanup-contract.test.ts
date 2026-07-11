@@ -38,7 +38,7 @@ test('App does not retain compiler-proven unused imports and locals', () => {
   assert.doesNotMatch(source, /urgentUpdatePromptNode,\s*\/\/ hot-path prompt updates/);
   assert.doesNotMatch(source, /\bunlinkNodes,/);
   assert.doesNotMatch(source, /\bmoveSelectedNodes,/);
-  assert.doesNotMatch(source, /\bupdateWorkflowNode,/);
+  assert.match(source, /\bupdateWorkflowNode,/);
   assert.doesNotMatch(source, /const \[pendingPrompt, setPendingPrompt\]/);
   assert.doesNotMatch(source, /\bpollTaskStatus,/);
   assert.doesNotMatch(source, /cancelGeneration: cancelGen/);

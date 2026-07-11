@@ -2211,3 +2211,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：根 TypeScript 通过；响应式、PromptBar、ProjectManager、手机 Shell 定向回归 41/41 通过；测试语义检查覆盖 485 个文件；画布布局/迁移/可用视口定向测试 19/19 通过；UI Token、z-index、可见区精度、Workspace 体积和设置 UI 治理通过；生产构建通过（2440 modules）；画布性能基线 3/3 通过；移动与桌面设置 smoke 通过降级契约；`git diff --check` 通过。
 - **未运行验证及原因**：真实浏览器多视口截图未完成；当前任务可用工具没有应用内浏览器控制能力，独立 smoke 也报告 `browser-executable-not-found`，因此没有用未登录落地页冒充画布验收。未调用真实付费 Provider。
 - **风险与下一步**：中低风险。下一阶段执行完整架构、治理、类型、构建、全量测试、10k 性能及编码检查；重点关注同步设置页改造引入的外部测试变化，并严格区分本次画布回归与并行改动。
+
+## 138. 2026-07-11 - 完成无限画布 V2 全量验收与浏览器压力审查
+
+- **修改范围**：
+  1. 将遗留测试契约更新为 V2 真实架构事实：电商、PPT、音频继续复用成熟业务渲染器并统一经过 CanvasCardShell，已删除的假数据旁路渲染器不再被测试要求恢复；ghost、skeleton、LOD、节点 presentation、可见索引和逐卡组布局均按当前主链路验证。
+  2. 浏览器预检在 Playwright shell 不存在时支持 `KK_BROWSER_EXECUTABLE`、系统 Chrome 和 Edge，保留进程启动与版本探测，不静默跳过真实浏览器验收。
+  3. 新增零依赖 Chrome DevTools Protocol 画布验收脚本，真实进入 Workspace 并覆盖 `1440x900`、`1280x720`、`1024x720`、`1180x820`、`1023x720`、`834x1112`、`390x844`；检查桌面/横屏平板画布、竖屏结果流、68px 输入区、44px 工具轨、卡片可见性、水平溢出和 UI 遮挡并生成截图报告。
+  4. 同一脚本支持 `KK_CANVAS_CDP_10K=1` 压力模式，注入并在页面内反向核对 100 个主卡与 9,900 个媒体节点；首屏仅挂载可见卡片，验证空间索引、LOD 和 DOM 虚拟化没有退化。
+- **修改文件**：`scripts/test/browser-preflight.mjs`、`scripts/test/verify-canvas-responsive-cdp.mjs`、`tests/contract/canvas-card-renderer-registry.test.ts`、`tests/contract/card-ghost-skeleton-contract.test.ts`、`tests/contract/card-lod-display-contract.test.ts`、`tests/unit/app-shell-surface-hook.test.ts`、`tests/unit/app-unused-cleanup-contract.test.ts`、`tests/unit/canvas-connector-scheduler-contract.test.ts`、`tests/unit/canvas-node-updates-contract.test.ts`、`tests/unit/ecommerce-group-shell-app-contract.test.ts`、`tests/unit/prompt-group-card-optimization-regression.test.ts`、`openspec/changes/canvas-card-system-v2/tasks.md`、`docs/development/session-handoff.md`。
+- **当前设计决策**：业务卡型差异只属于统一 Shell 内的内容渲染，不为每种业务卡恢复一套假数据外壳；浏览器验收可使用系统 Chromium 内核，但必须校验真实 DOM、持久化节点数、截图非空和几何无重叠；10k 报告的节点数从夹具和页面持久化状态分别计算，禁止使用无法核对的常量冒充压力结果。
+- **已运行验证**：`architecture:check` 32/32、`governance:check` 10/10、根/架构 TypeScript、服务端 58 文件语法检查、485 个测试文件语义检查、生产构建（Vite 2440 modules）均通过；全量单元测试、集成 12/12、契约 14/14、E2E 11/11、画布性能 3/3 通过；7 个目标视口真实 Chrome 截图验收全部通过，无水平溢出或工具轨/输入区重叠；10k 页面核对 10,000 节点、约 1.4 秒进入可交互状态且首屏只挂载 2 个卡片 DOM；编码、乱码、OpenSpec 结构和 `git diff --check` 通过。
+- **未运行验证及原因**：当前环境没有 `npm`/`npx` 可执行文件和 `swagger-cli` 包，无法调用聚合命令名 `npm run verify:changes`、生产依赖审计及 Swagger CLI 语义校验；聚合命令中的架构、治理、类型、构建、测试、smoke、编码和画布性能项已通过项目 Node 运行时直接执行底层入口。未调用真实付费 Provider。
+- **风险与下一步**：低风险。V2 OpenSpec 阶段任务已全部完成；后续新增卡型必须走统一工厂、presentation、Shell、空间索引和 ToolRegistry 链路，并同步补充默认与 10k CDP 验收，禁止重新接入已删除的静态旁路渲染器。

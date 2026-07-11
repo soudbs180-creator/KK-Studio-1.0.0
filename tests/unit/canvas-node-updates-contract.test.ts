@@ -93,7 +93,8 @@ test('canvas node update boundary lives outside CanvasContext', () => {
     contextSource.indexOf('const updateImageNodeDimensions = useCallback'),
     contextSource.indexOf('const persistedImageRecoverySignature = useMemo')
   );
-  assert.match(promptUpdateWrapperSource, /addCanvasPromptNode\(canvas, node\)/);
+  assert.match(promptUpdateWrapperSource, /addCanvasPromptNode\(canvas, presentableNode\)/);
+  assert.match(promptUpdateWrapperSource, /createCanvasCardPresentation/);
   assert.match(promptUpdateWrapperSource, /updateCanvasPromptNode\(canvas, node\)/);
   assert.doesNotMatch(promptUpdateWrapperSource, /const allZIndices = \[/);
   assert.doesNotMatch(promptUpdateWrapperSource, /promptNodes: c\.promptNodes\.map\(n => \{/);
@@ -113,8 +114,8 @@ test('addPromptNode does not await reference image persistence before returning'
     contextSource.indexOf('const urgentUpdatePromptNode = useCallback')
   );
 
-  assert.match(promptUpdateWrapperSource, /addCanvasPromptNode\(canvas, node\)/);
-  assert.match(promptUpdateWrapperSource, /void Promise\.allSettled\(saveTasks\)/);
+  assert.match(promptUpdateWrapperSource, /addCanvasPromptNode\(canvas, presentableNode\)/);
+  assert.match(promptUpdateWrapperSource, /void Promise\.allSettled\(saveTasks\)\.then/);
   assert.doesNotMatch(promptUpdateWrapperSource, /await Promise\.allSettled\(saveTasks\)/);
 });
 

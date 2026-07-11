@@ -12,6 +12,7 @@ test('ecommerce analysis confirmation leaves one visible framework card while ch
   const appSource = readSource('apps/web/src/App.tsx');
   const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
   const runtimeSource = readSource('apps/web/src/services/ecommerce/frameworkRuntime.ts');
+  const visibleItemsSource = readSource('apps/web/src/app/useVisibleCanvasItems.ts');
   const typesSource = readSource('apps/web/src/types.ts');
 
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
@@ -27,8 +28,8 @@ test('ecommerce analysis confirmation leaves one visible framework card while ch
   assert.match(buildRuntimeSource, /hiddenInCanvas: Boolean\(params\.frameworkId\)/);
   assert.doesNotMatch(buildRuntimeSource, /hiddenInCanvas: false/);
   assert.match(runtimeSource, /hiddenInCanvas: true/);
-  assert.match(appSource, /n\.hiddenInCanvas/);
-  assert.match(appSource, /n\.ecommerce\?\.frameworkId/);
-  assert.match(appSource, /n\.ecommerce\.kind === 'a-plus-group'/);
+  assert.match(visibleItemsSource, /if \(node\.hiddenInCanvas\)/);
+  assert.match(appSource, /node\.ecommerce\?\.frameworkId/);
+  assert.match(appSource, /node\.ecommerce\?\.kind !== 'main-image'/);
   assert.match(appSource, /ecommerceFrameworkTaskNodesById/);
 });
