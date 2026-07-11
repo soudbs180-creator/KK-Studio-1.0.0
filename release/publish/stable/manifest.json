@@ -2,7 +2,7 @@
   "appName": "KK Studio",
   "version": "1.6.0",
   "displayVersion": "v1.6.0",
-  "buildTime": "2026-07-11T10:14:09.843Z",
+  "buildTime": "2026-07-11T11:13:41.436Z",
   "releaseDate": "2026-07-11",
   "releaseNotes": [
     "重构无限画布卡片、排版、视口恢复与触控交互",
@@ -10,10 +10,10 @@
     "verified kkai.plus same-origin API workaround."
   ],
   "channel": "stable",
-  "commitSha": "ac3441b18f3a62f7fd4e8dd4b6ea983f23499e56",
-  "commitShortSha": "ac3441b",
+  "commitSha": "408d0bb0067969669118725726d5ea9b4c1ae758",
+  "commitShortSha": "408d0bb",
   "packageFile": "KK-Studio-Portable-1.6.0.zip",
   "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.6.0/KK-Studio-Portable-1.6.0.zip",
-  "sha256": "8becafd9910b7b0df4e6562037f568738328b5ca3904e25bc207599625629759",
+  "sha256": "35b4e1e74956f7d9672ebce6127f2945ff9f2048f47349a7c1baabc634cae593",
   "size": 71492552
 }

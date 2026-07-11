@@ -2248,3 +2248,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：完整 `verify:changes` 通过，覆盖架构、治理、生产依赖审计、根/架构/服务端/490 个测试文件类型检查、OpenAPI、生产构建、1703 个单元项（1701 通过、2 跳过）、集成 13/13、契约 15/15、E2E 11/11、Prompt 拖拽、移动/桌面设置、AI 接管、启动横幅、编码与画布性能 3/3。应用内浏览器实测 `1440x900`、`1280x720`、`1024x720`、`1180x820`、`834x1112`、`390x844`；独立 Chromium CDP 再验 `1440x900`、`1280x720`、`1024x720`、`1180x820`、`1023x720`、`834x1112`、`390x844`，确认当前页面为 v1.6.0、桌面卡片可见、工具轨 44px、输入区 68px、竖屏结果流不变且无水平溢出/chrome 重叠。10k CDP 实测恢复 10,000 节点、约 1.2 秒进入可交互状态且首屏仅挂载 2 张卡片。portable 已从最终源码重建，stable manifest 的版本、发布说明、大小和 SHA 由实际 ZIP 生成。
 - **未运行验证及原因**：未调用真实付费 Provider。聚合 smoke 因当前 npx 缓存没有 Playwright 模块而执行其内置契约降级路径；同一最终源码已由应用内浏览器和独立系统 Chromium CDP 完成真实页面与截图验收。生产依赖审计保留 1 条已知 `morgan <= 1.10.1` 中危日志伪造告警，聚合命令按项目策略记录告警但不阻断。
 - **风险与下一步**：低到中风险。旧 `RechargeModal` 文件暂时保留用于历史业务契约追溯，但已从活跃组件树移除；后续可在确认新充值视图完全替代其历史测试后删除文件与 BillingContext 兼容布尔状态。新增卡型必须继续接入统一工厂、Shell、空间索引、排版服务和 ToolRegistry，不得恢复静态占位渲染器。
+
+## 141. 2026-07-11 - 刷新 v1.6.0 portable 发布元数据
+
+- **修改范围**：在 #140 源码提交固定后重新执行 portable 构建与本地 stable 发布，使归档内容、版本说明、源提交、文件大小和 SHA-256 与最终 v1.6.0 源码一致。
+- **修改文件**：`release/publish/stable/manifest.json`、`docs/development/session-handoff.md`。
+- **当前设计决策**：stable manifest 的 `commitSha` 指向实际打包的源码提交 `408d0bb0067969669118725726d5ea9b4c1ae758`；发布元数据提交本身不改变归档内应用代码。
+- **已运行验证**：`package:portable` 成功，包体约 201.15 MB且不包含服务端 `.env`；`publish-portable-release.mjs` 成功，生成 `KK-Studio-Portable-1.6.0.zip`，SHA-256 为 `35b4e1e74956f7d9672ebce6127f2945ff9f2048f47349a7c1baabc634cae593`，stable manifest 与 portable app manifest 的版本和发布说明一致；#140 已完整通过 `verify:changes`、真实 Chromium 响应式和 10k 验收。
+- **未运行验证及原因**：未上传 GitHub Release 资产；本次范围是用户要求的源码提交与推送，未收到创建或覆盖远端 Release 二进制资产的授权。
+- **风险与下一步**：低风险。推送后必须核对本地 `main`、`origin/main` 与 v1.6.0 版本源一致；若后续上传 Release，必须使用本清单中的文件名、SHA 和源提交进行校验。
