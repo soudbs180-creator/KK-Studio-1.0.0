@@ -2224,3 +2224,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：`architecture:check` 32/32、`governance:check` 10/10、根/架构 TypeScript、服务端 58 文件语法检查、485 个测试文件语义检查、生产构建（Vite 2440 modules）均通过；全量单元测试、集成 12/12、契约 14/14、E2E 11/11、画布性能 3/3 通过；7 个目标视口真实 Chrome 截图验收全部通过，无水平溢出或工具轨/输入区重叠；10k 页面核对 10,000 节点、约 1.4 秒进入可交互状态且首屏只挂载 2 个卡片 DOM；编码、乱码、OpenSpec 结构和 `git diff --check` 通过。
 - **未运行验证及原因**：当前环境没有 `npm`/`npx` 可执行文件和 `swagger-cli` 包，无法调用聚合命令名 `npm run verify:changes`、生产依赖审计及 Swagger CLI 语义校验；聚合命令中的架构、治理、类型、构建、测试、smoke、编码和画布性能项已通过项目 Node 运行时直接执行底层入口。未调用真实付费 Provider。
 - **风险与下一步**：低风险。V2 OpenSpec 阶段任务已全部完成；后续新增卡型必须走统一工厂、presentation、Shell、空间索引和 ToolRegistry 链路，并同步补充默认与 10k CDP 验收，禁止重新接入已删除的静态旁路渲染器。
+
+## 139. 2026-07-11 - 重建设置控制台与账户充值路由视图
+
+- **修改范围**：
+  1. 从零重建共享 `SettingsConsoleShell`：桌面端固定 232px 分组侧栏、64px 顶栏、24px 内容边距，账户入口固定底部；移动端使用全屏分组首页和逐级返回，桌面覆盖层与 `/settings/*` 直接路由共用同一组件树。
+  2. 新增中性浅色/深色控制台 Token 与 `settings-console.css`，统一 8px 卡片圆角、6px 控件圆角、极弱 1px 边框、12/16px 模块节奏和 11-24px 字号层级；移除总览大型 Hero、玻璃模糊、彩色渐变、厚重卡片阴影与漂浮装饰。
+  3. 总览改为页面标题、四项核心指标、执行偏好、能力链路、计费摘要和系统状态的高密度网格；保留真实运行数据、快速策略和诊断入口。
+  4. 新增 `/settings/recharge`，保留 CNY/USD、四类通道、金额边界、积分预览、订单锁定、二维码、流水后四位、支付提报、倒计时和账单刷新流程。
+  5. 个人中心拆成概览、安全、账单和资料编辑四个路由视图；新增 `useAccountCenterController`，迁移身份绑定、资料同步、密码验证码、MFA、积分汇总和交易记录。旧个人中心模态框不再由 `AppGlobalModals` 挂载，旧 `openProfileSurface` 兼容入口统一委托设置控制台。
+  6. 更新设置架构治理、桌面/移动 smoke 和旧 UI 契约测试，使其验证新控制台、移动首页、账户子路由和充值路由，不再要求旧侧栏、旧 Hero 或玻璃拟态。
+- **修改文件**：`apps/web/src/components/settings/SettingsWorkbenchShell.tsx`、`SettingsWorkbenchPanel.tsx`、`SettingsScaffold.tsx`、`settingsRegistry.ts`、`settingsRouteConfig.tsx`、`views/DashboardView.localized.tsx`、`views/UserProfileView.tsx`、`views/RechargeView.tsx`、`controllers/useAccountCenterController.ts`、`apps/web/src/styles/settings-console.css`、`apps/web/src/hooks/useWorkspaceSurface.ts`、`apps/web/src/app/AppGlobalModals.tsx`、设置治理/smoke 脚本及对应单元测试。
+- **当前设计决策**：所有设置、账户和充值新视图只使用控制台中性表面；绿色、黄色和红色仅表达业务状态；普通卡片无阴影、无模糊、无渐变。直接路由与覆盖层共享路由定义和页面组件，移动端根 `/settings` 保留分组首页，详情页使用同一路由树。
+- **已运行验证**：设置专项 146/146 通过；`architecture:check` 全链、`governance:check` 全链、根/架构 TypeScript、服务端 58 文件语法检查、485 个测试文件语义检查、生产构建（Vite 2437 modules）均通过；全量单元测试 1678 项（1676 通过、2 跳过）、集成 12/12、契约 14/14、E2E 11/11 通过；移动/桌面设置 smoke、AI smoke、Prompt 拖动 smoke、启动横幅、编码、乱码、画布性能 3/3 和 OpenSpec 结构检查通过；`git diff --check` 通过。Codex 应用内浏览器实测 `390x844` 深色设置首页/个人中心/充值页与 `1440x900` 深浅色桌面总览，侧栏 232px、顶栏 64px、卡片圆角 8px，无横向溢出、无卡片内容溢出或文字重叠。
+- **未运行验证及原因**：当前运行时没有 `npm`/`npx` 与 `swagger-cli`，因此未调用聚合命令名 `npm run verify:changes`、`npm audit` 和 Swagger CLI 语义校验；聚合命令中的架构、治理、类型、构建、全测试、smoke、编码和性能项均已使用项目 Node 运行时直接执行底层入口。
+- **风险与下一步**：本次按并行画布任务委派要求未修改 `WorkspacePage`、`CanvasContext` 或 `InfiniteCanvas`。因此旧充值模态框与 `BillingContext.showRechargeModal` 仍由画布宿主和生成入口使用；下一次迁移需在画布提交基线稳定后，把这些调用改为应用层 `openSettingsSurface('recharge')` / `onRechargeRequired`，再删除 `RechargeModal`、旧 `UserProfileModal` 文件和 BillingContext UI 状态。服务端支付 API、DTO、数据库和计费规则未修改。

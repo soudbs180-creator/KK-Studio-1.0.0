@@ -12,6 +12,7 @@ import {
 } from './settingsRegistry';
 import { SettingsRouterShell } from './SettingsWorkbenchShell';
 import '../../styles/settings.css';
+import '../../styles/settings-console.css';
 
 export interface SettingsPanelProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
 
   const content = presentation === 'page' ? (
     <div
-      className="settings-panel settings-page-root"
+      className="settings-panel settings-page-root settings-console-host"
       data-testid="settings-page-root"
       style={{
         ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
@@ -159,11 +160,8 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     </div>
   ) : (
     <div
-      className="settings-panel settings-shell-backdrop"
+      className="settings-panel settings-shell-backdrop settings-console-host"
       style={{
-        padding: isMobile ? '0px' : '24px',
-        background: 'var(--settings-backdrop-bg)',
-        backdropFilter: 'blur(18px)',
         left: '0px',
         top: '0px',
         bottom: '0px',

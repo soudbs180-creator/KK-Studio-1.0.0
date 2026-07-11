@@ -35,14 +35,14 @@ test('billing ledger shares the same settings hero and section rhythm as the res
   assert.doesNotMatch(billingSource, /settings-reference-page-header/);
 });
 
-test('mobile settings opens directly on overview instead of a separate overview entry screen', () => {
+test('mobile settings uses a grouped home before routed console detail screens', () => {
   const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
-  assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
-  assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
-  assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
+  assert.match(settingsSource, /SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /SettingsConsoleRoutes/);
+  assert.match(settingsSource, /atHome \? <SettingsConsoleMobileHome/);
   assert.match(registrySource, /primaryActionLabelEn: 'Open API Workspace'/);
   assert.match(dashboardSource, /dashboardPrimaryAction/);
   assert.match(dashboardSource, /dashboard-grid-container/);

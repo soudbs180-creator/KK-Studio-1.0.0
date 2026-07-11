@@ -107,11 +107,13 @@ export function useWorkspaceSurface({
   }, []);
 
   const openProfileSurface = useCallback((view: UserProfileView = 'main') => {
+    void view;
     setWorkspaceSurface('workspace');
-    setProfileInitialView(view);
-    setShowProfileModal(true);
+    setProfileInitialView('main');
+    setShowProfileModal(false);
+    openSettingsPanel('user-profile');
     setShowUserMenu(false);
-  }, [setProfileInitialView, setShowProfileModal, setShowUserMenu]);
+  }, [openSettingsPanel, setProfileInitialView, setShowProfileModal, setShowUserMenu]);
 
   const openSettingsSurface = useCallback((
     view: SettingsSurfaceView = 'dashboard',

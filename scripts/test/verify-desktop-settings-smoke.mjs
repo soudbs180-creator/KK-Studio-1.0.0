@@ -301,6 +301,8 @@ function verifyDesktopSourceContracts() {
   const appDesktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
   const settingsShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
+  const settingsConsoleStyleSource = readSource('apps/web/src/styles/settings-console.css');
+  const settingsRoutesSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
   const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
@@ -309,8 +311,12 @@ function verifyDesktopSourceContracts() {
     /data-testid="desktop-user-menu-trigger"/,
     /desktop-user-menu-settings/,
     /data-testid="settings-page-root"/,
-    /modules=\{modules\}/,
-    /activeModuleId=\{activeModuleId\}/,
+    /SettingsConsoleSidebar/,
+    /SettingsConsoleRoutes/,
+    /--console-sidebar-width:\s*232px/,
+    /--console-topbar-height:\s*64px/,
+    /path:\s*'recharge'/,
+    /path:\s*'user-profile\/security'/,
     /dashboard-grid-card/,
     /Provider settings and capability routing|dashboardPrimaryAction/,
     /data-testid="api-official-editor-back"/,
@@ -327,6 +333,8 @@ function verifyDesktopSourceContracts() {
     appDesktopChromeSource,
     settingsPanelSource,
     settingsShellSource,
+    settingsConsoleStyleSource,
+    settingsRoutesSource,
     apiSettingsViewSource,
     workbenchSectionsSource,
     dashboardSource,

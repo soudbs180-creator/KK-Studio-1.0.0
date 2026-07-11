@@ -14,6 +14,7 @@ import {
 
 const DashboardView = lazyWithRetry(() => import('./views/DashboardView.localized.tsx'));
 const UserProfileView = lazyWithRetry(() => import('./views/UserProfileView.tsx'));
+const RechargeView = lazyWithRetry(() => import('./views/RechargeView.tsx'));
 const GenerationModeView = lazyWithRetry(() => import('./views/GenerationModeView.tsx'));
 const CapabilitySourcesView = lazyWithRetry(() => import('./views/CapabilitySourcesView.tsx'));
 const ProviderRoutesView = lazyWithRetry(() => import('./views/ProviderRoutesView.tsx'));
@@ -38,7 +39,11 @@ type SettingsWorkbenchRouteDefinition =
   | { path: 'data-sync'; kind: 'data-sync' }
   | { path: 'dev-diagnostics'; kind: 'dev-diagnostics' }
   | { path: 'appearance-motion'; kind: 'appearance-motion' }
-  | { path: 'user-profile'; kind: 'profile' };
+  | { path: 'user-profile'; kind: 'profile' }
+  | { path: 'user-profile/security'; kind: 'profile' }
+  | { path: 'user-profile/billing'; kind: 'profile' }
+  | { path: 'user-profile/edit'; kind: 'profile' }
+  | { path: 'recharge'; kind: 'recharge' };
 
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
@@ -54,6 +59,10 @@ const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] =
   { path: 'dev-diagnostics', kind: 'dev-diagnostics' },
   { path: 'appearance-motion', kind: 'appearance-motion' },
   { path: 'user-profile', kind: 'profile' },
+  { path: 'user-profile/security', kind: 'profile' },
+  { path: 'user-profile/billing', kind: 'profile' },
+  { path: 'user-profile/edit', kind: 'profile' },
+  { path: 'recharge', kind: 'recharge' },
 ];
 
 interface SettingsRouteOptions {
@@ -119,6 +128,8 @@ function getRouteElement(
       return <AppearanceMotionView key={routeRefreshKey} />;
     case 'profile':
       return <UserProfileView key={routeRefreshKey} />;
+    case 'recharge':
+      return <RechargeView key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }

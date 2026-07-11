@@ -16,7 +16,6 @@ import type {
 const GlobalLightbox = lazyNamedWithRetry(() => import('../components/image/GlobalLightbox'), 'GlobalLightbox');
 const PptStackPreviewModal = lazyWithRetry(() => import('../components/image/PptStackPreviewModal'));
 const SettingsPanel = lazyWithRetry(() => import('../components/settings/SettingsPanel'));
-const UserProfileModal = lazyWithRetry(() => import('../components/modals/UserProfileModal'));
 const SearchPalette = lazyWithRetry(() => import('../components/layout/SearchPalette'));
 const TagInputModal = lazyWithRetry(() => import('../components/modals/TagInputModal'));
 const TutorialOverlay = lazyWithRetry(() => import('../components/common/TutorialOverlay'));
@@ -305,19 +304,6 @@ const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
           allTags={tagModal.allTags}
           inheritedTags={tagModal.inheritedTags}
           isSubCard={tagModal.isSubCard}
-        />
-      </Suspense>
-    )}
-
-    {profileModal.isOpen && (
-      <Suspense fallback={null}>
-        <UserProfileModal
-          isOpen={profileModal.isOpen}
-          onClose={profileModal.onClose}
-          user={profileModal.user}
-          onSignOut={profileModal.onSignOut}
-          initialView={profileModal.initialView}
-          isMobile={profileModal.isMobile}
         />
       </Suspense>
     )}

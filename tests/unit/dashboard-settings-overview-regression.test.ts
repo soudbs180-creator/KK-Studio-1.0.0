@@ -24,10 +24,12 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(source, /const scheduleStorageSnapshotRefresh = useCallback\(\(\) => \{/);
   assert.match(source, /requestIdleCallback/);
 
-  // 验证大卡片布局
+  // 验证控制台标题、四指标与紧凑模块布局
+  assert.match(source, /dashboard-console-header/);
+  assert.match(source, /console-grid dashboard-console-metrics/);
   assert.match(source, /dashboard-grid-container/);
   assert.match(source, /dashboard-grid-card/);
-  assert.match(source, /LayoutDashboard/);
+  assert.doesNotMatch(source, /<SettingsHero/);
   assert.match(source, /Activity/);
   assert.match(source, /KeyRound/);
   assert.match(source, /HardDrive/);

@@ -64,11 +64,31 @@ function checkImports(dir) {
 }
 checkImports(path.join(ROOT_DIR, 'apps/web/src'));
 
-// 3. check-settings-mobile-capability-tree
+// 3. check-settings-console-shared-component-tree
 expectMatch(
   'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',
-  /SettingsMobileDashboard\s*onNavigate=\{onNavigate\}/,
-  'SettingsMobileShell must render SettingsMobileDashboard for mobile capability tree settings.'
+  /SettingsConsoleMobileHome\s+onNavigate=\{handleNavigate\}/,
+  'Mobile settings must render the shared console mobile home instead of the legacy dashboard.'
+);
+expectMatch(
+  'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',
+  /<SettingsConsoleRoutes[\s\S]*onNavigate=\{handleNavigate\}/,
+  'Desktop and mobile settings must share SettingsConsoleRoutes.'
+);
+expectMatch(
+  'apps/web/src/styles/settings-console.css',
+  /--console-sidebar-width:\s*232px/,
+  'Settings console sidebar width must remain 232px.'
+);
+expectMatch(
+  'apps/web/src/styles/settings-console.css',
+  /--console-topbar-height:\s*64px/,
+  'Settings console topbar height must remain 64px.'
+);
+expectMatch(
+  'apps/web/src/components/settings/settingsRouteConfig.tsx',
+  /path:\s*'recharge'[\s\S]*path:\s*'user-profile\/security'[\s\S]*path:\s*'user-profile\/billing'[\s\S]*path:\s*'user-profile\/edit'|path:\s*'user-profile\/security'[\s\S]*path:\s*'user-profile\/billing'[\s\S]*path:\s*'user-profile\/edit'[\s\S]*path:\s*'recharge'/,
+  'Recharge and all account-center subroutes must be registered.'
 );
 
 // 4. check-root-mode-settings-routing

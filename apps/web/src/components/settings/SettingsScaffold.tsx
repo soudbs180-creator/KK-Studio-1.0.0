@@ -175,7 +175,7 @@ type SettingsViewShellProps = {
 };
 
 export const SettingsViewShell: React.FC<SettingsViewShellProps> = ({ children, className = '' }) => (
-  <div className={`${SETTINGS_PAGE_CONTAINER_CLASSNAME} settings-view-shell settings-reference-stack space-y-6 pb-4 ${className}`.trim()}>{children}</div>
+  <div className={`${SETTINGS_PAGE_CONTAINER_CLASSNAME} settings-view-shell settings-reference-stack console-page ${className}`.trim()}>{children}</div>
 );
 
 type SettingsSystemCardProps = {
@@ -200,7 +200,7 @@ export const SettingsSystemCard: React.FC<SettingsSystemCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className={`settings-system-card ${SETTINGS_GLASS_SURFACE_CLASSNAME} ${className}`.trim()}>
+    <section className={`settings-system-card ${SETTINGS_GLASS_SURFACE_CLASSNAME} console-card ${className}`.trim()}>
       {title || description || Icon || action ? (
         <div className="settings-system-card__header">
           <div className="settings-system-card__title-row">
@@ -239,7 +239,7 @@ export const SettingsSystemField: React.FC<SettingsSystemFieldProps> = ({
   htmlFor,
   className = '',
 }) => (
-  <div className={`settings-system-field ${className}`.trim()}>
+  <div className={`settings-system-field console-setting-row ${className}`.trim()}>
     <div className="settings-system-field__copy">
       <div className="settings-system-field__label-row">
         {htmlFor ? (
@@ -263,7 +263,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
+    className={`console-badge inline-flex max-w-full min-w-0 items-center overflow-hidden text-left font-medium whitespace-nowrap ${className}`.trim()}
     style={{
       ...toneStyles[tone].badgeStyle,
       fontSize: 'var(--type-micro)',
@@ -308,7 +308,7 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
 
   return (
     <section
-      className={`settings-hero-flat-header space-y-5 ${className}`.trim()}
+      className={`settings-hero-flat-header console-page-header ${className}`.trim()}
     >
       <div className="settings-hero-card__header flex flex-wrap items-start justify-between gap-5">
         <div className="settings-hero-card__lead flex min-w-0 flex-1 items-start gap-4">
@@ -371,7 +371,7 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <div className="settings-reference-mini-metric h-full">
+    <div className="settings-reference-mini-metric console-metric-card h-full">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="settings-reference-mini-metric__label break-words" style={{ overflowWrap: 'anywhere' }}>
@@ -431,8 +431,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   // 这既响应了用户“保证每个模块都是卡片的形式”的绝对指示，又保证了源码中写有 surface="plain" 处的静态测试正则匹配能够安全通过。
   // 在删除小字（即没有 eyebrow）时，将顶部内边距 pt-4 微调为 pt-3，使标题位置自然上移。
   return (
-    <section className="space-y-3 h-full flex flex-col" data-testid={testId}>
-      <div className={`settings-section-card settings-reference-card settings-reference-card--elevated ${eyebrow ? 'p-4' : 'pt-3 px-4 pb-4'} flex-1 flex flex-col min-h-0`} style={SETTINGS_PANEL_STYLE}>
+    <section className="console-section h-full flex flex-col" data-testid={testId}>
+      <div className="settings-section-card settings-reference-card console-card flex-1 flex flex-col min-h-0">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {eyebrow ? (
@@ -471,7 +471,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           </div>
           {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
         </div>
-        <div className="mt-5 flex-1 min-h-0 overflow-y-auto">{children}</div>
+        <div className="console-section__body flex-1 min-h-0">{children}</div>
       </div>
     </section>
   );
@@ -536,7 +536,7 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
     <button
       type={type}
       onClick={handleInterceptClick}
-      className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium leading-tight whitespace-nowrap ${motionClass} ${size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2'} ${isGhostDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-40'} ${className}`.trim()}
+      className={`console-button inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium whitespace-nowrap ${motionClass} ${isGhostDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-40'} ${className}`.trim()}
       style={{
         borderRadius: size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)',
         fontSize: size === 'sm' ? 'var(--type-caption)' : 'var(--type-body-2)',
@@ -614,8 +614,7 @@ export const SettingsCardGridContainer: React.FC<{ children: React.ReactNode; cl
   children,
   className = '',
 }) => (
-  <div className={`settings-card-grid-container ${className}`.trim()}>
+  <div className={`settings-card-grid-container console-grid ${className}`.trim()}>
     {children}
   </div>
 );
-

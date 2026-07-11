@@ -46,10 +46,8 @@ test('Settings mobile shell routes nested API editor back actions to the API man
   const source = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.ok(source.includes('isApiManagementEditorRoute'));
-  assert.ok(source.includes('onBackToApiManagement'));
-  assert.match(source, /if \(isApiManagementEditorRoute\) \{\s*onBackToApiManagement\(\);\s*return;\s*\}/);
-  assert.match(source, /onBackToApiManagement=\{handleBackToApiManagement\}/);
-  assert.match(source, /isApiManagementEditorRoute=\{nestedApiEditorRoute\}/);
+  assert.match(source, /const nestedApiEditor = isApiManagementEditorRoute\(location\.pathname\);/);
+  assert.match(source, /if \(nestedApiEditor\) \{\s*navigate\('\/settings\/capability-sources', \{ state: nestedApiState \|\| undefined \}\);\s*return;\s*\}/);
 });
 
 test('ApiSettingsView list mode delegates calmer workbench overview copy to dedicated workbench sections', () => {

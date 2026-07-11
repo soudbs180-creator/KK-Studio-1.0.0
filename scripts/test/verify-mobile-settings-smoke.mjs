@@ -419,6 +419,8 @@ function verifyMobileSourceContracts() {
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
   const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
   const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
+  const settingsShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
+  const settingsConsoleStyleSource = readSource('apps/web/src/styles/settings-console.css');
 
   const checks = [
     /data-testid="mobile-header-menu-button"/,
@@ -432,6 +434,9 @@ function verifyMobileSourceContracts() {
     /testId="settings-model-center"/,
     /data-testid="api-model-center-provider-pool"/,
     /data-testid="api-model-center-preset-directory"/,
+    /SettingsConsoleMobileHome/,
+    /settings-console--mobile/,
+    /@media \(max-width: 767px\)/,
   ];
 
   const sources = [
@@ -441,6 +446,8 @@ function verifyMobileSourceContracts() {
     dashboardSource,
     workbenchSectionsSource,
     scaffoldSource,
+    settingsShellSource,
+    settingsConsoleStyleSource,
   ];
 
   for (const pattern of checks) {

@@ -32,6 +32,7 @@ export type CanonicalSettingsViewId =
   | 'data-sync'
   | 'dev-diagnostics'
   | 'user-profile'
+  | 'recharge'
   | 'appearance-motion';
 
 export type LegacySettingsViewId =
@@ -166,6 +167,7 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'data-sync': 'data-sync',
   'dev-diagnostics': 'dev-diagnostics',
   'user-profile': 'user-profile',
+  recharge: 'recharge',
   'appearance-motion': 'appearance-motion',
 };
 
@@ -328,6 +330,18 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     primaryActionTarget: 'dashboard',
     statusSummaryLabelZh: '账户状态',
     statusSummaryLabelEn: 'Account status',
+  },
+  recharge: {
+    eyebrow: 'Billing',
+    titleZh: '充值积分',
+    titleEn: 'Recharge Credits',
+    descriptionZh: '选择支付通道、充值金额并跟踪订单到账状态。',
+    descriptionEn: 'Choose a payment channel and amount, then track credit delivery.',
+    primaryActionLabelZh: '返回个人中心',
+    primaryActionLabelEn: 'Back to Profile',
+    primaryActionTarget: 'user-profile',
+    statusSummaryLabelZh: '充值状态',
+    statusSummaryLabelEn: 'Recharge status',
   },
   'appearance-motion': {
     eyebrow: 'Advanced Performance',
@@ -494,6 +508,7 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
   if (currentPath.startsWith('ai-management')) return 'ai-takeover';
   if (currentPath.startsWith('appearance-motion')) return 'appearance-motion';
   if (currentPath.startsWith('user-profile')) return 'user-profile';
+  if (currentPath.startsWith('recharge')) return 'recharge';
   if (currentPath.startsWith('storage-settings')) return 'data-sync';
   if (currentPath.startsWith('system-logs')) return 'dev-diagnostics';
   if (currentPath.startsWith('browser-assistant')) return 'browser-assistant';
@@ -564,7 +579,7 @@ export function getSettingsModules(language: AppLanguage): SettingsModule[] {
 }
 
 export function getSettingsModuleId(view: CanonicalSettingsViewId): SettingsModuleId | null {
-  if (view === 'user-profile') return null;
+  if (view === 'user-profile' || view === 'recharge') return null;
   if (view === 'dashboard' || view === 'generation-mode') return 'overview';
   if (view === 'ai-takeover' || view === 'capability-sources' || view === 'browser-assistant' || view === 'provider-routes') {
     return 'ai';

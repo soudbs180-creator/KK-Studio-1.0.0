@@ -92,16 +92,15 @@ describe('responsive surface utilities', () => {
     assert.doesNotMatch(desktopSteps, /mobile-tab-bar/);
   });
 
-  test('Clay settings shell keeps separate mobile and desktop surface tokens', () => {
-    const cssSource = readSource('apps/web/src/index.css');
+  test('settings console keeps separate mobile and desktop surface contracts', () => {
+    const cssSource = readSource('apps/web/src/styles/settings-console.css');
     const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
-    assert.match(settingsSource, /settings-shell-page--desktop/);
-    assert.match(settingsSource, /settings-shell-page--mobile/);
-    assert.match(cssSource, /--clay-desktop-shell-padding:\s*16px 28px 18px;/);
-    assert.match(cssSource, /--clay-mobile-shell-padding:\s*12px 8px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/);
-    assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop[\s\S]*padding:\s*var\(--clay-desktop-shell-padding\);/);
-    assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile[\s\S]*padding:\s*var\(--clay-mobile-shell-padding\);/);
+    assert.match(settingsSource, /settings-console--desktop/);
+    assert.match(settingsSource, /settings-console--mobile/);
+    assert.match(cssSource, /\.settings-console-content \{[\s\S]*padding: 24px;/);
+    assert.match(cssSource, /\.settings-console-content--mobile \{[\s\S]*padding: 14px 12px calc\(env\(safe-area-inset-bottom, 0px\) \+ 18px\);/);
+    assert.match(cssSource, /@media \(max-width: 767px\)/);
   });
 
   test('Clay search palette keeps distinct mobile sheet and desktop command surface', () => {

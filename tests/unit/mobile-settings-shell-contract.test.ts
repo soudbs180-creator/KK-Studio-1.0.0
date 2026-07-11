@@ -8,18 +8,16 @@ const ROOT_DIR = process.cwd();
 
 
 
-test('mobile settings shell opens the overview directly inside the shared router-backed workbench', () => {
+test('mobile settings shell opens a grouped console home and shares routed detail views', () => {
   const appSource = readSource('apps/web/src/App.tsx');
   const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
-  assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
-  assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
-  assert.match(settingsSource, /pick\('关闭设置', 'Close settings'\)/);
-  assert.match(settingsSource, /pick\('返回设置总览', 'Back to settings overview'\)/);
-  assert.match(settingsSource, /onBackToApiManagement/);
-  assert.doesNotMatch(settingsSource, /settings-shell-mobile__focus/);
+  assert.match(settingsSource, /SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /SettingsConsoleRoutes/);
+  assert.match(settingsSource, /const atHome = location\.pathname === '\/settings'/);
+  assert.match(settingsSource, /if \(activeView === 'dashboard'\) onClose\(\);/);
   assert.doesNotMatch(appSource, /mobileSettingsSection/);
   assert.doesNotMatch(appSource, /openMobileSettings/);
   assert.match(mobileSurfaceSource, /onOpenSettings: \(\) => void;/);
@@ -32,13 +30,12 @@ test('mobile settings shell opens the overview directly inside the shared router
   assert.match(registrySource, /id: 'system-logs'/);
 });
 
-test('mobile settings shell treats settings root as the dashboard detail route', () => {
+test('mobile settings shell treats settings root as the grouped home route', () => {
   const settingsSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
   assert.doesNotMatch(settingsSource, /SettingsRouterLocationState/);
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
-  assert.doesNotMatch(settingsSource, /isMobileHomeRoute/);
-  assert.doesNotMatch(settingsSource, /showHome/);
-  assert.doesNotMatch(settingsSource, /setShowHome/);
-  assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => \{\s*navigate\(buildSettingsPath\(view\)\);\s*\};/);
+  assert.match(settingsSource, /const atHome = location\.pathname === '\/settings' \|\| location\.pathname === '\/settings\/'/);
+  assert.match(settingsSource, /atHome \? <SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => navigate\(buildSettingsPath\(view\)\);/);
 });

@@ -8,7 +8,6 @@ import {
   Globe,
   HardDrive,
   KeyRound,
-  LayoutDashboard,
   Laptop,
   ScrollText,
 } from 'lucide-react';
@@ -34,7 +33,6 @@ import {
   SettingsActionButton,
   SettingsBadge,
   SettingsCardGridContainer,
-  SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
 import {
@@ -154,7 +152,7 @@ const MetricTile: React.FC<{
   helper: string;
   tone?: HealthTone;
 }> = ({ label, value, helper, tone = 'indigo' }) => (
-  <div className="dashboard-metric-tile" data-tone={tone}>
+  <div className="dashboard-metric-tile console-metric-card" data-tone={tone}>
     <div className="dashboard-metric-tile__label">{label}</div>
     <div className="dashboard-metric-tile__value">{value}</div>
     <div className="dashboard-metric-tile__helper">{helper}</div>
@@ -182,7 +180,7 @@ const DashboardPanel: React.FC<{
 
   return (
     <section
-      className={`dashboard-panel dashboard-grid-card ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
+      className={`dashboard-panel dashboard-grid-card console-card ${onClick ? 'dashboard-panel--interactive' : ''} ${className}`.trim()}
       data-clickable={onClick ? 'true' : 'false'}
       data-tone={tone}
       data-settings-dashboard-action={uiAction}
@@ -1597,17 +1595,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
       `}</style>
 
-      <SettingsHero
-        eyebrow={dashboardMeta.eyebrow}
-        title={dashboardMeta.title}
-        icon={LayoutDashboard}
-        tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
-        badge={<StatusBadge status={heroStatus} label={dashboardStatusSummaryLabel} />}
-        description={pick(
-          '先确定本地或服务器执行，再查看插件能力、消耗和系统状态。',
-          'Choose local or server execution, then review plugin capabilities, usage, and system state.',
-        )}
-        actions={(
+      <header className="console-page-header dashboard-console-header">
+        <div>
+          <span className="console-eyebrow">{dashboardMeta.eyebrow}</span>
+          <h2>{dashboardMeta.title}</h2>
+          <p>{pick(
+            '先确定本地或服务器执行，再查看能力链路、计费摘要和系统状态。',
+            'Choose local or server execution, then review capability routes, billing, and system state.',
+          )}</p>
+        </div>
+        <div className="dashboard-console-header__actions">
+          <StatusBadge status={heroStatus} label={dashboardStatusSummaryLabel} />
           <SettingsActionButton
             icon={ArrowRight}
             tone="primary"
@@ -1616,36 +1614,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           >
             {dashboardPrimaryAction.label}
           </SettingsActionButton>
-        )}
-        metrics={(
-          <>
-            <MetricTile
-              label={pick('系统就绪度', 'System readiness')}
-              value={`${systemReadiness}%`}
-              helper={heroStatusLabel}
-              tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
-            />
-            <MetricTile
-              label={pick('今日消耗', 'Spend today')}
-              value={formatUsd(todayCostUsd)}
-              helper={pick(`${formatCompactNumber(todayTokens)} tokens`, `${formatCompactNumber(todayTokens)} tokens`)}
-              tone="emerald"
-            />
-            <MetricTile
-              label={pick('API 链路', 'API routes')}
-              value={String(channelCount)}
-              helper={pick(`${officialCount} 官方 / ${activeProviderCount} 供应商在线`, `${officialCount} official / ${activeProviderCount} providers online`)}
-              tone={hasAvailableRoute ? 'indigo' : 'amber'}
-            />
-            <MetricTile
-              label={pick('余额', 'Balance')}
-              value={remainingBalanceDisplay}
-              helper={todayRechargeCount > 0 ? pick(`今日充值 ${todayRechargeCount} 条`, `${todayRechargeCount} recharges today`) : pick('余额快照', 'Balance snapshot')}
-              tone="amber"
-            />
-          </>
-        )}
-      />
+        </div>
+      </header>
+
+      <div className="console-grid dashboard-console-metrics">
+        <MetricTile
+          label={pick('系统就绪度', 'System readiness')}
+          value={`${systemReadiness}%`}
+          helper={heroStatusLabel}
+          tone={hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber'}
+        />
+        <MetricTile
+          label={pick('今日消耗', 'Spend today')}
+          value={formatUsd(todayCostUsd)}
+          helper={pick(`${formatCompactNumber(todayTokens)} tokens`, `${formatCompactNumber(todayTokens)} tokens`)}
+          tone="emerald"
+        />
+        <MetricTile
+          label={pick('API 链路', 'API routes')}
+          value={String(channelCount)}
+          helper={pick(`${officialCount} 官方 / ${activeProviderCount} 供应商在线`, `${officialCount} official / ${activeProviderCount} providers online`)}
+          tone={hasAvailableRoute ? 'indigo' : 'amber'}
+        />
+        <MetricTile
+          label={pick('余额', 'Balance')}
+          value={remainingBalanceDisplay}
+          helper={todayRechargeCount > 0 ? pick(`今日充值 ${todayRechargeCount} 条`, `${todayRechargeCount} recharges today`) : pick('余额快照', 'Balance snapshot')}
+          tone="amber"
+        />
+      </div>
 
       <SettingsCardGridContainer className="dashboard-grid-container dashboard-command-center dashboard-command-center--focused">
         <DashboardPanel
