@@ -8,11 +8,6 @@ test('Canvas Card Registry registers real renderers through the unified shell pa
     'ImageGenerationGroupRenderer.tsx',
     'VideoGenerationGroupRenderer.tsx',
     'MultiImageGroupRenderer.tsx',
-    'BrowserTaskCardRenderer.tsx',
-    'AssetCardRenderer.tsx',
-    'WorkflowCardRenderer.tsx',
-    'AgentCardRenderer.tsx',
-    'ExportCardRenderer.tsx',
     'UnknownCardRenderer.tsx',
   ];
   for (const filename of filenames) {
@@ -22,10 +17,11 @@ test('Canvas Card Registry registers real renderers through the unified shell pa
   }
 
   const registry = fs.readFileSync(path.resolve('apps/web/src/core/canvas/renderers/CanvasCardRendererRegistry.ts'), 'utf8');
-  for (const kind of ['ecommerce-task-card', 'ppt-slide-card', 'ppt-deck-card', 'music-task-card']) {
-    assert.match(registry, new RegExp(`this\\.register\\('${kind}'.*ImageGenerationGroupRenderer`));
-  }
+  assert.doesNotMatch(registry, /BrowserTaskCardRenderer|AssetCardRenderer|WorkflowCardRenderer|AgentCardRenderer|ExportCardRenderer/);
   for (const removed of ['EcommerceTaskCardRenderer.tsx', 'PptSlideCardRenderer.tsx', 'PptDeckCardRenderer.tsx', 'MusicTaskCardRenderer.tsx']) {
+    assert.equal(fs.existsSync(path.resolve(`apps/web/src/core/canvas/renderers/${removed}`)), false);
+  }
+  for (const removed of ['BrowserTaskCardRenderer.tsx', 'AssetCardRenderer.tsx', 'WorkflowCardRenderer.tsx', 'AgentCardRenderer.tsx', 'ExportCardRenderer.tsx']) {
     assert.equal(fs.existsSync(path.resolve(`apps/web/src/core/canvas/renderers/${removed}`)), false);
   }
 });

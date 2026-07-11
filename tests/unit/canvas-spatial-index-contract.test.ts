@@ -18,16 +18,21 @@ test('CanvasSpatialIndex uses grid buckets and viewport queries', () => {
   assert.match(source, /bucket\.forEach\(\(nodeId\) => result\.add\(nodeId\)\)/);
 });
 
-test('useCanvasSpatialIndex indexes prompt image and workflow nodes with lookup maps', () => {
+test('useCanvasSpatialIndex indexes prompt image workflow and notebook nodes with lookup maps', () => {
   const source = spatialHookSource();
 
   assert.match(source, /new CanvasSpatialIndex\(1000\)/);
   assert.match(source, /const promptNodeById = new Map<string, PromptNode>\(\)/);
   assert.match(source, /const imageNodeById = new Map<string, GeneratedImage>\(\)/);
   assert.match(source, /const workflowNodeById = new Map<string, WorkflowUtilityCanvasNode>\(\)/);
+  assert.match(source, /const noteNodeById = new Map<string, CanvasNoteNode>\(\)/);
   assert.match(source, /activeCanvas\.promptNodes\.forEach/);
   assert.match(source, /activeCanvas\.imageNodes\.forEach/);
   assert.match(source, /workflowNodes\.forEach/);
+  assert.match(source, /activeCanvas\.noteNodes \|\| \[\]/);
+  assert.match(source, /excludedNodeIds\?\.has\(node\.id\)/);
+  assert.match(source, /excludedNodeIds\?\.has\(note\.id\)/);
+  assert.match(spatialIndexSource(), /getAllBounds\(\)/);
 });
 
 test('useVisibleCanvasItemsNew avoids O(N) culling loops and queries spatial index', () => {
@@ -63,6 +68,9 @@ test('WorkspacePage uses the spatial-index visible-items path directly', () => {
   const source = workspaceSource();
 
   assert.match(source, /const \{ spatialIndex, promptNodeById, imageNodeById, workflowNodeById.*\} = useCanvasSpatialIndex\(/);
+  assert.match(source, /indexedCanvasSceneBounds/);
+  assert.match(source, /sceneBounds=\{indexedCanvasSceneBounds\}/);
+  assert.match(source, /excludedNodeIds: collapsedCanvasGroupNodeIds/);
   assert.match(source, /const viewportBounds = React\.useMemo\(\(\) => \{/);
   assert.match(source, /\} = useVisibleCanvasItemsNew\(\{/);
   assert.doesNotMatch(source, /diagnosticsVisibleItems/);

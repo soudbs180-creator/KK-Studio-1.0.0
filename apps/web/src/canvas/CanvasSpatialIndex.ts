@@ -83,6 +83,10 @@ export class CanvasSpatialIndex {
     return this.nodeBounds.get(nodeId);
   }
 
+  getAllBounds(): CanvasNodeBounds[] {
+    return Array.from(this.nodeBounds.values());
+  }
+
   // 简体中文：查询视口边界（包含 buffer）内的所有可见节点 ID
   query(vLeft: number, vTop: number, vRight: number, vBottom: number): Set<string> {
     const result = new Set<string>();

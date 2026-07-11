@@ -268,11 +268,20 @@ export const getCanvasMigrationSummaryKey = (storageKey: string): string => (
 );
 
 export const restoreCanvasMigrationBackup = (storageKey: string): boolean => {
-  const backupKey = getCanvasMigrationBackupKey(storageKey);
-  const backup = localStorage.getItem(backupKey);
-  if (!backup) return false;
-  localStorage.setItem(storageKey, backup);
-  localStorage.removeItem(backupKey);
+  try {
+    const backupKey = getCanvasMigrationBackupKey(storageKey);
+    const backup = localStorage.getItem(backupKey);
+    if (!backup) return false;
+    localStorage.setItem(storageKey, backup);
+    localStorage.removeItem(backupKey);
+    localStorage.removeItem(getCanvasMigrationSummaryKey(storageKey));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const acceptCanvasMigration = (storageKey: string): void => {
+  localStorage.removeItem(getCanvasMigrationBackupKey(storageKey));
   localStorage.removeItem(getCanvasMigrationSummaryKey(storageKey));
-  return true;
 };

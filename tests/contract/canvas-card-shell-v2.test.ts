@@ -9,12 +9,15 @@ test('all active business card surfaces expose the unified shell semantics', () 
   const image = read('apps/web/src/components/image/ImageCard2.tsx');
   const shell = read('apps/web/src/components/canvas/CanvasCardShell.tsx');
 
-  for (const source of [prompt, image, shell]) {
-    assert.match(source, /data-card-kind/);
-    assert.match(source, /data-layout-mode/);
-    assert.match(source, /data-detail-level/);
-    assert.match(source, /canvas-card-shell/);
+  for (const source of [prompt, image]) {
+    assert.match(source, /CanvasCardShell/);
+    assert.match(source, /presentation=\{shellPresentation\}/);
+    assert.match(source, /detailLevel=\{detailLevel\}/);
   }
+  assert.match(shell, /data-card-kind/);
+  assert.match(shell, /data-layout-mode/);
+  assert.match(shell, /data-detail-level/);
+  assert.match(shell, /canvas-card-shell/);
 });
 
 test('PPT deck uses one real deck card instead of scattered page cards', () => {
@@ -23,7 +26,8 @@ test('PPT deck uses one real deck card instead of scattered page cards', () => {
 
   assert.match(renderer, /isSingleDeckCard = node\.presentation\?\.kind === 'ppt-deck'/);
   assert.match(renderer, /renderedChildLayouts = isSingleDeckCard \? \[\] : childVisualLayouts/);
-  assert.match(prompt, /pptDeck\.pages\.slice\(0, 6\)/);
+  assert.match(prompt, /pptDeck\.pages\.map/);
+  assert.doesNotMatch(prompt, /pptDeck\.pages\.slice\(0, 6\)/);
   assert.match(prompt, /pptDeck\.lastThumbnailUrl/);
 });
 
@@ -34,12 +38,16 @@ test('fake business renderers cannot be restored as side paths', () => {
     'apps/web/src/core/canvas/renderers/PptSlideCardRenderer.tsx',
     'apps/web/src/core/canvas/renderers/PptDeckCardRenderer.tsx',
     'apps/web/src/core/canvas/renderers/MusicTaskCardRenderer.tsx',
+    'apps/web/src/core/canvas/renderers/BrowserTaskCardRenderer.tsx',
+    'apps/web/src/core/canvas/renderers/AssetCardRenderer.tsx',
+    'apps/web/src/core/canvas/renderers/WorkflowCardRenderer.tsx',
+    'apps/web/src/core/canvas/renderers/AgentCardRenderer.tsx',
+    'apps/web/src/core/canvas/renderers/ExportCardRenderer.tsx',
   ]) {
     assert.equal(fs.existsSync(path), false, `${path} must remain removed`);
   }
-  assert.match(registry, /presentationKind === 'ppt-deck'/);
-  assert.match(registry, /presentationKind === 'audio'/);
-  assert.doesNotMatch(registry, /import (?:EcommerceTask|PptSlide|PptDeck|MusicTask)CardRenderer/);
+  assert.match(registry, /return 'image-generation-group'/);
+  assert.doesNotMatch(registry, /import (?:EcommerceTask|PptSlide|PptDeck|MusicTask|BrowserTask|Asset|Workflow|Agent|Export)CardRenderer/);
 });
 
 test('multi-image cards persist fold and primary-image controls', () => {
@@ -64,4 +72,19 @@ test('audio uses the real media element and auxiliary cards stay virtualized', (
   assert.match(workspace, /isAuxiliaryCanvasNodeVisible/);
   assert.match(workspace, /activeCanvas\?\.noteNodes[\s\S]{0,220}\.filter\(\(note\) => isAuxiliaryCanvasNodeVisible/);
   assert.match(workspace, /node\.kind === 'workflow-panel'[\s\S]{0,220}isAuxiliaryCanvasNodeVisible/);
+});
+
+test('damaged auxiliary cards stay visible and notebook previews remain storage-backed', () => {
+  const workspace = read('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const canvasContext = read('apps/web/src/context/CanvasContext.tsx');
+  const migrationNotice = read('apps/web/src/components/canvas/CanvasMigrationNotice.tsx');
+
+  assert.match(workspace, /node\.presentation\?\.kind === 'unknown'/);
+  assert.match(workspace, /note\.presentation\?\.kind === 'unknown'/);
+  assert.match(workspace, /renderUnknownCanvasCard/);
+  assert.match(canvasContext, /canvas-note-preview-/);
+  assert.match(canvasContext, /await saveImage\(previewStorageId, previewUrl\)/);
+  assert.match(canvasContext, /previewStorageId, updatedAt/);
+  assert.match(migrationNotice, /restoreCanvasMigrationBackup/);
+  assert.match(migrationNotice, /acceptCanvasMigration/);
 });

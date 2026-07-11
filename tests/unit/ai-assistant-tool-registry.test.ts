@@ -225,8 +225,7 @@ test('工具注册表：canvas.arrangeNodes 调用注入的画布整理能力', 
 });
 
 test('ToolRegistry: canvas.arrangeNodes supports targeted compact node layout', async () => {
-  let updatePayload: any = null;
-  let arrangeAllCalled = false;
+  let arrangeCall: { mode?: string; nodeIds?: string[] } | null = null;
   const result = await toolRegistryInstance.execute('canvas.arrangeNodes', {
     nodeIds: ['p1', 'img1'],
     preset: 'compact-grid',
@@ -244,11 +243,8 @@ test('ToolRegistry: canvas.arrangeNodes supports targeted compact node layout', 
       groups: [],
       selectedNodeIds: []
     },
-    updateNodes: (updates: any) => {
-      updatePayload = updates;
-    },
-    arrangeAllNodes: () => {
-      arrangeAllCalled = true;
+    arrangeAllNodes: (mode?: string, nodeIds?: string[]) => {
+      arrangeCall = { mode, nodeIds };
     },
     notify: {
       success: () => {}
@@ -258,9 +254,28 @@ test('ToolRegistry: canvas.arrangeNodes supports targeted compact node layout', 
   assert.equal(result.status, 'arranged');
   assert.equal(result.preset, 'compact-grid');
   assert.equal(result.selectedCount, 2);
-  assert.equal(arrangeAllCalled, false);
-  assert.equal(updatePayload.promptNodes.length, 1);
-  assert.equal(updatePayload.imageNodes.length, 1);
+  assert.deepEqual(arrangeCall, { mode: 'grid', nodeIds: ['p1', 'img1'] });
+});
+
+test('ToolRegistry: canvas.arrangeNodes accepts layout alias and auxiliary card ids', async () => {
+  let arrangeCall: { mode?: string; nodeIds?: string[] } | null = null;
+  await toolRegistryInstance.execute('canvas.arrangeNodes', {
+    nodeIds: ['note-1', 'workflow-1'],
+    layout: 'column',
+  }, {
+    activeCanvas: {
+      id: 'canvas-1',
+      promptNodes: [],
+      imageNodes: [],
+      noteNodes: [{ id: 'note-1' }],
+      workflow: { nodes: [{ id: 'workflow-1' }] },
+      groups: [],
+    },
+    arrangeAllNodes: (mode?: string, nodeIds?: string[]) => {
+      arrangeCall = { mode, nodeIds };
+    },
+  });
+  assert.deepEqual(arrangeCall, { mode: 'column', nodeIds: ['note-1', 'workflow-1'] });
 });
 
 test('ToolRegistry: canvas.createPromptCards can attach Browser Assistant image results to prompt cards', async () => {

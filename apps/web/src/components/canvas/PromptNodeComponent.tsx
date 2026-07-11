@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { type PromptNode, AspectRatio, GenerationMode, type PromptGenerationMetadata, type EcommerceEditableTaskState, type EcommerceFrameworkQueueItem } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
-import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download, Heart, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download, Heart, AlertCircle, Bot, Pencil } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -25,6 +25,8 @@ import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
+import CanvasCardShell from './CanvasCardShell.tsx';
+import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
 
 const EcommerceCanvasWorkbenchCard = React.lazy(() => import('../ecommerce/EcommerceCanvasWorkbenchCard'));
 
@@ -302,6 +304,7 @@ interface PromptNodeProps {
     onCancel?: (id: string) => void;
     onDelete?: (id: string) => void;
     onRetry?: (node: PromptNode) => void;
+    onUseAsAiContext?: (node: PromptNode) => void;
     onEditPptDeck?: (node: PromptNode) => void;
     onExportPpt?: (node: PromptNode) => void;
     onExportPptx?: (node: PromptNode) => void;
@@ -577,6 +580,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     isMobile = false,
     onCancel,
     onDelete,
+    onRetry,
+    onUseAsAiContext,
     onEditPptDeck,
     onExportPpt,
     onExportPptx,
@@ -1247,6 +1252,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const isThumbnailShell = detailLevel === 'thumbnail-shell';
     const shellKind = node.presentation?.kind || (node.childImageIds.length > 0 ? 'prompt-result-group' : 'prompt-only');
     const shellLayoutMode = node.presentation?.layoutMode || 'column';
+    const shellPresentation = node.presentation || createCanvasCardPresentation(
+        shellKind,
+        shellLayoutMode,
+        cardWidth >= 400 ? 'wide' : cardWidth <= 280 ? 'compact' : 'standard',
+    );
     const shellCardShadow = shouldReduceShadow
         ? 'none'
         : (showError
@@ -1302,19 +1312,23 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     if (detailLevel === 'ghost') {
         return (
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`prompt-card-${node.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
-                className="canvas-card-shell prompt-node absolute flex flex-col items-center select-none"
+                id={node.id}
+                domId={`prompt-card-${node.id}`}
+                position={renderPos}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={cardWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel={detailLevel}
+                positioning="origin-transform"
+                surface={false}
+                renderDetailPlaceholder={false}
+                className="prompt-node flex flex-col items-center select-none"
                 style={{
-                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
-                    left: 0,
-                    top: 0,
-                    zIndex: effectiveStackZIndex,
-                    width: cardWidth,
                     height: cardHeight,
                     opacity: 0.8,
                     cursor: isDragging ? 'grabbing' : 'grab',
@@ -1337,28 +1351,33 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         {pickByDocumentLanguage(node.prompt, node.originalPrompt) || 'Ghost Details'}
                     </div>
                 </div>
-            </div>
+            </CanvasCardShell>
         );
     }
 
     if (isSlowLoading) {
         return (
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`prompt-card-${node.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
+                id={node.id}
+                domId={`prompt-card-${node.id}`}
+                position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={cardWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel="skeleton"
+                positioning="origin-transform"
+                surface={false}
+                renderDetailPlaceholder={false}
                 style={{
-                    position: 'absolute',
-                    left: `${snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1) - originX}px`,
-                    top: `${snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1) - originY}px`,
-                    width: `${cardWidth}px`,
                     height: `${cardHeight}px`,
                     pointerEvents: 'none',
                     opacity: 0.8,
                 }}
-                className="canvas-card-shell gpu-accelerated transition-opacity duration-300"
+                className="gpu-accelerated transition-opacity duration-300"
             >
                 <div
                     className="w-full h-full rounded-2xl border animate-pulse"
@@ -1368,7 +1387,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         backdropFilter: 'blur(8px)',
                     }}
                 />
-            </div>
+            </CanvasCardShell>
         );
     }
 
@@ -1380,15 +1399,24 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
 
         return (
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`prompt-card-${node.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
+                id={node.id}
+                domId={`prompt-card-${node.id}`}
+                position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={cardWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel={detailLevel}
+                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                surface={false}
+                renderDetailPlaceholder={false}
                 data-x={node.position.x}
                 data-y={node.position.y}
-                className={`canvas-card-shell prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
+                className={`prompt-node ${isChatMode ? 'w-full max-w-[460px] mx-auto my-3' : ''} flex flex-col items-center group antialiased select-none`}
                 style={isChatMode ? {
                     opacity: 1,
                 } : {
@@ -1547,20 +1575,29 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         </div>
                     </div>
                 </div>
-            </div>
+            </CanvasCardShell>
         );
     }
 
     return (
-        <div
+        <CanvasCardShell
             ref={containerRef}
-            id={`prompt-card-${node.id}`}
-            data-card-kind={shellKind}
-            data-layout-mode={shellLayoutMode}
-            data-detail-level={detailLevel}
+            id={node.id}
+            domId={`prompt-card-${node.id}`}
+            position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
+            origin={{ x: originX, y: originY }}
+            presentation={shellPresentation}
+            width={cardWidth}
+            height={cardHeight}
+            zIndex={effectiveStackZIndex}
+            selected={isSelected}
+            detailLevel={detailLevel}
+            positioning={isChatMode ? 'flow' : 'origin-transform'}
+            surface={false}
+            renderDetailPlaceholder={false}
             data-x={node.position.x}
             data-y={node.position.y}
-            className={`canvas-card-shell prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
+            className={`prompt-node ${isChatMode ? 'w-full max-w-[460px] mx-auto my-3' : ''} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
             style={isChatMode ? {
                 opacity: 1,
             } : {
@@ -1667,6 +1704,21 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {showError && onRetry && (
+                            <button
+                                type="button"
+                                className="inline-flex h-8 items-center gap-1 rounded-md border border-red-400/30 px-2 text-[11px] text-red-300 hover:bg-red-500/10"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onRetry(node);
+                                }}
+                                aria-label="Retry failed card"
+                                title="Retry failed card"
+                            >
+                                <Sparkles size={12} />
+                                Retry
+                            </button>
+                        )}
                         {!node.isGenerating && renderedSuccessCount > 0 && (
                             <div
                                 className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] text-[var(--text-secondary)] font-medium shrink-0 select-none"
@@ -2206,8 +2258,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 )}
                             </div>
 
-                            <div className="mt-3 space-y-2">
-                                {pptDeck.pages.slice(0, 6).map((page) => (
+                            <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
+                                {pptDeck.pages.map((page) => (
                                     <div
                                         key={`ppt-page-module-${page.pageIndex}`}
                                         className="rounded-xl border p-2.5"
@@ -2290,12 +2342,53 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         </div>
                                     </div>
                                 ))}
-                                {pptDeck.pages.length > 6 && (
-                                    <div className="text-[10px] text-[var(--text-tertiary)]">
-                                        其余 {pptDeck.pages.length - 6} 页继续在页面模块面板中管理。
-                                    </div>
-                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {shellKind === 'text' && (
+                        <div className="mx-3 mt-3 flex flex-wrap gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-2">
+                            <button
+                                type="button"
+                                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border-light)] px-2.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    void writeTextToClipboard(node.prompt).then(
+                                        () => notify.success('Copied', 'Text card copied to clipboard.'),
+                                        () => notify.error('Copy failed', 'Clipboard access is unavailable.'),
+                                    );
+                                }}
+                                title="Copy text"
+                            >
+                                <Copy size={13} />
+                                Copy
+                            </button>
+                            <button
+                                type="button"
+                                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border-light)] px-2.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onClickPrompt?.(node, false);
+                                }}
+                                title="Edit or use as prompt"
+                            >
+                                <Pencil size={13} />
+                                Edit / Prompt
+                            </button>
+                            {onUseAsAiContext && (
+                                <button
+                                    type="button"
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border-light)] px-2.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onUseAsAiContext(node);
+                                    }}
+                                    title="Use as AI context"
+                                >
+                                    <Bot size={13} />
+                                    AI Context
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -2670,7 +2763,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     onClose={() => setPreviewImage(null)}
                 />
             )}
-        </div>
+        </CanvasCardShell>
     );
 }, (prev, next) => {
     // 🚀 [Fix] Only compare state/data props to avoid rendering on inline function identity changes

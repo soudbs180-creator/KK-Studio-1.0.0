@@ -74,7 +74,6 @@ export interface UsePromptGroupLayoutDeps {
   promptGroupLayerById: Map<string, number> | null | undefined;
   promptGroupLayoutStateByIdRef: RefObject<Record<string, PromptGroupLayoutPresentationState>>;
   promptGroupLayoutVersion: number;
-  subCardLayoutMode: 'grid' | 'row' | 'column';
   promptNodesById: Map<string, PromptNode> | null | undefined;
   selectNodes: SelectNodes;
   selectedNodeIds: string[] | null | undefined;
@@ -244,7 +243,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupLayerById,
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
-    subCardLayoutMode,
     promptNodesById,
     selectNodes,
     selectedNodeIds,
@@ -639,7 +637,7 @@ function getSubCardStandardOffset(
 
           const layoutMode = promptNode.mode === GenerationMode.PPT
             ? 'column'
-            : (promptNode.presentation?.layoutMode || subCardLayoutMode);
+            : (promptNode.presentation?.layoutMode || 'column');
           const offset = getSubCardStandardOffset(promptNode, childImages, imageNode, layoutMode);
 
           const ownerBase = resolveCanvasNodePositionForLiveDrag(ownerId) || promptNode.position;
@@ -688,7 +686,6 @@ function getSubCardStandardOffset(
     liveDerivedNodeIdsByOwnerRef,
     liveNodePositionByIdRef,
     resolveCanvasNodePositionForLiveDrag,
-    subCardLayoutMode,
     syncLiveNodePositionState,
     currentPromptNodesById,
     currentImageNodesById,

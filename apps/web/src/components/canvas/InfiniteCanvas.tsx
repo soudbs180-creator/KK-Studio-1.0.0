@@ -15,6 +15,7 @@ import {
     doesViewportIntersectScene,
     isValidCanvasViewportTransform,
 } from '../../canvas/canvasViewportPersistence.ts';
+import { getAvailableCanvasViewport, measureCanvasViewportInsets } from '../../canvas/canvasAvailableViewport.ts';
 
 export interface InfiniteCanvasHandle {
     zoomIn: () => void;
@@ -41,6 +42,7 @@ interface InfiniteCanvasProps {
     onAutoArrange?: () => void; // Called when arrange button is clicked
     onResetView?: () => void; // Called when ESC is pressed (定位最新)
     sceneBounds?: CanvasSceneBounds[];
+    restoreFocusBounds?: CanvasSceneBounds[];
     viewStorageKey?: string;
     onMouseDown?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
@@ -89,7 +91,7 @@ const buildViewportTransform = (nextTransform: Transform, _preferGpu: boolean = 
     return `translate(${nextTransform.x}px, ${nextTransform.y}px) scale(${nextTransform.scale})`;
 };
 
-const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, sceneBounds = [], viewStorageKey = 'kk_canvas_view:default:desktop', onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop, backgroundOverlay, reducePointerEffects = false }, ref) => {
+const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, sceneBounds = [], restoreFocusBounds = [], viewStorageKey = 'kk_canvas_view:default:desktop', onMouseDown, onMouseMove, onMouseUp, onContextMenu, id, onImageDrop, backgroundOverlay, reducePointerEffects = false }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
@@ -109,6 +111,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     // 🚀 实时坐标追踪 Ref (解决 React 状态异步延迟，确保 getCurrentTransform 永远返回物理最新值)
     const syncTransformRef = useRef<Transform>({ x: 0, y: 0, scale: 1 });
     const sceneBoundsRef = useRef(sceneBounds);
+    const restoreFocusBoundsRef = useRef(restoreFocusBounds);
     const callbackRef = useRef({
         onTransformChange,
         onInteractionChange,
@@ -151,7 +154,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     useEffect(() => {
         sceneBoundsRef.current = sceneBounds;
-    }, [sceneBounds]);
+        restoreFocusBoundsRef.current = restoreFocusBounds;
+    }, [restoreFocusBounds, sceneBounds]);
 
     useEffect(() => {
         callbackRef.current = {
@@ -393,6 +397,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     useEffect(() => {
         const rect = readContainerRect();
         if (!rect) return;
+        const available = getAvailableCanvasViewport(rect, measureCanvasViewportInsets(rect));
 
         const initialGlow = {
             x: rect.width / 2,
@@ -406,12 +411,12 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
         // Restore only a view that still intersects the current scene.
         try {
-            const savedView = localStorage.getItem(viewStorageKey) || localStorage.getItem('kk_canvas_view');
+            const savedView = localStorage.getItem(viewStorageKey);
             if (savedView) {
                 const parsed = JSON.parse(savedView);
                 if (
                     isValidCanvasViewportTransform(parsed)
-                    && doesViewportIntersectScene(parsed, rect, sceneBoundsRef.current)
+                    && doesViewportIntersectScene(parsed, available, sceneBoundsRef.current)
                 ) {
                     setTransform(parsed);
                     syncTransformRef.current = parsed;
@@ -426,13 +431,21 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             localStorage.removeItem(viewStorageKey);
         }
 
-        const initialTransform = createCanvasFitTransform(sceneBoundsRef.current, rect, {
+        const initialTransformBase = createCanvasFitTransform(
+            restoreFocusBoundsRef.current.length > 0 ? restoreFocusBoundsRef.current : sceneBoundsRef.current,
+            available,
+            {
             padding: 72,
             minScale: CANVAS_MIN_SCALE,
             maxScale: 1,
-        }) || {
-            x: rect.width / 2,
-            y: rect.height / 2,
+        });
+        const initialTransform = initialTransformBase ? {
+            ...initialTransformBase,
+            x: initialTransformBase.x + available.x,
+            y: initialTransformBase.y + available.y,
+        } : {
+            x: available.centerX,
+            y: available.centerY,
             scale: 1
         };
         setTransform(initialTransform);
@@ -846,9 +859,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
+        const available = getAvailableCanvasViewport(rect, measureCanvasViewportInsets(rect));
         const newTransform = snapTransformForText({
-            x: rect.width / 2,
-            y: rect.height / 2,
+            x: available.centerX,
+            y: available.centerY,
             scale: 1
         });
         syncTransformRef.current = newTransform;
@@ -865,35 +879,19 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             return;
         }
 
-        // 计算所有卡片的边界
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        sceneBounds.forEach(bounds => {
-            minX = Math.min(minX, bounds.x);
-            maxX = Math.max(maxX, bounds.x + bounds.width);
-            minY = Math.min(minY, bounds.y);
-            maxY = Math.max(maxY, bounds.y + bounds.height);
-        });
-
-        const contentWidth = maxX - minX;
-        const contentHeight = maxY - minY;
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-
         const rect = container.getBoundingClientRect();
-        const padding = 100; // 边距
-        const availableWidth = rect.width - padding * 2;
-        const availableHeight = rect.height - padding * 2;
-
-        // 计算适合的缩放比例
-        const scaleX = availableWidth / contentWidth;
-        const scaleY = availableHeight / contentHeight;
-        const newScale = Math.min(Math.max(0.1, Math.min(scaleX, scaleY, 1)), 1); // 最大100%
-
-        // 计算新的x,y使内容居中
-        const newX = rect.width / 2 - centerX * newScale;
-        const newY = rect.height / 2 - centerY * newScale;
-
-        const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
+        const available = getAvailableCanvasViewport(rect, measureCanvasViewportInsets(rect));
+        const fitted = createCanvasFitTransform(sceneBounds, available, {
+            padding: 100,
+            minScale: CANVAS_MIN_SCALE,
+            maxScale: 1,
+        });
+        if (!fitted) return;
+        const newTransform = snapTransformForText({
+            ...fitted,
+            x: fitted.x + available.x,
+            y: fitted.y + available.y,
+        });
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
         emitTransformChange(newTransform);
@@ -902,7 +900,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         // 派发自定义事件，通知子卡片进行由内向外的慢加载优化以减小渲染压力
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('kk-fit-to-all', {
-                detail: { centerX, centerY }
+                detail: {
+                    centerX: (available.x - newTransform.x + available.width / 2) / newTransform.scale,
+                    centerY: (available.y - newTransform.y + available.height / 2) / newTransform.scale,
+                }
             }));
         }
     }, [sceneBounds, emitLiveTransformChange, emitTransformChange, resetView]);

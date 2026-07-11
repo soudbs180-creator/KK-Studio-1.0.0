@@ -50,3 +50,15 @@ test('audio factory output is a playable media node without fabricated duration'
 test('media cards reject missing URLs instead of rendering blank cards', () => {
   assert.throws(() => createCanvasCardNodes({ kind: 'media-only' }, defaults), /require at least one media URL/);
 });
+
+test('ecommerce factory output opens as a real framework workbench card', () => {
+  const result = createCanvasCardNodes({
+    kind: 'ecommerce',
+    title: 'Summer collection',
+    prompt: 'Build storefront assets',
+  }, defaults);
+
+  assert.equal(result.promptNodes[0].mode, 'ecommerce');
+  assert.equal(result.promptNodes[0].ecommerce?.kind, 'framework');
+  assert.equal(result.promptNodes[0].ecommerce?.displayLabel, 'Summer collection');
+});

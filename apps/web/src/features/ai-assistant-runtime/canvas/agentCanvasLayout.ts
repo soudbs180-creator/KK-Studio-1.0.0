@@ -1,23 +1,6 @@
-import type { CanvasSceneBounds } from '@kk/shared';
 import type { AspectRatio, Canvas, GeneratedImage, PromptNode } from '../../../types.ts';
-import { arrangeCanvasLayoutItems, resolveCanvasLayoutBounds } from '../../../canvas/canvasLayoutService.ts';
+import { resolveCanvasLayoutBounds } from '../../../canvas/canvasLayoutService.ts';
 import { getCardDimensions } from '../../../utils/styleUtils.ts';
-
-export type AgentNodeLayoutMode = 'grid' | 'row' | 'column';
-export type AgentNodeLayoutPreset = AgentNodeLayoutMode | 'compact-grid';
-
-export interface AgentNodeArrangeOptions {
-  mode?: AgentNodeLayoutMode;
-  preset?: AgentNodeLayoutPreset;
-  columns?: number;
-  gap?: number;
-}
-
-export interface AgentNodeArrangeUpdates {
-  promptNodes: { id: string; updates: Partial<PromptNode> }[];
-  imageNodes: { id: string; updates: Partial<GeneratedImage> }[];
-  bounds?: CanvasSceneBounds | null;
-}
 
 const PROMPT_WIDTH = 320;
 const DEFAULT_PROMPT_HEIGHT = 180;
@@ -72,57 +55,6 @@ const buildLayoutItems = (canvas: Canvas, nodeIds: readonly string[]): LayoutIte
     return [];
   });
 };
-
-const resolveColumns = (count: number, options: AgentNodeArrangeOptions): number => {
-  if (options.mode === 'row') return Math.max(1, count);
-  if (options.mode === 'column') return 1;
-  if (Number.isFinite(options.columns) && Number(options.columns) > 0) {
-    return Math.min(count, Math.max(1, Math.floor(Number(options.columns))));
-  }
-  return Math.max(1, Math.min(options.preset === 'compact-grid' ? 4 : 3, count));
-};
-
-export function resolveAgentNodeArrangeUpdates(
-  canvas: Canvas,
-  nodeIds: readonly string[],
-  options: AgentNodeArrangeOptions = {}
-): AgentNodeArrangeUpdates {
-  const items = buildLayoutItems(canvas, nodeIds);
-  if (items.length === 0) {
-    return { promptNodes: [], imageNodes: [] };
-  }
-
-  const gap = Number.isFinite(options.gap)
-    ? Math.max(0, Number(options.gap))
-    : options.preset === 'compact-grid'
-      ? 24
-      : 48;
-  const mode = options.mode
-    || (options.preset && options.preset !== 'compact-grid' ? options.preset : 'grid');
-  const columns = resolveColumns(items.length, { ...options, mode });
-  const { positions, bounds } = arrangeCanvasLayoutItems(
-    items.map((item) => ({
-      id: item.id,
-      position: { x: item.x, y: item.y },
-      width: item.width,
-      height: item.height,
-    })),
-    { mode, gap, columns },
-  );
-  const promptNodes: AgentNodeArrangeUpdates['promptNodes'] = [];
-  const imageNodes: AgentNodeArrangeUpdates['imageNodes'] = [];
-
-  items.forEach((item) => {
-    const position = positions[item.id];
-    if (item.kind === 'prompt') {
-      promptNodes.push({ id: item.id, updates: { position } });
-    } else {
-      imageNodes.push({ id: item.id, updates: { position } });
-    }
-  });
-
-  return { promptNodes, imageNodes, bounds };
-}
 
 export function resolveAgentGroupBounds(
   canvas: Canvas,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getCanvasRecoveryDiagnosticKey,
+  readCanvasMigrationSummary,
   restoreCanvasStateFromLocalStorage,
 } from '../../apps/web/src/context/canvasPersistence.ts';
 import {
@@ -9,6 +10,7 @@ import {
   sanitizePersistedCanvasesWithReport,
 } from '../../apps/web/src/context/canvasGeometrySanitizer.ts';
 import {
+  acceptCanvasMigration,
   getCanvasMigrationBackupKey,
   getCanvasMigrationSummaryKey,
   inferPromptLayoutMode,
@@ -400,6 +402,29 @@ test('first migration stores a versioned backup and exposes a reversible restore
   });
 });
 
+test('migration summary can be read and accepted without deleting current canvas data', () => {
+  const storageKey = 'kk_test_canvas_migration_accept';
+  const storage = new MemoryStorage();
+  const current = JSON.stringify({ canvases: [{ id: 'canvas-current' }] });
+  storage.setItem(storageKey, current);
+  storage.setItem(getCanvasMigrationBackupKey(storageKey), JSON.stringify({ canvases: [] }));
+  storage.setItem(getCanvasMigrationSummaryKey(storageKey), JSON.stringify({
+    version: 2,
+    migratedCanvasIds: ['canvas-current'],
+    repairedNodeIds: ['node-1'],
+    inferredLayoutNodeIds: [],
+    completedAt: 123,
+  }));
+
+  withLocalStorage(storage, () => {
+    assert.deepEqual(readCanvasMigrationSummary(storageKey)?.repairedNodeIds, ['node-1']);
+    acceptCanvasMigration(storageKey);
+    assert.equal(storage.getItem(storageKey), current);
+    assert.equal(storage.getItem(getCanvasMigrationBackupKey(storageKey)), null);
+    assert.equal(readCanvasMigrationSummary(storageKey), null);
+  });
+});
+
 test('canvas viewport is scoped, supports the full zoom range, and rejects off-scene views', () => {
   const scene = [{ x: 100, y: 200, width: 320, height: 240 }];
   assert.equal(getCanvasViewportStorageKey('canvas-1', 'desktop'), 'kk_canvas_view:canvas-1:desktop');
@@ -408,6 +433,11 @@ test('canvas viewport is scoped, supports the full zoom range, and rejects off-s
   assert.equal(isValidCanvasViewportTransform({ x: 0, y: 0, scale: 0.09 }), false);
   assert.equal(doesViewportIntersectScene({ x: -100, y: -200, scale: 1 }, { width: 800, height: 600 }, scene), true);
   assert.equal(doesViewportIntersectScene({ x: -10000, y: -10000, scale: 1 }, { width: 800, height: 600 }, scene), false);
+  assert.equal(doesViewportIntersectScene(
+    { x: -900, y: -200, scale: 1 },
+    { x: 1000, y: 0, width: 800, height: 600 },
+    scene,
+  ), false);
 });
 
 test('fit transform uses exact scene bounds and centers the result', () => {

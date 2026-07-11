@@ -7,8 +7,6 @@ import type { CanvasNoteRasterResult } from '../canvas/canvasNoteRasterizer.ts';
 
 export const MAX_CANVASES = 10;
 
-export type SubCardLayout = 'row' | 'grid' | 'column';
-
 export type ArrangeMode = 'grid' | 'row' | 'column';
 
 export interface CanvasState {
@@ -23,7 +21,6 @@ export interface CanvasState {
     fileSystemHandle: FileSystemDirectoryHandle | null;
     folderName: string | null;
     selectedNodeIds: string[];
-    subCardLayoutMode: SubCardLayout;
     viewportCenter: { x: number; y: number };
 }
 
@@ -52,7 +49,7 @@ export interface CanvasContextType {
     pushToHistory: () => void;
     canUndo: boolean;
     canRedo: boolean;
-    arrangeAllNodes: (mode?: ArrangeMode) => void;
+    arrangeAllNodes: (mode?: ArrangeMode, nodeIds?: string[]) => void;
     getNextCardPosition: () => { x: number; y: number };
     connectLocalFolder: () => Promise<void>;
     disconnectLocalFolder: () => Promise<void>;
@@ -101,7 +98,7 @@ export interface CanvasContextType {
     clearCanvasDrawings: () => void;
     convertDrawingsToNote: (drawingIds: string[], title?: string) => CanvasNoteNode | null;
     editNoteNode: (id: string) => string[];
-    rasterizeNote: (id: string, scale?: number) => Promise<CanvasNoteRasterResult | null>;
+    rasterizeNote: (id: string, scale?: number) => Promise<(CanvasNoteRasterResult & { previewStorageId: string }) | null>;
     updateNoteNodePosition: (id: string, position: { x: number; y: number }) => void;
     deleteNoteNode: (id: string) => void;
 }
@@ -143,6 +140,5 @@ export const DEFAULT_STATE: CanvasState = {
     fileSystemHandle: null,
     folderName: null,
     selectedNodeIds: [],
-    subCardLayoutMode: 'row',
     viewportCenter: { x: 0, y: 0 }
 };

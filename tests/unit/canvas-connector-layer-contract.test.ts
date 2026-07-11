@@ -24,11 +24,15 @@ test('prompt groups route connectors from the selected horizontal or vertical ca
   const geometry = readSource('apps/web/src/canvas/connectorGeometry.ts');
   const layout = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
   const workspace = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const imageRenderer = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
+  const videoRenderer = readSource('apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx');
 
   assert.match(geometry, /export function buildDockedHorizontalConnectorPath/);
   assert.match(layout, /layoutMode: 'grid' \| 'row' \| 'column'/);
   assert.match(layout, /layoutMode === 'row'/);
   assert.match(layout, /buildDockedHorizontalConnectorPath/);
   assert.match(layout, /getPromptNodeBoundsWidth\(node, false\)/);
-  assert.match(workspace, /subCardLayoutMode: state\.subCardLayoutMode/);
+  assert.doesNotMatch(workspace, /subCardLayoutMode: state\.subCardLayoutMode/);
+  assert.match(imageRenderer, /node\.presentation\?\.layoutMode \|\| 'column'/);
+  assert.match(videoRenderer, /node\.presentation\?\.layoutMode \|\| 'column'/);
 });

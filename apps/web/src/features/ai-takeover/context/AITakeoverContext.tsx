@@ -6,7 +6,7 @@ import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { startGenerationQueueSync } from '../../ai-assistant-runtime/queue/GenerationQueueSync.ts';
-import { resolveAgentGroupBounds, resolveAgentNodeArrangeUpdates } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
+import { resolveAgentGroupBounds } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
 import {
   agentRuntimeInstance,
   agentRunStore,
@@ -72,7 +72,7 @@ interface AITakeoverProviderProps {
   rasterizeNote?: (id: string, scale?: number) => Promise<any>;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
-  arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column') => void;
+  arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column', nodeIds?: string[]) => void;
   addGroup?: (group: any) => void;
   updateGroup?: (group: any) => void;
   setNodeTags?: (ids: string[], tags: string[]) => void;
@@ -535,20 +535,8 @@ export function AITakeoverProvider({
     // 注册自动排版 handler
     durableGenerationQueue.registerArrangeHandler(async (nodeIds, options) => {
       console.log('[DurableQueue] Job completed, nodes ready to arrange:', nodeIds);
-      const canvas = activeCanvasRef.current;
-      if (canvas && updateNodesRef.current && nodeIds.length > 0) {
-        const updates = resolveAgentNodeArrangeUpdates(canvas, nodeIds, {
-          mode: options.layout,
-          preset: options.layoutPreset,
-          columns: options.columns,
-          gap: options.gap
-        });
-        updateNodesRef.current(updates);
-        return;
-      }
-
       if (arrangeAllNodesRef.current) {
-        arrangeAllNodesRef.current(options.layout || 'grid');
+        arrangeAllNodesRef.current(options.layout || 'grid', nodeIds);
       }
     });
 

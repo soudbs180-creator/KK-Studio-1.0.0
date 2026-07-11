@@ -9,7 +9,6 @@ import type {
   CanvasContext,
   CanvasContextType,
   CanvasState,
-  SubCardLayout,
 } from '../../apps/web/src/context/canvasContextState.ts';
 
 const ROOT_DIR = process.cwd();
@@ -19,7 +18,6 @@ type CanvasContextStatePublicBoundary = {
   context: CanvasContextType;
   contextObject: typeof CanvasContext;
   arrangeMode: ArrangeMode;
-  subCardLayout: SubCardLayout;
 };
 
 

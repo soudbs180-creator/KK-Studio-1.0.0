@@ -76,6 +76,14 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
 }) => {
   const isDrawingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
+  const activePointerTypeRef = useRef<string | null>(null);
+  const touchPointersRef = useRef(new Map<number, Point>());
+  const touchGestureRef = useRef<{
+    distance: number;
+    worldX: number;
+    worldY: number;
+    scale: number;
+  } | null>(null);
   const pointsRef = useRef<Point[]>([]);
   const previewPathRef = useRef<SVGPathElement>(null);
   const previewRectRef = useRef<SVGRectElement>(null);
@@ -172,17 +180,54 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.pointerType === 'touch' && activePointerTypeRef.current === 'pen') {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.pointerType === 'touch' && Math.max(event.width, event.height) > 44) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.pointerType === 'touch') {
+      touchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
     if (textInputPos) submitText();
     const point = getCanvasCoords(event.clientX, event.clientY);
     if (!point) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (event.pointerType === 'touch' && touchPointersRef.current.size >= 2) {
+      const [first, second] = Array.from(touchPointersRef.current.values()).slice(0, 2);
+      const rect = canvasRef.current?.getCanvasRect();
+      const transform = canvasRef.current?.getCurrentTransform();
+      if (rect && transform) {
+        const midpoint = { x: (first.x + second.x) / 2 - rect.left, y: (first.y + second.y) / 2 - rect.top };
+        touchGestureRef.current = {
+          distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)),
+          worldX: (midpoint.x - transform.x) / transform.scale,
+          worldY: (midpoint.y - transform.y) / transform.scale,
+          scale: transform.scale,
+        };
+      }
+      isDrawingRef.current = false;
+      activePointerIdRef.current = null;
+      activePointerTypeRef.current = null;
+      pointsRef.current = [];
+      hideAllPreviews();
+      return;
+    }
+
     activePointerIdRef.current = event.pointerId;
+    activePointerTypeRef.current = event.pointerType;
     if (activeTool === 'text') {
       setTextInputPos(point);
       setTextInputValue('');
       activePointerIdRef.current = null;
+      activePointerTypeRef.current = null;
       event.currentTarget.releasePointerCapture(event.pointerId);
       return;
     }
@@ -192,6 +237,26 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' && touchPointersRef.current.has(event.pointerId)) {
+      touchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (touchGestureRef.current && touchPointersRef.current.size >= 2) {
+      const [first, second] = Array.from(touchPointersRef.current.values()).slice(0, 2);
+      const rect = canvasRef.current?.getCanvasRect();
+      if (!rect) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const gesture = touchGestureRef.current;
+      const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+      const scale = Math.min(3, Math.max(0.1, gesture.scale * (distance / gesture.distance)));
+      const midpoint = { x: (first.x + second.x) / 2 - rect.left, y: (first.y + second.y) / 2 - rect.top };
+      canvasRef.current?.setView(
+        midpoint.x - gesture.worldX * scale,
+        midpoint.y - gesture.worldY * scale,
+        scale,
+      );
+      return;
+    }
     if (!isDrawingRef.current || activePointerIdRef.current !== event.pointerId) return;
     const point = getCanvasCoords(event.clientX, event.clientY);
     if (!point) return;
@@ -249,10 +314,29 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
   };
 
   const finishPointer = (event: React.PointerEvent<HTMLDivElement>, cancelled = false) => {
-    if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.pointerType === 'touch') {
+      touchPointersRef.current.delete(event.pointerId);
+      if (touchGestureRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        if (touchPointersRef.current.size < 2) touchGestureRef.current = null;
+        isDrawingRef.current = false;
+        activePointerIdRef.current = null;
+        activePointerTypeRef.current = null;
+        pointsRef.current = [];
+        hideAllPreviews();
+        return;
+      }
+    }
+    if (activePointerIdRef.current !== event.pointerId) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     activePointerIdRef.current = null;
+    activePointerTypeRef.current = null;
     isDrawingRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     hideAllPreviews();

@@ -404,6 +404,7 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     isMobile,
     imageCardHeightById,
     getComputedGroupBounds,
+    excludedNodeIds: collapsedCanvasGroupNodeIds,
   });
 
   // 2. 算视口范围与 buffer 缓存边界

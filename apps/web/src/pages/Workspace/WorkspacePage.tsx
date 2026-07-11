@@ -3,7 +3,9 @@ import InfiniteCanvas, { type InfiniteCanvasHandle } from '../../components/canv
 import CanvasDrawingsLayer from '../../components/canvas/CanvasDrawingsLayer';
 import CanvasDrawingInteractionOverlay from '../../components/canvas/CanvasDrawingInteractionOverlay';
 import CanvasNoteCard from '../../components/canvas/CanvasNoteCard.tsx';
+import CanvasMigrationNotice from '../../components/canvas/CanvasMigrationNotice.tsx';
 import WorkflowPanelCard from '../../components/canvas/WorkflowPanelCard.tsx';
+import CanvasCardShell from '../../components/canvas/CanvasCardShell.tsx';
 import { PenTool, Type, Shapes, Palette, Trash, Scissors } from 'lucide-react';
 import ImageNode from '../../components/image/ImageCard';
 import PromptNodeComponent from '../../components/canvas/PromptNodeComponent';
@@ -43,7 +45,7 @@ import {
   type WorkflowUtilityCanvasNode,
 } from '../../app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
-import { getCanvasSceneBounds } from '../../canvas/canvasSceneGeometry.ts';
+import { getCanvasSceneBounds, getCanvasSceneBoundsForNodeIds } from '../../canvas/canvasSceneGeometry.ts';
 import { getCanvasViewportStorageKey } from '../../canvas/canvasViewportPersistence.ts';
 import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
@@ -55,6 +57,7 @@ import { useAppPromptBarProps } from '../../app/useAppPromptBarProps';
 import { useCanvasViewport } from '../../hooks/useCanvasViewport';
 import { useCanvasRenderItems } from '../../hooks/useCanvasRenderItems';
 import { canvasCardRendererRegistry } from '../../core/canvas/renderers/CanvasCardRendererRegistry';
+import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
 import { useCanvasInteractionState } from '../../hooks/useCanvasInteractionState';
 import { useCanvasNodeSelection } from '../../app/useCanvasNodeSelection';
 import { useDraftNodeSync } from '../../app/useDraftNodeSync';
@@ -192,6 +195,7 @@ type SharedPromptNodeActionProps = Pick<
   React.ComponentProps<typeof PromptNodeComponent>,
   | 'onCancel'
   | 'onRetry'
+  | 'onUseAsAiContext'
   | 'onEditPptDeck'
   | 'onExportPpt'
   | 'onExportPptx'
@@ -349,6 +353,24 @@ const TaskCenterTray = lazyNamedWithRetry(() => import('../../components/workspa
 const WindowManager = lazyNamedWithRetry(() => import('../../components/workspace/WindowManager'), 'WindowManager');
 const WorkspaceSurfacePanels = lazyNamedWithRetry(() => import('../../components/workspace/WorkspaceSurfacePanels'), 'WorkspaceSurfacePanels');
 const ProjectManager = lazyWithRetry(() => import('../../components/settings/ProjectManager'));
+
+const renderUnknownCanvasCard = (
+  node: { id?: string; position?: { x: number; y: number }; presentation?: unknown },
+  detailLevel: import('../../canvas/performanceProfile.ts').CanvasCardDetailLevel,
+  isSelected: boolean,
+  zoomScale: number,
+) => {
+  const renderer = canvasCardRendererRegistry.getRenderer('unknown-card');
+  if (!renderer) return null;
+  return React.createElement(renderer, {
+    key: node.id || 'unknown-card',
+    item: { node },
+    detailLevel,
+    isSelected,
+    highlighted: false,
+    zoomScale,
+  });
+};
 
 interface AppContentProps {
 }
@@ -548,6 +570,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     clearCanvasDrawings,
     convertDrawingsToNote,
     editNoteNode,
+    rasterizeNote,
     updateNoteNodePosition,
     deleteNoteNode,
     unlinkNodes
@@ -3178,6 +3201,13 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const getSharedPromptNodeActionProps = useCallback((node: PromptNode): SharedPromptNodeActionProps => ({
     onCancel: handleCancelGeneration,
     onRetry: handleRetryNode,
+    onUseAsAiContext: (targetNode) => {
+      selectNodes([targetNode.id], 'replace');
+      setIsChatOpen(true);
+      void import('../../services/system/notificationService').then(({ notify }) => {
+        notify.success('AI context', 'The text card is selected as assistant context.');
+      });
+    },
     onEditPptDeck: handleOpenPptDeckEditor,
     onExportPpt: handleExportPptPackageWithTaskCenter,
     onExportPptx: (targetNode) => {
@@ -3250,6 +3280,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     openSettingsSurfaceTracked,
     resolvePromptNodeFrameworkStatus,
     resolveEcommerceSlotState,
+    selectNodes,
+    setIsChatOpen,
     syncPromptNodeEcommerceSelection,
     updatePromptNode,
   ]);
@@ -3792,6 +3824,27 @@ export const AppContent: React.FC<AppContentProps> = () => {
     [activeCanvas?.id, canvasWorkspaceSurface],
   );
 
+  const canvasRestoreFocusBounds = React.useMemo(() => {
+    if (!activeCanvas) return [];
+    const selectedBounds = getCanvasSceneBoundsForNodeIds(activeCanvas, selectedNodeIds);
+    if (selectedBounds.length > 0) return selectedBounds;
+    const candidates = [
+      ...activeCanvas.promptNodes.map((node) => ({ id: node.id, timestamp: node.timestamp || 0 })),
+      ...activeCanvas.imageNodes.map((node) => ({ id: node.id, timestamp: node.timestamp || 0 })),
+      ...(activeCanvas.noteNodes || []).map((node) => ({ id: node.id, timestamp: node.updatedAt || node.createdAt || 0 })),
+      ...(activeCanvas.workflow?.nodes || []).map((node, index) => ({
+        id: node.id,
+        timestamp: Number((node.data as { updatedAt?: number; createdAt?: number } | undefined)?.updatedAt
+          || (node.data as { createdAt?: number } | undefined)?.createdAt
+          || index),
+      })),
+    ].sort((a, b) => b.timestamp - a.timestamp);
+    const latestBounds = candidates[0]
+      ? getCanvasSceneBoundsForNodeIds(activeCanvas, [candidates[0].id])
+      : [];
+    return latestBounds.length > 0 ? latestBounds : canvasSceneBounds;
+  }, [activeCanvas, canvasSceneBounds, selectedNodeIds]);
+
   const handleCanvasClick = React.useCallback(() => {
     clearSelection();
     setFocusedGroupId(null);
@@ -3818,7 +3871,12 @@ export const AppContent: React.FC<AppContentProps> = () => {
     isMobile,
     imageCardHeightById,
     getComputedGroupBounds,
+    excludedNodeIds: collapsedCanvasGroupNodeIds,
   });
+  const indexedCanvasSceneBounds = React.useMemo(
+    () => spatialIndex.getAllBounds(),
+    [spatialIndex],
+  );
 
   // 2. 算视口范围与 buffer 缓存边界
   const cullingOverscanBuffer = canvasPerformanceProfile.overscanBuffer;
@@ -3941,7 +3999,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
     promptGroupLayerById,
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
-    subCardLayoutMode: state.subCardLayoutMode,
     promptNodesById,
     selectNodes,
     selectedNodeIds,
@@ -4251,26 +4308,44 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
 
+    if (node.presentation?.kind === 'unknown') {
+      return renderUnknownCanvasCard(
+        node,
+        item.isPlaceholder ? 'skeleton' : item.detailLevel,
+        selectedNodeIds.includes(node.id),
+        canvasTransform.scale,
+      );
+    }
+
     if (item.isPlaceholder) {
       const { width: nodeWidth, totalHeight } = getCardDimensions(node.aspectRatio, true);
       const cardHeight = imageCardHeightById[node.id] ?? totalHeight;
       const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
-      const left = renderedImagePosition.x - nodeWidth / 2;
-      const top = renderedImagePosition.y - cardHeight;
       const stackZIndex = item.stackZIndexOverride ?? item.groupLayerZIndex;
 
       // 如果是大项目，为了不遮挡底下的 Canvas 渲染，占位层应该是完全透明的交互代理
       const isTransparentProxy = isLargeProject;
 
       return (
-        <div
-          id={`image-card-${node.id}`}
-          data-card-kind={node.presentation?.kind || (node.mode === GenerationMode.AUDIO ? 'audio' : 'media-only')}
-          data-layout-mode={node.presentation?.layoutMode || 'column'}
-          data-detail-level="skeleton"
+        <CanvasCardShell
+          id={node.id}
+          domId={`image-card-${node.id}`}
+          position={renderedImagePosition}
+          presentation={node.presentation || createCanvasCardPresentation(
+            node.mode === GenerationMode.AUDIO ? 'audio' : 'media-only',
+            'column',
+            nodeWidth <= 280 ? 'compact' : 'standard',
+          )}
+          width={nodeWidth}
+          height={cardHeight}
+          zIndex={stackZIndex}
+          selected={selectedNodeIds.includes(node.id)}
+          detailLevel="skeleton"
+          surface={false}
+          renderDetailPlaceholder={false}
           data-x={node.position.x}
           data-y={node.position.y}
-          className="canvas-card-shell image-node absolute pointer-events-auto cursor-pointer rounded-3xl select-none flex flex-col items-center justify-center"
+          className="image-node pointer-events-auto cursor-pointer rounded-lg select-none flex flex-col items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
             handleCanvasNodeSelect(node.id);
@@ -4280,11 +4355,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
             handleCanvasCardClick(node.id, true);
           }}
           style={{
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${nodeWidth}px`,
             height: `${cardHeight}px`,
-            zIndex: stackZIndex,
             background: isTransparentProxy ? 'transparent' : '#18181b',
             border: isTransparentProxy ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
           }}
@@ -4298,7 +4369,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
               </svg>
             </div>
           )}
-        </div>
+        </CanvasCardShell>
       );
     }
 
@@ -4411,7 +4482,6 @@ const isRectIntersecting = (
         promptGroupStackZIndexById,
         promptGroupRegroupLayoutsById,
         imageCardHeightById,
-        subCardLayoutMode: state.subCardLayoutMode,
         imageNodesById,
         promptGroupNodeIdsById,
         promptGroupLayoutStateByIdRef,
@@ -4509,7 +4579,6 @@ const isRectIntersecting = (
     focusedGroupId,
     generatingGroupIds,
     imageCardHeightById,
-    state.subCardLayoutMode,
     imageNodesById,
     highlightedIdVal,
     isMobile,
@@ -5586,13 +5655,15 @@ const isRectIntersecting = (
           right: isChatOpen ? `${chatSidebarWidth}px` : 0,
         }}
       >
+      <CanvasMigrationNotice />
       <InfiniteCanvas
         id="canvas-container"
         ref={canvasRef}
         showGrid={canvasMode === 'board' ? false : showGrid}
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
-        sceneBounds={canvasSceneBounds}
+        sceneBounds={indexedCanvasSceneBounds}
+        restoreFocusBounds={canvasRestoreFocusBounds}
         viewStorageKey={canvasViewStorageKey}
         reducePointerEffects={isLargeProject}
         backgroundOverlay={
@@ -5611,30 +5682,7 @@ const isRectIntersecting = (
         onCanvasClick={handleCanvasClick}
         onCanvasDoubleClick={handleCanvasDoubleClick}
         onAutoArrange={handleAutoArrange}
-        onResetView={() => {
-          // Focus the most recently generated card
-          const latestImage = activeCanvas?.imageNodes[activeCanvas.imageNodes.length - 1];
-          const latestPrompt = activeCanvas?.promptNodes[activeCanvas.promptNodes.length - 1];
-
-          // Prefer the latest image; if none exists, fall back to the latest prompt
-          const targetNode = latestImage || latestPrompt;
-
-          if (targetNode && canvasRef.current) {
-            // Use InfiniteCanvas.setView to center the target card
-            const container = document.getElementById('canvas-container');
-            if (container) {
-              const rect = container.getBoundingClientRect();
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-
-              // 计算需要的 transform，使目标卡片居中
-              const newX = centerX - targetNode.position.x * canvasTransform.scale;
-              const newY = centerY - targetNode.position.y * canvasTransform.scale;
-
-              canvasRef.current.setView(newX, newY, canvasTransform.scale);
-            }
-          }
-        }}
+        onResetView={resetViewFn}
         onImageDrop={handleImageDrop}
       >
         {/* 1. Connection Lines Layer (SVG) - Below all cards */}
@@ -5917,7 +5965,14 @@ const isRectIntersecting = (
         {/* 2. Canvas items */}
         {(activeCanvas?.noteNodes || [])
           .filter((note) => isAuxiliaryCanvasNodeVisible(note.id, note.position, note.width, note.height))
-          .map((note) => (
+          .map((note) => note.presentation?.kind === 'unknown'
+            ? renderUnknownCanvasCard(
+                note,
+                canvasPerformanceProfile.cardDetailLevel,
+                selectedNodeIds.includes(note.id),
+                canvasTransform.scale,
+              )
+            : (
           <CanvasNoteCard
             key={note.id}
             note={note}
@@ -5926,6 +5981,30 @@ const isRectIntersecting = (
             detailLevel={canvasPerformanceProfile.cardDetailLevel}
             onSelect={() => selectNodes([note.id], 'replace')}
             onDelete={() => deleteNoteNode(note.id)}
+            onUseAsReference={() => {
+              void (async () => {
+                try {
+                  const result = await rasterizeNote(note.id, 1);
+                  if (!result) return;
+                  const { getImage } = await import('../../services/storage/imageStorage');
+                  const previewUrl = await getImage(result.previewStorageId);
+                  setConfig((previous) => ({
+                    ...previous,
+                    referenceImages: [{
+                      id: result.previewStorageId,
+                      storageId: result.previewStorageId,
+                      data: previewUrl || '',
+                      mimeType: result.mimeType,
+                    }],
+                  }));
+                  const { notify } = await import('../../services/system/notificationService');
+                  notify.success('记事本已设为参考', '矢量内容已按需生成轻量预览，可直接用于 AI 创作。');
+                } catch (error) {
+                  const { notify } = await import('../../services/system/notificationService');
+                  notify.error('记事本转换失败', error instanceof Error ? error.message : String(error));
+                }
+              })();
+            }}
             onEdit={() => {
               const drawingIds = editNoteNode(note.id);
               if (drawingIds.length > 0) {
@@ -5940,10 +6019,20 @@ const isRectIntersecting = (
         {(activeCanvas?.workflow?.nodes || [])
           .filter((node): node is import('../../types').WorkflowPanelNode => node.kind === 'workflow-panel')
           .filter((node) => isAuxiliaryCanvasNodeVisible(node.id, node.position, node.width || 420, node.height || 420))
-          .map((node) => (
+          .map((node) => node.presentation?.kind === 'unknown'
+            ? renderUnknownCanvasCard(
+                node,
+                canvasPerformanceProfile.cardDetailLevel,
+                selectedNodeIds.includes(node.id),
+                canvasTransform.scale,
+              )
+            : (
             <WorkflowPanelCard
               key={node.id}
               node={node}
+              outputMedia={node.data.outputNodeIds
+                .map((outputId) => imageNodesById.get(outputId))
+                .filter((output): output is GeneratedImage => Boolean(output))}
               selected={selectedNodeIds.includes(node.id)}
               zoomScale={canvasTransform.scale}
               detailLevel={canvasPerformanceProfile.cardDetailLevel}

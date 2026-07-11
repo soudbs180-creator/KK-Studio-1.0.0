@@ -169,6 +169,20 @@ export const createCanvasCardNodes = (
     timestamp: now,
     mode: resolvePromptMode(promptKind),
     pptSlides: input.pptSlides,
+    ...(promptKind === 'ecommerce' ? {
+      ecommerce: {
+        kind: 'framework' as const,
+        sourceSheet: '主图' as const,
+        sourceRowKey: promptId,
+        stage: 'ready' as const,
+        displayLabel: input.title || 'Ecommerce workbench',
+        frameworkMeta: {
+          activeSheet: '主图' as const,
+          taskNodeIds: [],
+          inputSummary: input.prompt ? [input.prompt] : [],
+        },
+      },
+    } : {}),
     presentation: createCanvasCardPresentation(
       promptKind,
       layoutMode,

@@ -22,6 +22,7 @@ import {
 } from '../utils/referenceImageStorage';
 import {
     buildCanvasLocalPersistenceSignature,
+    CANVAS_STORAGE_KEY,
     clearPersistedCanvasStorageSnapshot,
     restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
@@ -46,6 +47,7 @@ import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } 
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
 import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
+import { arrangeCanvasSceneNodes, getCanvasArrangeRootNodeIds } from './canvasSceneArrange.ts';
 import { createCanvasCardPresentation, resolvePromptCardKind } from './canvasPresentationMigration';
 import { convertCanvasDrawingsToNote, restoreCanvasNoteToDrawings } from './canvasNotes.ts';
 import { createCanvasCardNodes, type CanvasCardFactoryResult, type CanvasCreateCardInput } from './canvasCardFactory.ts';
@@ -110,9 +112,9 @@ import {
     type AppStartupStage,
 } from '../services/system/appStartup';
 
-export type { ArrangeMode, CanvasContextType, CanvasState, SubCardLayout } from './canvasContextState';
+export type { ArrangeMode, CanvasContextType, CanvasState } from './canvasContextState';
 
-const STORAGE_KEY = 'kk_studio_canvas_state';
+const STORAGE_KEY = CANVAS_STORAGE_KEY;
 const LOCAL_FOLDER_REFRESH_INTERVAL_MS = 60000;
 const LOCAL_FOLDER_IDLE_GRACE_MS = 45000;
 const STARTUP_GENERATED_PREVIEW_LIMIT = 5;
@@ -142,7 +144,6 @@ const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState =
             : DEFAULT_STATE.canvases,
         history: restoredState.history || {},
         selectedNodeIds: restoredState.selectedNodeIds || [],
-        subCardLayoutMode: restoredState.subCardLayoutMode || DEFAULT_STATE.subCardLayoutMode,
         viewportCenter: restoredState.viewportCenter || DEFAULT_STATE.viewportCenter,
     };
 
@@ -1048,10 +1049,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const localPersistenceToken = useMemo(
         () => buildCanvasLocalPersistenceSignature(
             state.canvases,
-            state.activeCanvasId,
-            state.subCardLayoutMode
+            state.activeCanvasId
         ),
-        [state.activeCanvasId, state.canvases, state.subCardLayoutMode]
+        [state.activeCanvasId, state.canvases]
     );
     const isLargeLocalPersistenceCanvas = useMemo(
         () => state.canvases.some((canvas) => (
@@ -1267,7 +1267,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 fileSystemHandle: prev.fileSystemHandle,
                 folderName: prev.folderName,
                 selectedNodeIds: [],
-                subCardLayoutMode: prev.subCardLayoutMode,
                 viewportCenter: prev.viewportCenter
             };
         });
@@ -2299,33 +2298,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
      * - Projects arranged left-to-right (horizontal)
      * - No overlapping
      */
-    const arrangeAllNodes = useCallback((mode: ArrangeMode = 'grid') => {
+    const arrangeAllNodes = useCallback((mode: ArrangeMode = 'grid', targetNodeIds?: string[]) => {
         pushToHistory(); // Allow undo
 
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
         if (!currentCanvas) return;
 
         // --- SCOPED ARRANGE: Selected Nodes Only (Smart Layout) ---
-        const initialSelectedIds = state.selectedNodeIds || [];
-
-        // [NEW] Expand Group Selection: If a group is selected, arrange its children
-        let selectedIds = [...initialSelectedIds];
-        const groups = currentCanvas.groups || [];
-        const selectedGroups = groups.filter(g => initialSelectedIds.includes(g.id));
-
-        if (selectedGroups.length > 0) {
-            selectedGroups.forEach(g => {
-                if (g.nodeIds && g.nodeIds.length > 0) {
-                    selectedIds.push(...g.nodeIds);
-                }
-            });
-            // Deduplicate and remove Group IDs (they are not actual node IDs)
-            const groupIdSet = new Set(groups.map(g => g.id));
-            selectedIds = Array.from(new Set(selectedIds)).filter(id => !groupIdSet.has(id));
-        }
+        const selectedIds = Array.from(new Set(targetNodeIds ?? state.selectedNodeIds ?? []));
 
         if (selectedIds.length > 0) {
-            {
+            const auxiliaryIds = new Set([
+                ...(currentCanvas.noteNodes || []).map(note => note.id),
+                ...(currentCanvas.workflow?.nodes || []).map(node => node.id),
+                ...currentCanvas.groups.map(group => group.id),
+            ]);
+            if (!selectedIds.some(id => auxiliaryIds.has(id))) {
                 const singlePromptArrange = arrangeSingleSelectedPromptChildren(currentCanvas, selectedIds, mode);
                 if (singlePromptArrange) {
                     const newCanvases = state.canvases.map(c =>
@@ -2334,7 +2322,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setState(prev => ({
                         ...prev,
                         canvases: newCanvases,
-                        subCardLayoutMode: singlePromptArrange.subCardLayoutMode
                     }));
                     requestCanvasBoundsFocus(unionCanvasSceneBounds(
                         getCanvasSceneBoundsForNodeIds(singlePromptArrange.canvas, selectedIds),
@@ -2350,7 +2337,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setState(prev => ({
                         ...prev,
                         canvases: newCanvases,
-                        subCardLayoutMode: selectedRootArrange.subCardLayoutMode,
                     }));
                     requestCanvasBoundsFocus(unionCanvasSceneBounds(
                         getCanvasSceneBoundsForNodeIds(selectedRootArrange.canvas, selectedIds),
@@ -2366,7 +2352,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setState(prev => ({
                         ...prev,
                         canvases: newCanvases,
-                        subCardLayoutMode: selectedGroupedArrange.subCardLayoutMode
                     }));
                     requestCanvasBoundsFocus(unionCanvasSceneBounds(
                         getCanvasSceneBoundsForNodeIds(selectedGroupedArrange.canvas, selectedIds),
@@ -2374,125 +2359,33 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
 
-                // 简体中文注释：限制框选整理范围：如果局部整理 helper 均未成功应用，直接退出，避免误整理全画布卡片
-                return;
             }
+
+            const sceneArrange = arrangeCanvasSceneNodes(currentCanvas, selectedIds, mode);
+            if (!sceneArrange) return;
+            setState(prev => ({
+                ...prev,
+                canvases: prev.canvases.map(canvas => (
+                    canvas.id === prev.activeCanvasId ? sceneArrange.canvas : canvas
+                )),
+            }));
+            requestCanvasBoundsFocus(sceneArrange.bounds);
+            return;
         }
 
-        const newImageNodes = [...currentCanvas.imageNodes];
-        currentCanvas.promptNodes.forEach(prompt => {
-            const childImages = newImageNodes.filter(image => image.parentPromptId === prompt.id);
-            if (childImages.length === 0) return;
-
-            const targetMode = prompt.mode === GenerationMode.PPT ? 'column' : mode;
-            const imageDims = childImages.map(image => {
-                const { width, totalHeight } = getCardDimensions(image.aspectRatio as AspectRatio, true);
-                return { w: width, h: totalHeight };
-            });
-            const promptCenterX = prompt.position.x;
-            const promptBottom = prompt.position.y;
-
-            if (targetMode === 'row') {
-                const totalWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) + (childImages.length - 1) * 32;
-                let currentLeft = promptCenterX - totalWidth / 2;
-                const subCardsTopY = promptBottom + 56;
-
-                childImages.forEach((image, index) => {
-                    const dims = imageDims[index];
-                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
-                    if (foundIdx !== -1) {
-                        newImageNodes[foundIdx] = {
-                            ...newImageNodes[foundIdx],
-                            position: {
-                                x: currentLeft + dims.w / 2,
-                                y: subCardsTopY + dims.h
-                            }
-                        };
-                    }
-                    currentLeft += dims.w + 32;
-                });
-            } else if (targetMode === 'grid') {
-                const columns = Math.min(20, childImages.length);
-                const maxWidth = Math.max(...imageDims.map(dims => dims.w));
-                const totalWidth = columns * maxWidth + (columns - 1) * 32;
-                const startX = promptCenterX - totalWidth / 2 + maxWidth / 2;
-
-                const rowCount = Math.ceil(childImages.length / columns);
-                const rowMaxHeights: number[] = [];
-                for (let r = 0; r < rowCount; r++) {
-                    let maxH = 0;
-                    for (let c = 0; c < columns; c++) {
-                        const idx = r * columns + c;
-                        if (idx < childImages.length) {
-                            maxH = Math.max(maxH, imageDims[idx].h);
-                        }
-                    }
-                    rowMaxHeights.push(maxH);
-                }
-
-                const rowTopYs: number[] = [];
-                let currentTopY = promptBottom + 56;
-                for (let r = 0; r < rowCount; r++) {
-                    rowTopYs.push(currentTopY);
-                    currentTopY += rowMaxHeights[r] + 32;
-                }
-
-                childImages.forEach((image, index) => {
-                    const col = index % columns;
-                    const row = Math.floor(index / columns);
-                    const dims = imageDims[index];
-                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
-                    if (foundIdx !== -1) {
-                        newImageNodes[foundIdx] = {
-                            ...newImageNodes[foundIdx],
-                            position: {
-                                x: startX + col * (maxWidth + 32),
-                                y: rowTopYs[row] + dims.h
-                            }
-                        };
-                    }
-                });
-            } else {
-                // column
-                let currentTop = promptBottom + 56;
-                childImages.forEach((image, index) => {
-                    const dims = imageDims[index];
-                    const foundIdx = newImageNodes.findIndex(img => img.id === image.id);
-                    if (foundIdx !== -1) {
-                        newImageNodes[foundIdx] = {
-                            ...newImageNodes[foundIdx],
-                            position: {
-                                x: promptCenterX,
-                                y: currentTop + dims.h
-                            }
-                        };
-                    }
-                    currentTop += dims.h + 32;
-                });
-            }
-        });
-
-        setState(prev => {
-            const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId
-                    ? {
-                        ...c,
-                        promptNodes: c.promptNodes.map(prompt => ({
-                            ...prompt,
-                            presentation: createCanvasCardPresentation(
-                                prompt.presentation?.kind || resolvePromptCardKind(prompt, prompt.childImageIds?.length || 0),
-                                prompt.mode === GenerationMode.PPT ? 'column' : mode,
-                                prompt.presentation?.size || 'standard',
-                                prompt.presentation?.diagnostic,
-                            ),
-                        })),
-                        imageNodes: newImageNodes,
-                        lastModified: Date.now(),
-                    }
-                    : c
-            );
-            return { ...prev, canvases: newCanvases };
-        });
+        const globalArrange = arrangeCanvasSceneNodes(
+            currentCanvas,
+            getCanvasArrangeRootNodeIds(currentCanvas),
+            mode,
+        );
+        if (!globalArrange) return;
+        setState(prev => ({
+            ...prev,
+            canvases: prev.canvases.map(canvas => (
+                canvas.id === prev.activeCanvasId ? globalArrange.canvas : canvas
+            )),
+        }));
+        requestCanvasBoundsFocus(globalArrange.bounds);
 
     }, [pushToHistory, state.canvases, state.activeCanvasId, state.selectedNodeIds]);
 
@@ -3401,8 +3294,27 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const note = stateRef.current.canvases
             .find(canvas => canvas.id === stateRef.current.activeCanvasId)
             ?.noteNodes?.find(candidate => candidate.id === id);
-        return note ? rasterizeCanvasNote(note, { scale }) : null;
-    }, []);
+        if (!note) return null;
+
+        const result = await rasterizeCanvasNote(note, { scale });
+        const previewStorageId = note.previewStorageId || `canvas-note-preview-${note.id}`;
+        const previewUrl = URL.createObjectURL(result.blob);
+        try {
+            await saveImage(previewStorageId, previewUrl);
+        } finally {
+            URL.revokeObjectURL(previewUrl);
+        }
+        updateCanvas(canvas => ({
+            ...canvas,
+            noteNodes: (canvas.noteNodes || []).map(candidate => (
+                candidate.id === id
+                    ? { ...candidate, previewStorageId, updatedAt: Date.now() }
+                    : candidate
+            )),
+            lastModified: Date.now(),
+        }));
+        return { ...result, previewStorageId };
+    }, [updateCanvas]);
 
     const deleteNoteNode = useCallback((id: string) => {
         pushToHistory();

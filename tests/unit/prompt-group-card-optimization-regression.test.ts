@@ -27,7 +27,8 @@ test('visible canvas items expands prompt cohorts through a prompt-child index i
 
 test('global arrange callback persists layout mode per prompt presentation', () => {
   const source = readSource('apps/web/src/context/CanvasContext.tsx');
-  const arrangeStart = source.indexOf("const arrangeAllNodes = useCallback((mode: ArrangeMode = 'grid') => {");
+  const sceneArrangeSource = readSource('apps/web/src/context/canvasSceneArrange.ts');
+  const arrangeStart = source.indexOf("const arrangeAllNodes = useCallback((mode: ArrangeMode = 'grid', targetNodeIds?: string[]) => {");
   const arrangeEnd = source.indexOf('// --- File System Implementation ---', arrangeStart);
 
   assert.notEqual(arrangeStart, -1);
@@ -35,8 +36,9 @@ test('global arrange callback persists layout mode per prompt presentation', () 
 
   const arrangeSource = source.slice(arrangeStart, arrangeEnd);
 
-  assert.match(arrangeSource, /createCanvasCardPresentation/);
-  assert.match(arrangeSource, /prompt\.mode === GenerationMode\.PPT \? 'column' : mode/);
+  assert.match(arrangeSource, /arrangeCanvasSceneNodes/);
+  assert.match(sceneArrangeSource, /createCanvasCardPresentation/);
+  assert.match(sceneArrangeSource, /prompt\.presentation\?\.kind === 'ppt-deck' \? 'column' : mode/);
   assert.doesNotMatch(arrangeSource, /state\.subCardLayoutMode/);
   assert.match(arrangeSource, /\[pushToHistory, state\.canvases, state\.activeCanvasId, state\.selectedNodeIds\]/);
 });

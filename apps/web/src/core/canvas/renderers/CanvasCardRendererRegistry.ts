@@ -4,11 +4,6 @@ import type { CanvasCardDetailLevel } from '../../../canvas/performanceProfile';
 
 import ImageGenerationGroupRenderer from './ImageGenerationGroupRenderer';
 import VideoGenerationGroupRenderer from './VideoGenerationGroupRenderer';
-import BrowserTaskCardRenderer from './BrowserTaskCardRenderer';
-import AssetCardRenderer from './AssetCardRenderer';
-import WorkflowCardRenderer from './WorkflowCardRenderer';
-import AgentCardRenderer from './AgentCardRenderer';
-import ExportCardRenderer from './ExportCardRenderer';
 import UnknownCardRenderer from './UnknownCardRenderer';
 import MultiImageGroupRenderer from './MultiImageGroupRenderer.tsx';
 
@@ -16,23 +11,11 @@ export type CanvasCardKind =
   | 'image-generation-group'
   | 'video-generation-group'
   | 'multi-image-group'
-  | 'ecommerce-task-card'
-  | 'ppt-slide-card'
-  | 'ppt-deck-card'
-  | 'music-task-card'
-  | 'browser-task-card'
-  | 'asset-card'
-  | 'workflow-card'
-  | 'agent-card'
-  | 'export-card'
   | 'unknown-card';
 
 export type CardDisplayPattern =
   | 'prompt-result-group'
-  | 'standalone-task-card'
-  | 'standalone-media-card'
-  | 'multi-page-card'
-  | 'workflow-utility-card';
+  | 'standalone-task-card';
 
 export interface CardRenderPolicy {
   kind: CanvasCardKind;
@@ -90,23 +73,6 @@ class CanvasCardRendererRegistry {
     this.register('image-generation-group', createPolicy('image-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), ImageGenerationGroupRenderer);
     this.register('video-generation-group', createPolicy('video-generation-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), VideoGenerationGroupRenderer);
     this.register('multi-image-group', createPolicy('multi-image-group', 'prompt-result-group', { hasMainCard: true, hasResultCards: true, atomicGroup: true }), MultiImageGroupRenderer);
-    const functionalPromptGroupPolicy = (kind: CanvasCardKind, pattern: CardDisplayPattern) => createPolicy(kind, pattern, {
-      hasMainCard: true,
-      hasResultCards: true,
-      atomicGroup: true,
-    });
-
-    // Prompt-backed business cards must keep the shared positioned/interactive group shell.
-    // Their mode-specific UI remains owned by PromptNodeComponent and ImageCard.
-    this.register('ecommerce-task-card', functionalPromptGroupPolicy('ecommerce-task-card', 'standalone-task-card'), ImageGenerationGroupRenderer);
-    this.register('ppt-slide-card', functionalPromptGroupPolicy('ppt-slide-card', 'multi-page-card'), ImageGenerationGroupRenderer);
-    this.register('ppt-deck-card', functionalPromptGroupPolicy('ppt-deck-card', 'multi-page-card'), ImageGenerationGroupRenderer);
-    this.register('music-task-card', functionalPromptGroupPolicy('music-task-card', 'standalone-media-card'), ImageGenerationGroupRenderer);
-    this.register('browser-task-card', createPolicy('browser-task-card', 'standalone-task-card'), BrowserTaskCardRenderer);
-    this.register('asset-card', createPolicy('asset-card', 'standalone-media-card'), AssetCardRenderer);
-    this.register('workflow-card', createPolicy('workflow-card', 'workflow-utility-card'), WorkflowCardRenderer);
-    this.register('agent-card', createPolicy('agent-card', 'workflow-utility-card'), AgentCardRenderer);
-    this.register('export-card', createPolicy('export-card', 'workflow-utility-card'), ExportCardRenderer);
     this.register('unknown-card', createPolicy('unknown-card', 'standalone-task-card'), UnknownCardRenderer);
   }
 
@@ -127,30 +93,12 @@ class CanvasCardRendererRegistry {
   resolveCardKind(node: any): CanvasCardKind {
     if (!node || node.presentation?.kind === 'unknown') return 'unknown-card';
     const presentationKind = node.presentation?.kind as CanvasPresentationKind | undefined;
-    if (presentationKind === 'ecommerce') return 'ecommerce-task-card';
-    if (presentationKind === 'ppt-deck') return 'ppt-deck-card';
-    if (presentationKind === 'audio') return 'music-task-card';
     if (presentationKind === 'multi-image') return 'multi-image-group';
     
     // According to GenerationMode (IMAGE=1, VIDEO=2, AUDIO=3, PPT=4, ECOMMERCE=5)
     const mode = node.mode;
-    if (mode === 5 || mode === 'ecommerce') {
-      return 'ecommerce-task-card';
-    }
-    if (mode === 4 || mode === 'ppt') {
-      return node.pptDeck ? 'ppt-deck-card' : 'ppt-slide-card';
-    }
-    if (mode === 3 || mode === 'audio' || mode === 'music') {
-      return 'music-task-card';
-    }
     if (mode === 2 || mode === 'video') {
       return 'video-generation-group';
-    }
-    if (node.kind === 'agent') {
-      return 'agent-card';
-    }
-    if (node.kind === 'workflow') {
-      return 'workflow-card';
     }
     return 'image-generation-group';
   }
@@ -161,19 +109,8 @@ class CanvasCardRendererRegistry {
       case 'video-generation-group':
       case 'multi-image-group':
         return 'prompt-result-group';
-      case 'ecommerce-task-card':
-      case 'music-task-card':
-      case 'browser-task-card':
-        return 'standalone-task-card';
-      case 'ppt-deck-card':
-      case 'ppt-slide-card':
-        return 'multi-page-card';
-      case 'agent-card':
-      case 'workflow-card':
-      case 'export-card':
-        return 'workflow-utility-card';
       default:
-        return 'prompt-result-group';
+        return 'standalone-task-card';
     }
   }
 }

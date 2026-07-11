@@ -1,3 +1,4 @@
+import type { CanvasMigrationSummary } from '@kk/shared';
 import type { Canvas, PromptNode } from '../types';
 import { normalizeReferenceImagesStorage } from '../utils/referenceImageStorage.ts';
 import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer.ts';
@@ -14,6 +15,8 @@ export interface CanvasStorageStateLike {
     fileSystemHandle: FileSystemDirectoryHandle | null;
     folderName: string | null;
 }
+
+export const CANVAS_STORAGE_KEY = 'kk_studio_canvas_state';
 
 const stripReferenceImageData = (
     referenceImages: PromptNode['referenceImages'],
@@ -102,6 +105,21 @@ export const clearPersistedCanvasStorageSnapshot = () => {
 export const getCanvasRecoveryDiagnosticKey = (storageKey: string): string => (
     `${storageKey}:recovery-diagnostic`
 );
+
+export const readCanvasMigrationSummary = (
+    storageKey: string = CANVAS_STORAGE_KEY
+): CanvasMigrationSummary | null => {
+    try {
+        const raw = localStorage.getItem(getCanvasMigrationSummaryKey(storageKey));
+        if (!raw) return null;
+        const summary = JSON.parse(raw) as CanvasMigrationSummary;
+        return summary && typeof summary === 'object' && Number.isFinite(summary.completedAt)
+            ? summary
+            : null;
+    } catch {
+        return null;
+    }
+};
 
 export const restoreCanvasStateFromLocalStorage = (
     storageKey: string
@@ -261,12 +279,10 @@ export const buildCanvasFileSystemPersistenceSignature = (
 
 export const buildCanvasLocalPersistenceSignature = (
     canvases: Canvas[] = [],
-    activeCanvasId?: string,
-    subCardLayoutMode?: string
+    activeCanvasId?: string
 ): string => (
     [
         String(activeCanvasId || ''),
-        String(subCardLayoutMode || ''),
         canvases.map((canvas) => [
             canvas.id,
             canvas.name,

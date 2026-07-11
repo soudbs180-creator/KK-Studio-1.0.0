@@ -5,10 +5,11 @@ import { type WorkflowUtilityCanvasNode } from '../app/appCanvasTypes';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { createCanvasFitTransform } from '../canvas/canvasViewportPersistence.ts';
 import { CANVAS_FOCUS_BOUNDS_EVENT } from '../canvas/canvasViewportEvents.ts';
+import { getCanvasSceneBounds, unionCanvasSceneBounds } from '../canvas/canvasSceneGeometry.ts';
 import {
   canvasScreenPointToWorld,
   getAvailableCanvasViewport,
-  type CanvasViewportInsets,
+  measureCanvasViewportInsets,
 } from '../canvas/canvasAvailableViewport.ts';
 
 export interface UseCanvasViewportProps {
@@ -39,17 +40,7 @@ export function useCanvasViewport({
   const canvasTransformRef = React.useRef(canvasTransform);
   canvasTransformRef.current = canvasTransform;
 
-  const getViewportInsets = useCallback((rect: DOMRect): CanvasViewportInsets => {
-    const rail = document.getElementById('project-manager-container')?.getBoundingClientRect();
-    const topChrome = document.querySelector<HTMLElement>('.desktop-left-chrome')?.getBoundingClientRect();
-    const promptBar = document.getElementById('prompt-bar-container')?.getBoundingClientRect();
-    return {
-      left: rail ? Math.max(0, rail.right - rect.left + 12) : 0,
-      right: 0,
-      top: topChrome ? Math.max(0, topChrome.bottom - rect.top + 12) : 0,
-      bottom: promptBar ? Math.max(0, rect.bottom - promptBar.top + 12) : 0,
-    };
-  }, []);
+  const getViewportInsets = useCallback((rect: DOMRect) => measureCanvasViewportInsets(rect), []);
 
   const getUsableViewport = useCallback(() => {
     const rect = canvasRef.current?.getCanvasRect();
@@ -118,11 +109,21 @@ export function useCanvasViewport({
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncViewportCenter) : null;
     const canvas = document.getElementById('canvas-container');
     const promptBar = document.getElementById('prompt-bar-container');
+    const rail = document.getElementById('project-manager-container');
+    const topChrome = document.querySelector<HTMLElement>('.desktop-left-chrome');
+    const navigation = document.querySelector<HTMLElement>('.desktop-navigation-panel');
     if (canvas) observer?.observe(canvas);
     if (promptBar) observer?.observe(promptBar);
+    if (rail) observer?.observe(rail);
+    if (topChrome) observer?.observe(topChrome);
+    if (navigation) observer?.observe(navigation);
+    window.visualViewport?.addEventListener('resize', syncViewportCenter);
+    window.visualViewport?.addEventListener('scroll', syncViewportCenter);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', syncViewportCenter);
+      window.visualViewport?.removeEventListener('resize', syncViewportCenter);
+      window.visualViewport?.removeEventListener('scroll', syncViewportCenter);
     };
   }, [canvasRef, syncViewportCenter]);
 
@@ -227,6 +228,15 @@ export function useCanvasViewport({
             selectedNodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)
           ))
           .map((node: WorkflowUtilityCanvasNode) => node.position),
+        ...(activeCanvas.noteNodes || [])
+          .filter((node: any) => selectedNodeIdSet.has(node.id))
+          .map((node: any) => node.position),
+        ...(activeCanvas.groups || [])
+          .filter((group: any) => selectedNodeIdSet.has(group.id))
+          .map((group: any) => ({
+            x: group.bounds.x + group.bounds.width / 2,
+            y: group.bounds.y + group.bounds.height / 2,
+          })),
       ];
 
       if (allPositions.length > 0) {
@@ -237,50 +247,24 @@ export function useCanvasViewport({
       }
     }
 
-    // 2. 如果没有提示词卡片，跳转到最新的生成图片卡片。
-    const prompts = activeCanvas.promptNodes;
-    if (prompts.length === 0) {
-      let latestImage: any | null = null;
-      activeCanvas.imageNodes.forEach((image: any) => {
-        if (!latestImage || (image.timestamp || 0) > (latestImage.timestamp || 0)) {
-          latestImage = image;
-        }
-      });
-
-      if (latestImage) {
-        handleNavigateToNode(latestImage.position.x, latestImage.position.y);
-        return;
-      }
-      handleNavigateToNode(0, 0);
+    const candidates = [
+      ...activeCanvas.promptNodes.map((node: any) => ({ position: node.position, timestamp: node.timestamp || 0 })),
+      ...activeCanvas.imageNodes.map((node: any) => ({ position: node.position, timestamp: node.timestamp || 0 })),
+      ...(activeCanvas.noteNodes || []).map((node: any) => ({ position: node.position, timestamp: node.updatedAt || node.createdAt || 0 })),
+      ...(activeCanvas.workflow?.nodes || []).map((node: any, index: number) => ({
+        position: node.position,
+        timestamp: Number(node.data?.updatedAt || node.data?.createdAt || index),
+      })),
+    ].sort((a, b) => b.timestamp - a.timestamp);
+    if (candidates[0]) {
+      handleNavigateToNode(candidates[0].position.x, candidates[0].position.y);
       return;
     }
-
-    let latestPrompt: any | null = null;
-    prompts.forEach((prompt: any) => {
-      if (!latestPrompt || (prompt.timestamp || 0) > (latestPrompt.timestamp || 0)) {
-        latestPrompt = prompt;
-      }
-    });
-
-    if (latestPrompt) {
-      // 查找关联图片以计算包围盒
-      const childImages = activeCanvas.imageNodes.filter((img: any) => img.parentPromptId === latestPrompt.id);
-
-      let targetX = latestPrompt.position.x;
-      let targetY = latestPrompt.position.y;
-
-      if (childImages.length > 0) {
-        // 查找最低图片的底部
-        const maxY = Math.max(...childImages.map((img: any) => img.position.y));
-        // 目标垂直中心介于提示词底部和图片底部之间
-        targetY = (latestPrompt.position.y + maxY) / 2;
-      } else {
-        // 如果还没有图片，居中定位到卡片主体（锚点是 Bottom，所以向上移动）
-        targetY = latestPrompt.position.y - 100;
-      }
-
-      handleNavigateToNode(targetX, targetY);
-    }
+    const scene = unionCanvasSceneBounds(getCanvasSceneBounds(activeCanvas));
+    handleNavigateToNode(
+      scene ? scene.x + scene.width / 2 : 0,
+      scene ? scene.y + scene.height / 2 : 0,
+    );
   }, [activeCanvas, handleNavigateToNode, selectedNodeIds]);
 
   const handleFitToAll = useCallback(() => {

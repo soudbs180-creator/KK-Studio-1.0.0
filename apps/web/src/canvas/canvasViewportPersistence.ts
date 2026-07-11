@@ -26,14 +26,14 @@ export const isValidCanvasViewportTransform = (value: unknown): value is CanvasV
 
 export const doesViewportIntersectScene = (
   transform: CanvasViewportTransform,
-  viewport: { width: number; height: number },
+  viewport: { width: number; height: number; x?: number; y?: number },
   sceneBounds: readonly CanvasSceneBounds[],
 ): boolean => {
   const scene = unionCanvasSceneBounds(sceneBounds);
   if (!scene) return true;
   const visible = {
-    x: -transform.x / transform.scale,
-    y: -transform.y / transform.scale,
+    x: ((viewport.x || 0) - transform.x) / transform.scale,
+    y: ((viewport.y || 0) - transform.y) / transform.scale,
     width: viewport.width / transform.scale,
     height: viewport.height / transform.scale,
   };

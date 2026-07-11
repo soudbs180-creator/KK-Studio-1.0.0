@@ -14,6 +14,48 @@ export type CanvasAvailableViewport = {
   centerY: number;
 };
 
+type CanvasViewportRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+const readCssPixels = (styles: CSSStyleDeclaration, property: string): number => {
+  const value = Number.parseFloat(styles.getPropertyValue(property));
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+};
+
+export const measureCanvasViewportInsets = (rect: CanvasViewportRect): CanvasViewportInsets => {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+  const rootStyles = getComputedStyle(document.documentElement);
+  const safeTop = readCssPixels(rootStyles, '--kk-safe-area-top');
+  const safeRight = readCssPixels(rootStyles, '--kk-safe-area-right');
+  const safeBottom = readCssPixels(rootStyles, '--kk-safe-area-bottom');
+  const safeLeft = readCssPixels(rootStyles, '--kk-safe-area-left');
+  const rail = document.getElementById('project-manager-container')?.getBoundingClientRect();
+  const topChrome = document.querySelector<HTMLElement>('.desktop-left-chrome')?.getBoundingClientRect();
+  const navigation = document.querySelector<HTMLElement>('.desktop-navigation-panel')?.getBoundingClientRect();
+  const promptBar = document.getElementById('prompt-bar-container')?.getBoundingClientRect();
+  const visualViewport = window.visualViewport;
+  const keyboardBottomInset = visualViewport
+    ? Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop)
+    : 0;
+  return {
+    left: Math.max(safeLeft, rail ? rail.right - rect.left + 12 : 0),
+    right: Math.max(safeRight, navigation ? rect.right - navigation.left + 12 : 0),
+    top: Math.max(safeTop, topChrome ? topChrome.bottom - rect.top + 12 : 0),
+    bottom: Math.max(
+      safeBottom + keyboardBottomInset,
+      promptBar ? rect.bottom - promptBar.top + 12 : 0,
+    ),
+  };
+};
+
 export const getAvailableCanvasViewport = (
   viewport: { width: number; height: number },
   insets: Partial<CanvasViewportInsets> = {},

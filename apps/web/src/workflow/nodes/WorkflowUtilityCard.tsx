@@ -6,6 +6,8 @@ import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { canvasLivePositionStore } from '../../app/canvasLivePositionStore';
+import CanvasCardShell from '../../components/canvas/CanvasCardShell.tsx';
+import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
 
@@ -66,6 +68,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -118,24 +121,25 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
     });
   };
 
-  const handleDragMove = (event: MouseEvent | TouchEvent) => {
+  const handleDragMove = (event: PointerEvent) => {
     if (!dragStateRef.current) return;
-    const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
-    const clientY = 'touches' in event ? event.touches[0]?.clientY : event.clientY;
+    if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) return;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
     if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
 
     latestPointerRef.current = { x: clientX as number, y: clientY as number };
     schedulePositionUpdate();
   };
 
-  const handleDragStart = (event: React.MouseEvent | React.TouchEvent) => {
-    if ('button' in event && event.button !== 0) return;
+  const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
 
     const target = event.target as HTMLElement | null;
     if (target?.closest('button')) return;
 
-    const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
-    const clientY = 'touches' in event ? event.touches[0]?.clientY : event.clientY;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
     if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
 
     dragStateRef.current = {
@@ -144,23 +148,25 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
       startX: clientX as number,
       startY: clientY as number,
     };
+    pointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
 
     onSelect?.();
     onBringToFront?.();
     setIsDragging(true);
     document.body.style.userSelect = 'none';
 
-    window.addEventListener('mousemove', handleDragMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
-    window.addEventListener('touchmove', handleDragMove, { passive: false });
-    window.addEventListener('touchend', handleWindowMouseUp);
+    window.addEventListener('pointermove', handleDragMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
   };
 
-  const handleWindowMouseUp = () => {
-    window.removeEventListener('mousemove', handleDragMove);
-    window.removeEventListener('mouseup', handleWindowMouseUp);
-    window.removeEventListener('touchmove', handleDragMove);
-    window.removeEventListener('touchend', handleWindowMouseUp);
+  const handleWindowPointerUp = (event: PointerEvent) => {
+    if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) return;
+    window.removeEventListener('pointermove', handleDragMove);
+    window.removeEventListener('pointerup', handleWindowPointerUp);
+    window.removeEventListener('pointercancel', handleWindowPointerUp);
+    pointerIdRef.current = null;
     handleDragEnd();
   };
 
@@ -171,15 +177,19 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   const stackZIndex = elevateCanvasStackZIndex(getWorkflowCardStackZIndex(node, isSelected), isDragging);
 
   return (
-    <div
+    <CanvasCardShell
       ref={containerRef}
-      className={`absolute rounded-[22px] border transition-all ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
+      id={node.id}
+      domId={`workflow-card-${node.id}`}
+      position={node.position}
+      presentation={node.presentation || createCanvasCardPresentation('workflow-panel', 'column', 'standard')}
+      width={width}
+      height={height}
+      zIndex={stackZIndex}
+      selected={isSelected}
+      surface={false}
+      className={`rounded-lg border ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
       style={{
-        left: node.position.x - width / 2,
-        top: node.position.y - height,
-        width,
-        minHeight: height,
-        zIndex: stackZIndex,
         background: 'var(--frost-card-main-bg)',
         borderColor: isSelected ? 'var(--accent-coral)' : 'var(--frost-card-main-border)',
         boxShadow: isSelected
@@ -200,8 +210,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
       <div
         className="flex items-start justify-between gap-3 rounded-t-[22px] border-b px-4 py-3"
         style={{ borderColor: 'var(--frost-card-main-border)' }}
-        onMouseDown={handleDragStart}
-        onTouchStart={handleDragStart}
+        onPointerDown={handleDragStart}
       >
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]">
@@ -264,7 +273,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
           </button>
         )}
       </div>
-    </div>
+    </CanvasCardShell>
   );
 };
 

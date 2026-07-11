@@ -372,6 +372,10 @@ body.dark-mode .zoom-slider {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .canvas-card-shell {
+    --canvas-card-transition: none;
+  }
+
   .kk-desktop-composer-compact,
   .kk-desktop-composer-expanded {
     transition-duration: 0ms !important;
@@ -669,4 +673,18 @@ canvas {
 
 .kk-prompt-send-button-icon {
   z-index: var(--kk-z-local-content);
+}
+:root {
+  --kk-safe-area-top: env(safe-area-inset-top, 0px);
+  --kk-safe-area-right: env(safe-area-inset-right, 0px);
+  --kk-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --kk-safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+.canvas-migration-notice {
+  z-index: var(--kk-z-chrome);
+  background: var(--frost-card-framework-bg);
+  border: 1px solid var(--frost-card-framework-border);
+  box-shadow: var(--frost-card-framework-shadow);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
 }

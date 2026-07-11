@@ -28,6 +28,8 @@ import { useFavoritesStore } from '../../features/favorites';
 import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementScheduler';
 import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
+import CanvasCardShell from '../canvas/CanvasCardShell.tsx';
+import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
 
 const dominantColorCache = new Map<string, string>();
 
@@ -1446,31 +1448,41 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const isColorCardMode = detailLevel === 'ghost' || isCanvasTransforming || isDragging;
     const shellKind = image.presentation?.kind || (image.mode === GenerationMode.AUDIO ? 'audio' : 'media-only');
     const shellLayoutMode = image.presentation?.layoutMode || 'column';
+    const shellPresentation = image.presentation || createCanvasCardPresentation(
+        shellKind,
+        shellLayoutMode,
+        nodeWidth >= 400 ? 'wide' : nodeWidth <= 280 ? 'compact' : 'standard',
+    );
 
     if (isSlowLoading) {
         return (
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`image-card-${image.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
+                id={image.id}
+                domId={`image-card-${image.id}`}
+                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={nodeWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel="skeleton"
+                positioning="origin-transform"
+                surface={false}
+                renderDetailPlaceholder={false}
                 data-card-height={cardHeight}
                 style={{
-                    position: 'absolute',
-                    left: `${snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX}px`,
-                    top: `${snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY}px`,
-                    width: `${nodeWidth}px`,
                     height: `${cardHeight}px`,
                     pointerEvents: 'none',
                     opacity: 0.8,
                 }}
-                className="canvas-card-shell gpu-accelerated transition-opacity duration-300"
+                className="gpu-accelerated transition-opacity duration-300"
             >
                 <div
                     className="kk-image-card-skeleton w-full h-full rounded-2xl border animate-pulse"
                 />
-            </div>
+            </CanvasCardShell>
         );
     }
 
@@ -1489,16 +1501,25 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const isAudioLike = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
 
         return (
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`image-card-${image.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
+                id={image.id}
+                domId={`image-card-${image.id}`}
+                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={nodeWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel={detailLevel}
+                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                surface={false}
+                renderDetailPlaceholder={false}
                 data-x={image.position.x}
                 data-y={image.position.y}
                 data-card-height={cardHeight}
-                className={`canvas-card-shell image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`image-node ${isChatMode ? 'w-full max-w-[460px] mx-auto my-3' : ''} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
                     zIndex: effectiveStackZIndex,
@@ -1640,23 +1661,32 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         )}
                     </div>
                 </div>
-            </div>
+            </CanvasCardShell>
         );
     }
 
     return (
         // ... (Wrapper Divs) ...
         <>
-            <div
+            <CanvasCardShell
                 ref={containerRef}
-                id={`image-card-${image.id}`}
-                data-card-kind={shellKind}
-                data-layout-mode={shellLayoutMode}
-                data-detail-level={detailLevel}
+                id={image.id}
+                domId={`image-card-${image.id}`}
+                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                origin={{ x: originX, y: originY }}
+                presentation={shellPresentation}
+                width={nodeWidth}
+                height={cardHeight}
+                zIndex={effectiveStackZIndex}
+                selected={isSelected}
+                detailLevel={detailLevel}
+                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                surface={false}
+                renderDetailPlaceholder={false}
                 data-x={image.position.x}
                 data-y={image.position.y}
                 data-card-height={cardHeight}
-                className={`canvas-card-shell image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`image-node ${isChatMode ? 'w-full max-w-[460px] mx-auto my-3' : ''} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
                     zIndex: effectiveStackZIndex,
@@ -2276,7 +2306,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         </div>{/* 关闭下模块：信息模块 */}
                     </div>{/* 关闭外层 p-1.5 容器 */}
                 </div>{/* 关闭统一容器 */}
-            </div>
+            </CanvasCardShell>
 
         </>
     );

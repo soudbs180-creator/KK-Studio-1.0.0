@@ -18,7 +18,6 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   promptGroupStackZIndexById,
   promptGroupRegroupLayoutsById,
   imageCardHeightById,
-  subCardLayoutMode,
   imageNodesById,
   promptGroupNodeIdsById,
   promptGroupLayoutStateByIdRef,
@@ -153,7 +152,7 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
     focusedGroupId,
     generatingGroupIds,
     canvasScale: zoomScale,
-    layoutMode: node.presentation?.layoutMode || subCardLayoutMode,
+    layoutMode: node.presentation?.layoutMode || 'column',
     promptGroupLayoutState,
     regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
     imageCardHeightById,
@@ -204,73 +203,38 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
       {/* Main Prompt Card */}
       {renderPromptCard(renderedPromptNode, promptDetailLevel, promptCardZIndex, shadowBoost, isGroupFocused)}
 
-      {/* Video Result Frames (Atomic Unit Rendering - No internal sub-culling) */}
+      {/* The media card owns the real video player, duration and load state. */}
       {childVisualLayouts.map((childLayout: any, childIndex: number) => {
         const imageProps = getSharedImageNodeProps(childLayout.childNode);
         return (
-          <React.Fragment key={childLayout.childNode.id}>
-            <div className="relative pointer-events-auto" style={{ zIndex: promptCardZIndex + 10 + childIndex }}>
-              <ImageNode
-                id={`image-card-${childLayout.childNode.id}`}
-                {...imageProps}
-                isCreditModelOverride={promptGroupCreditDisplay.isCreditModel}
-                creditCostOverride={promptGroupCreditDisplay.creditCost}
-                detailLevel={detailLevel}
-                loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
-                loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
-                groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
-                stackZIndexOverride={promptCardZIndex + 10 + childIndex}
-                shadowBoost={shadowBoost}
-                position={childLayout.visualPosition}
-                onLivePositionChange={handleLiveNodePositionChange}
-                onHeightChange={handleImageCardHeightChange}
-                isVisible={true} // Atomic rendering: child is always rendered if parent is mounted
-                isCanvasTransforming={isCanvasTransforming}
-                highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
-                isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
-                onSelect={() => handlePromptGroupNodeSelect(node.id, childLayout.childNode.id)}
-                onDragStateChange={handleCanvasNodeDragStateChange}
-                onDragDelta={(delta, sourceNodeId) => {
-                  handlePromptGroupChildDragDelta({
-                    groupId: node.id,
-                    delta,
-                    sourceNodeId,
-                  });
-                }}
-                onDragCommit={(delta, sourceNodeId) => {
-                  handlePromptGroupChildDragCommit({
-                    groupId: node.id,
-                    delta,
-                    sourceNodeId,
-                  });
-                }}
-              />
-              {/* Custom Overlays for Video Node */}
-              <div 
-                className="absolute flex items-center justify-center bg-black/30 hover:bg-black/10 rounded-lg pointer-events-none"
-                style={{
-                  left: `${childLayout.visualPosition.x - 200}px`,
-                  top: `${childLayout.visualPosition.y - 300}px`,
-                  width: '400px',
-                  height: '300px',
-                }}
-              >
-                {/* Play Button Icon Overlay */}
-                <div className="w-12 h-12 bg-white/20 hover:bg-white/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white border border-white/30 cursor-pointer shadow-lg">
-                  <svg className="w-6 h-6 fill-current text-white translate-x-0.5" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                
-                {/* Video Info Badge */}
-                <div className="absolute bottom-3 right-3 bg-zinc-950/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] text-zinc-300 font-semibold flex items-center gap-1.5 border border-white/10">
-                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                  <span>MP4</span>
-                  <span>4.0s</span>
-                </div>
-              </div>
-            </div>
-          </React.Fragment>
+          <ImageNode
+            key={childLayout.childNode.id}
+            id={`image-card-${childLayout.childNode.id}`}
+            {...imageProps}
+            isCreditModelOverride={promptGroupCreditDisplay.isCreditModel}
+            creditCostOverride={promptGroupCreditDisplay.creditCost}
+            detailLevel={detailLevel}
+            loadPriority={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadPriority ?? 0}
+            loadBand={imageLoadSchedulingById.get(childLayout.childNode.id)?.loadBand ?? 0}
+            groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
+            stackZIndexOverride={promptCardZIndex + 10 + childIndex}
+            shadowBoost={shadowBoost}
+            position={childLayout.visualPosition}
+            onLivePositionChange={handleLiveNodePositionChange}
+            onHeightChange={handleImageCardHeightChange}
+            isVisible={true}
+            isCanvasTransforming={isCanvasTransforming}
+            highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
+            isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
+            onSelect={() => handlePromptGroupNodeSelect(node.id, childLayout.childNode.id)}
+            onDragStateChange={handleCanvasNodeDragStateChange}
+            onDragDelta={(delta, sourceNodeId) => {
+              handlePromptGroupChildDragDelta({ groupId: node.id, delta, sourceNodeId });
+            }}
+            onDragCommit={(delta, sourceNodeId) => {
+              handlePromptGroupChildDragCommit({ groupId: node.id, delta, sourceNodeId });
+            }}
+          />
         );
       })}
     </>

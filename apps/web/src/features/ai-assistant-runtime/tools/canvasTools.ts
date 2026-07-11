@@ -1,8 +1,6 @@
 // 简体中文：画布操作相关的 AI 助手工具 (Canvas Tools)
 
 import type { AgentToolDefinition } from './ToolRegistry.ts';
-import { resolveAgentNodeArrangeUpdates } from '../canvas/agentCanvasLayout.ts';
-import { requestCanvasBoundsFocus } from '../../../canvas/canvasViewportEvents.ts';
 import {
   createCanvasCardNodes,
   type CanvasCardFactoryResult,
@@ -199,13 +197,14 @@ export const canvasTools: AgentToolDefinition[] = [
       properties: {
         nodeIds: { type: 'array', items: { type: 'string' } },
         mode: { type: 'string', enum: ['grid', 'row', 'column'], description: '布局模式' },
+        layout: { type: 'string', enum: ['grid', 'row', 'column'], description: 'Layout mode compatibility alias' },
         preset: { type: 'string', enum: ['grid', 'row', 'column', 'compact-grid'] },
         columns: { type: 'number' },
         gap: { type: 'number' }
       }
     },
-    handler: async (input: { nodeIds?: string[]; mode?: 'grid' | 'row' | 'column'; preset?: 'grid' | 'row' | 'column' | 'compact-grid'; columns?: number; gap?: number }, ctx) => {
-      const mode = input?.mode || 'grid';
+    handler: async (input: { nodeIds?: string[]; mode?: 'grid' | 'row' | 'column'; layout?: 'grid' | 'row' | 'column'; preset?: 'grid' | 'row' | 'column' | 'compact-grid'; columns?: number; gap?: number }, ctx) => {
+      const mode = input?.mode || input?.layout || 'grid';
       const nodeIds = Array.isArray(input?.nodeIds) ? input.nodeIds.filter(Boolean) : [];
 
       if (nodeIds.length > 0) {
@@ -215,22 +214,18 @@ export const canvasTools: AgentToolDefinition[] = [
         const supportedNodeIds = new Set([
           ...(ctx.activeCanvas.promptNodes || []).map((node: any) => node.id),
           ...(ctx.activeCanvas.imageNodes || []).map((node: any) => node.id),
+          ...(ctx.activeCanvas.noteNodes || []).map((node: any) => node.id),
+          ...(ctx.activeCanvas.workflow?.nodes || []).map((node: any) => node.id),
+          ...(ctx.activeCanvas.groups || []).map((group: any) => group.id),
         ]);
         const missingNodeIds = nodeIds.filter((nodeId) => !supportedNodeIds.has(nodeId));
         if (missingNodeIds.length > 0) {
           throw new Error(`canvas.arrangeNodes cannot resolve nodeIds: ${missingNodeIds.join(', ')}`);
         }
-        if (typeof ctx.updateNodes !== 'function') {
-          throw new Error('canvas.arrangeNodes requires updateNodes when nodeIds are provided.');
+        if (typeof ctx.arrangeAllNodes !== 'function') {
+          throw new Error('canvas.arrangeNodes requires arrangeAllNodes in ExecutorContext.');
         }
-        const updates = resolveAgentNodeArrangeUpdates(ctx.activeCanvas, nodeIds, {
-          mode,
-          preset: input.preset,
-          columns: input.columns,
-          gap: input.gap
-        });
-        ctx.updateNodes(updates);
-        requestCanvasBoundsFocus(updates.bounds);
+        ctx.arrangeAllNodes(mode, nodeIds);
         ctx.notify?.success?.('画布已整理', `已按 ${input.preset || mode} 模式整理 ${nodeIds.length} 个节点。`);
         return {
           status: 'arranged',

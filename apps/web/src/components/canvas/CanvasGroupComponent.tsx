@@ -29,7 +29,7 @@ export interface CanvasGroupProps {
     zoom: number;
     stackZIndexOverride?: number;
     onUngroup: (id: string) => void;
-    onDragStart: (id: string, e: React.MouseEvent) => void;
+    onDragStart: (id: string, e: React.PointerEvent) => void;
     onGroupDrag?: (delta: { x: number; y: number }, sourceNodeIds?: string[]) => void;
     onGroupDragCommit?: (delta: { x: number; y: number }, sourceNodeIds?: string[]) => void;
     onDragStateChange?: (dragging: boolean) => void;
@@ -56,6 +56,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const rafRef = useRef<number | null>(null);
     const pendingDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const accumulatedDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const activePointerIdRef = useRef<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const isCollapsed = Boolean(group.collapsed);
     const isHidden = Boolean(group.hidden);
@@ -299,12 +300,35 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         });
     }, [flushPendingDrag]);
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1) {
+    const finishPointerDrag = useCallback((element: HTMLDivElement, pointerId: number, commit: boolean) => {
+        if (activePointerIdRef.current !== pointerId) return;
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+        flushPendingDrag();
+        setIsDragging(false);
+        onDragStateChange?.(false);
+        lastPos.current = null;
+        pendingDelta.current = { x: 0, y: 0 };
+        activePointerIdRef.current = null;
+        if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+
+        const finalDelta = accumulatedDelta.current;
+        if (commit && (finalDelta.x !== 0 || finalDelta.y !== 0)) {
+            onGroupDragCommit?.(finalDelta, group.nodeIds);
+        }
+        accumulatedDelta.current = { x: 0, y: 0 };
+    }, [flushPendingDrag, group.nodeIds, onDragStateChange, onGroupDragCommit]);
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) {
             return;
         }
-        e.stopPropagation(); // Prevent canvas pan
-        onDragStart(group.id, e); // Select the group nodes
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        activePointerIdRef.current = e.pointerId;
+        onDragStart(group.id, e);
 
         if (!onGroupDrag) return;
 
@@ -313,45 +337,18 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         onDragStateChange?.(true);
         accumulatedDelta.current = { x: 0, y: 0 };
 
-        const handleMouseMove = (ev: MouseEvent) => {
-            if (!lastPos.current) return;
+    };
 
-            const dx = (ev.clientX - lastPos.current.x) / zoom;
-            const dy = (ev.clientY - lastPos.current.y) / zoom;
-            lastPos.current = { x: ev.clientX, y: ev.clientY };
-
-            // Accumulate deltas and flush once per animation frame.
-            pendingDelta.current = {
-                x: pendingDelta.current.x + dx,
-                y: pendingDelta.current.y + dy
-            };
-
-            scheduleDragFlush();
+    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (activePointerIdRef.current !== event.pointerId || !lastPos.current || !onGroupDrag) return;
+        const dx = (event.clientX - lastPos.current.x) / zoom;
+        const dy = (event.clientY - lastPos.current.y) / zoom;
+        lastPos.current = { x: event.clientX, y: event.clientY };
+        pendingDelta.current = {
+            x: pendingDelta.current.x + dx,
+            y: pendingDelta.current.y + dy,
         };
-
-        const handleMouseUp = () => {
-            if (rafRef.current !== null) {
-                cancelAnimationFrame(rafRef.current);
-                rafRef.current = null;
-            }
-            flushPendingDrag();
-            setIsDragging(false);
-            onDragStateChange?.(false);
-            lastPos.current = null;
-            pendingDelta.current = { x: 0, y: 0 };
-            
-            const finalDelta = accumulatedDelta.current;
-            if (finalDelta.x !== 0 || finalDelta.y !== 0) {
-                onGroupDragCommit?.(finalDelta, group.nodeIds);
-            }
-            accumulatedDelta.current = { x: 0, y: 0 };
-
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        window.addEventListener('mousemove', handleMouseMove, { passive: true });
-        window.addEventListener('mouseup', handleMouseUp);
+        scheduleDragFlush();
     };
 
     return (
@@ -375,7 +372,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     transition: isDragging ? 'none' : 'box-shadow 0.3s ease',
                     contain: 'layout style'
                 }}
-                onMouseDown={handleMouseDown} // Allow dragging from anywhere in the group box
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={(event) => finishPointerDrag(event.currentTarget, event.pointerId, true)}
+                onPointerCancel={(event) => finishPointerDrag(event.currentTarget, event.pointerId, false)}
                 onContextMenu={handleContextMenu}
             >
                 {isCollapsed ? (
@@ -383,7 +383,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         <button
                             type="button"
                             onClick={handleToggleCollapsed}
-                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition-colors hover:bg-[var(--frost-card-sub-bg)]"
                             style={{
                                 borderColor: 'var(--frost-card-sub-border)',
@@ -422,7 +422,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                                     }
                                     e.stopPropagation();
                                 }}
-                                onMouseDown={(e) => e.stopPropagation()} // Allow text alignment/cursor
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className="w-32 text-xs font-medium border-none outline-none rounded px-1 transition-all"
                                 style={{
                                     ...groupInputSurfaceStyle,
@@ -449,7 +449,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         <button
                             type="button"
                             onClick={handleToggleHidden}
-                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--frost-card-sub-bg)]"
                             style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }}
                             title={hiddenToggleLabel}
@@ -460,7 +460,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         <button
                             type="button"
                             onClick={handleToggleCollapsed}
-                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--frost-card-sub-bg)]"
                             style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }}
                             title={collapsedToggleLabel}
@@ -541,7 +541,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                                 type="color"
                                 value={normalizeHexColor(groupBorderColor)}
                                 onChange={(e) => handleUpdateColor(e.currentTarget.value)}
-                                onMouseDown={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className="kk-canvas-context-menu-color-input"
                                 title="自定义内发光颜色"
                                 aria-label="自定义内发光颜色"

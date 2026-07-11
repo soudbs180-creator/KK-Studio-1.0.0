@@ -7,14 +7,15 @@ test('Card Ghost and Skeleton states stay interactive and lightweight', () => {
   const renderers = [
     'ImageGenerationGroupRenderer.tsx',
     'VideoGenerationGroupRenderer.tsx',
-    'BrowserTaskCardRenderer.tsx',
-    'AssetCardRenderer.tsx',
-    'WorkflowCardRenderer.tsx',
-    'AgentCardRenderer.tsx',
-    'ExportCardRenderer.tsx',
+    'UnknownCardRenderer.tsx',
   ];
   for (const filename of renderers) {
     const source = fs.readFileSync(path.resolve(`apps/web/src/core/canvas/renderers/${filename}`), 'utf8');
+    if (filename === 'UnknownCardRenderer.tsx') {
+      assert.match(source, /CanvasCardShell/);
+      assert.match(source, /detailLevel=\{detailLevel\}/);
+      continue;
+    }
     assert.match(source, /ghost/);
     assert.match(source, /skeleton/);
     if (source.includes("detailLevel === 'skeleton'")) {
