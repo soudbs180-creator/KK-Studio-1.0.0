@@ -440,7 +440,7 @@ test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job
 
   assert.equal(result.promptCount, 2);
   assert.equal(result.outputGroup.color, '#ffffff');
-  assert.equal(result.outputGroup.includePromptNodes, true);
+  assert.equal(result.outputGroup.includePromptNodes, false);
 });
 
 test('ToolRegistry: generation.retryJob retries failed durable queue prompts', async () => {

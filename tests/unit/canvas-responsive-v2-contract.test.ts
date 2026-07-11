@@ -51,15 +51,19 @@ test('workspace persists canvas views per responsive surface', () => {
   assert.doesNotMatch(source, /getCanvasViewportStorageKey\([^)]*,\s*'desktop'\)/);
 });
 
-test('desktop canvas chrome uses a stable compact composer and 44px rail', () => {
+test('desktop canvas chrome keeps the full composer compact without a collapse control', () => {
   const promptBar = fs.readFileSync('apps/web/src/components/layout/PromptBar.tsx', 'utf8');
   const projectManager = fs.readFileSync('apps/web/src/components/settings/ProjectManager.tsx', 'utf8');
   const css = fs.readFileSync('apps/web/src/styles/canvas.css', 'utf8');
 
-  assert.match(promptBar, /data-desktop-composer-state="compact"/);
-  assert.match(promptBar, /h-\[68px\]/);
+  assert.match(promptBar, /if \(!isExpanded && isMobile\)/);
   assert.match(promptBar, /data-desktop-composer-state="expanded"/);
-  assert.match(css, /max-height:\s*min\(320px, 30dvh\)/);
+  assert.doesNotMatch(promptBar, /title="收起高级配置"/);
+  assert.match(promptBar, /kk-desktop-composer-primary-input/);
+  assert.match(promptBar, /title="上传素材"/);
+  assert.match(css, /max-height:\s*min\(240px, 24dvh\)/);
+  assert.match(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:\s*2;/);
+  assert.match(css, /\.kk-desktop-composer-expanded \.kk-desktop-composer-body \{[\s\S]*order:\s*3;/);
   assert.match(projectManager, /fixed left-3 z-50 flex w-11/);
   assert.match(projectManager, /h-11 w-11 shrink-0/);
   assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);

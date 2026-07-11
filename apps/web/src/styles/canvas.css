@@ -353,8 +353,8 @@ body.dark-mode .zoom-slider {
 }
 
 .kk-desktop-composer-compact {
-  height: 68px;
-  min-height: 68px;
+  height: 56px;
+  min-height: 56px;
   border-radius: 12px;
 }
 
@@ -365,10 +365,41 @@ body.dark-mode .zoom-slider {
 }
 
 .kk-desktop-composer-expanded > .input-bar-inner {
-  max-height: min(320px, 30dvh);
+  max-height: min(240px, 24dvh);
+  padding: 8px;
+  gap: 6px;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
+}
+
+.kk-desktop-composer-expanded .input-bar-footer {
+  order: 2;
+  justify-content: flex-start;
+}
+
+.kk-desktop-composer-expanded .kk-desktop-composer-body {
+  order: 3;
+}
+
+.kk-desktop-composer-expanded .kk-desktop-composer-primary-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  margin-top: 0;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--frost-card-sub-border);
+  border-radius: 10px;
+  background: var(--frost-card-sub-bg);
+}
+
+.kk-desktop-composer-expanded .kk-desktop-composer-primary-input .input-bar-textarea {
+  min-height: 38px !important;
+  max-height: 82px !important;
+  margin-top: 0;
+  padding: 8px 4px;
+  font-size: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,7 +6,7 @@ interface PromptBarTopRowDesktopProps {
 
 const PromptBarTopRowDesktop: React.FC<PromptBarTopRowDesktopProps> = ({ children }) => {
   return (
-    <div className="flex items-center justify-between mb-2 gap-2">
+    <div className="flex items-center justify-between gap-1.5">
       {children}
     </div>
   );

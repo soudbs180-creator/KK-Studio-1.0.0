@@ -277,6 +277,18 @@ const cloneJob = (job: GenerationBatchJob): GenerationBatchJob => ({
 
 const cloneJobs = (jobs: GenerationBatchJob[]): GenerationBatchJob[] => jobs.map(cloneJob);
 
+const normalizePersistedOutputGroup = (
+  outputGroup: GenerationBatchOutputGroup | undefined,
+): GenerationBatchOutputGroup | undefined => {
+  if (!outputGroup) return undefined;
+  const isLegacyDefaultAssistantGroup = outputGroup.includePromptNodes === true
+    && /^AI(?: (?:image|video|audio))?(?: batch)? output$/i.test(outputGroup.label || '');
+
+  return isLegacyDefaultAssistantGroup
+    ? { ...outputGroup, includePromptNodes: false }
+    : outputGroup;
+};
+
 const migrateStoredJob = (raw: Partial<GenerationBatchJob> & Record<string, unknown>): GenerationBatchJob | null => {
   if (!raw.id || !raw.canvasId || !Array.isArray(raw.prompts)) return null;
   const taskType = normalizeTaskType(raw.taskType || (raw.options as { taskType?: unknown } | undefined)?.taskType);
@@ -332,7 +344,7 @@ const migrateStoredJob = (raw: Partial<GenerationBatchJob> & Record<string, unkn
       lyrics: options.lyrics,
       genre: options.genre,
     },
-    outputGroup: raw.outputGroup,
+    outputGroup: normalizePersistedOutputGroup(raw.outputGroup),
     arranged: raw.arranged,
     completionHandled: raw.completionHandled,
     createdAt: Number(raw.createdAt || Date.now()),

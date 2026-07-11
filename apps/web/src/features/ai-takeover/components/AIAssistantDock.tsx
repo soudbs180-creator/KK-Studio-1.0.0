@@ -38,11 +38,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const getDurableQueueJobNodeIds = (job: GenerationBatchJob): string[] => Array.from(new Set([
-  ...(job.outputGroup?.nodeIds || []),
-  ...job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id)),
-  ...job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []),
-]));
+const getDurableQueueJobNodeIds = (job: GenerationBatchJob): string[] => {
+  const promptNodeIds = job.outputGroup?.includePromptNodes === false
+    ? []
+    : job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set([
+    ...(job.outputGroup?.nodeIds || []),
+    ...promptNodeIds,
+    ...job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []),
+  ]));
+};
 
 const getUploadStateText = (state: string) => {
   switch (state) {

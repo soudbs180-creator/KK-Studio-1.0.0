@@ -659,10 +659,10 @@ ${optResult.optimizedPromptZh}
         const refImageId = intentResult.extracted.referenceImageNodeId;
         const aspectRatio = intentResult.extracted.aspectRatio;
         
-        let promptText = userInput
+        let promptText = (intentResult.extracted.prompt || userInput
           .replace(/(开始生成|直接生成|出图|跑图|生成|创造|绘图|把背景换成|换背景|背景改为|做成电商主图|更高级一点|更高级)/g, '')
           .replace(/(\d+)\s*(张|个)/g, '')
-          .replace(/“/g, '').replace(/”/g, '')
+          .replace(/“/g, '').replace(/”/g, ''))
           .trim();
 
         if (!promptText) {

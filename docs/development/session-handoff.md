@@ -2257,3 +2257,32 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：`package:portable` 成功，包体约 201.15 MB且不包含服务端 `.env`；`publish-portable-release.mjs` 成功，生成 `KK-Studio-Portable-1.6.0.zip`，SHA-256 为 `35b4e1e74956f7d9672ebce6127f2945ff9f2048f47349a7c1baabc634cae593`，stable manifest 与 portable app manifest 的版本和发布说明一致；#140 已完整通过 `verify:changes`、真实 Chromium 响应式和 10k 验收。
 - **未运行验证及原因**：未上传 GitHub Release 资产；本次范围是用户要求的源码提交与推送，未收到创建或覆盖远端 Release 二进制资产的授权。
 - **风险与下一步**：低风险。推送后必须核对本地 `main`、`origin/main` 与 v1.6.0 版本源一致；若后续上传 Release，必须使用本清单中的文件名、SHA 和源提交进行校验。
+
+## 142. 2026-07-11 - 收紧桌面生成输入区并清理旧队列卡
+
+- **修改范围**：
+  1. 桌面 PromptBar 固定为一套完整紧凑面板，不再提供收起为单行输入框的入口；模式、模型、模型配置、张数、提示词优化、文字输入、素材上传和发送均保持可达。
+  2. 模式按钮缩为 64x32px，模型/配置/张数/优化连续排列，文字/素材/发送组成独立输入行；面板高度由浏览器实测约 279px 收到 176px。
+  3. 默认 AI 生成任务只在画布显示成功产物，执行用 Prompt 节点通过 `hiddenInCanvas` 隔离并在成功或失败后删除；旧版默认 output group 自动迁移为 result-only。
+  4. Workspace 自动删除无产物、带 `automation` 与 `batch:*` 标签的旧失败队列卡，任务记录继续保留在 `DurableGenerationQueue` 与任务中心。
+  5. 画布迁移结果不再渲染顶部横幅，改为信息通知并自动接受迁移摘要；左侧工具栏与现有回收/导航入口保持不变。
+  6. “请帮我红色产品海报并加入任务队列”一类未指定数量的请求默认创建 1 项，并清除礼貌前缀和队列控制语，实际 Prompt 为“红色产品海报”。
+- **修改文件**：
+  - `apps/web/src/components/layout/PromptBar.tsx`
+  - `apps/web/src/components/layout/prompt-bar/`
+  - `apps/web/src/components/canvas/CanvasMigrationNotice.tsx`
+  - `apps/web/src/components/layout/ChatSidebar.tsx`
+  - `apps/web/src/features/ai-takeover/`
+  - `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts`
+  - `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+  - `apps/web/src/styles/canvas.css`
+  - `tests/unit/`、`tests/contract/canvas-card-shell-v2.test.ts`
+- **当前设计决策**：队列状态只属于任务中心和助手队列面板，画布不再展示运行时 Prompt 辅助节点；成功媒体仍作为真实画布产物。桌面生成控制使用唯一完整面板，移动端原有手势收起与结果流不变。
+- **已运行验证**：
+  - 根 TypeScript、架构 TypeScript、服务端 58 文件语法和 490 个测试文件语义检查通过。
+  - `architecture:check` 全链通过；`governance:check` 在生产构建刷新旧 v1.5.9 `app-version.json` 后全链通过。
+  - 定向单元/契约测试 86/86 通过，追加布局与清理检查 12/12 通过；Vite 生产构建通过（2431 modules）。
+  - 应用内浏览器实测：PromptBar 为 760x176px；模式 64x32px；模型、配置、张数、优化连续排列；文字输入后接 36x36px 素材与发送按钮；旧 `takeover_batch` 卡数量 0，`.canvas-migration-notice` 数量 0，左侧工具栏入口仍在。
+- **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，`npm run agents:status` 无法启动；备用 pnpm 因现有 `node_modules/@emnapi` 符号链接 ELOOP 无法执行聚合命令。已直接运行同一 `package.json` 底层 Node、TypeScript、治理、架构和 Vite 入口。未调用真实付费 Provider；最终全屏截图两次因浏览器 CDP 截图超时未生成，但同一页面的 DOM、可访问结构与实际几何已完成核对。
+- **风险与下一步**：低到中风险。旧卡清理仅匹配“失败、无子产物、同时带 automation 与 batch 标签”的历史节点，避免误删成功媒体和研究卡；后续队列卡型若需要重新进入画布，必须通过当前统一卡片工厂与 presentation 规则定义，不得恢复运行时 Prompt 卡旁路。

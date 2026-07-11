@@ -35,4 +35,21 @@ test('durable generation retries reuse deterministic canvas nodes', () => {
   assert.match(source, /takeover_batch_\$\{jobId\}_\$\{promptId\}/);
   assert.match(source, /existingQueueNode/);
   assert.match(source, /useDraft \|\| existingQueueNode/);
+  assert.match(source, /hiddenInCanvas: job\?\.outputGroup\?\.includePromptNodes === false/);
+});
+
+test('assistant generation jobs keep runtime prompt nodes out of the canvas by default', () => {
+  const generationTools = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
+  const queue = readSource('apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts');
+  const dock = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
+  const takeover = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
+  const workspace = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+
+  assert.match(generationTools, /includePromptNodes: false/);
+  assert.match(queue, /isLegacyDefaultAssistantGroup/);
+  assert.match(dock, /job\.outputGroup\?\.includePromptNodes === false/);
+  assert.match(takeover, /legacyQueuePromptNodeIds/);
+  assert.match(takeover, /deletePromptNodeRef/);
+  assert.match(workspace, /legacyQueueCardIds/);
+  assert.match(workspace, /node\.tags\.some\(\(tag\) => tag\.startsWith\('batch:'\)\)/);
 });

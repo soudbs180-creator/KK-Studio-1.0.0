@@ -23,6 +23,10 @@ const chatWithLlm: LlmChat = async (...args) => {
   return generationService.chat(...args);
 };
 
+const getQueuePromptNodeId = (jobId: string, promptId: string): string => (
+  `takeover_batch_${jobId}_${promptId}`.replace(/[^a-zA-Z0-9_-]/g, '_')
+);
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -65,6 +69,7 @@ interface AITakeoverProviderProps {
   selectedNodeIds: string[];
   addPromptNode: (node: any) => Promise<void> | void;
   updatePromptNode: (node: any) => Promise<void> | void;
+  deletePromptNode?: (id: string) => void;
   updateNodes?: (updates: { promptNodes?: any[]; imageNodes?: any[] }) => void;
   createCard?: (input: any) => any;
   convertDrawingsToNote?: (drawingIds: string[], title?: string) => any;
@@ -104,6 +109,7 @@ export function AITakeoverProvider({
   selectedNodeIds,
   addPromptNode,
   updatePromptNode,
+  deletePromptNode,
   updateNodes,
   createCard,
   convertDrawingsToNote,
@@ -374,6 +380,7 @@ export function AITakeoverProvider({
   const selectedModelRef = useRef(selectedModel);
   const addPromptNodeRef = useRef(addPromptNode);
   const updatePromptNodeRef = useRef(updatePromptNode);
+  const deletePromptNodeRef = useRef(deletePromptNode);
   const updateNodesRef = useRef(updateNodes);
   const executeGenerationRef = useRef(executeGeneration);
   const getNextCardPositionRef = useRef(getNextCardPosition);
@@ -388,6 +395,7 @@ export function AITakeoverProvider({
     selectedModelRef.current = selectedModel;
     addPromptNodeRef.current = addPromptNode;
     updatePromptNodeRef.current = updatePromptNode;
+    deletePromptNodeRef.current = deletePromptNode;
     updateNodesRef.current = updateNodes;
     executeGenerationRef.current = executeGeneration;
     getNextCardPositionRef.current = getNextCardPosition;
@@ -408,8 +416,9 @@ export function AITakeoverProvider({
       const job = durableGenerationQueue.getJob(jobId);
       const index = job ? job.prompts.findIndex(p => p.id === promptId) : 0;
       const strayDraft = activeCanvasRef.current?.promptNodes?.find((node: any) => node.isDraft);
-      const useDraft = index === 0 && strayDraft;
-      const deterministicNodeId = `takeover_batch_${jobId}_${promptId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const shouldKeepPromptNode = job?.outputGroup?.includePromptNodes !== false;
+      const useDraft = shouldKeepPromptNode && index === 0 && strayDraft;
+      const deterministicNodeId = getQueuePromptNodeId(jobId, promptId);
       const existingQueueNode = activeCanvasRef.current?.promptNodes?.find((node: any) => node.id === deterministicNodeId);
       const nodeId = useDraft ? strayDraft.id : deterministicNodeId;
       const pos = useDraft ? strayDraft.position : existingQueueNode?.position || {
@@ -453,6 +462,7 @@ export function AITakeoverProvider({
         parallelCount: options.countPerPrompt || 1,
         isGenerating: true,
         isDraft: false,
+        hiddenInCanvas: job?.outputGroup?.includePromptNodes === false,
         status: 'queued',
         mode: options.taskType,
         videoDuration: options.durationSeconds ? `${options.durationSeconds}s` : undefined,
@@ -506,13 +516,15 @@ export function AITakeoverProvider({
             if (!node.isGenerating) {
               cleanup();
               if (node.status === 'failed' || node.error) {
+                if (!shouldKeepPromptNode) deletePromptNodeRef.current?.(nodeId);
                 reject(new Error(node.error || '生图失败'));
               } else {
                 const resultImageNodeIds = node.childImageIds || [];
+                if (!shouldKeepPromptNode) deletePromptNodeRef.current?.(nodeId);
                 resolve({
-                  promptNodeId: nodeId,
+                  promptNodeId: shouldKeepPromptNode ? nodeId : undefined,
                   resultImageNodeIds,
-                  nodeIds: [nodeId, ...resultImageNodeIds],
+                  nodeIds: shouldKeepPromptNode ? [nodeId, ...resultImageNodeIds] : resultImageNodeIds,
                   providerTaskId: node.jobId
                 } as any);
               }
@@ -599,6 +611,15 @@ export function AITakeoverProvider({
     });
 
     // 挂载时，自动触发/恢复排队及挂起的批量任务
+    const legacyQueuePromptNodeIds = new Set(
+      durableGenerationQueue.getJobs()
+        .filter((job) => job.outputGroup?.includePromptNodes === false)
+        .flatMap((job) => job.prompts.map((prompt) => getQueuePromptNodeId(job.id, prompt.id)))
+    );
+    (activeCanvasRef.current?.promptNodes || [])
+      .filter((node: any) => legacyQueuePromptNodeIds.has(node.id))
+      .forEach((node: any) => deletePromptNodeRef.current?.(node.id));
+
     durableGenerationQueue.processQueue();
 
     const handleOnline = () => {

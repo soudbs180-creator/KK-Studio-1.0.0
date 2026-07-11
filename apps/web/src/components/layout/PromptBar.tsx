@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal, ArrowUp } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -3573,8 +3573,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
     const shouldRenderMobileReferenceTray = isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0);
     const shouldUseMobileInlineMedia = shouldRenderInlineMobileUploadButton || shouldRenderMobileReferenceTray;
-    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
-
     const activeEcommerceFooterSheet: EcommerceGroupSheet = ecommerceActiveTaskState?.sourceSheet ?? ecommerceActiveGroupSheet ?? '主图';
     const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -5116,7 +5114,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
         );
     }
 
-    if (!isExpanded) {
+    if (!isExpanded && isMobile) {
+        const compactSendInsufficient = isSystemCreditModel
+            && !billingLoading
+            && totalCreditCost > 0
+            && balance < totalCreditCost;
+        const compactSendDisabled = !promptDraft.trim();
+
         return (
             <>
                 <div
@@ -5134,7 +5138,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         transition: 'left 0.3s ease-out, height 0.2s ease-out',
                     }}
                 >
-                    <div className="flex h-[68px] min-w-0 items-center gap-2 px-2.5">
+                    <div className="flex h-14 min-w-0 items-center gap-2 px-2">
                         {activeSourceImage ? (
                             <div className="relative h-10 w-10 shrink-0" title="当前继续创作来源图">
                                 <img src={activeSourceImage.url} alt="来源图" className="h-10 w-10 rounded-lg object-cover" />
@@ -5151,7 +5155,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         ) : config.mode !== GenerationMode.ECOMMERCE && (
                             <button
                                 data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                className="prompt-bar-liquid-button relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                className="prompt-bar-liquid-button relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 onClick={() => fileInputRef.current?.click()}
                                 title="添加参考图"
                                 aria-label="添加参考图"
@@ -5164,14 +5168,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
                             </button>
                         )}
-                        <button
-                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
-                            className="prompt-bar-liquid-button hidden h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium text-[var(--text-secondary)] sm:flex"
-                            onClick={() => setIsExpanded(true)}
-                            title="展开模式、模型和高级配置"
-                        >
-                            <span className="max-w-36 truncate">{activeModeOption.label} / {displayModelLabel}</span>
-                        </button>
                         <div className="relative min-w-0 flex-1">
                             <ReferenceMentionPanel
                                 open={mentionState.open}
@@ -5199,35 +5195,41 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 onCompositionStart={() => { isComposingRef.current = true; }}
                                 onCompositionEnd={handleCompositionEnd}
                                 placeholder="描述要生成的内容..."
-                                className="input-bar-textarea h-10 min-h-10 max-h-10 w-full resize-none overflow-y-auto rounded-lg px-2 py-2 text-sm"
+                                className="input-bar-textarea h-10 min-h-10 max-h-10 w-full resize-none overflow-y-auto rounded-xl px-3 py-2 text-sm"
                                 rows={1}
                             />
                         </div>
                         <button
                             data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
-                            className="prompt-bar-liquid-button flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                            className="prompt-bar-liquid-button flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             onClick={() => setIsExpanded(true)}
                             title="展开高级配置"
                             aria-label="展开高级配置"
                         >
                             <SlidersHorizontal size={17} />
                         </button>
-                        <CreditSendButton
-                            isCreditModel={isSystemCreditModel}
-                            creditCost={totalCreditCost}
-                            balance={balance}
-                            balanceLoading={billingLoading}
-                            hasPrompt={!!promptDraft.trim()}
-                            colorStart={currentModel?.colorStart}
-                            colorEnd={currentModel?.colorEnd}
-                            textColor={currentModel?.textColor}
-                            ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
-                            className="prompt-bar-liquid-button prompt-bar-liquid-send"
-                            isMobile={false}
-                            parallelCount={config.parallelCount}
-                            onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
+                        <button
+                            type="button"
+                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                            data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
+                            disabled={compactSendDisabled}
                             onClick={submitPrompt}
-                        />
+                            title={compactSendInsufficient
+                                ? '积分不足'
+                                : isSystemCreditModel && totalCreditCost > 0
+                                    ? `发送，预计消耗 ${totalCreditCost} 积分`
+                                    : '发送'}
+                            aria-label="发送"
+                            className={`prompt-bar-liquid-send flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                compactSendDisabled
+                                    ? 'cursor-not-allowed border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-tertiary)] opacity-45'
+                                    : compactSendInsufficient
+                                        ? 'border-red-500/35 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                                        : 'border-[var(--accent-coral)] bg-[var(--accent-coral)] text-white hover:bg-[var(--accent-pink)]'
+                            }`}
+                        >
+                            <ArrowUp size={18} strokeWidth={2.4} />
+                        </button>
                     </div>
                 </div>
                 <input
@@ -5352,30 +5354,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <ChevronDown size={16} />
                                 </button>
                             )}
-                            {!isMobile && (
-                                <button
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                                    onClick={() => setIsExpanded(false)}
-                                    title="收起高级配置"
-                                    aria-label="收起高级配置"
-                                >
-                                    <ChevronDown size={16} />
-                                </button>
-                            )}
                         </div>
 
                         {!isEmbeddedMobileComposer && !isMobile && (
                             <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
-                                <DesktopComposerPromptTools
-                                    isMobile={isMobile}
-                                    config={config}
-                                    showPptOutlinePanel={showPptOutlinePanel}
-                                    onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-                                    onTogglePromptOptimization={handleTogglePromptOptimization}
-                                    onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
-                                />
-
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
                                     <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border  p-2" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -5579,7 +5561,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         )}
                     </PromptBarTopRow>
 
-                    <div>
+                    <div className="kk-desktop-composer-body">
                         {/* Reference Images List */}
                         {!isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
                             <div
@@ -5735,46 +5717,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <div className="w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"></div>
                                 </div>
 
-                                {/* Upload Button - At the end of reference images row - 始终显示 */}
-                                <button
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                    className="w-12 h-12 rounded-md transition-all duration-200 border hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100"
-                                    style={{
-                                        backgroundColor: 'var(--frost-card-sub-bg)',
-                                        color: 'var(--text-secondary)',
-                                        borderColor: 'var(--frost-card-sub-border)'
-                                    }}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="上传参考图"
-                                >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                        <polyline points="17 8 12 3 7 8" />
-                                        <line x1="12" y1="3" x2="12" y2="15" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Upload button when no reference images - 始终显示，与参考图同行对齐 */}
-                        {shouldRenderStandaloneUploadRow && (
-                            <div className="flex items-center p-2 px-3 mt-1">
-                                <button
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                    className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
-                                    style={{
-                                        color: 'var(--text-secondary)',
-                                        borderColor: 'var(--frost-card-sub-border)'
-                                    }}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="上传参考图"
-                                >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                        <polyline points="17 8 12 3 7 8" />
-                                        <line x1="12" y1="3" x2="12" y2="15" />
-                                    </svg>
-                                </button>
                             </div>
                         )}
 
@@ -5821,7 +5763,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <div
                             data-mobile-composer-section="primary-input"
                             className={[
-                                'relative',
+                                'relative kk-desktop-composer-primary-input',
                                 shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'relative mt-1 flex items-center gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
                                     ? 'relative mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
@@ -5937,14 +5879,42 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
                                     lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
                                 }}
-                                rows={PROMPT_TEXTAREA_MIN_ROWS}
+                                rows={isMobile ? PROMPT_TEXTAREA_MIN_ROWS : 1}
                             />
+                            {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
+                                <button
+                                    type="button"
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                    className="prompt-bar-liquid-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="上传素材"
+                                    aria-label="上传素材"
+                                >
+                                    <Plus size={17} />
+                                </button>
+                            )}
+                            {!isMobile && (
+                                <button
+                                    type="button"
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                                    data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
+                                    disabled={!promptDraft.trim()}
+                                    onClick={submitPrompt}
+                                    title={isSystemCreditModel && totalCreditCost > 0
+                                        ? `发送，预计消耗 ${totalCreditCost} 积分`
+                                        : '发送'}
+                                    aria-label="发送"
+                                    className="prompt-bar-liquid-send flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--accent-coral)] bg-[var(--accent-coral)] text-white transition-colors hover:bg-[var(--accent-pink)] disabled:cursor-not-allowed disabled:border-[var(--frost-card-sub-border)] disabled:bg-[var(--frost-card-sub-bg)] disabled:text-[var(--text-tertiary)] disabled:opacity-45"
+                                >
+                                    <ArrowUp size={17} strokeWidth={2.4} />
+                                </button>
+                            )}
                         </div>
                     </div> {/* End of input area hover wrapper */}
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex min-w-0 items-center gap-1.5 ${isMobile ? 'flex-1' : 'flex-1'}`}>
+                        <div className={`flex min-w-0 items-center gap-1.5 ${isMobile ? 'flex-1' : 'flex-none'}`}>
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
@@ -6429,7 +6399,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
                         </div>
 
-                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'justify-end' : 'ml-auto'}`}>
+                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'justify-end' : ''}`}>
                             {/* Group 2: Generation Settings */}
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
@@ -6594,7 +6564,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                             )}
-                        <div data-mobile-footer-control="send" className={isMobile ? 'shrink-0' : 'flex-shrink-0'}>
+                        {!isMobile && (
+                            <DesktopComposerPromptTools
+                                isMobile={false}
+                                config={config}
+                                showPptOutlinePanel={showPptOutlinePanel}
+                                onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                                onTogglePromptOptimization={handleTogglePromptOptimization}
+                                onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
+                            />
+                        )}
+                        {isMobile && <div data-mobile-footer-control="send" className="shrink-0">
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}
@@ -6632,7 +6612,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     }
                                 }}
                             />
-                        </div>
+                        </div>}
                         </div>
                     </PromptBarFooter>
                 </div>

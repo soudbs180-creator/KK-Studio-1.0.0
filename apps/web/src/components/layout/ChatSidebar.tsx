@@ -4556,6 +4556,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
         activeCanvas,
         addPromptNode,
         updatePromptNode,
+        deletePromptNode,
         updateNodes,
         createCard,
         convertDrawingsToNote,
@@ -4589,6 +4590,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
             selectedNodeIds={selectedNodeIds}
             addPromptNode={addPromptNode}
             updatePromptNode={updatePromptNode}
+            deletePromptNode={deletePromptNode}
             updateNodes={updateNodes}
             createCard={createCard}
             convertDrawingsToNote={convertDrawingsToNote}

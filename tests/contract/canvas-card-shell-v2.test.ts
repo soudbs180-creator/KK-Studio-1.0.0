@@ -85,6 +85,7 @@ test('damaged auxiliary cards stay visible and notebook previews remain storage-
   assert.match(canvasContext, /canvas-note-preview-/);
   assert.match(canvasContext, /await saveImage\(previewStorageId, previewUrl\)/);
   assert.match(canvasContext, /previewStorageId, updatedAt/);
-  assert.match(migrationNotice, /restoreCanvasMigrationBackup/);
   assert.match(migrationNotice, /acceptCanvasMigration/);
+  assert.match(migrationNotice, /notify\.info/);
+  assert.match(migrationNotice, /return null/);
 });

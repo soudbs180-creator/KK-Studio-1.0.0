@@ -93,9 +93,10 @@ function resolveTopSurfaceRoute(input: string): { surface: string; label: string
 
 function extractSimpleGeneratePrompt(input: string): string {
   return input
-    .replace(/^(请|麻烦|帮我|请帮我|麻烦帮我|给我|我要|我想要)\s*/g, '')
+    .replace(/^(麻烦帮我|请帮我|麻烦|帮我|请|给我|我要|我想要)\s*/g, '')
     .replace(/^(直接)?(生成|开始生成|出图|跑图|绘图|画|创建|做|设计)\s*(一个|一张|一下|个|张|组|批)?\s*/g, '')
     .replace(/(\d+)\s*(张|个)/g, '')
+    .replace(/[，,、]?\s*(并|然后|再)?\s*(加入|放入|添加到)(任务)?队列.*$/g, '')
     .replace(/[“”"]/g, '')
     .trim();
 }
@@ -712,7 +713,8 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   // 7. 单图生成/多图生成意图
   if (shouldTreatAsGeneration(cleanInput)) {
     const countMatch = lowerInput.match(/(\d+)\s*(张|个)/);
-    const defaultCount = isEditRequest ? 1 : 4;
+    const isExplicitQueueRequest = /(加入|放入|添加到)(任务)?队列|任务队列/.test(lowerInput);
+    const defaultCount = isEditRequest || isExplicitQueueRequest ? 1 : 4;
     const count = countMatch ? parseInt(countMatch[1]) : defaultCount;
     const aspectRatio = inferAspectRatio(cleanInput);
 
@@ -721,6 +723,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       confidence: 0.85,
       extracted: {
         count,
+        prompt: extractSimpleGeneratePrompt(cleanInput),
         referenceImageNodeId: isEditRequest ? refImageNodeId : undefined,
         aspectRatio
       },

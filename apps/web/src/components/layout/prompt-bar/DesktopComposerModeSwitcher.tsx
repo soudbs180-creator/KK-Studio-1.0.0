@@ -18,8 +18,8 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
 }) => {
   const activeModeIndex = modeOptions.findIndex((item) => item.mode === activeMode);
   const normalizedActiveIndex = activeModeIndex >= 0 ? activeModeIndex : 0;
-  const modeSlotWidth = isMobile ? 78 : 82;
-  const sliderWidth = isMobile ? 70 : 74;
+  const modeSlotWidth = isMobile ? 78 : 64;
+  const sliderWidth = isMobile ? 70 : 58;
   const sliderOffset =
     4 + normalizedActiveIndex * modeSlotWidth + (modeSlotWidth - sliderWidth) / 2;
 
@@ -70,7 +70,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
               <button
                 type="button"
                 data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleMode.uiAction}
-                className={`rounded-lg px-2.5 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-[82px] text-sm'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
+                className={`rounded-lg px-2 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-16 text-xs'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
                 style={{ color: isActive ? item.color : 'var(--text-secondary)' }}
                 onMouseDown={(event) => {
                   event.stopPropagation();
@@ -81,7 +81,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
                 }}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Icon size={14} className="transition-colors duration-200 ease-out" />
+                  <Icon size={13} className="transition-colors duration-200 ease-out" />
                   <span className={`transition-colors duration-200 ${isActive ? 'tracking-[0.01em]' : ''}`}>
                     {item.label}
                   </span>

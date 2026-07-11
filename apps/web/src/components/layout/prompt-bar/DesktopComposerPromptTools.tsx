@@ -63,7 +63,7 @@ export default function DesktopComposerPromptTools({
         </button>
       ) : null}
 
-      <div className="flex items-center gap-1 bg-[var(--prompt-bar-shell-bg)] rounded-lg border border-[var(--prompt-bar-shell-border)] p-[2px] transition-all">
+      <div className="flex h-9 items-center gap-1 bg-[var(--prompt-bar-shell-bg)] rounded-lg border border-[var(--prompt-bar-shell-border)] p-[2px] transition-all">
         <button
           type="button"
           data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.togglePromptOptimization.uiAction}

@@ -106,6 +106,15 @@ test('意图匹配单元测试：简单生成复用画布输入框并直接发�
   assert.equal(result.needsConfirmation, false);
 });
 
+test('IntentGate: explicit queue request creates one clean task prompt by default', () => {
+  const result = analyzeIntent('请帮我红色产品海报并加入任务队列');
+
+  assert.equal(result.intent, 'generate_images');
+  assert.equal(result.extracted.count, 1);
+  assert.equal(result.extracted.prompt, '红色产品海报');
+  assert.equal(result.needsConfirmation, true);
+});
+
 test('本地脑源码契约：快速设置页跳转只调用底层 openSettings 工具', () => {
   const source = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
 

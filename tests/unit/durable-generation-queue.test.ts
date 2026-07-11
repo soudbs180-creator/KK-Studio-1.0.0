@@ -82,6 +82,29 @@ describe('DurableGenerationQueue Tests', () => {
     assert.equal(queue.getJobs().length, 1);
   });
 
+  it('should migrate legacy default assistant groups to result-only canvas output', () => {
+    mockLocalStorage.clear();
+    mockLocalStorage.setItem('kk_durable_generation_jobs', JSON.stringify([{
+      schemaVersion: 2,
+      id: 'job-legacy-default-output',
+      idempotencyKey: 'legacy-default-output',
+      canvasId: 'canvas-1',
+      taskType: 'image',
+      status: 'failed',
+      progress: { total: 1, queued: 0, running: 0, completed: 0, failed: 1, percent: 100, phase: 'failed' },
+      outputs: [],
+      createdBy: 'assistant',
+      prompts: [{ id: 'prompt-1', prompt: 'red product poster', status: 'failed', phase: 'failed', retryCount: 0 }],
+      options: { taskType: 'image', modelId: 'test-model', aspectRatio: '1:1', imageSize: '1K', countPerPrompt: 1, concurrency: 1, layout: 'grid' },
+      outputGroup: { label: 'AI batch output', color: '#ffffff', includePromptNodes: true, tags: ['automation'] },
+      createdAt: 1,
+      updatedAt: 1,
+    }]));
+
+    const queue = new DurableGenerationQueue();
+    assert.equal(queue.getJob('job-legacy-default-output')?.outputGroup?.includePromptNodes, false);
+  });
+
   it('should derive a stable idempotency key when one is not provided', async () => {
     mockLocalStorage.clear();
     const queue = new DurableGenerationQueue();

@@ -587,6 +587,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
   });
 
   useEffect(() => {
+    const legacyQueueCardIds = (activeCanvas?.promptNodes || [])
+      .filter((node) => (
+        Boolean(node.error)
+        && (node.childImageIds || []).length === 0
+        && node.tags?.includes('automation')
+        && node.tags.some((tag) => tag.startsWith('batch:'))
+      ))
+      .map((node) => node.id);
+
+    if (legacyQueueCardIds.length === 0) return;
+    legacyQueueCardIds.forEach(deletePromptNode);
+    void import('../../services/system/notificationService').then(({ notify }) => {
+      notify.info('旧队列卡已清理', `已移除 ${legacyQueueCardIds.length} 张旧规则失败卡，任务记录仍保留在任务中心。`);
+    });
+  }, [activeCanvas?.promptNodes, deletePromptNode]);
+
+  useEffect(() => {
     const handleBatchHeightUpdates = (updates: Record<string, number>) => {
       const imageUpdates: Record<string, number> = {};
       const promptUpdates: Record<string, number> = {};

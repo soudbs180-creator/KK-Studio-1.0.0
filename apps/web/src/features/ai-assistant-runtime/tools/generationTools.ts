@@ -88,7 +88,7 @@ const createDefaultOutputGroup = (params: {
 }): AssistantOutputGroupPlan => ({
   label: params.label || 'AI batch output',
   color: '#ffffff',
-  includePromptNodes: true,
+  includePromptNodes: false,
   tags: Array.from(new Set(['automation', ...(params.jobId ? [`batch:${params.jobId}`] : []), ...(params.tags || [])]))
 });
 
