@@ -1,7 +1,7 @@
 import type { Canvas, PromptNode } from '../types';
 import { normalizeReferenceImagesStorage } from '../utils/referenceImageStorage.ts';
 import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer.ts';
-import { sanitizePersistedCanvases } from './canvasGeometrySanitizer.ts';
+import { sanitizePersistedCanvasesWithReport } from './canvasGeometrySanitizer.ts';
 import {
     getCanvasMigrationBackupKey,
     getCanvasMigrationSummaryKey,
@@ -99,6 +99,10 @@ export const clearPersistedCanvasStorageSnapshot = () => {
     lastPersistedCanvasStorageSnapshot = null;
 };
 
+export const getCanvasRecoveryDiagnosticKey = (storageKey: string): string => (
+    `${storageKey}:recovery-diagnostic`
+);
+
 export const restoreCanvasStateFromLocalStorage = (
     storageKey: string
 ): CanvasStorageStateLike | null => {
@@ -110,29 +114,58 @@ export const restoreCanvasStateFromLocalStorage = (
         }
 
         const parsed = JSON.parse(stored) as CanvasStorageStateLike;
-        const migration = migrateCanvasPresentations(sanitizePersistedCanvases(parsed.canvases));
-        if (migration.changed) {
+        if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Persisted canvas state is not an object.');
+        }
+        const sanitization = sanitizePersistedCanvasesWithReport(parsed.canvases);
+        const migration = migrateCanvasPresentations(sanitization.canvases);
+        if (migration.changed || sanitization.changed) {
             const backupKey = getCanvasMigrationBackupKey(storageKey);
-            if (!localStorage.getItem(backupKey)) {
-                localStorage.setItem(backupKey, stored);
+            try {
+                if (!localStorage.getItem(backupKey)) {
+                    localStorage.setItem(backupKey, stored);
+                }
+                const summary = {
+                    ...migration.summary,
+                    migratedCanvasIds: Array.from(new Set([
+                        ...migration.summary.migratedCanvasIds,
+                        ...sanitization.affectedCanvasIds,
+                    ])),
+                    repairedNodeIds: Array.from(new Set([
+                        ...migration.summary.repairedNodeIds,
+                        ...sanitization.repairedNodeIds,
+                    ])),
+                    flaggedNodeIds: Array.from(new Set([
+                        ...(migration.summary.flaggedNodeIds || []),
+                        ...sanitization.flaggedNodeIds,
+                    ])),
+                    issues: [
+                        ...(migration.summary.issues || []),
+                        ...sanitization.issues,
+                    ],
+                    backupKey,
+                };
+                localStorage.setItem(getCanvasMigrationSummaryKey(storageKey), JSON.stringify(summary));
+            } catch (backupError) {
+                console.error('[CanvasProvider] Failed to persist migration backup:', backupError);
             }
-            const summary = {
-                ...migration.summary,
-                backupKey,
-            };
-            localStorage.setItem(getCanvasMigrationSummaryKey(storageKey), JSON.stringify(summary));
         }
         return {
             ...parsed,
             canvases: migration.canvases,
         };
     } catch (error) {
-        console.error('[CanvasProvider] Failed to parse stored state (Resetting):', error);
+        console.error('[CanvasProvider] Failed to restore stored state; original data was preserved:', error);
         try {
-            localStorage.removeItem(storageKey);
-            clearPersistedCanvasStorageSnapshot();
-        } catch (cleanupErr) {
-            console.error('[CanvasProvider] Failed to clear localStorage:', cleanupErr);
+            const stored = localStorage.getItem(storageKey);
+            localStorage.setItem(getCanvasRecoveryDiagnosticKey(storageKey), JSON.stringify({
+                code: 'canvas-restore-failed',
+                message: error instanceof Error ? error.message : String(error),
+                sourceLength: stored?.length || 0,
+                completedAt: Date.now(),
+            }));
+        } catch (diagnosticError) {
+            console.error('[CanvasProvider] Failed to persist recovery diagnostic:', diagnosticError);
         }
         return null;
     }

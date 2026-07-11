@@ -3365,13 +3365,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [updateCanvas, pushToHistory]);
 
     const convertDrawingsToNote = useCallback((drawingIds: string[], title?: string): CanvasNoteNode | null => {
-        let createdNote: CanvasNoteNode | null = null;
+        const currentCanvas = stateRef.current.canvases.find(canvas => canvas.id === stateRef.current.activeCanvasId);
+        if (!currentCanvas) return null;
+        const options = { id: `note-${generateId()}`, title, now: Date.now() };
+        const previewCanvas = convertCanvasDrawingsToNote(currentCanvas, drawingIds, options);
+        const createdNote = previewCanvas.noteNodes?.find(note => note.id === options.id) || null;
+        if (!createdNote) return null;
         pushToHistory();
-        updateCanvas(canvas => {
-            const nextCanvas = convertCanvasDrawingsToNote(canvas, drawingIds, { title });
-            createdNote = nextCanvas.noteNodes?.[nextCanvas.noteNodes.length - 1] || null;
-            return nextCanvas;
-        });
+        updateCanvas(canvas => convertCanvasDrawingsToNote(canvas, drawingIds, options));
         return createdNote;
     }, [pushToHistory, updateCanvas]);
 

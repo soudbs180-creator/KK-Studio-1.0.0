@@ -88,11 +88,21 @@ export interface CanvasViewportSnapshot {
   updatedAt: number;
 }
 
+export interface CanvasMigrationIssue {
+  code: string;
+  message: string;
+  severity: "repaired" | "warning";
+  canvasId?: EntityId;
+  nodeId?: EntityId;
+}
+
 export interface CanvasMigrationSummary {
   version: typeof CANVAS_PRESENTATION_VERSION;
   migratedCanvasIds: EntityId[];
   repairedNodeIds: EntityId[];
   inferredLayoutNodeIds: EntityId[];
+  flaggedNodeIds?: EntityId[];
+  issues?: CanvasMigrationIssue[];
   backupKey?: string;
   completedAt: number;
 }

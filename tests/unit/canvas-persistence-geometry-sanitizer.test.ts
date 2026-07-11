@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { restoreCanvasStateFromLocalStorage } from '../../apps/web/src/context/canvasPersistence.ts';
-import { sanitizePersistedCanvases } from '../../apps/web/src/context/canvasGeometrySanitizer.ts';
+import {
+  getCanvasRecoveryDiagnosticKey,
+  restoreCanvasStateFromLocalStorage,
+} from '../../apps/web/src/context/canvasPersistence.ts';
+import {
+  sanitizePersistedCanvases,
+  sanitizePersistedCanvasesWithReport,
+} from '../../apps/web/src/context/canvasGeometrySanitizer.ts';
 import {
   getCanvasMigrationBackupKey,
   getCanvasMigrationSummaryKey,
@@ -166,6 +172,55 @@ test('persisted canvas sanitizer tolerates malformed canvas collections', () => 
   assert.deepEqual(sanitizePersistedCanvases({ canvases: [] }), []);
 });
 
+test('persisted canvas sanitizer salvages valid canvases beside malformed entries', () => {
+  const result = sanitizePersistedCanvasesWithReport([
+    null,
+    {
+      id: 'canvas-valid',
+      name: 'Valid',
+      lastModified: 1,
+      promptNodes: [],
+      imageNodes: [],
+      groups: [],
+      drawings: [],
+    },
+  ]);
+
+  assert.deepEqual(result.canvases.map((canvas) => canvas.id), ['canvas-valid']);
+  assert.equal(result.changed, true);
+  assert.equal(result.issues.some((issue) => issue.code === 'invalid-canvas-entry'), true);
+});
+
+test('persisted canvas sanitizer isolates malformed workflow edges without throwing', () => {
+  const result = sanitizePersistedCanvasesWithReport([{
+    id: 'canvas-workflow',
+    name: 'Workflow',
+    lastModified: 1,
+    promptNodes: [],
+    imageNodes: [],
+    groups: [],
+    drawings: [],
+    workflow: { version: 1, nodes: [], edges: [null] },
+  }]);
+
+  assert.deepEqual(result.canvases[0].workflow?.edges, []);
+  assert.equal(result.issues.some((issue) => issue.code === 'invalid-workflow-edge-entry'), true);
+});
+
+test('corrupt JSON remains untouched and receives a recovery diagnostic', () => {
+  const storageKey = 'kk_test_corrupt_canvas_state';
+  const storage = new MemoryStorage();
+  storage.setItem(storageKey, '{not-json');
+
+  withLocalStorage(storage, () => {
+    assert.equal(restoreCanvasStateFromLocalStorage(storageKey), null);
+    assert.equal(storage.getItem(storageKey), '{not-json');
+    const diagnostic = JSON.parse(storage.getItem(getCanvasRecoveryDiagnosticKey(storageKey)) || '{}');
+    assert.equal(diagnostic.code, 'canvas-restore-failed');
+    assert.equal(diagnostic.sourceLength, 9);
+  });
+});
+
 test('legacy prompt layout is inferred independently from child geometry', () => {
   const prompt = { id: 'prompt', position: { x: 0, y: 0 } } as any;
   const image = (id: string, x: number, y: number) => ({ id, position: { x, y } }) as any;
@@ -209,6 +264,108 @@ test('presentation migration keeps every legacy card visible and versions the ca
   assert.equal(migration.canvases[0].promptNodes[0].presentation?.kind, 'prompt-result-group');
   assert.equal(migration.canvases[0].promptNodes[0].presentation?.layoutMode, 'row');
   assert.equal(migration.canvases[0].imageNodes[0].presentation?.kind, 'media-only');
+});
+
+test('versioned canvases still migrate missing notebook presentations', () => {
+  const migration = migrateCanvasPresentations([{
+    id: 'canvas-1',
+    name: 'Versioned but incomplete',
+    presentationVersion: 2,
+    lastModified: 1,
+    promptNodes: [],
+    imageNodes: [],
+    groups: [],
+    drawings: [],
+    noteNodes: [{
+      id: 'note-1',
+      title: 'Legacy note',
+      position: { x: 0, y: 0 },
+      width: 320,
+      height: 240,
+      elements: [],
+      createdAt: 1,
+      updatedAt: 1,
+    }],
+  }] as any);
+
+  assert.equal(migration.changed, true);
+  assert.equal(migration.canvases[0].noteNodes?.[0].presentation.kind, 'notebook');
+  assert.equal(migration.summary.repairedNodeIds.includes('note-1'), true);
+});
+
+test('damaged versioned presentations become visible diagnostic cards', () => {
+  const migration = migrateCanvasPresentations([{
+    id: 'canvas-1',
+    name: 'Damaged',
+    presentationVersion: 2,
+    lastModified: 1,
+    promptNodes: [{
+      id: 'prompt-1',
+      prompt: 'keep me',
+      position: { x: 0, y: 0 },
+      childImageIds: [],
+      timestamp: 1,
+      presentation: {
+        version: 2,
+        kind: 'not-a-card-kind',
+        layoutMode: 'row',
+        size: 'standard',
+        ports: { source: 'right', target: 'left' },
+      },
+    }],
+    imageNodes: [],
+    groups: [],
+    drawings: [],
+  }] as any);
+
+  const presentation = migration.canvases[0].promptNodes[0].presentation;
+  assert.equal(presentation?.kind, 'unknown');
+  assert.match(presentation?.diagnostic || '', /Damaged card presentation/);
+  assert.equal(migration.summary.flaggedNodeIds?.includes('prompt-1'), true);
+});
+
+test('sanitizer-only repairs create a backup and migration summary', () => {
+  const storageKey = 'kk_test_canvas_sanitizer_backup';
+  const storage = new MemoryStorage();
+  const original = JSON.stringify({
+    canvases: [{
+      id: 'canvas-1',
+      name: 'Already versioned',
+      presentationVersion: 2,
+      lastModified: 1,
+      promptNodes: [],
+      imageNodes: [{
+        id: 'image-1',
+        url: '',
+        prompt: '',
+        timestamp: 1,
+        canvasId: 'canvas-1',
+        parentPromptId: 'missing',
+        position: { x: 0, y: 0 },
+        presentation: {
+          version: 2,
+          kind: 'media-only',
+          layoutMode: 'column',
+          size: 'compact',
+          ports: { source: 'bottom', target: 'top' },
+        },
+      }],
+      groups: [],
+      drawings: [],
+    }],
+    history: {},
+    fileSystemHandle: null,
+    folderName: null,
+  });
+  storage.setItem(storageKey, original);
+
+  withLocalStorage(storage, () => {
+    const restored = restoreCanvasStateFromLocalStorage(storageKey);
+    assert.equal(restored?.canvases[0].imageNodes[0].orphaned, true);
+    assert.equal(storage.getItem(getCanvasMigrationBackupKey(storageKey)), original);
+    const summary = JSON.parse(storage.getItem(getCanvasMigrationSummaryKey(storageKey)) || '{}');
+    assert.equal(summary.repairedNodeIds.includes('image-1'), true);
+  });
 });
 
 test('first migration stores a versioned backup and exposes a reversible restore', () => {
@@ -331,4 +488,27 @@ test('drawing conversion moves vectors into an editable notebook card', () => {
   assert.deepEqual(restored.drawings[0].points, source.drawings[0].points);
   assert.equal(restored.drawings[0].bindingNodeId, 'image-1');
   assert.equal(restored.lastModified, 20);
+});
+
+test('notebook conversion includes long text extents in card bounds', () => {
+  const source = {
+    id: 'canvas-1',
+    name: 'Text note',
+    promptNodes: [],
+    imageNodes: [],
+    groups: [],
+    drawings: [{
+      id: 'text-1',
+      type: 'text',
+      points: [{ x: 100, y: 100 }],
+      color: '#fff',
+      width: 1,
+      text: 'This is a long annotation that must remain inside the note card.',
+      fontSize: 24,
+    }],
+    lastModified: 1,
+  } as any;
+
+  const converted = convertCanvasDrawingsToNote(source, ['text-1'], { id: 'note-text', now: 1 });
+  assert.ok((converted.noteNodes?.[0].width || 0) > 700);
 });

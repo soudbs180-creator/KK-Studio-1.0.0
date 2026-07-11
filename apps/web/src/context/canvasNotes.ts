@@ -1,6 +1,18 @@
 import type { Canvas, CanvasDrawing, CanvasNoteNode } from '../types.ts';
 import { createCanvasCardPresentation } from './canvasPresentationMigration.ts';
 
+const getDrawingExtentPoints = (drawing: CanvasDrawing) => {
+  const points = drawing.points || [];
+  if (drawing.type !== 'text' || points.length === 0) return points;
+  const origin = points[0];
+  const fontSize = Math.max(8, drawing.fontSize || 16);
+  const textWidth = Math.max(80, (drawing.text || '').length * fontSize * 0.62);
+  return [
+    ...points,
+    { x: origin.x + textWidth, y: origin.y + fontSize * 1.4 },
+  ];
+};
+
 export const convertCanvasDrawingsToNote = (
   canvas: Canvas,
   drawingIds: readonly string[],
@@ -11,17 +23,20 @@ export const convertCanvasDrawingsToNote = (
   const drawings = canvas.drawings.filter((drawing) => ids.has(drawing.id));
   const missingIds = [...ids].filter((id) => !drawings.some((drawing) => drawing.id === id));
   if (missingIds.length > 0) throw new Error(`Cannot find drawings: ${missingIds.join(', ')}`);
-  const points = drawings.flatMap((drawing) => drawing.points || []);
+  const points = drawings.flatMap(getDrawingExtentPoints);
   if (points.length === 0) throw new Error('Selected drawings do not contain vector points.');
 
   const minX = Math.min(...points.map((point) => point.x));
   const minY = Math.min(...points.map((point) => point.y));
   const maxX = Math.max(...points.map((point) => point.x));
   const maxY = Math.max(...points.map((point) => point.y));
-  const width = Math.max(280, maxX - minX + 48);
-  const height = Math.max(180, maxY - minY + 72);
-  const left = minX - 24 - Math.max(0, width - (maxX - minX + 48)) / 2;
-  const top = minY - 48 - Math.max(0, height - (maxY - minY + 72)) / 2;
+  const strokePadding = Math.max(4, ...drawings.map((drawing) => drawing.width || 1));
+  const contentWidth = maxX - minX + strokePadding * 2;
+  const contentHeight = maxY - minY + strokePadding * 2;
+  const width = Math.max(280, contentWidth + 48);
+  const height = Math.max(180, contentHeight + 72);
+  const left = minX - strokePadding - 24 - Math.max(0, width - (contentWidth + 48)) / 2;
+  const top = minY - strokePadding - 48 - Math.max(0, height - (contentHeight + 72)) / 2;
   const now = options.now ?? Date.now();
   const note: CanvasNoteNode = {
     id: options.id || `note-${now.toString(36)}`,

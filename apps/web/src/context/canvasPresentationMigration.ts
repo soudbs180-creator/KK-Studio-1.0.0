@@ -4,6 +4,7 @@ import {
   type CanvasCardPresentation,
   type CanvasCardSizeToken,
   type CanvasLayoutMode,
+  type CanvasMigrationIssue,
   type CanvasMigrationSummary,
 } from '@kk/shared';
 import { GenerationMode, type Canvas, type GeneratedImage, type PromptNode } from '../types.ts';
@@ -11,12 +12,61 @@ import { GenerationMode, type Canvas, type GeneratedImage, type PromptNode } fro
 const PROMPT_WIDTH = 320;
 const DEFAULT_IMAGE_WIDTH = 280;
 const DEFAULT_IMAGE_HEIGHT = 360;
+const CARD_KINDS = new Set<CanvasCardKind>([
+  'prompt-result-group', 'prompt-only', 'media-only', 'ecommerce', 'ppt-deck',
+  'audio', 'text', 'notebook', 'multi-image', 'workflow-panel', 'unknown',
+]);
+const LAYOUT_MODES = new Set<CanvasLayoutMode>(['row', 'column', 'grid']);
+const SIZE_TOKENS = new Set<CanvasCardSizeToken>(['compact', 'standard', 'wide']);
 
 const resolvePorts = (layoutMode: CanvasLayoutMode): CanvasCardPresentation['ports'] => (
   layoutMode === 'row'
     ? { source: 'right', target: 'left' }
     : { source: 'bottom', target: 'top' }
 );
+
+const isValidPresentation = (
+  presentation: unknown,
+  allowedKinds: ReadonlySet<CanvasCardKind>,
+): presentation is CanvasCardPresentation => {
+  if (!presentation || typeof presentation !== 'object') return false;
+  const candidate = presentation as Partial<CanvasCardPresentation>;
+  if (candidate.version !== CANVAS_PRESENTATION_VERSION) return false;
+  if (!candidate.kind || !CARD_KINDS.has(candidate.kind) || !allowedKinds.has(candidate.kind)) return false;
+  if (!candidate.layoutMode || !LAYOUT_MODES.has(candidate.layoutMode)) return false;
+  if (!candidate.size || !SIZE_TOKENS.has(candidate.size)) return false;
+  const expectedPorts = resolvePorts(candidate.layoutMode);
+  return candidate.ports?.source === expectedPorts.source
+    && candidate.ports?.target === expectedPorts.target;
+};
+
+const normalizePresentation = (
+  presentation: unknown,
+  expected: CanvasCardPresentation,
+  allowedKinds: ReadonlySet<CanvasCardKind>,
+  nodeId: string,
+  issues: CanvasMigrationIssue[],
+): { presentation: CanvasCardPresentation; changed: boolean; inferred: boolean } => {
+  if (isValidPresentation(presentation, allowedKinds)) {
+    return { presentation, changed: false, inferred: false };
+  }
+  const candidate = presentation as Partial<CanvasCardPresentation> | undefined;
+  if (!candidate || candidate.version !== CANVAS_PRESENTATION_VERSION) {
+    return { presentation: expected, changed: true, inferred: true };
+  }
+  const diagnostic = `Damaged card presentation for ${nodeId}; original card data was preserved.`;
+  issues.push({
+    code: 'damaged-card-presentation',
+    message: diagnostic,
+    severity: 'warning',
+    nodeId,
+  });
+  return {
+    presentation: createCanvasCardPresentation('unknown', 'column', 'standard', diagnostic),
+    changed: true,
+    inferred: false,
+  };
+};
 
 export const createCanvasCardPresentation = (
   kind: CanvasCardKind,
@@ -84,6 +134,8 @@ const resolvePromptSize = (kind: CanvasCardKind): CanvasCardSizeToken => (
 const migrateCanvas = (canvas: Canvas) => {
   const inferredLayoutNodeIds: string[] = [];
   const migratedNodeIds: string[] = [];
+  const flaggedNodeIds: string[] = [];
+  const issues: CanvasMigrationIssue[] = [];
   const childImagesByPromptId = new Map<string, GeneratedImage[]>();
 
   canvas.imageNodes.forEach((image) => {
@@ -94,28 +146,40 @@ const migrateCanvas = (canvas: Canvas) => {
   });
 
   const promptNodes = canvas.promptNodes.map((prompt) => {
-    if (prompt.presentation?.version === CANVAS_PRESENTATION_VERSION) return prompt;
     const children = childImagesByPromptId.get(prompt.id) || [];
     const layoutMode = inferPromptLayoutMode(prompt, children);
     const kind = resolvePromptCardKind(prompt, children.length);
-    inferredLayoutNodeIds.push(prompt.id);
+    const normalized = normalizePresentation(
+      prompt.presentation,
+      createCanvasCardPresentation(kind, layoutMode, resolvePromptSize(kind)),
+      new Set<CanvasCardKind>(['prompt-result-group', 'prompt-only', 'ecommerce', 'ppt-deck', 'audio', 'text', 'multi-image', 'unknown']),
+      prompt.id,
+      issues,
+    );
+    if (!normalized.changed) return prompt;
+    if (normalized.inferred) inferredLayoutNodeIds.push(prompt.id);
+    else flaggedNodeIds.push(prompt.id);
     migratedNodeIds.push(prompt.id);
     return {
       ...prompt,
-      presentation: createCanvasCardPresentation(kind, layoutMode, resolvePromptSize(kind)),
+      presentation: normalized.presentation,
     };
   });
 
   const imageNodes = canvas.imageNodes.map((image) => {
-    if (image.presentation?.version === CANVAS_PRESENTATION_VERSION) return image;
+    const normalized = normalizePresentation(
+      image.presentation,
+      createCanvasCardPresentation('media-only', 'column', 'compact'),
+      new Set<CanvasCardKind>(['media-only', 'unknown']),
+      image.id,
+      issues,
+    );
+    if (!normalized.changed) return image;
+    if (!normalized.inferred) flaggedNodeIds.push(image.id);
     migratedNodeIds.push(image.id);
     return {
       ...image,
-      presentation: createCanvasCardPresentation(
-        'media-only',
-        'column',
-        'compact',
-      ),
+      presentation: normalized.presentation,
     };
   });
 
@@ -123,30 +187,45 @@ const migrateCanvas = (canvas: Canvas) => {
     ? {
       ...canvas.workflow,
       nodes: canvas.workflow.nodes.map((node) => {
-        if (node.presentation?.version === CANVAS_PRESENTATION_VERSION) return node;
+        const normalized = normalizePresentation(
+          node.presentation,
+          createCanvasCardPresentation('workflow-panel', 'column', 'wide'),
+          new Set<CanvasCardKind>(['workflow-panel', 'unknown']),
+          node.id,
+          issues,
+        );
+        if (!normalized.changed) return node;
+        if (!normalized.inferred) flaggedNodeIds.push(node.id);
         migratedNodeIds.push(node.id);
         return {
           ...node,
-          presentation: createCanvasCardPresentation('workflow-panel', 'column', 'wide'),
+          presentation: normalized.presentation,
         };
       }),
     }
     : canvas.workflow;
 
-  const noteNodes = (canvas.noteNodes || []).map((note) => (
-    note.presentation?.version === CANVAS_PRESENTATION_VERSION
-      ? note
-      : {
-        ...note,
-        presentation: createCanvasCardPresentation('notebook', 'column', 'standard'),
-      }
-  ));
+  const noteNodes = (canvas.noteNodes || []).map((note) => {
+    const normalized = normalizePresentation(
+      note.presentation,
+      createCanvasCardPresentation('notebook', 'column', 'standard'),
+      new Set<CanvasCardKind>(['notebook', 'unknown']),
+      note.id,
+      issues,
+    );
+    if (!normalized.changed) return note;
+    if (!normalized.inferred) flaggedNodeIds.push(note.id);
+    migratedNodeIds.push(note.id);
+    return { ...note, presentation: normalized.presentation };
+  });
 
   const changed = canvas.presentationVersion !== CANVAS_PRESENTATION_VERSION || migratedNodeIds.length > 0;
   return {
     changed,
     migratedNodeIds,
+    flaggedNodeIds,
     inferredLayoutNodeIds,
+    issues: issues.map((issue) => ({ ...issue, canvasId: canvas.id })),
     canvas: changed
       ? {
         ...canvas,
@@ -168,6 +247,8 @@ export const migrateCanvasPresentations = (canvases: Canvas[]) => {
     migratedCanvasIds,
     repairedNodeIds: results.flatMap((result) => result.migratedNodeIds),
     inferredLayoutNodeIds: results.flatMap((result) => result.inferredLayoutNodeIds),
+    flaggedNodeIds: results.flatMap((result) => result.flaggedNodeIds),
+    issues: results.flatMap((result) => result.issues),
     completedAt: Date.now(),
   };
 
