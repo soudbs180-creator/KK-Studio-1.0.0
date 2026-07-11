@@ -6,6 +6,7 @@ export function decideRoute(context: RouteContext): RouteDecision {
     deviceType,
     localRunnerAvailable,
     userPreferredMode,
+    allowCloudFallback = true,
     hasLocalUserKey,
     hasCloudUserKey,
     networkStatus,
@@ -60,9 +61,17 @@ export function decideRoute(context: RouteContext): RouteDecision {
       return {
         mode: 'local-runner',
         reason: 'User explicitly selected local mode, local runner and key are ready.',
-        fallback: hasCloudUserKey
-          ? { mode: 'cloud-user-key', reason: 'Local run failed; falling back to cloud user key.' }
-          : { mode: 'cloud-platform-key', reason: 'Local run failed; falling back to platform credits.' }
+        fallback: allowCloudFallback
+          ? hasCloudUserKey
+            ? { mode: 'cloud-user-key', reason: 'Local run failed; falling back to cloud user key.' }
+            : { mode: 'cloud-platform-key', reason: 'Local run failed; falling back to platform credits.' }
+          : undefined,
+      };
+    }
+    if (!allowCloudFallback) {
+      return {
+        mode: 'local-runner',
+        reason: 'Strict local mode is enabled. Cloud fallback is disabled even though the local route is not ready.',
       };
     }
     if (hasCloudUserKey) {
@@ -96,9 +105,11 @@ export function decideRoute(context: RouteContext): RouteDecision {
     return {
       mode: 'local-runner',
       reason: 'Desktop auto mode: local runner available and network normal.',
-      fallback: hasCloudUserKey
-        ? { mode: 'cloud-user-key', reason: 'Local run failed; falling back to cloud user key.' }
-        : { mode: 'cloud-platform-key', reason: 'Local run failed; falling back to platform credits.' }
+      fallback: allowCloudFallback
+        ? hasCloudUserKey
+          ? { mode: 'cloud-user-key', reason: 'Local run failed; falling back to cloud user key.' }
+          : { mode: 'cloud-platform-key', reason: 'Local run failed; falling back to platform credits.' }
+        : undefined,
     };
   }
 

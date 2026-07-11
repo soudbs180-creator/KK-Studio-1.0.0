@@ -1,4 +1,4 @@
-# AI Assistant Roadmap — KK Studio v1.5.9
+# AI Assistant Roadmap — KK Studio v1.6.0
 
 Last updated: 2026-06-26  
 Primary rules: `AGENTS.md`

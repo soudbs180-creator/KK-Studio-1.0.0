@@ -1,6 +1,6 @@
 # KK Studio 项目文档导航 (docs/README.md)
 
-欢迎使用 **KK Studio v1.5.9** 的项目文档知识库。本目录是 KK Studio 的开发与治理护城河。
+欢迎使用 **KK Studio v1.6.0** 的项目文档知识库。本目录是 KK Studio 的开发与治理护城河。
 
 为了确保 AI 编程助手（如 Codex、Claude、Cursor、Antigravity）和人类开发人员能够以最低的信息摩擦理解项目规则，所有文档均按照职责和生命周期进行了重组，并与项目根目录下的 [README.md](../README.md) 和最高执行规范 [AGENTS.md](../AGENTS.md) 建立了强映射关系。关于具体的技术分层，请参见技术栈与运行时定义 (Tech Layout & Runtime)。
 

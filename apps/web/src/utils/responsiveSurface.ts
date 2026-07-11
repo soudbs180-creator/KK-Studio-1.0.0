@@ -13,6 +13,18 @@ export interface AdaptiveResultTileGridMetrics {
   rowSpan: number;
 }
 
+export function resolveStableResponsiveViewport(
+  previous: { width: number; height: number },
+  next: { width: number; height: number },
+  isTextEntryFocused: boolean,
+): { width: number; height: number } {
+  const widthIsStable = Math.abs(next.width - previous.width) < 2;
+  const keyboardLikelyReducedHeight = next.height < previous.height - 120;
+  return isTextEntryFocused && widthIsStable && keyboardLikelyReducedHeight
+    ? { width: next.width, height: previous.height }
+    : next;
+}
+
 export function resolveResponsiveSurface(width: number): ResponsiveSurface {
   if (width <= PHONE_MAX_WIDTH) {
     return 'phone';

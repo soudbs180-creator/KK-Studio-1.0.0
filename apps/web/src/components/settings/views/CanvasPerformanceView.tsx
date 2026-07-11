@@ -1,55 +1,45 @@
 import React, { useState } from 'react';
-import { Gauge, HelpCircle } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
   SettingsSection,
   SettingsSystemField,
   SettingsHero,
-  SettingsBadge,
 } from '../SettingsScaffold';
 import { SettingSelect } from '../ui/index';
+import {
+  getCanvasPerformancePreferences,
+  setCanvasPerformancePreference,
+  type CanvasPerformancePreferences,
+} from '../../../canvas/canvasPerformancePreferences.ts';
 
 export const CanvasPerformanceView: React.FC = () => {
   const { pick } = useLocale();
+  const initialPreferences = getCanvasPerformancePreferences();
 
-  const [perfMode, setPerfMode] = useState<'auto' | 'quality' | 'smooth' | 'ghost'>(() => {
-    const val = localStorage.getItem('kk_studio_canvas_perf_mode');
-    return (val === 'quality' || val === 'smooth' || val === 'ghost') ? val : 'auto';
-  });
+  const [perfMode, setPerfMode] = useState(initialPreferences.mode);
 
-  const [viewportCulling, setViewportCulling] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_viewport_culling') !== 'false';
-  });
+  const [viewportCulling, setViewportCulling] = useState(initialPreferences.viewportCulling);
 
-  const [dragSuspend, setDragSuspend] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_drag_suspend') !== 'false';
-  });
+  const [dragSuspend, setDragSuspend] = useState(initialPreferences.dragSuspend);
 
-  const [zoomReduceMotion, setZoomReduceMotion] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_zoom_reduce_motion') !== 'false';
-  });
+  const [zoomReduceMotion, setZoomReduceMotion] = useState(initialPreferences.zoomReduceMotion);
 
-  const [connectorThrottle, setConnectorThrottle] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_connector_throttle') !== 'false';
-  });
-
-  const [lazyLoad, setLazyLoad] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_lazy_load') !== 'false';
-  });
-
-  const [delayDecode, setDelayDecode] = useState(() => {
-    return localStorage.getItem('kk_studio_perf_delay_decode') !== 'false';
-  });
+  const [connectorThrottle, setConnectorThrottle] = useState(initialPreferences.connectorThrottle);
 
   const handlePerfModeChange = (mode: 'auto' | 'quality' | 'smooth' | 'ghost') => {
     setPerfMode(mode);
-    localStorage.setItem('kk_studio_canvas_perf_mode', mode);
+    setCanvasPerformancePreference('mode', mode);
   };
 
-  const handleOptionChange = (key: string, val: boolean, setter: (v: boolean) => void) => {
+  const handleOptionChange = (
+    key: Exclude<keyof CanvasPerformancePreferences, 'mode'>,
+    val: boolean,
+    setter: (v: boolean) => void,
+  ) => {
     setter(val);
-    localStorage.setItem(key, String(val));
+    setCanvasPerformancePreference(key, val);
   };
 
   return (
@@ -128,7 +118,7 @@ export const CanvasPerformanceView: React.FC = () => {
           >
             <SettingSelect
               value={viewportCulling ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_viewport_culling', v === 'enabled', setViewportCulling)}
+              onChange={(v) => handleOptionChange('viewportCulling', v === 'enabled', setViewportCulling)}
               options={[
                 { label: pick('启用虚拟化', 'Enabled'), value: 'enabled' },
                 { label: pick('渲染全部 DOM', 'Disabled'), value: 'disabled' },
@@ -145,7 +135,7 @@ export const CanvasPerformanceView: React.FC = () => {
           >
             <SettingSelect
               value={dragSuspend ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_drag_suspend', v === 'enabled', setDragSuspend)}
+              onChange={(v) => handleOptionChange('dragSuspend', v === 'enabled', setDragSuspend)}
               options={[
                 { label: pick('暂停计算', 'Enabled'), value: 'enabled' },
                 { label: pick('保持计算 (可能卡顿)', 'Disabled'), value: 'disabled' },
@@ -162,7 +152,7 @@ export const CanvasPerformanceView: React.FC = () => {
           >
             <SettingSelect
               value={zoomReduceMotion ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_zoom_reduce_motion', v === 'enabled', setZoomReduceMotion)}
+              onChange={(v) => handleOptionChange('zoomReduceMotion', v === 'enabled', setZoomReduceMotion)}
               options={[
                 { label: pick('降低效果', 'Enabled'), value: 'enabled' },
                 { label: pick('全程渲染', 'Disabled'), value: 'disabled' },
@@ -179,7 +169,7 @@ export const CanvasPerformanceView: React.FC = () => {
           >
             <SettingSelect
               value={connectorThrottle ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_connector_throttle', v === 'enabled', setConnectorThrottle)}
+              onChange={(v) => handleOptionChange('connectorThrottle', v === 'enabled', setConnectorThrottle)}
               options={[
                 { label: pick('节流计算', 'Enabled'), value: 'enabled' },
                 { label: pick('同步计算', 'Disabled'), value: 'disabled' },
@@ -187,39 +177,6 @@ export const CanvasPerformanceView: React.FC = () => {
             />
           </SettingsSystemField>
 
-          <SettingsSystemField
-            label={pick('图片预览懒加载', 'Image Preview Lazy Loading')}
-            description={pick(
-              '只有卡片滚动到视口内时才拉取并显示对应的低清缩略图，省流提速。',
-              'Lazy load images to prevent network flooding and DOM decodes.'
-            )}
-          >
-            <SettingSelect
-              value={lazyLoad ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_lazy_load', v === 'enabled', setLazyLoad)}
-              options={[
-                { label: pick('开启懒加载', 'Enabled'), value: 'enabled' },
-                { label: pick('立即加载', 'Disabled'), value: 'disabled' },
-              ]}
-            />
-          </SettingsSystemField>
-
-          <SettingsSystemField
-            label={pick('大图延迟解码', 'Delayed Large Image Decoding')}
-            description={pick(
-              '对近距离原图（Original/Preview Quality）启用 decoding="async"，延迟解析直到图片完全滑入核心视点。',
-              'Use async decoding policy for high-res original imagery assets.'
-            )}
-          >
-            <SettingSelect
-              value={delayDecode ? 'enabled' : 'disabled'}
-              onChange={(v) => handleOptionChange('kk_studio_perf_delay_decode', v === 'enabled', setDelayDecode)}
-              options={[
-                { label: pick('延迟解码', 'Enabled'), value: 'enabled' },
-                { label: pick('立即同步解码', 'Disabled'), value: 'disabled' },
-              ]}
-            />
-          </SettingsSystemField>
         </div>
       </SettingsSection>
     </SettingsViewShell>

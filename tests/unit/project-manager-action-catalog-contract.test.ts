@@ -46,8 +46,6 @@ test('Project Manager project-list and danger-zone controls expose project actio
 
 test('Project Manager shell, canvas, workflow, and theme controls expose project action metadata', () => {
   for (const key of [
-    'expandToolbar',
-    'collapseToolbar',
     'openSearch',
     'openFavorites',
     'fitToAll',

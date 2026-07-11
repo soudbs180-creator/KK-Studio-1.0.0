@@ -1,4 +1,4 @@
-# KK Studio v1.5.9
+# KK Studio v1.6.0
 
 > 面向多模态 AI 创作、无限画布资产管理、多模型智能路由、用户自主密钥与商业化计费审计的多端一体化 AI 工作台。
 
@@ -26,7 +26,7 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 ## 1. 当前稳定事实
 
 * **项目名称**：`KK Studio`
-* **当前版本**：`v1.5.9`
+* **当前版本**：`v1.6.0`
 * **代码仓库**：`soudbs180-creator/nano-banana-KK-`
 * **版本事实唯一来源**：[config/release-manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/config/release-manifest.json)
 * **Web 主运行时**：`apps/web/`

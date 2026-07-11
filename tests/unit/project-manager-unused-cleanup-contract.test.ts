@@ -34,20 +34,9 @@ test('ProjectManager keeps mobile prompt props declared without destructuring un
   assert.doesNotMatch(destructuredPropsSource, /\bonOpenMobilePromptLibrary\b/);
 });
 
-test('ProjectManager desktop collapse keeps the 44px tool rail inside the viewport', () => {
+test('ProjectManager keeps a persistent keyboard-accessible 44px desktop rail', () => {
   const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
-  const desktopContainerMatch = Array.from(
-    projectManagerSource.matchAll(/id="project-manager-container"[\s\S]*?className=\{`([^`]+)`\}/g),
-  ).find((match) => match[1].includes('fixed left-3'));
-
-  assert.ok(desktopContainerMatch, 'desktop project manager container class must be present');
-
-  const desktopContainerClass = desktopContainerMatch[1];
-  assert.match(desktopContainerClass, /fixed left-3/);
-  assert.match(desktopContainerClass, /w-11/);
-  assert.doesNotMatch(
-    desktopContainerClass,
-    /-translate-x-full/,
-    'desktop collapsed rail must not move its controls offscreen',
-  );
+  assert.match(projectManagerSource, /className="fixed left-3 z-50 flex w-11/);
+  assert.match(projectManagerSource, /h-11 w-11 shrink-0/);
+  assert.doesNotMatch(projectManagerSource, /setIsCollapsed|inactivityTimerRef|tabIndex=\{-1\}/);
 });

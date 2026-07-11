@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCanvasRuntimeState } from '../../apps/web/src/features/ai-takeover/core/canvasRuntimeStateBuilder.ts';
+import { APP_VERSION } from '../../apps/web/src/config/appInfo.ts';
 
 test('运行态构建测试：无任何选中节点时的初始状态', () => {
   const mockCanvas = {
@@ -22,7 +23,7 @@ test('运行态构建测试：无任何选中节点时的初始状态', () => {
     canvasTransform: { x: 10, y: 20, scale: 1.5 }
   });
 
-  assert.equal(state.projectVersion, '1.5.9');
+  assert.equal(state.projectVersion, APP_VERSION);
   assert.equal(state.currentPage, 'canvas');
   assert.equal(state.canvas.id, 'test-canvas-1');
   assert.equal(state.canvas.name, '我的测试项目');

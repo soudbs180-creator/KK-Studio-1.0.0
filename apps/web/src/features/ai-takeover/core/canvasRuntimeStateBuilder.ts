@@ -2,7 +2,8 @@
 
 import type { CanvasRuntimeState } from '../types.ts';
 import type { CanvasCardKind, CanvasLayoutMode } from '@kk/shared';
-import { getCanvasSceneBounds, getCanvasSceneBoundsForNodeIds, unionCanvasSceneBounds } from '../../../canvas/canvasSceneGeometry.ts';
+import { getCanvasSceneBoundsForNodeIds, getCanvasSceneNodes, unionCanvasSceneBounds } from '../../../canvas/canvasSceneGeometry.ts';
+import { APP_VERSION } from '../../../config/appInfo.ts';
 
 const MAX_RUNTIME_TEXT_LENGTH = 500;
 const LONG_SECRET_PATTERN = /(?:Bearer\s+[a-zA-Z0-9_\-.]+|sk-[a-zA-Z0-9_\-]{8,}|[A-Za-z0-9+/=_-]{80,})/g;
@@ -159,14 +160,6 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
     cardKinds[kind] = (cardKinds[kind] || 0) + 1;
     if (layoutMode) layoutModes.add(layoutMode);
   };
-  promptNodes.forEach((node: any) => countCard(
-    node.presentation?.kind || (node.childImageIds?.length ? 'prompt-result-group' : 'prompt-only'),
-    node.presentation?.layoutMode,
-  ));
-  imageNodes.forEach((node: any) => countCard(node.presentation?.kind || 'media-only', node.presentation?.layoutMode));
-  noteNodes.forEach((node: any) => countCard('notebook', node.presentation?.layoutMode));
-  workflowPanels.forEach((node: any) => countCard('workflow-panel', node.presentation?.layoutMode));
-
   const geometryCanvas = activeCanvas ? {
     ...activeCanvas,
     promptNodes: promptNodes.filter((node: any) => node?.position),
@@ -178,7 +171,22 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       nodes: workflowNodes.filter((node: any) => node?.position),
     } : undefined,
   } : undefined;
-  const sceneBounds = unionCanvasSceneBounds(getCanvasSceneBounds(geometryCanvas));
+  const sceneNodes = getCanvasSceneNodes(geometryCanvas);
+  sceneNodes.forEach((node) => {
+    if (node.nodeType === 'group') return;
+    if (node.nodeType === 'workflow' && node.presentation?.kind !== 'workflow-panel') return;
+    const inferredKind: CanvasCardKind = node.nodeType === 'prompt'
+      ? (node.childNodeIds?.length ? 'prompt-result-group' : 'prompt-only')
+      : node.nodeType === 'media'
+        ? 'media-only'
+        : node.nodeType === 'note'
+          ? 'notebook'
+          : node.nodeType === 'workflow'
+            ? 'workflow-panel'
+            : 'unknown';
+    countCard(node.presentation?.kind || inferredKind, node.presentation?.layoutMode);
+  });
+  const sceneBounds = unionCanvasSceneBounds(sceneNodes.map((node) => node.bounds));
   const selectionBounds = unionCanvasSceneBounds(
     getCanvasSceneBoundsForNodeIds(geometryCanvas, selectedNodeIdsSafe),
   );
@@ -210,7 +218,7 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   }
 
   return {
-    projectVersion: '1.5.9',
+    projectVersion: APP_VERSION,
     currentPage,
     canvas: {
       id: canvasId,

@@ -46,6 +46,23 @@ export interface CanvasCardPresentation {
   };
 }
 
+export type CanvasSceneNodeType = "prompt" | "media" | "note" | "workflow" | "group" | "unknown";
+
+export interface CanvasSceneNode {
+  id: EntityId;
+  nodeType: CanvasSceneNodeType;
+  position: CanvasVectorPointDto;
+  bounds: CanvasSceneBounds;
+  presentation?: CanvasCardPresentation;
+  parentNodeId?: EntityId;
+  childNodeIds?: EntityId[];
+  memberNodeIds?: EntityId[];
+  zIndex?: number;
+  status?: "idle" | "running" | "paused" | "completed" | "failed" | "cancelled";
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface CanvasVectorPointDto {
   x: number;
   y: number;

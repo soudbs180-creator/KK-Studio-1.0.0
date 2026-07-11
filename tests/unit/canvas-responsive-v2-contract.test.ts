@@ -6,6 +6,7 @@ import {
   getCanvasViewportSurfaceKey,
   isCanvasWorkspaceResultFlow,
   resolveCanvasWorkspaceSurface,
+  resolveStableResponsiveViewport,
 } from '../../apps/web/src/utils/responsiveSurface.ts';
 import {
   canvasScreenPointToWorld,
@@ -27,6 +28,21 @@ test('landscape tablets use the touch canvas and a separate viewport key', () =>
   assert.equal(getCanvasViewportSurfaceKey('desktop-canvas'), 'desktop');
 });
 
+test('soft keyboards do not switch a portrait tablet into landscape canvas mode', () => {
+  const stable = resolveStableResponsiveViewport(
+    { width: 834, height: 1112 },
+    { width: 834, height: 640 },
+    true,
+  );
+  assert.deepEqual(stable, { width: 834, height: 1112 });
+  assert.equal(resolveCanvasWorkspaceSurface(stable.width, stable.height), 'tablet-portrait-results');
+  assert.deepEqual(resolveStableResponsiveViewport(
+    { width: 834, height: 1112 },
+    { width: 1023, height: 720 },
+    true,
+  ), { width: 1023, height: 720 });
+});
+
 test('workspace persists canvas views per responsive surface', () => {
   const source = fs.readFileSync('apps/web/src/pages/Workspace/WorkspacePage.tsx', 'utf8');
   assert.match(source, /resolveCanvasWorkspaceSurface/);
@@ -45,8 +61,17 @@ test('desktop canvas chrome uses a stable compact composer and 44px rail', () =>
   assert.match(promptBar, /data-desktop-composer-state="expanded"/);
   assert.match(css, /max-height:\s*min\(320px, 30dvh\)/);
   assert.match(projectManager, /fixed left-3 z-50 flex w-11/);
-  assert.match(projectManager, /h-10 w-10 shrink-0/);
+  assert.match(projectManager, /h-11 w-11 shrink-0/);
+  assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);
+  assert.doesNotMatch(projectManager, /setIsCollapsed|w-2 justify-center/);
   assert.doesNotMatch(projectManager, /scale\(\$\{desktopScale\}\)/);
+});
+
+test('tablet drawing tools keep 44px targets without enlarging color swatches', () => {
+  const workspace = fs.readFileSync('apps/web/src/pages/Workspace/WorkspacePage.tsx', 'utf8');
+  assert.match(workspace, /className="flex h-11 w-11 items-center justify-center rounded-lg"/);
+  assert.match(workspace, /className=\{`h-5 w-5 rounded-full border/);
+  assert.match(workspace, /text-\[10px\] h-11 w-11|h-11 w-11 items-center justify-center rounded-lg text-\[10px\]/);
 });
 
 test('touch canvas owns browser gestures and supports two-finger pan and zoom', () => {

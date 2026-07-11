@@ -42,6 +42,11 @@ export interface CanvasPerformanceProfile {
   cardDetailLevel: CanvasCardDetailLevel;
 }
 
+export interface CanvasPerformanceOverrides {
+  mode: 'auto' | 'quality' | 'smooth' | 'ghost';
+  connectorThrottle: boolean;
+}
+
 export interface CanvasTextSofteningProfile {
   active: boolean;
   progress: number;
@@ -273,6 +278,45 @@ export const getCanvasPerformanceProfile = (
     ),
     cardDetailLevel,
   };
+};
+
+export const applyCanvasPerformanceOverrides = (
+  profile: CanvasPerformanceProfile,
+  overrides: CanvasPerformanceOverrides,
+): CanvasPerformanceProfile => {
+  let next = profile;
+  if (overrides.mode === 'quality') {
+    next = {
+      ...next,
+      cardDetailLevel: 'full',
+      renderMode: 'standard',
+      edgeMode: 'full',
+      overscanMode: 'wide',
+      overscanBuffer: PROJECT_OVERSCAN.normal,
+    };
+  } else if (overrides.mode === 'smooth') {
+    next = {
+      ...next,
+      cardDetailLevel: profile.zoomBand === 'tiny' ? 'thumbnail-shell' : 'compact',
+      renderMode: 'performance',
+      edgeMode: 'throttled',
+      overscanMode: 'tight',
+      overscanBuffer: PROJECT_OVERSCAN.large,
+    };
+  } else if (overrides.mode === 'ghost') {
+    next = {
+      ...next,
+      cardDetailLevel: 'ghost',
+      renderMode: 'performance',
+      edgeMode: 'minimal',
+      overscanMode: 'tight',
+      overscanBuffer: PROJECT_OVERSCAN.huge,
+    };
+  }
+
+  return overrides.connectorThrottle
+    ? next
+    : { ...next, edgeMode: 'full', edgeThrottleMs: 0 };
 };
 
 export const shouldSimplifyCard = (profile: CanvasPerformanceProfile): boolean =>

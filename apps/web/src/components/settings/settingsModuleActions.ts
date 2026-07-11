@@ -139,12 +139,6 @@ export const PROJECT_MANAGER_ACTIONS = {
   mergeIntoCurrentProject: {
     uiAction: 'project-manager.mergeIntoCurrentProject',
   },
-  expandToolbar: {
-    uiAction: 'project-manager.expandToolbar',
-  },
-  collapseToolbar: {
-    uiAction: 'project-manager.collapseToolbar',
-  },
   openSearch: {
     uiAction: 'project-manager.openSearch',
   },

@@ -15,6 +15,7 @@ export interface RouteContext {
   browserDirectAvailable: boolean;
   userVpnEnabled?: boolean;
   userPreferredMode: 'auto' | 'local' | 'cloud' | 'platform';
+  allowCloudFallback?: boolean;
   provider: string;
   hasLocalUserKey: boolean;
   hasCloudUserKey: boolean;

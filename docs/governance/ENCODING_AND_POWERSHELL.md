@@ -1,5 +1,5 @@
 <!-- AI_ROUTING_KEY: encoding, utf8, powershell, CRLF, LF, mojibake -->
-# Encoding and PowerShell Rules — KK Studio v1.5.9
+# Encoding and PowerShell Rules — KK Studio v1.6.0
 
 Last updated: 2026-06-03
 

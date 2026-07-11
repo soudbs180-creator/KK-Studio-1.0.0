@@ -11,6 +11,7 @@ export type SettingsSurfaceView =
   | 'consumption-records'
   | 'storage-settings'
   | 'system-logs'
+  | 'recharge'
   | 'user-profile'
   | 'appearance-motion'
   | 'browser-assistant'

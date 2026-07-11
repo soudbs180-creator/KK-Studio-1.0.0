@@ -231,11 +231,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         return Number.isFinite(parsed) ? parsed : 80;
     });
     const [isDragging, setIsDragging] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    const [isMouseOver, setIsMouseOver] = useState(false);
 
     const dragStartRef = useRef({ y: 0, startTop: 0 });
-    const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
     const initialTop = 60;
     const activeProjectName = activeCanvas?.name || '项目';
 
@@ -293,69 +290,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         setIsDragging(true);
     };
 
-    const handleMouseEnter = useCallback(() => {
-        setIsMouseOver(true);
-        if (isMobile) return;
-        if (inactivityTimerRef.current) {
-            clearTimeout(inactivityTimerRef.current);
-            inactivityTimerRef.current = null;
-        }
-        setIsCollapsed(false);
-    }, [isMobile]);
-
-    const handleMouseLeave = useCallback(() => {
-        setIsMouseOver(false);
-        if (isMobile) return;
-        if (inactivityTimerRef.current) {
-            clearTimeout(inactivityTimerRef.current);
-        }
-
-        const activeElement = document.activeElement;
-        const isInputFocused =
-            activeElement instanceof HTMLInputElement ||
-            activeElement instanceof HTMLTextAreaElement ||
-            (activeElement as HTMLElement | null)?.isContentEditable;
-
-        if (isInputFocused) {
-            return;
-        }
-
-        inactivityTimerRef.current = setTimeout(() => {
-            const focusedElement = document.activeElement;
-            const stillEditing =
-                focusedElement instanceof HTMLInputElement ||
-                focusedElement instanceof HTMLTextAreaElement ||
-                (focusedElement as HTMLElement | null)?.isContentEditable;
-
-            if (!stillEditing) {
-                setIsCollapsed(true);
-            }
-        }, 60000); // 鼠标移开 1 分钟后自动收起
-    }, [isMobile]);
-
-    useEffect(() => {
-        // 挂载时，如果没有鼠标进入，4秒后自动收起
-        if (!isMobile) {
-            inactivityTimerRef.current = setTimeout(() => {
-                const focusedElement = document.activeElement;
-                const stillEditing =
-                    focusedElement instanceof HTMLInputElement ||
-                    focusedElement instanceof HTMLTextAreaElement ||
-                    (focusedElement as HTMLElement | null)?.isContentEditable;
-
-                if (!stillEditing) {
-                    setIsCollapsed(true);
-                }
-            }, 4000);
-        }
-
-        return () => {
-            if (inactivityTimerRef.current) {
-                clearTimeout(inactivityTimerRef.current);
-            }
-        };
-    }, [isMobile]);
-
     useEffect(() => {
         if (!showDropdown) {
             return;
@@ -377,16 +311,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         setEditingId(null);
         setEditName('');
 
-        // 如果保存后焦点失去，且鼠标不在面板上，自动收起
-        if (!isMouseOver && !isMobile) {
-            if (inactivityTimerRef.current) {
-                clearTimeout(inactivityTimerRef.current);
-            }
-            inactivityTimerRef.current = setTimeout(() => {
-                setIsCollapsed(true);
-            }, 60000);
-        }
-    }, [editName, editingId, renameCanvas, isMouseOver, isMobile]);
+    }, [editName, editingId, renameCanvas]);
 
     const startEditing = useCallback((canvas: { id: string; name: string }) => {
         setEditingId(canvas.id);
@@ -515,7 +440,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
     }, [activeCanvas, mergeCanvasInto, state.canvases]);
 
-    const desktopIconButtonClass = 'group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-all active:scale-95 hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]';
+    const desktopIconButtonClass = 'group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-all active:scale-95 hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-coral)]';
     const dropdownPositionStyle = isMobile
         ? { top: 'calc(100% + 10px)', left: 0, width: 'min(92vw, 340px)' }
         : undefined;
@@ -1021,22 +946,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
-                data-project-manager-action={PROJECT_MANAGER_ACTIONS.expandToolbar.uiAction}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-                onClick={() => {
-                    if (isCollapsed) {
-                        setIsCollapsed(false);
-                    }
-                }}
-                className={`fixed left-3 z-50 flex w-11 flex-col items-center select-none transition-opacity duration-200 ${isCollapsed ? 'h-24 cursor-pointer opacity-60 hover:opacity-100' : 'opacity-100'}`}
+                className="fixed left-3 z-50 flex w-11 flex-col items-center select-none"
                 style={{ 
                     top: '50%',
                     transform: 'translateY(-50%)',
                 }}
             >
                 <div
-                    className={`flex max-h-[calc(100dvh-144px)] flex-col items-center overflow-x-hidden rounded-lg transition-all duration-200 ${isCollapsed ? 'h-full w-2 justify-center px-0 py-3' : 'w-full gap-1 overflow-y-auto p-0.5'}`}
+                    className="flex max-h-[calc(100dvh-144px)] w-full flex-col items-center gap-1 overflow-x-hidden overflow-y-auto rounded-lg p-0.5"
                     style={{
                         background: 'var(--frost-card-framework-bg)',
                         border: '1px solid var(--frost-card-framework-border)',
@@ -1045,35 +962,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                     }}
                 >
-                    {isCollapsed ? (
-                        /* 收起状态：显示精致的磨砂质感发光天蓝色小竖线条 */
-                        <div 
-                            className="w-1.5 h-12 rounded-full transition-all duration-300"
-                            style={{
-                                background: 'rgba(96, 165, 250, 0.65)',
-                                border: '1px solid rgba(255, 255, 255, 0.25)',
-                                boxShadow: '0 0 8px rgba(96, 165, 250, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.2)',
-                                backdropFilter: 'blur(3px)',
-                                WebkitBackdropFilter: 'blur(3px)'
-                            }}
-                        />
-                    ) : (
-                        /* 展开状态 */
-                        <>
-                            {/* 顶部指示条：点击它可以收起，且形状和 collapsed 有过渡的动态 */}
-                            <button
-                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.collapseToolbar.uiAction}
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    setIsCollapsed(true);
-                                }}
-                                className="flex w-full justify-center py-1 opacity-30 hover:opacity-100 transition-opacity"
-                                title="收起工具栏"
-                            >
-                                <div className="h-1 w-6 rounded-full bg-[var(--text-secondary)] hover:bg-[var(--accent-coral)] transition-all duration-300 transform hover:scale-x-110" />
-                            </button>
-
-                            <div className="flex flex-col items-center gap-2 w-full">
+                    <div className="flex w-full flex-col items-center gap-2">
                                 <div className="relative">
                                     <button
                                         id="project-manager-trigger"
@@ -1084,7 +973,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         }}
                                         className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
                                         title={activeProjectName}
-                                        tabIndex={-1}
                                     >
                                         <Layers size={20} />
                                         <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
@@ -1100,7 +988,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={desktopIconButtonClass}
                                     title="搜索提示词"
-                                    tabIndex={-1}
                                 >
                                     <Search size={20} />
                                 </button>
@@ -1116,7 +1003,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         }}
                                         className={desktopIconButtonClass}
                                         title="收藏"
-                                        tabIndex={-1}
                                     >
                                         <Heart size={20} />
                                     </button>
@@ -1132,7 +1018,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={desktopIconButtonClass}
                                     title="缩放到全局"
-                                    tabIndex={-1}
                                 >
                                     <Maximize2 size={20} />
                                 </button>
@@ -1145,7 +1030,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={desktopIconButtonClass}
                                     title="定位卡组"
-                                    tabIndex={-1}
                                 >
                                     <Focus size={20} />
                                 </button>
@@ -1158,7 +1042,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
                                     title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
-                                    tabIndex={-1}
                                 >
                                     {canvasMode === 'board' ? <Palette size={20} /> : <Grid3x3 size={20} />}
                                 </button>
@@ -1173,7 +1056,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
                                     aria-pressed={showSnapToGrid}
                                     data-testid="canvas-snap-to-grid-toggle"
-                                    tabIndex={-1}
                                 >
                                     <Magnet size={20} />
                                 </button>
@@ -1186,7 +1068,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={desktopIconButtonClass}
                                     title="自动整理"
-                                    tabIndex={-1}
                                 >
                                     <LayoutDashboard size={20} />
                                 </button>
@@ -1205,7 +1086,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                             }}
                                             className={`${desktopIconButtonClass} ${showWorkflowDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
                                             title="工作流与模板"
-                                            tabIndex={-1}
                                         >
                                             <Network size={20} />
                                         </button>
@@ -1223,13 +1103,10 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     }}
                                     className={desktopIconButtonClass}
                                     title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
-                                    tabIndex={-1}
                                 >
                                     {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
                                 </button>
-                            </div>
-                        </>
-                    )}
+                    </div>
                 </div>
             </div>
             {deleteConfirmModal}

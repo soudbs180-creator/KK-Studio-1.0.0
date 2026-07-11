@@ -27,7 +27,8 @@ test('PPT prompt nodes expose a deck module state and stop rendering PPT child p
   assert.match(appSource, /if \(isPptDeckChildImageNode\(n\)\) \{\s*return false;\s*\}/);
 
   assert.match(promptNodeSource, /data-testid="ppt-deck-container"/);
-  assert.match(promptNodeSource, /pptDeck\.pages\.slice\(0, 6\)\.map/);
+  assert.match(promptNodeSource, /pptDeck\.pages\.map/);
+  assert.doesNotMatch(promptNodeSource, /pptDeck\.pages\.slice\(/);
   assert.doesNotMatch(
     promptNodeSource,
     /单页重生[\s\S]*Array\.from\(\{ length: Math\.min\(20, node\.childImageIds\.length\) \}\)/,

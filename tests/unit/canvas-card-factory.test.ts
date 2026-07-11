@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createCanvasCardNodes, type CanvasCreateCardInput } from '../../apps/web/src/context/canvasCardFactory.ts';
 
 const defaults = {
@@ -61,4 +62,11 @@ test('ecommerce factory output opens as a real framework workbench card', () => 
   assert.equal(result.promptNodes[0].mode, 'ecommerce');
   assert.equal(result.promptNodes[0].ecommerce?.kind, 'framework');
   assert.equal(result.promptNodes[0].ecommerce?.displayLabel, 'Summer collection');
+});
+
+test('legacy canvas creation tool names contain no unreachable side-path implementations', () => {
+  const tools = fs.readFileSync('apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts', 'utf8');
+  assert.match(tools, /name: 'canvas\.createPromptCards'[\s\S]*?createCardThroughFactory/);
+  assert.match(tools, /name: 'canvas\.createAudioCard'[\s\S]*?createCardThroughFactory/);
+  assert.doesNotMatch(tools, /takeover_ppt_|takeover_img_|new Audio\(\)|addAudioNode/);
 });

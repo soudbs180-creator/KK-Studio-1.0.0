@@ -126,7 +126,14 @@ export async function runBrowserPreflight() {
     };
 
     try {
-      const child = spawn(executablePath, ['--version'], { stdio: 'ignore' });
+      const child = spawn(executablePath, [
+        '--headless=new',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--dump-dom',
+        'about:blank',
+      ], { stdio: 'ignore' });
 
       const timeout = setTimeout(() => {
         try {

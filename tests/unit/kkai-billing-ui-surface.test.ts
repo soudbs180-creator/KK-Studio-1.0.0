@@ -10,6 +10,7 @@ const ROOT_DIR = process.cwd();
 
 test('KKAI keeps billing surfaces feature-gated and restores the desktop assistant trigger', () => {
   const appSource = readSource('apps/web/src/App.tsx');
+  const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
   const mobileWorkspaceSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
@@ -24,7 +25,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(appSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(appSource, /<AppDesktopChrome[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
   assert.match(appSource, /<AppMobileWorkspace[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
-  assert.match(appSource, /rechargeModal:\s*\{\s*enabled:\s*billingUiEnabled,\s*isOpen:\s*showRechargeModal,/);
+  assert.match(workspaceSource, /if \(!showRechargeModal\)[\s\S]*setShowRechargeModal\(false\);[\s\S]*openSettingsSurfaceTracked\('recharge'\);/);
 
   assert.match(desktopChromeSource, /\{billingUiEnabled && \(/);
   assert.match(desktopChromeSource, /onOpenProfile\('main'\)/);
@@ -35,7 +36,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(mobileWorkspaceSource, /onRechargeClick=\{billingUiEnabled \? onShowRecharge : undefined\}/);
   assert.doesNotMatch(mobileWorkspaceSurfaceSource, /useAdminRole/);
   assert.doesNotMatch(mobileWorkspaceSurfaceSource, /userRole=\{accountRole\}/);
-  assert.match(globalModalsSource, /rechargeModal\.enabled && rechargeModal\.isOpen/);
+  assert.doesNotMatch(globalModalsSource, /RechargeModal|rechargeModal\.enabled/);
 
   assert.match(chatSidebarSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(chatSidebarSource, /const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;/);

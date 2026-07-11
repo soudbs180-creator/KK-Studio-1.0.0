@@ -1,12 +1,12 @@
 <!-- AI_ROUTING_KEY: state, validation, verification, milestone, handoff -->
-# Project State and Validation — KK Studio v1.5.9
+# Project State and Validation — KK Studio v1.6.0
 
 Last updated: 2026-06-09
 
 ## 0. 当前验证基线
 
 ```text
-Project version: KK Studio v1.5.9
+Project version: KK Studio v1.6.0
 Version source of truth: config/release-manifest.json
 Node / package manager: root package.json engines.node and packageManager
 AI rules entry: AGENTS.md

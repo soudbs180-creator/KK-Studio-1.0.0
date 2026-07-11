@@ -42,7 +42,7 @@ export class OpencliService {
         status: 'success',
         summary: `已在浏览器打开并分析 ${target}。`,
         data: {
-          extractedText: `关于 KK Studio：\n1. KK Studio 是一个“本地优先 + 云端补位”的 AI 创作台。\n2. 支持无限画布和智能卡片编排。\n3. 当前版本为 v1.5.9，完美适配用户自有浏览器。`,
+          extractedText: `关于 KK Studio：\n1. KK Studio 是一个“本地优先 + 云端补位”的 AI 创作台。\n2. 支持无限画布和智能卡片编排。\n3. 当前版本为 v1.6.0，适配用户自有浏览器。`,
           screenshotUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
         }
       };

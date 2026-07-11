@@ -1,10 +1,11 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.9",
-  "displayVersion": "v1.5.9",
-  "releaseDate": "2026-06-26",
+  "version": "1.6.0",
+  "displayVersion": "v1.6.0",
+  "releaseDate": "2026-07-11",
   "releaseNotes": [
-    "升级版本至 v1.5.9 并同步推送至远端",
+    "重构无限画布卡片、排版、视口恢复与触控交互",
+    "统一画布与设置控制台的性能和生成路由策略",
     "verified kkai.plus same-origin API workaround."
   ],
   "versionTargets": {

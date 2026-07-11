@@ -128,6 +128,7 @@ import {
   isCanvasWorkspaceResultFlow,
   resolveCanvasWorkspaceSurface,
   resolveResponsiveSurface,
+  resolveStableResponsiveViewport,
 } from '../../utils/responsiveSurface';
 import { useVisibleCanvasItems, useVisibleCanvasItemsNew } from '../../app/useVisibleCanvasItems';
 import { useCanvasSpatialIndex } from '../../app/useCanvasSpatialIndex';
@@ -282,7 +283,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 );
 
 // Lucide icons replaced with SVGs
-import { toolRegistryInstance } from '../../features/ai-assistant-runtime';
+import { agentPermissionPolicy, toolRegistryInstance } from '../../features/ai-assistant-runtime';
 import { CanvasProvider, useCanvas, useCanvasStartupStatus } from '../../context/CanvasContext';
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { AppearanceMotionProvider } from '../../context/AppearanceMotionContext';
@@ -343,8 +344,13 @@ import {
 } from '../../workflow/templates/workflowTemplates';
 import { isWorkflowUtilityNodeKind } from '../../workflow/schema';
 import {
+  applyCanvasPerformanceOverrides,
   getCanvasPerformanceProfile,
 } from '../../canvas/performanceProfile';
+import {
+  getCanvasPerformancePreferences,
+  subscribeCanvasPerformancePreferences,
+} from '../../canvas/canvasPerformancePreferences.ts';
 
 const AppDesktopChrome = lazyWithRetry(() => import('../../app/AppDesktopChrome'));
 const AppGlobalModals = lazyWithRetry(() => import('../../app/AppGlobalModals'));
@@ -684,6 +690,11 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   // Canvas Ref for Zoom/Pan Controls
   const canvasRef = useRef<InfiniteCanvasHandle>(null);
+  const canvasPerformancePreferences = React.useSyncExternalStore(
+    subscribeCanvasPerformancePreferences,
+    getCanvasPerformancePreferences,
+    getCanvasPerformancePreferences,
+  );
   const autoRecoveredCanvasKeyRef = useRef<string>('');
 
   const {
@@ -711,8 +722,10 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const isLargeMeasurementCanvas = measurementCanvasNodeCount >= 80;
 
   useEffect(() => {
-    CanvasMeasurementScheduler.setLocked(isCanvasTransforming || isLargeMeasurementCanvas);
-  }, [isCanvasTransforming, isLargeMeasurementCanvas]);
+    CanvasMeasurementScheduler.setLocked(
+      isLargeMeasurementCanvas || (canvasPerformancePreferences.dragSuspend && isCanvasTransforming),
+    );
+  }, [canvasPerformancePreferences.dragSuspend, isCanvasTransforming, isLargeMeasurementCanvas]);
 
   const handleToggleGrid = () => setShowGrid(prev => !prev);
   const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
@@ -954,13 +967,23 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
 
     const syncMobileViewport = () => {
-      setResponsiveViewport({ width: window.innerWidth, height: window.innerHeight });
+      const activeElement = document.activeElement;
+      const isTextEntryFocused = activeElement instanceof HTMLInputElement
+        || activeElement instanceof HTMLTextAreaElement
+        || Boolean((activeElement as HTMLElement | null)?.isContentEditable);
+      setResponsiveViewport((previous) => resolveStableResponsiveViewport(
+        previous,
+        { width: window.innerWidth, height: window.innerHeight },
+        isTextEntryFocused,
+      ));
     };
 
     syncMobileViewport();
     window.addEventListener('resize', syncMobileViewport);
+    window.visualViewport?.addEventListener('resize', syncMobileViewport);
     return () => {
       window.removeEventListener('resize', syncMobileViewport);
+      window.visualViewport?.removeEventListener('resize', syncMobileViewport);
     };
   }, []);
 
@@ -2103,6 +2126,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
   // 简体中文：通过时间（200ms）与位移（250px）双重节流，优化交互期间（平移、缩放、拖拽）的重绘机制，保证高频平移流畅度的同时杜绝卡片丢失与白屏
   const lastInteractionRef = useRef({ time: 0, x: 0, y: 0, scale: 1 });
   const shouldFreezeRender = React.useMemo(() => {
+    if (isNodeDragActive && !canvasPerformancePreferences.dragSuspend) {
+      return false;
+    }
     // 1. 如果不是大型项目，操作复杂度很低，我们绝对不冻结任何渲染，保证流畅与卡片完全同步
     if (!isLargeProject) {
       lastInteractionRef.current = { time: Date.now(), x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
@@ -2139,7 +2165,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
     lastInteractionRef.current = { time: now, x: canvasTransform.x, y: canvasTransform.y, scale: canvasTransform.scale };
     return false;
-  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale, canvasInteractionPhase, isLargeProject, activeCanvas]);
+  }, [isCanvasTransforming, isNodeDragActive, canvasTransform.x, canvasTransform.y, canvasTransform.scale, canvasInteractionPhase, isLargeProject, activeCanvas, canvasPerformancePreferences.dragSuspend]);
 
   // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
   // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
@@ -2236,6 +2262,17 @@ export const AppContent: React.FC<AppContentProps> = () => {
   ) => {
     openSettingsSurface(view, supplier);
   }, [openSettingsSurface]);
+
+  useEffect(() => {
+    if (!showRechargeModal) {
+      return;
+    }
+
+    setShowRechargeModal(false);
+    if (billingUiEnabled) {
+      openSettingsSurfaceTracked('recharge');
+    }
+  }, [billingUiEnabled, openSettingsSurfaceTracked, setShowRechargeModal, showRechargeModal]);
 
   const openCurrentMobileSettingsSurface = useCallback(() => {
     openSettingsSurfaceTracked('dashboard');
@@ -3768,7 +3805,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
         ? 'pan'
         : 'idle';
 
-    return getCanvasPerformanceProfile({
+    const profile = getCanvasPerformanceProfile({
       scale: canvasTransform.scale || 1,
       isInteracting,
       interactionPhase: profileInteractionPhase,
@@ -3783,12 +3820,18 @@ export const AppContent: React.FC<AppContentProps> = () => {
       viewportWidth: typeof window === 'undefined' ? 0 : window.innerWidth,
       viewportHeight: typeof window === 'undefined' ? 0 : window.innerHeight,
     });
+    return applyCanvasPerformanceOverrides(profile, {
+      mode: canvasPerformancePreferences.mode,
+      connectorThrottle: canvasPerformancePreferences.connectorThrottle,
+    });
   }, [
     activeCanvas,
     canvasInteractionPhase,
     canvasTransform.scale,
     dragConnection?.active,
     selectionBox?.active,
+    canvasPerformancePreferences.connectorThrottle,
+    canvasPerformancePreferences.mode,
   ]);
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   // To satisfy contract test assertion: const resolveViewportNodePosition =
@@ -3910,6 +3953,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     getComputedGroupBounds,
     isNodeDragActive: shouldFreezeRender,
     isCanvasTransforming: shouldFreezeRender,
+    disableCulling: !canvasPerformancePreferences.viewportCulling,
     isPptDeckChildImageNode,
     promptGroupLayerById,
     promptGroupStackZIndexById,
@@ -5384,10 +5428,6 @@ const isRectIntersecting = (
       selectedCount: selectedNodeIds.length,
       onMigrate: handleMigrateSelection,
     },
-    rechargeModal: {
-      enabled: billingUiEnabled,
-      isOpen: showRechargeModal,
-    },
     markdownModal: {
       isOpen: showMarkdownModal,
       onClose: () => setShowMarkdownModal(false),
@@ -5441,21 +5481,21 @@ const isRectIntersecting = (
           <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
             <button
               onClick={() => setActiveDrawingTool('pen')}
-              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'pen' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'pen' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
               title="自由画笔"
             >
               <PenTool size={18} />
             </button>
             <button
               onClick={() => setActiveDrawingTool('select')}
-              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'select' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'select' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
               title="框选为参考图"
             >
               <Scissors size={18} />
             </button>
             <button
               onClick={() => setActiveDrawingTool('text')}
-              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'text' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'text' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
               title="文本工具"
             >
               <Type size={18} />
@@ -5464,7 +5504,7 @@ const isRectIntersecting = (
             {/* 形状下拉 */}
             <div className="relative group/shape flex items-center">
               <button
-                className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${['rect', 'circle', 'line', 'arrow'].includes(activeDrawingTool) ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${['rect', 'circle', 'line', 'arrow'].includes(activeDrawingTool) ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 title="形状工具"
               >
                 <Shapes size={18} />
@@ -5472,28 +5512,28 @@ const isRectIntersecting = (
               <div className="absolute top-full left-0 mt-2 hidden group-hover/shape:flex flex-col gap-1 p-1.5 rounded-xl border shadow-lg bg-[var(--frost-card-framework-bg)] border-[var(--frost-card-framework-border)] backdrop-blur-md z-[102] w-28">
                 <button
                   onClick={() => setActiveDrawingTool('rect')}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'rect' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'rect' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 >
                   <span className="w-3 h-3 border border-current rounded-sm inline-block" />
                   矩形
                 </button>
                 <button
                   onClick={() => setActiveDrawingTool('circle')}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'circle' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'circle' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 >
                   <span className="w-3 h-3 border border-current rounded-full inline-block" />
                   圆形
                 </button>
                 <button
                   onClick={() => setActiveDrawingTool('line')}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'line' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'line' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 >
                   <span className="w-3 h-px bg-current inline-block transform" style={{ transform: 'translateY(-1px)' }} />
                   直线
                 </button>
                 <button
                   onClick={() => setActiveDrawingTool('arrow')}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'arrow' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'arrow' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 >
                   <span className="text-[10px] inline-block font-bold">→</span>
                   箭头
@@ -5508,9 +5548,15 @@ const isRectIntersecting = (
               <button
                 key={color}
                 onClick={() => setActiveDrawingColor(color)}
-                className={`w-5 h-5 rounded-full border transition-all ${activeDrawingColor === color ? 'scale-120 ring-2 ring-[var(--accent-coral)] border-transparent' : 'border-white/20 hover:scale-110'}`}
-                style={{ backgroundColor: color }}
-              />
+                className="flex h-11 w-11 items-center justify-center rounded-lg"
+                aria-label={`选择颜色 ${color}`}
+                title={`选择颜色 ${color}`}
+              >
+                <span
+                  className={`h-5 w-5 rounded-full border transition-all ${activeDrawingColor === color ? 'scale-120 ring-2 ring-[var(--accent-coral)] border-transparent' : 'border-white/20 hover:scale-110'}`}
+                  style={{ backgroundColor: color }}
+                />
+              </button>
             ))}
           </div>
 
@@ -5520,7 +5566,7 @@ const isRectIntersecting = (
               <button
                 key={w}
                 onClick={() => setActiveDrawingWidth(w)}
-                className={`flex items-center justify-center rounded-lg transition-colors text-[10px] h-7 w-7 ${activeDrawingWidth === w ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg text-[10px] transition-colors ${activeDrawingWidth === w ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
                 title={`线宽: ${w}px`}
               >
                 {w === 2 ? '细' : w === 4 ? '中' : '粗'}
@@ -5535,7 +5581,7 @@ const isRectIntersecting = (
                 clearCanvasDrawings();
               }
             }}
-            className="flex h-9 px-3 items-center gap-1.5 rounded-xl text-xs text-red-400 transition-colors hover:bg-red-500/10 active:scale-95"
+            className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-xs text-red-400 transition-colors hover:bg-red-500/10 active:scale-95"
             title="清除全部画板内容"
           >
             <Trash size={15} />
@@ -5653,7 +5699,10 @@ const isRectIntersecting = (
         className="absolute inset-y-0 left-0 transition-all duration-300 ease-out"
         style={{
           right: isChatOpen ? `${chatSidebarWidth}px` : 0,
-        }}
+          '--canvas-card-transition': canvasPerformancePreferences.zoomReduceMotion && canvasInteractionPhase === 'zoom'
+            ? 'none'
+            : undefined,
+        } as React.CSSProperties}
       >
       <CanvasMigrationNotice />
       <InfiniteCanvas
@@ -6041,6 +6090,17 @@ const isRectIntersecting = (
               onPositionChange={(position) => updateWorkflowNodePosition(node.id, position)}
               onDataChange={(data) => updateWorkflowNode(node.id, { data })}
               onCommand={(action) => {
+                const workflowAction = {
+                  type: 'workflow.controlPanel',
+                  payload: { nodeId: node.id, action },
+                } as any;
+                const safety = agentPermissionPolicy.evaluateSafety(workflowAction);
+                if (!safety.allowed) {
+                  void import('../../services/system/notificationService').then(({ notify }) => {
+                    notify.error('工作流操作被阻止', safety.reason || '当前操作不符合安全策略。');
+                  });
+                  return;
+                }
                 const executionContext: any = {
                   activeCanvas,
                   updateWorkflowNode,
@@ -6054,10 +6114,11 @@ const isRectIntersecting = (
                 executionContext.executeTool = (toolName: string, input: unknown, extra: Record<string, unknown> = {}) => (
                   toolRegistryInstance.execute(toolName, input, { ...executionContext, ...extra })
                 );
-                void toolRegistryInstance.execute('workflow.controlPanel', {
-                  nodeId: node.id,
-                  action,
-                }, executionContext).catch((error) => {
+                void toolRegistryInstance.execute(
+                  workflowAction.type,
+                  workflowAction.payload,
+                  executionContext,
+                ).catch((error) => {
                   void import('../../services/system/notificationService').then(({ notify }) => {
                     notify.error('工作流执行失败', error?.message || String(error));
                   });

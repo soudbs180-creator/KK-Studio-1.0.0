@@ -40,9 +40,10 @@ export class ProviderRouteEngine {
 
     // 3. User preferred routing mode
     const storedPreferredMode = localStorage.getItem('kk_studio_preferred_generation_mode');
-    const userPreferredMode = (storedPreferredMode === 'local' || storedPreferredMode === 'cloud' || storedPreferredMode === 'platform')
+    const userPreferredMode = (storedPreferredMode === 'auto' || storedPreferredMode === 'local' || storedPreferredMode === 'cloud' || storedPreferredMode === 'platform')
       ? storedPreferredMode
-      : 'local';
+      : 'auto';
+    const allowCloudFallback = localStorage.getItem('kk_studio_fallback_to_cloud') !== 'false';
 
     // 4. Check locally resolved keys
     let hasLocalUserKey = false;
@@ -79,6 +80,7 @@ export class ProviderRouteEngine {
       browserDirectAvailable: false, // Disabled for security direct from UI
       userVpnEnabled,
       userPreferredMode,
+      allowCloudFallback,
       provider: isWebProvider ? options.preferredKeyId! : (slot?.provider || 'Google'),
       hasLocalUserKey,
       hasCloudUserKey,

@@ -49,7 +49,8 @@ test('useVisibleCanvasItemsNew avoids O(N) culling loops and queries spatial ind
     /activeCanvas\.imageNodes\.filter\([^)]*visibleIds\.has/,
     'Should not filter the entire imageNodes list based on visibleIds'
   );
-  assert.match(source, /const visibleIds = spatialIndex\.query\(vLeft, vTop, vRight, vBottom\)/);
+  assert.match(source, /: spatialIndex\.query\(vLeft, vTop, vRight, vBottom\)/);
+  assert.match(source, /const visibleIds = disableCulling/);
   assert.match(source, /visibleIds\.forEach\(/);
   assert.match(source, /promptNodeById\.get\(/);
   assert.match(source, /imageNodeById\.get\(/);

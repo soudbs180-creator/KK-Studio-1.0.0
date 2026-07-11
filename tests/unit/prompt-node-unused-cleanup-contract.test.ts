@@ -19,7 +19,8 @@ test('PromptNodeComponent does not retain source-proven unused locals', () => {
   assert.doesNotMatch(source, /import \{[^\n]*\bChevronRight\b/);
   assert.doesNotMatch(source, /\n\s+onPositionChange,/);
   assert.doesNotMatch(source, /\n\s+sourcePosition,/);
-  assert.doesNotMatch(source, /\n\s+onRetry,/);
+  assert.match(source, /showError && onRetry/);
+  assert.match(source, /aria-label="Retry failed card"/);
   assert.doesNotMatch(source, /\n\s+ioTrace,/);
   assert.doesNotMatch(source, /\n\s+onOpenStorageSettings,/);
   assert.doesNotMatch(source, /\n\s+onDisconnect,/);

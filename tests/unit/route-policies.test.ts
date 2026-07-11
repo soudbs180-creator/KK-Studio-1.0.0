@@ -78,3 +78,28 @@ test("routing policy: user preference overrides auto decisions", () => {
   assert.equal(decision.mode, 'cloud-platform-key');
   assert.match(decision.reason, /platform/i);
 });
+
+test('routing policy: strict local mode never silently falls back to cloud', () => {
+  const context: RouteContext = {
+    deviceType: 'desktop',
+    localRunnerAvailable: true,
+    browserDirectAvailable: false,
+    userPreferredMode: 'local',
+    allowCloudFallback: false,
+    provider: 'Google',
+    hasLocalUserKey: true,
+    hasCloudUserKey: true,
+    hasPlatformCredit: true,
+    networkStatus: 'normal',
+    taskType: 'image',
+  };
+
+  const decision = decideRoute(context);
+  assert.equal(decision.mode, 'local-runner');
+  assert.equal(decision.fallback, undefined);
+
+  const unavailable = decideRoute({ ...context, localRunnerAvailable: false, hasLocalUserKey: false });
+  assert.equal(unavailable.mode, 'local-runner');
+  assert.equal(unavailable.fallback, undefined);
+  assert.match(unavailable.reason, /strict local/i);
+});

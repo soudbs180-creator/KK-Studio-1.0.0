@@ -8,4 +8,6 @@
 - [x] Add editable workflow-panel and vector notebook cards.
 - [x] Add tablet-landscape canvas and compact desktop composer/tool rail.
 - [x] Expand CanvasRuntimeState and canonical card factory tools.
-- [x] Complete unit, contract, integration, browser, performance, and governance checks.
+- [x] Connect canvas performance and generation-route settings to their runtime consumers.
+- [x] Add focused unit, contract, integration, responsive, migration, and performance coverage.
+- [x] Complete the final six-viewport browser pass and full release verification after integration.

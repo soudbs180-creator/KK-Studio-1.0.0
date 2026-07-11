@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Zap, HelpCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Zap } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
   SettingsSection,
   SettingsSystemField,
   SettingsHero,
-  SettingsActionButton,
-  SETTINGS_GLASS_SURFACE_CLASSNAME,
 } from '../SettingsScaffold';
 import { SettingSelect } from '../ui/index';
 
@@ -17,16 +15,12 @@ export const GenerationModeView: React.FC = () => {
   // 核心模式选择
   const [preferredMode, setPreferredMode] = useState<'auto' | 'local' | 'cloud' | 'platform'>(() => {
     const val = localStorage.getItem('kk_studio_preferred_generation_mode');
-    return (val === 'auto' || val === 'cloud' || val === 'platform') ? val : 'local';
+    return (val === 'local' || val === 'cloud' || val === 'platform') ? val : 'auto';
   });
 
   // 高级用户设置项
   const [fallbackToCloud, setFallbackToCloud] = useState(() => {
     return localStorage.getItem('kk_studio_fallback_to_cloud') !== 'false';
-  });
-
-  const [enableCodex, setEnableCodex] = useState(() => {
-    return localStorage.getItem('kk_studio_enable_openai_oauth') === 'true';
   });
 
   const handleModeChange = (mode: 'auto' | 'local' | 'cloud' | 'platform') => {
@@ -37,11 +31,6 @@ export const GenerationModeView: React.FC = () => {
   const handleFallbackChange = (val: boolean) => {
     setFallbackToCloud(val);
     localStorage.setItem('kk_studio_fallback_to_cloud', String(val));
-  };
-
-  const handleCodexChange = (val: boolean) => {
-    setEnableCodex(val);
-    localStorage.setItem('kk_studio_enable_openai_oauth', String(val));
   };
 
   return (
@@ -154,12 +143,12 @@ export const GenerationModeView: React.FC = () => {
           <SettingsSystemField
             label={pick('默认环境策略', 'Default Device Defaults')}
             description={pick(
-              '针对桌面端与手机端的默认基准倾向设置（当前桌面端默认本地优先，手机端默认云端优先）。',
-              'Desktop uses Local-first by default; Mobile uses Cloud-first by default.'
+              '自动模式会结合设备、连接状态、可用密钥与本地运行器动态选择路由；手机端不会尝试桌面专属的本地运行器。',
+              'Auto mode selects a route from device, connectivity, available keys, and local-runner state; mobile never attempts the desktop-only local runner.'
             )}
           >
             <div className="text-xs text-[var(--text-secondary)] font-medium px-2 py-1 rounded bg-[var(--bg-tertiary)]">
-              {pick('根据宿主平台自动对齐', 'Aligned automatically per host OS')}
+              {pick('动态评估，不覆盖手动选择', 'Dynamic without overriding manual choice')}
             </div>
           </SettingsSystemField>
 
@@ -192,22 +181,6 @@ export const GenerationModeView: React.FC = () => {
             </div>
           </SettingsSystemField>
 
-          <SettingsSystemField
-            label={pick('OpenAI OAuth / Codex', 'OpenAI OAuth / Codex Integration')}
-            description={pick(
-              '开启实验性的官方 OAuth 免 Key 连接支持（默认关闭，请谨慎使用）。',
-              'Enable experimental OAuth connect integration.'
-            )}
-          >
-            <SettingSelect
-              value={enableCodex ? 'enabled' : 'disabled'}
-              onChange={(v) => handleCodexChange(v === 'enabled')}
-              options={[
-                { label: pick('已启用 (实验性)', 'Enabled (Beta)'), value: 'enabled' },
-                { label: pick('已禁用', 'Disabled'), value: 'disabled' },
-              ]}
-            />
-          </SettingsSystemField>
         </div>
       </SettingsSection>
     </SettingsViewShell>

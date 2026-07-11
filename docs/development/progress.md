@@ -1,4 +1,4 @@
-# Project Progress Report - KK Studio v1.5.9
+# Project Progress Report - KK Studio v1.6.0
 
 ## 状态
 **Current Status**: Active / Documentation Baseline Synced

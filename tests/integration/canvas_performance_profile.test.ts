@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  applyCanvasPerformanceOverrides,
   getCanvasDeviceTier,
   getCanvasInteractionIdleRelaxationMs,
   getCanvasPerformanceProfile,
@@ -154,6 +155,31 @@ describe('canvas performance profile', () => {
     assert.equal(profile.renderMode, 'performance')
     assert.equal(shouldSimplifyCard(profile), true)
     assert.equal(shouldThrottleEdges(profile), true)
+  })
+
+  test('applies user-selected quality ghost and connector policies', () => {
+    const base = getCanvasPerformanceProfile({
+      scale: 0.2,
+      isInteracting: true,
+      nodeCount: 240,
+      connectionCount: 120,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    })
+
+    const quality = applyCanvasPerformanceOverrides(base, { mode: 'quality', connectorThrottle: true })
+    assert.equal(quality.cardDetailLevel, 'full')
+    assert.equal(quality.edgeMode, 'full')
+    assert.equal(quality.overscanBuffer, 900)
+
+    const ghost = applyCanvasPerformanceOverrides(base, { mode: 'ghost', connectorThrottle: true })
+    assert.equal(ghost.cardDetailLevel, 'ghost')
+    assert.equal(ghost.edgeMode, 'minimal')
+    assert.equal(ghost.overscanBuffer, 220)
+
+    const unthrottled = applyCanvasPerformanceOverrides(base, { mode: 'smooth', connectorThrottle: false })
+    assert.equal(unthrottled.edgeMode, 'full')
+    assert.equal(unthrottled.edgeThrottleMs, 0)
   })
 
   test('progressively softens text from 100% to 50% zoom', () => {

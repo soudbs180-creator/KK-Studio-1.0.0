@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 
 async function main() {
-  const policyPath = 'apps/web/src/features/generation/routePolicies.ts';
+  const policyPath = 'apps/web/src/core/routing/routePolicies.ts';
   if (!fs.existsSync(policyPath)) {
     console.error(`[Desktop Local Default Check] P0 ERROR: ${policyPath} does not exist.`);
     process.exit(1);

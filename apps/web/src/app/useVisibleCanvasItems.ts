@@ -35,6 +35,7 @@ export interface UseVisibleCanvasItemsDeps {
   imageCardHeightById: Record<string, number>;
   selectedNodeIds: string[];
   draftNodeId: string | null;
+  disableCulling?: boolean;
   isCanvasTransforming: boolean;
 }
 
@@ -64,6 +65,7 @@ export interface UseVisibleCanvasItemsNewDeps {
   standaloneImageStackZIndexById: Map<string, number>;
   selectedNodeIds: string[];
   draftNodeId: string | null;
+  disableCulling?: boolean;
 }
 
 // 简体中文：新版解耦可视区过滤 Hook，完全避免了对大数组的 filter 遍历，实现了 O(1) 的空间查询到卡片实例的高效查找。
@@ -86,6 +88,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     standaloneImageStackZIndexById,
     selectedNodeIds,
     draftNodeId,
+    disableCulling = false,
   } = deps;
 
   const stableVisibleCanvasSceneRef = useRef<VisibleCanvasItemsResult>({
@@ -136,7 +139,14 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     );
 
     // 🚀 核心优化：只查询 viewport 覆盖的 bucket 节点集合，杜绝遍历节点大数组
-    const visibleIds = spatialIndex.query(vLeft, vTop, vRight, vBottom);
+    const visibleIds = disableCulling
+      ? new Set([
+          ...promptNodeById.keys(),
+          ...imageNodeById.keys(),
+          ...workflowNodeById.keys(),
+          ...groupById.keys(),
+        ])
+      : spatialIndex.query(vLeft, vTop, vRight, vBottom);
     const queriedAt = smokePerfEnabled ? performance.now() : 0;
 
     const rawVisiblePrompts: PromptNode[] = [];
@@ -158,7 +168,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     // O(1) 过滤与搜集可视卡片并做二次精确几何裁剪过滤
     visibleIds.forEach((id) => {
       const isForceVisible = id === draftNodeId || selectedNodeIds.includes(id);
-      if (!isForceVisible) {
+      if (!disableCulling && !isForceVisible) {
         const bounds = spatialIndex.getNodeBounds(id);
         if (bounds) {
           const isIntersecting = !(
@@ -375,6 +385,7 @@ export function useVisibleCanvasItemsNew(deps: UseVisibleCanvasItemsNewDeps): Vi
     standaloneImageStackZIndexById,
     selectedNodeIds,
     draftNodeId,
+    disableCulling,
   ]);
 }
 
@@ -395,6 +406,7 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     imageCardHeightById,
     selectedNodeIds,
     draftNodeId,
+    disableCulling = false,
     isCanvasTransforming,
   } = deps;
 
@@ -438,5 +450,6 @@ export function useVisibleCanvasItems(deps: UseVisibleCanvasItemsDeps): VisibleC
     standaloneImageStackZIndexById,
     selectedNodeIds,
     draftNodeId,
+    disableCulling,
   });
 }

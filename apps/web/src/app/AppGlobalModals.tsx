@@ -22,7 +22,6 @@ const TutorialOverlay = lazyWithRetry(() => import('../components/common/Tutoria
 const StorageSelectionModal = lazyWithRetry(() => import('../components/modals/StorageSelectionModal'));
 const MigrateModal = lazyNamedWithRetry(() => import('../components/modals/MigrateModal'), 'MigrateModal');
 const PptDeckEditorModal = lazyWithRetry(() => import('../components/image/PptDeckEditorModal'));
-const RechargeModal = lazyWithRetry(() => import('../components/modals/RechargeModal'));
 const MarkdownToCardsModal = lazyWithRetry(() => import('../components/markdown/MarkdownToCardsModal'));
 const MermaidRenderer = lazyWithRetry(() => import('../components/mermaid/MermaidRenderer'));
 
@@ -250,10 +249,6 @@ export interface AppGlobalModalsProps {
     selectedCount: number;
     onMigrate: (targetCanvasId: string) => void;
   };
-  rechargeModal: {
-    enabled: boolean;
-    isOpen: boolean;
-  };
   markdownModal: {
     isOpen: boolean;
     onClose: () => void;
@@ -287,7 +282,6 @@ const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
   searchPalette,
   tutorial,
   migrateModal,
-  rechargeModal,
   markdownModal,
   mermaidModal,
 }) => (
@@ -412,12 +406,6 @@ const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
           selectedCount={migrateModal.selectedCount}
           onMigrate={migrateModal.onMigrate}
         />
-      </Suspense>
-    )}
-
-    {rechargeModal.enabled && rechargeModal.isOpen && (
-      <Suspense fallback={null}>
-        <RechargeModal />
       </Suspense>
     )}
 

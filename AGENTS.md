@@ -1,7 +1,7 @@
-# AGENTS.md - AI Agent 项目总指导文件 — KK Studio v1.5.9
+# AGENTS.md - AI Agent 项目总指导文件 — KK Studio v1.6.0
 
 Last updated: 2026-06-25
-Project version: 1.5.9
+Project version: 1.6.0
 Version source of truth: `config/release-manifest.json`
 
 本文件只保留当前事实和修改边界。历史计划、迁移记录和旧架构描述只能用于追溯，不能覆盖当前源码、`package.json`、`config/release-manifest.json`、构建脚本和治理脚本。
@@ -11,7 +11,7 @@ Version source of truth: `config/release-manifest.json`
 | 领域 | 当前事实 |
 |---|---|
 | 产品名 | KK Studio |
-| 当前发布线 | KK Studio v1.5.9 |
+| 当前发布线 | KK Studio v1.6.0 |
 | 主版本源 | `config/release-manifest.json` |
 | Web 运行时 | `apps/web/` |
 | 后端运行时 | `server/` Express / VPS |
@@ -136,4 +136,3 @@ npm run verify:changes
    - 文档和验证全部通过后，**必须在控制台运行 `npm run agents:commit`** 将当前工作成果固化为本地 Git Commit。
    - `agents:commit` 会自动分析 Handoff 最新追加条目的标题作为 Git Commit 信息，确保文档描述与 Git 提交内容强一致。
    - 此提交将跳过 Husky 针对 portable 编译资产的验证，实现一键安全存档，绝对防止后续 Agent 接手时强行覆盖代码。
-
