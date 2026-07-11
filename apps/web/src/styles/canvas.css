@@ -374,12 +374,12 @@ body.dark-mode .zoom-slider {
 }
 
 .kk-desktop-composer-expanded .input-bar-footer {
-  order: 2;
+  order: 3;
   justify-content: flex-start;
 }
 
 .kk-desktop-composer-expanded .kk-desktop-composer-body {
-  order: 3;
+  order: 2;
 }
 
 .kk-desktop-composer-expanded .kk-desktop-composer-primary-input {

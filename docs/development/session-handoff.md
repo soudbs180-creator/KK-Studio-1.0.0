@@ -2286,3 +2286,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 应用内浏览器实测：PromptBar 为 760x176px；模式 64x32px；模型、配置、张数、优化连续排列；文字输入后接 36x36px 素材与发送按钮；旧 `takeover_batch` 卡数量 0，`.canvas-migration-notice` 数量 0，左侧工具栏入口仍在。
 - **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，`npm run agents:status` 无法启动；备用 pnpm 因现有 `node_modules/@emnapi` 符号链接 ELOOP 无法执行聚合命令。已直接运行同一 `package.json` 底层 Node、TypeScript、治理、架构和 Vite 入口。未调用真实付费 Provider；最终全屏截图两次因浏览器 CDP 截图超时未生成，但同一页面的 DOM、可访问结构与实际几何已完成核对。
 - **风险与下一步**：低到中风险。旧卡清理仅匹配“失败、无子产物、同时带 automation 与 batch 标签”的历史节点，避免误删成功媒体和研究卡；后续队列卡型若需要重新进入画布，必须通过当前统一卡片工厂与 presentation 规则定义，不得恢复运行时 Prompt 卡旁路。
+
+## 143. 2026-07-12 - 恢复桌面输入区原有分区并保留紧凑尺寸
+
+- **修改范围**：恢复桌面 PromptBar 的原有纵向分区顺序：模式与提示词工具位于顶部，文字输入与素材上传位于中部，模型、模型配置、张数和发送位于底部。继续使用唯一完整面板，不恢复桌面收起按钮；保留 #142 已完成的旧队列卡清理、迁移通知和生成队列规则。
+- **修改文件**：`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/styles/canvas.css`、`tests/unit/canvas-responsive-v2-contract.test.ts`、`docs/development/session-handoff.md`。
+- **当前设计决策**：本次只调整桌面控件归属和 CSS 顺序，不修改生成提交、计费校验、`DurableGenerationQueue`、画布节点迁移或移动端交互。沿用 64x32px 模式按钮、36px 素材按钮、40px 参数/发送控件和 240px 最大高度约束。
+- **已运行验证**：
+  - 相关契约测试 13/13 通过；根 TypeScript、架构 TypeScript、服务端 58 文件语法和 490 个测试文件语义检查通过。
+  - `architecture:check` 与 `governance:check` 全链通过；Shared、UI、API Client 编译通过；Vite 生产构建通过（2431 modules）。
+  - 应用内浏览器桌面 `1280x720` 实测 PromptBar 为 760x174px，控件顺序为模式/优化 -> 输入/素材 -> 模型/配置/张数/发送；桌面收起按钮、旧 `takeover_batch` 卡和 `.canvas-migration-notice` 数量均为 0。
+  - 移动端 `390x844` 展开面板实测为 390x199px，44px 触控目标保持不变且无水平溢出；验证后已恢复默认桌面视口。
+- **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，未运行聚合形式的 `npm run build` / `npm run verify:changes`；已直接运行对应的 Node、TypeScript、架构、治理和 Vite 入口。API Client 的静态导出包装文件内容已核对为 `export * from "@kk/shared";`。未调用真实付费 Provider；应用内浏览器全屏和局部截图仍因 CDP `Page.captureScreenshot` 超时未生成，已使用 DOM、可访问结构和实际几何完成验证。
+- **风险与下一步**：低风险。改动只影响桌面 PromptBar 布局，不改变功能链路；后续若继续调整输入区，应维持当前三段结构和移动端独立布局，避免再次跨区移动控件。

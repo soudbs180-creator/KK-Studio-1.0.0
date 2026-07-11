@@ -5358,6 +5358,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                         {!isEmbeddedMobileComposer && !isMobile && (
                             <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
+                                <DesktopComposerPromptTools
+                                    isMobile={false}
+                                    config={config}
+                                    showPptOutlinePanel={showPptOutlinePanel}
+                                    onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                                    onTogglePromptOptimization={handleTogglePromptOptimization}
+                                    onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
+                                />
+
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
                                     <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border  p-2" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -5891,22 +5900,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     aria-label="上传素材"
                                 >
                                     <Plus size={17} />
-                                </button>
-                            )}
-                            {!isMobile && (
-                                <button
-                                    type="button"
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
-                                    data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
-                                    disabled={!promptDraft.trim()}
-                                    onClick={submitPrompt}
-                                    title={isSystemCreditModel && totalCreditCost > 0
-                                        ? `发送，预计消耗 ${totalCreditCost} 积分`
-                                        : '发送'}
-                                    aria-label="发送"
-                                    className="prompt-bar-liquid-send flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--accent-coral)] bg-[var(--accent-coral)] text-white transition-colors hover:bg-[var(--accent-pink)] disabled:cursor-not-allowed disabled:border-[var(--frost-card-sub-border)] disabled:bg-[var(--frost-card-sub-bg)] disabled:text-[var(--text-tertiary)] disabled:opacity-45"
-                                >
-                                    <ArrowUp size={17} strokeWidth={2.4} />
                                 </button>
                             )}
                         </div>
@@ -6564,17 +6557,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                             )}
-                        {!isMobile && (
-                            <DesktopComposerPromptTools
-                                isMobile={false}
-                                config={config}
-                                showPptOutlinePanel={showPptOutlinePanel}
-                                onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-                                onTogglePromptOptimization={handleTogglePromptOptimization}
-                                onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
-                            />
-                        )}
-                        {isMobile && <div data-mobile-footer-control="send" className="shrink-0">
+                        <div data-mobile-footer-control="send" className={isMobile ? 'shrink-0' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}
@@ -6612,7 +6595,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     }
                                 }}
                             />
-                        </div>}
+                        </div>
                         </div>
                     </PromptBarFooter>
                 </div>

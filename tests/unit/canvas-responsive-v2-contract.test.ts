@@ -62,8 +62,10 @@ test('desktop canvas chrome keeps the full composer compact without a collapse c
   assert.match(promptBar, /kk-desktop-composer-primary-input/);
   assert.match(promptBar, /title="上传素材"/);
   assert.match(css, /max-height:\s*min\(240px, 24dvh\)/);
-  assert.match(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:\s*2;/);
-  assert.match(css, /\.kk-desktop-composer-expanded \.kk-desktop-composer-body \{[\s\S]*order:\s*3;/);
+  assert.match(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:\s*3;/);
+  assert.match(css, /\.kk-desktop-composer-expanded \.kk-desktop-composer-body \{[\s\S]*order:\s*2;/);
+  assert.match(promptBar, /<DesktopComposerPromptTools[\s\S]*<div className="kk-desktop-composer-body">/);
+  assert.match(promptBar, /<div className="kk-desktop-composer-body">[\s\S]*<PromptBarFooter isMobile=\{isMobile\}>/);
   assert.match(projectManager, /fixed left-3 z-50 flex w-11/);
   assert.match(projectManager, /h-11 w-11 shrink-0/);
   assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);
