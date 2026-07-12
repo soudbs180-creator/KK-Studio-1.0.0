@@ -2299,3 +2299,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 移动端 `390x844` 展开面板实测为 390x199px，44px 触控目标保持不变且无水平溢出；验证后已恢复默认桌面视口。
 - **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，未运行聚合形式的 `npm run build` / `npm run verify:changes`；已直接运行对应的 Node、TypeScript、架构、治理和 Vite 入口。API Client 的静态导出包装文件内容已核对为 `export * from "@kk/shared";`。未调用真实付费 Provider；应用内浏览器全屏和局部截图仍因 CDP `Page.captureScreenshot` 超时未生成，已使用 DOM、可访问结构和实际几何完成验证。
 - **风险与下一步**：低风险。改动只影响桌面 PromptBar 布局，不改变功能链路；后续若继续调整输入区，应维持当前三段结构和移动端独立布局，避免再次跨区移动控件。
+
+## 144. 2026-07-12 - 恢复原始 PromptBar 布局并仅做比例精修
+
+- **修改范围**：以 `b2ae00d4`（#141）的桌面 PromptBar 为视觉基准，完整恢复“模式与工具行 -> 独立素材行 -> 双行文字输入 -> 底部模型/参数/张数/发送”的原始布局；取消 #142 引入的素材内嵌输入框、额外输入胶囊边框和布局重排。继续保持桌面完整面板，不恢复收起按钮。
+- **修改文件**：`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/styles/canvas.css`、`tests/unit/canvas-responsive-v2-contract.test.ts`、`docs/development/session-handoff.md`。
+- **当前设计决策**：只缩小原布局，不重新设计结构。模式按钮继续为 64x32px，独立素材按钮缩为 36x36px，外层内边距为 6px、区块间距为 4px，文字为 14px；桌面面板由最初约 279px 收到 216px。#142 的旧卡清理、迁移通知、队列 Prompt 隔离和意图清洗全部保留。
+- **已运行验证**：
+  - 相关契约测试 13/13 通过；根 TypeScript、架构 TypeScript、服务端 58 文件语法和 490 个测试文件语义检查通过。
+  - `architecture:check`、`governance:check`、编码与乱码检查全链通过；Shared、UI、API Client 编译通过；Vite 生产构建通过（2431 modules）。
+  - 应用内浏览器桌面 `1280x720` 实测 PromptBar 为 760x216px，内部 `clientHeight` 与 `scrollHeight` 均为 215px，无内部滚动或水平溢出；独立素材按钮存在，内嵌“上传素材”按钮数量为 0，桌面收起按钮数量为 0。
+  - 应用内浏览器移动端 `390x844` 展开面板实测约 382x195px，无水平溢出，原移动端控件顺序与触控目标保持不变；最终全视口截图已完成视觉复核并恢复默认桌面视口。
+- **排障记录**：恢复原素材行后，类型检查发现 #142 同时删除了 `shouldRenderStandaloneUploadRow` 派生条件；按诊断规约从 #141 恢复该条件，随后类型检查和契约测试通过。
+- **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，未运行聚合形式的 `npm run verify:changes`；已直接运行对应的 Node、TypeScript、架构、治理、构建、定向测试与编码检查入口。未调用真实付费 Provider，本次变更不涉及生成请求和计费链路。
+- **风险与下一步**：低风险。后续 PromptBar 视觉调整必须以 #141 的控件分区为固定结构，只允许修改尺寸、间距、圆角、字体和弱视觉样式，不再跨区移动或合并控件。

@@ -3570,6 +3570,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
+    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
     const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
     const shouldRenderMobileReferenceTray = isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0);
     const shouldUseMobileInlineMedia = shouldRenderInlineMobileUploadButton || shouldRenderMobileReferenceTray;
@@ -5570,7 +5571,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         )}
                     </PromptBarTopRow>
 
-                    <div className="kk-desktop-composer-body">
+                    <div>
                         {/* Reference Images List */}
                         {!isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
                             <div
@@ -5726,6 +5727,44 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <div className="w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"></div>
                                 </div>
 
+                                <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
+                                    style={{
+                                        backgroundColor: 'var(--frost-card-sub-bg)',
+                                        color: 'var(--text-secondary)',
+                                        borderColor: 'var(--frost-card-sub-border)'
+                                    }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="上传参考图"
+                                >
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+
+                        {shouldRenderStandaloneUploadRow && (
+                            <div className="mt-0.5 flex items-center px-2 py-0.5">
+                                <button
+                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-dashed opacity-45 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-85"
+                                    style={{
+                                        color: 'var(--text-secondary)',
+                                        borderColor: 'var(--frost-card-sub-border)'
+                                    }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="上传参考图"
+                                >
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                </button>
                             </div>
                         )}
 
@@ -5772,7 +5811,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <div
                             data-mobile-composer-section="primary-input"
                             className={[
-                                'relative kk-desktop-composer-primary-input',
+                                'relative',
                                 shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'relative mt-1 flex items-center gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
                                     ? 'relative mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
@@ -5888,26 +5927,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
                                     lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
                                 }}
-                                rows={isMobile ? PROMPT_TEXTAREA_MIN_ROWS : 1}
+                                rows={PROMPT_TEXTAREA_MIN_ROWS}
                             />
-                            {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
-                                <button
-                                    type="button"
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                    className="prompt-bar-liquid-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="上传素材"
-                                    aria-label="上传素材"
-                                >
-                                    <Plus size={17} />
-                                </button>
-                            )}
                         </div>
                     </div> {/* End of input area hover wrapper */}
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex min-w-0 items-center gap-1.5 ${isMobile ? 'flex-1' : 'flex-none'}`}>
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
@@ -6392,7 +6419,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
                         </div>
 
-                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'justify-end' : ''}`}>
+                        <div className={`flex shrink-0 items-center gap-1.5 ${isMobile ? 'justify-end' : 'ml-auto'}`}>
                             {/* Group 2: Generation Settings */}
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>

@@ -365,41 +365,22 @@ body.dark-mode .zoom-slider {
 }
 
 .kk-desktop-composer-expanded > .input-bar-inner {
-  max-height: min(240px, 24dvh);
-  padding: 8px;
-  gap: 6px;
+  max-height: min(216px, calc(100dvh - 120px));
+  padding: 6px;
+  gap: 4px;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
 }
 
-.kk-desktop-composer-expanded .input-bar-footer {
-  order: 3;
-  justify-content: flex-start;
-}
-
-.kk-desktop-composer-expanded .kk-desktop-composer-body {
-  order: 2;
-}
-
-.kk-desktop-composer-expanded .kk-desktop-composer-primary-input {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 46px;
+.kk-desktop-composer-expanded .input-bar-textarea {
+  min-height: 44px !important;
+  max-height: 90px !important;
   margin-top: 0;
-  padding: 3px 4px 3px 10px;
-  border: 1px solid var(--frost-card-sub-border);
-  border-radius: 10px;
-  background: var(--frost-card-sub-bg);
-}
-
-.kk-desktop-composer-expanded .kk-desktop-composer-primary-input .input-bar-textarea {
-  min-height: 38px !important;
-  max-height: 82px !important;
-  margin-top: 0;
-  padding: 8px 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   font-size: 14px;
+  line-height: 18px !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
