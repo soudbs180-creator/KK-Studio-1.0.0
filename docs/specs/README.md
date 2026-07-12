@@ -2,6 +2,8 @@
 
 本目录定义了 KK Studio 的 **外部服务 API 规格协议、模型提供商的请求/响应参数映射规范、轮询行为机制以及 OpenAPI 标准描述**。
 
+KK Studio 自身 Express 运行时端点、鉴权约定和 TypeScript SDK 请从 [当前 API 文档中心](../api/README.md) 进入；本目录主要承载 OpenAPI 稳定子集与第三方 Provider 协议。
+
 ## 📁 目录文件清单
 
 1. **[openapi.yaml](openapi.yaml) —— OpenAPI 规格文件**

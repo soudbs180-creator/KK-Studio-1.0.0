@@ -18,6 +18,7 @@
 | **下载原图 / ZIP 打包** | [AGENTS.md](../AGENTS.md) §10.1 | [docs/ai-assistant/RUNBOOKS.md](ai-assistant/RUNBOOKS.md) 中 `download-selected-originals` | 优先 `originalUrl` 解析，ZIP 附带 manifest |
 | **数据库结构变更** | [AGENTS.md](../AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md) | 必须走 `migrations/` 目录；DDL 幂等；严禁在业务层写 DDL |
 | **系统安全 / 计费 / API 密钥** | [AGENTS.md](../AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
+| **KK Studio HTTP API / SDK** | [docs/api/README.md](api/README.md) | [运行时端点目录](api/runtime-endpoints.md)、[TypeScript Client](api/typescript-client.md)、[OpenAPI](specs/openapi.yaml) | 以 `server/` 挂载、共享 DTO 和 OpenAPI 稳定子集交叉核对 |
 | **编码格式 / 乱码防护** | [AGENTS.md](../AGENTS.md) §15 | [docs/governance/ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md) | 默认使用 `UTF-8 without BOM`、`LF` 换行，PowerShell 显式指定编码 |
 | **系统部署 / Supabase CLI** | [docs/setup/README.md](setup/README.md) | [docs/setup/GUIDE.md](setup/GUIDE.md) | 遵循自发布 VPS 定时与权限配置 |
 | **第三方接口规格 (gpt-best)** | [docs/specs/README.md](specs/README.md) | [docs/specs/API_DOCS.md](specs/API_DOCS.md) | 适配 Images/Videos/Audio v2 接口，轮询退避算法 |
@@ -31,6 +32,7 @@
 | ⚖️ [governance/](governance/README.md) | **项目治理与红线**。定义不可违背的编码、安全漏洞与版本验证规范。 | [ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md)<br>[SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md)<br>[PROJECT_STATE_AND_VALIDATION.md](governance/PROJECT_STATE_AND_VALIDATION.md) |
 | 🧠 [ai-assistant/](ai-assistant/README.md) | **AI 助手与 Agent 运行时**。提供 Canvas 运行态、工具库、指令运行及知识同步策略。 | [AI_ASSISTANT_ROADMAP.md](ai-assistant/AI_ASSISTANT_ROADMAP.md)<br>[RUNBOOKS.md](ai-assistant/RUNBOOKS.md)<br>[tool-registry.md](ai-assistant/tool-registry.md) |
 | 🏛️ [architecture/](architecture/README.md) | **架构底座与数据分层**。定义真实的项目模块所有权、数据库设计及多端 UI 架构。 | [PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md)<br>[DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md)<br>[DESIGN.md](architecture/DESIGN.md) |
+| 🔗 [api/](api/README.md) | **当前 HTTP API 与类型化客户端**。整理 Express 实际挂载端点、鉴权、兼容层、OpenAPI 覆盖和 SDK 方法。 | [runtime-endpoints.md](api/runtime-endpoints.md)<br>[typescript-client.md](api/typescript-client.md) |
 | 🔌 [specs/](specs/README.md) | **数据规格与 API 协议**。规范第三方提供商的 API 模型、轮询与对接参数。 | [openapi.yaml](specs/openapi.yaml)<br>[API_DOCS.md](specs/API_DOCS.md)<br>[NANO_BANANA.md](specs/NANO_BANANA.md) |
 | 🛠️ [setup/](setup/README.md) | **环境搭建与自发布部署**。系统在 VPS 和 Supabase 上运行、配置、启动的命令手册。 | [GUIDE.md](setup/GUIDE.md)<br>[SUPABASE_CLI.md](setup/SUPABASE_CLI.md) |
 | 💻 [development/](development/README.md) | **开发手册与交接模板**。指导多提供商架构设计、发布流以及 Durable 的会话交接。 | [session-handoff.md](development/session-handoff.md)<br>[multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) |

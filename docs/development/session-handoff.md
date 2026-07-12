@@ -2313,3 +2313,19 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **排障记录**：恢复原素材行后，类型检查发现 #142 同时删除了 `shouldRenderStandaloneUploadRow` 派生条件；按诊断规约从 #141 恢复该条件，随后类型检查和契约测试通过。
 - **未运行验证及原因**：当前运行时没有 `npm`/`npx` 可执行文件，未运行聚合形式的 `npm run verify:changes`；已直接运行对应的 Node、TypeScript、架构、治理、构建、定向测试与编码检查入口。未调用真实付费 Provider，本次变更不涉及生成请求和计费链路。
 - **风险与下一步**：低风险。后续 PromptBar 视觉调整必须以 #141 的控件分区为固定结构，只允许修改尺寸、间距、圆角、字体和弱视觉样式，不再跨区移动或合并控件。
+
+## 145. 2026-07-12 - 建立全量 API 文档与运行时端点目录
+
+- **修改范围**：以 `server/index.js` 和当前挂载的 `server/routes/` 为运行时事实源，整理 KK Studio v1.6.0 的 API 文档中心、完整有效端点目录、鉴权/信封/请求头/请求体限制约定，以及 `@kk/api-client` 的 73 个公开方法与共享 DTO 映射；同步补充 docs 总导航、Provider 规格入口和本次实施计划。
+- **修改文件**：`docs/api/README.md`、`docs/api/runtime-endpoints.md`、`docs/api/typescript-client.md`、`docs/README.md`、`docs/specs/README.md`、`docs/superpowers/plans/2026-07-12-api-documentation.md`、`docs/development/session-handoff.md`。
+- **当前设计决策**：明确区分“Express 实际可访问路由”“OpenAPI 稳定契约子集”“运行时/兼容/运维端点”和“第三方 Provider 协议”。不把 126 条路由注册语句全部误判为独立稳定 API：数组别名展开后为 130 条注册，其中 8 条被更早同方法同路径处理器覆盖；最终路由器有 122 个唯一有效操作，加 `/healthz` 共 123 个 HTTP 方法端点，另有 `/uploads/*` 静态前缀。OpenAPI 继续作为 34 paths / 42 operations 的稳定子集，本次不扩大其兼容承诺。
+- **已运行验证**：
+  - 通过脚本按 `server/index.js` mount 规则和路由顺序计算源码端点集合：`EXPECTED=123`、文档表格 `DOCUMENTED=124`（多出的唯一一项为静态 `/uploads/*`），`MISSING=0`、`EXTRA=0`。
+  - 从 `KkApiClient` 接口提取 73 个方法并与 `docs/api/typescript-client.md` 对照，缺项为 0；文档分组计数合计 73。
+  - 新增文档 Markdown 本地链接存在性检查通过，未发现破损链接；真实密钥/私钥特征和已移除运行时目录引用扫描无命中；`git diff --check` 通过。
+  - `check-spec-structure.mjs` 通过；使用仓库现有 `yaml` 包解析 `docs/specs/openapi.yaml` 成功，确认 34 paths。
+  - 直接执行 `governance:version`、`governance:current`、`governance:agent-docs`、`governance:skills`、`governance:compat`、Provider registry/presets/catalog、frontend provider 与 security 全链脚本，全部通过。
+  - 直接执行 `architecture:check` 的全部底层 Node 脚本以及编码/乱码检查，全部通过。
+- **完整测试排障**：直接运行完整 unit/integration/contract/e2e 链时，unit 阶段得到 1700 pass、4 fail、2 skipped，因此按失败即停规则未继续后三组。3 个知识索引/Skills 物理脚本测试仅因子进程 PATH 找不到 `node` 失败，注入 bundled Node 路径后定向复测 3/3 通过。剩余 `tests/unit/prompt-bar-layout-regression.test.ts` 仍期待旧 `flex-wrap` footer，而当前 HEAD 的 `PromptBarFooterDesktop.tsx` 为 `flex-nowrap`；定向复测稳定为 10 pass、1 fail，且本次 diff 未触碰组件或该测试，两文件均与 HEAD 完全一致，确认是 #144 基线遗留而非 API 文档变更引入。
+- **未运行验证及原因**：本机仍无 `npm`/`npx`/`swagger-cli` 可执行文件，未运行聚合形式的 `npm run spec:check`、`npm run verify:changes`；已直接运行规格结构检查并用现有 YAML 解析器验证 OpenAPI。未运行 `typecheck` 与构建，因为本次只修改 Markdown 文档和交接计划，不涉及 TypeScript、服务端实现或构建产物；完整测试当前被上述既有 PromptBar 断言阻断，尚未达到全绿提交条件。
+- **风险与下一步**：低风险。方法/路径已与源码集合自动对照，但鉴权和用途说明仍可能随路由内部逻辑演进而漂移；后续新增稳定端点时，应同步更新共享 DTO、`KkApiClient`、OpenAPI、运行时端点目录和契约测试。当前 OpenAPI 仅覆盖 42 operations，生成网关、AI Assistant、OCR、Provider Probe、遥测、Webhook 与旧兼容接口仍应按稳定性评估逐步建模。
