@@ -2329,3 +2329,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **完整测试排障**：直接运行完整 unit/integration/contract/e2e 链时，unit 阶段得到 1700 pass、4 fail、2 skipped，因此按失败即停规则未继续后三组。3 个知识索引/Skills 物理脚本测试仅因子进程 PATH 找不到 `node` 失败，注入 bundled Node 路径后定向复测 3/3 通过。剩余 `tests/unit/prompt-bar-layout-regression.test.ts` 仍期待旧 `flex-wrap` footer，而当前 HEAD 的 `PromptBarFooterDesktop.tsx` 为 `flex-nowrap`；定向复测稳定为 10 pass、1 fail，且本次 diff 未触碰组件或该测试，两文件均与 HEAD 完全一致，确认是 #144 基线遗留而非 API 文档变更引入。
 - **未运行验证及原因**：本机仍无 `npm`/`npx`/`swagger-cli` 可执行文件，未运行聚合形式的 `npm run spec:check`、`npm run verify:changes`；已直接运行规格结构检查并用现有 YAML 解析器验证 OpenAPI。未运行 `typecheck` 与构建，因为本次只修改 Markdown 文档和交接计划，不涉及 TypeScript、服务端实现或构建产物；完整测试当前被上述既有 PromptBar 断言阻断，尚未达到全绿提交条件。
 - **风险与下一步**：低风险。方法/路径已与源码集合自动对照，但鉴权和用途说明仍可能随路由内部逻辑演进而漂移；后续新增稳定端点时，应同步更新共享 DTO、`KkApiClient`、OpenAPI、运行时端点目录和契约测试。当前 OpenAPI 仅覆盖 42 operations，生成网关、AI Assistant、OCR、Provider Probe、遥测、Webhook 与旧兼容接口仍应按稳定性评估逐步建模。
+
+## 146. 2026-07-12 - 修复桌面 PromptBar 底部控件换行回归
+
+- **修改范围**：补齐 #144 从 #141 恢复原始 PromptBar 布局时遗漏的桌面 footer 行为，使模型、参数、张数与发送控件在空间不足时可安全换行，并恢复底部内边距与最小高度；同步修正回归测试中仍锁定 #141 旧顶部间距、与 #144 已验收紧凑比例冲突的断言。
+- **修改文件**：`apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx`、`tests/unit/prompt-bar-layout-regression.test.ts`、`docs/development/session-handoff.md`。
+- **当前设计决策**：桌面 footer 延续 #141 的 `flex-wrap`、`min-h-[42px]` 和安全内边距，防止窄窗口或完整模型名称导致控件溢出；顶部工具行继续保留 #144 已通过真实页面几何验收的 `gap-1.5` 紧凑比例。移动端独立的单行横向溢出策略不变。
+- **环境排障**：提交 #145 后确认 `node_modules/@emnapi` 与 `node_modules/@tybys` 是目标指向自身的损坏 Junction，已仅移除这两个无效链接节点；依赖扫描不再出现 `ELOOP`。本机仍没有 npm，可用 bundled Node 直接执行仓库底层入口。
+- **已运行验证**：
+  - PromptBar 与知识索引定向测试 14/14 通过；完整 unit、integration、contract、e2e 测试链全部通过。
+  - 根 TypeScript、架构 TypeScript、服务端 58 文件语法和 490 个测试文件语义检查通过。
+  - `architecture:check`、`governance:check` 的全部底层 Node 脚本通过；编码与乱码检查通过。
+  - Vite 生产构建通过，转换 2431 modules；`git diff --check` 通过。
+- **未运行验证及原因**：本机没有 `npm`/`npx`，未运行聚合形式的 `npm run verify:changes`；未运行依赖审计、Swagger CLI 规格校验和真实付费 Provider 调用。本次变更不涉及 API、计费、生成路由或数据库。
+- **风险与下一步**：低风险。改动仅恢复桌面 footer 的响应式换行与契约覆盖；后续 PromptBar 比例调整应避免把桌面 `flex-wrap` 与移动端 `flex-nowrap` 策略混用。
