@@ -1,7 +1,7 @@
-# Legacy Pruning and Anti-Regression Registry (v1.5.9)
+# Legacy Pruning and Anti-Regression Registry (v1.6.0)
 
 Last Updated: 2026-06-26
-Project Version: 1.5.9
+Project Version: 1.6.0
 
 ## 1. 已废弃与被清理的旧模块/入口 (Pruned Entrypoints)
 为了彻底给项目瘦身，防止旧版的冗余逻辑对新版本的打包和性能产生拖拽，以下模块已被永久移除、迁移或归档：

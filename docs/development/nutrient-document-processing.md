@@ -23,7 +23,7 @@ Do not expose the key through any `VITE_*` variable.
 
 ## Frontend usage
 
-Use [`nutrientDocumentService`](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/document/nutrientDocumentService.ts) from the browser code:
+Use [`nutrientDocumentService`](../../apps/web/src/services/document/nutrientDocumentService.ts) from the browser code:
 
 ```ts
 import { nutrientDocumentService } from '@/services/document/nutrientDocumentService';

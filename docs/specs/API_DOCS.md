@@ -1,5 +1,7 @@
 # GPT-Best API 适配文档
 
+Current project baseline: KK Studio v1.6.0.
+
 ## 概述
 
 KK-Studio 已全面适配 [gpt-best.apifox.cn](https://gpt-best.apifox.cn) 的 API 平台。    
@@ -131,8 +133,8 @@ KK-Studio 已全面适配 [gpt-best.apifox.cn](https://gpt-best.apifox.cn) 的 A
 
 ## 相关文件
 
-- [OpenAICompatibleAdapter.ts](../src/services/llm/OpenAICompatibleAdapter.ts) - 图像生成
-- [VideoCompatibleAdapter.ts](../src/services/llm/VideoCompatibleAdapter.ts) - 视频生成
-- [AudioCompatibleAdapter.ts](../src/services/llm/AudioCompatibleAdapter.ts) - 音频生成
-- [LLMAdapter.ts](../src/services/llm/LLMAdapter.ts) - 类型定义
-- [modelCapabilities.ts](../src/services/modelCapabilities.ts) - 模型能力注册
+- [providerAdapterRouter.ts](../../apps/web/src/services/llm/providerAdapterRouter.ts) - Web Provider adapter 路由入口
+- [LLMAdapter.ts](../../apps/web/src/services/llm/LLMAdapter.ts) - 媒体生成类型定义
+- [providerCapabilities.ts](../../apps/web/src/services/llm/providerCapabilities.ts) - Provider 能力映射
+- [providerStrategy.ts](../../apps/web/src/services/api/providerStrategy.ts) - 协议族与请求策略
+- [modelCapabilities.ts](../../apps/web/src/services/model/modelCapabilities.ts) - 模型能力注册

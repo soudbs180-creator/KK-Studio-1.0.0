@@ -1,5 +1,7 @@
 # 多供应商 API 架构方案
 
+Current baseline: KK Studio v1.6.0. Provider facts are owned by the server dispatcher; Web code consumes typed routing and capability results.
+
 ## 1. 背景与目标
 
 当前仓库已经接入多类供应商与多种协议面，包括：
@@ -138,43 +140,39 @@ interface ProviderProfile {
 
 仅当供应商存在专属异步能力时，才需要单独 executor。
 
-## 4. 建议目录结构
+## 4. 当前目录结构
 
-建议逐步从现有结构迁移到以下形态：
+当前实现已经收敛到以下边界，不再另建平行的根 `src/` Provider 系统：
 
 ```text
-src/services/providers/
-  profiles/
-    google.ts
-    openai.ts
-    anthropic.ts
-    12ai.ts
-    gptBest.ts
-    suxi.ts
-    newapi.ts
-    index.ts
-  router/
-    providerMatcher.ts
-    capabilityRouter.ts
-  transports/
-    openaiTransport.ts
-    geminiTransport.ts
-    claudeTransport.ts
-  executors/
-    syncExecutor.ts
-    asyncTaskExecutor.ts
-    twelveAiAsyncImageExecutor.ts
-  runtime/
-    resolveProviderRuntime.ts
-    resolveSurfaceDefaults.ts
+server/lib/dispatcher/
+  providerProfiles.js
+  providerRegistry.js
+  strictProviderContracts.js
+  adapters/
+
+apps/web/src/core/routing/
+  ProviderRouteEngine.ts
+  routePolicies.ts
+
+apps/web/src/services/api/
+  providerStrategy.ts
+  providerRegistry.ts
+  apiConfig.ts
+  connectionTest.ts
+
+apps/web/src/services/llm/
+  providerAdapterRouter.ts
+  providerCapabilities.ts
 ```
 
-迁移期可以保留现有入口：
+迁移期保留的当前入口包括：
 
-- `src/services/api/providerStrategy.ts`
-- `src/services/api/apiConfig.ts`
-- `src/services/api/connectionTest.ts`
-- `src/services/llm/OpenAICompatibleAdapter.ts`
+- `apps/web/src/core/routing/ProviderRouteEngine.ts`
+- `apps/web/src/services/api/providerStrategy.ts`
+- `apps/web/src/services/api/apiConfig.ts`
+- `apps/web/src/services/api/connectionTest.ts`
+- `apps/web/src/services/llm/providerAdapterRouter.ts`
 
 但内部实现应逐步改成调用新层，而不是继续堆条件分支。
 
@@ -382,13 +380,14 @@ interface ChannelRoutingPolicy {
 
 ## 13. 与当前代码的映射建议
 
-建议继续把以下文件视为迁移入口：
+继续把以下当前文件视为迁移入口：
 
-- [providerStrategy.ts](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/api/providerStrategy.ts)
-- [apiConfig.ts](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/api/apiConfig.ts)
-- [connectionTest.ts](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/api/connectionTest.ts)
-- [OpenAICompatibleAdapter.ts](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/llm/OpenAICompatibleAdapter.ts)
-- [keyManager.ts](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/auth/keyManager.ts)
+- [ProviderRouteEngine.ts](../../apps/web/src/core/routing/ProviderRouteEngine.ts)
+- [providerStrategy.ts](../../apps/web/src/services/api/providerStrategy.ts)
+- [apiConfig.ts](../../apps/web/src/services/api/apiConfig.ts)
+- [connectionTest.ts](../../apps/web/src/services/api/connectionTest.ts)
+- [providerAdapterRouter.ts](../../apps/web/src/services/llm/providerAdapterRouter.ts)
+- [keyManager.ts](../../apps/web/src/services/auth/keyManager.ts)
 
 迁移原则：
 

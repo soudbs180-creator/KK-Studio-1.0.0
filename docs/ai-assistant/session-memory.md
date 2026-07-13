@@ -169,8 +169,8 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 
 - Vite manual chunk ownership is now:
   - `model-services`: model/key/provider-strategy helpers, `useImageGeneration`, and `services/llm/syncImageBridge.ts`.
-  - `provider-adapters`: real `/src/services/llm/` provider execution modules only.
-  - `ecommerce-services`: `/src/services/ecommerce/` modules.
+  - `provider-adapters`: real `apps/web/src/services/llm/` provider execution modules only.
+  - `ecommerce-services`: `apps/web/src/services/ecommerce/` modules.
 - `provider-adapters-` is intentionally listed in `DEFERRED_HTML_MODULE_PRELOAD_PREFIXES`. Production HTML should not preload provider adapters during ordinary workspace startup.
 - `MobileEcommercePanel` must not restore static imports of `generateImage` from `geminiService` or `llmService` from `LLMService`; it uses dynamic wrappers so mobile ecommerce planning/generation loads providers only after user action.
 - `ecommerceAnalysisEnhancer` must not restore a static `LLMService` import; optional AI enhancement loads chat execution only when invoked.

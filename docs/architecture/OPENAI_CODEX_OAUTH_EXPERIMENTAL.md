@@ -1,7 +1,7 @@
-# OpenAI Codex & OAuth Experimental Specification (v1.5.9)
+# OpenAI Codex & OAuth Experimental Specification (v1.6.0)
 
 Last Updated: 2026-06-26
-Project Version: 1.5.9
+Project Version: 1.6.0
 
 ## 1. 实验性范围与 Feature Flag 默认关闭 (Experimental & Hard Flags)
 OpenAI OAuth 和 Codex 浏览器助手属于系统的实验性增强特性（Experimental features）。

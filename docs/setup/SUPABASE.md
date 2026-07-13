@@ -53,7 +53,7 @@ VITE_SUPABASE_ANON_KEY=sb_publishable_UvP5c6ShzuoYDtnZppd1yA_3L_m13l0
 
 - 不要把 `SUPABASE_ACCESS_TOKEN` 写进任何被 git 跟踪的文件。
 - 不要把 PAT 写进 `docs/`、`scripts/`、`.env.example`、README 或部署脚本。
-- 本地专用配置应留在仓库外，例如 `C:\Users\Administrator\.codex\` 或 `C:\Users\Administrator\.gemini\`。
+- 本地专用配置应留在仓库外，例如 `<USERPROFILE>/.codex/` 或 `<USERPROFILE>/.gemini/`。
 - 如果真实 PAT 曾经提交过 Git 或发给过别人，应立即去 Supabase 后台吊销并重新生成。
 
 ## 相关文件

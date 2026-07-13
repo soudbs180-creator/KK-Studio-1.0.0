@@ -17,7 +17,7 @@
 ### 1.3 深度优化对策
 > [!TIP]
 > **建立 Markdown 语义锚点元数据（Semantic Anchor Metadata）**
-在根目录 [README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/README.md) 的第 3 节中，使用结构化、无冗余的链接语法。在各子规范 `.md` 文档的头部统一引入 `<!-- AI_ROUTING_KEY: ... -->` 注释标记，方便 AI 助手在语义检索阶段进行正则过滤或嵌入式匹配。
+在根目录 [README.md](../../README.md) 的第 3 节中，使用结构化、无冗余的链接语法。在各子规范 `.md` 文档的头部统一引入 `<!-- AI_ROUTING_KEY: ... -->` 注释标记，方便 AI 助手在语义检索阶段进行正则过滤或嵌入式匹配。
 
 ---
 

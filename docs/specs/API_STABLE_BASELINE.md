@@ -1,5 +1,7 @@
 # API Stable Baseline
 
+Current project baseline: KK Studio v1.6.0.
+
 This file records the API documents that are the source of truth for this project.
 
 If runtime behavior, old code, or a third-party compatibility guess conflicts with these docs, the docs win.
@@ -127,7 +129,7 @@ Rules:
 
 ## Engineering policy
 
-- Runtime vendor matching now belongs in `src/services/api/providerStrategy.ts`.
+- Runtime vendor matching now belongs in `apps/web/src/services/api/providerStrategy.ts`.
 - When adding a new documented provider, update the strategy registry first, then wire any provider-specific payload differences only where strictly necessary.
 - When changing `OpenAICompatibleAdapter`, `VideoCompatibleAdapter`, `GoogleAdapter`, or connection testing, check this baseline first
 - Avoid undocumented automatic fallback between chat, images, and native Gemini routes

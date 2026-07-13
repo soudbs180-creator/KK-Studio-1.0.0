@@ -32,20 +32,20 @@ Google 的 coding agent 指南和 `gemini-api-dev` skill，刚好就是为这种
 
 修改 Gemini 相关能力时，优先从这些文件判断职责，不要跨层随意补逻辑：
 
-- `src/services/api/providerStrategy.ts`
+- `apps/web/src/services/api/providerStrategy.ts`
   负责供应商识别、协议家族选择、鉴权方式与 header/query 规则。
 
-- `src/services/api/connectionTest.ts`
+- `apps/web/src/services/api/connectionTest.ts`
   负责低成本验证连接是否走对协议，避免在测试阶段误触发计费型图片/视频任务。
 
-- `src/services/llm/GeminiNativeAdapter.ts`
-  负责 Gemini 原生协议聊天入口，适合放原生 Gemini chat 请求的收口逻辑。
+- `apps/web/src/services/llm/providerAdapterRouter.ts`
+  负责 Web 侧 Provider adapter 路由，不创建平行的 Gemini 专用入口。
 
-- `src/services/llm/GoogleAdapter.ts`
-  负责 Google 官方协议下的 Gemini / Imagen / Veo 调用，是官方端点的主落点。
+- `server/lib/dispatcher/providerProfiles.js`
+  负责 Google、Gemini 及兼容渠道的服务端画像事实。
 
-- `src/services/llm/geminiService.ts`
-  负责图片生成编排、错误归一化、降级与调用层体验，不是协议事实来源。
+- `server/lib/dispatcher/adapters/`
+  负责服务端 Provider 执行、错误归一化和受保护凭据传输。
 
 - `src/hooks/useImageGeneration.ts`
   负责 UI 层任务状态、成本、恢复与卡片数据拼装。

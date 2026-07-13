@@ -37,7 +37,7 @@
 ## 5. 统一供应商事实目录 (Canonical Provider Catalog)
 
 项目在 Phase P5 实现了供应商事实源的统一数据治理。唯一真相来源已收敛到共享事实源：
-👉 [`packages/shared/src/generation/providerCatalog.ts`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared/src/generation/providerCatalog.ts) (通过 `@kk/shared` 导出)
+👉 [`packages/shared/src/generation/providerCatalog.ts`](../../packages/shared/src/generation/providerCatalog.ts)（通过 `@kk/shared` 导出）
 
 在 CI 门禁与本地发布验证中，由比对校验脚本 `check-provider-catalog.mjs` 强制守护此目录与前端注册表 `providerRegistry.ts` 以及后端画像 `providerProfiles.js` 的强一致性。
 

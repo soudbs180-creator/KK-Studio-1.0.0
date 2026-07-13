@@ -38,12 +38,12 @@
 | 💻 [development/](development/README.md) | **开发手册与交接模板**。指导多提供商架构设计、发布流以及 Durable 的会话交接。 | [session-handoff.md](development/session-handoff.md)<br>[multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) |
 | ⚡ [archive/superpowers/](archive/superpowers/README.md) | **具体业务功能计划归档**。留作历史架构与具体超级功能逻辑实现的开发参考。 | [plans/](archive/superpowers/plans/) 实施方案<br>[specs/](archive/superpowers/specs/) 业务定义 |
 | 📊 [reports/](reports/README.md) | **分析与优化报告**。收集各类自动化或人工输出的性能与安全审计报告。 | [mobile-ui-optimization.md](reports/mobile-ui-optimization.md) |
-| 📦 [archive/](archive/README.md) | **归档区**。存放已经过时、与 v1.5.9 事实相冲突的历史文档，仅供追溯历史使用。 | 🚫 **警告：AI 严禁将此处文档作为当前代码开发的参考依据！** |
+| 📦 [archive/](archive/README.md) | **归档区**。存放已经过时、与 v1.6.0 事实相冲突的历史文档，仅供追溯历史使用。 | 🚫 **警告：AI 严禁将此处文档作为当前代码开发的参考依据！** |
 
 ---
 
 ## 🛡️ 文档一致性保证
 
 1. **去冗余化**：docs/ 目录下不再允许保留同名冗余文件，如发现重复文件，以 `governance/`、`ai-assistant/` 和 `architecture/` 为最高优先级，其余一律归档或删除。
-2. **拒绝陈旧信息**：所有与 Supabase 时代相关的旧版鉴权和积分扣减说明均已移入 `archive/`。在 v1.5.9 之后的开发中，应严格以 VPS 上的 PostgreSQL 自建 DDL (`migrations/`) 和 `server/` 代码为准。
+2. **拒绝陈旧信息**：所有与 Supabase 时代相关的旧版鉴权和积分扣减说明均已移入 `archive/`。v1.6.0 的当前开发应严格以 VPS 上的 PostgreSQL 自建 DDL (`migrations/`) 和 `server/` 代码为准。
 3. **编码防乱码**：所有在此知识库中新增或修改的 Markdown 文档，必须使用 `UTF-8 without BOM` 编码及 `LF` 换行符。

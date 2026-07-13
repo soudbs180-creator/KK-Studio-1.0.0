@@ -19,14 +19,14 @@ supabase --version
 ### 第 1 步：下载
 1. 访问 https://github.com/supabase/cli/releases/latest
 2. 下载 `supabase_windows_amd64.tar.gz`
-3. 解压到 `C:\Users\Administrator\.supabase\bin\`
+3. 解压到 `<USERPROFILE>/.supabase/bin/`
 
 ### 第 2 步：添加到环境变量
 ```powershell
 # 以管理员身份运行 PowerShell
 [Environment]::SetEnvironmentVariable(
     "Path", 
-    [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Users\Administrator\.supabase\bin", 
+    [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.supabase\bin",
     "User"
 )
 ```

@@ -129,3 +129,34 @@ test("current facts governance blocks stale active architecture and AI assistant
 
   assert.match(currentFactsSource, /staleActiveVersionPattern/);
 });
+
+test("current facts governance protects current guidance from local and removed runtime paths", () => {
+  const manifest = JSON.parse(readSource("config/release-manifest.json")) as {
+    version: string;
+    displayVersion?: string;
+  };
+  const currentFactsSource = readSource("scripts/governance/check-current-facts.mjs");
+  const expectedDisplayVersion = manifest.displayVersion || `v${manifest.version}`;
+  const currentGuidanceDocs = [
+    "docs/INDEX.md",
+    "docs/setup/README.md",
+    "docs/architecture/NEW_ARCHITECTURE_SOURCE_OF_TRUTH.md",
+    "docs/development/COMPLETE_DEVELOPMENT_GUIDE.md",
+    "docs/development/multi-vendor-provider-architecture.md",
+    "docs/specs/API_DOCS.md",
+    "docs/specs/API_STABLE_BASELINE.md",
+  ];
+
+  assert.match(currentFactsSource, /activeCurrentGuidanceDocs/);
+  assert.match(currentFactsSource, /absoluteUserPathPattern/);
+  assert.match(currentFactsSource, /rootLegacyServicesPathPattern/);
+
+  for (const docPath of currentGuidanceDocs) {
+    assert.match(currentFactsSource, new RegExp(docPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const source = readSource(docPath);
+    assert.match(source, new RegExp(expectedDisplayVersion.replace(/\./g, "\\.")));
+    assert.doesNotMatch(source, /v1\.5\.9/);
+    assert.doesNotMatch(source, /[a-z]:[\\/]users[\\/]/iu);
+    assert.doesNotMatch(source, /(?<!apps\/web\/)src\/services\//u);
+  }
+});

@@ -5,8 +5,8 @@
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
     "title": "AI Assistant Roadmap — KK Studio v1.6.0",
     "summary": "Last updated: 2026-06-26",
-    "contentHash": "f60b91343f940311032b03abbadd9f9c",
-    "updatedAt": "2026-07-11T09:28:18.620Z"
+    "contentHash": "1c8c6887dbd07e62becbc41086717ff8",
+    "updatedAt": "2026-07-13T07:38:46.922Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
-    "contentHash": "9acaf58f9c01f4e150914922154ba13c",
-    "updatedAt": "2026-06-06T03:13:04.701Z"
+    "contentHash": "32150f5d1a6f46a14b18fe819b1ece7d",
+    "updatedAt": "2026-07-13T07:37:50.102Z"
   },
   {
     "id": "doc_skills_md",
@@ -95,7 +95,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "本文件维护 KK Studio v1.6.0 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
-    "contentHash": "1beff9d74cdf0e6cff6053d775719fb3",
-    "updatedAt": "2026-07-11T09:28:18.619Z"
+    "contentHash": "2a9eab300bf1ef7fc4b98c2a48072750",
+    "updatedAt": "2026-07-13T07:36:27.960Z"
   }
 ]

@@ -2343,3 +2343,34 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - Vite 生产构建通过，转换 2431 modules；`git diff --check` 通过。
 - **未运行验证及原因**：本机没有 `npm`/`npx`，未运行聚合形式的 `npm run verify:changes`；未运行依赖审计、Swagger CLI 规格校验和真实付费 Provider 调用。本次变更不涉及 API、计费、生成路由或数据库。
 - **风险与下一步**：低风险。改动仅恢复桌面 footer 的响应式换行与契约覆盖；后续 PromptBar 比例调整应避免把桌面 `flex-wrap` 与移动端 `flex-nowrap` 策略混用。
+
+## 147. 2026-07-13 - 收敛兼容层治理与当前文档事实
+
+- **修改范围**：
+  1. 修复兼容层治理盲区：`compat` 目录现在进入自动发现，注册目录可以覆盖其后代文件；`server/routes/compat/` 作为高风险服务端兼容边界正式登记。
+  2. 所有兼容条目增加 `owner` 与 ISO `reviewBy` 元数据，注册表移除旧 1.4.9 计划声明，改为 v1.6.0 当前治理事实。
+  3. 强化当前文档事实检查：当前指导文档不得把 v1.5.8/v1.5.9 声明为当前版本，不得包含开发者本机绝对路径，也不得把已移除的根 `src/services/` 作为实现位置。
+  4. 将文档索引、setup 入口、AI Roadmap、架构真相源、Provider/Gemini/API/Nutrient 指导同步到 v1.6.0 和 `apps/web/src/`、`server/lib/dispatcher/` 当前路径；历史 handoff 与 dated progress 保留原始历史事实。
+  5. 新增本阶段设计说明、实施计划及兼容治理行为测试，计划内已完成步骤均同步勾选。
+- **修改文件**：
+  - `scripts/governance/check-compatibility-registry.mjs`
+  - `scripts/governance/check-current-facts.mjs`
+  - `docs/architecture/COMPATIBILITY_LAYER_REGISTRY.json`
+  - `tests/unit/compatibility-registry-governance.test.ts`
+  - `tests/unit/runtime-governance-upgrade.test.ts`
+  - `docs/ai-assistant/generated/project-index.json`
+  - `docs/README.md`、`docs/INDEX.md`、`docs/setup/`
+  - `docs/architecture/`、`docs/ai-assistant/`、`docs/development/`、`docs/governance/`、`docs/specs/` 中本次列入当前事实面的指导文档
+  - `docs/superpowers/specs/2026-07-13-architecture-convergence-phase-1-design.md`
+  - `docs/superpowers/plans/2026-07-13-architecture-convergence-phase-1.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：服务端兼容路由按目录作为一个可问责治理边界，不为每个路由文件重复登记；目录登记只负责覆盖发现，具体端点仍需在后续 API 收敛阶段逐项标注稳定、内部、兼容或废弃。当前事实检查使用明确的 active guidance 列表，避免重写历史交接记录，同时确保会指导新开发的文档严格跟随 `config/release-manifest.json`。
+- **已运行验证**：
+  - TDD 红绿链：新兼容治理测试初始 2/2 按预期失败，完成实现后与 runtime governance 定向测试共 11/11 通过。
+  - `architecture:check` 全部底层脚本通过；`governance:check` 全部底层脚本通过，兼容注册表报告 9 个注册层覆盖 13 个发现文件。
+  - 根 TypeScript、架构 TypeScript、服务端 58 文件语法和 491 个测试文件语义检查通过。
+  - Shared esbuild、UI `tsc`、API Client 完整 workspace build 和 Vite 生产构建通过；Vite 转换 2431 modules。
+  - 完整测试链通过：unit 1707 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11。
+  - UTF-8 编码、乱码检查和 `git diff --check` 通过。
+- **未运行验证及原因**：本机没有 `npm`/`npx`，无法运行聚合形式的 `npm run verify:changes`；已直接执行其与本次范围相关的架构、治理、类型、构建、完整测试和编码底层入口。Shared 的原始 workspace 脚本依赖缺失的 `npx`，因此使用同版本仓库 `esbuild` 入口执行了等价命令。未运行依赖审计、Swagger CLI 规格校验和真实付费 Provider 调用；本阶段未修改依赖、OpenAPI 或 Provider 请求行为。
+- **风险与下一步**：低风险，本阶段只改变治理和文档，不改变运行时响应。下一阶段应把 `ApiSettingsView` 的 Wuyin Catalog 直接 `fetch` 收敛到类型化 API Client，并删除或隔离指向不存在 `/api/auth/signin/:provider` 的未使用认证 shim；随后再对 81 个未纳入 OpenAPI 的运行时操作做稳定性分类。

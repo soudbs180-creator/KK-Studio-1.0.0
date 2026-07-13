@@ -51,6 +51,13 @@ function expectNotIncludes(relativePath, token, reason) {
   }
 }
 
+function expectNotMatches(relativePath, pattern, reason) {
+  const source = exists(relativePath) ? read(relativePath) : "";
+  if (pattern.test(source)) {
+    fail(`${relativePath} matches prohibited current-fact pattern ${pattern}. ${reason}`);
+  }
+}
+
 function collectFiles(relativeDir, options = {}) {
   const absoluteDir = abs(relativeDir);
   const collected = [];
@@ -142,16 +149,41 @@ const activeGovernanceVersionDocs = [
   "docs/governance/architecture_review.md",
 ];
 const activeCurrentVersionDocs = [
+  "docs/README.md",
+  "docs/INDEX.md",
+  "docs/setup/README.md",
   "docs/governance/DIAGNOSTICS_AND_DEBUGGING.md",
   "docs/architecture/PROJECT_STRUCTURE.md",
+  "docs/architecture/NEW_ARCHITECTURE_SOURCE_OF_TRUTH.md",
+  "docs/architecture/BROWSER_ASSISTANT_HUB.md",
+  "docs/architecture/LEGACY_REMOVAL_LIST.md",
+  "docs/architecture/OPENAI_CODEX_OAUTH_EXPERIMENTAL.md",
+  "docs/architecture/SLIDES_WORKFLOW_IN_CANVAS.md",
+  "docs/architecture/USER_OWNED_WEB_PROVIDER_BOUNDARY.md",
+  "docs/development/COMPLETE_DEVELOPMENT_GUIDE.md",
+  "docs/development/multi-vendor-provider-architecture.md",
   "docs/specs/current-state-inventory.md",
   "docs/specs/API_INTEGRATION_GUIDE.md",
+  "docs/specs/API_DOCS.md",
+  "docs/specs/API_STABLE_BASELINE.md",
   "docs/ai-assistant/ui-map.md",
   "docs/ai-assistant/skills/README.md",
   "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
 ];
+const activeCurrentGuidanceDocs = [
+  ...activeCurrentVersionDocs,
+  "docs/ai-assistant/session-memory.md",
+  "docs/development/gemini-agent-guide.md",
+  "docs/development/nutrient-document-processing.md",
+  "docs/governance/PROVIDER_PRESET_RULES.md",
+  "docs/governance/architecture_review.md",
+  "docs/setup/SUPABASE.md",
+  "docs/setup/SUPABASE_CLI.md",
+];
 const staleDisplayVersions = ["v1.5.6", "KK Studio v1.5.6", "`v1.5.6`", "项目版本：KK Studio v1.5.6"];
-const staleActiveVersionPattern = /\b(?:KK Studio\s+)?v?1\.5\.8\b/u;
+const staleActiveVersionPattern = /\b(?:KK Studio\s+)?v?1\.5\.(?:8|9)\b/u;
+const absoluteUserPathPattern = /(?:file:\/{3})?[a-z]:[\\/](?:users|documents and settings)[\\/]/iu;
+const rootLegacyServicesPathPattern = /(?<!apps\/web\/)src\/services\//u;
 
 if (rootPackage.version !== expectedVersion) {
   fail(`package.json version ${rootPackage.version} does not match release manifest ${expectedVersion}`);
@@ -223,8 +255,21 @@ for (const currentVersionDoc of activeCurrentVersionDocs) {
   expectIncludes(currentVersionDoc, expectedDisplayVersion, `${currentVersionDoc} must follow config/release-manifest.json (${expectedDisplayVersion}).`);
   const source = exists(currentVersionDoc) ? read(currentVersionDoc) : "";
   if (staleActiveVersionPattern.test(source)) {
-    fail(`${currentVersionDoc} contains stale active v1.5.8 version text instead of ${expectedDisplayVersion}.`);
+    fail(`${currentVersionDoc} contains a stale active v1.5.x version claim instead of ${expectedDisplayVersion}.`);
   }
+}
+
+for (const currentGuidanceDoc of activeCurrentGuidanceDocs) {
+  expectNotMatches(
+    currentGuidanceDoc,
+    absoluteUserPathPattern,
+    "Current guidance must use repository-relative links or portable placeholders such as <USERPROFILE>.",
+  );
+  expectNotMatches(
+    currentGuidanceDoc,
+    rootLegacyServicesPathPattern,
+    "Current Web implementation paths must live under apps/web/src/services/.",
+  );
 }
 
 expectIncludes("AGENTS.md", "apps/web/", "Current Web runtime must be explicit.");
