@@ -2374,3 +2374,37 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - UTF-8 编码、乱码检查和 `git diff --check` 通过。
 - **未运行验证及原因**：本机没有 `npm`/`npx`，无法运行聚合形式的 `npm run verify:changes`；已直接执行其与本次范围相关的架构、治理、类型、构建、完整测试和编码底层入口。Shared 的原始 workspace 脚本依赖缺失的 `npx`，因此使用同版本仓库 `esbuild` 入口执行了等价命令。未运行依赖审计、Swagger CLI 规格校验和真实付费 Provider 调用；本阶段未修改依赖、OpenAPI 或 Provider 请求行为。
 - **风险与下一步**：低风险，本阶段只改变治理和文档，不改变运行时响应。下一阶段应把 `ApiSettingsView` 的 Wuyin Catalog 直接 `fetch` 收敛到类型化 API Client，并删除或隔离指向不存在 `/api/auth/signin/:provider` 的未使用认证 shim；随后再对 81 个未纳入 OpenAPI 的运行时操作做稳定性分类。
+
+## 148. 2026-07-13 - 收敛 Wuyin Catalog 客户端与失效认证旁路
+
+- **修改范围**：
+  1. 在共享 Model Catalog 契约中新增 Wuyin Catalog item、来源和归一化响应 DTO，Web 默认目录类型改为直接复用共享 DTO。
+  2. `KkApiClient` 新增 `getWuyinCatalog` 与 `refreshWuyinCatalog`，分别调用现有 GET 目录和 POST 刷新端点，并把服务端旧 `{ success, data, source }` 载荷严格归一化为标准 `ApiResponse<WuyinCatalogResponseDto>`。
+  3. `ApiSettingsView` 的同步与保存前目录读取全部改走 `kkWebApiClient`；组件不再直接 `fetch` Wuyin Catalog，也不再自行解析兼容信封。原本的本地缓存、通知和静态 fallback 行为保持不变。
+  4. 删除没有 alias、没有生产依赖且唯一请求不存在 `/api/auth/signin/:provider` 的 `authCreateReact.tsx` 与旧 `utils/useAuth.js`。`@auth/create/react` 虚拟模块声明、旧 root/session 文件和当前 `AuthContext` 均未修改。
+  5. TypeScript Client 文档从 73 个方法更新到 75 个，并记录 Wuyin 兼容响应归一化边界；新增本阶段设计、计划和 6 项行为/边界测试。
+- **修改文件**：
+  - `packages/shared/src/contracts/dto/model-catalog.ts`
+  - `packages/shared/src/contracts/client/kk-api-client.ts`
+  - `apps/web/src/services/llm/wuyinCatalog.ts`
+  - `apps/web/src/components/settings/ApiSettingsView.tsx`
+  - 删除 `apps/web/src/shims/authCreateReact.tsx`
+  - 删除 `apps/web/src/utils/useAuth.js`
+  - `tests/unit/wuyin-catalog-api-client-boundary.test.ts`
+  - `docs/api/README.md`
+  - `docs/api/typescript-client.md`
+  - `docs/superpowers/specs/2026-07-13-api-client-boundary-convergence-design.md`
+  - `docs/superpowers/plans/2026-07-13-api-client-boundary-convergence.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：Wuyin 服务端兼容信封暂不改变，避免破坏外部或历史调用者；兼容数据在类型化 Client 边界一次性归一化，UI 只消费 `{ items, source }`。刷新使用已经存在的 POST `/api/v1/wuyin/catalog/refresh`，不再依赖 GET query 副作用。认证清理只删除确认未引用的本地文件，不把旧 React Router root/session 迁移混入本次范围。
+- **已运行验证**：
+  - TDD 红绿链：初始 4/4 按预期失败；补充非法 capability kind 后该用例按预期失败；最终新测试 6/6 通过。
+  - API Settings、API Management、Wuyin 与 KK API Client 定向测试 92/92 通过。
+  - `KkApiClient` 接口提取为 75 个公开方法，TypeScript Client 文档缺项为 0。
+  - `architecture:check` 与 `governance:check` 全部底层脚本通过；兼容层治理保持 9 个注册层覆盖 13 个发现文件。
+  - 根 TypeScript、架构 TypeScript、服务端 58 文件语法和 492 个测试文件语义检查通过。
+  - Shared esbuild、UI build、API Client 完整 workspace build 与 Vite 生产构建通过；Vite 转换 2431 modules。
+  - 完整测试链通过：unit 1713 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11。
+  - UTF-8 编码、乱码检查和 `git diff --check` 通过。
+- **未运行验证及原因**：本机没有 `npm`/`npx`，未运行聚合形式的 `npm run verify:changes`；已直接执行本次相关的架构、治理、类型、构建、完整测试和编码底层入口。未运行依赖审计、Swagger CLI 规格校验和真实付费 Wuyin 调用；本次没有修改依赖、OpenAPI 或服务端 Provider 执行行为。
+- **风险与下一步**：低到中风险。Client 现在会拒绝缺少必要字段、未知 kind/executionMode/content type 的目录项并返回标准错误，UI 随后使用已有静态 fallback，不会把不明结构写入 Provider 配置。下一阶段应对 81 个未进入 OpenAPI 的运行时操作做 stable/internal/compat/deprecated 分类，并以服务端 66 个兼容操作为优先拆分对象。

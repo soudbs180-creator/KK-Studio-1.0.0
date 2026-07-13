@@ -50,9 +50,10 @@ const client = createKkApiClient({
 - 响应为 401 且配置了 `refreshAccessToken` 时，只刷新并重试一次。
 - 每个成功分支都会检查 `X-Refresh-Token` 并调用 `onRefreshToken`。
 - 标准信封直接返回；非信封成功 JSON 会被包装为 `ApiResponse<T>`。
+- Wuyin Catalog 的旧 `{ success, data, source }` 响应由客户端归一化为 `ApiResponse<WuyinCatalogResponseDto>`，组件不直接解析兼容信封。
 - HTML 响应、Fetch 缺失、网络错误和非标准 HTTP 错误会转换为客户端 `ApiFailure`，不会把 HTML 当业务数据。
 
-## 方法目录（73 个）
+## 方法目录（75 个）
 
 ### 认证与 Profile（24）
 
@@ -124,7 +125,7 @@ const client = createKkApiClient({
 | `listCreditExchangeRates` | `GET /api/v1/billing/exchange-rates` |
 | `upsertCreditExchangeRate` | `PUT /api/v1/admin/billing/exchange-rates` |
 
-### Model Catalog、Provider 与定价（11）
+### Model Catalog、Provider 与定价（13）
 
 | 方法 | HTTP 端点 |
 |---|---|
@@ -139,6 +140,8 @@ const client = createKkApiClient({
 | `getSharedProviderPricingCache` | `GET /api/v1/provider-pricing-cache?baseUrl=` |
 | `upsertSharedProviderPricingCache` | `PUT /api/v1/provider-pricing-cache?baseUrl=` |
 | `deleteAdminCreditProvider` | `DELETE /api/v1/admin/credit-providers/:providerId` |
+| `getWuyinCatalog` | `GET /api/v1/wuyin/catalog`，归一化缓存/回退目录响应 |
+| `refreshWuyinCatalog` | `POST /api/v1/wuyin/catalog/refresh`，刷新并归一化远端目录响应 |
 
 ### Asset 与生成队列（10）
 
@@ -162,7 +165,7 @@ const client = createKkApiClient({
 | `saveWorkflow` | `PUT /api/v1/workspaces/:workspaceId/workflows/:workflowId` |
 | `getWorkflow` | `GET /api/v1/workspaces/:workspaceId/workflows/:workflowId` |
 
-分组计数：24 + 5 + 4 + 17 + 11 + 10 + 2 = 73。
+分组计数：24 + 5 + 4 + 17 + 13 + 10 + 2 = 75。
 
 ## DTO 来源
 

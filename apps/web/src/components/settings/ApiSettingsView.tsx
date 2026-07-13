@@ -2687,18 +2687,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         pick('正在同步最新的模型和价格表，这可能需要几秒钟，请稍候...', 'Syncing the latest models and prices, this may take a few seconds, please wait...'),
       );
       try {
-        const res = await fetch('/api/v1/wuyin/catalog?refresh=true');
-        const json = await res.json();
-        if (json && json.success && Array.isArray(json.data)) {
+        const result = await kkWebApiClient.refreshWuyinCatalog();
+        if (result.success) {
+          const catalogItems = result.data.items;
           // 简体中文注释：保存到前端缓存中
           const cacheKey = `wuyin_pricing_catalog_cache_https://api.wuyinkeji.com`;
-          window.localStorage.setItem(cacheKey, JSON.stringify(json.data));
+          window.localStorage.setItem(cacheKey, JSON.stringify(catalogItems));
           notify.success(
             pick('同步成功', 'Sync Succeeded'),
-            pick(`已成功爬取并缓存了 ${json.data.length} 个最新的速创模型与价格价格数据！`, `Successfully fetched and cached ${json.data.length} Wuyin models and pricing.`),
+            pick(`已成功爬取并缓存了 ${catalogItems.length} 个最新的速创模型与价格数据！`, `Successfully fetched and cached ${catalogItems.length} Wuyin models and pricing.`),
           );
         } else {
-          throw new Error(json?.message || 'Sync failed');
+          throw new Error(result.error.message || 'Sync failed');
         }
       } catch (error) {
         console.error('Failed to sync Wuyin catalog:', error);
@@ -2785,10 +2785,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               catalog = parsed;
             }
           } else {
-            const res = await fetch('/api/v1/wuyin/catalog');
-            const json = await res.json();
-            if (json && json.success && Array.isArray(json.data)) {
-              catalog = json.data;
+            const result = await kkWebApiClient.getWuyinCatalog();
+            if (result.success && result.data.items.length > 0) {
+              catalog = result.data.items;
             }
           }
         } catch (e) {

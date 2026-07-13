@@ -30,6 +30,62 @@ export interface ModelCatalogListDto {
   items: ModelCatalogItemDto[];
 }
 
+export type WuyinModelKindDto =
+  | "image"
+  | "video"
+  | "audio"
+  | "chat"
+  | "detail"
+  | "utility";
+
+export type WuyinExecutionModeDto =
+  | "async-detail"
+  | "sync"
+  | "sora2-special";
+
+export type WuyinSubmitContentTypeDto =
+  | "application/json"
+  | "application/x-www-form-urlencoded";
+
+export interface WuyinCatalogItemDto {
+  id: string;
+  name: string;
+  displayName: string;
+  categoryName: string;
+  kind: WuyinModelKindDto;
+  executionMode: WuyinExecutionModeDto;
+  docId?: string;
+  docUrl?: string;
+  endpointPath: string;
+  endpointUrl?: string;
+  method: "GET" | "POST";
+  contentType: string;
+  submitContentType: WuyinSubmitContentTypeDto;
+  detailPath?: string;
+  detailUrl?: string;
+  detailStatusMode?: "wuyin-async" | "sora2";
+  price?: number;
+  priceText?: string;
+  priceUnit?: string;
+  points?: number | null;
+  qps?: number;
+  aliases: string[];
+  enabled: boolean;
+  strictContractOnly?: boolean;
+  source?: string;
+  catalogSource?: string;
+  requestParamsRaw?: string;
+  responseParamsRaw?: string;
+  lastCrawledAt: string;
+}
+
+export type WuyinCatalogSourceDto = "cache" | "remote" | "fallback";
+
+export interface WuyinCatalogResponseDto {
+  items: WuyinCatalogItemDto[];
+  source: WuyinCatalogSourceDto;
+}
+
 export interface CreateAdminModelRequestDto {
   modelCode: string;
   displayName: string;

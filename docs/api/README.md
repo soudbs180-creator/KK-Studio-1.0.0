@@ -5,7 +5,7 @@
 ## 文档地图
 
 - [运行时端点目录](runtime-endpoints.md)：所有已挂载 HTTP 端点、鉴权级别、用途、别名与路由优先级。
-- [TypeScript 客户端](typescript-client.md)：`createKkApiClient` 配置、73 个客户端方法和 DTO 来源。
+- [TypeScript 客户端](typescript-client.md)：`createKkApiClient` 配置、75 个客户端方法和 DTO 来源。
 - [OpenAPI 3.0](../specs/openapi.yaml)：稳定契约子集，当前包含 34 个 path、42 个 operation。
 - [提供商协议](../specs/README.md)：Gemini、OpenAI-compatible、gpt-best、音视频任务等上游适配规范。
 
@@ -134,4 +134,3 @@ curl -sS https://<your-host>/api/v1/profile \
 ```
 
 生成请求必须携带用户身份；Provider 密钥应由服务端托管或通过加密的用户路由配置引用，不能写入示例或前端源码。
-

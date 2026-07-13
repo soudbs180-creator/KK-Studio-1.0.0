@@ -98,6 +98,9 @@ import type {
   SaveAdminCreditProviderRequestDto,
   SaveAdminCreditProviderResponseDto,
   UpsertProviderPricingCacheRequestDto,
+  WuyinCatalogItemDto,
+  WuyinCatalogResponseDto,
+  WuyinCatalogSourceDto,
 } from "../dto/model-catalog.ts";
 import type {
   SaveWorkflowRequestDto,
@@ -222,6 +225,12 @@ export interface KkApiClient {
     input?: UserRoutePricingSyncRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserRoutePricingSyncDto>>;
+  getWuyinCatalog(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<WuyinCatalogResponseDto>>;
+  refreshWuyinCatalog(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<WuyinCatalogResponseDto>>;
   createTempUser(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<TempUserSessionDto>>;
@@ -681,6 +690,93 @@ async function requestJson<TResponse>(
   }
 }
 
+interface LegacyWuyinCatalogPayload {
+  success?: unknown;
+  data?: unknown;
+  source?: unknown;
+}
+
+const WUYIN_MODEL_KINDS = new Set(["image", "video", "audio", "chat", "detail", "utility"]);
+const WUYIN_EXECUTION_MODES = new Set(["async-detail", "sync", "sora2-special"]);
+const WUYIN_SUBMIT_CONTENT_TYPES = new Set(["application/json", "application/x-www-form-urlencoded"]);
+
+function isWuyinCatalogSource(value: unknown): value is WuyinCatalogSourceDto {
+  return value === "cache" || value === "remote" || value === "fallback";
+}
+
+function isWuyinCatalogItem(value: unknown): value is WuyinCatalogItemDto {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const item = value as Partial<WuyinCatalogItemDto>;
+  return typeof item.id === "string"
+    && typeof item.name === "string"
+    && typeof item.displayName === "string"
+    && typeof item.categoryName === "string"
+    && typeof item.kind === "string"
+    && WUYIN_MODEL_KINDS.has(item.kind)
+    && typeof item.executionMode === "string"
+    && WUYIN_EXECUTION_MODES.has(item.executionMode)
+    && typeof item.endpointPath === "string"
+    && (item.method === "GET" || item.method === "POST")
+    && typeof item.contentType === "string"
+    && typeof item.submitContentType === "string"
+    && WUYIN_SUBMIT_CONTENT_TYPES.has(item.submitContentType)
+    && Array.isArray(item.aliases)
+    && item.aliases.every((alias) => typeof alias === "string")
+    && typeof item.enabled === "boolean"
+    && typeof item.lastCrawledAt === "string";
+}
+
+function normalizeWuyinCatalogPayload(
+  response: ApiResponse<LegacyWuyinCatalogPayload>,
+): ApiResponse<WuyinCatalogResponseDto> {
+  if (!response.success) {
+    return response;
+  }
+
+  const payload = response.data;
+  if (
+    payload?.success !== true
+    || !Array.isArray(payload.data)
+    || !payload.data.every(isWuyinCatalogItem)
+    || !isWuyinCatalogSource(payload.source)
+  ) {
+    return createClientError(
+      "INVALID_RESPONSE_PAYLOAD",
+      "KK API returned an invalid Wuyin catalog payload.",
+      response.meta.requestId,
+      response.meta.clientVersion,
+      [{ reason: "invalid_wuyin_catalog_payload" }],
+    );
+  }
+
+  return {
+    success: true,
+    data: {
+      items: payload.data,
+      source: payload.source,
+    },
+    meta: response.meta,
+  };
+}
+
+async function requestWuyinCatalog(
+  config: ApiClientConfig,
+  path: string,
+  method: "GET" | "POST",
+  options?: ApiClientRequestOptions,
+): Promise<ApiResponse<WuyinCatalogResponseDto>> {
+  const response = await requestJson<LegacyWuyinCatalogPayload>(
+    config,
+    path,
+    { method },
+    options,
+  );
+  return normalizeWuyinCatalogPayload(response);
+}
+
 export function createKkApiClient(config: ApiClientConfig): KkApiClient {
   return {
     register(input, options) {
@@ -970,6 +1066,24 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
           method: "POST",
           body: input ? JSON.stringify(input) : undefined,
         },
+        options,
+      );
+    },
+
+    getWuyinCatalog(options) {
+      return requestWuyinCatalog(
+        config,
+        "api/v1/wuyin/catalog",
+        "GET",
+        options,
+      );
+    },
+
+    refreshWuyinCatalog(options) {
+      return requestWuyinCatalog(
+        config,
+        "api/v1/wuyin/catalog/refresh",
+        "POST",
         options,
       );
     },

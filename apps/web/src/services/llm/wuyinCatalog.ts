@@ -3,56 +3,12 @@
 
 import { buildCanonicalApiRecordId } from '../auth/keyManagerCanonicalIds.ts';
 import { WUYIN_PRESET_LOGO_URL } from '../auth/keyManagerProviderPresets.ts';
+import type { WuyinCatalogItemDto } from '@kk/shared';
 
-export type WuyinModelKind =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'chat'
-  | 'detail'
-  | 'utility';
-
-export type WuyinExecutionMode =
-  | 'async-detail'
-  | 'sync'
-  | 'sora2-special';
-
-export type WuyinSubmitContentType =
-  | 'application/json'
-  | 'application/x-www-form-urlencoded';
-
-export interface WuyinCatalogItem {
-  id: string;                     // endpoint basename，例如 image_nanoBanana2
-  name: string;                   // 兼容旧属性：页面展示名，同 displayName
-  displayName: string;            // 页面展示名，例如 NanoBanana2
-  categoryName: string;           // 分类名称，例如：图片模型 / 视频模型 / 音频模型等
-  kind: WuyinModelKind;
-  executionMode: WuyinExecutionMode;
-
-  docId?: string;
-  docUrl?: string;
-
-  endpointPath: string;
-  endpointUrl?: string;           // endpointUrl 设为可选，仅在爬虫动态解析时提供
-  method: 'GET' | 'POST';
-  contentType: string;            // 请求 Content-Type
-  submitContentType: WuyinSubmitContentType; // 兼容旧属性
-
-  detailPath?: string;
-  detailStatusMode?: 'wuyin-async' | 'sora2';
-
-  price?: number;
-  priceText?: string;
-  priceUnit?: '张' | '秒' | '字符' | '次' | 'token' | string;
-
-  qps?: number;
-  aliases: string[];
-  enabled: boolean;
-
-  requestParamsRaw?: string;
-  responseParamsRaw?: string;
-  lastCrawledAt: string;
-}
+export type WuyinModelKind = WuyinCatalogItemDto['kind'];
+export type WuyinExecutionMode = WuyinCatalogItemDto['executionMode'];
+export type WuyinSubmitContentType = WuyinCatalogItemDto['submitContentType'];
+export type WuyinCatalogItem = WuyinCatalogItemDto;
 
 export const WUYIN_DEFAULT_BASE_URL = 'https://api.wuyinkeji.com';
 export const WUYIN_ASYNC_DETAIL_PATH = '/api/async/detail';
