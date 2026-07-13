@@ -2408,3 +2408,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - UTF-8 编码、乱码检查和 `git diff --check` 通过。
 - **未运行验证及原因**：本机没有 `npm`/`npx`，未运行聚合形式的 `npm run verify:changes`；已直接执行本次相关的架构、治理、类型、构建、完整测试和编码底层入口。未运行依赖审计、Swagger CLI 规格校验和真实付费 Wuyin 调用；本次没有修改依赖、OpenAPI 或服务端 Provider 执行行为。
 - **风险与下一步**：低到中风险。Client 现在会拒绝缺少必要字段、未知 kind/executionMode/content type 的目录项并返回标准错误，UI 随后使用已有静态 fallback，不会把不明结构写入 Provider 配置。下一阶段应对 81 个未进入 OpenAPI 的运行时操作做 stable/internal/compat/deprecated 分类，并以服务端 66 个兼容操作为优先拆分对象。
+
+## 149. 2026-07-13 - 确立 API 运行时全量整改规格
+
+- **修改范围**：将用户确认的“全部整改”要求固化为 API 运行时总规格，覆盖 123 个有效 HTTP 操作的机器分类、运行时与 OpenAPI 双向治理、8 个遮蔽注册清理、共享 DTO/API Client/服务端/Web 调用方跨层收敛、稳定实现移出兼容目录、响应信封统一、兼容废弃与有证据删除，以及逐波验证和推送规则。
+- **修改文件**：
+  - `docs/superpowers/specs/2026-07-13-api-runtime-full-remediation-design.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：采用证据驱动的分阶段全量整改，不做一次性路由重写。合同状态固定为 `stable`、`internal`、`compatibility`、`deprecated`，并与物理实现区分开；OpenAPI 是稳定合同事实源，运行时源码是实际挂载事实源，操作注册表负责分类，治理脚本要求三者一致。总规格拆成 Wave 0-6 的独立实施计划，每波验证、提交并推送后才进入下一波。仓库内零调用不等于外部零调用；缺少外部证据的接口进入受治理废弃期，不盲删。
+- **已运行验证**：
+  - 完成规格占位符、内部一致性、范围和歧义自审；未发现 `TBD`、`TODO`、空实现或跨波职责冲突。
+  - `governance:check` 的全部底层脚本通过：版本、当前事实、Agent 文档、Skills、兼容层、Provider registry/presets/frontend/catalog 与敏感边界均无违规。
+  - 当前架构文档检查与规格结构检查通过。
+  - UTF-8 编码、乱码检查和 `git diff --check` 通过。
+- **未运行验证及原因**：本次只新增 Markdown 总规格和 Handoff，没有修改源码、类型、路由、OpenAPI 或构建配置，因此未运行 TypeScript、构建和测试套件；本机没有 `npm`/`npx`，未运行聚合形式的 `npm run governance:check`，已直接执行其全部底层 Node 入口。未调用真实支付或付费 Provider。
+- **风险与下一步**：本提交只确立设计，不改变运行时行为。下一步在用户审阅规格后，为 Wave 0 编写独立实施计划，并按 TDD 建立操作注册表、运行时发现器和未分类接口治理守卫；在 Wave 0 推送前不开始删除路由。
