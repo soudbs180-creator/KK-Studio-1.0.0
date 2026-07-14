@@ -1,12 +1,18 @@
 // 简体中文：项目上下文脱敏构建器 (Project Context Builder)
 
-import type { SanitizedProjectContext, AssetContextSummary } from '../types';
+import type {
+  AssistantCollaborationMode,
+  AssistantWorkspaceSurface,
+  SanitizedProjectContext,
+  AssetContextSummary,
+} from '../types';
 import { buildCanvasRuntimeState } from './canvasRuntimeStateBuilder';
 
 export interface ContextBuilderParams {
-  currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
+  currentPage: AssistantWorkspaceSurface;
   aiTakeoverEnabled: boolean;
   agentEnabled: boolean;
+  collaborationMode?: AssistantCollaborationMode;
   activeCanvas: any;
   selectedNodeIds: string[];
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
@@ -32,6 +38,7 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     currentPage,
     aiTakeoverEnabled,
     agentEnabled,
+    collaborationMode = aiTakeoverEnabled ? 'takeover' : agentEnabled ? 'assist' : 'direct',
     activeCanvas,
     selectedNodeIds,
     apiKeyStatus,
@@ -126,7 +133,8 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     currentPage,
     aiTakeover: {
       enabled: aiTakeoverEnabled,
-      mode: apiKeyStatus === 'missing' ? 'local' : 'api'
+      mode: apiKeyStatus === 'missing' ? 'local' : 'api',
+      collaborationMode,
     },
     agent: {
       enabled: agentEnabled
@@ -153,4 +161,3 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     runtime
   };
 }
-

@@ -13,15 +13,13 @@ interface WorkspacePanelsProps {
 
 const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   activeSurface,
-  activePanel,
   renderChatSidebar,
   renderLibraryPanel,
   renderFavoritesPanel,
   auxiliaryPanels,
-  isMobile,
 }) => (
   <>
-    {(activePanel === 'chat' || !isMobile) ? renderChatSidebar?.() : null}
+    {renderChatSidebar?.()}
     {activeSurface === 'library' ? renderLibraryPanel?.() : null}
     {activeSurface === 'favorites' ? renderFavoritesPanel?.() : null}
     {auxiliaryPanels}

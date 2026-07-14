@@ -5,6 +5,26 @@ import type { ToolPermission, AgentToolCallLog } from '../../ai-takeover/types.t
 
 const MAX_TOOL_LOGS = 200;
 
+const resolveFreshToolContext = (ctx: any): any => {
+  const activeCanvas = typeof ctx?.getActiveCanvas === 'function'
+    ? ctx.getActiveCanvas()
+    : ctx?.activeCanvas;
+  const selectedNodeIds = typeof ctx?.getSelectedNodeIds === 'function'
+    ? ctx.getSelectedNodeIds()
+    : ctx?.selectedNodeIds;
+  const canvasRuntimeState = typeof ctx?.getCanvasRuntimeState === 'function'
+    ? ctx.getCanvasRuntimeState()
+    : ctx?.canvasRuntimeState;
+
+  return {
+    ...ctx,
+    activeCanvas,
+    selectedNodeIds,
+    canvasRuntimeState,
+    canvasRevision: activeCanvas?.lastModified || ctx?.canvasRevision || 0,
+  };
+};
+
 export interface AgentToolDefinition<Input = any, Output = any> {
   name: string;
   description: string;
@@ -68,7 +88,8 @@ export class AgentToolRegistry {
 
   async execute(name: string, input: any, ctx: any): Promise<any> {
     const tool = this.getTool(name);
-    const runId = ctx?.runId || `run_${Date.now()}`;
+    const runtimeContext = resolveFreshToolContext(ctx);
+    const runId = runtimeContext?.runId || `run_${Date.now()}`;
     const log: AgentToolCallLog = {
       id: `tool_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       runId,
@@ -92,7 +113,7 @@ export class AgentToolRegistry {
 
     // 安全隔离校验
     if (tool.permission === 'forbidden') {
-      ctx.notify?.error?.('操作被拦截', `出于绝对安全隔离原则，禁止 AI 助手执行该工具: ${name}`);
+      runtimeContext.notify?.error?.('操作被拦截', `出于绝对安全隔离原则，禁止 AI 助手执行该工具: ${name}`);
       const blockedLog: AgentToolCallLog = {
         ...log,
         status: 'blocked',
@@ -104,7 +125,7 @@ export class AgentToolRegistry {
     }
 
     if (tool.permission === 'confirm' || tool.permission === 'dangerous') {
-      const grant = ctx?.confirmationGrant;
+      const grant = runtimeContext?.confirmationGrant;
       const allowedTools = Array.isArray(grant?.toolNames) ? grant.toolNames : [];
       const authorized = grant?.confirmed === true
         && grant?.runId === runId
@@ -123,7 +144,7 @@ export class AgentToolRegistry {
 
     try {
       const validatedInput = tool.inputValidator ? tool.inputValidator.parse(input) : input;
-      const output = await tool.handler(validatedInput, ctx);
+      const output = await tool.handler(validatedInput, runtimeContext);
       
       // 审计工具执行的输出：如果返回 success === false
       if (output && typeof output === 'object' && (output as any).success === false) {
@@ -141,7 +162,7 @@ export class AgentToolRegistry {
       }
 
       if (tool.verify) {
-        const verification = await tool.verify(output, validatedInput, ctx);
+        const verification = await tool.verify(output, validatedInput, resolveFreshToolContext(runtimeContext));
         const verified = typeof verification === 'boolean' ? verification : verification.success;
         if (!verified) {
           const verificationMessage = typeof verification === 'boolean'

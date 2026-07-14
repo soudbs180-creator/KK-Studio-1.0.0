@@ -7,6 +7,7 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 1. **短期记忆 (Short-term Memory)**:
    - 包含当前会话消息队列 (`messages`，最大 30 条)。
    - 当前画布实时运行态 `CanvasRuntimeState`。
+   - 当前协作模式 `direct | assist | takeover`，用于决定输入路由和确认语义，不复制会话内容。
 2. **长期记忆 (Long-term Memory)**:
    - 已执行成功的 `agent_runs` 历史日志及对应工具调用记录 `agent_tool_calls`。
    - 固化的自定义 Skill 习惯偏好 (Upserted Skills)。
@@ -15,8 +16,17 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 
 - **会话分支克隆**: 用户选择“复制分支”时，复制完整的消息记录、连结的资产 ID、和当前的生成参数配置。
 - **持久化任务恢复**: 生图队列在底层以 localStorage/IndexedDB 缓存持久化。当页面刷新或断线重连时，`useTaskRecovery` 自动从缓存中提取 pending 任务进行状态恢复，并通知 AI 接管引擎更新相应卡片。
-- **会话退出脱敏**: 当关闭接管面板时，清空内存中的临时变量，仅保留加密的安全凭证标识。
+- **会话界面关闭**: 折叠或关闭聊天侧栏只释放临时 UI 引用，不得清空 `AgentRunStore`、`DurableGenerationQueue` 或已持久化的协作模式。敏感凭证仍不得写入这些存储。
 - **Agent Handoff**: 当开发中断时，将已完成步骤和未完成步骤归档至 `docs/development/session-handoff.md`。
+
+## 2.1 三态模式与 Pending Run 恢复 - 2026-07-15
+
+- 唯一协作模式存放在 `kk_assistant_collaboration_mode_v1`。Provider 首次挂载时读取并规范化该值；无效或缺失值回退到 `direct`。
+- 同一浏览器的 storage 事件可以同步模式变化，但模式切换不复制消息、不创建新画布，也不重置当前选区。
+- `direct`、`assist`、`takeover` 共享同一个 `CanvasContext`、`DurableGenerationQueue` 和 `AgentRunStore`。模式是交互策略，不是三套数据仓库。
+- Provider 挂载时调用 `AgentRunStore.getPendingRun()` 恢复仍有效的 pending run，并重新投影确认卡片和运行时间线。恢复 pending 状态不等于用户已确认，也不得产生重复 run。
+- AI 辅助的可执行计划以 `waiting_confirmation` 语义保存；AI 接管也必须保留 PermissionPolicy 判定后的确认边界。用户切回直接操作后，pending run 仍存在，但不会在后台因模式切换获得额外授权。
+- `DurableGenerationQueue` 独立持久化批量任务并负责恢复、重试与幂等；AgentRun 记录任务编排和工具审计，两者通过 run/job 标识关联，不互相替代。
 
 ## 3. Runtime Knowledge Projection - 2026-06-03
 

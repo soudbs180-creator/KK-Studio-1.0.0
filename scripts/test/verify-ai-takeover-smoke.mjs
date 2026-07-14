@@ -373,13 +373,16 @@ async function assertHttpHtml(url) {
 
 function verifySourceContracts() {
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const modeSwitchSource = readSource('apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx');
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const generationToolsSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
 
   const checks = [
     { source: chatSidebarSource, pattern: /id="btn-desktop-ai-assistant"/, label: 'desktop AI assistant edge entrypoint' },
     { source: chatSidebarSource, pattern: /data-chat-shell-action=\{CHAT_SHELL_ACTIONS\.toggleSidebar\.uiAction\}/, label: 'desktop AI entry state' },
-    { source: chatSidebarSource, pattern: /id="btn-ai-takeover-toggle"/, label: 'AI takeover toggle' },
+    { source: modeSwitchSource, pattern: /id:\s*['"]btn-ai-direct-mode['"]/, label: 'direct mode toggle' },
+    { source: modeSwitchSource, pattern: /id:\s*['"]btn-ai-assist-mode['"]/, label: 'assist mode toggle' },
+    { source: modeSwitchSource, pattern: /id:\s*['"]btn-ai-takeover-toggle['"]/, label: 'takeover mode toggle' },
     { source: chatSidebarSource, pattern: /kk-chat-sidebar-composer-actions[^"]*min-w-0[^"]*flex-wrap/, label: 'composer action wrapping' },
     { source: chatSidebarSource, pattern: /ai-takeover-run-timeline/, label: 'chat sidebar run timeline surface' },
     { source: chatSidebarSource, pattern: /ai-takeover-composer-input/, label: 'chat sidebar takeover input' },
@@ -525,6 +528,11 @@ try {
   const desktopEntry = await ensureWorkspaceReady(page);
   await assertElementInViewport(desktopEntry, 'Desktop AI assistant entry is outside the viewport');
   await desktopEntry.click();
+
+  const assistToggle = page.locator('#btn-ai-assist-mode');
+  await assertVisible(assistToggle, 'AI assist mode did not render after opening chat.');
+  await assistToggle.click();
+  await assertVisible(page.locator('.ai-context-suggestions'), 'Context suggestions did not render in AI assist mode.');
 
   const takeoverToggle = page.locator('#btn-ai-takeover-toggle');
   await assertVisible(takeoverToggle, 'AI takeover toggle did not render after opening chat.');

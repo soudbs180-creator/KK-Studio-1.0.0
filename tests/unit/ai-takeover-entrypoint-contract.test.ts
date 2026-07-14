@@ -5,15 +5,21 @@ import { readSource } from '../support/workspacePaths.js';
 
 test('chat sidebar AI takeover controls stay inside the composer action row', () => {
   const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const modeSwitchSource = readSource('apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx');
 
   assert.match(source, /kk-chat-sidebar-composer-actions[^"]*min-w-0[^"]*flex-wrap/);
   assert.match(source, /id="btn-desktop-ai-assistant"/);
   assert.match(source, /kk-chat-sidebar-agent-controls[^"]*min-w-0[^"]*flex-1[^"]*flex-wrap/);
-  assert.match(source, /id="btn-ai-takeover-toggle"[\s\S]{0,520}className=\{`shrink-0/);
+  assert.match(source, /<AITakeoverToggle/);
+  assert.match(modeSwitchSource, /id:\s*['"]btn-ai-direct-mode['"]/);
+  assert.match(modeSwitchSource, /id:\s*['"]btn-ai-assist-mode['"]/);
+  assert.match(modeSwitchSource, /id:\s*['"]btn-ai-takeover-toggle['"]/);
   assert.match(source, /currentRun[\s\S]{0,120}agentRunTimeline/);
   assert.match(source, /shouldShowTakeoverTimeline/);
   assert.match(source, /ai-takeover-run-timeline/);
-  assert.match(source, /id=\{aiTakeoverMode \? 'ai-takeover-composer-input' : 'chat-composer-input'\}/);
+  assert.match(source, /'ai-takeover-composer-input'/);
+  assert.match(source, /'ai-assist-composer-input'/);
+  assert.match(source, /'chat-composer-input'/);
   assert.match(source, /className="kk-chat-sidebar-send-control shrink-0"/);
 });
 

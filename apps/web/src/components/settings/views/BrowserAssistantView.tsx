@@ -609,7 +609,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   const createBrowserAssistantPreviewContext = (): SanitizedProjectContext => ({
     currentPage: 'settings',
-    aiTakeover: { enabled: true, mode: 'local' },
+    aiTakeover: { enabled: true, mode: 'local', collaborationMode: 'takeover' },
     agent: { enabled: true },
     canvas: {
       selectedNodeIds: [],

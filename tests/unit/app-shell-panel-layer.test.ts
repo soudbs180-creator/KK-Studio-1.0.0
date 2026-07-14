@@ -8,7 +8,7 @@ const ROOT_DIR = process.cwd();
 
 
 
-test("App delegates workspace panel rendering to a dedicated shell component", () => {
+test("App delegates workspace panels while keeping the assistant runtime mounted", () => {
   const workspacePageSource = readSource("apps/web/src/pages/Workspace/WorkspacePage.tsx");
   const layerSource = readSource("apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx");
   const panelsSource = readSource("apps/web/src/components/workspace/WorkspacePanels.tsx");
@@ -26,7 +26,8 @@ test("App delegates workspace panel rendering to a dedicated shell component", (
   assert.match(layerSource, /<AssetLibraryPanel/);
   assert.match(panelsSource, /renderChatSidebar\?: \(\) => ReactNode;/);
   assert.match(panelsSource, /renderLibraryPanel\?: \(\) => ReactNode;/);
-  assert.match(panelsSource, /activePanel === 'chat' \|\| !isMobile\) \? renderChatSidebar\?\.\(\) : null/);
+  assert.match(panelsSource, /\{renderChatSidebar\?\.\(\)\}/);
+  assert.doesNotMatch(panelsSource, /activePanel === 'chat' \|\| !isMobile/);
   assert.doesNotMatch(panelsSource, /!isMobile && renderChatSidebar/);
   assert.match(panelsSource, /\{activeSurface === 'library' \? renderLibraryPanel\?\.\(\) : null\}/);
   assert.doesNotMatch(panelsSource, /chatSidebar\?: ReactNode;/);

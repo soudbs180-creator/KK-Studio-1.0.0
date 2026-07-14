@@ -931,3 +931,94 @@ test('ToolRegistry: generation.createAudioTask uses the unified durable audio qu
   assert.equal(latestLog.toolName, 'generation.createAudioTask');
   assert.equal(latestLog.status, 'success');
 });
+
+test('ToolRegistry: each execution and verification resolve the latest canvas context', async () => {
+  const registry = new AgentToolRegistry();
+  let liveContext = {
+    activeCanvas: { id: 'canvas-live-1', lastModified: 11 },
+    selectedNodeIds: ['node-live-1'],
+    canvasRuntimeState: { canvasId: 'canvas-live-1', revision: 11 },
+  };
+  const handlerSnapshots: any[] = [];
+  const verificationSnapshots: any[] = [];
+
+  registry.register({
+    name: 'read-live-context',
+    description: 'captures the live canvas context',
+    permission: 'safe',
+    inputSchema: {},
+    handler: async (_input, ctx) => {
+      handlerSnapshots.push({
+        canvasId: ctx.activeCanvas.id,
+        selectedNodeIds: [...ctx.selectedNodeIds],
+        runtimeCanvasId: ctx.canvasRuntimeState.canvasId,
+        canvasRevision: ctx.canvasRevision,
+      });
+      liveContext = {
+        activeCanvas: { id: `${ctx.activeCanvas.id}-verified`, lastModified: ctx.canvasRevision + 1 },
+        selectedNodeIds: [`${ctx.selectedNodeIds[0]}-verified`],
+        canvasRuntimeState: {
+          canvasId: `${ctx.canvasRuntimeState.canvasId}-verified`,
+          revision: ctx.canvasRevision + 1,
+        },
+      };
+      return { success: true };
+    },
+    verify: async (_output, _input, ctx) => {
+      verificationSnapshots.push({
+        canvasId: ctx.activeCanvas.id,
+        selectedNodeIds: [...ctx.selectedNodeIds],
+        runtimeCanvasId: ctx.canvasRuntimeState.canvasId,
+        canvasRevision: ctx.canvasRevision,
+      });
+      return true;
+    },
+  });
+
+  const staleSnapshot = {
+    activeCanvas: { id: 'canvas-stale', lastModified: 1 },
+    selectedNodeIds: ['node-stale'],
+    canvasRuntimeState: { canvasId: 'canvas-stale', revision: 1 },
+    getActiveCanvas: () => liveContext.activeCanvas,
+    getSelectedNodeIds: () => liveContext.selectedNodeIds,
+    getCanvasRuntimeState: () => liveContext.canvasRuntimeState,
+  };
+
+  await registry.execute('read-live-context', {}, staleSnapshot);
+
+  liveContext = {
+    activeCanvas: { id: 'canvas-live-2', lastModified: 22 },
+    selectedNodeIds: ['node-live-2'],
+    canvasRuntimeState: { canvasId: 'canvas-live-2', revision: 22 },
+  };
+  await registry.execute('read-live-context', {}, staleSnapshot);
+
+  assert.deepEqual(handlerSnapshots, [
+    {
+      canvasId: 'canvas-live-1',
+      selectedNodeIds: ['node-live-1'],
+      runtimeCanvasId: 'canvas-live-1',
+      canvasRevision: 11,
+    },
+    {
+      canvasId: 'canvas-live-2',
+      selectedNodeIds: ['node-live-2'],
+      runtimeCanvasId: 'canvas-live-2',
+      canvasRevision: 22,
+    },
+  ]);
+  assert.deepEqual(verificationSnapshots, [
+    {
+      canvasId: 'canvas-live-1-verified',
+      selectedNodeIds: ['node-live-1-verified'],
+      runtimeCanvasId: 'canvas-live-1-verified',
+      canvasRevision: 12,
+    },
+    {
+      canvasId: 'canvas-live-2-verified',
+      selectedNodeIds: ['node-live-2-verified'],
+      runtimeCanvasId: 'canvas-live-2-verified',
+      canvasRevision: 23,
+    },
+  ]);
+});

@@ -38,7 +38,6 @@ test('ChatSidebar shell controls expose one stable local action catalog', () => 
     'copyMessage',
     'removeAttachment',
     'openAttachmentMenu',
-    'toggleAgentMode',
     'stopGeneration',
     'sendComposerMessage',
     'toggleImportPreviewAll',

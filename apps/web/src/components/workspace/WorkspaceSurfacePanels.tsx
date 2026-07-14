@@ -97,7 +97,7 @@ export function WorkspaceSurfacePanels({
               onGenerate={onGenerate}
               canvasTransform={canvasTransform}
               canvasRef={canvasRef}
-              workspaceSurface={workspaceSurface}
+              workspaceSurface={activeSurface}
               openToolWindowInstance={openToolWindowInstance}
               updateToolWindowLayout={updateToolWindowLayout}
               setPptEditorMode={setPptEditorMode}

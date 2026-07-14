@@ -3,4 +3,5 @@
 export * from './types';
 export * from './context/AITakeoverContext';
 export * from './components/AITakeoverToggle';
+export * from './components/AIContextSuggestions';
 export * from './components/AIAssistantDock';

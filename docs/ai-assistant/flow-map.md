@@ -4,6 +4,49 @@
 
 ---
 
+## 0. 三态协作总流程 - 2026-07-15
+
+```mermaid
+flowchart TD
+    User["用户继续操作或输入目标"] --> Mode{"AssistantCollaborationMode"}
+
+    Mode -->|direct| DirectCanvas["点击、拖拽、框选、编辑画布"]
+    Mode -->|direct| NormalChat["普通聊天"]
+    DirectCanvas --> CanvasContext["共享 CanvasContext"]
+
+    Mode -->|assist| LiveContext["读取当前页面、选区与 CanvasRuntimeState"]
+    LiveContext --> Suggestions["生成上下文建议"]
+    Suggestions --> Composer["点击建议只填入可编辑目标"]
+    Composer --> AssistPlan["AgentRuntime 生成执行预览"]
+    AssistPlan --> AssistConfirm{"用户确认？"}
+    AssistConfirm -->|否| KeepEditing["继续编辑或返回直接操作"]
+    AssistConfirm -->|是| ConfirmedExecution["按确认范围执行"]
+
+    Mode -->|takeover| Runtime["IntentGate → Planner → ToolRegistry → PermissionPolicy"]
+    Runtime --> Risk{"权限与影响评估"}
+    Risk -->|低风险| Executor["Executor → Verification → Memory / Knowledge Update"]
+    Risk -->|高风险、批量、成本或外部副作用| TakeoverConfirm{"等待 run-bound 确认"}
+    TakeoverConfirm -->|确认| Executor
+    TakeoverConfirm -->|取消| Cancelled["记录取消，不执行工具"]
+
+    ConfirmedExecution --> Executor
+    Executor --> CanvasContext
+    Executor --> Queue["共享 DurableGenerationQueue"]
+    Runtime --> RunStore["共享 AgentRunStore"]
+    AssistPlan --> RunStore
+    RunStore --> Timeline["确认卡片与运行时间线"]
+    CanvasContext --> Refresh["下一工具步骤前重新读取画布、选区与运行态"]
+    Queue --> Refresh
+```
+
+规则：
+
+- 三条路径由唯一的 `direct | assist | takeover` 状态互斥选择，不允许独立开关同时开启辅助与接管。
+- 直接模式保持普通聊天和画布原生操作；AI 辅助只建议并在执行前确认；AI 接管负责完整任务，但不绕过 PermissionPolicy。
+- 三态共享 `CanvasContext`、`DurableGenerationQueue`、`AgentRunStore` 和当前会话。切换模式不会复制数据或丢失 pending run。
+- ToolRegistry 在每一步 handler 和 verification 前获取新鲜上下文，使 AI 能看到用户在运行期间完成的合法直接操作；已确认的工具目标范围不会因刷新而被隐式扩大。
+- 本流程不新增跨工具统一 undo 事务；失败处理继续采用现有工具级验证、幂等、补偿或画布撤销能力。
+
 ## 0.1. Global Favorites And @ Reference Flow - 2026-06-05
 
 User trigger examples: typing `@` in PromptBar, ChatSidebar, or AI takeover dock; clicking a favorite prompt/image; clicking the heart action on an image or Prompt card.
@@ -38,7 +81,7 @@ Rules:
 - Favorite image rename updates the favorite display name; if the source image node is loaded, update `GeneratedImage.alias` so search can find it.
 - The heart Favorites surface is not the `@` popup. Favorites opens as a draggable floating collection window with Chinese copy; the `@` popup opens above the current token in the active composer.
 
-## 0. 本地快速功能跳转工作流
+## 0.2. 本地快速功能跳转工作流
 
 用户触发：“帮我打开个人中心” / “帮我打开 API” / “打开日志”
 

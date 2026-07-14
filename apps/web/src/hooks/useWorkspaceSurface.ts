@@ -47,7 +47,7 @@ export function useWorkspaceSurface({
     ? 'settings'
     : showProfileModal
       ? 'profile'
-      : isChatOpen
+      : isChatOpen && isMobile
         ? 'chat'
         : workspaceSurface;
 
@@ -103,7 +103,6 @@ export function useWorkspaceSurface({
   }, [setShowUserMenu]);
 
   const toggleChatPanel = useCallback(() => {
-    setWorkspaceSurface('workspace');
     setIsChatOpen((prev) => !prev);
   }, []);
 

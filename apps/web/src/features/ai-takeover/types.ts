@@ -1,7 +1,23 @@
 // 简体中文：定义 AI 接管的核心业务类型
 
 import type { AspectRatio, ImageSize, GenerationMode } from '../../types';
-import type { CanvasCardKind, CanvasLayoutMode, CanvasSceneBounds } from '@kk/shared';
+import type {
+  AssistantCollaborationMode,
+  AssistantWorkspaceSurface,
+  CanvasCardKind,
+  CanvasLayoutMode,
+  CanvasSceneBounds,
+} from '@kk/shared';
+
+export type { AssistantCollaborationMode, AssistantWorkspaceSurface } from '@kk/shared';
+
+export interface AssistantContextSuggestion {
+  id: string;
+  label: string;
+  description: string;
+  prompt: string;
+  targetNodeIds: string[];
+}
 
 export type AssistantBatchTaskDomain = 'general' | 'ecommerce';
 export type AssistantBatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
@@ -285,8 +301,12 @@ export interface PromptTemplate {
 
 // 脱敏项目上下文
 export interface SanitizedProjectContext {
-  currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
-  aiTakeover: { enabled: boolean; mode: 'local' | 'api' };
+  currentPage: AssistantWorkspaceSurface;
+  aiTakeover: {
+    enabled: boolean;
+    mode: 'local' | 'api';
+    collaborationMode: AssistantCollaborationMode;
+  };
   agent: { enabled: boolean };
   canvas: {
     id?: string;
@@ -348,7 +368,7 @@ export interface SanitizedProjectContext {
 
 export interface CanvasRuntimeState {
   projectVersion: string;
-  currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
+  currentPage: AssistantWorkspaceSurface;
   canvas: {
     id: string;
     name: string;

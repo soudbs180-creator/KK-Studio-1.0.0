@@ -34,7 +34,7 @@ const getNodeTags = (nodeById: Map<string, any>, ids: unknown): string[] => {
 };
 
 export interface CanvasRuntimeStateBuilderParams {
-  currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
+  currentPage: CanvasRuntimeState['currentPage'];
   activeCanvas: any;
   selectedNodeIds: string[];
   canvasTransform?: { x: number; y: number; scale: number } | null;

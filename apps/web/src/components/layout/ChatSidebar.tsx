@@ -36,7 +36,6 @@ import {
     subscribeCapabilityRouteAssignments,
 } from '../../services/api/capabilityRouteAssignments';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
-import { agentService, type AgentConfig} from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
 import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';
@@ -53,7 +52,13 @@ import { useImageGeneration } from '../../hooks/useImageGeneration';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
-import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
+import {
+    AITakeoverProvider,
+    AIContextSuggestions,
+    AITakeoverToggle,
+    useAITakeover,
+    type AssistantWorkspaceSurface,
+} from '../../features/ai-takeover';
 import { AGENT_CONTROL_ACTIONS, CHAT_SHELL_ACTIONS, durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
 import { useAssetStore } from '../../features/assets/assetStore';
 import {
@@ -464,26 +469,6 @@ const buildMessageWithAttachments = (
     return { messageContent, inlineData };
 };
 
-type AgentIntent = 'qa' | 'image-generate' | 'image-edit';
-
-const buildAgentSystemPrompt = (customPrompt?: string): string => {
-    const base = customPrompt?.trim() || '你是一个专业、友好的AI助手。请用简洁明了的方式回答用户的问题。';
-    return `${base}\n\n你当前处于“全能Agent模式”，请遵循以下执行框架：\n1) 先识别意图：问答 / 生成图片 / 修改图片 / 文档任务。\n2) 若为问答：给出结论+关键依据+可执行步骤。\n3) 若为创作请求：先补全关键缺失信息（构图、主体、光线、风格），再给出最终可执行指令。\n4) 若为图片编辑：优先保留主体身份与风格一致性，明确“保留项/修改项/禁止项”。\n5) 输出风格：结构化、可执行、不过度啰嗦。\n6) 不确定时主动给出最合理假设，不要空泛追问。`;
-};
-
-interface AgentActionPlan {
-    intent: AgentIntent;
-    prompt: string;
-    confidence: number;
-    reason?: string;
-}
-
-const pickPlannerModelId = (models: ChatModel[], selected: ChatModel): string | null => {
-    if (selected.type === 'chat' || selected.type === 'image+chat') return selected.id;
-    const fallback = models.find(m => m.type === 'chat' || m.type === 'image+chat');
-    return fallback?.id || null;
-};
-
 const buildAvailableChatModels = (includeSystemCreditModels = true): ChatModel[] => {
     const rawModels = keyManager.getGlobalModelList().filter(model => {
         if (model.isSystemInternal && !includeSystemCreditModels) return false;
@@ -519,65 +504,6 @@ const buildAvailableChatModels = (includeSystemCreditModels = true): ChatModel[]
     });
 
     return Array.from(uniqueMap.values());
-};
-
-const extractJson = (raw: string): any => {
-    const txt = (raw || '').trim();
-    try {
-        return JSON.parse(txt);
-    } catch {
-        const s = txt.indexOf('{');
-        const e = txt.lastIndexOf('}');
-        if (s >= 0 && e > s) {
-            return JSON.parse(txt.slice(s, e + 1));
-        }
-    }
-    throw new Error('Planner returned invalid JSON');
-};
-
-const planAgentAction = async (
-    plannerModelId: string,
-    userText: string,
-    atts: Attachment[]
-): Promise<AgentActionPlan> => {
-    const attachmentSummary = atts.map(a => `${a.type}:${a.name}`).join(', ') || 'none';
-    const plannerSystem = `You are an intent planner for an AI assistant.
-Decide action intent from user request and attachments.
-Allowed intents: qa, image-generate, image-edit.
-Rules:
-1) image-edit requires image attachment and an edit request.
-2) image-generate is for creating new image from text.
-3) otherwise qa.
-Return STRICT JSON only:
-{"intent":"qa|image-generate|image-edit","prompt":"string","confidence":0-1,"reason":"short"}`;
-
-    const plannerUser = `User text:\n${userText}\n\nAttachments:\n${attachmentSummary}`;
-    const plannedRaw = await chatWithLlm({
-        modelId: plannerModelId,
-        messages: [
-            { role: 'system', content: plannerSystem },
-            { role: 'user', content: plannerUser }
-        ],
-        stream: false,
-        temperature: 0.1,
-        maxTokens: 300
-    });
-
-    const planned = extractJson(plannedRaw);
-    const intent = (planned?.intent || 'qa') as AgentIntent;
-    const prompt = String(planned?.prompt || userText).trim() || userText;
-    const confidence = Number(planned?.confidence || 0.5);
-
-    if (intent !== 'qa' && intent !== 'image-generate' && intent !== 'image-edit') {
-        return { intent: 'qa', prompt: userText, confidence: 0.3, reason: 'fallback-invalid-intent' };
-    }
-
-    return {
-        intent,
-        prompt,
-        confidence: Number.isFinite(confidence) ? confidence : 0.5,
-        reason: planned?.reason
-    };
 };
 
 // 简体中文：预置对项目的理解以及常见报错调试的知识库
@@ -643,14 +569,14 @@ interface NormalChatSidebarProps extends ChatSidebarProps {
 }
 
 const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
-    const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel, workspaceSurface } = props;
+    const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel } = props;
     const { user, isTempUser, loading: authLoading } = useAuth();
 
 
     // 简体中文：AI接管与本地资源池相关状态和 Hook 注入
     const {
+        collaborationMode,
         aiTakeoverMode,
-        setAiTakeoverMode,
         messages,
         setMessages,
         isThinking: takeoverIsThinking,
@@ -662,6 +588,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         agentRunTimeline,
         setSelectedModel: ctxSetSelectedModel
     } = useAITakeover();
+    const isAgentCollaboration = collaborationMode !== 'direct';
 
     const visibleTakeoverTimeline = useMemo(() => {
         if (!currentRun && takeoverIsThinking) {
@@ -673,7 +600,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
         return agentRunTimeline;
     }, [agentRunTimeline, currentRun, takeoverIsThinking]);
-    const shouldShowTakeoverTimeline = aiTakeoverMode && Boolean(currentRun || takeoverIsThinking || pendingPlan);
+    const shouldShowTakeoverTimeline = isAgentCollaboration && Boolean(currentRun || takeoverIsThinking || pendingPlan);
 
     const [durableQueueJobs, setDurableQueueJobs] = useState<GenerationBatchJob[]>(() => durableGenerationQueue.getJobs());
     useEffect(() => durableGenerationQueue.subscribe(setDurableQueueJobs), []);
@@ -684,7 +611,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         job.prompts.some(prompt => prompt.status === 'failed') ||
         getDurableQueueJobNodeIds(job).length > 0
     )).slice(0, 4), [durableQueueJobs]);
-    const shouldShowDurableQueuePanel = aiTakeoverMode && activeDurableJobs.length > 0;
+    const shouldShowDurableQueuePanel = isAgentCollaboration && activeDurableJobs.length > 0;
 
     const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
 
@@ -1270,10 +1197,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         };
     }, [showModelMenu, updateModelMenuLayout]);
 
-    // Agent State Management
-    const [agentMode, setAgentMode] = useState(false);
-    const [currentAgent, setCurrentAgent] = useState<AgentConfig | null>(() => agentService.getActive());
-
     // 简体中文：实时同步选择的生图模型给 AI 接管 Context
     useEffect(() => {
         if (selectedModel) {
@@ -1459,15 +1382,15 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         }
     }, [sidebarWidth, onWidthChange]);
 
-    // 简体中文：AI接管模式与侧边栏宽度联动，当开启接管模式时锁定 380px，普通对话时恢复 420px，保证小地图与大画布的自适应避让距离无缝对齐
+    // 简体中文：AI 协作模式与侧边栏宽度联动，辅助/接管为上下文面板保留稳定宽度。
     useEffect(() => {
-        if (aiTakeoverMode) {
+        if (isAgentCollaboration) {
             setSidebarWidth(380);
         } else {
             const saved = localStorage.getItem('kk_chat_width');
             setSidebarWidth(saved ? Math.max(320, parseInt(saved, 10)) : 420);
         }
-    }, [aiTakeoverMode]);
+    }, [isAgentCollaboration]);
 
 
     // 4. Drag State (must be declared before scheduleAutoClose uses it)
@@ -1951,7 +1874,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     const activeMessages = messages as Message[];
 
-    const activeIsThinking = aiTakeoverMode ? takeoverIsThinking : isThinking;
+    const activeIsThinking = isAgentCollaboration ? takeoverIsThinking : isThinking;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -2397,12 +2320,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     };
 
     const handleSend = async () => {
-        if ((!input.trim() && attachments.length === 0) || isThinking) return;
+        if ((!input.trim() && attachments.length === 0) || activeIsThinking) return;
 
         const userText = input.trim();
         const hasKeys = keyManager.hasValidKeys();
 
-        if (aiTakeoverMode) {
+        if (collaborationMode !== 'direct') {
             setInput('');
             setAttachments([]);
             await sendTakeoverMessage(userText);
@@ -2443,32 +2366,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         setAttachments([]); // 清空附件
 
         // 如果匹配到绘图指令，且没有附件(普通模式)，则走绘图流程
-        if (!agentMode && match && currentAttachments.length === 0) {
+        if (match && currentAttachments.length === 0) {
             const prompt = match[2];
             handleImageGeneration(prompt);
             return;
-        }
-
-        // Agent模式: 先做“思考式规划”，再执行路由
-        if (agentMode) {
-            try {
-                const plannerModelId = pickPlannerModelId(availableModels, selectedModel);
-                if (plannerModelId) {
-                    const plan = await planAgentAction(plannerModelId, userText, currentAttachments);
-
-                    if (plan.intent === 'image-generate') {
-                        await handleImageGeneration(plan.prompt, currentAttachments);
-                        return;
-                    }
-
-                    if (plan.intent === 'image-edit') {
-                        await handleImageGeneration(plan.prompt, currentAttachments, 'edit');
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.warn('[Agent] Planning failed, fallback to normal chat:', e);
-            }
         }
 
         // 🚀 Guard: Pure Image Models cannot chat
@@ -2512,42 +2413,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             const history = filteredMsgs
                 .filter(m => m.id !== 'welcome')
                 .map(m => ({ role: m.role, content: m.content }));
-
-            // Agent模式:添加系统提示词
-            if (agentMode && currentAgent) {
-                history.unshift({ role: 'system' as any, content: buildAgentSystemPrompt(currentAgent.systemPrompt) });
-            }
-
-            // 简体中文：AI接管模式 - 注入项目理解系统上下文与可用操作动作链接
-            if (aiTakeoverMode) {
-                const systemTakeoverPrompt = `你当前处于“AI接管”模式。
-[系统当前运行状态]
-- 操作系统: Windows
-- 用户登录状态: ${user ? '已登录' : '未登录'}
-- 当前可用积分: ${balance}
-- 本地专属 API 密钥状态: ${keyManager.hasValidKeys() ? '已配置' : '未配置'}
-- 当前激活的模型 ID: ${selectedModel.id}
-
-[AI接管指令与动作链接规范]
-在接管模式下，你完全具备自动化操作、接管网页控制的特权。你可以通过在你的 Markdown 回答中嵌入交互式动作链接，浏览器会自动识别这些链接并在后台“自动帮用户点击运行”。
-请尽一切可能利用这些动作链接实现用户的控制意图。每个回答可以嵌入一个或多个以下链接：
-
-1. 批量在画布上建卡并执行生图：[批量生成提示词](action://takeover-bulk-generate?prompts=提示词1,提示词2,提示词3) 
-   - 必须使用英文逗号分隔提示词列表。
-   - 页面会在当前视口中心依次向右排开创建对应数量的 Prompt 卡片，并自动向后端拉起生成请求。
-2. 搜索并快速平滑定位到画布上的卡片：[定位卡片](action://takeover-locate?keyword=提示词关键字)
-   - 例如，如果用户说“帮我找到之前的那个画猫的卡片”或“我要查找那个狗的卡片”，你必须回答类似：‘好的，AI接管已启动，正在帮您在画布中搜寻并平滑定位包含“猫”的卡片... [正在自动定位](action://takeover-locate?keyword=猫)’。
-3. 打开并高亮 API 密钥配置面板：[配置 API 密钥](action://open-settings-api)
-   - 重要安全边界：绝对不允许要求用户把 API Key 发送在聊天框里，必须提示用户‘安全沙箱拦截：密钥需由您自行填写’，并自动触发该动作以高亮输入框引导用户填写。
-4. 新建画布：[新建画布项目](action://highlight-#btn-create-canvas)
-5. 充值积分：[去充值积分](action://open-recharge) 或高亮充值按钮：[高亮充值按钮](action://highlight-#btn-desktop-recharge)
-6. 设置：[打开设置](action://open-settings) 或高亮设置按钮：[高亮设置按钮](action://highlight-#btn-desktop-settings)
-7. 缩放控制：[高亮缩放控制](action://highlight-.desktop-zoom-rail)
-8. 提示词输入框：[高亮提示词输入](action://highlight-#prompt-input-composer)
-
-请结合当前的系统状态和用户的提问进行排障与自动控制，回答须精炼、极简、富有亲和力。`;
-                history.unshift({ role: 'system' as any, content: systemTakeoverPrompt });
-            }
 
             const { messageContent, inlineData } = buildMessageWithAttachments(userText, currentAttachments);
 
@@ -2699,9 +2564,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             .filter(m => m.id !== 'welcome')
             .map(m => ({ role: m.role, content: m.content }));
 
-        if (agentMode && currentAgent) {
-            history.unshift({ role: 'system' as any, content: buildAgentSystemPrompt(currentAgent.systemPrompt) });
-        }
         history.push({ role: 'user', content: messageContent });
 
         setIsThinking(true);
@@ -2736,7 +2598,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             abortControllerRef.current = null;
             setIsThinking(false);
         }
-    }, [agentMode, currentAgent, ensureModelAccess, isThinking, messages, registerActivity, resolveAssistantPreferredKeyId, selectedModel]);
+    }, [ensureModelAccess, isThinking, messages, registerActivity, resolveAssistantPreferredKeyId, selectedModel]);
 
     const handleClearCurrentSession = useCallback(() => {
         const welcomeMsg = createWelcomeMessage();
@@ -2997,7 +2859,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     return (
         <>
             {/* 侧边栏折叠时吸附在最右侧的展开按钮 */}
-            {!isOpen && !isMobile && (!workspaceSurface || workspaceSurface === 'workspace') && (
+            {!isOpen && !isMobile && (
             <button
                 onClick={onToggle}
                 id="btn-desktop-ai-assistant"
@@ -3571,14 +3433,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         })()}
 
                         {activeIsThinking && (
-                            aiTakeoverMode ? (
+                            isAgentCollaboration ? (
                                 <div className="flex gap-3">
                                     <div className="w-8 h-8 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] flex items-center justify-center shrink-0">
                                         <Cpu className="text-purple-500 w-4.5 h-4.5 animate-pulse" />
                                     </div>
                                     <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md text-xs text-[var(--text-secondary)] shadow-sm">
                                         <Loader2 className="animate-spin text-purple-500 w-3.5 h-3.5" />
-                                        <span>接管引擎正在规划...</span>
+                                        <span>{collaborationMode === 'assist' ? '正在读取页面与选区...' : '接管引擎正在规划...'}</span>
                                     </div>
                                 </div>
                             ) : (
@@ -3608,10 +3470,19 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         className="px-4 pb-4 pt-2 shrink-0 flex flex-col"
                         style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' } : undefined}
                     >
+                        <AIContextSuggestions
+                            onSelectSuggestion={(suggestion) => {
+                                setInput(suggestion.prompt);
+                                registerActivity();
+                                requestAnimationFrame(() => inputRef.current?.focus());
+                            }}
+                        />
                         {shouldShowTakeoverTimeline && (
                             <div className="ai-takeover-run-timeline mb-2 rounded-xl border border-zinc-800/80 bg-zinc-950/55 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
                                 <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-zinc-500">
-                                    <span className="font-bold text-zinc-300">接管时间线</span>
+                                    <span className="font-bold text-zinc-300">
+                                        {collaborationMode === 'assist' ? '辅助执行预览' : '接管时间线'}
+                                    </span>
                                     {currentRun && (
                                         <span className="max-w-[150px] truncate font-mono" title={currentRun.id}>
                                             {currentRun.status} - {currentRun.id.slice(-8)}
@@ -3787,7 +3658,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             </div>
                         )}
 
-                        {aiTakeoverMode && pendingPlan && pendingPlan.confirmation && (
+                        {isAgentCollaboration && pendingPlan && pendingPlan.confirmation && (
                             <div className="mb-2 p-3 rounded-xl border border-purple-900/40 bg-[#120f21]/70 backdrop-blur-md shadow-lg relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
                                 <div className="absolute top-0 right-0 p-2 opacity-5">
                                     <Cpu size={40} className="text-purple-500" />
@@ -3821,7 +3692,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         )}
 
                         {/* 简体中文：AI接管模式下的资源管理器面板 */}
-                        {aiTakeoverMode && showResourcePanel && (
+                        {isAgentCollaboration && showResourcePanel && (
                             <div className="mb-2 border border-zinc-800 bg-[#090a0f]/80 backdrop-blur-md rounded-xl p-3 max-h-48 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200">
                                 <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-zinc-800/40">
                                     <span className="text-[10px] font-bold text-zinc-400">已连结的本地项目资源池 ({takeoverImages.length + takeoverFiles.length})</span>
@@ -3951,10 +3822,18 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     onClose={closeReferenceMentionPanel}
                                 />
                                 <textarea
-                                    id={aiTakeoverMode ? 'ai-takeover-composer-input' : 'chat-composer-input'}
+                                    id={collaborationMode === 'takeover'
+                                        ? 'ai-takeover-composer-input'
+                                        : collaborationMode === 'assist'
+                                            ? 'ai-assist-composer-input'
+                                            : 'chat-composer-input'}
                                     ref={inputRef}
                                     className="w-full border-none shadow-none text-[15px] p-0.5 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed"
-                                    placeholder="开启你的灵感之旅..."
+                                    placeholder={collaborationMode === 'takeover'
+                                        ? '描述目标，AI 将跨工具执行...'
+                                        : collaborationMode === 'assist'
+                                            ? '询问下一步，或选择上方建议...'
+                                            : '开启你的灵感之旅...'}
                                     rows={1}
                                     value={input}
                                     onChange={e => {
@@ -4075,7 +3954,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             id="btn-takeover-plus-button"
                                             type="button"
                                             onClick={() => {
-                                                if (aiTakeoverMode) {
+                                                if (isAgentCollaboration) {
                                                     setShowTakeoverMenu(prev => !prev);
                                                 } else {
                                                     fileInputRef.current?.click();
@@ -4083,12 +3962,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             }}
                                             data-chat-shell-action={CHAT_SHELL_ACTIONS.openAttachmentMenu.uiAction}
                                             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-90 flex items-center justify-center"
-                                            title={aiTakeoverMode ? "打开接管选项" : "添加附件 (图片/视频/文档)"}
+                                            title={isAgentCollaboration ? "打开 AI 资源选项" : "添加附件 (图片/视频/文档)"}
                                         >
                                             <Plus size={18} />
                                         </button>
 
-                                        {aiTakeoverMode && showTakeoverMenu && (
+                                        {isAgentCollaboration && showTakeoverMenu && (
                                             <div
                                                 id="btn-takeover-menu-container"
                                                 className="kk-chat-sidebar-floating-menu absolute bottom-full left-0 mb-2 w-40 rounded-xl p-1 animate-in fade-in slide-in-from-bottom-2 duration-200"
@@ -4143,54 +4022,13 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         )}
                                     </div>
 
-                                    {/* Agent 药丸切换按钮 */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setAgentMode(!agentMode);
-                                            registerActivity();
-                                            if (!agentMode && !currentAgent) {
-                                                setCurrentAgent(agentService.getActive());
-                                            }
-                                        }}
-                                        data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleAgentMode.uiAction}
-                                        className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
-                                            agentMode
-                                                ? 'agent-active-btn'
-                                                : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
-                                        }`}
-                                        title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
-                                    >
-                                        <Bot size={11} className={agentMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
-                                        <span>Agent</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${agentMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-emerald-500/40 group-hover:bg-emerald-500/70'}`} />
-                                    </button>
-
-                                    {/* 简体中文：AI接管药丸切换按钮 */}
-                                    <button
-                                        id="btn-ai-takeover-toggle"
-                                        type="button"
-                                        onClick={() => {
-                                            setAiTakeoverMode(!aiTakeoverMode);
-                                            registerActivity();
-                                        }}
-                                        data-agent-action={AGENT_CONTROL_ACTIONS.toggleTakeoverMode.uiAction}
-                                        className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
-                                            aiTakeoverMode
-                                                ? 'ai-takeover-active-btn'
-                                                : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
-                                        }`}
-                                        title={aiTakeoverMode ? 'AI 接管已开启：自动为您批量生图、定位卡片或聚焦 API 输入框' : '开启 AI 接管'}
-                                    >
-                                        <Cpu size={11} className={aiTakeoverMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
-                                        <span>AI接管</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${aiTakeoverMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'ai-takeover-inactive-dot'}`} />
-                                    </button>
+                                    <AITakeoverToggle onModeChange={() => registerActivity()} />
                                 </div>
 
                                 {/* 右侧：发送 / 停止按钮 */}
                                 <div className="kk-chat-sidebar-send-control shrink-0">
-                                    {isThinking ? (
+                                    {activeIsThinking ? (
+                                        collaborationMode === 'direct' ? (
                                         <button
                                             type="button"
                                             onClick={handleStopGeneration}
@@ -4200,6 +4038,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         >
                                             <Square size={10} fill="white" />
                                         </button>
+                                        ) : (
+                                            <div
+                                                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)]"
+                                                aria-label="AI 正在处理"
+                                            >
+                                                <Loader2 size={13} className="animate-spin" />
+                                            </div>
+                                        )
                                     ) : (
                                         <button
                                             type="button"
@@ -4512,43 +4358,26 @@ const resolveAssistantPreferredModelGlobal = (models: ChatModel[]) => {
 };
 
 const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; setSelectedModel: (m: ChatModel) => void }> = (props) => {
-    const { aiTakeoverMode } = useAITakeover();
+    const { collaborationMode } = useAITakeover();
 
     useEffect(() => {
-        if (aiTakeoverMode) {
+        if (collaborationMode !== 'direct') {
             props.onWidthChange?.(380);
         } else {
             props.onWidthChange?.(420);
         }
-    }, [aiTakeoverMode, props.onWidthChange]);
+    }, [collaborationMode, props.onWidthChange]);
 
     return <NormalChatSidebar {...props} />;
 };
 
-const CollapsedDesktopChatSidebar: React.FC<Pick<ChatSidebarProps, 'onToggle' | 'workspaceSurface'>> = ({
-    onToggle,
-    workspaceSurface,
-}) => {
-    if (workspaceSurface && workspaceSurface !== 'workspace') {
-        return null;
-    }
-
-    return (
-        <button
-            onClick={onToggle}
-            id="btn-desktop-ai-assistant"
-            data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
-            className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
-            style={{
-                zIndex: KK_LAYER.drawer,
-                borderWidth: '1px 0 1px 1px',
-                borderStyle: 'solid',
-            }}
-            title="展开 AI 助手"
-        >
-            <ChevronLeft size={16} className="text-[var(--text-secondary)] transition-transform group-hover:-translate-x-0.5" />
-        </button>
-    );
+const resolveAssistantWorkspaceSurface = (workspaceSurface?: string): AssistantWorkspaceSurface => {
+    if (workspaceSurface === 'library') return 'library';
+    if (workspaceSurface === 'favorites') return 'favorites';
+    if (workspaceSurface === 'settings') return 'settings';
+    if (workspaceSurface === 'chat') return 'agent';
+    if (!workspaceSurface || workspaceSurface === 'workspace') return 'canvas';
+    return 'unknown';
 };
 
 const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
@@ -4585,6 +4414,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
 
     return (
         <AITakeoverProvider
+            currentPage={resolveAssistantWorkspaceSurface(props.workspaceSurface)}
             activeCanvas={activeCanvas}
             selectedModel={selectedModel}
             selectedNodeIds={selectedNodeIds}
@@ -4633,15 +4463,6 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
 };
 
 const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
-    if (!props.isOpen && !props.isMobile) {
-        return (
-            <CollapsedDesktopChatSidebar
-                onToggle={props.onToggle}
-                workspaceSurface={props.workspaceSurface}
-            />
-        );
-    }
-
     return <ChatSidebarLoaded {...props} />;
 };
 

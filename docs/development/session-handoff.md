@@ -2423,3 +2423,32 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - UTF-8 编码、乱码检查和 `git diff --check` 通过。
 - **未运行验证及原因**：本次只新增 Markdown 总规格和 Handoff，没有修改源码、类型、路由、OpenAPI 或构建配置，因此未运行 TypeScript、构建和测试套件；本机没有 `npm`/`npx`，未运行聚合形式的 `npm run governance:check`，已直接执行其全部底层 Node 入口。未调用真实支付或付费 Provider。
 - **风险与下一步**：本提交只确立设计，不改变运行时行为。下一步在用户审阅规格后，为 Wave 0 编写独立实施计划，并按 TDD 建立操作注册表、运行时发现器和未分类接口治理守卫；在 Wave 0 推送前不开始删除路由。
+
+## 150. 2026-07-15 - 统一直接、辅助与接管三态协作模式
+
+- **修改范围**：收口会话 `019f61a6-1e98-7793-aa47-35e01ea7d32a` 的三态协作改动，将助手交互统一为 `direct | assist | takeover`：直接模式保持普通聊天且不触发 Agent 工具；辅助模式同步当前页面、画布与选区并只生成确认优先的执行预览；接管模式通过既有 Agent Runtime 执行低风险动作并恢复待确认 Run。侧栏折叠、页面面板切换和运行时刷新不再重建助手状态，ToolRegistry 执行与验证前读取实时画布上下文。
+- **修改文件**：
+  - `packages/shared/src/contracts/dto/ai-assistant.ts`、`packages/shared/src/contracts/index.ts`
+  - `apps/web/src/features/ai-takeover/` 下的协作模式、上下文建议、运行时状态构建、Provider、类型与入口
+  - `apps/web/src/features/ai-assistant-runtime/runtime/agentControlActions.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
+  - `apps/web/src/components/layout/ChatSidebar.tsx`
+  - `apps/web/src/components/settings/views/BrowserAssistantView.tsx`
+  - `apps/web/src/components/workspace/WorkspacePanels.tsx`、`WorkspaceSurfacePanels.tsx`
+  - `apps/web/src/hooks/useWorkspaceSurface.ts`
+  - `tests/unit/` 中三态、侧栏、入口、工具注册表与 Shell 生命周期契约
+  - `scripts/test/verify-ai-takeover-smoke.mjs`
+  - `docs/ai-assistant/` 当前运行时文档与生成索引
+  - `openspec/changes/unify-ai-collaboration-modes/`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：`AssistantCollaborationMode` 是唯一状态源，旧 `aiTakeoverMode` 仅保留为 `direct/takeover` 兼容适配；三种模式共享同一画布状态、队列与 Agent Run 生命周期，不建立平行助手。辅助建议只填充用户意图，不产生工具副作用；接管仍受 PermissionPolicy 约束。助手组件在视觉折叠时保持挂载，从而保留模式、对话与 Pending Run；页面与选区通过实时 getter 在执行边界刷新。
+- **已运行验证**：
+  - `architecture:check` 的 32 项检查、`governance:check` 全部通过。
+  - 根 TypeScript、架构 TypeScript、服务端 58 文件语法与测试语义检查全部通过。
+  - Shared、UI、API Client 与 Web 生产构建通过。
+  - 完整测试链通过：unit 1722 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11；画布性能 3/3 通过。
+  - OpenSpec 结构、OpenAPI Swagger 校验、UTF-8 编码与乱码检查、`git diff --check` 全部通过。
+  - AI 接管、启动横幅、Prompt Group 拖拽、移动/桌面设置 smoke 的 HTTP 与源码 fallback 契约全部通过。
+  - Codex 应用内浏览器真实页面验收通过：三态互斥切换；辅助建议随画布与收藏上下文更新；接管状态在助手折叠/重开后保留；页面没有新增控制台 error。
+- **未运行验证及原因**：本机未提供系统 `npm`/`npx`，因此使用同一 bundled Node 直接执行聚合脚本的全部底层入口；自动 smoke 缺少独立 Playwright 模块，按脚本设计使用 HTTP 与源码 fallback，真实 UI 交互另由应用内浏览器覆盖。未调用真实付费 Provider、支付、生产 OAuth 或真实账户写操作，本阶段不涉及这些边界。
+- **风险与下一步**：生产依赖审计仍报告既有的 1 项中危 `morgan <= 1.10.1` 日志伪造告警，应独立升级处理。下一阶段进入 `harden-ai-control-plane`：删除 `action://` 自动执行旁路、引入类型化执行上下文和工具影响/费用/验证元数据、把 Agent 同步收敛到类型化 KK API Client，并以 `016_ai_assistant_user_scope.sql` 建立 Knowledge、Skill 与画布快照的用户范围。

@@ -88,6 +88,7 @@ test('AI Takeover composer and resource buttons share stable local action names'
 test('AI Takeover shell controls share stable local action names', () => {
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const sidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const modeSwitchSource = readSource('apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx');
 
   for (const key of [
     'runInlineActionLink',
@@ -105,5 +106,10 @@ test('AI Takeover shell controls share stable local action names', () => {
   }
 
   assert.match(dockSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.closeTakeoverMode\.uiAction\}/);
-  assert.match(sidebarSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.toggleTakeoverMode\.uiAction\}/);
+  assert.match(sidebarSource, /<AITakeoverToggle/);
+  for (const key of ['setDirectMode', 'setAssistMode', 'setTakeoverMode'] as const) {
+    assert.ok(AGENT_CONTROL_ACTIONS[key]);
+    assert.equal(AGENT_CONTROL_ACTIONS[key]?.toolName, undefined);
+    assert.match(modeSwitchSource, new RegExp(`AGENT_CONTROL_ACTIONS\\.${key}\\.uiAction`));
+  }
 });

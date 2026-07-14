@@ -1,8 +1,21 @@
 // 简体中文：AI 接管上下文控制中心 (AITakeover Context)
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode, useEffect } from 'react';
-import type { AssistantPlan, SanitizedProjectContext } from '../types';
+import type {
+  AssistantCollaborationMode,
+  AssistantContextSuggestion,
+  AssistantPlan,
+  AssistantWorkspaceSurface,
+  CanvasRuntimeState,
+  SanitizedProjectContext,
+} from '../types';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
+import { buildCanvasRuntimeState } from '../core/canvasRuntimeStateBuilder';
+import {
+  ASSISTANT_COLLABORATION_MODE_STORAGE_KEY,
+  buildAssistantContextSuggestions,
+  normalizeAssistantCollaborationMode,
+} from '../core/collaborationMode';
 import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { startGenerationQueueSync } from '../../ai-assistant-runtime/queue/GenerationQueueSync.ts';
@@ -27,6 +40,21 @@ const getQueuePromptNodeId = (jobId: string, promptId: string): string => (
   `takeover_batch_${jobId}_${promptId}`.replace(/[^a-zA-Z0-9_-]/g, '_')
 );
 
+const hasExecutablePlanActions = (plan: AssistantPlan): boolean => (
+  (plan.steps?.length || plan.actions?.length || 0) > 0
+);
+
+const buildAssistancePreviewPlan = (plan: AssistantPlan): AssistantPlan => ({
+  ...plan,
+  requiresConfirmation: true,
+  confirmation: {
+    title: 'AI 辅助建议',
+    summary: plan.confirmation?.summary || plan.reply || '已根据当前页面和选区生成下一步建议。',
+    confirmText: '交给 AI 执行',
+    cancelText: '暂不执行',
+  },
+});
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -37,8 +65,12 @@ interface Message {
 
 
 interface AITakeoverContextType {
+  collaborationMode: AssistantCollaborationMode;
+  setCollaborationMode: (mode: AssistantCollaborationMode) => void;
   aiTakeoverMode: boolean;
   setAiTakeoverMode: (enabled: boolean) => void;
+  canvasRuntimeState: CanvasRuntimeState;
+  contextSuggestions: AssistantContextSuggestion[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isThinking: boolean;
@@ -64,6 +96,7 @@ const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
 
 interface AITakeoverProviderProps {
   children: ReactNode;
+  currentPage?: AssistantWorkspaceSurface;
   activeCanvas: any;
   selectedModel: any;
   selectedNodeIds: string[];
@@ -104,6 +137,7 @@ interface AITakeoverProviderProps {
 
 export function AITakeoverProvider({
   children,
+  currentPage = 'canvas',
   activeCanvas,
   selectedModel: initialModel,
   selectedNodeIds,
@@ -144,8 +178,30 @@ export function AITakeoverProvider({
 
   useEffect(() => startGenerationQueueSync(), []);
 
-  const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
+  const [collaborationMode, setCollaborationModeState] = useState<AssistantCollaborationMode>(() => {
+    try {
+      return normalizeAssistantCollaborationMode(
+        globalThis.localStorage?.getItem(ASSISTANT_COLLABORATION_MODE_STORAGE_KEY),
+      );
+    } catch {
+      return 'direct';
+    }
+  });
+  const aiTakeoverMode = collaborationMode === 'takeover';
   const [selectedModel, setSelectedModel] = useState(initialModel);
+
+  const canvasRuntimeState = React.useMemo(() => buildCanvasRuntimeState({
+    currentPage,
+    activeCanvas,
+    selectedNodeIds: selectedNodeIds || [],
+    canvasTransform,
+    canvasRef,
+    config,
+  }), [activeCanvas, canvasRef, canvasTransform, config, currentPage, selectedNodeIds]);
+  const contextSuggestions = React.useMemo(
+    () => buildAssistantContextSuggestions(canvasRuntimeState),
+    [canvasRuntimeState],
+  );
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -203,30 +259,62 @@ export function AITakeoverProvider({
     }
   }, [messages, selectedModel, isCompressing, notify]);
 
+  const [restoredPendingRun] = useState<AgentRunRecord | null>(() => agentRunStore.getPendingRun() ?? null);
   const [isThinking, setIsThinking] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null);
-  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
-  const [currentRun, setCurrentRun] = useState<AgentRunRecord | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(() => {
+    if (!restoredPendingRun?.plan) return null;
+    return collaborationMode === 'assist'
+      ? buildAssistancePreviewPlan(restoredPendingRun.plan as AssistantPlan)
+      : restoredPendingRun.plan as AssistantPlan;
+  });
+  const [currentRunId, setCurrentRunId] = useState<string | null>(() => restoredPendingRun?.id ?? null);
+  const [currentRun, setCurrentRun] = useState<AgentRunRecord | null>(() => restoredPendingRun);
   const agentRunTimeline = React.useMemo(() => buildAgentRunTimeline(currentRun), [currentRun]);
 
 
 
-  const setAiTakeoverMode = useCallback((enabled: boolean) => {
-    setAiTakeoverModeState(enabled);
+  const setCollaborationMode = useCallback((mode: AssistantCollaborationMode) => {
+    const nextMode = normalizeAssistantCollaborationMode(mode);
+    setCollaborationModeState(nextMode);
+    try {
+      globalThis.localStorage?.setItem(ASSISTANT_COLLABORATION_MODE_STORAGE_KEY, nextMode);
+    } catch {
+      // Browser storage is optional; the in-memory mode remains authoritative for this session.
+    }
     if (notify) {
-      if (enabled) {
-        notify.success('AI 接管模式已启动', '右侧助手面板已固定，开启本地安全接管机制。');
+      if (nextMode === 'takeover') {
+        notify.success('AI 接管已开启', '低风险步骤可自动执行，高风险步骤仍会请求确认。');
+      } else if (nextMode === 'assist') {
+        notify.info('AI 辅助已开启', '建议会同步当前页面与选区，执行前由你决定。');
       } else {
-        notify.info('AI 接管模式已关闭', '已恢复为常规聊天面板。');
+        notify.info('已切换到直接操作', '画布保持可编辑，进行中的持久任务不会丢失。');
       }
     }
   }, [notify]);
 
+  const setAiTakeoverMode = useCallback((enabled: boolean) => {
+    setCollaborationMode(enabled ? 'takeover' : 'direct');
+  }, [setCollaborationMode]);
+
+  useEffect(() => {
+    const syncModeFromStorage = (event: StorageEvent) => {
+      if (event.key !== ASSISTANT_COLLABORATION_MODE_STORAGE_KEY) return;
+      setCollaborationModeState(normalizeAssistantCollaborationMode(event.newValue));
+    };
+    window.addEventListener('storage', syncModeFromStorage);
+    return () => window.removeEventListener('storage', syncModeFromStorage);
+  }, []);
+
   // 执行计划（桥接到 AgentRuntime）
   const executePlan = useCallback(async (runId: string) => {
     const ctx: any = {
-      activeCanvas,
-      selectedNodeIds: selectedNodeIds || [],
+      activeCanvas: activeCanvasRef.current,
+      selectedNodeIds: selectedNodeIdsRef.current,
+      canvasRuntimeState: canvasRuntimeStateRef.current,
+      canvasRevision: activeCanvasRef.current?.lastModified || 0,
+      getActiveCanvas: () => activeCanvasRef.current,
+      getSelectedNodeIds: () => selectedNodeIdsRef.current,
+      getCanvasRuntimeState: () => canvasRuntimeStateRef.current,
       selectedModel,
       addPromptNode,
       updatePromptNode,
@@ -289,9 +377,10 @@ export function AITakeoverProvider({
     // 智能脱敏上下文构建
     const assetsSummary = useAssetStore.getState().getAssetsSummary();
     const projectContext = buildSanitizedProjectContext({
-      currentPage: 'canvas',
-      aiTakeoverEnabled: true,
-      agentEnabled: false,
+      currentPage,
+      aiTakeoverEnabled: collaborationMode === 'takeover',
+      agentEnabled: collaborationMode !== 'direct',
+      collaborationMode,
       activeCanvas,
       selectedNodeIds: selectedNodeIds || [],
       apiKeyStatus,
@@ -326,7 +415,16 @@ export function AITakeoverProvider({
       setCurrentRun(record);
 
       // 评估是否需要确认卡片
-      if (plan.requiresConfirmation) {
+      if (collaborationMode === 'assist' && hasExecutablePlanActions(plan)) {
+        const previewPlan = buildAssistancePreviewPlan(plan);
+        const previewRecord = agentRunStore.updateRun(record.id, {
+          plan: previewPlan,
+          status: 'waiting_confirmation',
+          nextStep: '等待用户确认 AI 辅助建议。',
+        });
+        setPendingPlan(previewPlan);
+        setCurrentRun(previewRecord);
+      } else if (plan.requiresConfirmation) {
         setPendingPlan(plan);
       } else {
         // 如果不需要确认，静默且自动安全地执行
@@ -337,7 +435,7 @@ export function AITakeoverProvider({
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, collaborationMode, currentPage]);
 
 
   // 用户点击“确认执行”
@@ -377,6 +475,8 @@ export function AITakeoverProvider({
 
   // 简体中文：利用 Refs 跟踪最新的 React 状态与生图回调，供单例持久化队列消费以防闭包陈旧
   const activeCanvasRef = useRef(activeCanvas);
+  const selectedNodeIdsRef = useRef(selectedNodeIds || []);
+  const canvasRuntimeStateRef = useRef(canvasRuntimeState);
   const selectedModelRef = useRef(selectedModel);
   const addPromptNodeRef = useRef(addPromptNode);
   const updatePromptNodeRef = useRef(updatePromptNode);
@@ -392,6 +492,8 @@ export function AITakeoverProvider({
 
   useEffect(() => {
     activeCanvasRef.current = activeCanvas;
+    selectedNodeIdsRef.current = selectedNodeIds || [];
+    canvasRuntimeStateRef.current = canvasRuntimeState;
     selectedModelRef.current = selectedModel;
     addPromptNodeRef.current = addPromptNode;
     updatePromptNodeRef.current = updatePromptNode;
@@ -636,8 +738,12 @@ export function AITakeoverProvider({
   return (
     <AITakeoverContext.Provider
       value={{
+        collaborationMode,
+        setCollaborationMode,
         aiTakeoverMode,
         setAiTakeoverMode,
+        canvasRuntimeState,
+        contextSuggestions,
         messages,
         setMessages,
         isThinking,

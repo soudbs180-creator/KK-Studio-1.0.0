@@ -87,6 +87,22 @@ export const AGENT_CONTROL_ACTIONS = {
     uiAction: 'toggle-takeover-mode',
     toolName: undefined,
   },
+  setDirectMode: {
+    uiAction: 'set-assistant-direct-mode',
+    toolName: undefined,
+  },
+  setAssistMode: {
+    uiAction: 'set-assistant-assist-mode',
+    toolName: undefined,
+  },
+  setTakeoverMode: {
+    uiAction: 'set-assistant-takeover-mode',
+    toolName: undefined,
+  },
+  applyContextSuggestion: {
+    uiAction: 'apply-assistant-context-suggestion',
+    toolName: undefined,
+  },
   toggleTakeoverHistory: {
     uiAction: 'toggle-takeover-history',
     toolName: undefined,

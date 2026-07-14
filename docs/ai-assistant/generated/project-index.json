@@ -13,9 +13,9 @@
     "source": "doc",
     "path": "docs/ai-assistant/canvas-runtime-state.md",
     "title": "画布运行态协议 (Canvas Runtime State)",
-    "summary": "画布运行态是 AI 助手精准感知画布的桥梁。每次会话发起时，助手会将当前视口位置、框选对象及近期事件脱敏摘要后组装为状态发送给模型，从而避免模型靠猜测做出规划。",
-    "contentHash": "26d382cd9152ac0057aedf423a1105c1",
-    "updatedAt": "2026-07-11T09:33:48.292Z"
+    "summary": "画布运行态是 AI 助手精准感知当前工作区的桥梁。生成辅助建议或发起 Agent 规划时，助手会将当前页面、视口、框选对象及近期事件的脱敏摘要组装为状态；执行期间 ToolRegistry 还会在每一步重新读取运行态，从而避免模型或工具依赖过期快照。",
+    "contentHash": "7df1a5fd25ab188856eb51f95a6a8575",
+    "updatedAt": "2026-07-14T18:08:47.364Z"
   },
   {
     "id": "doc_flow_map_md",
@@ -23,8 +23,8 @@
     "path": "docs/ai-assistant/flow-map.md",
     "title": "流程地图 (Flow Map)",
     "summary": "本文件整理了 KK Studio v1.6.0 的核心工作流流转路径。",
-    "contentHash": "6912edbe8381cbd84877362c235ff01b",
-    "updatedAt": "2026-07-11T09:33:48.291Z"
+    "contentHash": "fc26de0d0429120b57f0a6e7e7d11a4f",
+    "updatedAt": "2026-07-14T17:59:29.408Z"
   },
   {
     "id": "doc_module_map_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
-    "contentHash": "32150f5d1a6f46a14b18fe819b1ece7d",
-    "updatedAt": "2026-07-13T07:37:50.102Z"
+    "contentHash": "f5d40cfe32b9f2724b32b804dd302b23",
+    "updatedAt": "2026-07-14T17:59:14.269Z"
   },
   {
     "id": "doc_skills_md",
@@ -95,7 +95,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "本文件维护 KK Studio v1.6.0 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
-    "contentHash": "2a9eab300bf1ef7fc4b98c2a48072750",
-    "updatedAt": "2026-07-13T07:36:27.960Z"
+    "contentHash": "2837db4af8e4ff80a595c09d55df73f0",
+    "updatedAt": "2026-07-14T17:58:33.311Z"
   }
 ]
