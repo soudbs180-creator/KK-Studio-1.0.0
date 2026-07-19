@@ -352,4 +352,161 @@ CREATE TABLE IF NOT EXISTS payment_callbacks (
   processed_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS public.agent_runs (
+  id text PRIMARY KEY,
+  user_id text NOT NULL,
+  user_message text NOT NULL,
+  intent text NOT NULL,
+  plan jsonb NOT NULL,
+  status text NOT NULL,
+  step_results jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 兼容已由 011 创建的旧表；CREATE TABLE IF NOT EXISTS 不会补充新列。
+ALTER TABLE public.agent_runs
+  ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS step_results jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+CREATE INDEX IF NOT EXISTS agent_runs_user_updated_idx
+  ON public.agent_runs(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.agent_tool_calls (
+  id text PRIMARY KEY,
+  run_id text NOT NULL REFERENCES public.agent_runs(id) ON DELETE CASCADE,
+  step_id text,
+  tool_name text NOT NULL,
+  input_summary text NOT NULL,
+  output_summary text,
+  status text NOT NULL,
+  outcome text,
+  failure_class text,
+  error_code text,
+  retryable boolean,
+  error text,
+  started_at timestamptz NOT NULL,
+  completed_at timestamptz,
+  idempotency_key text
+);
+
+ALTER TABLE public.agent_tool_calls
+  ADD COLUMN IF NOT EXISTS step_id text,
+  ADD COLUMN IF NOT EXISTS outcome text,
+  ADD COLUMN IF NOT EXISTS failure_class text,
+  ADD COLUMN IF NOT EXISTS error_code text,
+  ADD COLUMN IF NOT EXISTS retryable boolean;
+
+CREATE TABLE IF NOT EXISTS public.agent_memory (
+  id text PRIMARY KEY,
+  user_id text,
+  key text NOT NULL,
+  value text NOT NULL,
+  is_long_term boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.knowledge_documents (
+  id text PRIMARY KEY,
+  user_id text,
+  owner_scope text NOT NULL DEFAULT 'legacy',
+  source text NOT NULL,
+  path text NOT NULL,
+  title text NOT NULL,
+  summary text NOT NULL,
+  content_hash text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT knowledge_documents_owner_scope_check CHECK (
+    (owner_scope = 'user' AND user_id IS NOT NULL)
+    OR (owner_scope IN ('system', 'legacy') AND user_id IS NULL)
+  )
+);
+
+ALTER TABLE public.knowledge_documents
+  ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS owner_scope text NOT NULL DEFAULT 'legacy';
+
+CREATE TABLE IF NOT EXISTS public.knowledge_chunks (
+  id text PRIMARY KEY,
+  document_id text REFERENCES public.knowledge_documents(id) ON DELETE CASCADE,
+  content text NOT NULL,
+  chunk_index integer NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.canvas_runtime_snapshots (
+  id text PRIMARY KEY,
+  user_id text,
+  owner_scope text NOT NULL DEFAULT 'legacy',
+  canvas_id text NOT NULL,
+  snapshot_data jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT canvas_runtime_snapshots_owner_scope_check CHECK (
+    (owner_scope = 'user' AND user_id IS NOT NULL)
+    OR (owner_scope IN ('system', 'legacy') AND user_id IS NULL)
+  )
+);
+
+ALTER TABLE public.canvas_runtime_snapshots
+  ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS owner_scope text NOT NULL DEFAULT 'legacy';
+
+CREATE TABLE IF NOT EXISTS public.agent_skills (
+  id text PRIMARY KEY,
+  user_id text,
+  owner_scope text NOT NULL DEFAULT 'legacy',
+  name text NOT NULL,
+  trigger_text text NOT NULL,
+  tools text[] NOT NULL,
+  steps text[] NOT NULL,
+  safety text[],
+  validation text[],
+  knowledge_updates text[],
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT agent_skills_owner_scope_check CHECK (
+    (owner_scope = 'user' AND user_id IS NOT NULL)
+    OR (owner_scope IN ('system', 'legacy') AND user_id IS NULL)
+  )
+);
+
+ALTER TABLE public.agent_skills
+  ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS owner_scope text NOT NULL DEFAULT 'legacy';
+
+CREATE TABLE IF NOT EXISTS public.agent_skill_versions (
+  user_id text NOT NULL,
+  skill_key text NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (user_id, skill_key)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS agent_skills_user_name_idx
+  ON public.agent_skills(user_id, name) WHERE owner_scope = 'user';
+CREATE INDEX IF NOT EXISTS agent_skills_user_updated_idx
+  ON public.agent_skills(user_id, updated_at DESC) WHERE owner_scope = 'user';
+CREATE INDEX IF NOT EXISTS agent_skill_versions_user_updated_idx
+  ON public.agent_skill_versions(user_id, updated_at DESC);
+INSERT INTO public.agent_skill_versions (user_id, skill_key, updated_at, deleted)
+SELECT user_id, name, updated_at, false
+FROM public.agent_skills
+WHERE owner_scope = 'user' AND user_id IS NOT NULL
+ON CONFLICT (user_id, skill_key)
+DO UPDATE SET
+  updated_at = EXCLUDED.updated_at,
+  deleted = false
+WHERE public.agent_skill_versions.updated_at < EXCLUDED.updated_at
+   OR (
+     public.agent_skill_versions.updated_at = EXCLUDED.updated_at
+     AND public.agent_skill_versions.deleted = false
+   );
+CREATE INDEX IF NOT EXISTS knowledge_documents_user_updated_idx
+  ON public.knowledge_documents(user_id, updated_at DESC) WHERE owner_scope = 'user';
+CREATE INDEX IF NOT EXISTS knowledge_documents_system_updated_idx
+  ON public.knowledge_documents(updated_at DESC) WHERE owner_scope = 'system';
+CREATE INDEX IF NOT EXISTS canvas_runtime_snapshots_user_canvas_idx
+  ON public.canvas_runtime_snapshots(user_id, canvas_id, created_at DESC) WHERE owner_scope = 'user';
+
 COMMIT;

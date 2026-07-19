@@ -28,6 +28,13 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 - AI 辅助的可执行计划以 `waiting_confirmation` 语义保存；AI 接管也必须保留 PermissionPolicy 判定后的确认边界。用户切回直接操作后，pending run 仍存在，但不会在后台因模式切换获得额外授权。
 - `DurableGenerationQueue` 独立持久化批量任务并负责恢复、重试与幂等；AgentRun 记录任务编排和工具审计，两者通过 run/job 标识关联，不互相替代。
 
+## 2.2 确认快照与用户隔离 - 2026-07-19
+
+- 用户看到确认预览时，运行时冻结 owner、Run、Plan、Step、输入、幂等键、页面、项目、画布、排序后的选区、模型和可变配置摘要。执行时任何字段发生变化都必须重新确认，不能把 `waiting_confirmation`、`waiting_execution` 或 `running` 状态当成授权。
+- Agent Run、Tool Call、Knowledge、Skill、画布快照、队列投影和幂等缓存都按 owner 分区。账号在工具 await 期间切换时，原 owner 的 Run 记录为取消，不允许后续步骤、写入或补偿落到新 owner。
+- Runtime recovery 不签发通用 grant。它只能根据已开始步骤的 recovery ledger 和幂等键精确取消对应 `DurableGenerationQueue` Job；恢复、重试、取消等用户发起的队列操作仍遵循各自 ToolRegistry 权限。
+- Agent Run 与本地知识投影向服务端同步只使用类型化 KK API Client；失败快照保留 pending 标记，待同一 owner 恢复后重试。
+
 ## 3. Runtime Knowledge Projection - 2026-06-03
 
 - Runtime store: `apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts`.
@@ -40,10 +47,10 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 
 - AI 接管在聊天侧栏中开启时，接管消息会继承并回写当前会话，不能切到一个看起来像新分支的独立空对话。
 - “打开日志 / 查看日志 / 系统日志”属于 safe UI 操作，IntentGate 与 LLM Planner 都应直接规划 `openSettings({ tab: 'system-logs' })`，不得要求先配置模型。
-- 主聊天 action 处理器必须支持 `action://open-settings-logs`，并导航到 `system-logs` 设置页。
+- 主聊天 action 处理器只在用户显式点击时支持 `action://open-settings-logs` 并导航到 `system-logs`；消息渲染、到达或恢复不得自动解析执行任何 `action://`。
 - API 工作台能力分配卡片只渲染对应角色实际需要的控件；非 AI 助手卡片显示主链路、主模型、备用链路、备用模型，不保留不可见占位块。
 - “帮我打开个人中心 / API / 存储 / 计费 / 设置总览”等本地导航指令属于 safe UI 操作，IntentGate 应映射到 `open_settings_view` 并调用 `openSettings({ tab })`，即使已配置模型也先走本地。
-- “生成一个...”这类简单单次生成指令默认走 `fillInputPrompt` + `submitPromptComposer`，复用画布输入框已设置的模型、比例、参考图和模式；批量、文件夹或逐参考图生成仍进入确认与队列。
+- “生成一个...”这类简单单次生成指令由 Planner 构造只含一个 prompt item 的 `generation.createBatchJob`，展示模型、数量、费用与影响范围后进入 `DurableGenerationQueue`；AI 不调用 `submitPromptComposer` / `generation.submitComposer`，也不模拟 PromptBar。普通 PromptBar 仍保留给用户直接操作，批量、文件夹或逐参考图生成只是扩展同一持久任务的 prompts 与范围。
 - UI 位置不是 AI 助手的权威事实。助手记忆的权威单元是功能 ID、ToolRegistry 工具和 Skill/Runbook；修改 UI 后必须同步 `ui-map.md`、对应 Skill 和 `knowledge.recordChange` / `ui.recordLayoutChange` 投影。
 
 ## 5. Canvas Group Runtime Semantics - 2026-06-05

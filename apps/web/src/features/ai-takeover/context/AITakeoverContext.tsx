@@ -24,6 +24,10 @@ import {
   agentRuntimeInstance,
   agentRunStore,
   buildAgentRunTimeline,
+  captureAssistantAuthorizationScope,
+  type AssistantAuthorizationScopeSnapshot,
+  type AssistantExecutionContext,
+  type AssistantExecutionTrigger,
   type AgentRunRecord,
   type AgentRunTimelineStep,
   toolRegistryInstance,
@@ -267,9 +271,28 @@ export function AITakeoverProvider({
       ? buildAssistancePreviewPlan(restoredPendingRun.plan as AssistantPlan)
       : restoredPendingRun.plan as AssistantPlan;
   });
+  const [pendingAuthorizationScope, setPendingAuthorizationScope] = useState<AssistantAuthorizationScopeSnapshot | null>(() => (
+    restoredPendingRun
+      ? captureAssistantAuthorizationScope({
+          currentPage,
+          activeCanvas,
+          selectedNodeIds: selectedNodeIds || [],
+          canvasRuntimeState,
+          selectedModel,
+          config,
+          ecommerceState,
+        })
+      : null
+  ));
   const [currentRunId, setCurrentRunId] = useState<string | null>(() => restoredPendingRun?.id ?? null);
   const [currentRun, setCurrentRun] = useState<AgentRunRecord | null>(() => restoredPendingRun);
   const agentRunTimeline = React.useMemo(() => buildAgentRunTimeline(currentRun), [currentRun]);
+
+  useEffect(() => {
+    // getPendingRun() can convert an interrupted run into a pending failed snapshot.
+    // Trigger the durable backend flush after React has restored that local state.
+    agentRuntimeInstance.requestPendingRunSync();
+  }, []);
 
 
 
@@ -306,8 +329,18 @@ export function AITakeoverProvider({
   }, []);
 
   // 执行计划（桥接到 AgentRuntime）
-  const executePlan = useCallback(async (runId: string) => {
-    const ctx: any = {
+  const executePlan = useCallback(async (
+    runId: string,
+    trigger: AssistantExecutionTrigger,
+    confirmedByUser = false,
+    confirmedPlanSnapshot?: AssistantPlan,
+    confirmedAuthorizationScope?: AssistantAuthorizationScopeSnapshot,
+  ) => {
+    const ctx: AssistantExecutionContext = {
+      runId,
+      currentPage,
+      collaborationMode,
+      trigger,
       activeCanvas: activeCanvasRef.current,
       selectedNodeIds: selectedNodeIdsRef.current,
       canvasRuntimeState: canvasRuntimeStateRef.current,
@@ -315,6 +348,8 @@ export function AITakeoverProvider({
       getActiveCanvas: () => activeCanvasRef.current,
       getSelectedNodeIds: () => selectedNodeIdsRef.current,
       getCanvasRuntimeState: () => canvasRuntimeStateRef.current,
+      generationQueue: durableGenerationQueue,
+      runStore: agentRunStore,
       selectedModel,
       addPromptNode,
       updatePromptNode,
@@ -345,7 +380,22 @@ export function AITakeoverProvider({
       setPptEditorMode,
       togglePinTool
     };
-    ctx.executeTool = (toolName: string, input: unknown, extra: Record<string, unknown> = {}) => (
+    if (confirmedByUser) {
+      if (!confirmedPlanSnapshot) {
+        throw new Error('Cannot execute a confirmed plan without the exact preview shown to the user.');
+      }
+      if (!confirmedAuthorizationScope) {
+        throw new Error('Cannot execute a confirmed plan without the authorization scope shown to the user.');
+      }
+      ctx.planId = confirmedPlanSnapshot.id;
+      ctx.confirmationGrant = agentRuntimeInstance.createConfirmationGrant(
+        runId,
+        confirmedPlanSnapshot,
+        ctx,
+        confirmedAuthorizationScope,
+      );
+    }
+    ctx.executeTool = (toolName: string, input: unknown, extra: Partial<AssistantExecutionContext> = {}) => (
       toolRegistryInstance.execute(toolName, input, { ...ctx, ...extra })
     );
 
@@ -355,7 +405,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, currentPage, collaborationMode]);
 
 
   // 发送消息
@@ -371,6 +421,7 @@ export function AITakeoverProvider({
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
     setPendingPlan(null);
+    setPendingAuthorizationScope(null);
     setCurrentRunId(null);
     setCurrentRun(null);
 
@@ -422,35 +473,74 @@ export function AITakeoverProvider({
           status: 'waiting_confirmation',
           nextStep: '等待用户确认 AI 辅助建议。',
         });
+        setPendingAuthorizationScope(captureAssistantAuthorizationScope({
+          currentPage,
+          activeCanvas,
+          selectedNodeIds: selectedNodeIds || [],
+          canvasRuntimeState,
+          selectedModel,
+          config,
+          ecommerceState,
+        }));
         setPendingPlan(previewPlan);
         setCurrentRun(previewRecord);
       } else if (plan.requiresConfirmation) {
+        setPendingAuthorizationScope(captureAssistantAuthorizationScope({
+          currentPage,
+          activeCanvas,
+          selectedNodeIds: selectedNodeIds || [],
+          canvasRuntimeState,
+          selectedModel,
+          config,
+          ecommerceState,
+        }));
         setPendingPlan(plan);
       } else {
         // 如果不需要确认，静默且自动安全地执行
-        await executePlan(record.id);
+        await executePlan(record.id, 'takeover-auto');
       }
     } catch (e: any) {
       notify?.error('助手脑出现异常', e.message || '未知错误');
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, collaborationMode, currentPage]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, canvasRuntimeState, collaborationMode, currentPage]);
 
 
   // 用户点击“确认执行”
   const executePendingPlan = useCallback(async () => {
-    if (!currentRunId) return;
+    if (!currentRunId || !pendingPlan || !pendingAuthorizationScope) return;
     const runId = currentRunId;
+    const confirmedPlanSnapshot = pendingPlan;
+    const confirmedAuthorizationScope = pendingAuthorizationScope;
     setPendingPlan(null);
-    setCurrentRunId(null);
-    await executePlan(runId);
-  }, [currentRunId, executePlan]);
+    setPendingAuthorizationScope(null);
+    try {
+      await executePlan(
+        runId,
+        collaborationMode === 'assist' ? 'assist-confirmed' : 'takeover-confirmed',
+        true,
+        confirmedPlanSnapshot,
+        confirmedAuthorizationScope,
+      );
+    } catch (error) {
+      setPendingPlan(confirmedPlanSnapshot);
+      setPendingAuthorizationScope(confirmedAuthorizationScope);
+      throw error;
+    } finally {
+      const latest = agentRunStore.getRun(runId);
+      if (!latest || ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(latest.status)) {
+        setCurrentRunId(null);
+      }
+    }
+  }, [currentRunId, pendingPlan, pendingAuthorizationScope, executePlan, collaborationMode]);
 
   // 用户点击“取消计划”
   const cancelPendingPlan = useCallback(() => {
     const runId = currentRunId;
+    const wasRunning = currentRun?.status === 'running';
     setPendingPlan(null);
+    setPendingAuthorizationScope(null);
 
     if (runId) {
       void agentRuntimeInstance.cancelPendingRun(runId)
@@ -463,7 +553,9 @@ export function AITakeoverProvider({
     const cancelMsg: Message = {
       id: 'cancel_' + Date.now(),
       role: 'assistant',
-      content: `❌ **操作已取消**
+      content: wasRunning ? `⏹️ **已请求停止运行**
+当前步骤正在取消，后续依赖步骤不会启动。已经完成的步骤和已产生的费用不会自动回滚。`
+        : `❌ **操作已取消**
 我不会执行本次生图计划，也没有扣减您的积分。
 您可以选择：
 - 🔍 [只优化提示词并填充](action://takeover-prompt-only)
@@ -471,7 +563,7 @@ export function AITakeoverProvider({
       timestamp: Date.now()
     };
     setMessages(prev => [...prev, cancelMsg]);
-  }, [currentRunId]);
+  }, [currentRunId, currentRun?.status]);
 
   // 简体中文：利用 Refs 跟踪最新的 React 状态与生图回调，供单例持久化队列消费以防闭包陈旧
   const activeCanvasRef = useRef(activeCanvas);

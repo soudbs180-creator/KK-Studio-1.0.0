@@ -80,3 +80,12 @@ test('ChatSidebar edge toggles and model picker carry chat shell markers in ever
     'model picker rows should expose the chat model selection action',
   );
 });
+
+test('ChatSidebar action links require an explicit user click and are never auto-executed from assistant text', () => {
+  const sidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+
+  assert.match(sidebarSource, /handleActionClick/);
+  assert.doesNotMatch(sidebarSource, /executedMessageIdsRef/);
+  assert.doesNotMatch(sidebarSource, /lastMessage\.content\.match\(actionRegex\)/);
+  assert.doesNotMatch(sidebarSource, /AI接管模式下的动作自动拦截并静默执行/);
+});

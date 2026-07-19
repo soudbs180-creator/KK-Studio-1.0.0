@@ -283,7 +283,11 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
 );
 
 // Lucide icons replaced with SVGs
-import { agentPermissionPolicy, toolRegistryInstance } from '../../features/ai-assistant-runtime';
+import {
+  agentPermissionPolicy,
+  createUserActionConfirmation,
+  toolRegistryInstance,
+} from '../../features/ai-assistant-runtime';
 import { CanvasProvider, useCanvas, useCanvasStartupStatus } from '../../context/CanvasContext';
 import { ThemeProvider, useTheme } from '../../context/ThemeContext';
 import { AppearanceMotionProvider } from '../../context/AppearanceMotionContext';
@@ -2010,12 +2014,18 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const { scope } = (e as CustomEvent).detail;
       const { notify } = await import('../../services/system/notificationService');
       const taskId = `zip_${Date.now()}`;
+      const normalizedScope = scope === 'selected_nodes'
+        ? 'selected_cards'
+        : scope || 'all_canvas_outputs';
+      const confirmedSelectedNodeIds = normalizedScope === 'selected_cards'
+        ? [...selectedNodeIds]
+        : [];
 
       // 派发任务添加事件
       window.dispatchEvent(new CustomEvent('task-center:add', {
         detail: {
           id: taskId,
-          name: scope === 'selected_nodes' ? '导出选中原图 (ZIP)' : '导出全部原图 (ZIP)',
+          name: normalizedScope === 'selected_cards' ? '导出选中原图 (ZIP)' : '导出全部原图 (ZIP)',
           type: 'export',
           status: 'running',
           progress: 15
@@ -2023,11 +2033,20 @@ export const AppContent: React.FC<AppContentProps> = () => {
       }));
 
       try {
-        await toolRegistryInstance.execute('assets.zipOriginals', {
-          scope: scope || 'all_canvas_outputs'
-        }, {
+        const zipInput = {
+          scope: normalizedScope,
+          ...(normalizedScope === 'selected_cards'
+            ? { selectedNodeIds: confirmedSelectedNodeIds }
+            : {}),
+        };
+        await toolRegistryInstance.execute('assets.zipOriginals', zipInput, {
+          ...createUserActionConfirmation('assets.zipOriginals', zipInput, {
+            currentPage: 'canvas',
+            activeCanvas,
+            selectedNodeIds: confirmedSelectedNodeIds,
+          }),
           activeCanvas,
-          selectedNodeIds,
+          selectedNodeIds: confirmedSelectedNodeIds,
           notify
         });
 
@@ -6119,6 +6138,11 @@ const isRectIntersecting = (
                   return;
                 }
                 const executionContext: any = {
+                  ...createUserActionConfirmation(
+                    'workflow.controlPanel',
+                    workflowAction.payload,
+                    { currentPage: 'canvas', activeCanvas },
+                  ),
                   activeCanvas,
                   updateWorkflowNode,
                   createCard,

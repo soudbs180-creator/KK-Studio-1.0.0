@@ -9,6 +9,7 @@ User=kkstudio
 Group=kkstudio
 WorkingDirectory=/opt/kk-studio/current
 EnvironmentFile=/etc/kk-studio/kk-api.env
+Environment=NODE_ENV=production
 ExecStart=/usr/bin/node --env-file=/etc/kk-studio/kk-api.env server/index.js
 Restart=always
 RestartSec=3

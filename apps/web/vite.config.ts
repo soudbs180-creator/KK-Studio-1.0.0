@@ -332,7 +332,8 @@ function buildVersionManifestPlugin(): Plugin {
                 // 忽略没有 git 仓库或环境时的错误
             }
 
-            const commitSha = process.env.VERCEL_GIT_COMMIT_SHA
+            const commitSha = process.env.KK_STUDIO_COMMIT_SHA
+                || process.env.VERCEL_GIT_COMMIT_SHA
                 || process.env.COMMIT_REF
                 || process.env.GITHUB_SHA
                 || process.env.CF_PAGES_COMMIT_SHA
@@ -416,6 +417,8 @@ async function writeFetchResponse(
 function shouldProxyToLocalApi(requestPath: string): boolean {
     return requestPath === '/healthz'
         || requestPath === '/api/manifest'
+        || requestPath === '/api/ai-assistant'
+        || requestPath.startsWith('/api/ai-assistant/')
         || requestPath.startsWith('/api/v1/');
 }
 
@@ -593,6 +596,10 @@ export default defineConfig(({ mode }) => {
                 'Cache-Control': 'no-store',
             },
             proxy: {
+                '/api/ai-assistant': {
+                    target: 'http://127.0.0.1:3001',
+                    changeOrigin: true,
+                },
                 '/api/v1': {
                     target: 'http://127.0.0.1:3001',
                     changeOrigin: true,

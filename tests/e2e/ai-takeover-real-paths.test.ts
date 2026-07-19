@@ -135,7 +135,7 @@ describe('AI Takeover Real User Path E2E Contract & Flow Tests', () => {
     // B. 静态源码契约核对：确认在 generationTools 里的 generation.createBatchJob handler 中，如果传了 researchBrief，会通过 addPromptNode 创建一个报告节点
     const toolsSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
     assert.match(toolsSource, /researchBrief/);
-    assert.match(toolsSource, /research_brief_/);
+    assert.match(toolsSource, /createGenerationItemId\('research_brief'/);
     assert.match(toolsSource, /model:\s*'local-research'/);
     assert.match(toolsSource, /modelLabel:\s*'深度研究报告'/);
     assert.match(toolsSource, /await\s+addPromptNode\(briefNode\)/);

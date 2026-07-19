@@ -87,14 +87,14 @@ export function buildAgentRunTimeline(record?: AgentRunRecord | null): AgentRunT
       ? 'pending'
       : status === 'running'
         ? 'active'
-        : status === 'completed'
+        : status === 'completed' || status === 'completed_with_errors'
           ? 'done'
           : status === 'cancelled'
             ? 'cancelled'
             : 'failed';
 
   const verificationStatus: AgentRunTimelineStepStatus =
-    status === 'completed'
+    status === 'completed' || status === 'completed_with_errors'
       ? 'done'
       : status === 'failed'
         ? 'failed'
@@ -132,8 +132,10 @@ export function buildAgentRunTimeline(record?: AgentRunRecord | null): AgentRunT
     {
       ...DEFAULT_STEPS[4],
       status: verificationStatus,
-      detail: status === 'completed'
-        ? 'Handoff and knowledge update recorded'
+      detail: status === 'completed' || status === 'completed_with_errors'
+        ? status === 'completed_with_errors'
+          ? 'Verification completed with partial failures recorded'
+          : 'Handoff and knowledge update recorded'
         : nextStep || 'Handoff and knowledge update after execution',
     },
   ];

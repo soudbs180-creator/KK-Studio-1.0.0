@@ -117,12 +117,23 @@ import type {
   ApiResponse,
   RequestMeta,
 } from "../http/envelope.ts";
+import type {
+  AgentKnowledgeChangeDto,
+  AgentKnowledgeDocumentDto,
+  AgentKnowledgeSearchQueryDto,
+  AgentRunDto,
+  AgentSkillDeleteDto,
+  AgentSkillDto,
+  AgentToolCallDto,
+  AssistantApiResultDto,
+} from "../dto/ai-assistant.ts";
 
 export interface ApiClientConfig {
   baseUrl: string;
   fetchImpl?: typeof fetch;
   getAccessToken?: () => string | undefined | Promise<string | undefined>;
   refreshAccessToken?: () => string | undefined | Promise<string | undefined>;
+  getAuthSubject?: () => string | undefined | Promise<string | undefined>;
   onRefreshToken?: (token: string) => void | Promise<void>;
   getClientVersion?: () => string | undefined;
   getDefaultHeaders?: () => Record<string, string | undefined>;
@@ -130,6 +141,8 @@ export interface ApiClientConfig {
 
 export interface ApiClientRequestOptions {
   accessToken?: string;
+  /** Captured owner for deferred writes; a subject change aborts before any network request. */
+  expectedAuthSubject?: string;
   clientVersion?: string;
   headers?: Record<string, string | undefined>;
   requestId?: string;
@@ -420,6 +433,31 @@ export interface KkApiClient {
     input: ClaimGenerationBatchJobRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  upsertAgentRun(
+    input: AgentRunDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto>>>;
+  recordAgentToolCall(
+    input: AgentToolCallDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentToolCallDto>>>;
+  recordKnowledgeChange(
+    input: AgentKnowledgeChangeDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentKnowledgeDocumentDto>>>;
+  searchAgentKnowledge(
+    input?: AgentKnowledgeSearchQueryDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentKnowledgeDocumentDto[]>>>;
+  upsertAgentSkill(
+    input: AgentSkillDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentSkillDto>>>;
+  deleteAgentSkill(
+    skillId: string,
+    input: AgentSkillDeleteDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentSkillDto>>>;
   saveWorkflow(
     workspaceId: string,
     workflowId: string,
@@ -583,6 +621,64 @@ async function resolveRefreshedAccessToken(
   return config.refreshAccessToken ? config.refreshAccessToken() : undefined;
 }
 
+async function resolveAuthSubject(config: ApiClientConfig): Promise<string | undefined> {
+  const subject = config.getAuthSubject ? await config.getAuthSubject() : undefined;
+  const normalized = String(subject || "").trim();
+  return normalized || undefined;
+}
+
+function decodeAccessTokenSubject(token?: string): string | undefined {
+  try {
+    const payload = String(token || "").split(".")[1];
+    if (!payload || typeof globalThis.atob !== "function") return undefined;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const claims = JSON.parse(globalThis.atob(padded)) as Record<string, unknown>;
+    const subject = String(claims.sub || claims.userId || claims.user_id || "").trim();
+    return subject || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function canRetryWithRefreshedIdentity(input: {
+  initialAuthSubject?: string;
+  refreshedAuthSubject?: string;
+  initialAccessToken?: string;
+  refreshedAccessToken?: string;
+}): boolean {
+  const checks: boolean[] = [];
+  if (input.initialAuthSubject || input.refreshedAuthSubject) {
+    checks.push(Boolean(
+      input.initialAuthSubject
+      && input.refreshedAuthSubject
+      && input.initialAuthSubject === input.refreshedAuthSubject,
+    ));
+  }
+  const initialTokenSubject = decodeAccessTokenSubject(input.initialAccessToken);
+  const refreshedTokenSubject = decodeAccessTokenSubject(input.refreshedAccessToken);
+  if (initialTokenSubject || refreshedTokenSubject) {
+    checks.push(Boolean(
+      initialTokenSubject
+      && refreshedTokenSubject
+      && initialTokenSubject === refreshedTokenSubject,
+    ));
+  }
+  return checks.length === 0 || checks.every(Boolean);
+}
+
+function matchesExpectedAuthSubject(input: {
+  expectedAuthSubject?: string;
+  resolvedAuthSubject?: string;
+  accessToken?: string;
+}): boolean {
+  const expected = String(input.expectedAuthSubject || "").trim();
+  if (!expected) return true;
+  if (String(input.resolvedAuthSubject || "").trim() !== expected) return false;
+  const tokenSubject = decodeAccessTokenSubject(input.accessToken);
+  return !tokenSubject || tokenSubject === expected;
+}
+
 async function requestJson<TResponse>(
   config: ApiClientConfig,
   path: string,
@@ -627,6 +723,19 @@ async function requestJson<TResponse>(
     const initialAccessToken = normalizeTransportSafeAccessToken(
       await resolveAccessToken(config, options),
     );
+    const initialAuthSubject = await resolveAuthSubject(config);
+    if (!matchesExpectedAuthSubject({
+      expectedAuthSubject: options?.expectedAuthSubject,
+      resolvedAuthSubject: initialAuthSubject,
+      accessToken: initialAccessToken,
+    })) {
+      return createClientError(
+        "AUTH_SUBJECT_CHANGED",
+        "The authenticated user changed before the request could be sent.",
+        requestId,
+        clientVersion,
+      );
+    }
     let { response, payload } = await executeRequest(initialAccessToken);
 
     if (response.status === 401 && typeof options?.accessToken !== "string") {
@@ -634,7 +743,29 @@ async function requestJson<TResponse>(
         const refreshedAccessToken = normalizeTransportSafeAccessToken(
           await resolveRefreshedAccessToken(config),
         );
-        if (refreshedAccessToken && refreshedAccessToken !== initialAccessToken) {
+        const refreshedAuthSubject = await resolveAuthSubject(config);
+        if (!matchesExpectedAuthSubject({
+          expectedAuthSubject: options?.expectedAuthSubject,
+          resolvedAuthSubject: refreshedAuthSubject,
+          accessToken: refreshedAccessToken,
+        })) {
+          return createClientError(
+            "AUTH_SUBJECT_CHANGED",
+            "The authenticated user changed before the request could be retried.",
+            requestId,
+            clientVersion,
+          );
+        }
+        if (
+          refreshedAccessToken
+          && refreshedAccessToken !== initialAccessToken
+          && canRetryWithRefreshedIdentity({
+            initialAuthSubject,
+            refreshedAuthSubject,
+            initialAccessToken,
+            refreshedAccessToken,
+          })
+        ) {
           ({ response, payload } = await executeRequest(refreshedAccessToken));
         }
       } catch {
@@ -643,7 +774,10 @@ async function requestJson<TResponse>(
     }
 
     if (response.ok) {
-      await persistRefreshHeader(config, response);
+      const responseAuthSubject = await resolveAuthSubject(config);
+      if (!initialAuthSubject || responseAuthSubject === initialAuthSubject) {
+        await persistRefreshHeader(config, response);
+      }
     }
 
     if (isEnvelope<TResponse>(payload)) {
@@ -1681,6 +1815,64 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         config,
         `api/v1/generation-jobs/${encodeURIComponent(jobId)}/claim`,
         { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    upsertAgentRun(input, options) {
+      return requestJson<AssistantApiResultDto<AgentRunDto>>(
+        config,
+        "api/ai-assistant/runs",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    recordAgentToolCall(input, options) {
+      return requestJson<AssistantApiResultDto<AgentToolCallDto>>(
+        config,
+        "api/ai-assistant/tool-calls",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    recordKnowledgeChange(input, options) {
+      return requestJson<AssistantApiResultDto<AgentKnowledgeDocumentDto>>(
+        config,
+        "api/ai-assistant/changes",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    searchAgentKnowledge(input = {}, options) {
+      const params = new URLSearchParams();
+      const query = String(input.query || "").trim();
+      if (query) params.set("query", query);
+      const suffix = params.size > 0 ? `?${params.toString()}` : "";
+      return requestJson<AssistantApiResultDto<AgentKnowledgeDocumentDto[]>>(
+        config,
+        `api/ai-assistant/knowledge${suffix}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    upsertAgentSkill(input, options) {
+      return requestJson<AssistantApiResultDto<AgentSkillDto>>(
+        config,
+        "api/ai-assistant/skills",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    deleteAgentSkill(skillId, input, options) {
+      return requestJson<AssistantApiResultDto<AgentSkillDto>>(
+        config,
+        `api/ai-assistant/skills/${encodeURIComponent(skillId)}`,
+        { method: "DELETE", body: JSON.stringify(input) },
         options,
       );
     },

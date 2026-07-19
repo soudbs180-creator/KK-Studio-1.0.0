@@ -13,6 +13,7 @@ fi
 TARGET_DATABASE_URL="${TARGET_DATABASE_URL:-}"
 EXPORT_ROOT="${EXPORT_ROOT:-${REPO_ROOT}/.tmp-postgres-migration}"
 BOOTSTRAP_SQL="${BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/postgres/bootstrap-kk-vps.sql}"
+AI_ASSISTANT_SCOPE_MIGRATION="${AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/migrations/016_ai_assistant_user_scope.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -31,6 +32,11 @@ if [[ ! -f "${BOOTSTRAP_SQL}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${AI_ASSISTANT_SCOPE_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing AI assistant scope migration: ${AI_ASSISTANT_SCOPE_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -44,8 +50,10 @@ fi
 echo "[import-runtime-into-vps] Applying bootstrap schema"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${BOOTSTRAP_SQL}"
 
-echo "[import-runtime-into-vps] Applying exported runtime schema snapshot"
-psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${RUNTIME_SCHEMA_SQL}"
+echo "[import-runtime-into-vps] Applying mandatory AI assistant user-scope migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AI_ASSISTANT_SCOPE_MIGRATION}"
+
+echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only; canonical bootstrap and migrations own the target schema"
 
 echo "[import-runtime-into-vps] Importing exported runtime data"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${RUNTIME_SQL}"

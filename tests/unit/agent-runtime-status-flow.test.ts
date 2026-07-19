@@ -57,6 +57,22 @@ describe('AgentRunStore Status Flow Tests', () => {
     assert.equal(record.status, 'waiting_confirmation');
   });
 
+  it('returns immutable Run snapshots instead of mutable store-owned records', () => {
+    mockLocalStorage.clear();
+    const store = new AgentRunStore(mockLocalStorage as any, () => 'immutable-run-user');
+    const created = store.createRun('immutable', 'test', {
+      requiresConfirmation: true,
+      nested: { value: 'original' },
+    });
+    created.status = 'running';
+    created.plan.nested.value = 'tampered';
+    const fetched = store.getRun(created.id)!;
+    assert.equal(fetched.status, 'waiting_confirmation');
+    assert.equal(fetched.plan.nested.value, 'original');
+    fetched.status = 'completed';
+    assert.equal(store.getRun(created.id)?.status, 'waiting_confirmation');
+  });
+
   it('P0: zombie running/waiting_execution jobs should heal to failed on load', () => {
     globalThis.localStorage = mockLocalStorage as any;
     mockLocalStorage.clear();
@@ -85,10 +101,10 @@ describe('AgentRunStore Status Flow Tests', () => {
       }
     ];
 
-    mockLocalStorage.setItem('kk_agent_runs_history', JSON.stringify(dirtyRuns));
+    mockLocalStorage.setItem('kk_agent_runs_history:owner:local_user', JSON.stringify(dirtyRuns));
 
     // 实例化一个新的 Store，它在 constructor 里调用 loadRuns()
-    const tempStore = new AgentRunStore();
+    const tempStore = new AgentRunStore(mockLocalStorage as any, () => 'local_user');
 
     const run1 = tempStore.getRun('run_1')!;
     const run2 = tempStore.getRun('run_2')!;
@@ -113,9 +129,108 @@ describe('AgentRunStore Status Flow Tests', () => {
     
     // 强制修改 updatedAt 为 6 分钟前
     const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
-    record.updatedAt = sixMinutesAgo;
+    agentRunStore.restoreRunSnapshot({ ...record, updatedAt: sixMinutesAgo });
 
     const pending = agentRunStore.getPendingRun();
     assert.equal(pending, undefined);
+    assert.equal(agentRunStore.getRun(record.id)?.status, 'failed');
+    assert.equal(agentRunStore.getRun(record.id)?.backendSyncState, 'pending');
+  });
+
+  it('keeps an old waiting_confirmation Run reachable until the user decides', () => {
+    mockLocalStorage.clear();
+    const store = new AgentRunStore(mockLocalStorage as any, () => 'confirmation-user');
+    const record = store.createRun('confirm later', 'test', { requiresConfirmation: true });
+    store.restoreRunSnapshot({
+      ...record,
+      updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const pending = store.getPendingRun();
+
+    assert.equal(pending?.id, record.id);
+    assert.equal(record.status, 'waiting_confirmation');
+    assert.equal(record.nextStep, undefined);
+  });
+
+  it('applies a stale-server authority snapshot only with a matching local CAS and preserves local tool calls', () => {
+    mockLocalStorage.clear();
+    const store = new AgentRunStore(mockLocalStorage as any, () => 'authority-user');
+    const created = store.createRun('reconcile me', 'test', { requiresConfirmation: false });
+    const localToolCall = {
+      id: 'tool-local-only',
+      runId: created.id,
+      toolName: 'canvas.getState',
+      inputSummary: '{}',
+      status: 'success' as const,
+      startedAt: created.createdAt,
+    };
+    const local = store.updateRun(created.id, {
+      status: 'failed',
+      toolCalls: [localToolCall],
+    });
+    const expectedLocalUpdatedAt = local.updatedAt;
+    const authoritativeUpdatedAt = new Date(Date.parse(local.updatedAt) + 1_000).toISOString();
+
+    const applied = store.applyAuthoritativeRun({
+      id: local.id,
+      userMessage: local.userMessage,
+      intent: local.intent,
+      plan: local.plan,
+      status: 'completed',
+      toolCalls: [],
+      stepResults: [],
+      createdAt: local.createdAt,
+      updatedAt: authoritativeUpdatedAt,
+    }, expectedLocalUpdatedAt);
+
+    assert.equal(applied?.status, 'completed');
+    assert.deepEqual(applied?.toolCalls.map((toolCall) => toolCall.id), ['tool-local-only']);
+    assert.equal(applied?.backendSyncState, 'synced');
+
+    const newerLocal = store.updateRun(local.id, { status: 'cancelled' });
+    const rejected = store.applyAuthoritativeRun({
+      ...applied!,
+      status: 'completed_with_errors',
+      updatedAt: new Date(Date.parse(newerLocal.updatedAt) + 1_000).toISOString(),
+    }, authoritativeUpdatedAt);
+
+    assert.equal(rejected, undefined);
+    assert.equal(store.getRun(local.id)?.status, 'cancelled');
+    assert.equal(store.getRun(local.id)?.backendSyncState, 'pending');
+  });
+
+  it('keeps local Agent Run history isolated when the authenticated owner changes', () => {
+    mockLocalStorage.clear();
+    let ownerId = 'user-a';
+    const store = new AgentRunStore(mockLocalStorage as any, () => ownerId);
+
+    const runA = store.createRun('private A', 'test', { requiresConfirmation: true });
+    ownerId = 'user-b';
+    assert.equal(store.listRuns().length, 0);
+    const runB = store.createRun('private B', 'test', { requiresConfirmation: false });
+
+    ownerId = 'user-a';
+    assert.deepEqual(store.listRuns().map((run) => run.id), [runA.id]);
+    ownerId = 'user-b';
+    assert.deepEqual(store.listRuns().map((run) => run.id), [runB.id]);
+  });
+
+  it('persists whether the latest Run snapshot still needs backend synchronization', () => {
+    mockLocalStorage.clear();
+    const store = new AgentRunStore(mockLocalStorage as any, () => 'sync-user');
+    const run = store.createRun('sync me', 'test', { requiresConfirmation: false });
+    const initialUpdatedAt = run.updatedAt;
+
+    assert.equal(run.backendSyncState, 'pending');
+    store.markBackendSynced(run.id, initialUpdatedAt);
+    assert.equal(store.getRun(run.id)?.backendSyncState, 'synced');
+
+    const updated = store.updateRun(run.id, { status: 'completed' });
+    assert.equal(updated.backendSyncState, 'pending');
+    store.markBackendSynced(run.id, initialUpdatedAt);
+    assert.equal(store.getRun(run.id)?.backendSyncState, 'pending');
+    store.markBackendSynced(run.id, updated.updatedAt);
+    assert.equal(store.getRun(run.id)?.backendSyncState, 'synced');
   });
 });

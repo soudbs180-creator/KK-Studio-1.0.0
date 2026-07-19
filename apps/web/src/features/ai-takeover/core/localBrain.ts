@@ -93,23 +93,24 @@ ${optResult.optimizedPromptZh}`;
       }
 
       case 'submit_composer': {
-        const prompt = (intentResult.extracted.prompt || '').trim();
-
-        if (prompt) {
-          reply = `### 🚀 已接管画布输入框并发送
-我会先把「${prompt}」填入当前画布输入框，然后复用当前已设置的模型、比例、参考图和生成参数直接发送。`;
-          actions.push({
-            type: 'fillInputPrompt',
-            payload: { prompt }
-          });
-        } else {
-          reply = `### 🚀 收到指令，正在帮您运行发送...
-接管引擎正直接调用 PromptBar 发送生成按钮为您拉起任务。`;
+        const prompt = (intentResult.extracted.prompt || context.promptBarInput?.prompt || '').trim();
+        if (!prompt) {
+          reply = `### 还需要一条生成提示词
+当前输入框为空。请告诉我希望生成什么，或先在画布输入框中填写提示词；在得到明确内容后，我会展示数量、费用与影响范围，再提交持久任务。`;
+          break;
         }
 
+        reply = `### 已准备单张生成计划
+提示词：「${prompt}」；预计输出 1 张。确认后将通过 DurableGenerationQueue 创建可恢复任务，并在完成后导入当前画布。`;
         actions.push({
-          type: 'submitPromptComposer',
-          payload: {}
+          type: 'generation.createBatchJob',
+          payload: {
+            prompts: [{ prompt }],
+            options: {
+              countPerPrompt: 1,
+              layout: 'grid'
+            }
+          }
         });
         break;
       }
@@ -476,15 +477,26 @@ ${optResult.optimizedPromptZh}
         break;
       }
 
+      case 'resume_generation_job': {
+        const jobId = intentResult.extracted.jobId || '';
+        reply = `### 已准备恢复暂停的生成任务
+我会通过 \`generation.resumeJob\` 恢复任务 \`${jobId}\`。系统会先核对它仍处于暂停状态；继续处理未完成项目可能消耗积分或 Provider 配额。`;
+
+        actions.push({
+          type: 'generation.resumeJob',
+          payload: { jobId }
+        });
+        break;
+      }
+
       case 'retry_generation_job': {
         const jobId = intentResult.extracted.jobId || '';
         const retryTargetLabel = jobId ? `任务 \`${jobId}\`` : '最近一个存在失败项的批量任务';
-        const retryPayload = {
-          ...(intentResult.extracted.jobId ? { jobId: intentResult.extracted.jobId } : {}),
-          target: intentResult.extracted.jobId ? undefined : 'latest_failed'
-        } as { jobId?: string; target?: 'latest_failed' };
+        const retryPayload = intentResult.extracted.jobId
+          ? { jobId: intentResult.extracted.jobId }
+          : {};
         reply = `### 已准备重试失败批次
-我会通过 \`generation.retryJob\` 将${retryTargetLabel}中失败的队列项重新加入 DurableGenerationQueue，已完成的结果不会重复提交。`;
+AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job、版本和失败项集合；确认后不会改选其他任务。通过 \`generation.retryJob\` 重新入队时，已完成结果不会重复提交。`;
 
         actions.push({
           type: 'generation.retryJob',

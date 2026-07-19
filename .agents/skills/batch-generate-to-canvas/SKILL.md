@@ -32,15 +32,16 @@ description: 批量图片、视频与音频生成及队列控制技能，支持�
 
 ## ⚙️ 任务控制机制 (Queue Controls)
 - **暂停 (Pause)**: 调用 `generation.pauseJob(jobId)` 挂起任务，重置正在运行的子任务为 `queued`，暂不占用并发配额。
-- **恢复 (Resume)**: 调用 `generation.resumeJob(jobId)` 将任务状态改回 `queued`，自动触发队列调度恢复处理。
-- **重试失败项 (Retry failed)**: 调用 `generation.retryJob(jobId)` 只把失败子项重置为 `queued`，不重复提交已完成的 Prompt/Image 输出；若用户要求“重试最近失败批次”但未提供 ID，调用 `generation.retryJob({ target: 'latest_failed' })`。
-- **取消 (Cancel)**: 调用 `generation.cancelJob(jobId)` 取消任务，处于排队或运行中的子任务全部标记为 `failed` 且原因为用户取消。
+- **恢复 (Resume)**: 调用 `generation.resumeJob(jobId)` 将任务状态改回 `queued`，自动触发队列调度恢复处理；未完成项可能继续消耗 Provider 配额或积分，必须先确认。
+- **重试失败项 (Retry failed)**: `generation.retryJob` 只把冻结 Job 中的失败子项重置为 `queued`，不重复提交已完成的 Prompt/Image 输出。若用户只说“重试最近失败批次”，AgentRuntime 必须在确认卡出现前解析具体 `jobId`，同时冻结 Job `updatedAt` 与可重试 Prompt ID 集合；执行层不接受动态 latest/current selector。重试会再次产生 Provider 调用，必须先确认。
+- **取消 (Cancel)**: 调用 `generation.cancelJob(jobId)` 取消任务，Job 进入 `cancelled`；处于排队或运行中的子任务标记为不可重试的 `failed/cancelled`。取消不可撤销，必须绑定明确 Job 并先确认。
 
 ## 🛠️ 实现规约与规则
 - **限速与并发**: 图片默认并发 `3`、最大 `8`、批量上限 `100`；视频默认 `1`、最大 `2`、批量上限 `20`；音频默认 `2`、最大 `4`、批量上限 `50`。
-- **确认授权**: `generation.createVideoJob` 与 `generation.createAudioJob` 均为 `confirm` 工具，只能在当前 `runId` 的确认授权覆盖对应工具名后执行。
+- **确认授权**: `generation.createBatchJob`、`ecommerce.createBatchTransformJob`、`generation.createVideoJob`、`generation.createAudioJob`、`generation.resumeJob`、`generation.retryJob` 与 `generation.cancelJob` 都是有效权限为 `confirm` 的工具。授权必须精确绑定 owner、Run、Plan、Step、Job/输入、画布、选区、模型和配置快照；`generation.pauseJob` 是可恢复的 `safe` 局部控制。
 - **能力声明**: 视频/音频参数必须根据 Provider 能力注册表判断，不得通过模型名称字符串猜测 T2V、I2V、首尾帧、音频或时长能力。
 - **执行后验证**: 工具返回后校验任务 `schemaVersion=2`、`taskType`、队列持久化记录和画布输出；验证失败不得写入 Memory 或 KnowledgeStore。
+- **队列状态验证**: pause/resume/retry/cancel 必须读取 `DurableGenerationQueue` 的实时 Job 状态；不得用幂等缓存中的旧输出替代领域状态。
 - **幂等防护**: `generation.createBatchJob` 必须支持幂等密钥 `idempotencyKey`，如果用户未传入则根据 `canvasId` 和参数哈希计算稳定 Key，防止网络波动重复提交。
 - **电商紧凑布局**: `compact-grid` 映射为 `layout='grid'`、`columns=min(4,count)`、`gap=24`，比例从用户指令写入 `aspectRatio`，例如 `4:5`。
 - **打组与标签 (Group output)**: 每次批量生成任务完成后，需在画布上创建一个统一的 `CanvasGroup` 包裹住所有的 Prompt/Image 节点，默认边框发光颜色为 `#ffffff`，并为子节点打上 `automation` 标签。

@@ -1,7 +1,10 @@
 // 简体中文：生图和批量生图任务相关的 AI 助手工具 (Generation Tools)
 
 import type { AgentToolDefinition } from './ToolRegistry.ts';
-import { durableGenerationQueue } from '../queue/DurableGenerationQueue.ts';
+import {
+  durableGenerationQueue,
+  type DurableGenerationQueue,
+} from '../queue/DurableGenerationQueue.ts';
 import type { AssistantOutputGroupPlan, BatchGenerationPlan } from '../../ai-takeover/types.ts';
 import {
   CreateAudioJobToolInputSchema,
@@ -16,8 +19,27 @@ import {
 type BatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
 
 type RetryJobInput = {
-  jobId?: string;
-  target?: 'latest_failed';
+  jobId: string;
+  expectedUpdatedAt: number;
+  expectedRetryablePromptIds: string[];
+};
+
+const stableGenerationHash = (value: string, seed: number): string => value.split('').reduce(
+  (hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0,
+  seed,
+).toString(16).padStart(8, '0');
+
+const createGenerationItemId = (
+  prefix: string,
+  idempotencyKey: string | undefined,
+  index = 0,
+): string => {
+  const normalizedKey = String(idempotencyKey || '').trim();
+  if (!normalizedKey) {
+    return `${prefix}_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+  const source = `${normalizedKey}\u0000${prefix}\u0000${index}`;
+  return `${prefix}_${stableGenerationHash(source, 2166136261)}${stableGenerationHash(source, 3335557771)}`;
 };
 
 // ==========================================
@@ -157,7 +179,7 @@ const createSingleMediaJob = (input: any, ctx: any, taskType: GenerationMediaTas
   const referenceImageNodeId = input.referenceImageNodeId || input.options?.referenceImageNodeId;
   const count = taskType === 'image' ? Math.max(1, Number(input.count || 4)) : 1;
   const prompts = Array.from({ length: count }, (_, index) => ({
-    id: `prompt_item_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}`,
+    id: createGenerationItemId('prompt_item', input.idempotencyKey, index),
     prompt: input.prompt,
     referenceImageNodeId
   }));
@@ -191,25 +213,15 @@ const createSingleMediaJob = (input: any, ctx: any, taskType: GenerationMediaTas
   );
 };
 
-const resolveRetryJob = (input: RetryJobInput) => {
-  if (input.jobId) {
-    const explicitJob = durableGenerationQueue.getJob(input.jobId);
-    if (!explicitJob) {
-      throw new Error(`generation job not found: ${input.jobId}`);
-    }
-    return { job: explicitJob, resolvedFrom: 'explicit' as const };
+const resolveRetryJob = (
+  input: RetryJobInput,
+  queue: Pick<DurableGenerationQueue, 'getJob'> = durableGenerationQueue,
+) => {
+  const explicitJob = queue.getJob(input.jobId);
+  if (!explicitJob) {
+    throw new Error(`generation job not found: ${input.jobId}`);
   }
-
-  const latestFailedJob = durableGenerationQueue
-    .getJobs()
-    .filter(job => job.status !== 'cancelled' && job.prompts.some(prompt => prompt.status === 'failed'))
-    .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-
-  if (!latestFailedJob) {
-    throw new Error('generation retry target not found: no failed durable generation job');
-  }
-
-  return { job: latestFailedJob, resolvedFrom: 'latest_failed' as const };
+  return explicitJob;
 };
 
 const requireGenerationJob = (jobId: string) => {
@@ -218,6 +230,23 @@ const requireGenerationJob = (jobId: string) => {
     throw new Error(`generation job not found: ${jobId}`);
   }
   return job;
+};
+
+const verifyPersistedGenerationJobState = (
+  output: any,
+  input: { jobId?: string },
+  allowedStatuses: readonly string[],
+  operation: string,
+  queue: Pick<DurableGenerationQueue, 'getJob'> = durableGenerationQueue,
+) => {
+  const jobId = String(input.jobId || output?.id || output?.jobId || '').trim();
+  const job = jobId ? queue.getJob(jobId) : undefined;
+  return {
+    success: Boolean(job && allowedStatuses.includes(job.status)),
+    message: job
+      ? `Generation job ${job.id} is ${job.status}; expected ${allowedStatuses.join(' or ')} after ${operation}.`
+      : `Generation job verification could not find the durable job after ${operation}.`,
+  };
 };
 
 const capabilityUnavailable = (message: string, setupAction = 'open-workspace') => ({
@@ -264,7 +293,7 @@ export const generationTools: AgentToolDefinition[] = [
         const prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }> = [];
         for (let i = 0; i < count; i++) {
           prompts.push({
-            id: 'prompt_item_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 9),
+            id: createGenerationItemId('prompt_item', input.idempotencyKey, i),
             prompt: prompt,
             referenceImageNodeId
           });
@@ -378,18 +407,19 @@ export const generationTools: AgentToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        plan: { type: 'object', description: '批量生图完整执行计划' }
+        plan: { type: 'object', description: '批量生图完整执行计划' },
+        idempotencyKey: { type: 'string' }
       },
       required: ['plan']
     },
-    handler: async (input: { plan: BatchGenerationPlan }, ctx) => {
+    handler: async (input: { plan: BatchGenerationPlan; idempotencyKey?: string }, ctx) => {
       const { plan } = input;
       const { activeCanvas, selectedModel, notify } = ctx;
       const count = plan.imageIds.length;
 
       try {
         const prompts = plan.imageIds.map((imageId: string, idx: number) => ({
-          id: 'prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
+          id: createGenerationItemId('prompt_item', input.idempotencyKey, idx),
           prompt: plan.promptStrategy.basePrompt,
           referenceImageNodeId: imageId
         }));
@@ -410,10 +440,11 @@ export const generationTools: AgentToolDefinition[] = [
             outputGroup
           }),
           activeCanvas?.id || 'default',
-          plan.id
+          input.idempotencyKey
         );
 
         notify.success('批量生成计划已提交', `任务已加入持久化队列 (Job ID: ${job.id})，共 ${count} 张图`);
+        return job;
       } catch (e: any) {
         notify.error('批量生成排队失败', e.message || '未知异常');
         throw e;
@@ -430,14 +461,22 @@ export const generationTools: AgentToolDefinition[] = [
     handler: async (input: any, ctx) => {
       const { onGenerate, notify } = ctx;
 
+      if (ctx.trigger !== 'user-action') {
+        return {
+          success: false as const,
+          code: 'DIRECT_USER_ACTION_REQUIRED' as const,
+          message: 'Composer submission is reserved for an explicit user click. AI generation must use generation.createBatchJob.',
+        };
+      }
+
       if (typeof onGenerate !== 'function') {
         notify.warning('未绑定发送功能', '');
         return capabilityUnavailable('Prompt composer submit handler is not bound.');
       }
 
-      onGenerate();
+      await Promise.resolve(onGenerate());
       notify.success('AI 接管：已帮您发起生成任务', '');
-      return { status: 'submitted' };
+      return { success: true as const, executionOutcome: 'success' as const, status: 'submitted' };
     }
   },
 
@@ -473,7 +512,7 @@ export const generationTools: AgentToolDefinition[] = [
       if (options?.researchBrief && typeof addPromptNode === 'function') {
         const lastPos = typeof getNextCardPosition === 'function' ? getNextCardPosition() : { x: 100, y: 100 };
         const briefNode = {
-          id: 'research_brief_' + Date.now(),
+          id: createGenerationItemId('research_brief', idempotencyKey),
           prompt: options.researchBrief,
           position: {
             x: lastPos.x - 300,
@@ -491,11 +530,14 @@ export const generationTools: AgentToolDefinition[] = [
           status: 'done',
           tags: ['research-brief', 'automation']
         };
-        await addPromptNode(briefNode);
+        const liveCanvas = ctx.getActiveCanvas?.() || activeCanvas;
+        if (!(liveCanvas?.promptNodes || []).some((node: any) => node.id === briefNode.id)) {
+          await addPromptNode(briefNode);
+        }
       }
 
       const formattedPrompts = prompts.map((p, idx) => ({
-        id: 'prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
+        id: createGenerationItemId('prompt_item', idempotencyKey, idx),
         prompt: p.prompt,
         referenceImageNodeId: p.referenceImageNodeId
       }));
@@ -558,7 +600,7 @@ export const generationTools: AgentToolDefinition[] = [
         throw new Error('ecommerce.createBatchTransformJob requires imported images or canvas image nodes.');
       }
       const prompts = imageIds.map((imageId: string, idx: number) => ({
-        id: 'ecommerce_prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
+        id: createGenerationItemId('ecommerce_prompt_item', input.idempotencyKey, idx),
         prompt: input.rawUserRequest,
         referenceImageNodeId: imageId
       }));
@@ -617,14 +659,17 @@ export const generationTools: AgentToolDefinition[] = [
         status: job.status,
         promptCount: job.prompts.length
       };
-    }
+    },
+    verify: async (output: any, input: { jobId: string }) => (
+      verifyPersistedGenerationJobState(output, input, ['paused'], 'pause')
+    ),
   },
 
   // 6. generation.resumeJob - 恢复批量生图任务
   {
     name: 'generation.resumeJob',
     description: '恢复指定的批量生图任务',
-    permission: 'safe',
+    permission: 'confirm',
     inputSchema: {
       type: 'object',
       properties: {
@@ -634,46 +679,117 @@ export const generationTools: AgentToolDefinition[] = [
     },
     inputValidator: GenerationJobControlInputSchema,
     handler: async (input: { jobId: string }, ctx) => {
-      requireGenerationJob(input.jobId);
+      const currentJob = requireGenerationJob(input.jobId);
+      if (currentJob.status === 'queued' || currentJob.status === 'running') {
+        return {
+          success: true,
+          executionOutcome: 'success',
+          alreadyActive: true,
+          id: currentJob.id,
+          status: currentJob.status,
+          promptCount: currentJob.prompts.length,
+        };
+      }
+      if (currentJob.status !== 'paused') {
+        return {
+          success: false,
+          executionOutcome: 'failed',
+          code: 'INVALID_JOB_STATE',
+          retryable: false,
+          message: `Generation job ${input.jobId} cannot resume from status ${currentJob.status}.`,
+          id: currentJob.id,
+          status: currentJob.status,
+          promptCount: currentJob.prompts.length,
+        };
+      }
       durableGenerationQueue.resumeJob(input.jobId);
       const job = requireGenerationJob(input.jobId);
-      if (job.status === 'queued' || job.status === 'running') {
-        ctx.notify.success('任务已恢复', `批量生图任务 ${input.jobId} 已恢复并开始继续生图。`);
-      } else {
-        ctx.notify.warning?.('任务未恢复', `任务 ${input.jobId} 当前状态为 ${job.status}，无需恢复。`);
+      if (job.status !== 'queued' && job.status !== 'running') {
+        return {
+          success: false,
+          executionOutcome: 'failed',
+          code: 'RESUME_VERIFICATION_FAILED',
+          retryable: false,
+          message: `Generation job ${input.jobId} did not enter a runnable state.`,
+          id: job.id,
+          status: job.status,
+          promptCount: job.prompts.length,
+        };
       }
+      ctx.notify.success('任务已恢复', `批量生图任务 ${input.jobId} 已恢复并开始继续生图。`);
       return {
+        success: true,
+        executionOutcome: 'success',
         id: job.id,
         status: job.status,
         promptCount: job.prompts.length
       };
-    }
+    },
+    verify: async (output: any, input: { jobId: string }) => (
+      verifyPersistedGenerationJobState(output, input, ['queued', 'running'], 'resume')
+    ),
   },
 
   // 7. generation.retryJob - retry failed prompts in a durable generation job
   {
     name: 'generation.retryJob',
     description: 'Retry failed prompts in a durable batch generation job without resubmitting completed items.',
-    permission: 'safe',
+    permission: 'confirm',
     inputSchema: {
       type: 'object',
       properties: {
         jobId: { type: 'string', description: 'Durable generation job ID' },
-        target: { type: 'string', enum: ['latest_failed'], description: 'Retry the latest failed durable generation job when jobId is omitted.' }
-      }
+        expectedUpdatedAt: { type: 'number', description: 'Queue job revision frozen before confirmation' },
+        expectedRetryablePromptIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Sorted retryable failed prompt IDs frozen before confirmation'
+        }
+      },
+      required: ['jobId', 'expectedUpdatedAt', 'expectedRetryablePromptIds']
     },
     inputValidator: GenerationRetryJobInputSchema,
     handler: async (input: RetryJobInput, ctx) => {
-      const { job: resolvedJob, resolvedFrom } = resolveRetryJob(input);
+      const queue = ctx.generationQueue || durableGenerationQueue;
+      const resolvedJob = resolveRetryJob(input, queue);
+      const actualRetryablePromptIds = resolvedJob.prompts
+        .filter(prompt => prompt.status === 'failed' && prompt.retryable !== false)
+        .map(prompt => prompt.id)
+        .sort();
+      const expectedRetryablePromptIds = [...input.expectedRetryablePromptIds].sort();
+      const frozenScopeStillMatches = resolvedJob.updatedAt === input.expectedUpdatedAt
+        && actualRetryablePromptIds.length === expectedRetryablePromptIds.length
+        && actualRetryablePromptIds.every((promptId, index) => promptId === expectedRetryablePromptIds[index]);
 
-      const retryingCount = resolvedJob.prompts.filter(prompt => prompt.status === 'failed').length;
-      if (retryingCount === 0) {
+      if (!frozenScopeStillMatches) {
         return {
+          success: false,
+          executionOutcome: 'failed',
+          code: 'STALE_RETRY_TARGET',
+          retryable: false,
+          message: `Generation job ${resolvedJob.id} changed after confirmation preview; create a new retry plan.`,
           id: resolvedJob.id,
           status: resolvedJob.status,
-          resolvedFrom,
+          expectedUpdatedAt: input.expectedUpdatedAt,
+          actualUpdatedAt: resolvedJob.updatedAt,
+          expectedRetryablePromptIds,
+          actualRetryablePromptIds,
+        };
+      }
+
+      const retryingCount = actualRetryablePromptIds.length;
+      if (retryingCount === 0) {
+        return {
+          success: false,
+          executionOutcome: 'failed',
+          code: 'NO_RETRYABLE_ITEMS',
+          retryable: false,
+          message: `Generation job ${resolvedJob.id} has no retryable failed items.`,
+          id: resolvedJob.id,
+          status: resolvedJob.status,
+          resolvedFrom: 'explicit',
           retryingCount: 0,
-          failedCount: 0,
+          failedCount: resolvedJob.prompts.filter(prompt => prompt.status === 'failed').length,
           queuedCount: resolvedJob.prompts.filter(prompt => prompt.status === 'queued').length,
           promptCount: resolvedJob.prompts.length,
           outputGroup: resolvedJob.outputGroup,
@@ -681,16 +797,18 @@ export const generationTools: AgentToolDefinition[] = [
         };
       }
 
-      durableGenerationQueue.retryFailedPrompts(resolvedJob.id);
-      const job = durableGenerationQueue.getJob(resolvedJob.id) || resolvedJob;
+      queue.retryFailedPrompts(resolvedJob.id);
+      const job = queue.getJob(resolvedJob.id) || resolvedJob;
 
       ctx.notify?.success?.('失败项已重新入队', `已将 ${retryingCount} 个失败项重新加入 DurableGenerationQueue。`);
       return {
+        success: true,
+        executionOutcome: 'success',
         id: job.id,
         idempotencyKey: job.idempotencyKey,
         canvasId: job.canvasId,
         status: job.status,
-        resolvedFrom,
+        resolvedFrom: 'explicit',
         retryingCount,
         promptCount: job.prompts.length,
         completedCount: job.prompts.filter(prompt => prompt.status === 'completed').length,
@@ -700,7 +818,19 @@ export const generationTools: AgentToolDefinition[] = [
         outputGroup: job.outputGroup,
         updatedAt: job.updatedAt
       };
-    }
+    },
+    verify: async (output: any, input: RetryJobInput, ctx) => {
+      if (Number(output?.retryingCount || 0) <= 0) {
+        return { success: false, message: 'Retry did not requeue any failed generation item.' };
+      }
+      return verifyPersistedGenerationJobState(
+        output,
+        input,
+        ['queued', 'running', 'completed', 'completed_with_errors'],
+        'retry',
+        ctx.generationQueue || durableGenerationQueue,
+      );
+    },
   },
 
   // 8. generation.getJobStatus - 读取批量生图任务状态摘要
@@ -742,7 +872,7 @@ export const generationTools: AgentToolDefinition[] = [
   {
     name: 'generation.cancelJob',
     description: '取消指定的批量生图任务，并中止排队中或执行中的任务',
-    permission: 'safe',
+    permission: 'confirm',
     inputSchema: {
       type: 'object',
       properties: {
@@ -761,7 +891,10 @@ export const generationTools: AgentToolDefinition[] = [
         status: job.status,
         promptCount: job.prompts.length
       };
-    }
+    },
+    verify: async (output: any, input: { jobId: string }) => (
+      verifyPersistedGenerationJobState(output, input, ['cancelled'], 'cancellation')
+    ),
   },
   {
     name: 'generation.createAudioTask',

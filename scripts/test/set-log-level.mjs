@@ -5,6 +5,32 @@ import { fileURLToPath } from 'node:url';
 process.env.KK_LOG_LEVEL ??= "WARN";
 process.env.KK_API_SESSION_SIGNING_SECRET ??= "unit-test-kk-session-signing-secret";
 
+// Browser runtime singletons must exercise their durable path in Node tests as well.
+// This test-only Storage implementation is installed before ESM test modules load.
+if (!("localStorage" in globalThis)) {
+  const values = new Map();
+  globalThis.localStorage = {
+    get length() {
+      return values.size;
+    },
+    clear() {
+      values.clear();
+    },
+    getItem(key) {
+      return values.has(String(key)) ? values.get(String(key)) : null;
+    },
+    key(index) {
+      return [...values.keys()][index] ?? null;
+    },
+    removeItem(key) {
+      values.delete(String(key));
+    },
+    setItem(key, value) {
+      values.set(String(key), String(value));
+    },
+  };
+}
+
 const originalConsoleWarn = console.warn.bind(console);
 const originalConsoleError = console.error.bind(console);
 

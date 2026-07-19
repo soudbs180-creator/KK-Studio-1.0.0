@@ -8,6 +8,53 @@ import { BROWSER_ACTIONS } from '../browser/browserActionCatalog.ts';
 
 const getBridgeClient = (ctx: any) => ctx?.browserBridge;
 const getBridgeSnapshot = (ctx: any) => ctx?.browserBridgeSnapshot || ctx?.browserAssistantSnapshot;
+type IdempotentBrowserInput = { idempotencyKey?: string };
+
+const requireBrowserToolInputObject = (input: unknown): Record<string, unknown> => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('Browser tool input must be a JSON object.');
+  }
+  return input as Record<string, unknown>;
+};
+
+const parseExplicitBrowserTarget = (value: unknown): string => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new TypeError('Browser AI tools require an explicit public http(s) target URL.');
+  }
+  return sanitizeBrowserBridgeUrl(value.trim());
+};
+
+const browserInspectInputValidator = {
+  parse(input: unknown) {
+    const record = requireBrowserToolInputObject(input);
+    for (const field of ['includePalette', 'includeOcr', 'includeLayout']) {
+      if (record[field] !== undefined && typeof record[field] !== 'boolean') {
+        throw new TypeError(`Browser inspect field ${field} must be boolean.`);
+      }
+    }
+    return {
+      ...record,
+      target: parseExplicitBrowserTarget(record.target),
+    } as { target: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } & IdempotentBrowserInput;
+  },
+};
+
+const browserWriteBackInputValidator = {
+  parse(input: unknown) {
+    const record = requireBrowserToolInputObject(input);
+    for (const field of ['title', 'price']) {
+      if (typeof record[field] !== 'string' || !record[field].trim()) {
+        throw new TypeError(`Browser DOM write field ${field} must be a non-empty string.`);
+      }
+    }
+    return {
+      ...record,
+      target: parseExplicitBrowserTarget(record.target),
+      title: String(record.title),
+      price: String(record.price),
+    } as { target: string; title: string; price: string } & IdempotentBrowserInput;
+  },
+};
 
 const {
   getStatus,
@@ -64,7 +111,7 @@ export const browserTools: AgentToolDefinition[] = [
       },
       required: ['url']
     },
-    handler: async (input: { url: string; targets?: string[]; label?: string }, ctx) => {
+    handler: async (input: { url: string; targets?: string[]; label?: string } & IdempotentBrowserInput, ctx) => {
       const url = sanitizeBrowserBridgeUrl(input.url);
       const command = createBrowserBridgeCommand({
         kind: extractProduct.commandKind,
@@ -73,6 +120,7 @@ export const browserTools: AgentToolDefinition[] = [
           targets: input.targets || ['price', 'title', 'image', 'description'],
           label: input.label
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: extractProduct.requiresUserGesture
       });
 
@@ -97,7 +145,7 @@ export const browserTools: AgentToolDefinition[] = [
       },
       required: ['prompt']
     },
-    handler: async (input: { prompt: string; platformId?: string; count?: number; sessionIds?: string[]; sessionCount?: number }, ctx) => {
+    handler: async (input: { prompt: string; platformId?: string; count?: number; sessionIds?: string[]; sessionCount?: number } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: generateExternal.commandKind,
         target: input.platformId || 'browser_generation_platform',
@@ -108,6 +156,7 @@ export const browserTools: AgentToolDefinition[] = [
           sessionIds: input.sessionIds || [],
           sessionCount: input.sessionCount
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: generateExternal.requiresUserGesture
       });
 
@@ -131,7 +180,7 @@ export const browserTools: AgentToolDefinition[] = [
       },
       required: ['channelId']
     },
-    handler: async (input: { channelId: string; imageUrl?: string; title?: string; body?: string }, ctx) => {
+    handler: async (input: { channelId: string; imageUrl?: string; title?: string; body?: string } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: publishDraft.commandKind,
         target: input.channelId,
@@ -141,6 +190,7 @@ export const browserTools: AgentToolDefinition[] = [
           body: input.body,
           publishMode: 'draft_only'
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: publishDraft.requiresUserGesture
       });
 
@@ -152,7 +202,7 @@ export const browserTools: AgentToolDefinition[] = [
   },
   {
     name: inspectPage.toolName,
-    description: 'Capture the active external browser viewport and return a sanitized visual/layout/OCR summary through Browser Bridge.',
+    description: 'Capture a confirmed public external page URL and return a sanitized visual/layout/OCR summary through Browser Bridge.',
     permission: inspectPage.permission,
     inputSchema: {
       type: 'object',
@@ -161,18 +211,21 @@ export const browserTools: AgentToolDefinition[] = [
         includePalette: { type: 'boolean' },
         includeOcr: { type: 'boolean' },
         includeLayout: { type: 'boolean' }
-      }
+      },
+      required: ['target']
     },
-    handler: async (input: { target?: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean }, ctx) => {
+    inputValidator: browserInspectInputValidator,
+    handler: async (input: { target: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: inspectPage.commandKind,
-        target: input.target || 'active_tab',
+        target: input.target,
         payload: {
           includePalette: input.includePalette ?? true,
           includeOcr: input.includeOcr ?? true,
           includeLayout: input.includeLayout ?? true,
           source: 'browser-assistant-screen-inspect'
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: inspectPage.requiresUserGesture
       });
 
@@ -193,7 +246,7 @@ export const browserTools: AgentToolDefinition[] = [
         projectHint: { type: 'string' }
       }
     },
-    handler: async (input: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string }, ctx) => {
+    handler: async (input: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: openDesktopProject.commandKind,
         target: input.ide || 'cursor',
@@ -202,6 +255,7 @@ export const browserTools: AgentToolDefinition[] = [
           projectHint: input.projectHint || 'current_workspace',
           source: 'browser-assistant-desktop-adapter'
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: openDesktopProject.requiresUserGesture
       });
 
@@ -223,7 +277,7 @@ export const browserTools: AgentToolDefinition[] = [
         model: { type: 'string' }
       }
     },
-    handler: async (input: { provider?: string; endpoint?: string; model?: string }, ctx) => {
+    handler: async (input: { provider?: string; endpoint?: string; model?: string } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: checkLocalLlm.commandKind,
         target: 'local_llm_gateway',
@@ -233,6 +287,7 @@ export const browserTools: AgentToolDefinition[] = [
           model: input.model,
           source: 'browser-assistant-local-llm'
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: checkLocalLlm.requiresUserGesture
       });
 
@@ -244,7 +299,7 @@ export const browserTools: AgentToolDefinition[] = [
   },
   {
     name: writeBackDom.toolName,
-    description: '通过 Browser Bridge 将用户确认后的字段回写到当前外部网页 DOM',
+    description: '通过 Browser Bridge 将用户确认后的字段回写到已冻结的公开网页 URL 对应 DOM',
     permission: writeBackDom.permission,
     inputSchema: {
       type: 'object',
@@ -253,16 +308,18 @@ export const browserTools: AgentToolDefinition[] = [
         title: { type: 'string' },
         price: { type: 'string' }
       },
-      required: ['title', 'price']
+      required: ['target', 'title', 'price']
     },
-    handler: async (input: { target?: string; title: string; price: string }, ctx) => {
+    inputValidator: browserWriteBackInputValidator,
+    handler: async (input: { target: string; title: string; price: string } & IdempotentBrowserInput, ctx) => {
       const command = createBrowserBridgeCommand({
         kind: writeBackDom.commandKind,
-        target: input.target || 'active_tab',
+        target: input.target,
         payload: {
           title: input.title,
           price: input.price
         },
+        idempotencyKey: input.idempotencyKey,
         requiresUserGesture: writeBackDom.requiresUserGesture
       });
 

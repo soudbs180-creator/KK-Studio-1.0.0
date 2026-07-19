@@ -221,10 +221,42 @@ export function shouldTreatAsGeneration(input: string): boolean {
 export function analyzeIntent(input: string, context?: SanitizedProjectContext): IntentResult {
   const cleanInput = (input || '').trim();
   const lowerInput = cleanInput.toLowerCase();
-  const retryJobId = extractGenerationJobId(cleanInput);
+  const generationJobId = extractGenerationJobId(cleanInput);
   const firstUrl = extractHttpUrl(cleanInput);
   const hasRetryGenerationCommand = /重试|重新跑|再试|retry|rerun/i.test(cleanInput);
-  const hasFailedBatchTarget = Boolean(retryJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
+  const hasFailedBatchTarget = Boolean(generationJobId) || /失败.*(批次|队列|任务)|(?:批次|队列|任务).*(失败)|刚才|上次|最近|latest|last|recent|failed\s+(?:job|batch)|job|batch/i.test(cleanInput);
+  const resumeCommandWithoutId = generationJobId
+    ? cleanInput.replace(generationJobId, ' ')
+    : cleanInput;
+  const hasStrongResumeCommand = /恢复|resume/i.test(resumeCommandWithoutId);
+  const hasContinueCommand = /继续(?:执行|运行|生成|生图|处理)|继续(?:这个|该|此)(?:已?暂停的?)?(?:生成|生图)(?:任务|批次|队列)|continue\s+(?:running|processing|generating|execution)|continue\s+(?:the\s+)?paused\s+(?:generation\s+)?(?:job|batch)/i.test(resumeCommandWithoutId);
+  const hasPausedGenerationAnchor = /暂停|挂起|生成(?:任务|批次|队列)|生图(?:任务|批次|队列)|durable\s*generation\s*queue|paused\s+(?:generation\s+)?(?:job|batch)|generation\s+(?:job|batch)/i.test(resumeCommandWithoutId);
+
+  if (hasRetryGenerationCommand && hasFailedBatchTarget) {
+    return {
+      intent: 'retry_generation_job',
+      confidence: 0.93,
+      extracted: generationJobId ? { jobId: generationJobId } : { retryTarget: 'recent_failed' },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到重试失败批量生成任务；重试可能再次消耗积分或 Provider 配额。'
+    };
+  }
+
+  if (
+    generationJobId
+    && !hasRetryGenerationCommand
+    && (hasStrongResumeCommand || (hasContinueCommand && hasPausedGenerationAnchor))
+  ) {
+    return {
+      intent: 'resume_generation_job',
+      confidence: 0.94,
+      extracted: { jobId: generationJobId },
+      risk: 'cost',
+      needsConfirmation: true,
+      reason: '识别到恢复暂停持久化生成任务；恢复后可能继续消耗积分或 Provider 配额。'
+    };
+  }
 
   // 提取选区与参考图
   const selectedNodeIds = context?.canvas?.selectedNodeIds || [];
@@ -393,20 +425,6 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
     }
   }
 
-  if (
-    hasRetryGenerationCommand &&
-    hasFailedBatchTarget
-  ) {
-    return {
-      intent: 'retry_generation_job',
-      confidence: 0.93,
-      extracted: retryJobId ? { jobId: retryJobId } : { retryTarget: 'latest_failed' },
-      risk: 'none',
-      needsConfirmation: false,
-      reason: '识别到重试失败批量生成任务的安全队列控制指令。'
-    };
-  }
-
   const hasBrowserAssistantSurface = /浏览器助手|browser\s*assistant|网页直通|多端|守护进程|chrome\s*插件|bridge\s*插件|插件状态|daemon/i.test(cleanInput);
   if (hasBrowserAssistantSurface && /检查|检测|诊断|状态|连接|连通|是否可用|健康/i.test(cleanInput)) {
     return {
@@ -511,8 +529,8 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       confidence: 0.95,
       extracted: {},
       risk: 'cost',
-      needsConfirmation: false,
-      reason: '识别到发送/运行生成意图。'
+      needsConfirmation: true,
+      reason: '识别到发送/运行生成意图；生成必须先确认数量、费用与影响范围。'
     };
   }
 
@@ -597,7 +615,7 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
     };
   }
 
-  // 6.8. 简单“生成一个...”直接复用画布输入框配置并发送，不绕到独立建卡确认流。
+  // 6.8. 简单“生成一个...”统一进入单项 DurableGenerationQueue 计划，不旁路确认与恢复链路。
   if (
     shouldTreatAsGeneration(cleanInput) &&
     /生成|出图|跑图|画|发送|出个/i.test(cleanInput) &&
@@ -614,8 +632,8 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
           prompt: extractSimpleGeneratePrompt(cleanInput)
         },
         risk: 'cost',
-        needsConfirmation: false,
-        reason: '识别到简单单次生成指令，复用画布输入框当前模型、比例、参考图等配置并直接发送。'
+        needsConfirmation: true,
+        reason: '识别到简单单次生成指令；统一通过持久队列并在执行前确认数量、费用与影响范围。'
       };
     }
   }

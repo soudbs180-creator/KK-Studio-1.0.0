@@ -339,12 +339,14 @@ export const uiTools: AgentToolDefinition[] = [
         return capabilityUnavailable('Prompt input host config setter is not bound.');
       }
 
-      setConfig((prev: any) => ({
+      await Promise.resolve(setConfig((prev: any) => ({
         ...prev,
         prompt: prompt
-      }));
+      })));
       notify.success('输入框已填入优化提示词', '');
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'filled'
       };
     }
@@ -371,12 +373,14 @@ export const uiTools: AgentToolDefinition[] = [
         return capabilityUnavailable('Generation mode host config setter is not bound.');
       }
 
-      setConfig((prev: any) => ({
+      await Promise.resolve(setConfig((prev: any) => ({
         ...prev,
         mode: mode
-      }));
+      })));
       notify.success(`已切换至【${mode === 'image' ? '图片' : mode === 'video' ? '视频' : mode === 'audio' ? '音频' : mode === 'ppt' ? 'PPT' : '电商'}】模式`, '');
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'changed',
         mode
       };
@@ -421,9 +425,11 @@ export const uiTools: AgentToolDefinition[] = [
         return capabilityUnavailable('PPT editor mode host handler is not bound.');
       }
 
-      setPptEditorMode(input.mode);
+      await Promise.resolve(setPptEditorMode(input.mode));
       notify.success('编辑器模式已切换', `已成功切换为 PPT ${input.mode === 'outline' ? '大纲' : '缩略图'}编辑模式。`);
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'changed',
         mode: input.mode
       };
@@ -452,6 +458,8 @@ export const uiTools: AgentToolDefinition[] = [
       await openToolWindowInstance(input.toolId, input.url, input.options);
       notify.success('工具窗口已打开', `工具 ${input.toolId} 窗口实例创建成功。`);
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'opened',
         toolId: input.toolId
       };
@@ -476,9 +484,11 @@ export const uiTools: AgentToolDefinition[] = [
         return capabilityUnavailable('Tool pin host handler is not bound.');
       }
 
-      togglePinTool(input.toolId, input.pinned);
+      await Promise.resolve(togglePinTool(input.toolId, input.pinned));
       notify.success(input.pinned ? '工具已常驻' : '已取消工具常驻', '');
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: input.pinned ? 'pinned' : 'unpinned',
         toolId: input.toolId
       };
@@ -519,6 +529,8 @@ export const uiTools: AgentToolDefinition[] = [
         notify.success(input.minimized ? '已最小化窗口' : '已还原窗口', '');
       }
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'scheduled',
         instanceId: input.instanceId
       };

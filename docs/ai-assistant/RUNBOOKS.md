@@ -1,6 +1,6 @@
 # AI Assistant Runbooks — KK Studio v1.6.0
 
-Last updated: 2026-06-05
+Last updated: 2026-07-19
 Primary rules: `AGENTS.md`  
 Detailed roadmap: `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`
 
@@ -23,6 +23,8 @@ Knowledge      完成后更新哪些知识文件
 ```
 
 新增 Tool、修改 Flow、修改 UI 入口、修改画布状态结构、修改批量生成或下载逻辑时，必须同步更新本文件或拆分到 `docs/ai-assistant/skills/*.md`。
+
+所有确认型步骤都必须使用用户看到的预览快照：授权精确绑定 owner、Run、Plan、Step、输入、幂等键、页面、项目、画布、选区、模型与可变配置摘要。Run 状态、恢复流程或父工作流不能扩展该范围；执行前范围发生变化时必须重新确认。
 
 ---
 
@@ -59,21 +61,21 @@ knowledge.recordChange
 
 ```text
 1. 调用 canvas.getState 获取 CanvasRuntimeState。
-2. 读取 selection.selectedNodeIds。
+2. 读取 selection.selectedNodeIds，并把去重后的 ID 冻结到确认预览和 `assets.zipOriginals` 输入。
 3. 调用 canvas.getSelectedNodes 获取选区 Prompt 与 Image 节点。
 4. 对 Image 节点直接加入下载列表。
 5. 对 Prompt 节点解析 childImageIds 并加入下载列表。
 6. 同时选中 Prompt 与其子图时按 image node id 去重。
 7. 对每张图调用 assets.resolveOriginals。
 8. 按 originalUrl -> apiResultUrl -> url -> storageId -> failedItems 解析原图。
-9. 调用 assets.zipOriginals 生成 ZIP。
+9. 用户确认冻结范围后，调用 assets.zipOriginals 生成 ZIP；执行时不得替换为新的实时选区。
 10. ZIP 内写入 manifest.json。
 11. 返回下载结果。
 ```
 
 ### Safety
 
-- 下载已有原图属于 `safe`。
+- `assets.zipOriginals` 属于 `confirm`；下载会产生本地文件副作用，必须展示数量、范围和失败处理，并绑定冻结选区。
 - 范围不明确时默认当前选区。
 - 没有选区且用户未指定范围时，不自动下载整个画布。
 - ZIP manifest 不写入密钥、完整用户隐私、完整 base64。
@@ -137,8 +139,8 @@ generation.getJobStatus
 generation.pauseJob
 generation.resumeJob
 generation.retryJob
+generation.cancelJob
 canvas.createPromptCards
-canvas.createImageCards
 canvas.arrangeNodes
 knowledge.recordChange
 ```
@@ -162,13 +164,15 @@ knowledge.recordChange
 14. 执行 `canvas.arrangeNodes({ nodeIds, preset })`，只整理本 job 节点。
 15. 创建或更新一个 `CanvasGroup`，默认 `color: '#ffffff'`。
 16. 打 automation 和 batch:<jobId> tag。
-17. 若部分子项失败且用户要求重试，调用 `generation.retryJob` 仅重试 failed 子项；如果用户未提供 jobId 但指向最近失败批次，使用 `generation.retryJob({ target: 'latest_failed' })`。
+17. 若部分子项失败且用户要求重试，先由 AgentRuntime 在当前 owner 的 Queue 中把相对语义解析为具体 Job，再把 `jobId`、Job `updatedAt` 与可重试 failed Prompt ID 集合冻结到确认计划。`generation.retryJob` 只接受该快照；目标变化时要求重新预览，不重选其他任务。
 18. 写入 ToolCallLog、AgentRunRecord、KnowledgeSync。
 ```
 
 ### Safety
 
 - 批量生成是 `confirm`。
+- 恢复和重试可能继续消耗 Provider 配额或积分，属于 `confirm`；取消不可撤销，也属于 `confirm`。
+- 暂停是可恢复的局部队列控制，可作为 `safe` 执行；执行后仍必须验证 Job 的实时 `paused` 状态。
 - 上传文件是 `confirm`。
 - 大批量、覆盖、清空旧结果是 `dangerous`。
 - 不允许循环模拟输入框逐条发送。
@@ -473,10 +477,12 @@ knowledge.recordChange
 3. 读取 taskPersistence pending / processing tasks。
 4. 重建 CanvasRuntimeState。
 5. 对比画布节点与 job item 状态。
-6. 可自动恢复的 safe 操作直接恢复。
-7. 若任务已结束但存在 failed 子项，调用 `generation.retryJob` 只重试失败项；恢复语境中没有明确 jobId 时，允许使用 `generation.retryJob({ target: 'latest_failed' })` 定位最近失败任务。
-8. 涉及扣积分、上传、覆盖、删除的操作重新确认。
-9. 写入新的 handoff。
+6. 只读状态检查可自动恢复；不得从持久 Run 状态合成确认授权。
+7. 暂停状态的任务只有在用户确认明确 Job、未完成项和后续费用后，才调用 `generation.resumeJob`。
+8. 若任务已结束但存在 failed 子项，用户确认后调用 `generation.retryJob` 只重试失败项；恢复语境中没有明确 jobId 时，必须在确认预览生成前解析并冻结具体 Job/版本/失败项集合，禁止把 latest/current 动态选择器写入 Pending Run。
+9. Runtime 内部补偿只能依据已开始步骤的 recovery ledger 与幂等键精确取消对应 Durable Job，不得签发或接受通用 `runtime-recovery` grant。
+10. 涉及扣积分、上传、覆盖、删除或取消的操作重新确认。
+11. 写入新的 handoff。
 ```
 
 ### Safety
@@ -485,6 +491,7 @@ knowledge.recordChange
 - 不重复提交已完成生成。
 - 使用 idempotencyKey 去重。
 - 不自动执行危险操作。
+- 账号、画布、选区、模型或配置在预览后改变时停止恢复并要求重新确认。
 
 ### Validation
 

@@ -37,6 +37,8 @@ import {
   browserBridgeAdapter,
   createBrowserBridgeCommand,
   createBrowserBridgeSetupRequiredResult,
+  getBrowserBridgeOwnerStorageKey,
+  subscribeBrowserBridgeCommand,
   type BrowserBridgeCommand,
   type BrowserBridgeResult,
   type BrowserBridgeStatusSnapshot,
@@ -44,6 +46,8 @@ import {
 import { BROWSER_ACTIONS, BROWSER_LOCAL_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
 import { agentRuntimeInstance, toolRegistryInstance } from '../../../features/ai-assistant-runtime';
 import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
+import { subscribeAuthSessionChange } from '../../../services/auth/authSessionEvents';
+import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile';
 
 const SETUP_HINT = '请先启动本地守护进程并连接 Chrome Bridge 插件，然后回到浏览器助手重试。';
 
@@ -75,6 +79,72 @@ interface AccountSession {
   enabled: boolean;
   priority: 'high' | 'normal' | 'low';
 }
+
+const DEFAULT_BROWSER_SESSIONS: AccountSession[] = [
+  { id: 'sess_leo_1', platformId: 'leonardo', username: 'leo_geek_alpha', status: 'logged_in', enabled: true, priority: 'high' },
+  { id: 'sess_leo_2', platformId: 'leonardo', username: 'leo_geek_beta', status: 'logged_in', enabled: true, priority: 'normal' },
+  { id: 'sess_mj_1', platformId: 'midjourney', username: 'mj_unlimited_pro', status: 'logged_in', enabled: true, priority: 'high' },
+];
+
+const DEFAULT_SELECTED_BROWSER_SESSIONS = ['sess_leo_1', 'sess_leo_2'];
+const DEFAULT_BROWSER_PROMPT = '一间充满蒸汽朋克风的未来科技感机械加工坊，充满黄色暖光和铜锈质感，高清画质';
+const DEFAULT_TAKEOVER_INPUT = '用网页直通代理多开 2 个号并发跑 3 张商品海报图';
+const DEFAULT_BROWSER_PLATFORMS: ImageGenPlatform[] = [
+  {
+    id: 'midjourney',
+    name: 'Midjourney 网页版',
+    url: 'https://alpha.midjourney.com',
+    status: 'unknown',
+    enabled: false,
+    quota: 'Pro 无限生成模式',
+  },
+  {
+    id: 'leonardo',
+    name: 'Leonardo.ai',
+    url: 'https://leonardo.ai',
+    status: 'unknown',
+    enabled: true,
+    quota: '多账号 Session 混合池',
+  },
+  {
+    id: 'tensorart',
+    name: 'Tensor.Art',
+    url: 'https://tensor.art',
+    status: 'unknown',
+    enabled: true,
+    quota: '每日 100 免费点数',
+  },
+];
+const DEFAULT_BROWSER_SOCIAL_CHANNELS: SocialChannel[] = [
+  {
+    id: 'xhs',
+    name: '小红书网页版',
+    url: 'https://creator.xiaohongshu.com',
+    status: 'unknown',
+    enabled: true,
+  },
+  {
+    id: 'weibo',
+    name: '微博网页版',
+    url: 'https://weibo.com',
+    status: 'unknown',
+    enabled: false,
+  },
+];
+
+interface BrowserOwnerScope {
+  ownerId: string;
+  epoch: number;
+}
+
+const loadOwnerBrowserValue = <T,>(ownerId: string, key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(getBrowserBridgeOwnerStorageKey(key, ownerId));
+    return saved ? JSON.parse(saved) as T : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 type BrowserLoginStatus = ImageGenPlatform['status'];
 
@@ -224,6 +294,22 @@ const workerCode = `
 `;
 
 export const BrowserAssistantView: React.FC = () => {
+  const [browserOwnerId, setBrowserOwnerId] = useState(() => getRuntimeOwnerId());
+  const browserOwnerIdRef = useRef(browserOwnerId);
+  const browserOwnerEpochRef = useRef(0);
+  const workerRef = useRef<Worker | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+  const logsBufferRef = useRef<string[]>([]);
+  const captureBrowserOwnerScope = (): BrowserOwnerScope => ({
+    ownerId: browserOwnerIdRef.current,
+    epoch: browserOwnerEpochRef.current,
+  });
+  const isBrowserOwnerScopeCurrent = (scope: BrowserOwnerScope): boolean => (
+    isMountedRef.current
+    && browserOwnerIdRef.current === scope.ownerId
+    && browserOwnerEpochRef.current === scope.epoch
+    && getRuntimeOwnerId() === scope.ownerId
+  );
   // 连通性状态
   const [daemonStatus, setDaemonStatus] = useState<ConnectionStatus>('disconnected');
   const [extensionStatus, setExtensionStatus] = useState<ConnectionStatus>('disconnected');
@@ -291,7 +377,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [clippingProgress, setClippingProgress] = useState(false);
 
   // 外部生图状态
-  const [promptText, setPromptText] = useState('一间充满蒸汽朋克风的未来科技感机械加工坊，充满黄色暖光和铜锈质感，高清画质');
+  const [promptText, setPromptText] = useState(DEFAULT_BROWSER_PROMPT);
   const [genPlatform, setGenPlatform] = useState('leonardo');
   const [genLoading, setGenLoading] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
@@ -343,35 +429,19 @@ export const BrowserAssistantView: React.FC = () => {
   } | null>(null);
 
   // --- 阶段五：单站多账号多实例会话池状态 ---
-  const [sessions, setSessions] = useState<AccountSession[]>(() => {
-    const saved = localStorage.getItem('kk_browser_sessions');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return [
-      { id: 'sess_leo_1', platformId: 'leonardo', username: 'leo_geek_alpha', status: 'logged_in', enabled: true, priority: 'high' },
-      { id: 'sess_leo_2', platformId: 'leonardo', username: 'leo_geek_beta', status: 'logged_in', enabled: true, priority: 'normal' },
-      { id: 'sess_mj_1', platformId: 'midjourney', username: 'mj_unlimited_pro', status: 'logged_in', enabled: true, priority: 'high' },
-    ];
-  });
+  const [sessions, setSessions] = useState<AccountSession[]>(() => loadOwnerBrowserValue(
+    browserOwnerId,
+    'sessions',
+    DEFAULT_BROWSER_SESSIONS,
+  ));
   
   // 生图路由与多实例选择
   const [routingMode, setRoutingMode] = useState<'api' | 'proxy'>('proxy');
-  const [selectedSessionsForGen, setSelectedSessionsForGen] = useState<string[]>(() => {
-    const saved = localStorage.getItem('kk_browser_selected_sessions');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return ['sess_leo_1', 'sess_leo_2'];
-  });
+  const [selectedSessionsForGen, setSelectedSessionsForGen] = useState<string[]>(() => loadOwnerBrowserValue(
+    browserOwnerId,
+    'selected_sessions',
+    DEFAULT_SELECTED_BROWSER_SESSIONS,
+  ));
 
   // 双向 DOM 修改同步回写状态
   const [editedTitle, setEditedTitle] = useState('');
@@ -379,7 +449,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [writeBackLoading, setWriteBackLoading] = useState(false);
 
   // AI Takeover 自然语言预览输入
-  const [takeoverInput, setTakeoverInput] = useState('用网页直通代理多开 2 个号并发跑 3 张商品海报图');
+  const [takeoverInput, setTakeoverInput] = useState(DEFAULT_TAKEOVER_INPUT);
   const [takeoverOutput, setTakeoverOutput] = useState<{
     intent: string;
     routing: string;
@@ -401,6 +471,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 桌面通道诊断
   const handleTestIde = async () => {
+    const ownerScope = captureBrowserOwnerScope();
     setTestingDesktop(true);
     setDesktopStatus('connecting');
 
@@ -416,7 +487,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.openDesktopProject.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setDesktopStatus('error');
@@ -442,11 +513,11 @@ export const BrowserAssistantView: React.FC = () => {
       setDesktopStatus('error');
       notify.error('桌面调起失败', result.error || result.summary);
     } catch (error: any) {
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setDesktopStatus('error');
       notify.error('桌面调起失败', error?.message || 'Browser Bridge 桌面通道执行失败');
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setTestingDesktop(false);
       }
     }
@@ -476,58 +547,17 @@ export const BrowserAssistantView: React.FC = () => {
 
 
   // 外部网页直通生图平台管理
-  const [platforms, setPlatforms] = useState<ImageGenPlatform[]>([
-    {
-      id: 'midjourney',
-      name: 'Midjourney 网页版',
-      url: 'https://alpha.midjourney.com',
-      status: 'unknown',
-      enabled: false,
-      quota: 'Pro 无限生成模式',
-    },
-    {
-      id: 'leonardo',
-      name: 'Leonardo.ai',
-      url: 'https://leonardo.ai',
-      status: 'unknown',
-      enabled: true,
-      quota: '多账号 Session 混合池',
-    },
-    {
-      id: 'tensorart',
-      name: 'Tensor.Art',
-      url: 'https://tensor.art',
-      status: 'unknown',
-      enabled: true,
-      quota: '每日 100 免费点数',
-    },
-  ]);
+  const [platforms, setPlatforms] = useState<ImageGenPlatform[]>(() => (
+    DEFAULT_BROWSER_PLATFORMS.map((platform) => ({ ...platform }))
+  ));
 
   // 社交分发平台管理
-  const [socialChannels, setSocialChannels] = useState<SocialChannel[]>([
-    {
-      id: 'xhs',
-      name: '小红书网页版',
-      url: 'https://creator.xiaohongshu.com',
-      status: 'unknown',
-      enabled: true,
-    },
-    {
-      id: 'weibo',
-      name: '微博网页版',
-      url: 'https://weibo.com',
-      status: 'unknown',
-      enabled: false,
-    },
-  ]);
+  const [socialChannels, setSocialChannels] = useState<SocialChannel[]>(() => (
+    DEFAULT_BROWSER_SOCIAL_CHANNELS.map((channel) => ({ ...channel }))
+  ));
 
   // 引用引用区：防止垃圾回收并用于卸载清理销毁
   const [activePipelineCmdId, setActivePipelineCmdId] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-  const isMountedRef = useRef<boolean>(true);
-  
-  // 采用 Ref 缓存的日志缓冲池，限制最大存储长度，避免引发大规模重排与内存溢出
-  const logsBufferRef = useRef<string[]>([]);
 
   const appendPipelineLog = (log: string) => {
     logsBufferRef.current.push(log);
@@ -636,21 +666,24 @@ export const BrowserAssistantView: React.FC = () => {
   // 定期从 browserBridgeAdapter 同步连通性状态
   useEffect(() => {
     const syncStatus = async () => {
+      const ownerScope = captureBrowserOwnerScope();
       try {
         const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
           browserAssistantSnapshot: getBrowserBridgeSnapshot()
         }) as BrowserBridgeStatusSnapshot;
-        if (isMountedRef.current) {
+        if (isBrowserOwnerScopeCurrent(ownerScope)) {
           applyBrowserStatusSnapshot(status);
         }
       } catch (err) {
-        console.warn('Failed to sync status from browser.getStatus', err);
+        if (isBrowserOwnerScopeCurrent(ownerScope)) {
+          console.warn('Failed to sync status from browser.getStatus', err);
+        }
       }
     };
     syncStatus();
     const interval = setInterval(syncStatus, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [browserOwnerId]);
 
   // 1. 初始化 Web Worker，组件卸载时 100% 回收资源
   useEffect(() => {
@@ -676,14 +709,15 @@ export const BrowserAssistantView: React.FC = () => {
         URL.revokeObjectURL(workerUrl);
       }
     };
-  }, []);
+  }, [browserOwnerId]);
 
   // 1b. 监听浏览器桥全局异步消息以打通回调闭环
   useEffect(() => {
-    const handleBridgeMessage = (e: Event) => {
-      const msg = (e as CustomEvent).detail;
-      if (!msg || typeof msg !== 'object') return;
-      const commandId = msg.commandId || msg.id;
+    if (!activePipelineCmdId) return;
+    const ownerScope = captureBrowserOwnerScope();
+    const handleBridgeMessage = (msg: BrowserBridgeResult) => {
+      if (!isBrowserOwnerScopeCurrent(ownerScope) || !msg || typeof msg !== 'object') return;
+      const commandId = msg.id;
 
       if (commandId && activePipelineCmdId === commandId) {
         if (msg.status === 'queued') {
@@ -737,18 +771,85 @@ export const BrowserAssistantView: React.FC = () => {
       }
     };
 
-    window.addEventListener('browser-bridge-message', handleBridgeMessage);
-    return () => window.removeEventListener('browser-bridge-message', handleBridgeMessage);
-  }, [activePipelineCmdId, extractedData, routingMode, sessions, genPlatform, selectedSessionsForGen]);
+    return subscribeBrowserBridgeCommand(activePipelineCmdId, handleBridgeMessage);
+  }, [activePipelineCmdId, browserOwnerId, extractedData, routingMode, sessions, genPlatform, selectedSessionsForGen]);
 
   // Sessions 本地持久化同步
   useEffect(() => {
-    localStorage.setItem('kk_browser_sessions', JSON.stringify(sessions));
-  }, [sessions]);
+    localStorage.setItem(getBrowserBridgeOwnerStorageKey('sessions', browserOwnerId), JSON.stringify(sessions));
+    localStorage.removeItem('kk_browser_sessions');
+  }, [browserOwnerId, sessions]);
 
   useEffect(() => {
-    localStorage.setItem('kk_browser_selected_sessions', JSON.stringify(selectedSessionsForGen));
-  }, [selectedSessionsForGen]);
+    localStorage.setItem(
+      getBrowserBridgeOwnerStorageKey('selected_sessions', browserOwnerId),
+      JSON.stringify(selectedSessionsForGen),
+    );
+    localStorage.removeItem('kk_browser_selected_sessions');
+  }, [browserOwnerId, selectedSessionsForGen]);
+
+  useEffect(() => subscribeAuthSessionChange(() => {
+    const nextOwnerId = getRuntimeOwnerId();
+    if (nextOwnerId === browserOwnerIdRef.current) return;
+    browserOwnerEpochRef.current += 1;
+    browserOwnerIdRef.current = nextOwnerId;
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    logsBufferRef.current = [];
+    setBrowserOwnerId(nextOwnerId);
+    setSessions(loadOwnerBrowserValue(nextOwnerId, 'sessions', DEFAULT_BROWSER_SESSIONS));
+    setSelectedSessionsForGen(loadOwnerBrowserValue(
+      nextOwnerId,
+      'selected_sessions',
+      DEFAULT_SELECTED_BROWSER_SESSIONS,
+    ));
+    setPlaygroundTab('extract');
+    setTargetUrl('');
+    setExtractLoading(false);
+    setExtractStep('');
+    setExtractedData(null);
+    setClippingProgress(false);
+    setPromptText(DEFAULT_BROWSER_PROMPT);
+    setGenPlatform('leonardo');
+    setGenLoading(false);
+    setGenProgress(0);
+    setGenStep('');
+    setGeneratedImageUrl(null);
+    setPublishingLoading(false);
+    setPublishingStep('');
+    setClipboardPayload(null);
+    setLocalLlmEndpoint('http://localhost:11434');
+    setLocalLlmModel('qwen2.5-coder:7b');
+    setLocalLlmStatus('disconnected');
+    setTestingLlm(false);
+    setScreenInspectStatus('idle');
+    setInspectData(null);
+    setActivePipelineCmdId(null);
+    setPipelineRunning(false);
+    setPipelineStep(0);
+    setPipelineStatusText('');
+    setPipelineLogs([]);
+    setPipelineCompletedData(null);
+    setRoutingMode('proxy');
+    setEditedTitle('');
+    setEditedPrice('');
+    setWriteBackLoading(false);
+    setTakeoverInput(DEFAULT_TAKEOVER_INPUT);
+    setTakeoverOutput(null);
+    setTakeoverLoading(false);
+    setDesktopStatus('disconnected');
+    setTestingDesktop(false);
+    setZipProgress(0);
+    setZipLoading(false);
+    setZipStep('');
+    setZippedFileLoc(null);
+    setPlatforms(DEFAULT_BROWSER_PLATFORMS.map((platform) => ({ ...platform })));
+    setSocialChannels(DEFAULT_BROWSER_SOCIAL_CHANNELS.map((channel) => ({ ...channel })));
+    setDaemonStatus('disconnected');
+    setExtensionStatus('disconnected');
+    setDaemonLatency(null);
+    setTestingConnection(false);
+  }), []);
 
   // 2. WASM 内存数据采样定时器，安全卸载防内存泄漏
   useEffect(() => {
@@ -773,6 +874,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 3. 通用连通性诊断 (自适应连接)
   const checkConnectivity = async (isManual = false) => {
     if (testingConnection) return;
+    const ownerScope = captureBrowserOwnerScope();
     setTestingConnection(true);
 
     try {
@@ -780,7 +882,7 @@ export const BrowserAssistantView: React.FC = () => {
         browserAssistantSnapshot: getBrowserBridgeSnapshot()
       }) as BrowserBridgeStatusSnapshot;
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       applyBrowserStatusSnapshot(status);
 
       if (isManual) {
@@ -791,11 +893,11 @@ export const BrowserAssistantView: React.FC = () => {
         }
       }
     } catch (error: any) {
-      if (isMountedRef.current && isManual) {
+      if (isBrowserOwnerScopeCurrent(ownerScope) && isManual) {
         notify.error('检测失败', error?.message || 'browser.getStatus 执行失败');
       }
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setTestingConnection(false);
       }
     }
@@ -803,6 +905,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 4. 检测外部平台登录状态 (安全脱敏校验)
   const checkPlatformLogin = async (id: string) => {
+    const ownerScope = captureBrowserOwnerScope();
     setPlatforms((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: 'checking' } : p))
     );
@@ -811,7 +914,7 @@ export const BrowserAssistantView: React.FC = () => {
       const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
         browserAssistantSnapshot: getBrowserBridgeSnapshot()
       }) as BrowserBridgeStatusSnapshot;
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       applyBrowserStatusSnapshot(status);
       const platformSnapshot = status.platforms.find((platform) => platform.id === id);
       const nextStatus = normalizeBrowserLoginStatus(platformSnapshot?.status);
@@ -834,6 +937,7 @@ export const BrowserAssistantView: React.FC = () => {
         );
       }
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setPlatforms((prev) =>
         prev.map((p) => (p.id === id ? { ...p, status: 'unknown' } : p))
       );
@@ -856,6 +960,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 5. 检测社交分发通道
   const checkSocialLogin = async (id: string) => {
+    const ownerScope = captureBrowserOwnerScope();
     setSocialChannels((prev) =>
       prev.map((sc) => (sc.id === id ? { ...sc, status: 'checking' } : sc))
     );
@@ -864,7 +969,7 @@ export const BrowserAssistantView: React.FC = () => {
       const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
         browserAssistantSnapshot: getBrowserBridgeSnapshot()
       }) as BrowserBridgeStatusSnapshot;
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       applyBrowserStatusSnapshot(status);
       const channelSnapshot = status.socialChannels.find((channel) => channel.id === id);
       const nextStatus = normalizeBrowserLoginStatus(channelSnapshot?.status);
@@ -887,6 +992,7 @@ export const BrowserAssistantView: React.FC = () => {
         );
       }
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setSocialChannels((prev) =>
         prev.map((sc) => (sc.id === id ? { ...sc, status: 'unknown' } : sc))
       );
@@ -930,6 +1036,7 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
   const checkSessionLogin = async (id: string) => {
+    const ownerScope = captureBrowserOwnerScope();
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: 'checking' } : s))
     );
@@ -938,7 +1045,7 @@ export const BrowserAssistantView: React.FC = () => {
       const status = await toolRegistryInstance.execute('browser.getStatus', {}, {
         browserAssistantSnapshot: getBrowserBridgeSnapshot()
       }) as BrowserBridgeStatusSnapshot;
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       applyBrowserStatusSnapshot(status);
       const sessionSnapshot = status.sessions.find((session) => session.id === id);
       const nextStatus = normalizeBrowserLoginStatus(sessionSnapshot?.status);
@@ -954,6 +1061,7 @@ export const BrowserAssistantView: React.FC = () => {
         );
       }
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, status: 'unknown' } : s))
       );
@@ -974,6 +1082,7 @@ export const BrowserAssistantView: React.FC = () => {
       return;
     }
 
+    const ownerScope = captureBrowserOwnerScope();
     setExtractLoading(true);
     setExtractedData(null);
 
@@ -988,7 +1097,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.extractProduct.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setExtractStep(result.summary);
@@ -1024,10 +1133,11 @@ export const BrowserAssistantView: React.FC = () => {
       setExtractStep(result.error || result.summary);
       notify.error('提取失败', result.error || result.summary);
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setExtractStep(error?.message || 'Browser Bridge 商品提取失败');
       notify.error('提取失败', error?.message || 'Browser Bridge 商品提取失败');
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setExtractLoading(false);
       }
     }
@@ -1036,6 +1146,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 7. 本地抠图导入画布 (Web Worker 后台处理)
   const handleImportToCanvasWithClip = () => {
     if (!extractedData) return;
+    const ownerScope = captureBrowserOwnerScope();
 
     const triggerImport = (imgUrl: string, isClipped: boolean) => {
       window.dispatchEvent(new CustomEvent('takeover-create-prompt-cards', {
@@ -1060,7 +1171,7 @@ export const BrowserAssistantView: React.FC = () => {
       workerRef.current.postMessage({ task: 'clip', data: extractedData.imageUrl });
 
       workerRef.current.onmessage = (e) => {
-        if (!isMountedRef.current) return;
+        if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
         const { type, data } = e.data;
         if (type === 'done') {
           setClippingProgress(false);
@@ -1078,6 +1189,7 @@ export const BrowserAssistantView: React.FC = () => {
   // 7b. 双向 DOM 实时编辑与 Browser Bridge 回写
   const handleWriteBackDom = async () => {
     if (!extractedData) return;
+    const ownerScope = captureBrowserOwnerScope();
     setWriteBackLoading(true);
 
     try {
@@ -1093,7 +1205,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.writeBackDom.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         notify.warning('Browser Bridge 未连接', result.summary);
@@ -1117,9 +1229,10 @@ export const BrowserAssistantView: React.FC = () => {
 
       notify.error('DOM 同步失败', result.error || result.summary);
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       notify.error('DOM 同步失败', error?.message || 'Browser Bridge DOM 回写失败');
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setWriteBackLoading(false);
       }
     }
@@ -1132,6 +1245,7 @@ export const BrowserAssistantView: React.FC = () => {
       return;
     }
 
+    const ownerScope = captureBrowserOwnerScope();
     const selectedPlat = platforms.find((p) => p.id === genPlatform);
     if (!selectedPlat || !selectedPlat.enabled) {
       notify.warning('平台不可用', '请确保您在上方启用了对应的生图平台');
@@ -1156,7 +1270,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.generateExternal.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setGenStep(result.summary);
@@ -1183,10 +1297,11 @@ export const BrowserAssistantView: React.FC = () => {
       setGenStep(result.error || result.summary);
       notify.error('外部生图失败', result.error || result.summary);
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setGenStep(error?.message || 'Browser Bridge 外部生图失败');
       notify.error('外部生图失败', error?.message || 'Browser Bridge 外部生图失败');
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setGenLoading(false);
       }
     }
@@ -1197,6 +1312,7 @@ export const BrowserAssistantView: React.FC = () => {
     const imageUrlToPublish = overrideImageUrl || generatedImageUrl;
     if (!imageUrlToPublish) return;
 
+    const ownerScope = captureBrowserOwnerScope();
     const xhsPlat = socialChannels.find((sc) => sc.id === 'xhs');
     if (!xhsPlat || !xhsPlat.enabled) {
       notify.warning('小红书渠道未启用', '请先在上方启用小红书分发通道');
@@ -1220,7 +1336,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.publishDraft.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setPublishingStep(result.summary);
@@ -1243,10 +1359,11 @@ export const BrowserAssistantView: React.FC = () => {
       setPublishingStep(result.error || result.summary);
       notify.error('草稿保存失败', result.error || result.summary);
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setPublishingStep(error?.message || 'Browser Bridge 草稿保存失败');
       notify.error('草稿保存失败', error?.message || 'Browser Bridge 草稿保存失败');
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setPublishingLoading(false);
       }
     }
@@ -1254,6 +1371,7 @@ export const BrowserAssistantView: React.FC = () => {
 
   // 10. 阶段四：本地 LLM 网关连通性诊断
   const handleTestLocalLlm = async () => {
+    const ownerScope = captureBrowserOwnerScope();
     setTestingLlm(true);
     setLocalLlmStatus('connecting');
 
@@ -1270,7 +1388,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.checkLocalLlm.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setLocalLlmStatus('error');
@@ -1294,11 +1412,11 @@ export const BrowserAssistantView: React.FC = () => {
       setLocalLlmStatus('error');
       notify.error('Ollama 网关诊断失败', result.error || result.summary);
     } catch (err: any) {
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setLocalLlmStatus('error');
       notify.error('Ollama 网关诊断失败', `Browser Bridge 本地网关诊断失败: ${err?.message || String(err)}`);
     } finally {
-      if (isMountedRef.current) {
+      if (isBrowserOwnerScopeCurrent(ownerScope)) {
         setTestingLlm(false);
       }
     }
@@ -1316,8 +1434,10 @@ export const BrowserAssistantView: React.FC = () => {
       return;
     }
 
+    const ownerScope = captureBrowserOwnerScope();
     try {
       const content = (await navigator.clipboard.readText()).trim();
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       if (!content) {
         notify.warning('剪贴板为空', '没有读取到可导入画布的文本内容。');
         return;
@@ -1330,6 +1450,7 @@ export const BrowserAssistantView: React.FC = () => {
       });
       notify.info('剪贴板已读取', '可在下方提示中确认后导入为画布 Prompt 卡片。');
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       notify.error('剪贴板读取失败', error?.message || '浏览器拒绝了剪贴板读取请求。');
     }
   };
@@ -1351,6 +1472,7 @@ export const BrowserAssistantView: React.FC = () => {
   const handleScreenInspect = async () => {
     if (screenInspectStatus === 'capturing' || screenInspectStatus === 'parsing') return;
 
+    const ownerScope = captureBrowserOwnerScope();
     setScreenInspectStatus('capturing');
     setInspectData(null);
 
@@ -1367,7 +1489,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.inspectPage.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setScreenInspectStatus('idle');
@@ -1396,7 +1518,7 @@ export const BrowserAssistantView: React.FC = () => {
       setScreenInspectStatus('idle');
       notify.error('屏幕感知失败', result.error || result.summary);
     } catch (error: any) {
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setScreenInspectStatus('idle');
       notify.error('屏幕感知失败', error?.message || 'Browser Bridge 屏幕感知失败');
     }
@@ -1427,6 +1549,7 @@ export const BrowserAssistantView: React.FC = () => {
       return;
     }
 
+    const ownerScope = captureBrowserOwnerScope();
     const selectedPlat = platforms.find((p) => p.id === genPlatform);
     if (!selectedPlat || !selectedPlat.enabled) {
       notify.warning('平台不可用', '请先启用本次流水线要使用的外部生图平台。');
@@ -1480,7 +1603,7 @@ export const BrowserAssistantView: React.FC = () => {
         requiresUserGesture: BROWSER_ACTIONS.generateExternal.requiresUserGesture
       });
 
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
 
       if (result.status === 'setup_required') {
         setPipelineStep(1);
@@ -1538,14 +1661,14 @@ export const BrowserAssistantView: React.FC = () => {
       appendPipelineLog(`[failed] ${result.error || result.summary}`);
       notify.error('流水线执行失败', result.error || result.summary);
     } catch (error: any) {
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       const message = error?.message || 'Browser Bridge 流水线执行失败';
       setPipelineStep(1);
       setPipelineStatusText(message);
       appendPipelineLog(`[error] ${message}`);
       notify.error('流水线执行失败', message);
     } finally {
-      if (isMountedRef.current && !shouldKeepRunning) {
+      if (isBrowserOwnerScopeCurrent(ownerScope) && !shouldKeepRunning) {
         setPipelineRunning(false);
       }
     }
@@ -1554,7 +1677,8 @@ export const BrowserAssistantView: React.FC = () => {
   // 14. 阶段五：AI Takeover 自然语言解析预览与真实回注驱动
   const handlePreviewTakeoverPlan = async () => {
     if (!takeoverInput) return;
-    
+
+    const ownerScope = captureBrowserOwnerScope();
     setTakeoverLoading(true);
     setTakeoverOutput(null);
 
@@ -1563,7 +1687,7 @@ export const BrowserAssistantView: React.FC = () => {
         takeoverInput,
         createBrowserAssistantPreviewContext()
       );
-      if (!isMountedRef.current) return;
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setTakeoverLoading(false);
 
       const plan = record.plan;
@@ -1602,6 +1726,7 @@ export const BrowserAssistantView: React.FC = () => {
         notify.success('参数回注成功', '已切换至「全自动宏流水线」，并已注入真实规划器识别出的代理路线。');
       }
     } catch (error: any) {
+      if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setTakeoverLoading(false);
       notify.error('AI Takeover 解析失败', error?.message || 'AgentRuntime 预览计划失败');
     }

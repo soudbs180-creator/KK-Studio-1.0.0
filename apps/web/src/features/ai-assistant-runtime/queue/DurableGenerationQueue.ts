@@ -6,6 +6,7 @@ import type {
   GenerationMediaTaskType,
   GenerationBatchJobDto,
 } from '@kk/shared';
+import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.ts';
 
 export interface GenerationBatchOutputGroup {
   groupId?: string;
@@ -31,6 +32,7 @@ export type GenerationErrorCategory =
   | 'invalid_input'
   | 'rate_limit'
   | 'provider_unavailable'
+  | 'persistence'
   | 'network'
   | 'unknown';
 
@@ -44,6 +46,9 @@ export interface GenerationQueuePrompt {
   resultImageNodeIds?: string[];
   outputs?: GenerationJobOutputDto[];
   providerTaskId?: string;
+  providerAttemptId?: string;
+  providerStartedAt?: number;
+  reconciliationRequired?: boolean;
   error?: string;
   errorCategory?: GenerationErrorCategory;
   retryable?: boolean;
@@ -306,6 +311,9 @@ const migrateStoredJob = (raw: Partial<GenerationBatchJob> & Record<string, unkn
       resultImageNodeIds: prompt.resultImageNodeIds,
       outputs: prompt.outputs,
       providerTaskId: prompt.providerTaskId,
+      providerAttemptId: prompt.providerAttemptId,
+      providerStartedAt: prompt.providerStartedAt,
+      reconciliationRequired: prompt.reconciliationRequired,
       error: prompt.error,
       errorCategory: prompt.errorCategory,
       retryable: prompt.retryable,
@@ -366,16 +374,57 @@ export class DurableGenerationQueue {
   private isProcessing = false;
   private processRequested = false;
   private readonly storage: QueueStorage | null;
+  private readonly ownerIdResolver: () => string;
+  private activeOwnerId: string;
 
-  constructor(storage?: QueueStorage | null) {
+  constructor(storage?: QueueStorage | null, ownerIdResolver: () => string = getRuntimeOwnerId) {
     this.storage = storage === undefined ? getBrowserStorage() : storage;
+    this.ownerIdResolver = ownerIdResolver;
+    this.activeOwnerId = this.resolveOwnerId();
     this.loadJobs();
+  }
+
+  private resolveOwnerId(): string {
+    return String(this.ownerIdResolver() || '').trim().slice(0, 200) || 'local_user';
+  }
+
+  private storageKey(): string {
+    return this.activeOwnerId === 'local_user'
+      ? STORAGE_KEY
+      : `${STORAGE_KEY}:owner:${encodeURIComponent(this.activeOwnerId)}`;
+  }
+
+  private ensureOwnerScope(): void {
+    const ownerId = this.resolveOwnerId();
+    if (ownerId === this.activeOwnerId) return;
+    for (const controller of this.abortControllers.values()) controller.abort('auth-subject-changed');
+    if (this.processTimer) clearTimeout(this.processTimer);
+    this.processTimer = null;
+    this.inFlightTasks.clear();
+    this.abortControllers.clear();
+    this.isProcessing = false;
+    this.processRequested = false;
+    this.jobs = [];
+    this.activeOwnerId = ownerId;
+    this.loadJobs();
+    this.notifyListeners();
+    if (this.executor) this.scheduleProcess();
+  }
+
+  public refreshOwnerScope(): string {
+    this.ensureOwnerScope();
+    return this.activeOwnerId;
+  }
+
+  public getOwnerScopeId(): string {
+    this.ensureOwnerScope();
+    return this.activeOwnerId;
   }
 
   private loadJobs() {
     if (!this.storage) return;
     try {
-      const stored = this.storage.getItem(STORAGE_KEY);
+      const stored = this.storage.getItem(this.storageKey());
       if (stored) {
         const parsed = JSON.parse(stored);
         this.jobs = Array.isArray(parsed)
@@ -394,18 +443,37 @@ export class DurableGenerationQueue {
     for (const job of this.jobs) {
       if (['paused', 'cancelled', 'completed', 'completed_with_errors', 'failed'].includes(job.status)) continue;
       let hasRunningPrompt = false;
+      let requiresReconciliation = false;
       for (const promptItem of job.prompts) {
         if (promptItem.status !== 'running') continue;
         const taskKey = this.getTaskKey(job.id, promptItem.id);
         if (!this.inFlightTasks.has(taskKey)) {
-          promptItem.status = 'queued';
-          promptItem.phase = 'queued';
+          if (promptItem.providerStartedAt) {
+            promptItem.status = 'failed';
+            promptItem.phase = 'failed';
+            promptItem.error = 'Provider execution was interrupted after it started. Automatic replay is blocked to avoid duplicate cost; verify the upstream result before starting a replacement.';
+            promptItem.errorCategory = 'persistence';
+            promptItem.retryable = false;
+            promptItem.reconciliationRequired = true;
+            requiresReconciliation = true;
+          } else {
+            promptItem.status = 'queued';
+            promptItem.phase = 'queued';
+          }
           changed = true;
         } else {
           hasRunningPrompt = true;
         }
       }
-      if (job.status === 'running' && !hasRunningPrompt) {
+      if (requiresReconciliation) {
+        const hasRemainingWork = job.prompts.some((prompt) => prompt.status === 'queued' || prompt.status === 'running');
+        job.status = hasRemainingWork
+          ? 'paused'
+          : job.prompts.some((prompt) => prompt.status === 'completed')
+            ? 'completed_with_errors'
+            : 'failed';
+        job.updatedAt = Date.now();
+      } else if (job.status === 'running' && !hasRunningPrompt) {
         job.status = 'queued';
         changed = true;
       }
@@ -424,25 +492,68 @@ export class DurableGenerationQueue {
     }
   }
 
-  private prunePersistedJobs() {
-    if (this.jobs.length <= MAX_PERSISTED_JOBS) return;
-    const active = this.jobs.filter((job) => ['queued', 'running', 'paused'].includes(job.status));
-    const inactive = this.jobs
+  private buildPersistedJobsSnapshot(): GenerationBatchJob[] {
+    const snapshot = cloneJobs(this.jobs);
+    for (const job of snapshot) job.progress = calculateProgress(job);
+    if (snapshot.length <= MAX_PERSISTED_JOBS) return snapshot;
+    const active = snapshot.filter((job) => ['queued', 'running', 'paused'].includes(job.status));
+    const inactive = snapshot
       .filter((job) => !['queued', 'running', 'paused'].includes(job.status))
       .sort((left, right) => right.updatedAt - left.updatedAt);
-    this.jobs = [...active, ...inactive].slice(0, MAX_PERSISTED_JOBS);
+    return [...active, ...inactive].slice(0, MAX_PERSISTED_JOBS);
   }
 
-  private saveJobs() {
-    for (const job of this.jobs) job.progress = calculateProgress(job);
-    this.prunePersistedJobs();
+  private saveJobs(): boolean {
     try {
-      this.storage?.setItem(STORAGE_KEY, JSON.stringify(this.jobs));
+      if (!this.storage) throw new Error('Durable queue storage is unavailable.');
+      const persistedJobs = this.buildPersistedJobsSnapshot();
+      const serialized = JSON.stringify(persistedJobs);
+      this.storage.setItem(this.storageKey(), serialized);
+      if (this.storage.getItem(this.storageKey()) !== serialized) {
+        throw new Error('Durable queue storage did not retain the written snapshot.');
+      }
+      const persistedById = new Map(persistedJobs.map((job) => [job.id, job]));
+      this.jobs = persistedJobs.map((snapshot) => {
+        const current = this.jobs.find((job) => job.id === snapshot.id) || snapshot;
+        current.progress = { ...snapshot.progress };
+        return current;
+      }).filter((job) => persistedById.has(job.id));
+      this.notifyListeners();
+      return true;
     } catch (error) {
       console.error('[DurableQueue] Failed to save jobs to storage:', error);
-    } finally {
-      this.notifyListeners();
+      return false;
     }
+  }
+
+  private createDurabilityError(message: string): Error & { code?: string } {
+    const error = new Error(message) as Error & { code?: string };
+    error.code = 'DURABLE_STORAGE_UNAVAILABLE';
+    return error;
+  }
+
+  private persistMutationOrRollback(previousJobs: GenerationBatchJob[], message: string): void {
+    if (this.saveJobs()) return;
+    this.jobs = cloneJobs(previousJobs);
+    throw this.createDurabilityError(message);
+  }
+
+  private markPromptForReconciliation(job: GenerationBatchJob, prompt: GenerationQueuePrompt, message: string): void {
+    prompt.status = 'failed';
+    prompt.phase = 'failed';
+    prompt.error = message;
+    prompt.errorCategory = 'persistence';
+    prompt.retryable = false;
+    prompt.reconciliationRequired = true;
+    const hasRemainingWork = job.prompts.some((candidate) => (
+      candidate.id !== prompt.id && (candidate.status === 'queued' || candidate.status === 'running')
+    ));
+    job.status = hasRemainingWork
+      ? 'paused'
+      : job.prompts.some((candidate) => candidate.status === 'completed')
+        ? 'completed_with_errors'
+        : 'failed';
+    job.updatedAt = Date.now();
   }
 
   private getTaskKey(jobId: string, promptId: string): string {
@@ -458,82 +569,143 @@ export class DurableGenerationQueue {
   }
 
   public registerExecutor(executor: GenerationQueueExecutor | null) {
+    this.ensureOwnerScope();
     this.executor = executor;
     this.healZombieTasks();
     this.scheduleProcess();
   }
 
   public registerArrangeHandler(handler: typeof this.arrangeHandler) {
+    this.ensureOwnerScope();
     this.arrangeHandler = handler;
     this.scheduleProcess();
   }
 
   public registerCompletionHandler(handler: typeof this.completionHandler) {
+    this.ensureOwnerScope();
     this.completionHandler = handler;
     this.scheduleProcess();
   }
 
   public getJobs(): GenerationBatchJob[] {
+    this.ensureOwnerScope();
     return cloneJobs(this.jobs);
   }
 
   public subscribe(listener: GenerationQueueListener): () => void {
+    this.ensureOwnerScope();
     this.listeners.add(listener);
     listener(cloneJobs(this.jobs));
     return () => this.listeners.delete(listener);
   }
 
   public getJob(id: string): GenerationBatchJob | undefined {
+    this.ensureOwnerScope();
     const job = this.findJob(id);
     return job ? cloneJob(job) : undefined;
   }
 
   public mergeRemoteJob(remote: GenerationBatchJobDto): GenerationBatchJob {
+    this.ensureOwnerScope();
+    const previousJobs = cloneJobs(this.jobs);
     let job = this.jobs.find((item) => item.idempotencyKey === remote.idempotencyKey);
+    const remoteUpdatedAt = Date.parse(remote.updatedAt) || Date.now();
+    if (job && remoteUpdatedAt < job.updatedAt) return cloneJob(job);
     if (!job) {
       const parameters = remote.parameters as unknown as Record<string, unknown>;
-      const created = this.createJob(
-        remote.items.map((item) => ({
-          id: item.id,
-          prompt: item.prompt,
-          referenceImageNodeId: item.referenceImageNodeId,
-        })),
-        {
-          ...parameters,
-          taskType: remote.taskType,
+      const taskType = normalizeTaskType(remote.taskType);
+      const prompts = remote.items.map((item) => ({
+        id: item.id,
+        prompt: item.prompt,
+        referenceImageNodeId: item.referenceImageNodeId,
+        status: 'queued' as const,
+        phase: 'queued' as const,
+        retryCount: item.retryCount,
+      }));
+      job = {
+        schemaVersion: 2,
+        id: `job_remote_${hashString(remote.id)}`,
+        idempotencyKey: remote.idempotencyKey,
+        canvasId: remote.workspaceId,
+        taskType,
+        status: 'paused',
+        progress: { total: prompts.length, queued: prompts.length, running: 0, completed: 0, failed: 0, percent: 0, phase: 'queued' },
+        outputs: [],
+        createdBy: 'assistant',
+        prompts,
+        options: {
+          taskType,
           modelId: remote.modelCode,
-          outputGroup: remote.outputGroup,
+          aspectRatio: String(parameters.aspectRatio || '1:1'),
+          imageSize: String(parameters.imageSize || '1K'),
+          countPerPrompt: Number(parameters.countPerPrompt || 1),
+          concurrency: normalizeConcurrency(parameters.concurrency, taskType),
+          layout: parameters.layout === 'row' || parameters.layout === 'column' ? parameters.layout : 'grid',
+          layoutPreset: parameters.layoutPreset as GenerationQueueOptions['layoutPreset'],
+          columns: typeof parameters.columns === 'number' ? parameters.columns : undefined,
+          gap: typeof parameters.gap === 'number' ? parameters.gap : undefined,
+          durationSeconds: typeof parameters.durationSeconds === 'number' ? parameters.durationSeconds : undefined,
+          resolution: typeof parameters.resolution === 'string' ? parameters.resolution : undefined,
+          generateAudio: typeof parameters.generateAudio === 'boolean' ? parameters.generateAudio : undefined,
+          firstFrameAssetId: typeof parameters.firstFrameAssetId === 'string' ? parameters.firstFrameAssetId : undefined,
+          lastFrameAssetId: typeof parameters.lastFrameAssetId === 'string' ? parameters.lastFrameAssetId : undefined,
+          motion: typeof parameters.motion === 'string' ? parameters.motion : undefined,
+          voice: typeof parameters.voice === 'string' ? parameters.voice : undefined,
+          lyrics: typeof parameters.lyrics === 'string' ? parameters.lyrics : undefined,
+          genre: typeof parameters.genre === 'string' ? parameters.genre : undefined,
         },
-        remote.workspaceId,
-        remote.idempotencyKey,
-      );
-      job = this.findJob(created.id);
+        outputGroup: remote.outputGroup ? cloneOutputGroup(remote.outputGroup) : undefined,
+        createdAt: Date.parse(remote.createdAt) || Date.now(),
+        updatedAt: remoteUpdatedAt,
+      };
+      this.jobs.push(job);
     }
-    if (!job) throw new Error(`Failed to mirror generation job ${remote.id}.`);
 
     const remoteItems = new Map(remote.items.map((item) => [item.id, item]));
+    let hasReconciliationItem = false;
+    let hasLocalInFlightItem = false;
     job.prompts = job.prompts.map((prompt) => {
       const item = remoteItems.get(prompt.id);
       if (!item) return prompt;
-      const status = item.status === 'running' && remote.status === 'running' ? 'queued' : item.status;
+      if (this.inFlightTasks.has(this.getTaskKey(job!.id, prompt.id))) {
+        hasLocalInFlightItem = true;
+        return prompt;
+      }
+      const remoteWasRunning = item.status === 'running' && remote.status === 'running';
+      const status = remoteWasRunning ? 'failed' : item.status;
+      if (remoteWasRunning) hasReconciliationItem = true;
       return {
         ...prompt,
         status,
         phase: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'queued',
         retryCount: item.retryCount,
-        retryable: item.retryable,
-        error: item.error,
-        errorCategory: item.errorCategory as GenerationErrorCategory | undefined,
+        retryable: remoteWasRunning ? false : item.retryable,
+        reconciliationRequired: remoteWasRunning || undefined,
+        error: remoteWasRunning
+          ? 'Remote provider execution lost its active lease. Automatic replay is blocked to avoid duplicate cost.'
+          : item.error,
+        errorCategory: remoteWasRunning ? 'unknown' : item.errorCategory as GenerationErrorCategory | undefined,
         providerTaskId: item.providerTaskId,
         outputs: item.outputs.map((output) => ({ ...output })),
       };
     });
-    job.status = remote.status === 'running' ? 'queued' : remote.status;
+    if (hasLocalInFlightItem) {
+      job.status = 'running';
+    } else if (hasReconciliationItem) {
+      const hasRemainingWork = job.prompts.some((prompt) => prompt.status === 'queued' || prompt.status === 'running');
+      job.status = hasRemainingWork
+        ? 'paused'
+        : job.prompts.some((prompt) => prompt.status === 'completed')
+          ? 'completed_with_errors'
+          : 'failed';
+    } else {
+      job.status = remote.status === 'running' ? 'queued' : remote.status;
+    }
     job.outputs = remote.outputs.map((output) => ({ ...output }));
     job.outputGroup = remote.outputGroup ? cloneOutputGroup(remote.outputGroup) : job.outputGroup;
     job.createdAt = Date.parse(remote.createdAt) || job.createdAt;
-    job.updatedAt = Date.parse(remote.updatedAt) || Date.now();
-    this.saveJobs();
+    job.updatedAt = remoteUpdatedAt;
+    this.persistMutationOrRollback(previousJobs, `Remote generation job ${remote.id} could not be persisted locally.`);
     if (job.status === 'queued') this.scheduleProcess();
     return cloneJob(job);
   }
@@ -543,16 +715,20 @@ export class DurableGenerationQueue {
   }
 
   public clearAllJobs() {
-    for (const controller of this.abortControllers.values()) controller.abort();
+    this.ensureOwnerScope();
+    const previousJobs = cloneJobs(this.jobs);
     this.jobs = [];
+    this.persistMutationOrRollback(previousJobs, 'DurableGenerationQueue could not persist clearing the queue.');
+    for (const controller of this.abortControllers.values()) controller.abort();
     this.inFlightTasks.clear();
     this.abortControllers.clear();
-    this.saveJobs();
   }
 
   public archiveFinishedJobs() {
+    this.ensureOwnerScope();
+    const previousJobs = cloneJobs(this.jobs);
     this.jobs = this.jobs.filter((job) => ['queued', 'running', 'paused'].includes(job.status));
-    this.saveJobs();
+    this.persistMutationOrRollback(previousJobs, 'DurableGenerationQueue could not persist archived jobs.');
   }
 
   public createJob(
@@ -561,6 +737,7 @@ export class DurableGenerationQueue {
     canvasId: string,
     idempotencyKey?: string,
   ): GenerationBatchJob {
+    this.ensureOwnerScope();
     const normalizedPrompts = Array.isArray(prompts) ? prompts : [];
     const taskType = normalizeTaskType(options?.taskType);
     const limits = MEDIA_LIMITS[taskType];
@@ -575,9 +752,10 @@ export class DurableGenerationQueue {
     const existing = this.jobs.find((job) => job.idempotencyKey === stableIdempotencyKey);
     if (existing) {
       if (!existing.outputGroup && options?.outputGroup) {
+        const previousJobs = cloneJobs(this.jobs);
         existing.outputGroup = options.outputGroup as GenerationBatchOutputGroup;
         existing.updatedAt = Date.now();
-        this.saveJobs();
+        this.persistMutationOrRollback(previousJobs, `Generation job ${existing.id} output group could not be persisted.`);
       }
       return cloneJob(existing);
     }
@@ -627,14 +805,19 @@ export class DurableGenerationQueue {
       updatedAt: now,
     };
     this.jobs.push(newJob);
-    this.saveJobs();
+    if (!this.saveJobs()) {
+      this.jobs = this.jobs.filter((job) => job.id !== newJob.id);
+      throw this.createDurabilityError('DurableGenerationQueue could not persist the new job; generation was not started.');
+    }
     this.scheduleProcess();
     return cloneJob(newJob);
   }
 
   public pauseJob(jobId: string) {
+    this.ensureOwnerScope();
     const job = this.findJob(jobId);
     if (!job || (job.status !== 'queued' && job.status !== 'running')) return;
+    const previousJobs = cloneJobs(this.jobs);
     job.status = 'paused';
     for (const prompt of job.prompts) {
       if (prompt.status === 'running') {
@@ -643,21 +826,25 @@ export class DurableGenerationQueue {
       }
     }
     job.updatedAt = Date.now();
-    this.saveJobs();
+    this.persistMutationOrRollback(previousJobs, `Generation job ${jobId} pause state could not be persisted.`);
   }
 
   public resumeJob(jobId: string) {
+    this.ensureOwnerScope();
     const job = this.findJob(jobId);
     if (!job || job.status !== 'paused') return;
+    const previousJobs = cloneJobs(this.jobs);
     job.status = 'queued';
     job.updatedAt = Date.now();
-    this.saveJobs();
+    this.persistMutationOrRollback(previousJobs, `Generation job ${jobId} resume state could not be persisted.`);
     this.scheduleProcess();
   }
 
   public retryFailedPrompts(jobId: string) {
+    this.ensureOwnerScope();
     const job = this.findJob(jobId);
     if (!job || job.status === 'cancelled') return;
+    const previousJobs = cloneJobs(this.jobs);
     let changed = false;
     for (const prompt of job.prompts) {
       if (prompt.status !== 'failed' || prompt.retryable === false) continue;
@@ -667,18 +854,23 @@ export class DurableGenerationQueue {
       delete prompt.error;
       delete prompt.errorCategory;
       delete prompt.retryable;
+      delete prompt.reconciliationRequired;
+      delete prompt.providerAttemptId;
+      delete prompt.providerStartedAt;
       changed = true;
     }
     if (!changed) return;
     job.status = 'queued';
     job.updatedAt = Date.now();
-    this.saveJobs();
+    this.persistMutationOrRollback(previousJobs, `Generation job ${jobId} retry state could not be persisted.`);
     this.scheduleProcess();
   }
 
   public cancelJob(jobId: string) {
+    this.ensureOwnerScope();
     const job = this.findJob(jobId);
     if (!job || ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(job.status)) return;
+    const previousJobs = cloneJobs(this.jobs);
     job.status = 'cancelled';
     for (const prompt of job.prompts) {
       if (prompt.status === 'queued' || prompt.status === 'running') {
@@ -688,13 +880,17 @@ export class DurableGenerationQueue {
         prompt.errorCategory = 'cancelled';
         prompt.retryable = false;
       }
-      this.abortControllers.get(this.getTaskKey(job.id, prompt.id))?.abort();
     }
     job.updatedAt = Date.now();
-    this.saveJobs();
+    this.persistMutationOrRollback(previousJobs, `Generation job ${jobId} cancellation could not be persisted.`);
+    for (const prompt of job.prompts) {
+      this.abortControllers.get(this.getTaskKey(job.id, prompt.id))?.abort();
+    }
   }
 
   public async processQueue() {
+    this.ensureOwnerScope();
+    const ownerId = this.activeOwnerId;
     if (this.isProcessing) {
       this.processRequested = true;
       return;
@@ -703,6 +899,7 @@ export class DurableGenerationQueue {
     try {
       do {
         this.processRequested = false;
+        if (ownerId !== this.resolveOwnerId()) return;
         await this.processQueueOnce();
       } while (this.processRequested);
     } finally {
@@ -711,27 +908,41 @@ export class DurableGenerationQueue {
     }
   }
 
-  private async handleFinishedJob(job: GenerationBatchJob) {
+  private async handleFinishedJob(job: GenerationBatchJob): Promise<boolean> {
     const outputNodeIds = getJobOutputNodeIds(job);
     if (job.outputGroup) job.outputGroup.nodeIds = outputNodeIds;
+    if (outputNodeIds.length === 0 || !this.arrangeHandler) job.arranged = true;
+    if (outputNodeIds.length === 0 || !this.completionHandler) job.completionHandled = true;
+    job.updatedAt = Date.now();
+    if (!this.saveJobs()) return false;
     if (!job.arranged && outputNodeIds.length > 0 && this.arrangeHandler) {
+      job.arranged = true;
+      job.updatedAt = Date.now();
+      if (!this.saveJobs()) {
+        job.arranged = false;
+        return false;
+      }
       try {
         await this.arrangeHandler(outputNodeIds, job.options, job);
-        job.arranged = true;
       } catch (error) {
         console.error('[DurableQueue] Layout auto-arrangement failed:', error);
       }
     }
     if (!job.completionHandled && outputNodeIds.length > 0 && this.completionHandler) {
+      job.completionHandled = true;
+      job.updatedAt = Date.now();
+      if (!this.saveJobs()) {
+        job.completionHandled = false;
+        return false;
+      }
       try {
         await this.completionHandler(job, outputNodeIds);
-        job.completionHandled = true;
       } catch (error) {
         console.error('[DurableQueue] Completion handler failed:', error);
       }
     }
     job.updatedAt = Date.now();
-    this.saveJobs();
+    return this.saveJobs();
   }
 
   private async processQueueOnce() {
@@ -739,8 +950,10 @@ export class DurableGenerationQueue {
       (item.status === 'completed' || item.status === 'completed_with_errors')
       && (!item.arranged || !item.completionHandled)
     ))) {
-      await this.handleFinishedJob(job);
+      if (!await this.handleFinishedJob(job)) return;
     }
+
+    if (!this.executor) return;
 
     const runningJobs = this.jobs.filter((job) => job.status === 'running');
     if (runningJobs.length === 0) {
@@ -748,7 +961,10 @@ export class DurableGenerationQueue {
       if (nextJob) {
         nextJob.status = 'running';
         nextJob.updatedAt = Date.now();
-        this.saveJobs();
+        if (!this.saveJobs()) {
+          nextJob.status = 'queued';
+          return;
+        }
         runningJobs.push(nextJob);
       }
     }
@@ -760,8 +976,7 @@ export class DurableGenerationQueue {
       const completedCount = currentJob.prompts.filter((prompt) => prompt.status === 'completed').length;
       const failedCount = currentJob.prompts.length - completedCount;
       currentJob.status = failedCount === 0 ? 'completed' : completedCount === 0 ? 'failed' : 'completed_with_errors';
-      await this.handleFinishedJob(currentJob);
-      this.scheduleProcess();
+      if (await this.handleFinishedJob(currentJob)) this.scheduleProcess();
       return;
     }
 
@@ -776,12 +991,23 @@ export class DurableGenerationQueue {
     for (const prompt of toStart) {
       prompt.status = 'running';
       prompt.phase = 'provider_processing';
+    }
+    if (toStart.length > 0 && !this.saveJobs()) {
+      for (const prompt of toStart) {
+        prompt.status = 'queued';
+        prompt.phase = 'queued';
+      }
+      currentJob.status = 'queued';
+      return;
+    }
+    for (const prompt of toStart) {
       void this.executePromptTask(currentJob.id, prompt.id);
     }
-    if (toStart.length > 0) this.saveJobs();
   }
 
   private async executePromptTask(jobId: string, promptId: string) {
+    this.ensureOwnerScope();
+    const ownerId = this.activeOwnerId;
     const taskKey = this.getTaskKey(jobId, promptId);
     if (this.inFlightTasks.has(taskKey)) return;
     const job = this.findJob(jobId);
@@ -799,9 +1025,24 @@ export class DurableGenerationQueue {
     promptItem.status = 'running';
     promptItem.phase = 'provider_processing';
     job.status = 'running';
+    const providerStartedAt = Date.now();
+    promptItem.providerStartedAt = providerStartedAt;
+    promptItem.providerAttemptId = `${jobId}:${promptId}:${promptItem.retryCount + 1}:${providerStartedAt}`;
+    delete promptItem.reconciliationRequired;
+    job.updatedAt = providerStartedAt;
+    if (!this.saveJobs()) {
+      delete promptItem.providerStartedAt;
+      delete promptItem.providerAttemptId;
+      promptItem.status = 'queued';
+      promptItem.phase = 'queued';
+      job.status = 'queued';
+      return;
+    }
+
     const controller = new AbortController();
     this.abortControllers.set(taskKey, controller);
     this.inFlightTasks.add(taskKey);
+    let shouldSchedule = false;
     try {
       const result = normalizeExecutorResult(await this.executor(
         promptItem.prompt,
@@ -810,6 +1051,7 @@ export class DurableGenerationQueue {
         promptId,
         controller.signal,
       ));
+      if (ownerId !== this.resolveOwnerId()) return;
       const activeJob = this.findJob(jobId);
       const activePrompt = activeJob?.prompts.find((prompt) => prompt.id === promptId);
       if (!activeJob || activeJob.status === 'cancelled' || !activePrompt) return;
@@ -830,6 +1072,17 @@ export class DurableGenerationQueue {
           ...outputs.map((output) => output.nodeId).filter((id): id is string => Boolean(id)),
         ]));
       }
+      activeJob.updatedAt = Date.now();
+      if (!this.saveJobs()) {
+        this.markPromptForReconciliation(
+          activeJob,
+          activePrompt,
+          'Provider returned a result, but the durable completion snapshot could not be saved. Automatic replay is blocked; verify the imported output before starting a replacement.',
+        );
+        this.saveJobs();
+        return;
+      }
+      shouldSchedule = true;
     } catch (error) {
       const retryJob = this.findJob(jobId);
       const retryPrompt = retryJob?.prompts.find((prompt) => prompt.id === promptId);
@@ -842,26 +1095,60 @@ export class DurableGenerationQueue {
         retryPrompt.error = classified.message;
         retryPrompt.errorCategory = classified.category;
         retryPrompt.retryable = true;
-        this.saveJobs();
-        await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+        delete retryPrompt.providerAttemptId;
+        delete retryPrompt.providerStartedAt;
+        retryJob.updatedAt = Date.now();
+        if (this.saveJobs()) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+          shouldSchedule = true;
+        } else {
+          this.markPromptForReconciliation(
+            retryJob,
+            retryPrompt,
+            'Provider failed, but the durable retry snapshot could not be saved. Automatic retry is blocked to prevent an untracked paid request.',
+          );
+          this.saveJobs();
+        }
       } else if (classified.retryable && retryPrompt.retryCount < RETRY_ATTEMPTS && retryJob.status === 'paused') {
         retryPrompt.retryCount += 1;
         retryPrompt.status = 'queued';
         retryPrompt.phase = 'queued';
+        retryPrompt.error = classified.message;
+        retryPrompt.errorCategory = classified.category;
+        retryPrompt.retryable = true;
+        delete retryPrompt.providerAttemptId;
+        delete retryPrompt.providerStartedAt;
+        retryJob.updatedAt = Date.now();
+        if (!this.saveJobs()) {
+          this.markPromptForReconciliation(
+            retryJob,
+            retryPrompt,
+            'The paused provider failure could not be saved durably. Automatic replay remains blocked pending manual verification.',
+          );
+          this.saveJobs();
+        }
       } else {
         retryPrompt.status = 'failed';
         retryPrompt.phase = 'failed';
         retryPrompt.error = classified.message;
         retryPrompt.errorCategory = classified.category;
         retryPrompt.retryable = classified.retryable;
+        retryJob.updatedAt = Date.now();
+        if (!this.saveJobs()) {
+          this.markPromptForReconciliation(
+            retryJob,
+            retryPrompt,
+            'The provider failure outcome could not be saved durably. Automatic replay is blocked pending manual verification.',
+          );
+          this.saveJobs();
+        } else {
+          shouldSchedule = true;
+        }
       }
     } finally {
       this.inFlightTasks.delete(taskKey);
       this.abortControllers.delete(taskKey);
-      const activeJob = this.findJob(jobId);
-      if (activeJob) activeJob.updatedAt = Date.now();
-      this.saveJobs();
-      this.scheduleProcess();
+      if (shouldSchedule) this.scheduleProcess();
     }
   }
 }

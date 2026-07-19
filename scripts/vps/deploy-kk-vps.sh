@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 APP_USER="${KK_APP_USER:-kkstudio}"
 APP_GROUP="${KK_APP_GROUP:-$APP_USER}"
@@ -8,10 +8,10 @@ CURRENT_DIR="${KK_CURRENT_DIR:-$APP_ROOT/current}"
 ENV_DIR="${KK_ENV_DIR:-/etc/kk-studio}"
 APP_SITE_ROOT="${KK_APP_SITE_ROOT:-/var/www/kk-app}"
 WEB_ENV_FILE="${KK_WEB_ENV_FILE:-$ENV_DIR/kk-web.env}"
+API_ENV_FILE="${KK_API_ENV_FILE:-$ENV_DIR/kk-api.env}"
 APPLY_BOOTSTRAP_SQL="${KK_APPLY_BOOTSTRAP_SQL:-false}"
-POSTGRES_DB="${KK_PG_DB:-kkstudio}"
-POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
 BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/postgres/bootstrap-kk-vps.sql}"
+AI_ASSISTANT_SCOPE_MIGRATION_PATH="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-migrations/016_ai_assistant_user_scope.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -19,19 +19,140 @@ RELEASES_DIR="${APP_ROOT}/releases"
 APP_RELEASES_DIR="/var/www/releases/app"
 
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
-COMMIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
-RELEASE_NAME="${TIMESTAMP}-${COMMIT_SHA}"
+COMMIT_SHA=""
+COMMIT_SHORT_SHA=""
+RELEASE_NAME=""
+RUNTIME_DATABASE_URL=""
+MIGRATION_DATABASE_URL=""
+RUNTIME_DATABASE_USER=""
 
-NEW_RELEASE_DIR="${RELEASES_DIR}/release-${RELEASE_NAME}"
-NEW_APP_RELEASE_DIR="${APP_RELEASES_DIR}/kk-app-${RELEASE_NAME}"
+NEW_RELEASE_DIR=""
+NEW_APP_RELEASE_DIR=""
 
 # 备份原先的软链接指向，用以部署失败时回退
 PREV_CURRENT=""
 PREV_APP=""
+SCHEMA_CUTOVER_APPLIED=false
+SCHEMA_MIGRATION_ATTEMPTED=false
+API_SERVICES_STOPPED_FOR_SCHEMA_CUTOVER=false
+ACTIVE_API_SERVICES_BEFORE_CUTOVER=()
 
 require_repo_root() {
   if [[ ! -f package.json || ! -d apps/web ]]; then
     echo "[deploy-kk-vps] Run this script from the repository root." >&2
+    exit 1
+  fi
+}
+
+require_clean_git_release() {
+  if ! command -v git >/dev/null 2>&1; then
+    echo "[deploy-kk-vps] git is required to create an attributable release." >&2
+    exit 1
+  fi
+  COMMIT_SHA="$(git rev-parse --verify HEAD 2>/dev/null || true)"
+  if [[ ! "${COMMIT_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "[deploy-kk-vps] Unable to resolve a full 40-character Git commit SHA." >&2
+    exit 1
+  fi
+  if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+    echo "[deploy-kk-vps] Refusing to deploy a dirty worktree; commit or remove every tracked and untracked change first." >&2
+    exit 1
+  fi
+  COMMIT_SHA="${COMMIT_SHA,,}"
+  COMMIT_SHORT_SHA="${COMMIT_SHA:0:7}"
+  RELEASE_NAME="${TIMESTAMP}-${COMMIT_SHORT_SHA}"
+  NEW_RELEASE_DIR="${RELEASES_DIR}/release-${RELEASE_NAME}"
+  NEW_APP_RELEASE_DIR="${APP_RELEASES_DIR}/kk-app-${RELEASE_NAME}"
+}
+
+read_env_value() {
+  local env_file="$1"
+  local key="$2"
+  local value
+  value="$(sed -n "s/^${key}=//p" "${env_file}" | tail -n 1)"
+  value="${value%$'\r'}"
+  if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "${value}"
+}
+
+require_runtime_database_target() {
+  if ! command -v psql >/dev/null 2>&1; then
+    echo "[deploy-kk-vps] psql is required for mandatory schema migration." >&2
+    exit 1
+  fi
+  if [[ ! -f "${API_ENV_FILE}" ]]; then
+    echo "[deploy-kk-vps] Runtime API environment file not found: ${API_ENV_FILE}" >&2
+    exit 1
+  fi
+  RUNTIME_DATABASE_URL="$(read_env_value "${API_ENV_FILE}" DATABASE_URL)"
+  if [[ ! "${RUNTIME_DATABASE_URL}" =~ ^postgres(ql)?:// ]]; then
+    echo "[deploy-kk-vps] DATABASE_URL in ${API_ENV_FILE} is missing or is not a PostgreSQL URL." >&2
+    exit 1
+  fi
+  if ! psql "${RUNTIME_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc 'SELECT 1' >/dev/null; then
+    echo "[deploy-kk-vps] Cannot connect to the exact DATABASE_URL used by kk-api.service." >&2
+    exit 1
+  fi
+  MIGRATION_DATABASE_URL="${KK_MIGRATION_DATABASE_URL:-${RUNTIME_DATABASE_URL}}"
+  if [[ ! "${MIGRATION_DATABASE_URL}" =~ ^postgres(ql)?:// ]]; then
+    echo "[deploy-kk-vps] KK_MIGRATION_DATABASE_URL is not a PostgreSQL URL." >&2
+    exit 1
+  fi
+
+  local runtime_identity migration_identity authority_probe missing_count unauthorized_count version_missing can_create_schema is_superuser
+  runtime_identity="$(psql "${RUNTIME_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT current_database() || '|' || coalesce(inet_server_addr()::text, 'local-socket') || '|' || coalesce(inet_server_port()::text, 'default')")"
+  migration_identity="$(psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT current_database() || '|' || coalesce(inet_server_addr()::text, 'local-socket') || '|' || coalesce(inet_server_port()::text, 'default')")"
+  if [[ -z "${runtime_identity}" || "${runtime_identity}" != "${migration_identity}" ]]; then
+    echo "[deploy-kk-vps] Runtime and migration credentials do not resolve to the same PostgreSQL database endpoint." >&2
+    exit 1
+  fi
+  RUNTIME_DATABASE_USER="$(psql "${RUNTIME_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc 'SELECT current_user')"
+  if [[ -z "${RUNTIME_DATABASE_USER}" ]]; then
+    echo "[deploy-kk-vps] Could not resolve the kk-api runtime database role." >&2
+    exit 1
+  fi
+
+  authority_probe="$(psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -AtF '|' -qc "
+    WITH targets(name) AS (VALUES
+      ('agent_runs'), ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
+      ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills')
+    ), relations AS (
+      SELECT target.name, class.oid, class.relowner
+      FROM targets AS target
+      LEFT JOIN pg_class AS class
+        ON class.oid = to_regclass('public.' || target.name)
+    )
+    SELECT
+      count(*) FILTER (WHERE oid IS NULL),
+      count(*) FILTER (
+        WHERE oid IS NOT NULL
+          AND NOT pg_has_role(current_user, relowner, 'USAGE')
+          AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
+      ),
+      CASE WHEN to_regclass('public.agent_skill_versions') IS NULL THEN 1 ELSE 0 END,
+      has_schema_privilege(current_user, 'public', 'CREATE'),
+      (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
+    FROM relations
+  ")"
+  IFS='|' read -r missing_count unauthorized_count version_missing can_create_schema is_superuser <<< "${authority_probe}"
+  if [[ "${unauthorized_count}" != "0" ]]; then
+    echo "[deploy-kk-vps] Migration role does not own or inherit ownership for every existing AI assistant table." >&2
+    exit 1
+  fi
+  if [[ "${missing_count}" != "0" && "${APPLY_BOOTSTRAP_SQL}" != "true" ]]; then
+    echo "[deploy-kk-vps] Required AI tables are missing and KK_APPLY_BOOTSTRAP_SQL is not enabled." >&2
+    exit 1
+  fi
+  if [[ "${version_missing}" != "0" && "${can_create_schema}" != "t" ]]; then
+    echo "[deploy-kk-vps] Migration role cannot create agent_skill_versions in the public schema." >&2
+    exit 1
+  fi
+  if [[ "${APPLY_BOOTSTRAP_SQL}" == "true" && "${is_superuser}" != "t" ]]; then
+    echo "[deploy-kk-vps] Full bootstrap during deploy requires an explicit superuser migration credential." >&2
     exit 1
   fi
 }
@@ -47,8 +168,21 @@ verify_preflight_changes() {
 
 # 部署出错时的自动化回滚逻辑
 on_error() {
-  local exit_code=$?
-  echo "[deploy-kk-vps] CRITICAL: An error occurred on line $1. Exit code: ${exit_code}." >&2
+  local error_line="$1"
+  local exit_code="$2"
+  echo "[deploy-kk-vps] CRITICAL: An error occurred near line ${error_line}. Exit code: ${exit_code}." >&2
+
+  if [[ "${SCHEMA_CUTOVER_APPLIED}" == "true" ]]; then
+    echo "[deploy-kk-vps] Database schema cutover already completed; refusing to restart or restore the previous release." >&2
+    echo "[deploy-kk-vps] Keep the compatible release selected (if switched) and repair/restart it manually." >&2
+    return
+  fi
+
+  if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
+    echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
+    echo "[deploy-kk-vps] Verify schema 016 manually before selecting and starting a compatible release." >&2
+    return
+  fi
   
   if [[ -n "${PREV_CURRENT}" ]]; then
     echo "[deploy-kk-vps] Initiating rollback to previous stable releases..." >&2
@@ -69,19 +203,31 @@ on_error() {
     
     nginx -t && systemctl reload nginx || true
     
-    echo "[deploy-kk-vps] Restarting previous systemd services..." >&2
-    systemctl daemon-reload
-    for service in "${SYSTEMD_SERVICES[@]}"; do
-      systemctl restart "${service}" || true
-    done
     echo "[deploy-kk-vps] Rollback process completed." >&2
   fi
-  
+
+  if [[ "${API_SERVICES_STOPPED_FOR_SCHEMA_CUTOVER}" == "true" ]]; then
+    echo "[deploy-kk-vps] Schema migration did not complete; restarting the unchanged API release." >&2
+    systemctl daemon-reload || true
+    for service in "${ACTIVE_API_SERVICES_BEFORE_CUTOVER[@]}"; do
+      systemctl restart "${service}" || true
+    done
+  fi
+}
+
+# EXIT 同时覆盖命令失败与脚本中的显式 exit；进入 handler 前先移除 trap，避免恢复失败递归触发。
+on_exit() {
+  local exit_code=$?
+  local error_line="${BASH_LINENO[0]:-${LINENO}}"
+  if [[ "${exit_code}" -eq 0 ]]; then
+    return
+  fi
+  trap - EXIT
+  on_error "${error_line}" "${exit_code}"
   exit "${exit_code}"
 }
 
-# 注册异常捕获钩子
-trap 'on_error $LINENO' ERR
+trap on_exit EXIT
 
 sync_repo_to_release_dir() {
   echo "[deploy-kk-vps] Deploying Commit: ${COMMIT_SHA} on Branch: $(git branch --show-current 2>/dev/null || echo "unknown")"
@@ -122,7 +268,7 @@ run_npm_script_in_release() {
 
 build_static_sites() {
   echo "[deploy-kk-vps] Building Web Static Site..."
-  run_npm_script_in_release "npm run build" "${WEB_ENV_FILE}"
+  run_npm_script_in_release "KK_STUDIO_COMMIT_SHA='${COMMIT_SHA}' npm run build" "${WEB_ENV_FILE}"
   
   # 验证打包产物及清单文件是否就绪
   if [[ ! -f "${NEW_RELEASE_DIR}/apps/web/dist/app-version.json" ]]; then
@@ -139,24 +285,168 @@ build_static_sites() {
 }
 
 harden_env_permissions() {
-  if [[ -f "${ENV_DIR}/kk-api.env" ]]; then
-    chgrp "${APP_GROUP}" "${ENV_DIR}/kk-api.env"
-    chmod 0640 "${ENV_DIR}/kk-api.env"
+  if [[ -f "${API_ENV_FILE}" ]]; then
+    chgrp "${APP_GROUP}" "${API_ENV_FILE}"
+    chmod 0640 "${API_ENV_FILE}"
   fi
 }
 
-apply_bootstrap_sql_if_requested() {
-  if [[ "${APPLY_BOOTSTRAP_SQL}" != "true" ]]; then
-    return
-  fi
+stop_api_services_for_schema_cutover() {
+  echo "[deploy-kk-vps] Stopping API services for the database schema cutover..."
+  API_SERVICES_STOPPED_FOR_SCHEMA_CUTOVER=true
+  for service in "${SYSTEMD_SERVICES[@]}"; do
+    local unit_listing
+    if ! unit_listing="$(systemctl list-unit-files "${service}.service" --no-legend --no-pager)"; then
+      echo "[deploy-kk-vps] ERROR: Failed to query systemd unit ${service}.service before schema cutover." >&2
+      return 1
+    fi
+    if ! grep -q "^${service}\\.service" <<<"${unit_listing}"; then
+      echo "[deploy-kk-vps] Skipping missing optional service: ${service}"
+      continue
+    fi
 
-  if [[ ! -f "${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}" ]]; then
+    local active_state
+    if ! active_state="$(systemctl show "${service}.service" --property=ActiveState --value)"; then
+      echo "[deploy-kk-vps] ERROR: Failed to read ActiveState for ${service}.service before schema cutover." >&2
+      return 1
+    fi
+    case "${active_state}" in
+      active|activating|reloading|refreshing)
+        ACTIVE_API_SERVICES_BEFORE_CUTOVER+=("${service}")
+        ;;
+      inactive|failed|deactivating)
+        echo "[deploy-kk-vps] Service already inactive before cutover: ${service}"
+        ;;
+      *)
+        echo "[deploy-kk-vps] ERROR: Unexpected ActiveState '${active_state}' for ${service}.service." >&2
+        return 1
+        ;;
+    esac
+
+    if ! systemctl stop "${service}"; then
+      echo "[deploy-kk-vps] ERROR: Failed to stop ${service}.service before schema cutover." >&2
+      return 1
+    fi
+  done
+}
+
+verify_database_migration_inputs() {
+  if [[ "${APPLY_BOOTSTRAP_SQL}" == "true" && ! -f "${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}" ]]; then
     echo "[deploy-kk-vps] Bootstrap SQL not found at ${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${AI_ASSISTANT_SCOPE_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] AI assistant scope migration not found at ${NEW_RELEASE_DIR}/${AI_ASSISTANT_SCOPE_MIGRATION_PATH}" >&2
+    exit 1
+  fi
+}
 
-  echo "[deploy-kk-vps] Executing bootstrap database migrations..."
-  su - "${POSTGRES_SUPERUSER}" -c "psql -v ON_ERROR_STOP=1 -d '${POSTGRES_DB}' -f '${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}'"
+apply_database_migrations() {
+  if [[ "${APPLY_BOOTSTRAP_SQL}" == "true" ]]; then
+    echo "[deploy-kk-vps] Executing optional full bootstrap database schema..."
+    SCHEMA_MIGRATION_ATTEMPTED=true
+    psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}"
+  fi
+
+  echo "[deploy-kk-vps] Applying mandatory AI assistant user-scope migration..."
+  SCHEMA_MIGRATION_ATTEMPTED=true
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AI_ASSISTANT_SCOPE_MIGRATION_PATH}"
+
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
+SELECT format(
+  'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %s TO %I',
+  string_agg(format('public.%I', table_name), ', '),
+  :'runtime_role'
+)
+FROM (VALUES
+  ('agent_runs'), ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
+  ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions')
+) AS ai_tables(table_name)
+\gexec
+SQL
+
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'agent_runs'
+      AND column_name = 'user_id'
+      AND is_nullable = 'NO'
+  ) THEN
+    RAISE EXCEPTION 'agent_runs.user_id is not present and NOT NULL';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'agent_runs'
+      AND column_name = 'step_results'
+      AND data_type = 'jsonb'
+      AND is_nullable = 'NO'
+      AND coalesce(column_default, '') LIKE '%[]%'
+  ) THEN
+    RAISE EXCEPTION 'agent_runs.step_results is not canonical jsonb NOT NULL with an empty-array default';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('knowledge_documents'),
+      ('agent_skills'),
+      ('canvas_runtime_snapshots')
+    ) AS expected(table_name)
+    LEFT JOIN information_schema.columns AS actual
+      ON actual.table_schema = 'public'
+      AND actual.table_name = expected.table_name
+      AND actual.column_name = 'owner_scope'
+    WHERE actual.column_name IS NULL
+      OR actual.data_type <> 'text'
+      OR actual.is_nullable <> 'NO'
+      OR coalesce(actual.column_default, '') NOT LIKE '%legacy%'
+  ) THEN
+    RAISE EXCEPTION 'AI owner_scope columns are missing or do not enforce canonical NOT NULL legacy defaults';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('agent_runs', 'created_at'),
+      ('agent_runs', 'updated_at'),
+      ('agent_tool_calls', 'started_at'),
+      ('agent_tool_calls', 'completed_at'),
+      ('agent_memory', 'created_at'),
+      ('agent_memory', 'updated_at'),
+      ('knowledge_documents', 'created_at'),
+      ('knowledge_documents', 'updated_at'),
+      ('knowledge_chunks', 'created_at'),
+      ('canvas_runtime_snapshots', 'created_at'),
+      ('canvas_runtime_snapshots', 'updated_at'),
+      ('agent_skills', 'created_at'),
+      ('agent_skills', 'updated_at')
+    ) AS expected(table_name, column_name)
+    LEFT JOIN information_schema.columns AS actual
+      ON actual.table_schema = 'public'
+      AND actual.table_name = expected.table_name
+      AND actual.column_name = expected.column_name
+    WHERE actual.data_type IS DISTINCT FROM 'timestamp with time zone'
+  ) THEN
+    RAISE EXCEPTION 'AI assistant timestamp columns are missing or are not timestamptz';
+  END IF;
+  IF to_regclass('public.agent_skill_versions') IS NULL THEN
+    RAISE EXCEPTION 'agent_skill_versions is missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_index AS index
+    JOIN pg_class AS class ON class.oid = index.indexrelid
+    WHERE class.relname = 'agent_skills_user_name_idx'
+      AND index.indisunique
+      AND pg_get_expr(index.indpred, index.indrelid) LIKE '%owner_scope%user%'
+  ) THEN
+    RAISE EXCEPTION 'agent_skills_user_name_idx is missing its user-scope predicate';
+  END IF;
+END $$;
+SQL
+  SCHEMA_CUTOVER_APPLIED=true
 }
 
 atomic_switch_symlinks() {
@@ -183,6 +473,18 @@ atomic_switch_symlinks() {
   # 执行软链接原子切换
   ln -sfn "${NEW_RELEASE_DIR}" "${CURRENT_DIR}"
   ln -sfn "${NEW_APP_RELEASE_DIR}" "${APP_SITE_ROOT}"
+}
+
+install_systemd_units() {
+  local api_unit="${CURRENT_DIR}/config/deploy/systemd/kk-api.service"
+  if [[ ! -f "${api_unit}" ]]; then
+    echo "[deploy-kk-vps] API systemd unit not found at ${api_unit}" >&2
+    exit 1
+  fi
+
+  echo "[deploy-kk-vps] Installing API systemd unit from the selected release..."
+  install -m 0644 "${api_unit}" /etc/systemd/system/kk-api.service
+  systemctl daemon-reload
 }
 
 install_nginx_gateway() {
@@ -219,6 +521,7 @@ restart_services_and_reload_nginx() {
       echo "[deploy-kk-vps] Skipping missing optional service: ${service}"
     fi
   done
+  API_SERVICES_STOPPED_FOR_SCHEMA_CUTOVER=false
   
   echo "[deploy-kk-vps] Reloading nginx service..."
   systemctl reload nginx
@@ -241,7 +544,7 @@ validate_deployment_by_curl() {
   echo "[deploy-kk-vps] Local file Commit SHA: ${COMMIT_SHA}"
   echo "[deploy-kk-vps] HTTP Response Commit SHA: ${live_sha}"
   
-  if [[ "${live_sha}" != "${COMMIT_SHA}" && "${COMMIT_SHA}" != "unknown" ]]; then
+  if [[ "${live_sha}" != "${COMMIT_SHA}" ]]; then
     echo "[deploy-kk-vps] ERROR: Deployed version SHA mismatch! Expected ${COMMIT_SHA} but got ${live_sha}." >&2
     exit 1
   fi
@@ -294,15 +597,20 @@ cleanup_old_releases() {
 
 # 流程运行
 require_repo_root
+require_clean_git_release
+require_runtime_database_target
 verify_preflight_changes
 sync_repo_to_release_dir
 install_dependencies
-apply_bootstrap_sql_if_requested
 build_static_sites
 harden_env_permissions
+verify_database_migration_inputs
+stop_api_services_for_schema_cutover
+apply_database_migrations
 
 # 进入临界区，进行原子替换与重载
 atomic_switch_symlinks
+install_systemd_units
 install_nginx_gateway
 restart_services_and_reload_nginx
 

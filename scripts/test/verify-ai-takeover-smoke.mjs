@@ -470,7 +470,7 @@ try {
   page = await browser.newPage({ viewport: { width: 1600, height: 980 } });
   await installSmokeApiRoutes(page);
 
-  await page.addInitScript((seedDurableQueueJobs) => {
+  await page.addInitScript(({ seedDurableQueueJobs, authenticatedOwnerId }) => {
     const now = Date.now();
     const expiresAt = now + 24 * 60 * 60 * 1000;
     const createdAtIso = new Date(now).toISOString();
@@ -512,15 +512,26 @@ try {
         isTempUser: true,
         tempUserExpiry: expiresAt,
       }));
-      window.localStorage.setItem('kk_durable_generation_jobs', JSON.stringify(seedDurableQueueJobs.map((job) => ({
+      const queueSnapshot = JSON.stringify(seedDurableQueueJobs.map((job) => ({
         ...job,
         createdAt: now,
         updatedAt: now,
-      }))));
+      })));
+      const queueStorageKey = 'kk_durable_generation_jobs';
+      window.localStorage.setItem(queueStorageKey, queueSnapshot);
+      for (const ownerId of new Set([tempUser.id, authenticatedOwnerId])) {
+        window.localStorage.setItem(
+          `${queueStorageKey}:owner:${encodeURIComponent(ownerId)}`,
+          queueSnapshot,
+        );
+      }
     } catch (e) {
       console.warn('InitScript localStorage error:', e);
     }
-  }, SMOKE_DURABLE_QUEUE_JOBS);
+  }, {
+    seedDurableQueueJobs: SMOKE_DURABLE_QUEUE_JOBS,
+    authenticatedOwnerId: SMOKE_PROFILE.id,
+  });
 
   await gotoWithRetry(page, targetUrl);
   await page.waitForTimeout(1200);

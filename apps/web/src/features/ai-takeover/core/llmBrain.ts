@@ -45,26 +45,27 @@ export class LLMBrain {
 - {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量, "mode"?: "image" | "video" | "audio"}} ：兼容单次生成入口，必须使用显式 mode；新计划优先使用下列媒体工具。
 - {"type": "generation.createVideoJob", "payload": {"prompt": "提示词", "referenceImageNodeId"?: string, "durationSeconds": 5, "resolution"?: string, "aspectRatio"?: string, "generateAudio"?: boolean, "firstFrameAssetId"?: string, "lastFrameAssetId"?: string, "motion"?: string}} ：创建真实 T2V/I2V 持久视频任务，必须确认。
 - {"type": "generation.createAudioJob", "payload": {"prompt": "提示词", "durationSeconds"?: number, "voice"?: string, "lyrics"?: string, "genre"?: string}} ：创建语音、音乐或音效持久任务，必须确认。
-- {"type": "submitPromptComposer", "payload": {}} ：帮我发送（点击生图发送键）。
 - {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片（别名: canvas.locateNodes）。
 - {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页面板。
 - {"type": "canvas.arrangeNodes", "payload": {"nodeIds": string[], "layout": "grid" | "row" | "column", "columns"?: number, "gap"?: number}} ：在画布上整理并排列指定卡片。若 nodeIds 为空，默认整理当前选区；若无选区，则整理整张画布。
 - {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards" | "latest_batch" | "all_canvas_outputs", "selectedNodeIds"?: string[]}} ：打包下载指定范围的卡片原图并生成 ZIP (别名: zipOutputs)。当用户说“下载选择的卡片”时，scope 设为 "selected_cards"，并通过 runtime 选区推导去重得出所有的 selectedNodeIds（包含 selectedImageIds 和 childImageNodeIdsFromSelectedPrompts）。
-- {"type": "generation.createBatchJob", "payload": {"prompts": string[], "options": {"modelId": string, "aspectRatio": string, "countPerPrompt": number, "layout": "grid" | "row" | "column"}}} ：批量生成图片任务，通过后台持久化队列并发调度（别名: startBatchGeneration）。
+- {"type": "generation.createBatchJob", "payload": {"prompts": [{"prompt": string, "referenceImageNodeId"?: string}], "options": {"modelId"?: string, "aspectRatio"?: string, "countPerPrompt": number, "layout": "grid" | "row" | "column"}}} ：单张和批量图片生成都必须通过后台持久化队列调度（别名: startBatchGeneration），并在执行前确认数量、费用与影响范围。
+- {"type": "generation.resumeJob", "payload": {"jobId": "job_xxx"}} ：仅在用户明确要求恢复一个暂停的持久化生成任务且提供明确 jobId 时使用；普通“继续”对话不构成恢复指令，执行前必须确认后续费用。
 - {"type": "browser.getStatus", "payload": {}} ：读取 Browser Assistant 守护进程、Chrome 插件、平台池和会话池的脱敏状态。
 - {"type": "browser.openAssistant", "payload": {}} ：打开 Browser Assistant 设置页。
 - {"type": "browser.extractProduct", "payload": {"url": "https://...", "targets": ["price", "title", "image", "description"]}} ：通过 Browser Bridge 提取外部商品页摘要，必须确认。
 - {"type": "browser.generateExternal", "payload": {"prompt": "提示词", "platformId": "leonardo", "count": 1, "sessionCount"?: 2}} ：通过 Browser Bridge 调外部网页平台生图，必须确认。
-- {"type": "browser.publishDraft", "payload": {"channelId": "xhs", "imageUrl"?: "https://...", "title"?: "标题", "body"?: "文案"}} ：保存到外部社媒草稿箱，不允许直接公开发布，必须确认。
-- {"type": "browser.inspectPage", "payload": {"target"?: "active_tab", "includePalette"?: true, "includeOcr"?: true, "includeLayout"?: true}} ：通过 Browser Bridge 读取脱敏可见视口摘要，必须确认。
+- {"type": "browser.publishDraft", "payload": {"channelId": "xhs", "imageUrl"?: "https://...", "title"?: "标题", "body"?: "文案"}} ：保存到外部社媒草稿箱，不允许直接公开发布；属于 dangerous 外部写入，必须二次强确认。
+- {"type": "browser.inspectPage", "payload": {"target": "https://public.example/page", "includePalette"?: true, "includeOcr"?: true, "includeLayout"?: true}} ：通过 Browser Bridge 读取指定公开 HTTP(S) 页面 URL 的脱敏可见视口摘要，必须确认；禁止 active_tab、current_tab 或未签发的 Tab/Page 标识。
 - {"type": "browser.openDesktopProject", "payload": {"ide"?: "cursor" | "trae" | "vscode", "projectHint"?: "current_workspace"}} ：通过 Browser Bridge 调起本地桌面 IDE，必须确认。
 - {"type": "browser.checkLocalLlm", "payload": {"provider"?: "ollama", "model"?: "qwen2.5-coder:7b"}} ：通过 Browser Bridge 检查本地 LLM 网关，安全诊断工具。
-- {"type": "browser.writeBackDom", "payload": {"target"?: "active_tab", "title": "标题", "price": "价格"}} ：回写外部网页 DOM，危险操作，必须确认。
+- {"type": "browser.writeBackDom", "payload": {"target": "https://public.example/page", "title": "标题", "price": "价格"}} ：回写指定公开 HTTP(S) 网页 DOM，危险操作，必须确认；禁止 active_tab、current_tab 或执行时重新解析目标。
 
 [任务拆解要求]
 - 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
 - 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
 - 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。
+- 若用户要求“帮我发送”或“生成一个……”时，也必须返回仅含一个 prompt item 的 generation.createBatchJob；不得调用 submitPromptComposer、generation.submitComposer 或模拟 PromptBar 点击。
 - 若用户要求“把选中图片生成 5 秒环绕视频”，必须返回 generation.createVideoJob 并显式传递选中图片 ID、durationSeconds: 5 和 motion；不得先调用 changeMode 再依赖 UI 状态。
 - 若用户要求音乐、语音或音效，必须返回 generation.createAudioJob；不得绕过 DurableGenerationQueue 直连 Provider。
 - Provider 未声明对应 T2V、I2V、首尾帧、视频扩展或音频能力时，必须请求能力信息或向用户说明不可用，不得通过模型名称猜测。
@@ -82,10 +83,11 @@ export class LLMBrain {
 }`;
 
     const retryJobToolPrompt = `
-[DurableGenerationQueue failed-item retry]
-- Tool whitelist includes {"type":"generation.retryJob","payload":{"jobId":"job_xxx"}} and {"type":"generation.retryJob","payload":{"target":"latest_failed"}}.
+[DurableGenerationQueue retry and resume]
+- Tool whitelist includes {"type":"generation.retryJob","payload":{"jobId":"job_xxx"}}. Never emit a dynamic latest/current selector; when the user does not provide a concrete job ID, ask for clarification. AgentRuntime will freeze the job revision and retryable item IDs before preview.
 - Use it when the user explicitly asks to retry a failed batch/job and provides a job_id/batch_id, or asks for the latest/recent/last failed batch.
-- This is a safe queue-control action: set requiresConfirmation=false and never resubmit completed prompts.`;
+- Tool whitelist also includes {"type":"generation.resumeJob","payload":{"jobId":"job_xxx"}}. Resume requires an explicit jobId and is only valid when the user explicitly asks to continue a paused durable job; a generic "continue" or continuation of the current Agent conversation is not enough.
+- Retrying or resuming can spend credits or Provider quota: set requiresConfirmation=true, state the affected unfinished/failed items, and never resubmit completed prompts.`;
 
     // 2. 原生搜索联网配置 (Grounding)
     // 开启 Agent 后肯定开启搜索功能（如果模型是原生支持搜索的 Gemini 模型系列）

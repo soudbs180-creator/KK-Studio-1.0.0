@@ -21,6 +21,8 @@ export type CanvasCardMediaInput = {
 
 export type CanvasCreateCardInput = {
   kind: CanvasCardKind;
+  /** Agent/tool retry key. When present, every produced node ID is deterministic. */
+  idempotencyKey?: string;
   title?: string;
   prompt?: string;
   position?: { x: number; y: number };
@@ -57,6 +59,16 @@ const createDefaultId = (now: number) => (prefix: string, index = 0) => (
   `${prefix}-${now.toString(36)}-${index}-${Math.random().toString(36).slice(2, 8)}`
 );
 
+const stableCardHash = (value: string, seed: number): string => value.split('').reduce(
+  (hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0,
+  seed,
+).toString(16).padStart(8, '0');
+
+const createDeterministicId = (idempotencyKey: string) => (prefix: string, index = 0) => {
+  const source = `${idempotencyKey}\u0000${prefix}\u0000${index}`;
+  return `agent-${prefix}-${stableCardHash(source, 2166136261)}${stableCardHash(source, 3335557771)}`;
+};
+
 const resolvePromptMode = (kind: CanvasCardKind) => {
   if (kind === 'ecommerce') return GenerationMode.ECOMMERCE;
   if (kind === 'ppt-deck') return GenerationMode.PPT;
@@ -68,7 +80,8 @@ export const createCanvasCardNodes = (
   defaults: CanvasCardFactoryDefaults,
 ): CanvasCardFactoryResult => {
   const now = defaults.now ?? Date.now();
-  const idFactory = defaults.idFactory || createDefaultId(now);
+  const idFactory = defaults.idFactory
+    || (input.idempotencyKey ? createDeterministicId(input.idempotencyKey) : createDefaultId(now));
   const position = input.position || defaults.position;
   const layoutMode = input.layoutMode || (input.kind === 'multi-image' ? 'grid' : 'column');
   const aspectRatio = (input.aspectRatio || AspectRatio.SQUARE) as PromptNode['aspectRatio'];

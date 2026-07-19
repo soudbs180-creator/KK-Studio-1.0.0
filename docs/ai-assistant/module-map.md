@@ -27,8 +27,10 @@
 - **云端大模型规划器**: [llmBrain.ts](../../apps/web/src/features/ai-takeover/core/llmBrain.ts)
 - **意图分析**: [intentGate.ts](../../apps/web/src/features/ai-takeover/core/intentGate.ts)
 - **工具/动作执行**:
+  - 类型化执行上下文: [AssistantExecutionContext.ts](../../apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts)
   - 运行时协调器: [AgentRuntime.ts](../../apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts)
   - 工具定义与注册: [ToolRegistry.ts](../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts)
+  - 运行记录存储: [AgentRunStore.ts](../../apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts)
 - **安全与确认策略**:
   - 安全门禁: [safetyPolicy.ts](../../apps/web/src/features/ai-takeover/core/safetyPolicy.ts)
   - 强确认弹出卡片: [confirmationPolicy.ts](../../apps/web/src/features/ai-takeover/core/confirmationPolicy.ts)
@@ -70,4 +72,13 @@ Maintains the AI assistant project knowledge projection used by `knowledge.searc
 - **Handoff source**: [session-handoff.md](../../docs/development/session-handoff.md)
 - **Tests**: [agent-knowledge-sync.test.ts](../../tests/unit/agent-knowledge-sync.test.ts)
 
-Boundary: this runtime store is a browser projection/cache. It must not be treated as authoritative database storage and must only contain redacted summaries.
+Boundary: this runtime store is a browser projection/cache. It must not be treated as authoritative database storage and must only contain redacted summaries. Server synchronization goes through typed KK API Client methods. User records are scoped by the authenticated user; only explicitly marked system knowledge is shared, and legacy unowned records are not queried as shared knowledge.
+
+## 6. AI Assistant persistence boundary
+
+- **Shared DTO and client contract**: `packages/shared/src/contracts/dto/ai-assistant.ts`, `packages/shared/src/contracts/client/kk-api-client.ts`
+- **Web API client**: `packages/api-client`
+- **Authenticated server routes**: `server/routes/ai-assistant.js`
+- **User-scope migration**: `migrations/016_ai_assistant_user_scope.sql`
+
+The web runtime must not bypass this boundary with raw `fetch`. Agent runs retain per-step verification outcomes; tool calls retain outcome and failure metadata; Knowledge, UI layout Knowledge and Skill writes are bound to the current user. Server adapters map database rows to the public camelCase DTO, reject cross-owner access, and order Agent Run snapshots by the client `updatedAt` value. Browser Agent Run history, Knowledge projections and retry queues use owner-qualified keys and never reuse another owner's cache; same-owner tabs merge versioned projection records and re-read persisted pending tasks before mutation, so unrelated writes cannot erase another tab's tombstone or delete retry. An in-flight failure is queued for the owner that initiated it. Skill acknowledgements are version-matched, and name-scoped deletion versions plus the server `agent_skill_versions` gate prevent late same-name upserts—even with different tab-generated IDs—from clearing newer pending payloads or resurrecting deleted Skills. Unsynchronized Run snapshots stay durably marked pending until the typed client acknowledges the latest timestamp.

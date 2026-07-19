@@ -72,3 +72,42 @@ test("KK API client persists X-Refresh-Token before returning envelope responses
 
   assert.equal(refreshedToken, "new-access-token");
 });
+
+test("KK API client never retries an owner-scoped body with a refreshed token from another subject", async () => {
+  let authSubject = "owner-a";
+  const requests: Array<{ authorization: string | null; body: string | null }> = [];
+  const client = createKkApiClient({
+    baseUrl: "https://api.example.com",
+    getAccessToken: () => "owner-a-token",
+    getAuthSubject: () => authSubject,
+    refreshAccessToken: () => {
+      authSubject = "owner-b";
+      return "owner-b-token";
+    },
+    fetchImpl: async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      requests.push({
+        authorization: headers.get("authorization"),
+        body: typeof init?.body === "string" ? init.body : null,
+      });
+      return new Response(JSON.stringify({ error: "expired" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  const response = await client.upsertAgentSkill({
+    id: "skill-owner-a",
+    name: "owner-a-private-skill",
+    trigger: "private",
+    tools: ["knowledge.searchProject"],
+    steps: ["read"],
+    updatedAt: "2026-07-19T09:00:00.000Z",
+  });
+
+  assert.equal(response.success, false);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.authorization, "Bearer owner-a-token");
+  assert.match(requests[0]?.body || "", /owner-a-private-skill/);
+});

@@ -618,9 +618,22 @@ export const AIAssistantDock: React.FC = () => {
               <div className="flex items-center justify-between text-[9px] text-zinc-500">
                 <span className="font-bold">{pick('任务拆分执行链', 'Orchestration Timeline')}</span>
                 {currentRun && (
-                  <span className="font-mono text-[8px] text-zinc-400">
-                    ID: {currentRun.id.slice(-6).toUpperCase()} ({currentRun.status})
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[8px] text-zinc-400">
+                      ID: {currentRun.id.slice(-6).toUpperCase()} ({currentRun.status})
+                    </span>
+                    {currentRun?.status === 'running' && (
+                      <button
+                        type="button"
+                        onClick={cancelPendingPlan}
+                        data-agent-action={AGENT_CONTROL_ACTIONS.cancelPlan.uiAction}
+                        data-agent-runtime-action={AGENT_CONTROL_ACTIONS.cancelPlan.runtimeAction}
+                        className="rounded-md border border-rose-500/35 px-1.5 py-0.5 text-[8px] font-bold text-rose-300 hover:bg-rose-500/10"
+                      >
+                        {pick('停止', 'Stop')}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -796,6 +809,7 @@ export const AIAssistantDock: React.FC = () => {
               const total = job.prompts.length;
               const completed = job.prompts.filter((p: any) => p.status === 'completed').length;
               const failed = job.prompts.filter((p: any) => p.status === 'failed').length;
+              const retryableFailed = job.prompts.filter((p: any) => p.status === 'failed' && p.retryable !== false).length;
               const running = job.prompts.filter((p: any) => p.status === 'running').length;
               const outputNodeCount = getDurableQueueJobNodeIds(job).length;
               const percent = job.progress?.percent ?? Math.round(((completed + failed) / total) * 100);
@@ -855,7 +869,7 @@ export const AIAssistantDock: React.FC = () => {
                           <Play size={10} />
                         </button>
                       )}
-                      {failed > 0 && job.status !== 'cancelled' && (
+                      {retryableFailed > 0 && job.status !== 'cancelled' && (
                         <button
                           onClick={() => durableGenerationQueue.retryFailedPrompts(job.id)}
                           data-agent-action={AGENT_CONTROL_ACTIONS.retryGenerationJob.uiAction}

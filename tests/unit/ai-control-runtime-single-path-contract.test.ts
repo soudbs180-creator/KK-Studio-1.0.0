@@ -32,7 +32,8 @@ test('AI control execution has one production path through AgentRuntime and runt
   const takeoverContext = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
   assert.match(takeoverContext, /agentRuntimeInstance\.executePendingRun/);
   assert.doesNotMatch(takeoverContext, /executeAction/);
-  assert.doesNotMatch(takeoverContext, /generationQueue/);
+  assert.match(takeoverContext, /generationQueue:\s*durableGenerationQueue/);
+  assert.doesNotMatch(takeoverContext, /generationQueue\.(?:createJob|add|enqueue)/);
   assert.doesNotMatch(takeoverContext, /addToQueue/);
 
   const toolRegistryDoc = readSource('docs/ai-assistant/tool-registry.md');
@@ -69,6 +70,8 @@ test('Browser Assistant ZIP export event delegates to ToolRegistry assets.zipOri
   );
 
   assert.match(eventBridge, /toolRegistryInstance\.execute\('assets\.zipOriginals'/);
+  assert.match(eventBridge, /normalizedScope === 'selected_cards'/);
+  assert.match(eventBridge, /selectedNodeIds: confirmedSelectedNodeIds/);
   assert.doesNotMatch(eventBridge, /zipOutputs\(/);
 });
 

@@ -1,3 +1,5 @@
+import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.ts';
+
 export type BrowserBridgeConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export type BrowserBridgeCommandKind =
@@ -12,6 +14,7 @@ export type BrowserBridgeCommandKind =
 
 export interface BrowserBridgeCommand {
   id: string;
+  idempotencyKey?: string;
   kind: BrowserBridgeCommandKind;
   target?: string;
   payload: Record<string, any>;
@@ -23,6 +26,10 @@ export interface BrowserBridgeCommand {
 export interface BrowserBridgeResult<TData = any> {
   id: string;
   status: 'success' | 'queued' | 'setup_required' | 'failed';
+  success?: boolean;
+  executionOutcome?: 'success' | 'retryable_failure' | 'failed';
+  code?: 'SETUP_REQUIRED' | 'BROWSER_BRIDGE_FAILED';
+  retryable?: boolean;
   summary: string;
   data?: TData;
   error?: string;
@@ -56,10 +63,16 @@ export interface BrowserBridgeExecuteOptions {
 }
 
 const SETUP_HINT = '请先启动本地守护进程并连接 Chrome Bridge 插件，然后回到浏览器助手重试。';
+const BROWSER_STORAGE_PREFIX = 'kk_browser_owner';
 
 const SENSITIVE_KEY_PATTERN = /authorization|api[-_]?key|cookie|token|secret|password|credential|jwt|local[-_]?endpoint|endpoint/i;
 const BEARER_PATTERN = /^Bearer\s+/i;
 const API_KEY_PATTERN = /^sk-[a-zA-Z0-9_-]{8,}/i;
+
+export const getBrowserBridgeOwnerStorageKey = (
+  key: string,
+  ownerId = getRuntimeOwnerId(),
+): string => `${BROWSER_STORAGE_PREFIX}:${encodeURIComponent(String(ownerId || 'local_user'))}:${key}`;
 
 const isPlainObject = (value: unknown): value is Record<string, any> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -158,15 +171,46 @@ export const redactBrowserBridgePayload = (value: any): any => {
   return value;
 };
 
+const browserBridgeAuditTargetHost = (target?: string): string | undefined => {
+  if (!target) return undefined;
+  const normalized = String(target).trim();
+  try {
+    return new URL(normalized).host.slice(0, 255) || undefined;
+  } catch {
+    return normalized.replace(/^.*@/, '').split(/[/?#]/)[0].slice(0, 100) || undefined;
+  }
+};
+
+const redactBrowserBridgeText = (value: unknown, fallback: string): string => String(value || fallback)
+  .replace(/Bearer\s+[a-zA-Z0-9_\-.]+/gi, 'Bearer ***')
+  .replace(/Basic\s+[a-zA-Z0-9+/=]+/gi, 'Basic ***')
+  .replace(/([?&](?:access[_-]?token|api[_-]?key|password|secret|token|cookie)=)[^&#\s"']*/gi, '$1***')
+  .replace(/sk-[a-zA-Z0-9_\-]{8,}/gi, 'sk-***')
+  .replace(/\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/g, 'jwt.***')
+  .slice(0, 500);
+
 export const createBrowserBridgeCommand = (input: {
   kind: BrowserBridgeCommandKind;
   target?: string;
   payload?: Record<string, any>;
+  idempotencyKey?: string;
   requiresUserGesture?: boolean;
 }): BrowserBridgeCommand => {
-  const payload = input.payload || {};
+  const idempotencyKey = String(input.idempotencyKey || '').trim().slice(0, 300) || undefined;
+  const payload = idempotencyKey
+    ? { ...(input.payload || {}), idempotencyKey }
+    : input.payload || {};
+  const stableCommandHash = idempotencyKey
+    ? Array.from(`${input.kind}:${idempotencyKey}`).reduce(
+        (hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0,
+        2166136261,
+      ).toString(16).padStart(8, '0')
+    : undefined;
   return {
-    id: `browser_cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    id: stableCommandHash
+      ? `browser_cmd_${stableCommandHash}`
+      : `browser_cmd_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    idempotencyKey,
     kind: input.kind,
     target: sanitizeCommandTarget(input.target),
     payload,
@@ -181,12 +225,52 @@ export const createBrowserBridgeSetupRequiredResult = (
 ): BrowserBridgeResult => ({
   id: commandId,
   status: 'setup_required',
+  success: false,
+  executionOutcome: 'retryable_failure',
+  code: 'SETUP_REQUIRED',
+  retryable: true,
   summary: SETUP_HINT,
   error: 'Browser Bridge disconnected',
   audit: {
     redacted: true
   }
 });
+
+const normalizeBrowserBridgeResult = (result: BrowserBridgeResult): BrowserBridgeResult => {
+  const safeResult: BrowserBridgeResult = {
+    ...result,
+    summary: redactBrowserBridgeText(result.summary, 'Browser Bridge completed.'),
+    error: result.error ? redactBrowserBridgeText(result.error, 'Browser Bridge failed') : undefined,
+    audit: {
+      ...result.audit,
+      redacted: true,
+      targetHost: browserBridgeAuditTargetHost(result.audit?.targetHost),
+    },
+  };
+  if (result.status === 'setup_required') {
+    return {
+      ...safeResult,
+      success: false,
+      executionOutcome: 'retryable_failure',
+      code: 'SETUP_REQUIRED',
+      retryable: true,
+    };
+  }
+  if (result.status === 'failed') {
+    return {
+      ...safeResult,
+      success: false,
+      executionOutcome: 'failed',
+      code: 'BROWSER_BRIDGE_FAILED',
+      retryable: result.retryable ?? false,
+    };
+  }
+  return {
+    ...safeResult,
+    success: true,
+    executionOutcome: 'success',
+  };
+};
 
 const createDisconnectedStatus = (snapshot?: Partial<BrowserBridgeStatusSnapshot>): BrowserBridgeStatusSnapshot => ({
   daemonStatus: snapshot?.daemonStatus || 'disconnected',
@@ -211,6 +295,40 @@ let globalWsClient: any = null;
 let currentDaemonStatus: BrowserBridgeConnectionStatus = 'disconnected';
 let currentExtensionStatus: BrowserBridgeConnectionStatus = 'disconnected';
 let currentLatency: number | null = null;
+const browserCommandOwners = new Map<string, string>();
+const browserCommandListeners = new Map<string, Set<{
+  ownerId: string;
+  listener: (result: BrowserBridgeResult) => void;
+}>>();
+
+export const subscribeBrowserBridgeCommand = (
+  commandId: string,
+  listener: (result: BrowserBridgeResult) => void,
+): (() => void) => {
+  const normalizedCommandId = String(commandId || '').trim();
+  if (!normalizedCommandId) return () => {};
+  const registration = { ownerId: getRuntimeOwnerId(), listener };
+  const listeners = browserCommandListeners.get(normalizedCommandId) || new Set();
+  listeners.add(registration);
+  browserCommandListeners.set(normalizedCommandId, listeners);
+  return () => {
+    const current = browserCommandListeners.get(normalizedCommandId);
+    current?.delete(registration);
+    if (current?.size === 0) browserCommandListeners.delete(normalizedCommandId);
+  };
+};
+
+const notifyBrowserBridgeCommandListeners = (
+  commandId: string,
+  result: BrowserBridgeResult,
+  ownerId: string,
+): void => {
+  const listeners = browserCommandListeners.get(commandId);
+  if (!listeners || getRuntimeOwnerId() !== ownerId) return;
+  for (const registration of listeners) {
+    if (registration.ownerId === ownerId) registration.listener(result);
+  }
+};
 
 if (typeof window !== 'undefined') {
   class RobustWebSocket {
@@ -302,6 +420,7 @@ if (typeof window !== 'undefined') {
   const pendingCommands = new Map<string, {
     resolve: (value: BrowserBridgeResult) => void;
     timer: any;
+    ownerId: string;
   }>();
 
   const globalBridgeClient: BrowserBridgeClient = {
@@ -312,16 +431,34 @@ if (typeof window !== 'undefined') {
         latencyMs: currentLatency,
         setupRequired: currentDaemonStatus !== 'connected' || currentExtensionStatus !== 'connected',
         setupHint: SETUP_HINT,
-        platforms: JSON.parse(localStorage.getItem('kk_browser_platforms') || '[]'),
-        sessions: JSON.parse(localStorage.getItem('kk_browser_sessions') || '[]'),
-        socialChannels: JSON.parse(localStorage.getItem('kk_browser_social_channels') || '[]')
+        platforms: JSON.parse(localStorage.getItem(getBrowserBridgeOwnerStorageKey('platforms')) || '[]'),
+        sessions: JSON.parse(localStorage.getItem(getBrowserBridgeOwnerStorageKey('sessions')) || '[]'),
+        socialChannels: JSON.parse(localStorage.getItem(getBrowserBridgeOwnerStorageKey('social_channels')) || '[]')
       };
     },
 
     async execute(command: BrowserBridgeCommand): Promise<BrowserBridgeResult> {
+      const executionOwnerId = getRuntimeOwnerId();
       if (!globalWsClient || currentDaemonStatus !== 'connected') {
         return createBrowserBridgeSetupRequiredResult(command.id);
       }
+
+      const existingCommandOwner = browserCommandOwners.get(command.id);
+      if (existingCommandOwner && existingCommandOwner !== executionOwnerId) {
+        return {
+          id: command.id,
+          status: 'failed',
+          success: false,
+          executionOutcome: 'failed',
+          code: 'BROWSER_BRIDGE_FAILED',
+          retryable: false,
+          summary: 'Browser Bridge command ID is still bound to another authenticated owner.',
+          error: 'Browser Bridge owner conflict',
+          audit: { redacted: true, commandKind: command.kind },
+        };
+      }
+
+      browserCommandOwners.set(command.id, executionOwnerId);
 
       const sent = globalWsClient.send({
         type: 'browser_bridge_command',
@@ -329,6 +466,7 @@ if (typeof window !== 'undefined') {
       });
 
       if (!sent) {
+        browserCommandOwners.delete(command.id);
         return createBrowserBridgeSetupRequiredResult(command.id);
       }
 
@@ -336,6 +474,8 @@ if (typeof window !== 'undefined') {
         const timer = setTimeout(() => {
           if (pendingCommands.has(command.id)) {
             pendingCommands.delete(command.id);
+            browserCommandOwners.delete(command.id);
+            browserCommandListeners.delete(command.id);
             resolve({
               id: command.id,
               status: 'failed',
@@ -344,13 +484,13 @@ if (typeof window !== 'undefined') {
               audit: {
                 redacted: true,
                 commandKind: command.kind,
-                targetHost: command.target
+                targetHost: browserBridgeAuditTargetHost(command.target)
               }
             });
           }
         }, 30000); // 30秒超时
 
-        pendingCommands.set(command.id, { resolve, timer });
+        pendingCommands.set(command.id, { resolve, timer, ownerId: executionOwnerId });
       });
     }
   };
@@ -360,52 +500,54 @@ if (typeof window !== 'undefined') {
   globalWsClient = new RobustWebSocket(
     'ws://localhost:9099',
     (msg) => {
-      console.log('[Global Native WS Message]', msg);
       if (msg && typeof msg === 'object') {
-        const commandId = msg.commandId || msg.id;
-        if (commandId) {
-          const pending = pendingCommands.get(commandId);
+        const commandId = String(msg.commandId || msg.id || '').trim();
+        if (!commandId) return;
+        const pending = pendingCommands.get(commandId);
+        const commandOwnerId = browserCommandOwners.get(commandId) || pending?.ownerId;
+        if (!commandOwnerId) return;
+        if (commandOwnerId !== getRuntimeOwnerId()) {
           if (pending) {
             pendingCommands.delete(commandId);
             clearTimeout(pending.timer);
             pending.resolve({
               id: commandId,
-              status: msg.status || 'success',
-              summary: msg.summary || '指令执行完成。',
-              data: msg.data,
-              error: msg.error,
-              audit: {
-                redacted: true,
-                commandKind: msg.commandKind,
-                targetHost: msg.targetHost
-              }
+              status: 'failed',
+              success: false,
+              executionOutcome: 'failed',
+              code: 'BROWSER_BRIDGE_FAILED',
+              retryable: false,
+              summary: 'Browser Bridge response was discarded because the authenticated owner changed.',
+              error: 'Browser Bridge owner changed',
+              audit: { redacted: true },
             });
           }
+          browserCommandOwners.delete(commandId);
+          browserCommandListeners.delete(commandId);
+          return;
         }
 
-        // 全局分发自定义事件，供组件监听异步结果更新
-        window.dispatchEvent(new CustomEvent('browser-bridge-message', { detail: msg }));
-
-        // 异步生成成功时自动画入画布
-        if (
-          msg.status === 'success' &&
-          (msg.commandKind === 'generate_external' || msg.kind === 'generate_external') &&
-          msg.data
-        ) {
-          const data = msg.data;
-          const imageUrl = data.finalImageUrl || data.imageUrl || data.resultUrl;
-          if (imageUrl) {
-            window.dispatchEvent(
-              new CustomEvent('takeover-create-prompt-cards', {
-                detail: {
-                  prompts: [
-                    `流水线自动编排海报: ${data.productTitle || data.title || 'Browser Bridge pipeline result'}\n营销文案: ${data.postText || data.caption || data.body || data.summary || 'Browser Bridge 已返回外部网页生成结果。'}`
-                  ],
-                  imageUrl: imageUrl
-                }
-              })
-            );
-          }
+        const result = normalizeBrowserBridgeResult({
+          id: commandId,
+          status: msg.status || 'success',
+          summary: redactBrowserBridgeText(msg.summary, '指令执行完成。'),
+          data: msg.data,
+          error: msg.error ? redactBrowserBridgeText(msg.error, 'Browser Bridge failed') : undefined,
+          audit: {
+            redacted: true,
+            commandKind: msg.commandKind,
+            targetHost: browserBridgeAuditTargetHost(msg.targetHost),
+          },
+        });
+        if (pending) {
+          pendingCommands.delete(commandId);
+          clearTimeout(pending.timer);
+          pending.resolve(result);
+        }
+        notifyBrowserBridgeCommandListeners(commandId, result, commandOwnerId);
+        if (result.status !== 'queued') {
+          browserCommandOwners.delete(commandId);
+          browserCommandListeners.delete(commandId);
         }
       }
     },
@@ -424,11 +566,17 @@ if (typeof window !== 'undefined') {
   globalWsClient.connect();
 }
 
+const browserBridgeExecutions = new Map<string, Promise<BrowserBridgeResult>>();
+const MAX_BROWSER_BRIDGE_EXECUTIONS = 200;
+
 export const browserBridgeAdapter = {
   async getStatus(options: BrowserBridgeExecuteOptions = {}): Promise<BrowserBridgeStatusSnapshot> {
+    const executionOwnerId = getRuntimeOwnerId();
     const client = options.client || resolveWindowBridge();
     if (client?.getStatus) {
-      return await client.getStatus();
+      const status = await client.getStatus();
+      if (getRuntimeOwnerId() !== executionOwnerId) return createDisconnectedStatus();
+      return status;
     }
     return createDisconnectedStatus(options.snapshot);
   },
@@ -437,20 +585,73 @@ export const browserBridgeAdapter = {
     command: BrowserBridgeCommand,
     options: BrowserBridgeExecuteOptions = {}
   ): Promise<BrowserBridgeResult> {
-    const client = options.client || resolveWindowBridge();
-    if (client?.execute) {
-      return await client.execute(command);
-    }
+    const executionOwnerId = getRuntimeOwnerId();
+    const executeOnce = async (): Promise<BrowserBridgeResult> => {
+      const client = options.client || resolveWindowBridge();
+      if (client?.execute) {
+        const result = normalizeBrowserBridgeResult(await client.execute(command));
+        if (getRuntimeOwnerId() !== executionOwnerId) {
+          return {
+            id: command.id,
+            status: 'failed',
+            success: false,
+            executionOutcome: 'failed',
+            code: 'BROWSER_BRIDGE_FAILED',
+            retryable: false,
+            summary: 'Browser Bridge execution stopped because the authenticated owner changed.',
+            error: 'Browser Bridge owner changed',
+            audit: { redacted: true, commandKind: command.kind },
+          };
+        }
+        return result;
+      }
 
-    const status = await this.getStatus(options);
-    if (status.daemonStatus !== 'connected' || status.extensionStatus !== 'connected') {
+      const status = await this.getStatus(options);
+      if (status.daemonStatus !== 'connected' || status.extensionStatus !== 'connected') {
+        return createBrowserBridgeSetupRequiredResult(command.id);
+      }
+
+      if (options.transport) {
+        const result = normalizeBrowserBridgeResult(await options.transport(command));
+        if (getRuntimeOwnerId() !== executionOwnerId) {
+          return {
+            id: command.id,
+            status: 'failed',
+            success: false,
+            executionOutcome: 'failed',
+            code: 'BROWSER_BRIDGE_FAILED',
+            retryable: false,
+            summary: 'Browser Bridge execution stopped because the authenticated owner changed.',
+            error: 'Browser Bridge owner changed',
+            audit: { redacted: true, commandKind: command.kind },
+          };
+        }
+        return result;
+      }
+
       return createBrowserBridgeSetupRequiredResult(command.id);
-    }
+    };
 
-    if (options.transport) {
-      return await options.transport(command);
-    }
+    if (!command.idempotencyKey) return executeOnce();
+    const executionKey = `${executionOwnerId}\u0000${command.id}`;
+    const existingExecution = browserBridgeExecutions.get(executionKey);
+    if (existingExecution) return existingExecution;
 
-    return createBrowserBridgeSetupRequiredResult(command.id);
+    const execution = executeOnce();
+    browserBridgeExecutions.set(executionKey, execution);
+    if (browserBridgeExecutions.size > MAX_BROWSER_BRIDGE_EXECUTIONS) {
+      const oldestExecutionKey = browserBridgeExecutions.keys().next().value;
+      if (oldestExecutionKey) browserBridgeExecutions.delete(oldestExecutionKey);
+    }
+    try {
+      const result = await execution;
+      if (result.status === 'failed' || result.status === 'setup_required') {
+        browserBridgeExecutions.delete(executionKey);
+      }
+      return result;
+    } catch (error) {
+      browserBridgeExecutions.delete(executionKey);
+      throw error;
+    }
   }
 };

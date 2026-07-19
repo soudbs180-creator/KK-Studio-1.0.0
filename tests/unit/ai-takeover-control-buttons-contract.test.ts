@@ -82,6 +82,8 @@ test('AI Takeover composer and resource buttons share stable local action names'
   assert.match(dockSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
   assert.match(dockSource, /id="ai-takeover-dock-composer-input"/);
   assert.match(smokeSource, /id="ai-takeover-dock-composer-input"/);
+  assert.match(smokeSource, /`\$\{queueStorageKey\}:owner:\$\{encodeURIComponent\(ownerId\)\}`/);
+  assert.match(smokeSource, /authenticatedOwnerId: SMOKE_PROFILE\.id/);
   assert.doesNotMatch(sidebarSource, /data-agent-action=\{AGENT_CONTROL_ACTIONS\.sendTakeoverMessage\.uiAction\}/);
 });
 

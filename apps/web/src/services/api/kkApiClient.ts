@@ -13,6 +13,7 @@ import {
   setStoredKkApiAccessToken,
 } from "./authAccessToken.ts";
 import { getStoredAdminSessionToken } from "./adminSession.ts";
+import { getRuntimeOwnerId } from "../auth/runtimeSessionProfile.ts";
 import {
   isHostedRuntime,
   isLoopbackHostname,
@@ -135,6 +136,7 @@ export function createKkWebApiClient(): KkApiClient {
     baseUrl: resolveKkApiBaseUrl(),
     getAccessToken: getPreferredKkApiAccessToken,
     refreshAccessToken: refreshPreferredKkApiAccessToken,
+    getAuthSubject: getRuntimeOwnerId,
     onRefreshToken: persistRefreshedKkApiAccessToken,
     getClientVersion: () => "kk-legacy-web",
     getDefaultHeaders: () => ({
@@ -153,4 +155,3 @@ export {
   resolveKkApiModelProxyBaseUrl,
   resolveOriginHostname,
 };
-

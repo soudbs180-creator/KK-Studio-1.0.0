@@ -2,6 +2,15 @@
 
 import type { AssistantPlan, SanitizedProjectContext } from '../types.ts';
 
+const formatConfirmedBrowserTarget = (value: unknown): string => {
+  try {
+    const url = new URL(String(value || ''));
+    return `${url.origin}${url.pathname}`.slice(0, 180);
+  } catch {
+    return '';
+  }
+};
+
 export interface ConfirmationDetails {
   required: boolean;
   title: string;
@@ -21,9 +30,10 @@ export interface ConfirmationDetails {
 }
 
 // 必须触发强确认卡片的动作列表
-const CONFIRM_ACTIONS = [
+export const CONFIRM_ACTIONS = [
   'startGeneration',
   'startBatchGeneration',
+  'cancelBatchGeneration',
   'uploadAssetToAI',
   'readFileContent',
   'attachManyReferenceImages',
@@ -35,7 +45,19 @@ const CONFIRM_ACTIONS = [
   'generation.createVideoJob',
   'generation.createAudioJob',
   'generation.createAudioTask',
+  'generation.cancelJob',
+  'generation.retryJob',
+  'generation.resumeJob',
+  'generation.start',
+  'generation.submitComposer',
+  'knowledge.recordChange',
+  'skills.upsertSkill',
+  'submitPromptComposer',
   'ecommerce.createBatchTransformJob',
+  'assets.zipOriginals',
+  'zipOutputs',
+  'workflow.controlPanel',
+  'ui.recordLayoutChange',
   'browser.extractProduct',
   'browser.generateExternal',
   'browser.publishDraft',
@@ -96,11 +118,14 @@ export const confirmationPolicy = {
 上传策略：仅在开始生成时使用对应的单张参考图，不会一次性全部上传整个目录内容。`;
     } 
     // 2. 单图/多图常规生成
-    else if (plan.intent === 'generate_images') {
+    else if (plan.intent === 'generate_images' || plan.intent === 'submit_composer') {
       const genAction = plan.actions.find(a => a.type === 'startGeneration');
+      const queueAction = plan.actions.find(a => a.type === 'generation.createBatchJob');
       const payload = genAction?.type === 'startGeneration' ? genAction.payload : null;
+      const queuedPrompts = queueAction?.type === 'generation.createBatchJob' ? queueAction.payload.prompts : [];
       
-      const count = payload ? payload.count : 1;
+      const count = payload ? payload.count : Math.max(1, queuedPrompts.length);
+      const prompt = payload?.prompt || String(queuedPrompts[0]?.prompt || '');
       title = '确认生成图片？';
       taskType = '图像生成';
       source = '输入提示词';
@@ -110,11 +135,40 @@ export const confirmationPolicy = {
       expectedOutputs = count;
       requiresCredits = context.settings.apiKeyStatus === 'missing';
 
-      summary = `使用提示词：「${payload?.prompt?.substring(0, 30)}...」；
+      summary = `使用提示词：「${prompt.substring(0, 30)}${prompt.length > 30 ? '...' : ''}」；
 预计输出：${count} 张图片；
-额度消耗：${requiresCredits ? '会消耗系统积分' : '使用专属 API 密钥，不消耗系统积分'}。`;
+执行路径：DurableGenerationQueue，可恢复、可取消并防止重复提交；
+额度消耗：${context.billing?.canEstimateCost === true ? (requiresCredits ? '会消耗系统积分' : '使用已配置的专属 API') : '当前无法精确估算，执行前仍需明确确认'}。`;
     }
-    // 3. 资源上传
+    // 3. 恢复或重试生成任务：未完成项可能重新调用 Provider，必须明确展示费用风险。
+    else if (plan.actions.some(action => (
+      action.type === 'generation.retryJob' || action.type === 'generation.resumeJob'
+    ))) {
+      const queueAction = plan.actions.find(action => (
+        action.type === 'generation.retryJob' || action.type === 'generation.resumeJob'
+      ));
+      const isResume = queueAction?.type === 'generation.resumeJob';
+      const jobId = String((queueAction as any)?.payload?.jobId || '').trim();
+      const retryablePromptIds = queueAction?.type === 'generation.retryJob'
+        ? queueAction.payload.expectedRetryablePromptIds || []
+        : [];
+      title = isResume ? '确认恢复生成任务？' : '确认重试失败项？';
+      taskType = isResume ? '恢复持久生成任务' : '重试失败生成项';
+      source = jobId ? `DurableGenerationQueue 任务 ${jobId}` : '未冻结目标的 DurableGenerationQueue 任务';
+      imageCount = retryablePromptIds.length;
+      expectedOutputs = retryablePromptIds.length;
+      promptStrategy = isResume ? '仅继续未完成队列项' : '仅重试失败队列项';
+      requiresCredits = context.settings.apiKeyStatus === 'missing';
+      const costSummary = context.billing?.canEstimateCost === true
+        ? (requiresCredits ? '可能继续消耗系统积分' : '可能继续消耗已配置 Provider 的配额')
+        : '当前无法精确估算，恢复或重试前仍需明确确认';
+      summary = [
+        `${isResume ? '恢复' : '重试'}只会处理尚未完成的队列项，已完成结果不会重复提交。`,
+        isResume ? '' : `已冻结影响范围：任务 ${jobId} 的 ${retryablePromptIds.length} 个失败项；目标变化后将要求重新确认。`,
+        `费用影响：${costSummary}；任务可继续暂停或取消。`,
+      ].filter(Boolean).join('\n');
+    }
+    // 4. 资源上传
     else if (plan.intent === 'upload_assets') {
       title = '确认上传资源？';
       taskType = '文件/图片上传';
@@ -126,7 +180,7 @@ export const confirmationPolicy = {
       summary = `该操作将把导入的文件与图片上传至 KK Studio 项目存储库。
 部分大模型将可以读取这些资源的文本描述摘要。`;
     }
-    // 4. Browser Assistant 外部网页控制
+    // 5. Browser Assistant 外部网页控制
     else if (
       plan.intent === 'extract_page_content' ||
       plan.intent === 'control_multidevice' ||
@@ -136,11 +190,15 @@ export const confirmationPolicy = {
       (plan.actions[0]?.type as string | undefined) === 'browser.inspectPage' ||
       (plan.actions[0]?.type as string | undefined) === 'browser.openDesktopProject'
     ) {
-      const actionType = plan.actions[0]?.type as string | undefined;
+      const browserAction = plan.actions.find((action) => action.type.startsWith('browser.'));
+      const actionType = browserAction?.type as string | undefined;
       const isDomWrite = actionType === 'browser.writeBackDom';
+      const confirmedTarget = formatConfirmedBrowserTarget((browserAction as any)?.payload?.target);
       title = isDomWrite ? '二次确认网页 DOM 回写？' : '确认使用 Browser Bridge？';
       taskType = isDomWrite ? '外部网页 DOM 回写' : '外部网页自动化';
-      source = 'Browser Assistant / Browser Bridge';
+      source = confirmedTarget
+        ? `Browser Assistant / Browser Bridge · ${confirmedTarget}`
+        : 'Browser Assistant / Browser Bridge';
       imageCount = 0;
       promptStrategy = '结构化 Browser Bridge 工具调用';
       expectedOutputs = actionType === 'browser.generateExternal' ? 1 : 0;
@@ -148,8 +206,8 @@ export const confirmationPolicy = {
       willUpload = actionType === 'browser.publishDraft';
 
       summary = isDomWrite
-        ? '此操作会通过已连接的 Browser Bridge 修改当前外部网页 DOM。请确认目标页面和字段无误；AI 不会读取或上传密钥、Cookie 或登录凭证。'
-        : '此操作会调用本地守护进程或 Chrome Bridge 插件处理外部网页。若未连接 Bridge，系统只会返回连接引导，不会伪造成功结果。';
+        ? `此操作会通过已连接的 Browser Bridge 修改已确认网页 ${confirmedTarget || '（目标无效）'} 的 DOM。请确认目标页面和字段无误；AI 不会读取或上传密钥、Cookie 或登录凭证。`
+        : `此操作会调用本地守护进程或 Chrome Bridge 插件处理${confirmedTarget ? `已确认网页 ${confirmedTarget}` : '明确的外部目标'}。若未连接 Bridge，系统只会返回连接引导，不会伪造成功结果。`;
     }
 
     return {

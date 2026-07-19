@@ -689,7 +689,7 @@ function resolveProfileUserId(req) {
   }
 
   const tempUserId = String(req.headers[TEMP_USER_ID_HEADER] || '').trim();
-  const allowLocalTempUser = process.env.KKAI_LOCAL_ONLY === 'true' || process.env.NODE_ENV !== 'production';
+  const allowLocalTempUser = process.env.KKAI_LOCAL_ONLY === 'true';
   if (allowLocalTempUser && /^temp-[a-zA-Z0-9_.-]{4,128}$/.test(tempUserId)) {
     return {
       userId: tempUserId,

@@ -150,9 +150,11 @@ export const GenerationJobControlInputSchema = z.object({
 });
 
 export const GenerationRetryJobInputSchema = z.object({
-  jobId: z.string().min(1).optional(),
-  target: z.literal("latest_failed").optional(),
-}).transform((value) => value.jobId ? value : { ...value, target: value.target || "latest_failed" as const });
+  jobId: z.string().min(1),
+  expectedUpdatedAt: z.number().int().nonnegative(),
+  expectedRetryablePromptIds: z.array(z.string().min(1)).min(1).max(100)
+    .transform((ids) => Array.from(new Set(ids)).sort()),
+});
 
 export const StartGenerationToolInputSchema = z.object({
   prompt: z.string().trim().min(1).max(20_000),

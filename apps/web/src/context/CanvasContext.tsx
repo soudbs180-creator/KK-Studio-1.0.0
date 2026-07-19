@@ -2016,11 +2016,23 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
         pushToHistory();
         updateCanvas(canvas => {
+            const existingPromptIds = new Set(canvas.promptNodes.map(node => node.id));
+            const existingImageIds = new Set(canvas.imageNodes.map(node => node.id));
+            const existingNoteIds = new Set((canvas.noteNodes || []).map(node => node.id));
             let nextCanvas: Canvas = {
                 ...canvas,
-                promptNodes: [...canvas.promptNodes, ...result.promptNodes],
-                imageNodes: [...canvas.imageNodes, ...result.imageNodes],
-                noteNodes: [...(canvas.noteNodes || []), ...result.noteNodes],
+                promptNodes: [
+                    ...canvas.promptNodes,
+                    ...result.promptNodes.filter(node => !existingPromptIds.has(node.id)),
+                ],
+                imageNodes: [
+                    ...canvas.imageNodes,
+                    ...result.imageNodes.filter(node => !existingImageIds.has(node.id)),
+                ],
+                noteNodes: [
+                    ...(canvas.noteNodes || []),
+                    ...result.noteNodes.filter(node => !existingNoteIds.has(node.id)),
+                ],
                 lastModified: Date.now(),
             };
             result.workflowNodes.forEach((node) => {

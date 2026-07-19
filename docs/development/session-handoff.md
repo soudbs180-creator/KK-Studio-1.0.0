@@ -2452,3 +2452,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - Codex 应用内浏览器真实页面验收通过：三态互斥切换；辅助建议随画布与收藏上下文更新；接管状态在助手折叠/重开后保留；页面没有新增控制台 error。
 - **未运行验证及原因**：本机未提供系统 `npm`/`npx`，因此使用同一 bundled Node 直接执行聚合脚本的全部底层入口；自动 smoke 缺少独立 Playwright 模块，按脚本设计使用 HTTP 与源码 fallback，真实 UI 交互另由应用内浏览器覆盖。未调用真实付费 Provider、支付、生产 OAuth 或真实账户写操作，本阶段不涉及这些边界。
 - **风险与下一步**：生产依赖审计仍报告既有的 1 项中危 `morgan <= 1.10.1` 日志伪造告警，应独立升级处理。下一阶段进入 `harden-ai-control-plane`：删除 `action://` 自动执行旁路、引入类型化执行上下文和工具影响/费用/验证元数据、把 Agent 同步收敛到类型化 KK API Client，并以 `016_ai_assistant_user_scope.sql` 建立 Knowledge、Skill 与画布快照的用户范围。
+
+## 151. 2026-07-19 - 强化 AI 执行控制面
+
+- **修改范围**：完成 `harden-ai-control-plane`。移除 ChatSidebar 对 `action://` 的自动解析执行旁路，AI 自治动作统一经过 `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update`；引入类型化 `AssistantExecutionContext`、运行级用户授权、取消与恢复语义，并让每个计划步骤消费显式验证规则。ToolRegistry 统一工具影响、费用、失败、恢复、幂等和验证元数据，修改型工具必须验证输入与结果；Run、Tool Call、Knowledge、Skill 同步收敛到类型化 KK API Client。新增用户范围迁移 `016_ai_assistant_user_scope.sql`，并接入 VPS 与本地数据库入口。进一步冻结 `generation.retryJob` 的任务版本和失败项集合，限制 AI Browser 工具只接受公开 HTTP(S) 目标，并为 Browser Session、Tool 日志、Handoff 与异步响应建立 owner 隔离和敏感信息脱敏。
+- **修改文件**：
+  - `packages/shared/src/contracts/` 下 AI Assistant DTO、KK API Client 契约与 Generation Schema
+  - `apps/web/src/features/ai-assistant-runtime/` 下执行上下文、Runtime、Run Store、ToolRegistry、Knowledge、Queue、Browser Bridge、Handoff 与领域工具
+  - `apps/web/src/features/ai-takeover/` 下意图、Planner 提示、确认策略、类型、Provider 与 Dock
+  - `apps/web/src/components/layout/ChatSidebar.tsx`、`apps/web/src/components/settings/views/BrowserAssistantView.tsx`、画布上下文与 Workspace 入口
+  - `apps/web/src/services/api/kkApiClient.ts` 与 `packages/shared/src/contracts/client/kk-api-client.ts` 的类型化 Client 实现边界
+  - `server/routes/ai-assistant.js`、`server/lib/ai-assistant-dto.js` 与认证兼容入口
+  - `migrations/016_ai_assistant_user_scope.sql`、PostgreSQL bootstrap/import/export、VPS 部署和本地数据库初始化脚本
+  - `tests/unit/`、`tests/e2e/ai-takeover-real-paths.test.ts` 与 AI 接管 Chrome smoke 脚本
+  - `docs/ai-assistant/`、`.agents/skills/`、`openspec/changes/harden-ai-control-plane/` 与生成知识索引
+- **当前设计决策**：`action://` 只保留为用户主动点击的导航链接，不能作为 AI 执行协议；所有 AI 工具输入在计划保存、授权生成和执行前都必须通过同一 ToolRegistry 校验。规划与执行在任何异步边界前捕获 owner，账户切换时 fail closed，记录仍归原 owner。`safe` 仅用于只读、导航或可撤销局部操作；生成、批量与成本操作要求确认，删除、公开发布和账户变更保持危险或禁止。动态“最近失败任务”只存在于意图层，确认前冻结为具体 `jobId + expectedUpdatedAt + expectedRetryablePromptIds`，目标漂移时不自动改选。幂等持久化只保存白名单安全回执，不保存任意工具原始输出；Browser Bridge 不再广播或记录原生响应，AI 浏览器工具禁止 `active_tab/current_tab/current_page`，直接用户界面仍可使用低层 `active_tab`。Browser Assistant 在 owner 变化时清空 URL、提取/OCR、Prompt、日志、DOM 编辑与文件路径等派生状态，递增 owner epoch 并重建 Worker，旧账户异步回调不得写入新账户 UI 或画布。
+- **已运行验证**：
+  - 聚焦安全回归全部通过，覆盖 Handoff/Tool 日志脱敏、owner 隔离、确认授权、步骤验证、重试快照、Browser Bridge 协议与 `action://` 旁路。
+  - `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run spec:check` 全部通过；服务端 59 个文件语法检查和 500 个测试文件语义检查通过，OpenAPI 有效。
+  - `npm run build` 通过，Shared、UI、API Client 和 Web 生产构建完成，Vite 转换 2434 个模块。
+  - 完整测试链通过：unit 1834 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11。
+  - `npm run verify:ai-takeover-smoke` 使用真实 Google Chrome 通过；状态链与 DurableGenerationQueue 投影正常，证据位于 `temp/playwright/ai-takeover-smoke/`。
+  - AI 文档知识索引已重建；`npm run check:encoding` 与 `git diff --check` 通过。
+- **未运行验证及原因**：未在真实 PostgreSQL 实例执行 `016_ai_assistant_user_scope.sql`，当前环境没有 `psql`、Docker 或 Bash；已通过迁移源码、数据库入口和 VPS 部署契约测试。未运行完整发布聚合命令 `npm run verify:changes`，因为本提交是计划中的独立第二阶段，依赖审计、其他 UI smoke 与画布性能门禁留到全站重构完整发布前统一执行。未调用真实付费 Provider、支付、生产 OAuth、公开发布或真实账户变更。
+- **风险与下一步**：数据库发布前必须在受控 PostgreSQL 备份上演练迁移并核对旧 Knowledge、Skill 与画布快照的兼容归属标记。现阶段控制面已收口，下一阶段只能在本提交形成干净基线后进入 `expand-ai-site-capabilities`，先生成 UI/业务能力覆盖矩阵，再按领域补齐 ToolRegistry；不得把 UI 点击模拟或账户/计费写操作重新接入自治链路。

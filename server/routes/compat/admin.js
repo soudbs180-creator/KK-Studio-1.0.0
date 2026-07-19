@@ -549,7 +549,7 @@ router.post('/api/v1/admin/session/verify-password', requireAdmin, async (req, r
   if (!password) return sendError(res, req, 400, 'ADMIN_PASSWORD_REQUIRED', 'Admin password is required.');
 
   const configuredPassword = process.env.ADMIN_CONSOLE_PASSWORD || process.env.KK_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '';
-  const allowLocalPassword = process.env.NODE_ENV !== 'production' || process.env.KKAI_LOCAL_ONLY === 'true';
+  const allowLocalPassword = process.env.KKAI_LOCAL_ONLY === 'true';
   if (configuredPassword && password !== configuredPassword) {
     return sendError(res, req, 403, 'ADMIN_PASSWORD_INVALID', 'Admin password is invalid.');
   }

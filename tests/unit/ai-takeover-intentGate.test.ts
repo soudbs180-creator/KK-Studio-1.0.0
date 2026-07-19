@@ -98,12 +98,13 @@ test('IntentGate: 网页直通多账号生图映射到外部生成计划并要�
   assert.equal(result.risk, 'cost');
 });
 
-test('意图匹配单元测试：简单生成复用画布输入框并直接发送', () => {
+test('意图匹配单元测试：简单生成进入持久队列并要求费用确认', () => {
   const result = analyzeIntent('帮我生成一个赛博猫头像');
 
   assert.equal(result.intent, 'submit_composer');
   assert.equal(result.extracted.prompt, '赛博猫头像');
-  assert.equal(result.needsConfirmation, false);
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
 });
 
 test('IntentGate: explicit queue request creates one clean task prompt by default', () => {
@@ -123,12 +124,12 @@ test('本地脑源码契约：快速设置页跳转只调用底层 openSettings 
   assert.match(source, /payload: \{ tab: settingsView \}/);
 });
 
-test('本地脑源码契约：简单生成先填充输入框再提交 composer', () => {
+test('本地脑源码契约：简单生成直接创建统一持久队列任务', () => {
   const source = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
 
-  assert.match(source, /type: 'fillInputPrompt'/);
-  assert.match(source, /type: 'submitPromptComposer'/);
-  assert.match(source, /复用当前已设置的模型、比例、参考图和生成参数直接发送/);
+  assert.match(source, /case 'submit_composer'[\s\S]*type: 'generation\.createBatchJob'/);
+  assert.match(source, /DurableGenerationQueue/);
+  assert.doesNotMatch(source, /type: 'submitPromptComposer'/);
 });
 
 test('本地脑源码契约：批量电商计划携带比例、紧凑布局和输出分组', () => {
@@ -150,12 +151,12 @@ test('AgentRuntime 源码契约：本地可处理的意图即使已有模型也�
   assert.match(source, /plan = localPlan/);
 });
 
-test('IntentGate: retry failed durable generation job is a safe queue control', () => {
+test('IntentGate: retry failed durable generation job requires cost confirmation', () => {
   const result = analyzeIntent('重试失败批次 job_abc123');
 
   assert.equal(result.intent, 'retry_generation_job');
-  assert.equal(result.needsConfirmation, false);
-  assert.equal(result.risk, 'none');
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
   assert.equal(result.extracted.jobId, 'job_abc123');
 });
 
@@ -163,7 +164,7 @@ test('IntentGate: English retry failed job command extracts the job id', () => {
   const result = analyzeIntent('retry failed job job_def456');
 
   assert.equal(result.intent, 'retry_generation_job');
-  assert.equal(result.needsConfirmation, false);
+  assert.equal(result.needsConfirmation, true);
   assert.equal(result.extracted.jobId, 'job_def456');
 });
 
@@ -171,9 +172,38 @@ test('IntentGate: retry latest failed batch works without an explicit job id', (
   const result = analyzeIntent('重试刚才失败的批次');
 
   assert.equal(result.intent, 'retry_generation_job');
-  assert.equal(result.needsConfirmation, false);
-  assert.equal(result.risk, 'none');
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
   assert.equal(result.extracted.jobId, undefined);
+});
+
+test('IntentGate: Chinese resume command requires a concrete durable job id and cost confirmation', () => {
+  const result = analyzeIntent('恢复 job_paused123');
+
+  assert.equal(result.intent, 'resume_generation_job');
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
+  assert.equal(result.extracted.jobId, 'job_paused123');
+});
+
+test('IntentGate: English resume command extracts the concrete durable job id', () => {
+  const result = analyzeIntent('resume job_paused456');
+
+  assert.equal(result.intent, 'resume_generation_job');
+  assert.equal(result.needsConfirmation, true);
+  assert.equal(result.risk, 'cost');
+  assert.equal(result.extracted.jobId, 'job_paused456');
+});
+
+test('IntentGate: generic conversation continuation never resumes a generation queue job', () => {
+  assert.notEqual(analyzeIntent('继续').intent, 'resume_generation_job');
+  assert.notEqual(analyzeIntent('continue job_paused789').intent, 'resume_generation_job');
+  assert.notEqual(analyzeIntent('继续暂停生成任务 job_paused789').intent, 'resume_generation_job');
+  assert.notEqual(analyzeIntent('continue to pause generation job job_paused789').intent, 'resume_generation_job');
+
+  const explicitPausedJob = analyzeIntent('继续执行暂停的生成任务 job_paused789');
+  assert.equal(explicitPausedJob.intent, 'resume_generation_job');
+  assert.equal(explicitPausedJob.extracted.jobId, 'job_paused789');
 });
 
 test('Local brain source contract: retry job intent maps to generation.retryJob', () => {
@@ -182,12 +212,27 @@ test('Local brain source contract: retry job intent maps to generation.retryJob'
 
   assert.match(typesSource, /'retry_generation_job'/);
   assert.match(typesSource, /jobId\?: string/);
-  assert.match(typesSource, /target\?: 'latest_failed'/);
+  assert.match(typesSource, /expectedRetryablePromptIds\?: string\[\]/);
   assert.match(typesSource, /type: 'generation\.retryJob'/);
   assert.match(brainSource, /case 'retry_generation_job'/);
   assert.match(brainSource, /type: 'generation\.retryJob'/);
   assert.match(brainSource, /jobId: intentResult\.extracted\.jobId/);
-  assert.match(brainSource, /target: intentResult\.extracted\.jobId \? undefined : 'latest_failed'/);
+  assert.doesNotMatch(brainSource, /target: intentResult\.extracted\.jobId \? undefined : 'latest_failed'/);
+  assert.match(brainSource, /AgentRuntime.*冻结为具体 Job、版本和失败项集合/);
+});
+
+test('Local brain and cloud planner source contract: resume intent maps only to generation.resumeJob with jobId', () => {
+  const typesSource = readSource('apps/web/src/features/ai-takeover/types.ts');
+  const brainSource = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
+  const llmSource = readSource('apps/web/src/features/ai-takeover/core/llmBrain.ts');
+
+  assert.match(typesSource, /'resume_generation_job'/);
+  assert.match(typesSource, /type: 'generation\.resumeJob'/);
+  assert.match(brainSource, /case 'resume_generation_job'/);
+  assert.match(brainSource, /type: 'generation\.resumeJob'/);
+  assert.match(brainSource, /payload: \{ jobId \}/);
+  assert.match(llmSource, /"type": "generation\.resumeJob"/);
+  assert.match(llmSource, /generic "continue"/);
 });
 
 test('Local brain source contract: browser assistant intents map to namespaced browser tools', () => {

@@ -1,7 +1,7 @@
 // 简体中文：工具执行审计日志 (Agent Audit Log)
 
 import type { AgentToolCallLog } from '../../ai-takeover/types.ts';
-import { toolRegistryInstance } from '../tools/ToolRegistry.ts';
+import { redactToolSummary, toolRegistryInstance } from '../tools/ToolRegistry.ts';
 
 export class AgentAuditLog {
   /**
@@ -17,7 +17,7 @@ export class AgentAuditLog {
   logCall(log: AgentToolCallLog): void {
     console.log(`[AgentAuditLog] [${log.status.toUpperCase()}] 工具: ${log.toolName}, 运行ID: ${log.runId}`);
     if (log.error) {
-      console.error(`[AgentAuditLog] 错误详情:`, log.error);
+      console.error(`[AgentAuditLog] 错误详情:`, redactToolSummary(log.error));
     }
   }
 }

@@ -292,12 +292,13 @@ const getDurableQueueJobCounts = (job: GenerationBatchJob) => {
     const total = job.prompts.length;
     const completed = job.prompts.filter(prompt => prompt.status === 'completed').length;
     const failed = job.prompts.filter(prompt => prompt.status === 'failed').length;
+    const retryableFailed = job.prompts.filter(prompt => prompt.status === 'failed' && prompt.retryable !== false).length;
     const running = job.prompts.filter(prompt => prompt.status === 'running').length;
     const queued = job.prompts.filter(prompt => prompt.status === 'queued').length;
     const percent = job.progress?.percent ?? (total > 0 ? Math.round(((completed + failed) / total) * 100) : 0);
     const firstFailure = job.prompts.find(prompt => prompt.status === 'failed' && prompt.error)?.error || '';
 
-    return { total, completed, failed, running, queued, percent, firstFailure };
+    return { total, completed, failed, retryableFailed, running, queued, percent, firstFailure };
 };
 
 const cleanGreeting = (text: string): string => {
@@ -1208,39 +1209,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             });
         }
     }, [selectedModel, ctxSetSelectedModel]);
-
-    // 简体中文：记录已自动执行过的消息 Action，防止重复执行
-    const executedMessageIdsRef = useRef<Set<string>>(new Set());
-
-    // 简体中文：AI接管模式下的动作自动拦截并静默执行
-    useEffect(() => {
-        if (!aiTakeoverMode) return;
-        const currentMessages = messages;
-        if (!currentMessages || currentMessages.length === 0) return;
-        const lastMessage = currentMessages[currentMessages.length - 1];
-        
-        if (lastMessage.role === 'assistant' && !executedMessageIdsRef.current.has(lastMessage.id)) {
-            executedMessageIdsRef.current.add(lastMessage.id);
-            
-            const actionRegex = /action:\/\/[^\s\)\"\]]+/g;
-            const matches = lastMessage.content.match(actionRegex);
-            if (matches && matches.length > 0) {
-                matches.forEach(actionUrl => {
-                    // 过滤机制：防止执行任何会触发 sendTakeoverMessage 的交互链接以防无限循环
-                    const isMessageAction =
-                        actionUrl === 'action://takeover-prompt-only' ||
-                        actionUrl === 'action://takeover-prompt-doc' ||
-                        actionUrl.startsWith('action://takeover-bulk-generate');
-
-                    if (!isMessageAction) {
-                        setTimeout(() => {
-                            handleActionClick(actionUrl);
-                        }, 200);
-                    }
-                });
-            }
-        }
-    }, [messages, aiTakeoverMode, handleActionClick]);
 
     // Subscribe to keyManager updates
     const lastPreferredModelIdRef = useRef<string>('');
@@ -3484,9 +3452,22 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         {collaborationMode === 'assist' ? '辅助执行预览' : '接管时间线'}
                                     </span>
                                     {currentRun && (
-                                        <span className="max-w-[150px] truncate font-mono" title={currentRun.id}>
-                                            {currentRun.status} - {currentRun.id.slice(-8)}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="max-w-[150px] truncate font-mono" title={currentRun.id}>
+                                                {currentRun.status} - {currentRun.id.slice(-8)}
+                                            </span>
+                                            {currentRun?.status === 'running' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelPendingPlan}
+                                                    data-agent-action={AGENT_CONTROL_ACTIONS.cancelPlan.uiAction}
+                                                    data-agent-runtime-action={AGENT_CONTROL_ACTIONS.cancelPlan.runtimeAction}
+                                                    className="rounded-md border border-rose-500/35 px-1.5 py-0.5 text-[9px] font-bold text-rose-300 hover:bg-rose-500/10"
+                                                >
+                                                    停止
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                                 <div className="grid grid-cols-5 gap-1">
@@ -3613,7 +3594,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                             <Play size={11} />
                                                         </button>
                                                     )}
-                                                    {counts.failed > 0 && job.status !== 'cancelled' && (
+                                                    {counts.retryableFailed > 0 && job.status !== 'cancelled' && (
                                                         <button
                                                             type="button"
                                                             data-action="retry-durable-job"

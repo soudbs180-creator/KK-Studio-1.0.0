@@ -72,8 +72,9 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(deploySource, /nginx -t/);
   assert.match(deploySource, /systemctl list-unit-files "\$\{service\}\.service"/);
   assert.match(deploySource, /Skipping missing optional service/);
-  assert.match(deploySource, /chgrp "\$\{APP_GROUP\}" "\$\{ENV_DIR\}\/kk-api\.env"/);
-  assert.match(deploySource, /chmod 0640 "\$\{ENV_DIR\}\/kk-api\.env"/);
+  assert.match(deploySource, /API_ENV_FILE="\$\{KK_API_ENV_FILE:-\$ENV_DIR\/kk-api\.env\}"/);
+  assert.match(deploySource, /chgrp "\$\{APP_GROUP\}" "\$\{API_ENV_FILE\}"/);
+  assert.match(deploySource, /chmod 0640 "\$\{API_ENV_FILE\}"/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
   assert.match(deploySource, /rsync -a --delete "\$\{NEW_RELEASE_DIR\}\/apps\/web\/dist\/" "\$\{NEW_APP_RELEASE_DIR\}\/"/);

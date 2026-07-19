@@ -65,11 +65,12 @@ export const canvasTools: AgentToolDefinition[] = [
       type: 'object',
       properties: {
         prompt: { type: 'string', description: '填充的提示词内容' },
-        negativePrompt: { type: 'string', description: '负面词' }
+        negativePrompt: { type: 'string', description: '负面词' },
+        idempotencyKey: { type: 'string' }
       },
       required: ['prompt']
     },
-    handler: async (input: { prompt: string; negativePrompt?: string }, ctx) => {
+    handler: async (input: { prompt: string; negativePrompt?: string; idempotencyKey?: string }, ctx) => {
       const { prompt } = input;
       const { activeCanvas, selectedModel, updatePromptNode, addPromptNode, getNextCardPosition, notify } = ctx;
 
@@ -84,26 +85,37 @@ export const canvasTools: AgentToolDefinition[] = [
           optimizedPromptZh: '本地优化成功'
         });
         notify.success('卡片已优化', '已将优化提示词直接写入当前选中的卡片中。');
+        return { status: 'updated', nodeId: selectedPromptNode.id };
       } else {
         const lastPos = getNextCardPosition();
-        const newNode = {
-          id: 'takeover_opt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
-          prompt: prompt,
-          optimizedPromptEn: prompt,
-          optimizedPromptZh: '本地优化成功',
+        const card = createCanvasCardNodes({
+          kind: 'prompt-only',
+          prompt,
+          idempotencyKey: input.idempotencyKey,
           position: lastPos,
           aspectRatio: '1:1',
           imageSize: '1K',
           model: selectedModel?.id || 'gemini-2.5-flash',
+        }, {
+          canvasId: activeCanvas?.id || ctx.canvasId || 'default_canvas',
+          position: lastPos,
+          model: selectedModel?.id || 'gemini-2.5-flash',
+        });
+        const newNode = {
+          ...card.promptNodes[0],
+          optimizedPromptEn: prompt,
+          optimizedPromptZh: '本地优化成功',
           modelLabel: selectedModel?.name || 'Gemini 2.5 Flash',
           provider: selectedModel?.provider || 'Google',
-          childImageIds: [],
-          timestamp: Date.now(),
           parallelCount: 1
         };
 
-        await addPromptNode(newNode);
+        const liveCanvas = ctx.getActiveCanvas?.() || activeCanvas;
+        if (!(liveCanvas?.promptNodes || []).some((node: any) => node.id === newNode.id)) {
+          await addPromptNode(newNode);
+        }
         notify.success('已新建优化卡片', '未检测到选中卡片，已为您自动在画布中创建了一张提示词卡片。');
+        return { status: 'created', nodeId: newNode.id };
       }
     }
   },
@@ -228,6 +240,8 @@ export const canvasTools: AgentToolDefinition[] = [
         ctx.arrangeAllNodes(mode, nodeIds);
         ctx.notify?.success?.('画布已整理', `已按 ${input.preset || mode} 模式整理 ${nodeIds.length} 个节点。`);
         return {
+          success: true as const,
+          executionOutcome: 'success' as const,
           status: 'arranged',
           mode,
           preset: input.preset,
@@ -240,11 +254,23 @@ export const canvasTools: AgentToolDefinition[] = [
       }
 
       ctx.arrangeAllNodes(mode);
+      const liveCanvas = ctx.getActiveCanvas?.() || ctx.activeCanvas;
+      const selectedCount = getContextSelectedNodeIds(ctx).length;
+      const canvasNodeCount = [
+        ...(liveCanvas?.promptNodes || []),
+        ...(liveCanvas?.imageNodes || []),
+        ...(liveCanvas?.noteNodes || []),
+        ...(liveCanvas?.workflow?.nodes || []),
+        ...(liveCanvas?.groups || []),
+      ].length;
       ctx.notify?.success?.('画布已整理', `已按 ${mode} 模式整理当前选区或画布。`);
       return {
+        success: true as const,
+        executionOutcome: 'success' as const,
         status: 'arranged',
         mode,
-        selectedCount: getContextSelectedNodeIds(ctx).length
+        selectedCount,
+        affectedCount: selectedCount || canvasNodeCount
       };
     }
   },
@@ -262,6 +288,7 @@ export const canvasTools: AgentToolDefinition[] = [
         aspectRatio: { type: 'string' },
         imageSize: { type: 'string' },
         model: { type: 'string' },
+        idempotencyKey: { type: 'string' },
         media: { type: 'array', items: { type: 'object' } },
         pptSlides: { type: 'array', items: { type: 'string' } },
         diagnostic: { type: 'string' },
@@ -328,13 +355,15 @@ export const canvasTools: AgentToolDefinition[] = [
       properties: {
         title: { type: 'string' },
         steps: { type: 'array', items: { type: 'object' } },
+        idempotencyKey: { type: 'string' },
       },
     },
-    handler: async (input: { title?: string; steps?: CanvasCreateCardInput['workflowSteps'] }, ctx) => {
+    handler: async (input: { title?: string; steps?: CanvasCreateCardInput['workflowSteps']; idempotencyKey?: string }, ctx) => {
       const result = await createCardThroughFactory({
         kind: 'workflow-panel',
         title: input.title,
         workflowSteps: input.steps,
+        idempotencyKey: input.idempotencyKey,
       }, ctx);
       if (!result) return capabilityUnavailable('Workflow panel creation handler is not bound.');
       return { status: 'created', kind: 'workflow-panel', nodeId: result.primaryNodeId };
@@ -363,6 +392,9 @@ export const canvasTools: AgentToolDefinition[] = [
         workflowAbortControllers.delete(panel.id);
         updateData({ ...panel.data, status: input.action === 'pause' ? 'paused' : 'cancelled' });
         return { status: input.action, nodeId: panel.id };
+      }
+      if (ctx.trigger !== 'user-action') {
+        throw new Error('Workflow run/retry requires a direct user action until every nested tool and input is expanded into the confirmed plan.');
       }
       if (typeof ctx.executeTool !== 'function') {
         return capabilityUnavailable('Workflow ToolRegistry executor is not bound.');
@@ -432,11 +464,12 @@ export const canvasTools: AgentToolDefinition[] = [
         },
         imageUrl: { type: 'string' },
         model: { type: 'string' },
-        aspectRatio: { type: 'string' }
+        aspectRatio: { type: 'string' },
+        idempotencyKey: { type: 'string' }
       },
       required: ['prompts']
     },
-    handler: async (input: { prompts: string[]; imageUrl?: string; model?: string; aspectRatio?: string }, ctx) => {
+    handler: async (input: { prompts: string[]; imageUrl?: string; model?: string; aspectRatio?: string; idempotencyKey?: string }, ctx) => {
       const { prompts, imageUrl } = input;
       const { getNextCardPosition, notify } = ctx;
       if (!prompts || prompts.length === 0) {
@@ -456,6 +489,7 @@ export const canvasTools: AgentToolDefinition[] = [
         aspectRatio: input.aspectRatio,
         media: imageUrl ? [{ url: imageUrl, prompt: promptText }] : [],
         layoutMode: 'row',
+        idempotencyKey: `${input.idempotencyKey || 'canvas.createPromptCards'}:card:${index}`,
       }, ctx)));
       if (created.some((result) => !result)) {
         return capabilityUnavailable('Canvas prompt card creation handler is not bound.');
@@ -465,6 +499,7 @@ export const canvasTools: AgentToolDefinition[] = [
         status: 'created',
         count: prompts.length,
         imageCount: created.reduce((sum, result) => sum + (result?.imageNodes.length || 0), 0),
+        nodeIds: created.flatMap((result) => result ? [result.primaryNodeId] : []),
       };
     }
   },
@@ -477,17 +512,19 @@ export const canvasTools: AgentToolDefinition[] = [
       properties: {
         prompt: { type: 'string', description: '音频来源提示词或文案' },
         url: { type: 'string', description: '音频资源 URL 链接' },
-        mimeType: { type: 'string', description: '音频多媒体 MIME 类型' }
+        mimeType: { type: 'string', description: '音频多媒体 MIME 类型' },
+        idempotencyKey: { type: 'string' }
       },
       required: ['url']
     },
-    handler: async (input: { prompt?: string; url: string; mimeType?: string }, ctx) => {
+    handler: async (input: { prompt?: string; url: string; mimeType?: string; idempotencyKey?: string }, ctx) => {
       const { prompt, url, mimeType } = input;
       const { notify } = ctx;
       const created = await createCardThroughFactory({
         kind: 'audio',
         prompt,
         media: [{ url, mimeType }],
+        idempotencyKey: input.idempotencyKey,
       }, ctx);
       if (!created) return capabilityUnavailable('Canvas audio node creation handler is not bound.');
       notify.success('音频卡片已创建', '播放器将在加载资源后读取真实时长。');

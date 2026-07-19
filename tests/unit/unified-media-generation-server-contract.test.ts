@@ -46,6 +46,15 @@ test('ComfyUI rejects unapproved templates and arbitrary workflow input', async 
 test('the browser sync always identifies the lease owner when pushing updates', () => {
   const source = readSource('apps/web/src/features/ai-assistant-runtime/queue/GenerationQueueSync.ts');
 
-  assert.match(source, /updateGenerationJob\(remoteId, \{[\s\S]{0,280}leaseOwner: getDeviceId\(\)/);
+  assert.match(source, /updateGenerationJob\(\s*remoteId,\s*\{[\s\S]{0,500}leaseOwner: getDeviceId\(\)/);
   assert.doesNotMatch(source, /leaseOwner: ACTIVE_STATUSES\.has\(job\.status\) \? getDeviceId\(\) : undefined/);
+});
+
+test('the browser sync reschedules the current owner after an in-flight owner switch', () => {
+  const source = readSource('apps/web/src/features/ai-assistant-runtime/queue/GenerationQueueSync.ts');
+
+  assert.match(source, /if \(syncInFlightOwnerId\) \{\s*syncRequestedWhileInFlight = true;\s*return;/);
+  assert.match(source, /const currentOwnerId = ensureSyncOwner\(\);/);
+  assert.match(source, /syncRequestedWhileInFlight \|\| currentOwnerId !== ownerId/);
+  assert.match(source, /queueMicrotask\(\(\) => void syncJobsToServer\(durableGenerationQueue\.getJobs\(\)\)\)/);
 });

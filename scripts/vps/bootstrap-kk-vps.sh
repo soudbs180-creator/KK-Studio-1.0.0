@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 APP_USER="${KK_APP_USER:-kkstudio}"
 APP_GROUP="${KK_APP_GROUP:-$APP_USER}"
 APP_ROOT="${KK_APP_ROOT:-/opt/kk-studio}"
@@ -12,6 +15,7 @@ POSTGRES_USER="${KK_PG_USER:-kkstudio}"
 POSTGRES_PASSWORD="${KK_PG_PASSWORD:-}"
 POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
 REPO_BOOTSTRAP_SQL="${KK_BOOTSTRAP_SQL:-scripts/postgres/bootstrap-kk-vps.sql}"
+AI_ASSISTANT_SCOPE_MIGRATION="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-migrations/016_ai_assistant_user_scope.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -78,29 +82,70 @@ prepare_directories() {
 }
 
 setup_postgres() {
+  if [[ ! -f "${REPO_BOOTSTRAP_SQL}" ]]; then
+    echo "[bootstrap-kk-vps] Required bootstrap SQL not found at ${REPO_BOOTSTRAP_SQL}." >&2
+    exit 1
+  fi
+  if [[ ! -f "${AI_ASSISTANT_SCOPE_MIGRATION}" ]]; then
+    echo "[bootstrap-kk-vps] Required AI assistant migration not found at ${AI_ASSISTANT_SCOPE_MIGRATION}." >&2
+    exit 1
+  fi
+
+  REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
+  AI_ASSISTANT_SCOPE_MIGRATION="$(realpath "${AI_ASSISTANT_SCOPE_MIGRATION}")"
+  case "${REPO_BOOTSTRAP_SQL}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+  case "${AI_ASSISTANT_SCOPE_MIGRATION}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] AI assistant migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+
+  for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
+    if [[ ! "${identifier}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
+      echo "[bootstrap-kk-vps] PostgreSQL role and database identifiers must use lowercase letters, digits, and underscores." >&2
+      exit 1
+    fi
+  done
+
+  if ! command -v runuser >/dev/null 2>&1; then
+    echo "[bootstrap-kk-vps] runuser is required for PostgreSQL provisioning." >&2
+    exit 1
+  fi
+
   if [[ -z "${POSTGRES_PASSWORD}" ]]; then
-    echo "[bootstrap-kk-vps] KK_PG_PASSWORD is empty. Skipping PostgreSQL role/database creation." >&2
-  else
-    su - "${POSTGRES_SUPERUSER}" -c "psql -v ON_ERROR_STOP=1 <<'SQL'
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${POSTGRES_USER}') THEN
-    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '${POSTGRES_USER}', '${POSTGRES_PASSWORD}');
-  ELSE
-    EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', '${POSTGRES_USER}', '${POSTGRES_PASSWORD}');
-  END IF;
-END
-\$\$;
-SQL"
-
-    su - "${POSTGRES_SUPERUSER}" -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'\" | grep -q 1 || createdb --owner='${POSTGRES_USER}' '${POSTGRES_DB}'"
+    echo "[bootstrap-kk-vps] KK_PG_PASSWORD is required; refusing to create an unusable runtime role." >&2
+    exit 1
   fi
 
-  if [[ -f "${REPO_BOOTSTRAP_SQL}" ]]; then
-    su - "${POSTGRES_SUPERUSER}" -c "psql -v ON_ERROR_STOP=1 -d '${POSTGRES_DB}' -f '${REPO_BOOTSTRAP_SQL}'"
-  else
-    echo "[bootstrap-kk-vps] Bootstrap SQL not found at ${REPO_BOOTSTRAP_SQL}. Skipping schema bootstrap." >&2
+  export KK_BOOTSTRAP_ROLE_PASSWORD="${POSTGRES_PASSWORD}"
+  runuser --preserve-environment -u "${POSTGRES_SUPERUSER}" -- \
+    psql -v ON_ERROR_STOP=1 -v role_name="${POSTGRES_USER}" <<'SQL'
+\getenv role_password KK_BOOTSTRAP_ROLE_PASSWORD
+SELECT format(
+  CASE
+    WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'role_name')
+      THEN 'ALTER ROLE %I WITH LOGIN PASSWORD %L'
+    ELSE 'CREATE ROLE %I LOGIN PASSWORD %L'
+  END,
+  :'role_name',
+  :'role_password'
+) \gexec
+SQL
+  unset KK_BOOTSTRAP_ROLE_PASSWORD
+
+  if ! runuser -u "${POSTGRES_SUPERUSER}" -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" | grep -q 1; then
+    runuser -u "${POSTGRES_SUPERUSER}" -- createdb --owner="${POSTGRES_USER}" "${POSTGRES_DB}"
   fi
+
+  # 单一 psql 会话先 SET ROLE，确保 fresh install 的所有对象归运行角色所有。
+  runuser -u "${POSTGRES_SUPERUSER}" -- psql \
+    -v ON_ERROR_STOP=1 \
+    -d "${POSTGRES_DB}" \
+    -c "SET ROLE \"${POSTGRES_USER}\"" \
+    -f "${REPO_BOOTSTRAP_SQL}" \
+    -f "${AI_ASSISTANT_SCOPE_MIGRATION}"
 }
 
 install_runtime_templates() {

@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
   createBrowserBridgeCommand,
+  getBrowserBridgeOwnerStorageKey,
   redactBrowserBridgePayload,
   sanitizeBrowserBridgeUrl,
 } from '../../apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts';
+
+const bridgeSource = readFileSync(
+  new URL('../../apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts', import.meta.url),
+  'utf8',
+);
+const browserAssistantSource = readFileSync(
+  new URL('../../apps/web/src/components/settings/views/BrowserAssistantView.tsx', import.meta.url),
+  'utf8',
+);
 
 test('Browser Bridge URL sanitizer accepts ordinary http and https URLs', () => {
   assert.equal(
@@ -51,6 +62,73 @@ test('Browser Bridge command factory creates auditable user-gesture commands', (
   assert.equal(command.target, 'https://example.com/item/1');
   assert.equal(command.requiresUserGesture, true);
   assert.equal(typeof command.createdAt, 'number');
+});
+
+test('Browser Bridge command factory keeps active_tab only for direct user bridge commands', () => {
+  const command = createBrowserBridgeCommand({
+    kind: 'inspect_page',
+    target: 'active_tab',
+    payload: { source: 'direct-user-click' },
+    requiresUserGesture: true,
+  });
+  assert.equal(command.target, 'active_tab');
+});
+
+test('Browser Bridge storage keys are owner-qualified', () => {
+  assert.equal(
+    getBrowserBridgeOwnerStorageKey('sessions', 'owner/a'),
+    'kk_browser_owner:owner%2Fa:sessions',
+  );
+  assert.notEqual(
+    getBrowserBridgeOwnerStorageKey('sessions', 'owner-a'),
+    getBrowserBridgeOwnerStorageKey('sessions', 'owner-b'),
+  );
+});
+
+test('Browser Bridge does not broadcast or log raw native messages', () => {
+  assert.doesNotMatch(bridgeSource, /Global Native WS Message/);
+  assert.doesNotMatch(bridgeSource, /browser-bridge-message/);
+  assert.match(bridgeSource, /subscribeBrowserBridgeCommand/);
+});
+
+test('Browser Assistant persists sessions through owner-qualified storage keys', () => {
+  assert.match(browserAssistantSource, /getBrowserBridgeOwnerStorageKey\('sessions', browserOwnerId\)/);
+  assert.match(browserAssistantSource, /getBrowserBridgeOwnerStorageKey\('selected_sessions', browserOwnerId\)/);
+  assert.doesNotMatch(browserAssistantSource, /localStorage\.setItem\('kk_browser_sessions'/);
+  assert.doesNotMatch(browserAssistantSource, /localStorage\.setItem\('kk_browser_selected_sessions'/);
+});
+
+test('Browser Assistant invalidates async work and clears owner-derived state on account changes', () => {
+  assert.match(browserAssistantSource, /browserOwnerEpochRef\.current \+= 1/);
+  assert.match(browserAssistantSource, /workerRef\.current\?\.terminate\(\)/);
+  assert.match(browserAssistantSource, /isBrowserOwnerScopeCurrent\(ownerScope\)/);
+  assert.match(browserAssistantSource, /setTargetUrl\(''\)/);
+  assert.match(browserAssistantSource, /setExtractedData\(null\)/);
+  assert.match(browserAssistantSource, /setPipelineLogs\(\[\]\)/);
+  assert.match(browserAssistantSource, /setEditedTitle\(''\)/);
+  assert.match(browserAssistantSource, /setEditedPrice\(''\)/);
+  assert.match(browserAssistantSource, /setZippedFileLoc\(null\)/);
+  assert.match(browserAssistantSource, /setPlatforms\(DEFAULT_BROWSER_PLATFORMS\.map/);
+  assert.match(browserAssistantSource, /workerRef\.current\.onmessage = \(e\) => \{\s*if \(!isBrowserOwnerScopeCurrent\(ownerScope\)\) return;/);
+});
+
+test('Browser Bridge command factory derives a stable command id and payload key from idempotency', () => {
+  const first = createBrowserBridgeCommand({
+    kind: 'generate_external',
+    payload: { prompt: 'same request' },
+    idempotencyKey: 'run-browser:generate-external:1',
+    requiresUserGesture: true,
+  });
+  const second = createBrowserBridgeCommand({
+    kind: 'generate_external',
+    payload: { prompt: 'same request' },
+    idempotencyKey: 'run-browser:generate-external:1',
+    requiresUserGesture: true,
+  });
+
+  assert.equal(first.id, second.id);
+  assert.equal(first.idempotencyKey, 'run-browser:generate-external:1');
+  assert.equal(first.payload.idempotencyKey, 'run-browser:generate-external:1');
 });
 
 test('Browser Bridge command keeps execution payload and stores a redacted audit payload', () => {

@@ -10,13 +10,15 @@ test('AI assistant retry job docs contract: registry and runbooks expose generat
   const skillsIndexDocs = readSource('docs/ai-assistant/skills.md');
 
   assert.match(generationToolsSource, /name: 'generation\.retryJob'/);
-  assert.match(generationToolsSource, /permission: 'safe'/);
-  assert.match(generationToolsSource, /target\?: 'latest_failed'/);
+  assert.match(generationToolsSource, /permission: 'confirm'/);
+  assert.match(generationToolsSource, /expectedUpdatedAt/);
+  assert.match(generationToolsSource, /expectedRetryablePromptIds/);
   assert.match(generationToolsSource, /resolveRetryJob/);
-  assert.match(generationToolsSource, /retryFailedPrompts\(resolvedJob\.id\)/);
+  assert.match(generationToolsSource, /queue\.retryFailedPrompts\(resolvedJob\.id\)/);
+  assert.doesNotMatch(generationToolsSource, /target\?: 'latest_failed'/);
 
   for (const docsSource of [toolRegistryDocs, batchSkillDocs, runbooksDocs, skillsIndexDocs]) {
     assert.match(docsSource, /`generation\.retryJob`/);
-    assert.match(docsSource, /latest_failed|最近失败|latest failed/i);
+    assert.match(docsSource, /具体|冻结|jobId|job id/i);
   }
 });

@@ -26,7 +26,7 @@ flowchart TD
     Runtime --> Risk{"权限与影响评估"}
     Risk -->|低风险| Executor["Executor → Verification → Memory / Knowledge Update"]
     Risk -->|高风险、批量、成本或外部副作用| TakeoverConfirm{"等待 run-bound 确认"}
-    TakeoverConfirm -->|确认| Executor
+    TakeoverConfirm -->|用户授予 run-bound 权限| Executor
     TakeoverConfirm -->|取消| Cancelled["记录取消，不执行工具"]
 
     ConfirmedExecution --> Executor
@@ -45,6 +45,9 @@ flowchart TD
 - 直接模式保持普通聊天和画布原生操作；AI 辅助只建议并在执行前确认；AI 接管负责完整任务，但不绕过 PermissionPolicy。
 - 三态共享 `CanvasContext`、`DurableGenerationQueue`、`AgentRunStore` 和当前会话。切换模式不会复制数据或丢失 pending run。
 - ToolRegistry 在每一步 handler 和 verification 前获取新鲜上下文，使 AI 能看到用户在运行期间完成的合法直接操作；已确认的工具目标范围不会因刷新而被隐式扩大。
+- 确认授权必须来自用户动作，并绑定 owner、Run、Plan、Step、输入、幂等键以及预览时的页面、项目、画布、选区、模型与可变配置摘要；恢复 `waiting_confirmation` 或错误的 `running` 状态本身不能生成授权。
+- 每个计划步骤都执行输入校验、幂等保护和显式 verification。运行结果区分成功、部分成功、可重试失败、已回滚失败与取消。
+- 取消会中止当前执行信号；handler 和异步 verifier 返回后都会复查信号，且 abort 优先于迟到的普通网络错误分类。内部补偿只扫描已经开始的步骤，并以 recovery ledger 的幂等键精确匹配 `DurableGenerationQueue` Job 后直接取消，不创建可复用的 recovery grant；被中止 handler 落定后会复扫一次。依赖步骤不会继续启动，终态 Run 不接受迟到取消；Agent Run 和 Tool Call 通过类型化 KK API Client 同步。
 - 本流程不新增跨工具统一 undo 事务；失败处理继续采用现有工具级验证、幂等、补偿或画布撤销能力。
 
 ## 0.1. Global Favorites And @ Reference Flow - 2026-06-05
@@ -107,20 +110,23 @@ graph TD
 
 规则：UI 位置变化不改变该流程。开发者只需同步 UI Map、Skill 和 ToolRegistry 映射，AI 助手仍控制底层功能线路。
 
-## 0.5. 简单生成直发工作流
+## 0.5. 简单生成持久队列工作流
 
 用户触发：“生成一个白色产品海报” / “帮我生成一个赛博猫头像”
 
 ```mermaid
 graph TD
-    User([用户输入简单单次生成指令]) --> IntentGate[IntentGate 本地识别 submit_composer]
+    User([用户输入简单单次生成指令]) --> IntentGate[IntentGate 识别 submit_composer 意图]
     IntentGate --> ExtractPrompt[提取提示词主体]
-    ExtractPrompt --> FillPrompt[调用 prompt.optimizeInput / fillInputPrompt 写入画布输入框]
-    FillPrompt --> Submit[调用 generation.submitComposer / submitPromptComposer]
-    Submit --> PromptBar[复用当前模型、比例、参考图和模式直接发送]
+    ExtractPrompt --> Plan[构造仅含一个 prompt item 的 generation.createBatchJob]
+    Plan --> Preview[展示模型、数量、费用与画布影响范围]
+    Preview --> Confirm{用户确认？}
+    Confirm -->|否| Cancel[保留画布，不提交任务]
+    Confirm -->|是| Queue[写入 DurableGenerationQueue]
+    Queue --> Canvas[完成后导入当前 CanvasRuntimeState]
 ```
 
-若用户要求“批量”“每张参考图分别生成”“文件夹每张图都做一张”，不得走简单直发，应进入批量生成和确认流程。
+AI 自治的单张与批量生成都走 `generation.createBatchJob` 和同一个持久队列，不模拟 PromptBar，也不调用 `generation.submitComposer`。普通 PromptBar 仍保留给用户直接操作。若用户要求“每张参考图分别生成”或“文件夹每张图都做一张”，Planner 扩展 prompts 和影响范围后进入同一确认流程。
 
 ## 1. 下载选中卡片原图工作流
 
@@ -129,9 +135,11 @@ graph TD
 ```mermaid
 graph TD
     User([用户在画布框选卡片并输入下载指令]) --> IntentGate[IntentGate 识别下载意图及 scope=selected_cards]
-    IntentGate --> ToolCall[调用 assets.zipOriginals 工具]
-    ToolCall --> SelectedNodes[CanvasContext 读取 selectedNodeIds]
-    SelectedNodes --> ParseImages[解析所选图片卡片及 Prompt 卡片的子图像]
+    IntentGate --> FreezeSelection[冻结预览时 selectedNodeIds 并写入工具输入]
+    FreezeSelection --> Confirm{用户确认范围？}
+    Confirm -->|否| Cancel[不创建 ZIP]
+    Confirm -->|是| ToolCall[调用 assets.zipOriginals 工具]
+    ToolCall --> ParseImages[按冻结选区解析图片卡片及 Prompt 卡片的子图像]
     ParseImages --> Deduplicate[卡片去重并收集 GeneratedImage 对象]
     Deduplicate --> ResolveOriginal{解析原图源}
     ResolveOriginal -- 1. originalUrl 存在 --> DownloadOrig[请求下载 originalUrl]
@@ -156,7 +164,7 @@ The selected-original download path is implemented by:
 - `apps/web/src/features/assets/zipOutputs.ts`
 - `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
 
-Runtime rule: `selected_cards` never means all canvases. It means the current `selectedNodeIds`; selected Prompt cards expand to their child image nodes. The ZIP source resolver tries `originalUrl`, then `apiResultUrl`, then `url`, then `storageId`, then local asset recovery. `manifest.json` is always written, including manifest-only archives when every download fails.
+Runtime rule: `selected_cards` never means all canvases. It means the `selectedNodeIds` frozen into the confirmed plan input; execution validates that those nodes still exist on the confirmed canvas and never substitutes a newer live selection. Selected Prompt cards expand to their child image nodes. The ZIP source resolver tries `originalUrl`, then `apiResultUrl`, then `url`, then `storageId`, then local asset recovery. `manifest.json` is always written and returned as structured verification evidence. A manifest-only archive remains inspectable when every download fails, but the Agent step is `retryable_failure`, not partial success.
 
 ---
 

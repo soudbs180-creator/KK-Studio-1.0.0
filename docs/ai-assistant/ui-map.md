@@ -9,7 +9,7 @@
 | 功能组件 | CSS 选择器 / 标识符 | 描述 |
 | :--- | :--- | :--- |
 | **API 设置面板** | `.settings-api-management` / `#settings-panel` | 系统设置中的 API 密钥管理面板 |
-| **系统日志面板** | `action://open-settings-logs` / `system-logs` | AI 接管与聊天 action 链接可直接打开系统日志维护面板 |
+| **系统日志面板** | `action://open-settings-logs` / `system-logs` | 用户显式点击聊天 action 链接，或 Agent 结构化调用 `ui.openSettings` 后打开系统日志维护面板；消息不得自动触发链接 |
 | **个人中心设置页** | `user-profile` / `/settings/user-profile` | 设置页中的个人中心入口，AI 助手通过 `openSettings({ tab: 'user-profile' })` 打开 |
 | **设置功能路由** | `dashboard` / `api-management` / `consumption-records` / `storage-settings` / `system-logs` / `user-profile` | AI 助手快速导航的稳定功能 ID；UI 按钮位置变化时仍以这些 ID 调用底层能力 |
 | **能力分配卡片** | `[data-testid="settings-workbench-capability"]` / `.settings-capability-card` | API 工作台高级模式的能力路由分配卡片，非 AI 助手卡片不保留不可见占位行 |
@@ -31,7 +31,7 @@
 
 当开发人员修改或重构上述 DOM 的 id、class 或相对位置时，**必须**在此文件中同步更新，防止 AI 助手的 `highlightElement` 与聚焦指令失效。
 
-AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、提交生成、整理卡片、批量生成等操作应优先调用 ToolRegistry 或 Context API。按钮移动到别的位置时，需要更新本 UI Map 和对应 Skill/Runbook，但不应改变 `ui.openSettings`、`generation.submitComposer` 等工具语义。
+AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、提交生成、整理卡片、批量生成等操作应优先调用 ToolRegistry 或 Context API。按钮移动到别的位置时，需要更新本 UI Map 和对应 Skill/Runbook，但不应改变 `ui.openSettings` 等稳定工具语义。AI 自治的单张与批量生成统一使用 `generation.createBatchJob`；`generation.submitComposer` 只保留为用户直接操作的兼容入口。
 
 ## 2.1 三态协作控件规则 - 2026-07-15
 

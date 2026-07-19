@@ -11,6 +11,7 @@ if [[ -f "${ENV_FILE}" ]]; then
 fi
 
 SUPABASE_DB_URL="${SUPABASE_DB_URL:-}"
+SOURCE_DATABASE_LABEL="${SOURCE_DATABASE_LABEL:-supabase-runtime}"
 EXPORT_ROOT="${EXPORT_ROOT:-${REPO_ROOT}/.tmp-postgres-migration}"
 TABLES="${TABLES:-profiles,temp_users,external_identities,admin_auth,admin_sessions,user_credits,credit_exchange_rates,credit_transactions,generation_tasks,workflow_documents,workspace_layouts,workspace_cloud_images,admin_credit_models,provider_pricing_cache,payment_orders,payment_callbacks}"
 
@@ -58,7 +59,7 @@ printf '%s\n' "${TABLE_ARRAY[@]}" > "${EXPORT_ROOT}/runtime-table-order.txt"
 
 cat > "${EXPORT_ROOT}/runtime-manifest.json" <<EOF
 {
-  "source": "${SUPABASE_DB_URL}",
+  "sourceKind": "${SOURCE_DATABASE_LABEL}",
   "tableCount": ${#TABLE_ARRAY[@]},
   "tables": [
 $(printf '    "%s"%s\n' "${TABLE_ARRAY[@]}" "" | sed '$!s/$/,/')
@@ -75,8 +76,11 @@ EOF
 cat > "${EXPORT_ROOT}/README.txt" <<EOF
 Supabase runtime export
 
-Source:
-  ${SUPABASE_DB_URL}
+Source kind:
+  ${SOURCE_DATABASE_LABEL}
+
+Credentials:
+  Intentionally omitted. The source URL is accepted only through the process environment.
 
 Tables:
   ${TABLES}

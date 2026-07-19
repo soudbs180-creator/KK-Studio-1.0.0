@@ -2,6 +2,9 @@
 
 import type { AspectRatio, ImageSize, GenerationMode } from '../../types';
 import type {
+  AgentFailureClass,
+  AgentStepOutcome,
+  AgentToolCallStatus,
   AssistantCollaborationMode,
   AssistantWorkspaceSurface,
   CanvasCardKind,
@@ -10,6 +13,7 @@ import type {
 } from '@kk/shared';
 
 export type { AssistantCollaborationMode, AssistantWorkspaceSurface } from '@kk/shared';
+export type { AgentFailureClass, AgentStepOutcome, AgentToolCallStatus } from '@kk/shared';
 
 export interface AssistantContextSuggestion {
   id: string;
@@ -61,6 +65,7 @@ export type AssistantIntent =
   | 'browser_write_back_dom'       // 通过 Browser Bridge 回写外部网页 DOM
   | 'arrange_nodes'                // 整理卡片/排版布局
   | 'retry_generation_job'         // 重试失败的持久化批量生成任务
+  | 'resume_generation_job'        // 恢复明确指定的暂停持久化生成任务
   | 'navigate_to_surface'          // 跳转/导航到画板、库或收藏夹页面
   | 'unknown';
 
@@ -78,7 +83,7 @@ export interface IntentResult {
     downloadScope?: string;        // 下载范围
     prompt?: string;               // 直接发送生成时提取的提示词
     jobId?: string;                // 持久化批量生成任务 ID
-    retryTarget?: 'latest_failed';
+    retryTarget?: 'recent_failed';
     settingsView?: string;         // 设置页子功能 ID
     url?: string;
     browserAction?: 'status' | 'open' | 'extract_product' | 'generate_external' | 'publish_draft' | 'inspect_page' | 'open_desktop_project' | 'check_local_llm' | 'write_back_dom';
@@ -105,31 +110,46 @@ export type AssistantAction =
   | { type: 'optimizePromptLocally'; payload: { subject: string; templateId?: string; style?: string } }
   | { type: 'fillPrompt'; payload: { prompt: string; negativePrompt?: string; modelId?: string } }
   | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string; mode?: string } }
+  | { type: 'generation.start'; payload: { prompt: string; count: number; options?: any; aspectRatio?: string; referenceImageNodeId?: string; mode?: string } }
   | { type: 'generation.createVideoJob'; payload: { prompt: string; modelId?: string; referenceImageNodeId?: string; durationSeconds?: number; resolution?: string; aspectRatio?: string; generateAudio?: boolean; firstFrameAssetId?: string; lastFrameAssetId?: string; motion?: string; idempotencyKey?: string } }
   | { type: 'generation.createAudioJob'; payload: { prompt: string; modelId?: string; durationSeconds?: number; voice?: string; lyrics?: string; genre?: string; idempotencyKey?: string } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
   | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
-  | { type: 'generation.retryJob'; payload: { jobId?: string; target?: 'latest_failed' } }
+  | {
+      type: 'generation.retryJob';
+      payload: {
+        jobId?: string;
+        expectedUpdatedAt?: number;
+        expectedRetryablePromptIds?: string[];
+      };
+    }
+  | { type: 'generation.getJobStatus'; payload: { jobId: string } }
+  | { type: 'generation.pauseJob'; payload: { jobId: string } }
+  | { type: 'generation.resumeJob'; payload: { jobId: string } }
+  | { type: 'generation.cancelJob'; payload: { jobId: string } }
   | { type: 'ecommerce.createBatchTransformJob'; payload: { imageIds?: string[]; rawUserRequest: string; aspectRatio?: string; layoutPreset?: AssistantBatchLayoutPreset; outputGroup?: AssistantOutputGroupPlan; productCategory?: string; idempotencyKey?: string } }
   | { type: 'locateCard'; payload: { keyword: string } }
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
   | { type: 'locateApiCard'; payload: { idOrName: string } }
   | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
+  | { type: 'assets.zipOriginals'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
   | { type: 'canvas.arrangeNodes'; payload: { nodeIds: string[]; mode: string; preset?: string } }
   | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } }
   | { type: 'fillInputPrompt'; payload: { prompt: string } }
   | { type: 'changeMode'; payload: { mode: GenerationMode } }
   | { type: 'submitPromptComposer'; payload: {} }
+  | { type: 'generation.submitComposer'; payload: {} }
+  | { type: 'workflow.controlPanel'; payload: { nodeId: string; action: 'run' | 'pause' | 'cancel' | 'retry' } }
   | { type: 'browser.getStatus'; payload: {} }
   | { type: 'browser.openAssistant'; payload: {} }
   | { type: 'browser.extractProduct'; payload: { url: string; targets?: ('price' | 'title' | 'image' | 'description')[]; label?: string } }
   | { type: 'browser.generateExternal'; payload: { prompt: string; platformId?: string; count?: number; sessionIds?: string[]; sessionCount?: number } }
   | { type: 'browser.publishDraft'; payload: { channelId: string; imageUrl?: string; title?: string; body?: string } }
-  | { type: 'browser.inspectPage'; payload: { target?: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } }
+  | { type: 'browser.inspectPage'; payload: { target: string; includePalette?: boolean; includeOcr?: boolean; includeLayout?: boolean } }
   | { type: 'browser.openDesktopProject'; payload: { ide?: 'cursor' | 'trae' | 'vscode'; projectHint?: string } }
   | { type: 'browser.checkLocalLlm'; payload: { provider?: string; endpoint?: string; model?: string } }
-  | { type: 'browser.writeBackDom'; payload: { target?: string; title: string; price: string } }
+  | { type: 'browser.writeBackDom'; payload: { target: string; title: string; price: string } }
   | { type: 'ui.navigateToSurface'; payload: { surface: string } }
   | { type: 'knowledge.recordChange'; payload: { title: string; summary: string; source?: 'runtime' | 'user' | 'import' } };
 
@@ -465,10 +485,15 @@ export type ToolPermission =
 export interface AgentToolCallLog {
   id: string;
   runId: string;
+  stepId?: string;
   toolName: string;
   inputSummary: string;
   outputSummary?: string;
-  status: 'success' | 'failed' | 'blocked' | 'setup_required' | 'verification_failed';
+  status: AgentToolCallStatus;
+  outcome?: AgentStepOutcome;
+  failureClass?: AgentFailureClass;
+  errorCode?: string;
+  retryable?: boolean;
   error?: string;
   startedAt: string;
   completedAt?: string;

@@ -42,12 +42,12 @@ describe('DurableGenerationQueue Recovery Tests', () => {
     const job = queue.createJob(prompts, options, 'canvas-1', 'key-recover-1');
     assert.equal(job.status, 'queued');
 
-    // 等待一个小周期，验证它不会自动跑起来，或者即使跑了也会退回到 queued
+    // 没有 executor 时不得先写 running；保持原始 queued 快照即可安全恢复。
     await new Promise(resolve => setTimeout(resolve, 50));
     const currentJob = queue.getJob(job.id)!;
     assert.equal(currentJob.status, 'queued');
     assert.equal(currentJob.prompts[0].status, 'queued');
-    assert.equal(currentJob.prompts[0].error, 'No executor registered yet');
+    assert.equal(currentJob.prompts[0].error, undefined);
 
     // 注册 executor
     let executed = false;

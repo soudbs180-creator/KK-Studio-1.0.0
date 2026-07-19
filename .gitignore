@@ -61,6 +61,7 @@ scripts/alipay-mcp.env
 .codex-tmp*/
 .codex-temp-*
 .tmp/
+.tmp-postgres-migration/
 .tmp-playwright/
 .playwright-cli/
 .vitest/
