@@ -2476,3 +2476,24 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - AI 文档知识索引已重建；`npm run check:encoding` 与 `git diff --check` 通过。
 - **未运行验证及原因**：未在真实 PostgreSQL 实例执行 `016_ai_assistant_user_scope.sql`，当前环境没有 `psql`、Docker 或 Bash；已通过迁移源码、数据库入口和 VPS 部署契约测试。未运行完整发布聚合命令 `npm run verify:changes`，因为本提交是计划中的独立第二阶段，依赖审计、其他 UI smoke 与画布性能门禁留到全站重构完整发布前统一执行。未调用真实付费 Provider、支付、生产 OAuth、公开发布或真实账户变更。
 - **风险与下一步**：数据库发布前必须在受控 PostgreSQL 备份上演练迁移并核对旧 Knowledge、Skill 与画布快照的兼容归属标记。现阶段控制面已收口，下一阶段只能在本提交形成干净基线后进入 `expand-ai-site-capabilities`，先生成 UI/业务能力覆盖矩阵，再按领域补齐 ToolRegistry；不得把 UI 点击模拟或账户/计费写操作重新接入自治链路。
+
+## 152. 2026-07-19 - 扩展 AI 全站领域能力
+
+- **修改范围**：完成 `expand-ai-site-capabilities`。新增类型化实时站点能力端口，将项目列表/打开/新建/重命名/删除、工作区状态、素材摘要、历史撤销/重做、生成偏好、导出能力、账户摘要与计费摘要接入既有 `AssistantExecutionContext` 和 ToolRegistry；ChatSidebar 通过实时 `CanvasContext`、AssetStore、配置与导航 getter 提供 Host 能力，不模拟菜单或按钮点击。LocalBrain、LLM Planner 和 `AssistantAction` 收敛到 `navigation.*`、`workspace.*`、`project.*`、`generation.createBatchJob`、`assets.*` 等领域名；AI 发起的单图、参考图编辑和通用批量生成统一进入 `DurableGenerationQueue`，素材为空或项目名歧义时先澄清。账户与计费仅提供脱敏只读摘要，未注册充值、支付确认、余额、密钥、数据库或 Shell 写工具。发布全站能力覆盖矩阵及项目/偏好安全 Skill，并重建知识索引。
+- **修改文件**：
+  - `apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts`、`index.ts`、`runtime/aiManagementActions.ts`
+  - `apps/web/src/features/ai-assistant-runtime/tools/siteCapabilityTools.ts`、`ToolRegistry.ts`
+  - `apps/web/src/features/ai-takeover/` 下 Provider、意图、Local/LLM Planner、项目上下文、确认策略与动作类型
+  - `apps/web/src/components/layout/ChatSidebar.tsx`
+  - `tests/unit/ai-site-capabilities.test.ts`、ToolRegistry/意图/队列/技能目录相关单测与 `tests/e2e/ai-takeover-real-paths.test.ts`
+  - `docs/ai-assistant/site-capability-matrix.md`、`docs/ai-assistant/skills/project-and-preferences-management.md`、技能索引、README 与生成知识索引
+  - `openspec/changes/expand-ai-site-capabilities/`
+- **当前设计决策**：全站能力按领域注册，不为每个按钮制造工具；折叠面板、菜单开关等纯 UI 行为继续保持 `toolName: undefined`，AI 不得自动触发。`project.open` 在规划时从脱敏项目清单冻结唯一 ID；同名或未知目标只返回澄清，不执行切换；“项目管理”继续路由设置页。项目、历史与偏好修改均具备类型化校验、Run/Step 幂等键和实时 Host 状态验证，Host 未收敛时不能伪报成功。普通 Prompt Composer 的 `generation.submitComposer` 仅保留给用户直接操作，AI 生成统一使用 `generation.createBatchJob`；全站只实例化一个 `DurableGenerationQueue`，页面刷新、侧栏折叠和页面切换共享同一任务持久状态。
+- **已运行验证**：
+  - 最终工作树上的 `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run spec:check`、`npm run build` 全部通过；服务端 59 个文件语法检查、501 个测试文件语义检查和 OpenAPI 校验通过，Vite 生产构建转换 2435 个模块。
+  - 完整 `npm run test` 通过：unit 1840 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11。
+  - 领域工具、意图、ToolRegistry 与 AI Management 聚焦回归 80/80 通过；持久队列恢复、存储失败、幂等、暂停/继续、任务面板和生成运行时回归 78/78 通过。
+  - `npm run verify:ai-takeover-smoke` 使用真实 Google Chrome 通过，页面显示 Agent 时间线与唯一 `DurableGenerationQueue` 投影，截图证据位于 `temp/playwright/ai-takeover-smoke/ai-takeover-timeline.png`。
+  - `npm run check:encoding` 与 `git diff --check` 通过；新增 Skill 已进入 `docs/ai-assistant/generated/project-index.json`。
+- **未运行验证及原因**：未运行完整发布聚合命令 `npm run verify:changes`，因为这是总计划中的独立第三阶段，依赖审计、其余 UI smoke 与画布性能门禁将在全站 UI 和文档治理全部完成后统一执行。未调用真实付费 Provider、真实 ZIP 下载、支付、充值、生产 OAuth、公开发布或账户写操作；本阶段验证使用持久队列夹具与真实本地页面，避免产生费用或外部副作用。
+- **风险与下一步**：低到中风险。项目、历史和偏好 Host 通过短周期状态收敛守卫阻止 React 异步状态假成功；后续若把这些状态迁移到远端持久化，应将同一端口升级为服务端确认而不是绕开 verify。下一阶段仅在本提交形成干净基线后进入 `modernize-ai-first-workspace-ui`，优先修复重复画布 ID、侧栏宽度、任务活动投影、单项归档、导航语义和可访问性，不建立第二套助手或任务状态源。

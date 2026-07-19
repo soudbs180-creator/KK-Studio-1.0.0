@@ -71,6 +71,10 @@
     - 职责：使用 Service Worker 缓存策略做 CDN 超时 (200ms) 自动回源站降级与测速偏好广播。
     - 关联工具：`browser.getStatus` (Connectivity Doctor)
 
+17. **[项目与生成偏好管理 Skill (project-and-preferences-management)](skills/project-and-preferences-management.md)**
+    - 职责：基于实时用户范围项目快照执行项目切换、新建、重命名、删除和生成默认值更新，并对模糊目标、危险删除与未知偏好字段进行拦截。
+    - 关联工具：`project.list`, `project.getActive`, `project.open`, `project.create`, `project.rename`, `project.delete`, `preferences.get`, `preferences.updateGenerationDefaults`
+
 ---
 
 ## 🛡️ 静态 analysis 与校验支持

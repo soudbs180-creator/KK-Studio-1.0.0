@@ -30,6 +30,7 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
 );
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
+import { getRuntimeOwnerId } from '../../services/auth/runtimeSessionProfile';
 import {
     isCapabilityRouteAssignmentModelDisabled,
     resolveEnabledCapabilityRouteAssignment,
@@ -59,7 +60,13 @@ import {
     useAITakeover,
     type AssistantWorkspaceSurface,
 } from '../../features/ai-takeover';
-import { AGENT_CONTROL_ACTIONS, CHAT_SHELL_ACTIONS, durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
+import {
+    AGENT_CONTROL_ACTIONS,
+    CHAT_SHELL_ACTIONS,
+    durableGenerationQueue,
+    type AssistantSiteCapabilityPorts,
+    type GenerationBatchJob,
+} from '../../features/ai-assistant-runtime';
 import { useAssetStore } from '../../features/assets/assetStore';
 import {
     ReferenceMentionPanel,
@@ -4363,7 +4370,16 @@ const resolveAssistantWorkspaceSurface = (workspaceSurface?: string): AssistantW
 
 const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
     const {
+        state,
         activeCanvas,
+        createCanvas,
+        switchCanvas,
+        deleteCanvas,
+        renameCanvas,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
         addPromptNode,
         updatePromptNode,
         deletePromptNode,
@@ -4386,7 +4402,207 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
         rememberPreferredKeyForMode: () => {}
     });
     const { balance } = useBilling();
+    const { user } = useAuth();
     const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
+
+    const canvasStateRef = useRef(state);
+    const canvasActionsRef = useRef({
+        createCanvas,
+        switchCanvas,
+        deleteCanvas,
+        renameCanvas,
+        undo,
+        redo,
+    });
+    const historyAvailabilityRef = useRef({ canUndo, canRedo });
+    const navigationRef = useRef({
+        focusWorkspace: props.focusWorkspace,
+        openLibrarySurface: props.openLibrarySurface,
+        openFavoritesSurface: props.openFavoritesSurface,
+        openProfileSurface: props.openProfileSurface,
+        onOpenSettings: props.onOpenSettings,
+    });
+    const configRef = useRef(props.config);
+    const setConfigRef = useRef(props.setConfig);
+    const accountRef = useRef({ user, apiKeyStatus, balance });
+
+    canvasStateRef.current = state;
+    canvasActionsRef.current = { createCanvas, switchCanvas, deleteCanvas, renameCanvas, undo, redo };
+    historyAvailabilityRef.current = { canUndo, canRedo };
+    navigationRef.current = {
+        focusWorkspace: props.focusWorkspace,
+        openLibrarySurface: props.openLibrarySurface,
+        openFavoritesSurface: props.openFavoritesSurface,
+        openProfileSurface: props.openProfileSurface,
+        onOpenSettings: props.onOpenSettings,
+    };
+    configRef.current = props.config;
+    setConfigRef.current = props.setConfig;
+    accountRef.current = { user, apiKeyStatus, balance };
+
+    const waitForHostState = useCallback(async (predicate: () => boolean) => {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+            if (predicate()) return;
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        }
+        if (!predicate()) throw new Error('Workspace state did not converge after the requested operation.');
+    }, []);
+
+    const siteCapabilities = useMemo<AssistantSiteCapabilityPorts>(() => ({
+        navigation: {
+            openSurface: async (surface) => {
+                const navigation = navigationRef.current;
+                if (surface === 'workspace') {
+                    if (!navigation.focusWorkspace) throw new Error('Workspace navigation is unavailable.');
+                    navigation.focusWorkspace();
+                    return;
+                }
+                if (surface === 'library') {
+                    if (!navigation.openLibrarySurface) throw new Error('Library navigation is unavailable.');
+                    navigation.openLibrarySurface();
+                    return;
+                }
+                if (surface === 'favorites') {
+                    if (!navigation.openFavoritesSurface) throw new Error('Favorites navigation is unavailable.');
+                    navigation.openFavoritesSurface();
+                    return;
+                }
+                if (surface === 'profile') {
+                    if (!navigation.openProfileSurface) throw new Error('Profile navigation is unavailable.');
+                    navigation.openProfileSurface('main');
+                    return;
+                }
+                if (!navigation.onOpenSettings) throw new Error('Settings navigation is unavailable.');
+                navigation.onOpenSettings('dashboard');
+            },
+            openSettings: async (view = 'dashboard') => {
+                const handler = navigationRef.current.onOpenSettings;
+                if (!handler) throw new Error('Settings navigation is unavailable.');
+                handler(view as SettingsSurfaceView);
+            },
+        },
+        project: {
+            getSnapshot: () => {
+                const current = canvasStateRef.current;
+                return {
+                    activeProjectId: current.activeCanvasId,
+                    canCreateProject: current.canvases.length < 10,
+                    projects: current.canvases.map((canvas) => ({
+                        id: canvas.id,
+                        name: canvas.name,
+                        active: canvas.id === current.activeCanvasId,
+                        lastModified: Number(canvas.lastModified || 0),
+                        promptCount: canvas.promptNodes?.length || 0,
+                        imageCount: canvas.imageNodes?.length || 0,
+                        noteCount: canvas.noteNodes?.length || 0,
+                        workflowNodeCount: canvas.workflow?.nodes?.length || 0,
+                    })),
+                };
+            },
+            openProject: async (projectId) => {
+                canvasActionsRef.current.switchCanvas(projectId);
+                await waitForHostState(() => canvasStateRef.current.activeCanvasId === projectId);
+            },
+            createProject: async (name) => {
+                const projectId = canvasActionsRef.current.createCanvas();
+                if (!projectId) return null;
+                await waitForHostState(() => canvasStateRef.current.canvases.some((canvas) => canvas.id === projectId));
+                if (name) {
+                    await canvasActionsRef.current.renameCanvas(projectId, name);
+                    await waitForHostState(() => canvasStateRef.current.canvases.some((canvas) => (
+                        canvas.id === projectId && canvas.name === name
+                    )));
+                }
+                return projectId;
+            },
+            renameProject: async (projectId, name) => {
+                await canvasActionsRef.current.renameCanvas(projectId, name);
+                await waitForHostState(() => canvasStateRef.current.canvases.some((canvas) => (
+                    canvas.id === projectId && canvas.name === name
+                )));
+            },
+            deleteProject: async (projectId) => {
+                canvasActionsRef.current.deleteCanvas(projectId);
+                await waitForHostState(() => !canvasStateRef.current.canvases.some((canvas) => canvas.id === projectId));
+            },
+        },
+        history: {
+            getSnapshot: () => {
+                const current = canvasStateRef.current;
+                const projectId = current.activeCanvasId;
+                const projectHistory = current.history[projectId];
+                return {
+                    projectId,
+                    canUndo: historyAvailabilityRef.current.canUndo,
+                    canRedo: historyAvailabilityRef.current.canRedo,
+                    undoDepth: projectHistory?.past?.length || 0,
+                    redoDepth: projectHistory?.future?.length || 0,
+                };
+            },
+            undo: async () => {
+                const projectId = canvasStateRef.current.activeCanvasId;
+                const before = canvasStateRef.current.history[projectId];
+                const beforePast = before?.past?.length || 0;
+                const beforeFuture = before?.future?.length || 0;
+                canvasActionsRef.current.undo();
+                await waitForHostState(() => {
+                    const current = canvasStateRef.current.history[projectId];
+                    return (current?.past?.length || 0) !== beforePast
+                        || (current?.future?.length || 0) !== beforeFuture;
+                });
+            },
+            redo: async () => {
+                const projectId = canvasStateRef.current.activeCanvasId;
+                const before = canvasStateRef.current.history[projectId];
+                const beforePast = before?.past?.length || 0;
+                const beforeFuture = before?.future?.length || 0;
+                canvasActionsRef.current.redo();
+                await waitForHostState(() => {
+                    const current = canvasStateRef.current.history[projectId];
+                    return (current?.past?.length || 0) !== beforePast
+                        || (current?.future?.length || 0) !== beforeFuture;
+                });
+            },
+        },
+        preferences: {
+            getGenerationDefaults: () => {
+                const config = configRef.current || {};
+                return {
+                    mode: config.mode,
+                    aspectRatio: config.aspectRatio,
+                    imageSize: config.imageSize,
+                    parallelCount: config.parallelCount,
+                    enablePromptOptimization: config.enablePromptOptimization,
+                    enableGrounding: config.enableGrounding,
+                    enableImageSearch: config.enableImageSearch,
+                    thinkingMode: config.thinkingMode,
+                };
+            },
+            updateGenerationDefaults: async (patch) => {
+                const setter = setConfigRef.current;
+                if (typeof setter !== 'function') throw new Error('Generation preferences are unavailable.');
+                setter((previous: Record<string, unknown>) => ({ ...previous, ...patch }));
+                await waitForHostState(() => Object.entries(patch).every(([field, value]) => (
+                    configRef.current?.[field] === value
+                )));
+            },
+        },
+        account: {
+            getAccountSummary: () => ({
+                ownerId: getRuntimeOwnerId(),
+                authenticated: Boolean(accountRef.current.user),
+                apiKeyStatus: accountRef.current.apiKeyStatus as 'missing' | 'configured_masked',
+            }),
+            getBillingSummary: () => ({
+                available: Number.isFinite(Number(accountRef.current.balance)),
+                balance: Number.isFinite(Number(accountRef.current.balance)) ? Number(accountRef.current.balance) : null,
+                unit: 'credits',
+            }),
+        },
+        assets: {
+            getSnapshot: () => useAssetStore.getState().getAssetsSummary(),
+        },
+    }), [waitForHostState]);
 
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => {
         const models = buildAvailableChatModels(KKAI_FEATURE_FLAGS.billing);
@@ -4432,6 +4648,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
             updateToolWindowLayout={props.updateToolWindowLayout}
             setPptEditorMode={props.setPptEditorMode}
             togglePinTool={props.togglePinTool}
+            siteCapabilities={siteCapabilities}
         >
             <ChatSidebarInner
                 {...props}

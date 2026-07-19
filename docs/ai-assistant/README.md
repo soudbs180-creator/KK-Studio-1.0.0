@@ -22,10 +22,13 @@
 5. **[flow-map.md](flow-map.md)** 与 **[module-map.md](module-map.md)**
    - **职责**：系统交互流和模块依赖树的映射，帮助 Agent 进行全局定位。
 
-6. **[skills.md](skills.md)** (以及 **[skills/](skills/README.md)** 专门子目录)、**[safety-policy.md](safety-policy.md)** 和 **[session-memory.md](session-memory.md)**
+6. **[site-capability-matrix.md](site-capability-matrix.md) —— 全站 UI / 业务能力覆盖矩阵**
+   - **职责**：按领域标记真实业务入口、Agent 工具、权限、仅本地 UI 动作和禁止自治能力，并固定“打开项目到 ZIP”的验收旅程。
+
+7. **[skills.md](skills.md)** (以及 **[skills/](skills/README.md)** 专门子目录)、**[safety-policy.md](safety-policy.md)** 和 **[session-memory.md](session-memory.md)**
    - **职责**：定义助手的安全围栏与临时上下文记忆同步方式。
 
 ## 🧠 助手开发规范
 
-- **工具优先，不模拟 UI**：严禁采用模拟人在输入框填值、点击按钮来做批量生图或下载。必须直接通过 `DurableJobQueue` 或 Tool Registry 提供的 API 接口进行调用。
+- **工具优先，不模拟 UI**：严禁采用模拟人在输入框填值、点击按钮来做批量生图或下载。必须直接通过 `DurableGenerationQueue` 或 ToolRegistry 提供的业务接口进行调用。
 - **选区感知**：下载和整理卡片时，必须优先获取并基于 `selectedNodeIds` 状态，而不是全量画布。

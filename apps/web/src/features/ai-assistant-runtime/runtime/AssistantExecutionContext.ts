@@ -1,5 +1,5 @@
 import type { AssistantCollaborationMode, AssistantWorkspaceSurface } from '@kk/shared';
-import type { CanvasRuntimeState } from '../../ai-takeover/types.ts';
+import type { AssetContextSummary, CanvasRuntimeState } from '../../ai-takeover/types.ts';
 import type { Canvas } from '../../../types/index.ts';
 import type { BrowserBridgeClient, BrowserBridgeStatusSnapshot } from '../browser/browserBridge.ts';
 import type { DurableGenerationQueue } from '../queue/DurableGenerationQueue.ts';
@@ -54,6 +54,100 @@ export interface AssistantExecutionNotificationPort {
   error: (...args: any[]) => any;
 }
 
+export type AssistantHostResult<Value> = Value | Promise<Value>;
+
+export interface AssistantProjectSummary {
+  id: string;
+  name: string;
+  active: boolean;
+  lastModified: number;
+  promptCount: number;
+  imageCount: number;
+  noteCount: number;
+  workflowNodeCount: number;
+}
+
+export interface AssistantProjectSnapshot {
+  activeProjectId: string;
+  canCreateProject: boolean;
+  projects: AssistantProjectSummary[];
+}
+
+export interface AssistantProjectCapabilityPort {
+  getSnapshot: () => AssistantProjectSnapshot;
+  openProject: (projectId: string) => AssistantHostResult<void>;
+  createProject: (name?: string) => AssistantHostResult<string | null>;
+  renameProject: (projectId: string, name: string) => AssistantHostResult<void>;
+  deleteProject: (projectId: string) => AssistantHostResult<void>;
+}
+
+export interface AssistantHistorySnapshot {
+  projectId: string;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoDepth: number;
+  redoDepth: number;
+}
+
+export interface AssistantHistoryCapabilityPort {
+  getSnapshot: () => AssistantHistorySnapshot;
+  undo: () => AssistantHostResult<void>;
+  redo: () => AssistantHostResult<void>;
+}
+
+export interface AssistantGenerationPreferenceSnapshot {
+  mode?: string;
+  aspectRatio?: string;
+  imageSize?: string;
+  parallelCount?: number;
+  enablePromptOptimization?: boolean;
+  enableGrounding?: boolean;
+  enableImageSearch?: boolean;
+  thinkingMode?: 'minimal' | 'high';
+}
+
+export interface AssistantGenerationPreferencePatch extends AssistantGenerationPreferenceSnapshot {}
+
+export interface AssistantPreferenceCapabilityPort {
+  getGenerationDefaults: () => AssistantGenerationPreferenceSnapshot;
+  updateGenerationDefaults: (patch: AssistantGenerationPreferencePatch) => AssistantHostResult<void>;
+}
+
+export interface AssistantNavigationCapabilityPort {
+  openSurface: (surface: 'workspace' | 'library' | 'favorites' | 'profile' | 'settings') => AssistantHostResult<void>;
+  openSettings: (view?: string) => AssistantHostResult<void>;
+}
+
+export interface AssistantAccountSummary {
+  ownerId: string;
+  authenticated: boolean;
+  apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
+}
+
+export interface AssistantBillingSummary {
+  available: boolean;
+  balance: number | null;
+  unit: 'credits';
+}
+
+export interface AssistantAccountCapabilityPort {
+  getAccountSummary: () => AssistantAccountSummary;
+  getBillingSummary: () => AssistantBillingSummary;
+}
+
+export interface AssistantAssetCapabilityPort {
+  getSnapshot: () => AssetContextSummary;
+}
+
+export interface AssistantSiteCapabilityPorts {
+  navigation: AssistantNavigationCapabilityPort;
+  project: AssistantProjectCapabilityPort;
+  history: AssistantHistoryCapabilityPort;
+  preferences: AssistantPreferenceCapabilityPort;
+  account: AssistantAccountCapabilityPort;
+  assets: AssistantAssetCapabilityPort;
+}
+
 type AssistantHostCallback = (...args: any[]) => any;
 
 /**
@@ -86,6 +180,7 @@ export interface AssistantExecutionContext {
   generationQueue: DurableGenerationQueue;
   runStore: AgentRunStore;
   notify: AssistantExecutionNotificationPort;
+  siteCapabilities?: AssistantSiteCapabilityPorts;
 
   selectedModel?: { id?: string; [key: string]: unknown };
   config?: any;

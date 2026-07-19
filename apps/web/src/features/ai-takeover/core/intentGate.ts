@@ -42,7 +42,7 @@ const quickSettingsRoutes = [
   {
     view: 'project-manager',
     label: '工程管理',
-    pattern: /项目|工程|备份|原图下载|下载项目/
+    pattern: /项目|工程|备份|原图下载|下载项目|project\s*manager|project\s*settings/
   },
   {
     view: 'dashboard',
@@ -52,7 +52,7 @@ const quickSettingsRoutes = [
 ] as const;
 
 function resolveQuickSettingsRoute(input: string): { view: string; label: string } | null {
-  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去|清理|清空|重置|切换|切换到|下载/.test(input);
+  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去|清理|清空|重置|切换|切换到|下载|open|show|view|go\s+to/i.test(input);
   if (!isNavigationRequest) return null;
 
   const matched = quickSettingsRoutes.find(route => route.pattern.test(input));
@@ -255,6 +255,40 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       risk: 'cost',
       needsConfirmation: true,
       reason: '识别到恢复暂停持久化生成任务；恢复后可能继续消耗积分或 Provider 配额。'
+    };
+  }
+
+  const projectItems = context?.projects?.items || [];
+  const asksForProjectList = /项目列表|所有项目|有哪些项目|列出项目|list\s+projects?|show\s+projects?/i.test(cleanInput);
+  if (asksForProjectList) {
+    return {
+      intent: 'list_projects',
+      confidence: 0.96,
+      extracted: {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到读取当前用户项目清单的请求。'
+    };
+  }
+
+  const asksForProjectManager = /项目管理|工程管理|project\s*manager|project\s*settings/i.test(cleanInput);
+  const asksToOpenProject = !asksForProjectManager
+    && /(?:打开|切换到|进入|前往|open|switch\s+to).*(?:项目|project)|(?:项目|project).*(?:打开|切换|进入|open|switch)/i.test(cleanInput);
+  if (asksToOpenProject) {
+    const matchedProjects = projectItems.filter((project) => (
+      cleanInput.includes(project.id)
+      || (project.name.trim().length > 0 && lowerInput.includes(project.name.trim().toLowerCase()))
+    ));
+    const matchedProject = matchedProjects.length === 1 ? matchedProjects[0] : undefined;
+    return {
+      intent: 'open_project',
+      confidence: matchedProject ? 0.98 : 0.78,
+      extracted: matchedProject ? { projectId: matchedProject.id, projectName: matchedProject.name } : {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: matchedProject
+        ? '识别到打开具体项目的请求，并已从脱敏项目清单冻结目标 ID。'
+        : '识别到项目切换请求，但没有唯一匹配的项目；需要先澄清。'
     };
   }
 

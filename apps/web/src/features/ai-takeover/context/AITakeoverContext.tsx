@@ -28,6 +28,7 @@ import {
   type AssistantAuthorizationScopeSnapshot,
   type AssistantExecutionContext,
   type AssistantExecutionTrigger,
+  type AssistantSiteCapabilityPorts,
   type AgentRunRecord,
   type AgentRunTimelineStep,
   toolRegistryInstance,
@@ -137,6 +138,7 @@ interface AITakeoverProviderProps {
   updateToolWindowLayout?: (instanceId: string, layout: Partial<any>) => void;
   setPptEditorMode?: (mode: string) => void;
   togglePinTool?: (toolId: string, pinned: boolean) => void;
+  siteCapabilities?: AssistantSiteCapabilityPorts;
 }
 
 export function AITakeoverProvider({
@@ -177,7 +179,8 @@ export function AITakeoverProvider({
   openToolWindowInstance,
   updateToolWindowLayout,
   setPptEditorMode,
-  togglePinTool
+  togglePinTool,
+  siteCapabilities
 }: AITakeoverProviderProps) {
 
   useEffect(() => startGenerationQueueSync(), []);
@@ -350,6 +353,7 @@ export function AITakeoverProvider({
       getCanvasRuntimeState: () => canvasRuntimeStateRef.current,
       generationQueue: durableGenerationQueue,
       runStore: agentRunStore,
+      siteCapabilities,
       selectedModel,
       addPromptNode,
       updatePromptNode,
@@ -405,7 +409,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, currentPage, collaborationMode]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, siteCapabilities, currentPage, collaborationMode]);
 
 
   // 发送消息
@@ -440,6 +444,7 @@ export function AITakeoverProvider({
       balanceKnown: true,
       canEstimateCost: true,
       assetsSummary,
+      projectSnapshot: siteCapabilities?.project.getSnapshot(),
       errors: [],
       config,
       ecommerceState,
@@ -504,7 +509,7 @@ export function AITakeoverProvider({
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, canvasRuntimeState, collaborationMode, currentPage]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, canvasRuntimeState, collaborationMode, currentPage, siteCapabilities]);
 
 
   // 用户点击“确认执行”

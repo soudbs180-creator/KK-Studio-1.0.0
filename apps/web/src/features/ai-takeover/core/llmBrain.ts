@@ -42,11 +42,21 @@ export class LLMBrain {
 - {"type": "fillInputPrompt", "payload": {"prompt": "优化后的英文提示词"}} ：填充提示词到页面输入框。
 - {"type": "fillPrompt", "payload": {"prompt": "提示词"}} ：在画布上修改或新建提示词卡片。
 - {"type": "changeMode", "payload": {"mode": "image" | "video" | "audio" | "ppt" | "ecommerce"}} ：切换模式。
-- {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量, "mode"?: "image" | "video" | "audio"}} ：兼容单次生成入口，必须使用显式 mode；新计划优先使用下列媒体工具。
+- startGeneration 仅为旧计划兼容入口；新计划不得使用，图片生成统一调用 generation.createBatchJob。
 - {"type": "generation.createVideoJob", "payload": {"prompt": "提示词", "referenceImageNodeId"?: string, "durationSeconds": 5, "resolution"?: string, "aspectRatio"?: string, "generateAudio"?: boolean, "firstFrameAssetId"?: string, "lastFrameAssetId"?: string, "motion"?: string}} ：创建真实 T2V/I2V 持久视频任务，必须确认。
 - {"type": "generation.createAudioJob", "payload": {"prompt": "提示词", "durationSeconds"?: number, "voice"?: string, "lyrics"?: string, "genre"?: string}} ：创建语音、音乐或音效持久任务，必须确认。
 - {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片（别名: canvas.locateNodes）。
-- {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页面板。
+- {"type": "navigation.openSurface", "payload": {"surface": "workspace" | "canvas" | "library" | "favorites" | "profile" | "settings"}} ：通过统一工作区导航打开页面，不模拟点击。
+- {"type": "navigation.openSettings", "payload": {"view"?: "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置子页面，不执行页面内按钮。
+- {"type": "workspace.getState", "payload": {}} ：读取当前页面、项目、选区、持久队列与 Run 的脱敏摘要。
+- {"type": "project.list", "payload": {}} / {"type": "project.getActive", "payload": {}} ：读取项目清单或当前项目。
+- {"type": "project.open", "payload": {"projectId": string}} ：打开 context.projects.items 中的具体项目 ID；不得按模糊名称在执行时重新选择。
+- {"type": "project.create", "payload": {"name"?: string}} / {"type": "project.rename", "payload": {"projectId": string, "name": string}} ：创建或重命名项目；创建必须确认。
+- {"type": "project.delete", "payload": {"projectId": string}} ：危险删除，必须二次确认；不得删除最后一个项目。
+- {"type": "assets.list", "payload": {"scope"?: "all" | "imported" | "canvas" | "selection"}} ：读取素材与画布输出的脱敏元数据，不返回文件内容或签名 URL。
+- {"type": "history.getState", "payload": {}} / {"type": "history.undo", "payload": {}} / {"type": "history.redo", "payload": {}} ：读取或控制当前项目的画布历史。
+- {"type": "preferences.get", "payload": {}} / {"type": "preferences.updateGenerationDefaults", "payload": {"patch": object}} ：只读或确认后更新白名单生成偏好；禁止密钥、账户和计费字段。
+- {"type": "account.getSummary", "payload": {}} / {"type": "billing.getSummary", "payload": {}} ：仅返回脱敏只读摘要。不存在充值、支付确认、余额修改、密钥读取或密钥写入工具。
 - {"type": "canvas.arrangeNodes", "payload": {"nodeIds": string[], "layout": "grid" | "row" | "column", "columns"?: number, "gap"?: number}} ：在画布上整理并排列指定卡片。若 nodeIds 为空，默认整理当前选区；若无选区，则整理整张画布。
 - {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards" | "latest_batch" | "all_canvas_outputs", "selectedNodeIds"?: string[]}} ：打包下载指定范围的卡片原图并生成 ZIP (别名: zipOutputs)。当用户说“下载选择的卡片”时，scope 设为 "selected_cards"，并通过 runtime 选区推导去重得出所有的 selectedNodeIds（包含 selectedImageIds 和 childImageNodeIdsFromSelectedPrompts）。
 - {"type": "generation.createBatchJob", "payload": {"prompts": [{"prompt": string, "referenceImageNodeId"?: string}], "options": {"modelId"?: string, "aspectRatio"?: string, "countPerPrompt": number, "layout": "grid" | "row" | "column"}}} ：单张和批量图片生成都必须通过后台持久化队列调度（别名: startBatchGeneration），并在执行前确认数量、费用与影响范围。
@@ -62,6 +72,7 @@ export class LLMBrain {
 - {"type": "browser.writeBackDom", "payload": {"target": "https://public.example/page", "title": "标题", "price": "价格"}} ：回写指定公开 HTTP(S) 网页 DOM，危险操作，必须确认；禁止 active_tab、current_tab 或执行时重新解析目标。
 
 [任务拆解要求]
+- 完整旅程固定为：先用 project.open 打开具体项目，再用 assets.list 与 canvas.getSelectedNodes 读取素材/选区；目标不完整时只澄清，不执行工具；展示数量、费用和影响后调用 generation.createBatchJob；任务由 DurableGenerationQueue 导入 CanvasRuntimeState 并排版；用 generation.getJobStatus 核对失败项；最后调用 assets.zipOriginals。不得通过刷新、页面切换或折叠助手重新提交生成。
 - 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
 - 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
 - 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。

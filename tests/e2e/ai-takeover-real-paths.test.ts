@@ -53,7 +53,9 @@ describe('AI Takeover Real User Path E2E Contract & Flow Tests', () => {
     const brain = new LocalAssistantBrain();
     const plan = await brain.plan('画 4 张可爱的太空柴犬，背景是斑斓的星云', ctx);
     assert.ok(plan.actions.length > 0);
-    assert.equal(plan.actions[0].type, 'startGeneration');
+    assert.equal(plan.actions[0].type, 'generation.createBatchJob');
+    assert.equal((plan.actions[0] as any).payload.prompts.length, 4);
+    assert.equal(plan.requiresConfirmation, true);
 
     // B. 静态源码契约核对：确保 AITakeoverContext 中对 executor 进行了注册，且最终会把生成的图像卡片节点更新/添加到画布上
     const contextSource = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
@@ -82,8 +84,9 @@ describe('AI Takeover Real User Path E2E Contract & Flow Tests', () => {
 
     const brain = new LocalAssistantBrain();
     const plan = await brain.plan('把柴犬的背景换成充满落日余晖的雪山', ctxWithImg);
-    assert.equal(plan.actions[0].type, 'startGeneration');
-    assert.equal((plan.actions[0] as any).payload.referenceImageNodeId, 'img_node_galaxy');
+    assert.equal(plan.actions[0].type, 'generation.createBatchJob');
+    assert.equal((plan.actions[0] as any).payload.prompts[0].referenceImageNodeId, 'img_node_galaxy');
+    assert.equal((plan.actions[0] as any).payload.options.countPerPrompt, 1);
 
     // B. 静态源码契约核对：确保 durableGenerationQueue 的 executor 真正解析了 referenceImageNodeId，并添加了 referenceImages 属性
     const contextSource = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
@@ -103,7 +106,11 @@ describe('AI Takeover Real User Path E2E Contract & Flow Tests', () => {
     const plan = await brain.plan('我想配置 API 密钥', ctxMissing);
     assert.equal(plan.intent, 'configure_api');
     assert.match(plan.reply, /打开 API 设置面板/);
-    assert.match(plan.reply, /高亮 API 密钥/);
+    assert.match(plan.reply, /无法替您填写、读取或保存/);
+    assert.deepEqual(plan.actions, [{
+      type: 'navigation.openSettings',
+      payload: { view: 'api-management' },
+    }]);
   });
 
   it('4. E2E [refresh-queue-recovery]: 刷新页面 -> queued/running job 恢复', () => {

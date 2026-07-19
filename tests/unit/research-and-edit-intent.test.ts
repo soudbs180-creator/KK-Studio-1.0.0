@@ -158,9 +158,10 @@ describe('P1-P2 Intent and LocalBrain Recovery Tests', () => {
     const planEdit = await brain.plan('背景换成雪山', ctxWithImg);
     assert.equal(planEdit.intent, 'generate_images');
     assert.equal(planEdit.actions.length, 1);
-    assert.equal(planEdit.actions[0].type, 'startGeneration');
-    assert.equal((planEdit.actions[0] as any).payload.referenceImageNodeId, 'img_node_1');
-    assert.equal((planEdit.actions[0] as any).payload.count, 1);
+    assert.equal(planEdit.actions[0].type, 'generation.createBatchJob');
+    assert.equal((planEdit.actions[0] as any).payload.prompts[0].referenceImageNodeId, 'img_node_1');
+    assert.equal((planEdit.actions[0] as any).payload.prompts.length, 1);
+    assert.equal((planEdit.actions[0] as any).payload.options.countPerPrompt, 1);
 
     // 2. 缺少选区
     const ctxEmpty: any = { canvas: { selectedNodeIds: [], promptNodes: [], imageNodes: [] }, settings: {} };

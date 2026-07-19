@@ -6,7 +6,8 @@ import { readSource } from '../support/workspacePaths.js';
 test('chat sidebar surfaces DurableGenerationQueue jobs in the real AI takeover panel', () => {
   const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
-  assert.match(source, /durableGenerationQueue,\s*type GenerationBatchJob/);
+  assert.match(source, /durableGenerationQueue,/);
+  assert.match(source, /type GenerationBatchJob,/);
   assert.match(source, /useState<GenerationBatchJob\[\]>\(\(\) => durableGenerationQueue\.getJobs\(\)\)/);
   assert.match(source, /durableGenerationQueue\.subscribe\(setDurableQueueJobs\)/);
   assert.match(source, /activeDurableJobs = useMemo/);

@@ -140,10 +140,10 @@ ${optResult.optimizedPromptZh}`;
           payload: { mode: 'image' as any }
         });
         actions.push({
-          type: 'startGeneration',
+          type: 'generation.createBatchJob',
           payload: {
-            prompt,
-            count: 1
+            prompts: [{ prompt }],
+            options: { countPerPrompt: 1, layout: 'grid' }
           }
         });
         break;
@@ -201,16 +201,11 @@ ${optResult.optimizedPromptZh}
 
       case 'configure_api': {
         reply = `### ⚙️ 正在为您打开 API 设置面板
-出于安全原因，我**无法替您填写、读取或保存** API 密钥。我会为您打开设置页面并高亮 API 密钥的输入位置。
-请您在稍后高亮的输入框中手动填写您的密钥（如 Gemini API Key），保存后即可不消耗任何系统积分畅享无限绘图！`;
+出于安全原因，我**无法替您填写、读取或保存** API 密钥。我只会打开 API 工作台，密钥输入和保存必须由您亲自完成。`;
 
         actions.push({
-          type: 'openSettings',
-          payload: { tab: 'api-management' }
-        });
-        actions.push({
-          type: 'highlightElement',
-          payload: { selector: '.settings-api-key-input, input[type="password"]' }
+          type: 'navigation.openSettings',
+          payload: { view: 'api-management' }
         });
         break;
       }
@@ -221,14 +216,18 @@ ${optResult.optimizedPromptZh}
 您也可以手动点击 👉 [跳转到系统日志页面](action://open-settings-logs) 快速打开该面板。`;
 
         actions.push({
-          type: 'openSettings',
-          payload: { tab: 'system-logs' }
+          type: 'navigation.openSettings',
+          payload: { view: 'system-logs' }
         });
         break;
       }
 
       case 'navigate_to_surface': {
-        const surface = intentResult.extracted.surface || 'workspace';
+        const requestedSurface = intentResult.extracted.surface || 'workspace';
+        const surface = (['workspace', 'canvas', 'library', 'favorites', 'profile', 'settings'] as const)
+          .includes(requestedSurface as 'workspace')
+          ? requestedSurface as 'workspace' | 'canvas' | 'library' | 'favorites' | 'profile' | 'settings'
+          : 'workspace';
         const label = SURFACE_LABELS[surface] || '工作区';
         let actionUrl = `action://open-${surface}`;
         if (surface === 'workspace') actionUrl = 'action://open-workspace';
@@ -238,9 +237,33 @@ ${optResult.optimizedPromptZh}
 您也可以手动点击 👉 [立即跳转到${label}](${actionUrl}) 快速切换。`;
 
         actions.push({
-          type: 'ui.navigateToSurface',
+          type: 'navigation.openSurface',
           payload: { surface }
         });
+        break;
+      }
+
+      case 'list_projects': {
+        const projects = context.projects?.items || [];
+        reply = projects.length > 0
+          ? `### 当前项目\n${projects.map((project) => `- ${project.active ? '●' : '○'} ${project.name}（${project.id}）`).join('\n')}`
+          : '### 当前没有可用项目';
+        actions.push({ type: 'project.list', payload: {} });
+        break;
+      }
+
+      case 'open_project': {
+        const projectId = intentResult.extracted.projectId;
+        const projectName = intentResult.extracted.projectName;
+        if (!projectId) {
+          const projects = context.projects?.items || [];
+          reply = `### 需要确认要打开的项目\n${projects.length > 0
+            ? `请选择一个明确项目：\n${projects.map((project) => `- ${project.name}（${project.id}）`).join('\n')}`
+            : '当前没有可打开的项目。'}`;
+          break;
+        }
+        reply = `### 准备打开项目\n将通过 \`project.open\` 打开“${projectName || projectId}”，不会模拟项目菜单点击。`;
+        actions.push({ type: 'project.open', payload: { projectId } });
         break;
       }
 
@@ -251,66 +274,10 @@ ${optResult.optimizedPromptZh}
 这是本地安全跳转，我会直接调用设置页路由，不需要先配置模型。`;
 
         actions.push({
-          type: 'openSettings',
-          payload: { tab: settingsView }
+          type: 'navigation.openSettings',
+          payload: { view: settingsView }
         });
 
-        // 针对不同页面的自然语言微动作映射 (高亮特定的按钮)
-        const lowerInput = userInput.toLowerCase();
-        if (settingsView === 'storage-settings') {
-          if (/缓存|碎片|失效|清理/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-storage-settings-action="storage-settings.cleanBrokenCards"]' }
-            });
-          } else if (/清空|全部/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-storage-settings-action="storage-settings.clearAllData"]' }
-            });
-          }
-        } else if (settingsView === 'consumption-records') {
-          if (/api|接口|开发/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-consumption-records-action="consumption-records.switchToApiLedger"]' }
-            });
-          } else if (/积分|额度|用户/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-consumption-records-action="consumption-records.switchToCreditsLedger"]' }
-            });
-          } else if (/刷新/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-consumption-records-action="consumption-records.refreshLedger"]' }
-            });
-          }
-        } else if (settingsView === 'user-profile') {
-          if (/消费|使用|明细|记录|日志/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-user-profile-action="user-profile.switchToUsageLogs"]' }
-            });
-          } else if (/充值|交易|入账/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-user-profile-action="user-profile.switchToRechargeLogs"]' }
-            });
-          } else if (/复制|id/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-user-profile-action="user-profile.copyUserId"]' }
-            });
-          }
-        } else if (settingsView === 'project-manager') {
-          if (/下载|备份|导出|原图/.test(lowerInput)) {
-            actions.push({
-              type: 'highlightElement',
-              payload: { selector: 'button[data-project-manager-action="project-manager.downloadProjectOriginals"]' }
-            });
-          }
-        }
         break;
       }
 
@@ -393,8 +360,8 @@ ${optResult.optimizedPromptZh}
           reply = `### ⚙️ 正在为您查找供应商卡片“${query}”...
 已为您自动打开 API 设置面板，并对目标卡片进行磨砂挖空聚焦高亮显示。`;
           actions.push({
-            type: 'openSettings',
-            payload: { tab: 'api-management' }
+            type: 'navigation.openSettings',
+            payload: { view: 'api-management' }
           });
           actions.push({
             type: 'locateApiCard',
@@ -421,7 +388,7 @@ ${optResult.optimizedPromptZh}
             reply = `### 📦 打包下载提示
 当前没有选中的图片卡片或可下载子图。您可以先在画布上选中卡片，或者我可以直接帮您打包下载最新一次生成的批次。`;
             actions.push({
-              type: 'zipOutputs',
+              type: 'assets.zipOriginals',
               payload: { scope: 'latest_batch' }
             });
             break;
@@ -435,7 +402,7 @@ ${optResult.optimizedPromptZh}
         }
 
         actions.push({
-          type: 'zipOutputs',
+          type: 'assets.zipOriginals',
           payload: { 
             scope,
             selectedNodeIds: selectedIds
@@ -687,12 +654,10 @@ AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job�
 此操作涉及额度消耗，我已为您准备好执行计划，请确认：`;
 
           actions.push({
-            type: 'startGeneration',
+            type: 'generation.createBatchJob',
             payload: {
-              prompt: promptText,
-              count: 1,
-              aspectRatio,
-              referenceImageNodeId: refImageId
+              prompts: [{ prompt: promptText, referenceImageNodeId: refImageId }],
+              options: { countPerPrompt: 1, aspectRatio, layout: 'grid' }
             }
           });
         } else {
@@ -701,11 +666,10 @@ AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job�
 此操作涉及额度消耗，我已为您准备好执行计划，请确认：`;
 
           actions.push({
-            type: 'startGeneration',
+            type: 'generation.createBatchJob',
             payload: {
-              prompt: promptText,
-              count,
-              aspectRatio
+              prompts: Array.from({ length: count }, () => ({ prompt: promptText })),
+              options: { countPerPrompt: 1, aspectRatio, layout: 'grid' }
             }
           });
         }
@@ -726,6 +690,12 @@ AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job�
           includePromptNodes: extractedOutputGroup?.includePromptNodes ?? true,
           tags: Array.from(new Set([...(extractedOutputGroup?.tags || []), 'automation', `batch:${batchPlanId}`]))
         };
+
+        if (imageCount === 0) {
+          reply = `### 还没有可用于批量生成的素材
+请先打开目标项目并导入图片，或明确选择画布中的参考图。读取到素材后，我会展示数量、费用与影响范围，再创建可恢复的批量任务。`;
+          break;
+        }
 
         if (taskDomain === 'ecommerce' && imageIds.length > 0) {
           reply = `### 🛍️ 准备执行电商主图批量重绘
@@ -749,35 +719,21 @@ AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job�
 此操作将为文件夹内的每张图片拉起生成任务，涉及高额积分消耗。执行计划如下：`;
 
           actions.push({
-            type: 'startBatchGeneration',
+            type: 'generation.createBatchJob',
             payload: {
-              plan: {
-                id: batchPlanId,
-                sourceCollectionId: 'assets_pool',
-                imageIds,
-                taskDomain,
+              prompts: imageIds.map((imageId) => ({
+                prompt: userInput,
+                referenceImageNodeId: imageId
+              })),
+              options: {
+                countPerPrompt: 1,
                 aspectRatio,
                 layoutPreset,
+                taskDomain,
                 productCategory: intentResult.extracted.productCategory,
-                promptStrategy: {
-                  mode: 'single_template',
-                  rawUserStyle: userInput,
-                  basePrompt: userInput,
-                },
-                output: {
-                  countPerImage: 1,
-                  expectedTotal: imageCount
-                },
-                referencePolicy: {
-                  useEachImageAsReference: true,
-                  uploadOnlyWhenGenerating: true
-                },
-                costPolicy: {
-                  requiresCredits: context.settings.apiKeyStatus === 'missing'
-                },
-                confirmationRequired: true,
                 outputGroup
-              }
+              },
+              idempotencyKey: batchPlanId
             }
           });
         }

@@ -1261,6 +1261,7 @@ import { knowledgeTools } from './knowledgeTools.ts';
 import { uiTools } from './uiTools.ts';
 import { skillTools } from './skillTools.ts';
 import { browserTools } from './browserTools.ts';
+import { siteCapabilityTools } from './siteCapabilityTools.ts';
 // 注册所有导入的工具
 [
   ...canvasTools,
@@ -1269,7 +1270,8 @@ import { browserTools } from './browserTools.ts';
   ...knowledgeTools,
   ...uiTools,
   ...skillTools,
-  ...browserTools
+  ...browserTools,
+  ...siteCapabilityTools
 ].forEach(tool => {
   toolRegistryInstance.register(tool);
 });
@@ -1319,6 +1321,7 @@ toolRegistryInstance.registerAlias('generation.submitComposer', 'submitPromptCom
 toolRegistryInstance.registerAlias('prompt.fillPrompt', 'fillPrompt');
 toolRegistryInstance.registerAlias('prompt.optimizeInput', 'fillInputPrompt');
 toolRegistryInstance.registerAlias('getModelCapabilities', 'provider.getModelCapabilities');
+toolRegistryInstance.registerAlias('export.zipOriginals', 'assets.zipOriginals');
 
 // 导出兼容旧的大模型工具结构
 export const TOOL_REGISTRY = toolRegistryInstance.getAllTools().map(t => ({

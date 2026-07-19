@@ -41,8 +41,8 @@
     "path": "docs/ai-assistant/README.md",
     "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.6.0",
     "summary": "本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。",
-    "contentHash": "438e8b8186125abcc05abc4e021a7350",
-    "updatedAt": "2026-07-11T09:33:48.290Z"
+    "contentHash": "f845fb363823f73956fc442bfd105c1b",
+    "updatedAt": "2026-07-19T15:42:04.150Z"
   },
   {
     "id": "doc_runbooks_md",
@@ -72,13 +72,22 @@
     "updatedAt": "2026-07-19T10:26:40.452Z"
   },
   {
+    "id": "doc_site_capability_matrix_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/site-capability-matrix.md",
+    "title": "KK Studio AI 全站能力覆盖矩阵",
+    "summary": "Last verified: 2026-07-19",
+    "contentHash": "e402927139d7ce6b121a1cd62c544864",
+    "updatedAt": "2026-07-19T15:40:10.739Z"
+  },
+  {
     "id": "doc_skills_md",
     "source": "doc",
     "path": "docs/ai-assistant/skills.md",
     "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.0",
     "summary": "本文件是 KK Studio v1.6.0 规范下 AI 助手的可执行技能手册 (Skills) 索引。",
-    "contentHash": "e65916b7410118f9cf5ba1f4fa78c76c",
-    "updatedAt": "2026-07-19T11:11:24.786Z"
+    "contentHash": "ffb00fe7745497311020b9296d17bced",
+    "updatedAt": "2026-07-19T15:49:41.379Z"
   },
   {
     "id": "doc_tool_registry_md",

@@ -116,12 +116,13 @@ test('IntentGate: explicit queue request creates one clean task prompt by defaul
   assert.equal(result.needsConfirmation, true);
 });
 
-test('本地脑源码契约：快速设置页跳转只调用底层 openSettings 工具', () => {
+test('本地脑源码契约：快速设置页跳转只调用领域导航工具', () => {
   const source = readSource('apps/web/src/features/ai-takeover/core/localBrain.ts');
 
   assert.match(source, /case 'open_settings_view'/);
-  assert.match(source, /type: 'openSettings'/);
-  assert.match(source, /payload: \{ tab: settingsView \}/);
+  assert.match(source, /type: 'navigation\.openSettings'/);
+  assert.match(source, /payload: \{ view: settingsView \}/);
+  assert.doesNotMatch(source, /type: 'openSettings'/);
 });
 
 test('本地脑源码契约：简单生成直接创建统一持久队列任务', () => {

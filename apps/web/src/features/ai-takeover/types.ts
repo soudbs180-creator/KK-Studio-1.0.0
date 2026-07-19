@@ -66,6 +66,8 @@ export type AssistantIntent =
   | 'arrange_nodes'                // 整理卡片/排版布局
   | 'retry_generation_job'         // 重试失败的持久化批量生成任务
   | 'resume_generation_job'        // 恢复明确指定的暂停持久化生成任务
+  | 'list_projects'                // 列出当前用户项目
+  | 'open_project'                 // 打开具体项目
   | 'navigate_to_surface'          // 跳转/导航到画板、库或收藏夹页面
   | 'unknown';
 
@@ -98,6 +100,8 @@ export interface IntentResult {
     motion?: string;
     genre?: string;
     productCategory?: string;
+    projectId?: string;
+    projectName?: string;
   };
   risk: 'none' | 'low' | 'cost' | 'upload' | 'destructive';
   needsConfirmation: boolean;      // 是否需要强确认卡片
@@ -134,7 +138,12 @@ export type AssistantAction =
   | { type: 'locateApiCard'; payload: { idOrName: string } }
   | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
   | { type: 'assets.zipOriginals'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
+  | { type: 'assets.list'; payload: { scope?: 'all' | 'imported' | 'canvas' | 'selection' } }
+  | { type: 'export.getCapabilities'; payload: {} }
+  | { type: 'export.zipOriginals'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
   | { type: 'canvas.arrangeNodes'; payload: { nodeIds: string[]; mode: string; preset?: string } }
+  | { type: 'canvas.getState'; payload: {} }
+  | { type: 'canvas.getSelectedNodes'; payload: {} }
   | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } }
   | { type: 'fillInputPrompt'; payload: { prompt: string } }
   | { type: 'changeMode'; payload: { mode: GenerationMode } }
@@ -151,6 +160,23 @@ export type AssistantAction =
   | { type: 'browser.checkLocalLlm'; payload: { provider?: string; endpoint?: string; model?: string } }
   | { type: 'browser.writeBackDom'; payload: { target: string; title: string; price: string } }
   | { type: 'ui.navigateToSurface'; payload: { surface: string } }
+  | { type: 'navigation.openSurface'; payload: { surface: 'workspace' | 'canvas' | 'library' | 'favorites' | 'profile' | 'settings' } }
+  | { type: 'navigation.openSettings'; payload: { view?: string } }
+  | { type: 'workspace.getState'; payload: {} }
+  | { type: 'workspace.focus'; payload: {} }
+  | { type: 'project.list'; payload: {} }
+  | { type: 'project.getActive'; payload: {} }
+  | { type: 'project.open'; payload: { projectId: string } }
+  | { type: 'project.create'; payload: { name?: string; idempotencyKey?: string } }
+  | { type: 'project.rename'; payload: { projectId: string; name: string; idempotencyKey?: string } }
+  | { type: 'project.delete'; payload: { projectId: string; idempotencyKey?: string } }
+  | { type: 'history.getState'; payload: {} }
+  | { type: 'history.undo'; payload: { idempotencyKey?: string } }
+  | { type: 'history.redo'; payload: { idempotencyKey?: string } }
+  | { type: 'preferences.get'; payload: {} }
+  | { type: 'preferences.updateGenerationDefaults'; payload: { patch: Record<string, unknown>; idempotencyKey?: string } }
+  | { type: 'account.getSummary'; payload: {} }
+  | { type: 'billing.getSummary'; payload: {} }
   | { type: 'knowledge.recordChange'; payload: { title: string; summary: string; source?: 'runtime' | 'user' | 'import' } };
 
 export interface AgentPlanStep {
@@ -328,6 +354,20 @@ export interface SanitizedProjectContext {
     collaborationMode: AssistantCollaborationMode;
   };
   agent: { enabled: boolean };
+  projects?: {
+    activeProjectId: string;
+    canCreateProject: boolean;
+    items: Array<{
+      id: string;
+      name: string;
+      active: boolean;
+      lastModified: number;
+      promptCount: number;
+      imageCount: number;
+      noteCount: number;
+      workflowNodeCount: number;
+    }>;
+  };
   canvas: {
     id?: string;
     name?: string;

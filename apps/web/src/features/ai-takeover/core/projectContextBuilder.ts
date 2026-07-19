@@ -21,6 +21,20 @@ export interface ContextBuilderParams {
   balanceKnown: boolean;
   canEstimateCost: boolean;
   assetsSummary: AssetContextSummary;
+  projectSnapshot?: {
+    activeProjectId: string;
+    canCreateProject: boolean;
+    projects: Array<{
+      id: string;
+      name: string;
+      active: boolean;
+      lastModified: number;
+      promptCount: number;
+      imageCount: number;
+      noteCount: number;
+      workflowNodeCount: number;
+    }>;
+  };
   errors: any[];
   config?: any;
   ecommerceState?: any;
@@ -47,6 +61,7 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     balanceKnown,
     canEstimateCost,
     assetsSummary,
+    projectSnapshot,
     errors,
     config,
     ecommerceState,
@@ -139,6 +154,11 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     agent: {
       enabled: agentEnabled
     },
+    projects: projectSnapshot ? {
+      activeProjectId: projectSnapshot.activeProjectId,
+      canCreateProject: projectSnapshot.canCreateProject,
+      items: projectSnapshot.projects,
+    } : undefined,
     canvas: {
       id: activeCanvas?.id,
       name: activeCanvas?.name || '新画布',
