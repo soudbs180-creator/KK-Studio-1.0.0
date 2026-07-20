@@ -160,7 +160,7 @@ const validateStepGraph = (steps: AgentPlanStep[]) => {
 };
 
 const actionPayloadWithIdempotency = (step: AgentPlanStep, runId?: string) => {
-  const payload = { ...((step.action as any).payload || {}) };
+  const payload: Record<string, unknown> = { ...(step.action.payload || {}) };
   payload.idempotencyKey = runId
     ? createRunStepIdempotencyKey(runId, step.stepId)
     : step.idempotencyKey;
@@ -337,8 +337,9 @@ export async function verifyAgentPlanStep(
 
     case 'canvas_state': {
       const runtimeState = context.getCanvasRuntimeState?.() || context.canvasRuntimeState;
+      const activeCanvas = context.getActiveCanvas?.() || context.activeCanvas;
       const baseline = context.verificationBaseline;
-      const currentRevision = Number(runtimeState?.canvas?.lastModified ?? context.activeCanvas?.lastModified ?? 0);
+      const currentRevision = Number(runtimeState?.canvas?.lastModified ?? activeCanvas?.lastModified ?? 0);
       const revisionChanged = Number.isFinite(currentRevision)
         && Number.isFinite(Number(baseline?.canvasRevision))
         && currentRevision !== Number(baseline?.canvasRevision);
@@ -737,9 +738,14 @@ export class AgentRuntime {
     });
     this.syncRunToBackend(runningRecord);
 
-    const executeStep = async (step: AgentPlanStep) => {
+    const assertLiveExecutionScope = (step: AgentPlanStep): void => {
       if (abortController.signal.aborted) {
-        throw new AgentStepVerificationError(buildStepVerificationResult(step, 'cancelled', 'Agent run was cancelled.', false));
+        throw new AgentStepVerificationError(buildStepVerificationResult(
+          step,
+          'cancelled',
+          'Agent run was cancelled.',
+          false,
+        ));
       }
       if (getRuntimeOwnerId() !== executionOwnerId) {
         abortController.abort('owner_changed');
@@ -750,16 +756,21 @@ export class AgentRuntime {
           false,
         ));
       }
-      const currentCanvasId = String(executorContext.getActiveCanvas?.()?.id || executorContext.activeCanvas?.id || '');
+      const currentCanvasId = String(
+        executorContext.getActiveCanvas?.()?.id || executorContext.activeCanvas?.id || '',
+      );
       if (authorizedCanvasId && currentCanvasId !== authorizedCanvasId) {
         abortController.abort('canvas_changed');
         throw new AgentStepVerificationError(buildStepVerificationResult(
           step,
           'cancelled',
-          'Agent run stopped because the active canvas changed after confirmation.',
+          'Agent run stopped because the active canvas changed after authorization.',
           false,
         ));
       }
+    };
+
+    const executeStep = async (step: AgentPlanStep) => {
       const payload = actionPayloadWithIdempotency(step, runId);
       const baselineState = executorContext.getCanvasRuntimeState?.() || executorContext.canvasRuntimeState;
       const baselineCanvas = executorContext.getActiveCanvas?.() || executorContext.activeCanvas;
@@ -781,14 +792,17 @@ export class AgentRuntime {
 
       let output: unknown;
       try {
+        assertLiveExecutionScope(step);
         this.runStartedStepIds.get(runId)?.add(step.stepId);
         output = await toolRegistryInstance.execute(step.action.type, payload, stepContext);
-        if (getRuntimeOwnerId() !== executionOwnerId) {
-          abortController.abort('owner_changed');
-          throw new Error('Agent run owner changed during tool execution.');
-        }
+        assertLiveExecutionScope(step);
         this.registerRecoveryTarget(runId, step, output, executorContext);
       } catch (error) {
+        if (error instanceof AgentStepVerificationError) {
+          stepResults.push(error.result);
+          updateOwnedRun({ stepResults: [...stepResults] });
+          throw error;
+        }
         if (getRuntimeOwnerId() !== executionOwnerId) throw error;
         const toolLog = [...toolRegistryInstance.getLogs(executionOwnerId)].reverse().find((log) => (
           log.runId === runId && log.stepId === step.stepId
@@ -806,6 +820,7 @@ export class AgentRuntime {
       const toolLog = [...toolRegistryInstance.getLogs(executionOwnerId)].reverse().find((log) => (
         log.runId === runId && log.stepId === step.stepId
       ));
+      assertLiveExecutionScope(step);
       const verification = await verifyAgentPlanStep(step, output, stepContext, toolLog);
       stepResults.push(verification);
       updateOwnedRun({ stepResults: [...stepResults] });
@@ -858,7 +873,7 @@ export class AgentRuntime {
         completedStepIds: steps.map((step) => step.stepId),
       });
       void writeHandoff(updated, executionOwnerId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const verificationResult = error instanceof AgentStepVerificationError ? error.result : undefined;
       const ownerChanged = getRuntimeOwnerId() !== executionOwnerId;
       const cancelled = abortController.signal.aborted
@@ -887,7 +902,7 @@ export class AgentRuntime {
       const toolCalls: AgentToolCallLog[] = toolRegistryInstance.getLogs(executionOwnerId).filter((log) => (
         log.runId === runId && new Date(log.startedAt).getTime() >= executionStartedAt
       ));
-      const safeExecutionError = redactToolText(error?.message || String(error));
+      const safeExecutionError = redactToolText(error instanceof Error ? error.message : String(error));
       const updated = updateOwnedRun({
         status: cancelled ? 'cancelled' : 'failed',
         toolCalls,

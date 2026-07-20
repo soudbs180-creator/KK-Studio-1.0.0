@@ -1,71 +1,100 @@
-# KK Studio Clay UI System
+# KK Studio Canvas-First Workspace UI
 
-Last updated: 2026-05-01
+Status: current visual direction for KK Studio v1.6.0.
+Last reviewed: 2026-07-20.
+Owner: `packages/ui` tokens and primitives; feature composition remains in
+`apps/web/`.
 
-## Canonical Direction
+## Direction
 
-New KK Studio UI work must follow the Clay design direction from the cached `getdesign` template. The product should read as warm, clear, and visually decisive: cream canvas `#fffaf0`, near-black ink `#0a0a0a`, readable body copy `#3a3a3a`, muted copy `#6a6a6a`, flat hairline cards, and saturated color-block accents.
+KK Studio is a professional creative workbench. The canvas is the primary
+workspace, while AI plans, permissions, cost estimates and verification stay
+visible without covering the work. The visual language is quiet, low-contrast
+and information-dense: semantic surfaces, thin borders, restrained elevation,
+and one clear accent for the current action.
 
-Light mode is warm and bright. Dark mode is a true dark Clay theme on neutral black-gray surfaces, not a blue, indigo, or teal workspace variant.
+Do not introduce a second visual system, a marketing-style hero, full-screen
+assistant overlays, decorative gradients, heavy blur, or oversized rounded
+cards. A panel should earn its frame by containing a focused tool, a repeated
+item, or a confirmation step.
 
-Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. This means translucent backgrounds, blur, hairline borders, readable text contrast, and tokenized low shadows with solid fallbacks.
+## Semantic tokens
 
-## Visual Hierarchy
+Tokens live in `packages/ui`; feature CSS consumes token names rather than
+hard-coded colors. Light and dark themes use the same semantic roles.
 
-| Layer | Treatment | Examples |
+| Role | Light intent | Dark intent |
 | --- | --- | --- |
-| Canvas | warm cream, no cool-gray cast | main workspace background |
-| Product surfaces | controlled frosted main/sub card or hairline fallback | panels, cards, lists |
-| Color block | saturated pink/teal/lavender/peach/ochre/coral | primary emphasis, selected high-value cards |
-| Command surface | frosted framework card with clear border | search palette, modal, settings shell |
-| Dark theme | neutral black-gray canvas and cream text | dark canvas and cards |
+| `--kk-color-canvas` | neutral warm-white workspace | near-black workspace |
+| `--kk-color-surface` | quiet raised surface | charcoal raised surface |
+| `--kk-color-surface-muted` | low-emphasis panel fill | low-emphasis panel fill |
+| `--kk-color-border` | subtle hairline | subtle hairline |
+| `--kk-color-text` | high-contrast ink | high-contrast text |
+| `--kk-color-text-muted` | secondary copy | secondary copy |
+| `--kk-color-accent` | one branded action color | same semantic accent, adjusted for contrast |
+| `--kk-color-success/warning/danger` | status meaning only | status meaning only |
 
-## Color Rules
+Use the token scale for spacing, control heights and focus rings. Do not add a
+one-off color because a panel is visually empty; hierarchy comes from spacing,
+labels and state, not decoration.
 
-- Canvas: `#fffaf0`.
-- Surface soft: `#faf5e8`; surface card: `#f5f0e0`; surface strong: `#ebe6d6`.
-- Primary text and primary CTA: `#0a0a0a`.
-- Body text: `#3a3a3a`; muted text: `#6a6a6a`.
-- Hairline: `#e5e5e5`.
-- Dark canvas: `#0b0b0c`; dark surface: `#141414`; dark elevated: `#1f1f1f`.
-- Brand blocks: `#ff4d8b`, `#1a3a3a`, `#b8a4ed`, `#ffb084`, `#e8b94a`, `#a4d4c5`, `#ff6b5a`.
-- Semantic success/warning/error colors are allowed only for real status meaning.
+## Workspace hierarchy
 
-## Radius And Shadows
+1. **Global command entry**: the top bar exposes search and the AI/command
+   entry. It stays available on every workspace surface.
+2. **Canvas**: owns the largest continuous area and remains directly
+   interactive in every collaboration mode.
+3. **Context rail**: selection-aware suggestions appear near the active
+   context. A suggestion fills a draft; it never executes a business action.
+4. **Assistant dock**: the right side shows the plan, permission, cost,
+   progress and verification evidence. It can collapse without unmounting the
+   Agent Run or durable queue.
+5. **Task rail**: persistent generation and Agent work appears at the bottom
+   or as a mobile continuation surface. It is a read-only projection of
+   `DurableGenerationQueue` and `AgentRunStore`.
 
-- Standard controls: 12px.
-- Content cards: 16px.
-- Feature cards and major sheets: 24px.
-- Inputs, main cards, sub cards, and framework cards use shared controlled frosted tokens.
-- Do not add heavy shadows, blue glows, or stacked one-off glass effects.
+No assistant state should be represented by a second task store or by a DOM
+selector. Domain actions go through `ToolRegistry` and the typed execution
+context.
 
-## Controls
+## Controls and interaction
 
-- Buttons use 44px touch-safe height where practical.
-- Primary buttons use near-black or Clay accent fills with clear contrast.
-- Inputs use controlled frosted warm surfaces and visible focus states.
-- Selected states should use Clay accent tokens, not generic blue/purple utility classes.
-- Footer/action controls must stay inside their panel with ellipsis-safe labels.
+- Use familiar icons for undo, redo, zoom, download and collapse; provide a
+  tooltip for an icon whose meaning is not obvious.
+- Use segmented controls or a radio group for `direct`, `assist` and
+  `takeover`. Only one mode can be selected, and the selected state must be
+  announced to assistive technology.
+- Keep controls at a stable size. Text wraps or truncates inside its parent;
+  it must never move neighboring canvas or task content.
+- Focus moves into a newly opened dialog or sheet, `Escape` closes the topmost
+  dismissible layer, and focus returns to the invoking control.
+- Progress is exposed with an accessible live region. Error, partial success,
+  retry and cancellation are distinct states, not only color changes.
+- On small screens, the canvas remains the primary view. Plans and tasks use a
+  bottom sheet or continuation list with a visible status and next action.
 
-## Search Palette
+## Collaboration modes
 
-Desktop search is a command surface with a 24px radius and flat border. Mobile search is a bottom sheet with its own top radius and safe-area spacing. Both themes use Clay tokens, no heavy panel shadow, and no inline focus mutation.
+`direct` keeps ordinary controls and chat available; it does not run Agent
+tools. `assist` mirrors the current page and selection, offers editable
+suggestions, and requires confirmation before any executable plan. `takeover`
+may run safe reads, navigation and explicitly reversible local work, while
+generation, batch, cost, deletion, publication, account and payment actions
+remain confirmed or forbidden. None of the modes may add a canvas-blocking
+mask.
 
-## Settings And API Pages
+## Motion and elevation
 
-Settings pages keep action areas visually stronger than repeated informational modules. Mobile and desktop shells use separate padding and layout rules. Advanced diagnostics, route pools, OCR, and platform tooling stay behind advanced disclosure unless directly relevant.
+Use short, purposeful transitions for state changes and respect reduced-motion
+preferences. Prefer a one-layer elevation and a thin border over stacked
+shadows. Avoid animating the entire canvas, changing layout during hover, or
+using motion to communicate information that is not also expressed in text or
+an accessible state.
 
-## Typography
+## Migration rule
 
-Display headings use `Plain Black` if available, otherwise `Inter`, weight 500, with negative letter spacing. UI and body copy use `Inter`, normal spacing, and compact product sizes.
-
-## Motion
-
-Use the shared Clay motion scale:
-
-- Fast hover: 120ms.
-- Standard controls: 160ms.
-- Panels/sheets: 240ms.
-- Ease: `cubic-bezier(0.16, 1, 0.3, 1)`.
-
-Avoid broad `transition-all` for theme-critical surfaces. Theme toggles should not flicker or animate large background/box-shadow changes.
+When an existing feature is touched, move its repeated visual values to
+`packages/ui` tokens and use the nearest shared primitive. Do not create a
+`new-ui` tree or a parallel assistant. Update `docs/ai-assistant/ui-map.md`
+only when a stable surface or route changes; business semantics remain in the
+ToolRegistry and service contracts.

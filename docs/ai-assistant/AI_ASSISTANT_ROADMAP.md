@@ -1,11 +1,18 @@
-# AI Assistant Roadmap — KK Studio v1.6.0
+# AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0
+
+> Status: historical planning record. Do not use unchecked Sprint items,
+> legacy tool aliases, or proposed file lists as current implementation facts.
+> Current behavior is defined by `tool-registry.md`,
+> `site-capability-matrix.md`, `canvas-runtime-state.md`, the source code, and
+> active OpenSpec changes. New work belongs in an OpenSpec change rather than
+> another parallel roadmap.
 
 Last updated: 2026-06-26  
 Primary rules: `AGENTS.md`
 
 ## 0. 文档定位
 
-本文件是 AI 助手 / 画布 Agent 的详细工程路线。`AGENTS.md` 定义最高规则和边界；本文件定义 Sprint、目标文件、类型结构、测试点和验收清单。
+本文件保留 AI 助手 / 画布 Agent 的历史工程路线。`AGENTS.md` 定义最高规则和边界；本文件中的 Sprint、目标文件、类型结构和验收项只用于追溯，不能覆盖当前代码与 active OpenSpec。
 
 Agent 处理以下任务时必须读取本文件：
 

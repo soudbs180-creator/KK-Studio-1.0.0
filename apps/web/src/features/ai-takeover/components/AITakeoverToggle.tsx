@@ -45,6 +45,15 @@ export interface AITakeoverToggleProps {
 
 export const AITakeoverToggle: React.FC<AITakeoverToggleProps> = ({ onModeChange }) => {
   const { collaborationMode, setCollaborationMode } = useAITakeover();
+  const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selectModeAt = (index: number) => {
+    const option = MODE_OPTIONS[index];
+    if (!option) return;
+    setCollaborationMode(option.mode);
+    onModeChange?.(option.mode);
+    optionRefs.current[index]?.focus();
+  };
 
   return (
     <div
@@ -64,11 +73,31 @@ export const AITakeoverToggle: React.FC<AITakeoverToggleProps> = ({ onModeChange
             type="button"
             role="radio"
             aria-checked={isActive}
+            tabIndex={isActive ? 0 : -1}
             data-mode={option.mode}
             data-agent-action={option.action}
+            ref={(element) => {
+              optionRefs.current[MODE_OPTIONS.indexOf(option)] = element;
+            }}
             onClick={() => {
               setCollaborationMode(option.mode);
               onModeChange?.(option.mode);
+            }}
+            onKeyDown={(event) => {
+              const currentIndex = MODE_OPTIONS.indexOf(option);
+              let nextIndex: number | null = null;
+              if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                nextIndex = (currentIndex + 1) % MODE_OPTIONS.length;
+              } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                nextIndex = (currentIndex - 1 + MODE_OPTIONS.length) % MODE_OPTIONS.length;
+              } else if (event.key === 'Home') {
+                nextIndex = 0;
+              } else if (event.key === 'End') {
+                nextIndex = MODE_OPTIONS.length - 1;
+              }
+              if (nextIndex === null) return;
+              event.preventDefault();
+              selectModeAt(nextIndex);
             }}
             className={`flex h-6 min-w-0 items-center gap-1 rounded-full px-2 text-[10px] font-bold transition-all active:scale-95 ${
               isActive

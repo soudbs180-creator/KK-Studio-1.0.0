@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -18,17 +18,27 @@ import {
   Layers,
   Eye,
   Copy,
-  Settings
+  Settings,
+  Bot,
 } from 'lucide-react';
-import { KK_LAYER } from '@kk/ui';
-import { durableGenerationQueue, type GenerationBatchJob } from '../../features/ai-assistant-runtime';
+import { KK_LAYER, KK_LAYOUT } from '@kk/ui';
+import {
+  agentRunStore,
+  agentRuntimeInstance,
+  durableGenerationQueue,
+  type AgentRunRecord,
+  type GenerationBatchJob,
+} from '../../features/ai-assistant-runtime';
 import { notify } from '../../services/system/notificationService';
 import { useCanvas } from '../../context/CanvasContext';
+import { getAssistantSidebarCenterLeft } from '../../utils/canvasCenter';
+import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 
 interface TaskCenterTrayProps {
-  onOpenSettings?: (view?: any) => void;
+  onOpenSettings?: (view?: SettingsSurfaceView) => void;
   isChatOpen?: boolean;
   chatSidebarWidth?: number;
+  isMobile?: boolean;
 }
 
 // 自定义非生图任务结构
@@ -40,6 +50,26 @@ interface CustomTask {
   progress?: number;
   error?: string;
   createdAt: number;
+}
+
+type TaskCenterActivityStatus = CustomTask['status']
+  | GenerationBatchJob['status']
+  | 'waiting_confirmation';
+
+interface TaskCenterActivity {
+  id: string;
+  source: 'generation' | 'agent' | 'transient';
+  name: string;
+  type: CustomTask['type'] | 'assistant';
+  status: TaskCenterActivityStatus;
+  progress: number;
+  error?: string;
+  createdAt: number;
+  canRetry: boolean;
+  requiresSetup: boolean;
+  isGenerationJob: boolean;
+  rawJob: GenerationBatchJob | null;
+  rawRun: AgentRunRecord | null;
 }
 
 const isSetupRequiredError = (value: string) => {
@@ -60,7 +90,8 @@ const isSetupRequiredError = (value: string) => {
 export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   onOpenSettings,
   isChatOpen = false,
-  chatSidebarWidth = 320
+  chatSidebarWidth = KK_LAYOUT.workspace.assistantSidebarDefaultWidth,
+  isMobile = false,
 }) => {
   const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
   const [isOpen, setIsOpen] = useState(false);
@@ -71,18 +102,17 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     durableGenerationQueue.getJobs()
   );
 
-  // 临时/自定义任务（如 PPT 编译、网页提取、原图打包）
-  const [customTasks, setCustomTasks] = useState<CustomTask[]>(() => {
-    const saved = localStorage.getItem('kk_custom_tasks');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('[TaskCenter] 无法读取本地任务缓存:', e);
-      }
-    }
-    return [];
-  });
+  const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>(() => agentRunStore.listRuns());
+
+  // Non-durable event tasks remain a session-only compatibility projection.
+  // Durable generation and Agent state stay owned by their respective stores.
+  const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeTaskCenter = useCallback(() => {
+    setIsOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
 
   // 订阅生图队列更新
   useEffect(() => {
@@ -91,10 +121,19 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     });
   }, []);
 
-  // 持久化自定义任务
+  useEffect(() => agentRunStore.subscribe(setAgentRuns), []);
+
   useEffect(() => {
-    localStorage.setItem('kk_custom_tasks', JSON.stringify(customTasks));
-  }, [customTasks]);
+    if (!isOpen) return undefined;
+    closeButtonRef.current?.focus();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeTaskCenter();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [closeTaskCenter, isOpen]);
 
   // 注册全局事件，允许其他组件下发任务
   useEffect(() => {
@@ -151,8 +190,8 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     };
   }, []);
 
-  // 组合生图队列任务和自定义任务为统一的任务列表
-  const allCombinedTasks = [
+  // Read-only activity projection: Queue and Agent Run remain the sources of truth.
+  const allCombinedTasks: TaskCenterActivity[] = [
     ...generationJobs.map((job) => {
       // 映射生图 job 状态
       const totalPrompts = job.prompts.length;
@@ -167,45 +206,90 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
       return {
         id: job.id,
+        source: 'generation' as const,
         name: job.outputGroup?.label || `批量生成任务 (${totalPrompts} 项)`,
         type: job.taskType,
-        status: job.status as any,
+        status: job.status,
         progress,
         error: failedPrompts > 0 ? `有 ${failedPrompts} 项生成失败` : undefined,
         createdAt: job.createdAt,
         isGenerationJob: true,
         canRetry: !setupRequired && job.prompts.some((prompt) => prompt.status === 'failed' && prompt.retryable !== false),
         requiresSetup: setupRequired,
-        rawJob: job
+        rawJob: job,
+        rawRun: null,
+      };
+    }),
+    ...agentRuns.map((run) => {
+      const totalSteps = Math.max(0, Number(run.totalSteps || 0));
+      const completedSteps = Math.min(totalSteps, run.completedStepIds?.length || 0);
+      const isTerminal = ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(run.status);
+      const status: TaskCenterActivityStatus = run.status === 'waiting_confirmation'
+        ? 'waiting_confirmation'
+        : run.status === 'planning' || run.status === 'waiting_execution'
+          ? 'queued'
+          : run.status;
+      const progress = isTerminal
+        ? 100
+        : totalSteps > 0
+          ? Math.round((completedSteps / totalSteps) * 100)
+          : 0;
+      const latestFailure = [...(run.stepResults || [])]
+        .reverse()
+        .find((step) => step.outcome !== 'success');
+      const error = ['failed', 'cancelled', 'completed_with_errors'].includes(run.status)
+        ? latestFailure?.message || run.nextStep
+        : undefined;
+
+      return {
+        id: run.id,
+        source: 'agent' as const,
+        name: run.userMessage || run.intent || 'AI assistant task',
+        type: 'assistant' as const,
+        status,
+        progress,
+        error,
+        createdAt: Date.parse(run.createdAt) || Date.now(),
+        isGenerationJob: false,
+        canRetry: false,
+        requiresSetup: isSetupRequiredError(`${error || ''} ${run.nextStep || ''}`),
+        rawJob: null,
+        rawRun: run,
       };
     }),
     ...customTasks.map((t) => ({
       ...t,
+      source: 'transient' as const,
+      progress: t.progress ?? 0,
       isGenerationJob: false,
       canRetry: t.status === 'failed',
       requiresSetup: false,
-      rawJob: null
+      rawJob: null,
+      rawRun: null,
     }))
   ].sort((a, b) => b.createdAt - a.createdAt);
 
   // 过滤任务
   const filteredTasks = allCombinedTasks.filter((task) => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'running') return task.status === 'running' || task.status === 'queued';
+    if (activeTab === 'running') return task.status === 'running' || task.status === 'queued' || task.status === 'paused' || task.status === 'waiting_confirmation';
     if (activeTab === 'completed') return task.status === 'completed' || task.status === 'completed_with_errors';
     if (activeTab === 'failed') return task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors';
     return true;
   });
 
   const activeRunningCount = allCombinedTasks.filter(
-    (t) => t.status === 'running' || t.status === 'queued'
+    (t) => t.status === 'running'
+      || t.status === 'queued'
+      || t.status === 'paused'
+      || t.status === 'waiting_confirmation'
   ).length;
 
   const handlePause = (task: typeof allCombinedTasks[0]) => {
     if (task.isGenerationJob) {
       durableGenerationQueue.pauseJob(task.id);
       notify.success('任务已暂停', `已成功挂起批量生成任务：${task.name}`);
-    } else {
+    } else if (task.source === 'transient') {
       setCustomTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, status: 'paused' } : t))
       );
@@ -216,7 +300,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     if (task.isGenerationJob) {
       durableGenerationQueue.resumeJob(task.id);
       notify.success('任务已恢复', `已重新拉起批量生成任务：${task.name}`);
-    } else {
+    } else if (task.source === 'transient') {
       setCustomTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, status: 'running', progress: t.progress ?? 0 } : t))
       );
@@ -227,7 +311,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     if (task.isGenerationJob) {
       durableGenerationQueue.retryFailedPrompts(task.id);
       notify.success('已发起重试', '失败的生成项已重新进入生成队列。');
-    } else {
+    } else if (task.source === 'transient') {
       // 自定义任务重试：发布事件让执行器感知
       window.dispatchEvent(new CustomEvent(`task-center:retry:${task.id}`, { detail: { taskId: task.id } }));
       setCustomTasks((prev) =>
@@ -241,6 +325,10 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     if (task.isGenerationJob) {
       durableGenerationQueue.cancelJob(task.id);
       notify.info('任务已取消', `批量生成任务 ${task.name} 已被强制终止。`);
+    } else if (task.source === 'agent' && task.rawRun) {
+      void agentRuntimeInstance.cancelPendingRun(task.rawRun.id).then(() => {
+        notify.info('任务已取消', `AI 任务 ${task.name} 已停止。`);
+      });
     } else {
       setCustomTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, status: 'failed', error: '用户强制取消' } : t))
@@ -251,8 +339,9 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
   const handleDelete = (task: typeof allCombinedTasks[0]) => {
     if (task.isGenerationJob) {
-      durableGenerationQueue.cancelJob(task.id);
-      durableGenerationQueue.archiveFinishedJobs();
+      durableGenerationQueue.archiveJob(task.id);
+    } else if (task.source === 'agent') {
+      agentRunStore.archiveRun(task.id);
     } else {
       setCustomTasks((prev) => prev.filter((t) => t.id !== task.id));
     }
@@ -261,6 +350,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
   const handleClearCompleted = () => {
     durableGenerationQueue.archiveFinishedJobs();
+    agentRunStore.archiveFinishedRuns();
     setCustomTasks((prev) => prev.filter((t) => t.status !== 'completed'));
     notify.success('task cleanup completed', '已自动归档所有完成的任务记录。');
   };
@@ -336,21 +426,23 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   // 根据类型获取图标
   const getTaskIcon = (type: string) => {
     switch (type) {
+      case 'assistant':
+        return <Bot className="kk-task-center-type-icon" data-type="assistant" size={16} />;
       case 'image':
-        return <Image className="text-emerald-400" size={16} />;
+        return <Image className="kk-task-center-type-icon" data-type="image" size={16} />;
       case 'video':
-        return <Video className="text-sky-400" size={16} />;
+        return <Video className="kk-task-center-type-icon" data-type="video" size={16} />;
       case 'audio':
-        return <AudioLines className="text-amber-400" size={16} />;
+        return <AudioLines className="kk-task-center-type-icon" data-type="audio" size={16} />;
       case 'ppt':
-        return <FileText className="text-orange-400" size={16} />;
+        return <FileText className="kk-task-center-type-icon" data-type="ppt" size={16} />;
       case 'extract':
-        return <Globe className="text-indigo-400" size={16} />;
+        return <Globe className="kk-task-center-type-icon" data-type="extract" size={16} />;
       case 'membership':
-        return <Layers className="text-purple-400" size={16} />;
+        return <Layers className="kk-task-center-type-icon" data-type="membership" size={16} />;
       case 'export':
       default:
-        return <Download className="text-pink-400" size={16} />;
+        return <Download className="kk-task-center-type-icon" data-type="export" size={16} />;
     }
   };
 
@@ -359,49 +451,56 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     switch (status) {
       case 'running':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-sky-400">
+          <span className="kk-task-center-status" data-status="running">
             <Loader2 className="animate-spin" size={11} />
             <span>执行中</span>
           </span>
         );
       case 'queued':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-amber-400">
+          <span className="kk-task-center-status" data-status="queued">
             <Loader2 className="animate-pulse" size={11} />
             <span>排队中</span>
           </span>
         );
+      case 'waiting_confirmation':
+        return (
+          <span className="kk-task-center-status" data-status="waiting_confirmation">
+            <Bot size={11} />
+            <span>等待确认</span>
+          </span>
+        );
       case 'paused':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-gray-400">
+          <span className="kk-task-center-status" data-status="paused">
             <Pause size={11} />
             <span>已暂停</span>
           </span>
         );
       case 'completed':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+          <span className="kk-task-center-status" data-status="completed">
             <CheckCircle2 size={11} />
             <span>已完成</span>
           </span>
         );
       case 'completed_with_errors':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-amber-400">
+          <span className="kk-task-center-status" data-status="completed_with_errors">
             <AlertTriangle size={11} />
             <span>部分完成</span>
           </span>
         );
       case 'failed':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-rose-400">
+          <span className="kk-task-center-status" data-status="failed">
             <AlertTriangle size={11} />
             <span>失败</span>
           </span>
         );
       case 'cancelled':
         return (
-          <span className="flex items-center gap-1 text-[11px] text-gray-500">
+          <span className="kk-task-center-status" data-status="cancelled">
             <X size={11} />
             <span>已取消</span>
           </span>
@@ -414,9 +513,10 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   return (
     <div
       data-testid="desktop-task-center"
-      className="kk-task-center-host fixed top-0 flex flex-col items-center pointer-events-none"
+      data-mobile={isMobile ? 'true' : 'false'}
+      className="kk-task-center-host fixed flex flex-col items-center pointer-events-none"
       style={{
-        left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
+        left: isMobile ? undefined : getAssistantSidebarCenterLeft(isChatOpen, chatSidebarWidth),
         zIndex: KK_LAYER.floatingPanel
       }}
     >
@@ -428,8 +528,9 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
           <button
             type="button"
             aria-label="展开任务状态列表"
-            aria-expanded="false"
+            aria-expanded={isOpen}
             aria-controls="desktop-task-center-panel"
+            ref={triggerRef}
             onClick={() => setIsOpen(true)}
             className="kk-task-center-trigger"
             title="展开任务状态列表"
@@ -445,31 +546,38 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         {isOpen && (
           <div
             id="desktop-task-center-panel"
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="task-center-title"
             className="kk-task-center-panel flex min-h-0 flex-1 flex-col overflow-hidden"
           >
           {/* 面板头部 */}
-          <div className="flex justify-between items-center px-5 py-4 border-b border-white/10 bg-white/2">
+          <div className="kk-task-center-header">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">任务状态列表</span>
+              <span id="task-center-title" className="kk-task-center-title">任务状态列表</span>
               {activeRunningCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-400">
-                  {activeRunningCount} 运行中
+                <span className="kk-task-center-count">
+                  {activeRunningCount} 进行中
                 </span>
               )}
             </div>
             
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleClearCompleted}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors text-xs flex items-center gap-1"
+                aria-label="清理已完成任务"
+                className="kk-task-center-header-action kk-task-center-clear-action"
                 title="清理已完成"
               >
                 <Trash2 size={13} />
                 <span>清理已完成</span>
               </button>
               <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                type="button"
+                ref={closeButtonRef}
+                onClick={closeTaskCenter}
+                className="kk-task-center-header-action"
                 aria-label="收起任务状态列表"
                 title="收起任务状态列表"
               >
@@ -479,7 +587,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
           </div>
 
           {/* 选项卡筛选 */}
-          <div className="flex px-4 py-2 border-b border-white/5 gap-1 bg-white/1">
+          <div className="kk-task-center-tabs" role="tablist" aria-label="任务筛选">
             {[
               { id: 'all', name: '全部' },
               { id: 'running', name: '执行中' },
@@ -490,12 +598,32 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs transition-colors ${
-                    active 
-                      ? 'bg-white/10 text-white font-medium' 
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                  }`}
+                  type="button"
+                  id={`task-center-tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls="task-center-list"
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  onKeyDown={(event) => {
+                    const tabs = ['all', 'running', 'completed', 'failed'] as const;
+                    const currentIndex = tabs.indexOf(tab.id as typeof tabs[number]);
+                    const nextIndex = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+                      ? (currentIndex + 1) % tabs.length
+                      : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                        ? (currentIndex - 1 + tabs.length) % tabs.length
+                        : event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? tabs.length - 1
+                            : -1;
+                    if (nextIndex < 0) return;
+                    event.preventDefault();
+                    setActiveTab(tabs[nextIndex]);
+                    document.getElementById(`task-center-tab-${tabs[nextIndex]}`)?.focus();
+                  }}
+                  className="kk-task-center-tab"
+                  data-active={active ? 'true' : 'false'}
                 >
                   {tab.name}
                 </button>
@@ -504,27 +632,36 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
           </div>
 
           {/* 任务列表内容 */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2.5 max-h-[250px]">
+          <div
+            id="task-center-list"
+            role="tabpanel"
+            aria-labelledby={`task-center-tab-${activeTab}`}
+            aria-live="polite"
+            className="kk-task-center-list"
+          >
             {filteredTasks.length === 0 ? (
-              <div className="py-12 text-center text-xs text-gray-500">
+              <div className="kk-task-center-empty">
                 暂无匹配该筛选条件的任务记录
               </div>
             ) : (
               filteredTasks.map((task) => {
                 const isRunning = task.status === 'running' || task.status === 'queued';
+                const isAwaitingConfirmation = task.status === 'waiting_confirmation';
                 const isFailed = task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors';
                 const isPaused = task.status === 'paused';
                 
                 return (
                   <div
                     key={task.id}
-                    className="p-3.5 rounded-2xl border border-white/5 bg-white/2 hover:bg-white/4 transition-colors flex items-center justify-between gap-4"
+                    className="kk-task-center-item"
+                    data-status={task.status}
+                    data-source={task.source}
                   >
                     {/* 左侧信息 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
                         {getTaskIcon(task.type)}
-                        <span className="text-xs font-semibold text-white/95 truncate">
+                        <span className="kk-task-center-item-name">
                           {task.name}
                         </span>
                         {getStatusDisplay(task.status)}
@@ -532,25 +669,27 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                       
                       {/* 进度条 */}
                       <div className="flex items-center gap-3">
-                        <div className="h-1 flex-1 rounded-full bg-white/5 overflow-hidden">
+                        <div
+                          role="progressbar"
+                          aria-label={`${task.name} progress`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.max(0, Math.min(100, task.progress ?? 0))}
+                          className="kk-task-center-progress"
+                        >
                           <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              isFailed 
-                                ? 'bg-rose-500' 
-                                : task.status === 'completed' 
-                                  ? 'bg-emerald-500' 
-                                  : 'bg-sky-500 animate-pulse'
-                            }`}
+                            className="kk-task-center-progress-value"
+                            data-status={isFailed ? 'failed' : task.status}
                             style={{ width: `${task.progress ?? 0}%` }}
                           />
                         </div>
-                        <span className="text-[10px] font-semibold text-gray-400 min-w-[28px] text-right">
+                        <span className="kk-task-center-progress-label">
                           {task.progress ?? 0}%
                         </span>
                       </div>
 
                       {task.error && (
-                        <div className="text-[10px] text-rose-400 mt-1 flex items-center gap-1">
+                        <div className="kk-task-center-error">
                           <AlertTriangle size={9} />
                           <span>{task.error}</span>
                         </div>
@@ -558,18 +697,18 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {/* Telemetry metadata row */}
                       {task.rawJob && (
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[9px] text-gray-400 font-medium">
-                          <span className="px-1 py-0.2 rounded bg-white/5 border border-white/5 text-gray-300">
+                        <div className="kk-task-center-meta">
+                          <span className="kk-task-center-model">
                             {task.rawJob.options?.modelId ? task.rawJob.options.modelId.slice(0, 15) : 'Model'}
                           </span>
                           <span>·</span>
-                          <span className="text-sky-400">
+                          <span className="kk-task-center-meta-accent">
                             {task.rawJob.options?.aspectRatio || '1:1'}
                           </span>
                           {task.rawJob.createdAt && (
                             <>
                               <span>·</span>
-                              <span className="text-gray-500">
+                              <span>
                                 {new Date(task.rawJob.createdAt).toLocaleTimeString()}
                               </span>
                             </>
@@ -578,18 +717,20 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                       )}
 
                       {!task.isGenerationJob && task.createdAt && (
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[9px] text-gray-500">
+                        <div className="kk-task-center-meta">
                           <span>创建时间: {new Date(task.createdAt).toLocaleTimeString()}</span>
                         </div>
                       )}
                     </div>
 
                     {/* 右侧控制动作 */}
-                    <div className="flex items-center gap-1.5 pl-2 border-l border-white/5">
-                      {isRunning && (
+                    <div className="kk-task-center-actions">
+                      {isRunning && task.source !== 'agent' && (
                         <button
+                          type="button"
                           onClick={() => handlePause(task)}
-                          className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                          aria-label={`Pause ${task.name}`}
+                          className="kk-task-center-action"
                           title="暂停任务"
                         >
                           <Pause size={13} />
@@ -598,8 +739,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {isPaused && (
                         <button
+                          type="button"
                           onClick={() => handleResume(task)}
-                          className="p-2 rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                          aria-label={`Resume ${task.name}`}
+                          className="kk-task-center-action"
+                          data-tone="success"
                           title="恢复执行"
                         >
                           <Play size={13} />
@@ -608,18 +752,24 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {isFailed && task.canRetry && (
                         <button
+                          type="button"
                           onClick={() => handleRetry(task)}
-                          className="p-2 rounded-xl text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors"
+                          aria-label={`Retry ${task.name}`}
+                          className="kk-task-center-action"
+                          data-tone="info"
                           title="失败重试"
                         >
                           <RotateCw size={13} />
                         </button>
                       )}
 
-                      {isRunning && (
+                      {(isRunning || isAwaitingConfirmation) && (
                         <button
+                          type="button"
                           onClick={() => handleCancel(task)}
-                          className="p-2 rounded-xl text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          aria-label={`Cancel ${task.name}`}
+                          className="kk-task-center-action"
+                          data-tone="danger"
                           title="取消任务"
                         >
                           <X size={13} />
@@ -628,8 +778,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {task.status === 'completed' && task.isGenerationJob && (
                         <button
+                          type="button"
                           onClick={() => handleLocate(task)}
-                          className="p-2 rounded-xl text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 transition-colors"
+                          aria-label={`Locate ${task.name}`}
+                          className="kk-task-center-action"
+                          data-tone="info"
                           title="定位节点"
                         >
                           <Eye size={13} />
@@ -638,8 +791,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {isFailed && (
                         <button
+                          type="button"
                           onClick={() => handleCopyError(task)}
-                          className="p-2 rounded-xl text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          aria-label={`Copy error for ${task.name}`}
+                          className="kk-task-center-action"
+                          data-tone="warning"
                           title="复制错误"
                         >
                           <Copy size={13} />
@@ -660,8 +816,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                           if (!isSetupRequired) return null;
                           return (
                             <button
+                              type="button"
                               onClick={() => onOpenSettings?.('api-management')}
-                              className="p-2 rounded-xl text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors"
+                              aria-label="Open API settings"
+                              className="kk-task-center-action"
+                              data-tone="info"
                               title="去配置 API"
                             >
                               <Settings size={13} />
@@ -672,8 +831,10 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
 
                       {(task.status === 'completed' || isFailed) && (
                         <button
+                          type="button"
                           onClick={() => handleDelete(task)}
-                          className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+                          aria-label={`Archive ${task.name}`}
+                          className="kk-task-center-action"
                           title="清除记录"
                         >
                           <Trash2 size={13} />

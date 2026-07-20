@@ -15,19 +15,19 @@ function extractCssBlock(source: string, selector: string): string {
   return matches[matches.length - 1][1];
 }
 
-test('Clay manuals define the controlled frosted material override', () => {
+test('workspace manuals define the semantic surface and elevation direction', () => {
   const manuals = [
     readSource('docs/architecture/DESIGN.md'),
     readSource('docs/architecture/DESIGN.md'),
     readSource('docs/architecture/DESIGN.md'), // 用 docs/architecture/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
   ].join('\n');
 
-  assert.match(manuals, /controlled frosted|受控磨砂/i);
-  assert.match(manuals, /input|输入框/i);
-  assert.match(manuals, /main card|主卡/i);
-  assert.match(manuals, /sub card|副卡/i);
-  assert.match(manuals, /framework card|框架卡/i);
-  assert.match(manuals, /neutral black|neutral gray|中性黑灰/i);
+  assert.match(manuals, /Canvas-First Workspace UI/i);
+  assert.match(manuals, /semantic surfaces|semantic tokens/i);
+  assert.match(manuals, /thin borders|restrained elevation/i);
+  assert.match(manuals, /packages\/ui/i);
+  assert.match(manuals, /neutral warm-white|near-black workspace/i);
+  assert.match(manuals, /direct[\s\S]*assist[\s\S]*takeover/i);
   assert.doesNotMatch(manuals, /true dark teal-black theme|teal-black canvas|暗色画布使用 `#0a1a1a`/i);
 });
 

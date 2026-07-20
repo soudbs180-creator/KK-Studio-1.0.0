@@ -867,7 +867,10 @@ function normalizeWuyinCatalogPayload(
   response: ApiResponse<LegacyWuyinCatalogPayload>,
 ): ApiResponse<WuyinCatalogResponseDto> {
   if (!response.success) {
-    return response;
+    // The transport error branch does not carry a catalog payload. Keep the
+    // error envelope while narrowing the generic at this normalization
+    // boundary instead of leaking the legacy payload type to callers.
+    return response as ApiResponse<WuyinCatalogResponseDto>;
   }
 
   const payload = response.data;

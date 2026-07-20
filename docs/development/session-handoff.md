@@ -2497,3 +2497,23 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `npm run check:encoding` 与 `git diff --check` 通过；新增 Skill 已进入 `docs/ai-assistant/generated/project-index.json`。
 - **未运行验证及原因**：未运行完整发布聚合命令 `npm run verify:changes`，因为这是总计划中的独立第三阶段，依赖审计、其余 UI smoke 与画布性能门禁将在全站 UI 和文档治理全部完成后统一执行。未调用真实付费 Provider、真实 ZIP 下载、支付、充值、生产 OAuth、公开发布或账户写操作；本阶段验证使用持久队列夹具与真实本地页面，避免产生费用或外部副作用。
 - **风险与下一步**：低到中风险。项目、历史和偏好 Host 通过短周期状态收敛守卫阻止 React 异步状态假成功；后续若把这些状态迁移到远端持久化，应将同一端口升级为服务端确认而不是绕开 verify。下一阶段仅在本提交形成干净基线后进入 `modernize-ai-first-workspace-ui`，优先修复重复画布 ID、侧栏宽度、任务活动投影、单项归档、导航语义和可访问性，不建立第二套助手或任务状态源。
+
+## 153. 2026-07-20 - 重构 AI 优先工作台并完成文档治理
+
+- **修改范围**：完成 `modernize-ai-first-workspace-ui`，并把会话 `019f61a6-1e98-7793-aa47-35e01ea7d32a` 的阶段性改动收口到可验证基线。画布保留唯一 `canvas-container`，侧栏宽度与画布定位统一消费 `packages/ui` 布局 Token；顶部增加全局 AI 与命令入口；TaskCenter 改为 `DurableGenerationQueue` 与 `AgentRunStore` 的只读活动投影，单项归档、取消、恢复和清理均按稳定 ID 操作，并在移动端保持同一任务可见性。同步补充三态单选键盘行为、TaskCenter Escape/焦点恢复、ARIA 状态、进度 live region 和任务列表的浅深主题语义样式。控制面增加异步工具执行期间的实时画布作用域守卫，画布切换会在验证前取消 Run。
+- **修改文件**：
+  - `apps/web/src/app/AppDesktopChrome.tsx`、`apps/web/src/components/layout/ChatSidebar.tsx`、`apps/web/src/components/workspace/TaskCenterTray.tsx`、`apps/web/src/components/workspace/WorkspaceShell.tsx`
+  - `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts`、`queue/DurableGenerationQueue.ts`、`runtime/AgentRunStore.ts`、`runtime/AssistantExecutionContext.ts`
+  - `apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx`、`apps/web/src/hooks/useWorkspaceSurface.ts`、`apps/web/src/pages/Workspace/WorkspacePage.tsx`、`apps/web/src/styles/base.css`、`apps/web/src/styles/kk-ui-tokens.css`、`apps/web/src/utils/canvasCenter.ts`
+  - `packages/ui/src/core/layout.ts`、`packages/shared/src/contracts/client/kk-api-client.ts`
+  - `openspec/changes/modernize-ai-first-workspace-ui/`、`scripts/governance/check-documentation-governance.mjs`、`scripts/test/verify-*-smoke.mjs` 中的浏览器预检 fallback、`package.json`
+  - `tests/unit/ai-control-plane-hardening.test.ts`、任务中心/工作台/文档治理契约及同步更新的 legacy UI 契约测试
+  - `.agents/AGENTS.md`、活跃 AI/架构/设置/报告文档、`docs/governance/DOCUMENTATION_INDEX.md`、`docs/development/session-handoff.md`
+- **当前设计决策**：直接、辅助、接管仍共享同一助手与运行时；顶部入口只打开现有助手或命令面板，不创建平行助手。TaskCenter 不再把生成持久状态复制到本地存储，短暂 `task-center:*` 事件仅作为兼容投影。任务面板采用语义背景、边框、状态色与无模糊单层层级，保留旧 frosted Token 只为未迁移表面兼容。文档治理脚本扫描隐藏 `.agents` 与全部 Markdown，生成 226 份文档的当前/历史/待归档索引，并对活跃文档的 Supabase 凭据、默认密码、旧运行命令和过时玻璃 UI 术语 fail closed。
+- **已运行验证**：
+  - 架构 32 项全部通过；治理版本、当前事实、Agent 文档、文档索引、Skills、兼容层、Provider 与敏感边界全部通过（文档索引 226 份：152 current、60 history、14 pending archive、0 conflicts）。
+  - 根 TypeScript、架构 TypeScript、服务端 59 文件语法和 502 个测试文件语义检查通过；Shared、UI、API Client 和 Web Vite 生产构建通过，Web 转换 2435 个模块。
+  - 全量 unit、integration、contract、e2e dot-reporter 测试通过；AI 控制面聚焦回归 19/19，AI/队列/三态/任务中心/文档契约聚焦回归 172/172，Canvas 性能 3/3。
+  - AI 接管、移动设置、桌面设置、Prompt Group 拖拽、启动横幅 smoke 均通过仓库 fallback（HTTP 与源码契约）；编码、乱码和 `git diff --check` 通过。
+- **未运行验证及原因**：系统没有 `npm`/`npx`，所以未执行字面量聚合命令；已直接执行对应底层 Node、TypeScript、Vite 和测试入口。`swagger-cli` 不在本地依赖中，OpenAPI Swagger 子校验未运行。Chrome 预检返回 `browser-preflight-nonzero-exit`（退出码 2147483651），Codex Node REPL 访问浏览器目录被宿主 `EPERM` 拒绝，因此没有真实浏览器交互证据；smoke 已按脚本设计完成 fallback。未连接真实 PostgreSQL、付费 Provider、支付、OAuth、公开发布或账户写操作。
+- **风险与下一步**：文档索引仍有 14 份待归档历史报告，下一阶段应按产品负责人确认逐份迁移到 `docs/archive/`，而不是在活跃文档中继续扩大兼容说明。生产发布前补装并运行 Swagger CLI、在受控浏览器 runner 重跑真实页面 smoke，并演练迁移 016；本提交不改变付费和账户安全边界。

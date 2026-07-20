@@ -3,10 +3,10 @@
     "id": "doc_ai_assistant_roadmap_md",
     "source": "doc",
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
-    "title": "AI Assistant Roadmap — KK Studio v1.6.0",
+    "title": "AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0",
     "summary": "Last updated: 2026-06-26",
-    "contentHash": "1c8c6887dbd07e62becbc41086717ff8",
-    "updatedAt": "2026-07-13T07:38:46.922Z"
+    "contentHash": "b58478795ed7cd58fbcffb1ad3c52e01",
+    "updatedAt": "2026-07-20T11:49:42.965Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -41,8 +41,8 @@
     "path": "docs/ai-assistant/README.md",
     "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.6.0",
     "summary": "本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。",
-    "contentHash": "f845fb363823f73956fc442bfd105c1b",
-    "updatedAt": "2026-07-19T15:42:04.150Z"
+    "contentHash": "1a897dad048b3afc55057021dadf38be",
+    "updatedAt": "2026-07-20T11:49:16.522Z"
   },
   {
     "id": "doc_runbooks_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
-    "contentHash": "de2f646dc4479725c1cc37f0b17bdd6b",
-    "updatedAt": "2026-07-19T10:26:40.452Z"
+    "contentHash": "16e3480489a6bd71724b99b552ed4d5b",
+    "updatedAt": "2026-07-20T11:49:42.966Z"
   },
   {
     "id": "doc_site_capability_matrix_md",
@@ -104,7 +104,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "本文件维护 KK Studio v1.6.0 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
-    "contentHash": "4e69cd93ba054c3ccd7b8c3d21bbed9b",
-    "updatedAt": "2026-07-19T10:29:27.104Z"
+    "contentHash": "eb8a11fe0bad3e5fb776d0460116e3a5",
+    "updatedAt": "2026-07-20T11:49:16.522Z"
   }
 ]

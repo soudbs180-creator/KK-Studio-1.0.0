@@ -8,6 +8,7 @@
 | [AGENTS.md](../AGENTS.md) | AI 与 Agent 行为最高准则、安全红线、完成定义 | 任意代码、AI 助手或流程重构 |
 | [README.md](../README.md) | 项目总入口、技术栈、本地启动与开发说明 | 项目启动、环境准备 |
 | [docs/README.md](README.md) | 文档库全局总控、路由导航与子目录职责划分 | 查找具体文档规则 |
+| [governance/DOCUMENTATION_INDEX.md](governance/DOCUMENTATION_INDEX.md) | 全量 Markdown 的 current/history/conflict/pending-archive 分类与清洗状态 | 文档治理、归档和 CI 门禁 |
 | **项目治理 (Governance)** | | |
 | [governance/ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md) | 编码格式红线、乱码防护、PowerShell 显式指定编码规范 | 所有新脚本及文件写操作 |
 | [governance/SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md) | 安全与后端整改积压项、API 密钥隔离、CORS、计费 | 后端接口鉴权、安全配置、积分 |
@@ -23,15 +24,16 @@
 | [architecture/DATABASE_STRUCTURE.md](architecture/DATABASE_STRUCTURE.md) | VPS 数据存取路由规范、服务端计费扣减与退款原则 | 积分扣减与退款的接口实现 |
 | [architecture/DEVICE_UI_ARCHITECTURE.md](architecture/DEVICE_UI_ARCHITECTURE.md) | 桌面端与 Expo 移动端 UI 界面拆分、共享逻辑设计规范 | 适配多端交互的组件重构 |
 | [architecture/ADAPTER_ROUTING.md](architecture/ADAPTER_ROUTING.md) | Google 官方协议与 OpenAI 兼容适配器路由与请求参数规范 | 对接新大模型或调整图片宽高比 |
-| [architecture/DESIGN.md](architecture/DESIGN.md) | 磨砂玻璃态（Glassmorphism）、微动效、卡片视觉层级设计 | 界面美化、主题切换、CSS 重构 |
+| [architecture/DESIGN.md](architecture/DESIGN.md) | 画布优先、低对比度、语义 Token、浅色/深色和无障碍交互 | UI 重构、主题切换、响应式验收 |
 | **API 接口与规格 (Specs)** | | |
 | [specs/API_DOCS.md](specs/API_DOCS.md) | gpt-best API 绘图、视频和音频 v2 提交与查询格式规范 | 视频/音频生成及异步轮询逻辑 |
 | [specs/NANO_BANANA.md](specs/NANO_BANANA.md) | 经过画图优化的 nano-banana 接口规格 | 绘图接口参数映射 |
 | [specs/GEMINI_PRO_IMAGE.md](specs/GEMINI_PRO_IMAGE.md) | 官方 `gemini-3-pro-image` 的 OpenAPI spec 和 inline 格式 | 官方绘图参数兼容 |
-| [specs/API_INTEGRATION_GUIDE.md](specs/API_INTEGRATION_GUIDE.md) | 早期 NewAPI 与 12AI 对接的业务流程参考（部分 Schema 已过期） | 接口逻辑重构参考 |
+| [specs/API_INTEGRATION_GUIDE.md](specs/API_INTEGRATION_GUIDE.md) | 当前类型化 KK API Client、服务端 Provider adapter 和动态计价边界 | 接口逻辑重构与安全审查 |
+| [specs/API_USAGE_GUIDE.md](specs/API_USAGE_GUIDE.md) | 安全 API Client 调用、任务幂等和错误处理示例 | Web/Mobile API 接入 |
 | **自发布部署 (Setup)** | | |
 | [setup/GUIDE.md](setup/GUIDE.md) | VPS 及自建 PostgreSQL 的初始化和快速部署 | 物理机或 VPS 的部署上线 |
-| [setup/SUPABASE_CLI.md](setup/SUPABASE_CLI.md) | Supabase 本地 CLI 开发环境和数据迁移命令 | Supabase 本地模拟开发 |
+| [setup/SUPABASE_CLI.md](setup/SUPABASE_CLI.md) | 历史索引（不属于当前部署链路） | 仅追溯旧资料，不执行 |
 | **开发实践 (Development)** | | |
 | [development/session-handoff.md](development/session-handoff.md) | Agent 会话交接记录模板文件 | 执行会话交接 |
 | [development/COMPLETE_DEVELOPMENT_GUIDE.md](development/COMPLETE_DEVELOPMENT_GUIDE.md) | KK Studio 核心系统架构与完整开发指南 | 梳理整体功能、模块分层与 AI 接管逻辑 |
@@ -41,4 +43,4 @@
 | **审计与优化报告 (Reports)** | | |
 | [reports/root-notes/PERFORMANCE_OPTIMIZATION.md](reports/root-notes/PERFORMANCE_OPTIMIZATION.md) | 桌面端/画布的性能优化策略 | 画布渲染性能调优 |
 | **归档历史 (Archive)** | | |
-| [archive/](archive/README.md) | 所有与 Supabase Auth / RLS 相关的过时历史文档目录 | 🚫 **修改当前代码时严禁使用** |
+| [archive/](archive/README.md) | 已过时或与 v1.6.0 冲突的历史文档目录 | 🚫 **修改当前代码时严禁使用** |

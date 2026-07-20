@@ -731,6 +731,17 @@ export class DurableGenerationQueue {
     this.persistMutationOrRollback(previousJobs, 'DurableGenerationQueue could not persist archived jobs.');
   }
 
+  /** Archive one terminal job without changing any other queue entry. */
+  public archiveJob(jobId: string): boolean {
+    this.ensureOwnerScope();
+    const job = this.findJob(jobId);
+    if (!job || ['queued', 'running', 'paused'].includes(job.status)) return false;
+    const previousJobs = cloneJobs(this.jobs);
+    this.jobs = this.jobs.filter((candidate) => candidate.id !== jobId);
+    this.persistMutationOrRollback(previousJobs, `Generation job ${jobId} could not be archived.`);
+    return true;
+  }
+
   public createJob(
     prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }>,
     options: Partial<GenerationQueueOptions> & Record<string, unknown>,

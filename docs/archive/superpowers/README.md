@@ -13,4 +13,4 @@
 ## ⚠️ 使用原则
 
 - **仅作历史与逻辑参考**：本目录下的文档记录了过往版本的具体业务实现路径和设计构想。在开发全新功能或升级旧功能时，可以从此处的 plans 和 specs 中汲取实现细节，但不可绕过 `AGENTS.md` 规范。
-- **与当前版本对齐**：若在阅读历史 plans 时发现其中提到的数据库定义或模块路由与 v1.5.8 目前的事实冲突，应当以 `AGENTS.md`、`config/release-manifest.json`、`docs/architecture/` 中的最新架构规范 and 真实源码为准。
+- **与当前版本对齐**：若在阅读历史 plans 时发现其中提到的数据库定义或模块路由与 v1.6.0 目前的事实冲突，应当以 `AGENTS.md`、`config/release-manifest.json`、`docs/architecture/` 中的最新架构规范和真实源码为准。

@@ -20,9 +20,11 @@ KK Studio 自身 Express 运行时端点、鉴权约定和 TypeScript SDK 请从
 4. **[GEMINI_PRO_IMAGE.md](GEMINI_PRO_IMAGE.md) —— 官方 Gemini 图像接口规格**
    - **职责**：Gemini 官方原生协议的 Image 格式 spec 定义。
 
-5. **[API_INTEGRATION_GUIDE.md](API_INTEGRATION_GUIDE.md) —— API 历史集成参考**
-   - **职责**：保留 NewAPI 与 12AI 对接的业务流程参考。
-   - **⚠️ 警告**：该文件包含部分已弃用的 Supabase 时代数据库表（如 `admin_models`、`admin_settings` 等），因此其数据库部分不可作为当前代码开发的依据，仅用于对多渠道分发逻辑的参考。
+5. **[API_INTEGRATION_GUIDE.md](API_INTEGRATION_GUIDE.md) —— 当前集成边界**
+   - **职责**：定义共享 DTO、类型化 KK API Client、服务端 Provider adapter、运行时计价和验证的接入顺序。
+
+6. **[API_USAGE_GUIDE.md](API_USAGE_GUIDE.md) —— 安全客户端用法**
+   - **职责**：给出 `createKkApiClient`、目录读取、持久生成任务和错误处理的安全示例。
 
 ## 🔌 接口协议原则
 

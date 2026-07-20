@@ -2,22 +2,22 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readSource } from '../support/workspacePaths.js';
 
-test('mobile workspace omits task-center chrome while desktop keeps the fixed tray', () => {
+test('desktop and mobile reuse the same persistent task-center projection', () => {
   const workspace = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const shell = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
   const mobileWorkspace = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
   const mobileSurface = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
   assert.doesNotMatch(workspace, /taskCenter=\{/);
-  assert.match(workspace, /!isMobile && !isLargeProject && \(/);
-  assert.match(workspace, /<TaskCenterTray[\s\S]{0,160}onOpenSettings=/);
+  assert.match(workspace, /!isLargeProject && \(/);
+  assert.match(workspace, /<TaskCenterTray[\s\S]{0,240}isMobile=\{isMobile\}/);
   assert.doesNotMatch(shell, /taskCenter/);
   assert.doesNotMatch(mobileWorkspace, /taskCenter/);
   assert.doesNotMatch(mobileSurface, /taskCenter/);
   assert.match(shell, /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/);
 });
 
-test('task center remains desktop-only and does not retain mobile summary or sheet markup', () => {
+test('task center projects Queue and Agent Run state without a second mobile store', () => {
   const tray = readSource('apps/web/src/components/workspace/TaskCenterTray.tsx');
   const tokens = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
@@ -27,6 +27,11 @@ test('task center remains desktop-only and does not retain mobile summary or she
   assert.match(tray, /aria-label="展开任务状态列表"/);
   assert.match(tray, /className="kk-task-center-rail"/);
   assert.doesNotMatch(tray, /setCustomTasks[\s\S]{0,620}setIsOpen\(true\)/);
+  assert.doesNotMatch(tray, /kk_custom_tasks/);
+  assert.match(tray, /agentRunStore\.subscribe/);
+  assert.match(tray, /durableGenerationQueue\.archiveJob\(task\.id\)/);
+  assert.match(tray, /agentRunStore\.archiveRun\(task\.id\)/);
+  assert.match(tray, /data-mobile=\{isMobile \? ['"]true['"] : ['"]false['"]\}/);
   assert.doesNotMatch(tray, /mobile-task-center/);
   assert.doesNotMatch(tray, /variant\?:\s*'desktop'\s*\|\s*'mobile'/);
   assert.doesNotMatch(tray, /createPortal\(/);
@@ -34,6 +39,11 @@ test('task center remains desktop-only and does not retain mobile summary or she
   assert.match(tray, /isSetupRequiredError/);
   assert.doesNotMatch(tray, /z-\[1000\]/);
   assert.match(tokens, /\.kk-task-center-morph\[data-state='open'\]/);
-  assert.match(tokens, /\.kk-task-center-rail[\s\S]{0,320}background: var\(--accent-green\)/);
+  assert.match(tokens, /\.kk-task-center-rail[\s\S]{0,320}background: var\(--state-info-text\)/);
+  assert.doesNotMatch(
+    tokens.match(/\.kk-task-center-morph\[data-state='open'\][\s\S]*?\n\}/)?.[0] || '',
+    /backdrop-filter|frost-card-framework/,
+  );
   assert.match(tokens, /\.kk-task-center-panel[\s\S]{0,180}kk-task-center-panel-enter/);
+  assert.match(tokens, /\.kk-task-center-host\[data-mobile='true'\]/);
 });

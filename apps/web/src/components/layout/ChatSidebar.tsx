@@ -1,7 +1,7 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Pause, Play, Ghost } from 'lucide-react';
-import { KK_LAYER } from '@kk/ui';
+import { KK_LAYER, KK_LAYOUT, normalizeAssistantSidebarWidth } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -1345,9 +1345,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     // 3. Layout State
     const [keyboardHeight, setKeyboardHeight] = useState(0);
-    const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
         const saved = localStorage.getItem('kk_chat_width');
-        return saved ? Math.max(320, parseInt(saved, 10)) : 420;
+        return normalizeAssistantSidebarWidth(saved ?? KK_LAYOUT.workspace.assistantSidebarDefaultWidth);
     });
 
     // 🚀 Sync width to parent in real-time during live resize drag
@@ -1360,10 +1360,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     // 简体中文：AI 协作模式与侧边栏宽度联动，辅助/接管为上下文面板保留稳定宽度。
     useEffect(() => {
         if (isAgentCollaboration) {
-            setSidebarWidth(380);
+            setSidebarWidth(KK_LAYOUT.workspace.assistantSidebarTakeoverWidth);
         } else {
             const saved = localStorage.getItem('kk_chat_width');
-            setSidebarWidth(saved ? Math.max(320, parseInt(saved, 10)) : 420);
+            setSidebarWidth(normalizeAssistantSidebarWidth(saved ?? KK_LAYOUT.workspace.assistantSidebarDefaultWidth));
         }
     }, [isAgentCollaboration]);
 
@@ -1375,7 +1375,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     // 简体中文：侧边栏宽度拉伸调整相关状态与 Refs
     const [isResizing, setIsResizing] = useState(false);
-    const dragStartWidthRef = useRef(420);
+    const dragStartWidthRef = useRef<number>(KK_LAYOUT.workspace.assistantSidebarDefaultWidth);
     const dragStartXRef = useRef(0);
     const resizeMaskRef = useRef<HTMLDivElement | null>(null);
 
@@ -1937,14 +1937,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             if (rafId) cancelAnimationFrame(rafId);
             rafId = requestAnimationFrame(() => {
                 const deltaX = dragStartXRef.current - e.clientX;
-                const newWidth = Math.max(320, Math.min(800, dragStartWidthRef.current + deltaX));
+                const newWidth = normalizeAssistantSidebarWidth(dragStartWidthRef.current + deltaX);
                 setSidebarWidth(newWidth);
             });
         };
 
         const handleMouseUp = (e: MouseEvent) => {
             const deltaX = dragStartXRef.current - e.clientX;
-            const newWidth = Math.max(320, Math.min(800, dragStartWidthRef.current + deltaX));
+            const newWidth = normalizeAssistantSidebarWidth(dragStartWidthRef.current + deltaX);
             localStorage.setItem('kk_chat_width', newWidth.toString());
             setIsResizing(false);
         };
@@ -2837,7 +2837,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             {!isOpen && !isMobile && (
             <button
                 onClick={onToggle}
+                type="button"
                 id="btn-desktop-ai-assistant"
+                aria-controls="ai-assistant-sidebar"
+                aria-expanded={false}
+                aria-label="Open AI assistant"
                 data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
                 className="kk-workspace-edge-toggle fixed right-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                     style={{
@@ -2854,6 +2858,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             {/* 2. Chat Card Popover (Morph Transformation) */}
             {(isOpen || !isMobile) && (
                 <div
+                    id="ai-assistant-sidebar"
+                    role="complementary"
+                    aria-label="AI assistant"
+                    aria-hidden={!isOpen}
+                    inert={!isOpen ? true : undefined}
                     onMouseEnter={() => {
                         setIsHovering(true);
                         clearAutoClose();
@@ -2883,6 +2892,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         }
                     }}
                     onWheel={registerActivity}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape' && !event.defaultPrevented && isOpen) {
+                            event.preventDefault();
+                            closeChat();
+                        }
+                    }}
                     className={`fixed kk-workspace-sidebar kk-workspace-chrome-surface flex flex-col ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'
                         : 'top-0 right-0 bottom-0 border-l border-[var(--border-light)]'
@@ -2913,6 +2928,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         <button
                             type="button"
                             onClick={onToggle}
+                            aria-controls="ai-assistant-sidebar"
+                            aria-expanded={true}
+                            aria-label="Close AI assistant"
                             data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleSidebar.uiAction}
                             className="kk-workspace-edge-toggle absolute -left-6 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b transition-all group"
                             style={{
@@ -2956,6 +2974,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <button
                                     type="button"
                                     onClick={onClose || onToggle}
+                                    aria-label="Close AI assistant"
                                     data-chat-shell-action={CHAT_SHELL_ACTIONS.closeMobileSidebar.uiAction}
                                     className="kk-workspace-icon-control -ml-2 rounded-full flex items-center justify-center shrink-0"
                                     title="返回"
@@ -4346,16 +4365,6 @@ const resolveAssistantPreferredModelGlobal = (models: ChatModel[]) => {
 };
 
 const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; setSelectedModel: (m: ChatModel) => void }> = (props) => {
-    const { collaborationMode } = useAITakeover();
-
-    useEffect(() => {
-        if (collaborationMode !== 'direct') {
-            props.onWidthChange?.(380);
-        } else {
-            props.onWidthChange?.(420);
-        }
-    }, [collaborationMode, props.onWidthChange]);
-
     return <NormalChatSidebar {...props} />;
 };
 

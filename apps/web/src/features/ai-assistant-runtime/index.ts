@@ -35,7 +35,7 @@ export {
   sameAssistantStepAuthorizations,
 } from './runtime/AssistantExecutionContext.ts';
 export { agentRunStore } from './runtime/AgentRunStore.ts';
-export type { AgentRunRecord } from './runtime/AgentRunStore.ts';
+export type { AgentRunRecord, AgentRunStoreListener } from './runtime/AgentRunStore.ts';
 export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
 export { AGENT_CONTROL_ACTIONS } from './runtime/agentControlActions.ts';

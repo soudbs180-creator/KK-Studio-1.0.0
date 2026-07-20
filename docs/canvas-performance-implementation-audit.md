@@ -9,7 +9,7 @@
 1. 视觉/交互 hotfix：降低背景、grid glow、部分拖拽与 selection 热路径成本。
 2. 恢复稳定性修复：历史画布恢复时保护已有子图位置，避免加载期自动纠偏把旧布局重排。
 
-但当前实现已经在 v1.5.9 中完全落地并强化了性能方案文档要求：
+但当前实现已经在 v1.6.0 中完全落地并强化了性能方案文档要求：
 
 - [x] `useCanvasSpatialIndex` (已落地)
 - [x] `useVisibleCanvasItems` (已落地，补齐了精确 rectIntersect 过滤)

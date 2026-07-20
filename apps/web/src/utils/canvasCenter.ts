@@ -1,9 +1,19 @@
 // Centralized viewport center utilities
 import { getViewportPreferredPosition } from './canvasUtils'
 import { isPhoneResponsiveWidth } from './responsiveSurface'
+import { KK_LAYOUT, normalizeAssistantSidebarWidth } from '@kk/ui';
 
 // Simple typed alias for clarity
 export type ViewportOffsets = { left: number; right: number };
+
+export const getAssistantSidebarCenterLeft = (
+  isChatOpen: boolean,
+  chatSidebarWidth: number = KK_LAYOUT.workspace.assistantSidebarDefaultWidth,
+): string => (
+  isChatOpen
+    ? `calc(50% - ${normalizeAssistantSidebarWidth(chatSidebarWidth) / 2}px)`
+    : '50%'
+);
 
 const getPromptInputRect = (): DOMRect | null => {
   if (typeof document === 'undefined') return null;
@@ -22,10 +32,12 @@ export const getViewportOffsets = (
   isSidebarOpen: boolean,
   isChatOpen: boolean,
   isMobile: boolean,
-  chatSidebarWidth: number = 420
+  chatSidebarWidth: number = KK_LAYOUT.workspace.assistantSidebarDefaultWidth
 ): ViewportOffsets => {
-  const left = isSidebarOpen && !isMobile ? 260 : (isMobile ? 0 : 60);
-  const right = isChatOpen && !isMobile ? chatSidebarWidth : 0;
+  const left = isSidebarOpen && !isMobile
+    ? KK_LAYOUT.workspace.navigationRailWidth
+    : (isMobile ? 0 : KK_LAYOUT.workspace.compactRailWidth);
+  const right = isChatOpen && !isMobile ? normalizeAssistantSidebarWidth(chatSidebarWidth) : 0;
   return { left, right };
 };
 

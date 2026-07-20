@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, LayoutDashboard, LogOut, User, Zap, Shield } from 'lucide-react';
+import { Bot, LayoutDashboard, LogOut, User, Zap, Shield, Search } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
@@ -38,6 +38,8 @@ interface AppDesktopChromeProps {
   onOpenProfile: (view: UserProfileView) => void;
   onOpenSettings: () => void;
   onSignOut: () => void | Promise<void>;
+  onOpenAssistant: () => void;
+  onOpenCommandPalette: () => void;
 }
 
 interface DesktopMenuActionButtonProps {
@@ -84,6 +86,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onOpenProfile,
   onOpenSettings,
   onSignOut,
+  onOpenAssistant,
+  onOpenCommandPalette,
 }) => {
   const { adminLevel } = useAuth();
   if (isMobile) {
@@ -95,6 +99,31 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
       className="kk-workspace-chrome-surface w-full flex items-center gap-3 rounded-2xl border p-2.5 select-none relative"
       style={chromeSurfaceStyle}
     >
+      <div className="flex items-center gap-1 border-r border-[var(--frost-card-framework-border)] pr-2" role="group" aria-label="Workspace commands">
+        <button
+          type="button"
+          id="btn-global-ai-assistant"
+          data-global-ai-entry="true"
+          className="kk-workspace-icon-control"
+          onClick={onOpenAssistant}
+          aria-label="Open AI assistant"
+          title="Open AI assistant"
+        >
+          <Bot size={17} />
+        </button>
+        <button
+          type="button"
+          id="btn-global-command-palette"
+          data-command-entry="true"
+          className="kk-workspace-icon-control"
+          onClick={onOpenCommandPalette}
+          aria-label="Open command search"
+          title="Open command search"
+        >
+          <Search size={16} />
+        </button>
+      </div>
+
       {/* 简体中文：头像按钮区域 (高度与右侧资产齐平) */}
       <div className="relative flex-shrink-0">
         <button

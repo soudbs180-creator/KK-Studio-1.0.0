@@ -5643,6 +5643,8 @@ const isRectIntersecting = (
               onOpenProfile={openProfileSurface}
               onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
               onSignOut={() => { void signOut(); }}
+              onOpenAssistant={() => setIsChatOpen(true)}
+              onOpenCommandPalette={() => setIsSearchOpen(true)}
             />
           </React.Suspense>
         </div>
@@ -6375,12 +6377,13 @@ const isRectIntersecting = (
         </React.Suspense>
       )}
 
-      {!isMobile && !isLargeProject && (
+      {!isLargeProject && (
         <React.Suspense fallback={null}>
           <TaskCenterTray
             onOpenSettings={openSettingsSurfaceTracked}
             isChatOpen={isChatOpen}
             chatSidebarWidth={chatSidebarWidth}
+            isMobile={isMobile}
           />
         </React.Suspense>
       )}

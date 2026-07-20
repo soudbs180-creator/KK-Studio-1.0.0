@@ -26,7 +26,7 @@
 * **错误表现**: 运行 `npm run architecture:check` 报错并列出大量的 `Found hardcoded color literals` 文件位置。
 * **定位原因**: 在 TSX 组件或 CSS 文件中写入了硬编码的颜色代码（如 `#ffffff` 或 `rgba(0,0,0,0.1)`），没有使用组件库中的预设 Token。
 * **修复方法**:
-  * **优先方案**: 将颜色替换为 `packages/ui/` 声明的磨砂玻璃态样式或由 `activeTheme` 动态提供的主题色。
+  * **优先方案**: 将颜色替换为 `packages/ui/` 声明的语义 Token 或由 `activeTheme` 动态提供的主题色。
   * **特例方案**: 如果是不可避免的硬编码（如品牌官方 Logo 填充色、Canvas 的 2D 绘图 Context 刷白等），在颜色声明所在行的末尾，添加 **`// UI_TOKEN_EXCEPTION`** 行内注释，静态分析 AST 脚本检测到该标记后会自动予以豁免通过。
 
 ### 2.2 敏感工具校验不一致 (`[一致性校验错误]`)

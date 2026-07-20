@@ -12,14 +12,14 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 
 | 读者 / 场景 / 任务 | 核心文档入口 | 关联阅读 / 辅助参考 | 核心用途与要求 |
 |---|---|---|---|
-| **新手开发快速上手** | [README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/README.md) | [docs/architecture/PROJECT_STRUCTURE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/PROJECT_STRUCTURE.md) | 了解项目定位、分层设计、依赖启动方式 |
-| **Agent / 机器人修改代码** | [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) | 按 [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 顶部任务表路由 | 必须读取的最高优先级规则、安全与模块边界 |
-| **开发 AI 助手与画布 Agent** | [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) §7-§11 | [docs/ai-assistant/AI_ASSISTANT_ROADMAP.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/AI_ASSISTANT_ROADMAP.md)<br>[docs/ai-assistant/RUNBOOKS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/RUNBOOKS.md) | 实现 CanvasRuntimeState 对齐与 ToolRegistry 声明 |
-| **安全 / 计费 / 后端 API** | [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
-| **数据库结构变更** | [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/DATABASE_SCHEMA.md) | 必须走 migrations/ 目录，DDL 完全幂等且防冲突 |
-| **解决乱码与编写脚本** | [docs/governance/ENCODING_AND_POWERSHELL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/ENCODING_AND_POWERSHELL.md) | `.editorconfig` / `.gitattributes` | 规范 `UTF-8 without BOM`、`LF` 与 PowerShell 编码 |
-| **环境搭建与 VPS 发布** | [docs/setup/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/setup/README.md) | [docs/setup/GUIDE.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/setup/GUIDE.md) | 系统在 VPS 环境下的部署、CLI 权限与自发布命令 |
-| **第三方接口适配 (gpt-best)** | [docs/specs/README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/README.md) | [docs/specs/API_DOCS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/API_DOCS.md) | 遵循多模态 v2 接口、轮询机制与失败退避算法 |
+| **新手开发快速上手** | [README.md](./README.md) | [docs/architecture/PROJECT_STRUCTURE.md](./docs/architecture/PROJECT_STRUCTURE.md) | 了解项目定位、分层设计、依赖启动方式 |
+| **Agent / 机器人修改代码** | [AGENTS.md](./AGENTS.md) | 按 [AGENTS.md](./AGENTS.md) 顶部任务表路由 | 必须读取的最高优先级规则、安全与模块边界 |
+| **开发 AI 助手与画布 Agent** | [AGENTS.md](./AGENTS.md) §7-§11 | [docs/ai-assistant/AI_ASSISTANT_ROADMAP.md](./docs/ai-assistant/AI_ASSISTANT_ROADMAP.md)<br>[docs/ai-assistant/RUNBOOKS.md](./docs/ai-assistant/RUNBOOKS.md) | 实现 CanvasRuntimeState 对齐与 ToolRegistry 声明 |
+| **安全 / 计费 / 后端 API** | [AGENTS.md](./AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](./docs/governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
+| **数据库结构变更** | [AGENTS.md](./AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](./docs/architecture/DATABASE_SCHEMA.md) | 必须走 migrations/ 目录，DDL 完全幂等且防冲突 |
+| **解决乱码与编写脚本** | [docs/governance/ENCODING_AND_POWERSHELL.md](./docs/governance/ENCODING_AND_POWERSHELL.md) | `.editorconfig` / `.gitattributes` | 规范 `UTF-8 without BOM`、`LF` 与 PowerShell 编码 |
+| **环境搭建与 VPS 发布** | [docs/setup/README.md](./docs/setup/README.md) | [docs/setup/GUIDE.md](./docs/setup/GUIDE.md) | 系统在 VPS 环境下的部署、CLI 权限与自发布命令 |
+| **第三方接口适配 (gpt-best)** | [docs/specs/README.md](./docs/specs/README.md) | [docs/specs/API_DOCS.md](./docs/specs/API_DOCS.md) | 遵循多模态 v2 接口、轮询机制与失败退避算法 |
 
 ---
 
@@ -28,14 +28,14 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 * **项目名称**：`KK Studio`
 * **当前版本**：`v1.6.0`
 * **代码仓库**：`soudbs180-creator/nano-banana-KK-`
-* **版本事实唯一来源**：[config/release-manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/config/release-manifest.json)
+* **版本事实唯一来源**：[config/release-manifest.json](./config/release-manifest.json)
 * **Web 主运行时**：`apps/web/`
 * **Mobile 运行时**：`apps/mobile/`
 * **后端运行时**：`server/` (Express / VPS)
 * **数据库迁移目录**：`migrations/`
 
 > [!IMPORTANT]
-> 历史文档中可能仍残留 `1.4.x`、`1.5.0`、`1.5.1` 或旧部署口径。当前开发必须严格以源码类型、[config/release-manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/config/release-manifest.json)、[package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)、[AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 及治理校验脚本为准。
+> 历史文档中可能仍残留 `1.4.x`、`1.5.0`、`1.5.1` 或旧部署口径。当前开发必须严格以源码类型、[config/release-manifest.json](./config/release-manifest.json)、[package.json](./package.json)、[AGENTS.md](./AGENTS.md) 及治理校验脚本为准。
 
 ---
 
@@ -54,16 +54,16 @@ KK Studio 专注于多模态 AI 画布创作与商业级积分运营：
 为了保持主文档精简、条理清晰，项目的具体技术细节与核心规约已去中心化存放。请点击以下链接查看各模块的具体要求：
 
 ### UI 与品牌设计
-* [品牌与视觉规范 (DESIGN.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/DESIGN.md)：定义 `KK Studio` 暖奶油色调主品牌色彩（#fffaf0）、毛玻璃材质与 Clay UI 交互系统。
-* [Z-Index 图层层级规范 (Z_INDEX_GUIDE.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/Z_INDEX_GUIDE.md)：规范画布、卡片节点、悬浮控制台、设置侧边栏及弹窗的严格 Z-Index 范围，防范遮挡。
+* [工作台视觉规范 (DESIGN.md)](./docs/architecture/DESIGN.md)：定义画布优先、低对比度、语义 Token 驱动的浅色/深色专业工作台。
+* [Z-Index 图层层级规范 (Z_INDEX_GUIDE.md)](./docs/architecture/Z_INDEX_GUIDE.md)：规范画布、卡片节点、悬浮控制台、设置侧边栏及弹窗的严格 Z-Index 范围，防范遮挡。
 
 ### 核心机制与性能
-* [高性能画布与缓存设计 (CANVAS_PERFORMANCE_AND_CACHE.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/CANVAS_PERFORMANCE_AND_CACHE.md)：规定无限画布的视口裁剪剔除（Viewport Culling）、延迟重绘，以及基于 IndexedDB 的图片离线缓存自愈。
-* [API 路由与计费审计规范 (API_ROUTING_AND_BILLING.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/API_ROUTING_AND_BILLING.md)：规范特权大模型 API 请求“零直连前端”的安全网关逻辑，以及原子级积分预扣和失败回滚退款审计流程。
+* [高性能画布与缓存设计 (CANVAS_PERFORMANCE_AND_CACHE.md)](./docs/architecture/CANVAS_PERFORMANCE_AND_CACHE.md)：规定无限画布的视口裁剪剔除（Viewport Culling）、延迟重绘，以及基于 IndexedDB 的图片离线缓存自愈。
+* [API 路由与计费审计规范 (API_ROUTING_AND_BILLING.md)](./docs/governance/API_ROUTING_AND_BILLING.md)：规范特权大模型 API 请求“零直连前端”的安全网关逻辑，以及原子级积分预扣和失败回滚退款审计流程。
 
 ### 版本发布与治理
-* [版本发布与更新规范 (VERSION_AND_RELEASE.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/VERSION_AND_RELEASE.md)：明确以 `release-manifest.json` 为最高事实的版本发布机制与防退化 TDD 本地校验流程。
-* [全栈架构审查与优化报告 (architecture_review.md)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/architecture_review.md)：提供从底层核心逻辑（堆叠上下文、多并发 I/O 竞争、分布式计费一阶段事务）到 AI 代理读取效率的苛刻架构师评审与优化对策。
+* [版本发布与更新规范 (VERSION_AND_RELEASE.md)](./docs/governance/VERSION_AND_RELEASE.md)：明确以 `release-manifest.json` 为最高事实的版本发布机制与防退化 TDD 本地校验流程。
+* [全栈架构审查与优化报告 (architecture_review.md)](./docs/governance/architecture_review.md)：提供从底层核心逻辑（堆叠上下文、多并发 I/O 竞争、分布式计费一阶段事务）到 AI 代理读取效率的苛刻架构师评审与优化对策。
 
 ---
 
@@ -71,7 +71,7 @@ KK Studio 专注于多模态 AI 画布创作与商业级积分运营：
 
 | 层次 | 技术选型 | 备注与规范限制 |
 |---|---|---|
-| **Web 前端** | Vite + React 19 + TypeScript + Tailwind + AntD / Lobe UI | 基于 UI Bridge 进行组件 Presets 适配 |
+| **Web 前端** | Vite + React 19 + TypeScript + Tailwind | 使用 `@kk/ui/web` 与语义 Token，业务状态留在 Web Feature |
 | **Mobile 移动端** | Expo + React Native + expo-router | 专注于跨平台原生交互，避免平台专属 API |
 | **Shared 共享包** | TypeScript ESM | 纯 DTO 与领域模型，保持平台无关性 |
 | **API Client** | Typed HTTP Client | 统一请求封装与跨端 Session 管理 |
@@ -88,7 +88,7 @@ KK Studio 专注于多模态 AI 画布创作与商业级积分运营：
 ```text
 nano-banana-KK-/
 ├── apps/
-│   ├── web/                         # 桌面 Web 主运行时 (Canvas, UI, AI 取代)
+│   ├── web/                         # 桌面 Web 主运行时 (Canvas, UI, AI 接管)
 │   └── mobile/                      # Expo 移动端 App
 ├── packages/
 │   ├── shared/                      # 跨端纯 TS 契约与领域规则 (DTO, 枚举, 类型)
@@ -101,7 +101,7 @@ nano-banana-KK-/
 │   ├── governance/                  # 项目治理 (安全、编码规范、乱码防范、状态校验)
 │   ├── architecture/                # 架构设计 (模块结构、数据库 Schema、设计规范)
 │   ├── specs/                       # 数据规格与第三方 API 规范 (API_DOCS.md)
-│   ├── setup/                       # 环境搭建与 VPS/Supabase 部署指南
+│   ├── setup/                       # 当前 VPS、PostgreSQL 与发布部署指南
 │   ├── development/                 # 开发手册 (多提供商设计、Handoff 模板)
 │   └── archive/                     # 过时历史文档归档区 (AI 开发严禁参考此处)
 ├── scripts/                         # CI、治理、发布、测试、维护脚本
@@ -119,7 +119,7 @@ nano-banana-KK-/
 
 ### 6.1 前端应用层 (Apps)
 
-#### [apps/web/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web)
+#### [apps/web/](./apps/web)
 * **核心职责**：负责桌面 Web 端无限画布的主交互界面渲染，承载 Prompt 卡片、图片节点、选区、分组及标签等创作流程；提供 AI 助手面板与自动化接管的 UI 入口。
 * **技术特性**：基于 React 19、Tailwind CSS 以及 Ant Design / Lobe UI 适配网桥。
 * **核心边界与禁止事项**：
@@ -127,7 +127,7 @@ nano-banana-KK-/
   * 🚫 严禁直接与数据库进行 DDL 或 DML 交互；
   * 🚫 严禁在浏览器端直连特权大模型 Provider，所有请求必须经由 `packages/api-client` 转发至后端网关。
 
-#### [apps/mobile/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/mobile)
+#### [apps/mobile/](./apps/mobile)
 * **核心职责**：负责原生移动端的 UI 呈现与触控交互，提供移动端的随身 AI 创作界面。
 * **技术特性**：基于 Expo、React Native 以及 `expo-router` 实现多端原生路由。
 * **核心边界与禁止事项**：
@@ -137,19 +137,19 @@ nano-banana-KK-/
 
 ### 6.2 协议与共享包层 (Packages)
 
-#### [packages/shared/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared)
+#### [packages/shared/](./packages/shared)
 * **核心职责**：定义跨端共享的通信协议与业务概念。包括各种 API 请求/响应 of DTO (数据传输对象) 类型定义、通用枚举（如模型类型、任务状态）以及不依赖特定平台的领域级核心算法规则。
 * **技术特性**：纯 TypeScript 编写，输出 ESM 模块。
 * **核心边界与禁止事项**：
   * 🚫 严禁引入 React、DOM、Expo、RN 或者是 Node.js 等与特定环境绑定的 API，必须保持绝对的平台无关性 (Platform-Agnostic)。
 
-#### [packages/api-client/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client)
+#### [packages/api-client/](./packages/api-client)
 * **核心职责**：统一封装前后端 HTTP 接口请求及 Session 会话周期边界，向 Web 和 Mobile 提供一致且类型安全的 API 交互层。
 * **技术特性**：利用 Axios/Fetch，并通过依赖注入的形式接收跨端存储凭据。
 * **核心边界与禁止事项**：
   * 🚫 严禁在包内硬编码特定平台的持久化存储方式（如 Web 端的 `localStorage` 或移动端的 `SecureStore`），必须由应用端注入存储适配器。
 
-#### [packages/ui/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/ui)
+#### [packages/ui/](./packages/ui)
 * **核心职责**：管理项目的设计令牌 (Design Tokens)、跨端公共样式 Preset、图标基底以及 UI 适配层 Bridge。
 * **技术特性**：采用 Vanilla CSS 设计系统，支持暗色/浅色主题。
 * **核心边界与禁止事项**：
@@ -159,14 +159,14 @@ nano-banana-KK-/
 
 ### 6.3 服务端与底层 (Server & Database)
 
-#### [server/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server)
+#### [server/](./server)
 * **核心职责**：项目后台运行时的权威源。负责特权大模型 API Key 代理请求、高安全积分预扣扣减与结算、退款审计流写入、Stripe 支付 Webhook 签名强验、静态资产落盘管理以及用户 JWT 校验。
 * **技术特性**：基于 Node.js 与 Express 框架部署于 VPS。
 * **核心边界与禁止事项**：
   * 🚫 严禁引入任何前端视图组件或 CSS 框架依赖；
   * 🚫 绝对禁止在 Git 提交中遗留 any 真实的私钥，且在读取特权环境变量失败时必须拒绝启动服务。
 
-#### [migrations/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations)
+#### [migrations/](./migrations)
 * **核心职责**：存放 PostgreSQL 的所有 DDL (数据定义语言) 迁移文件，作为数据库 Schema 变更的**唯一权威物理目录**。
 * **技术特性**：纯 SQL 迁移文件，按 `NNN_<description>.sql` 顺序编写。
 * **核心边界与禁止事项**：
@@ -255,20 +255,20 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none test
 KK Studio 重视开发中的踩坑复盘，为了避免团队或 AI 助手重复犯下相同的设计与代码错误，引入了基于 `docs/` 的复盘沉淀机制：
 
 * **开发规约与红线**：
-  * [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 规定了 AI 修改代码的最高指令与权限。
-  * [docs/governance/ENCODING_AND_POWERSHELL.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/ENCODING_AND_POWERSHELL.md) 记录了 Windows 环境防乱码实践。
-  * [docs/governance/SECURITY_AND_BACKLOG.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/SECURITY_AND_BACKLOG.md) 梳理了 CORS、JWT 拦截与积分流水的核心待办。
+  * [AGENTS.md](./AGENTS.md) 规定了 AI 修改代码的最高指令与权限。
+  * [docs/governance/ENCODING_AND_POWERSHELL.md](./docs/governance/ENCODING_AND_POWERSHELL.md) 记录了 Windows 环境防乱码实践。
+  * [docs/governance/SECURITY_AND_BACKLOG.md](./docs/governance/SECURITY_AND_BACKLOG.md) 梳理了 CORS、JWT 拦截与积分流水的核心待办。
 * **核心机制与 Runbooks**：
-  * [docs/ai-assistant/RUNBOOKS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/RUNBOOKS.md) 提供了下载选区原图、批量生成、整理卡片、任务恢复的 SOP。
-  * [docs/architecture/DATABASE_SCHEMA.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/architecture/DATABASE_SCHEMA.md) 提供数据底座 ER 关系图。
+  * [docs/ai-assistant/RUNBOOKS.md](./docs/ai-assistant/RUNBOOKS.md) 提供了下载选区原图、批量生成、整理卡片、任务恢复的 SOP。
+  * [docs/architecture/DATABASE_SCHEMA.md](./docs/architecture/DATABASE_SCHEMA.md) 提供数据底座 ER 关系图。
 * **复盘文档规范 (`*_LESSONS.md`)**：
-  * 参照 opentu 的复盘积累实践，凡是在开发中解决的重大 Bug、性能瓶颈（如画布缩放重绘、大文件打包、多模型轮询故障等），均需在 `docs/reports/` 或对应模块下输出 `*_LESSONS.md` 记录原因、诊断步骤、优化方案和防御性设计，并在 [docs/governance/PROJECT_STATE_AND_VALIDATION.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/governance/PROJECT_STATE_AND_VALIDATION.md) 中进行归档。
+  * 参照 opentu 的复盘积累实践，凡是在开发中解决的重大 Bug、性能瓶颈（如画布缩放重绘、大文件打包、多模型轮询故障等），均需在 `docs/reports/` 或对应模块下输出 `*_LESSONS.md` 记录原因、诊断步骤、优化方案和防御性设计，并在 [docs/governance/PROJECT_STATE_AND_VALIDATION.md](./docs/governance/PROJECT_STATE_AND_VALIDATION.md) 中进行归档。
 
 ---
 
 ## 11. 项目发展结论
 
-KK Studio v1.5.9 的开发重点是把现有多模态创作工作台收敛为：
+KK Studio v1.6.0 的开发重点是把现有多模态创作工作台收敛为：
 1. **稳定的 Monorepo 物理分层架构**，确保移动端、Web 端、协议层和 UI 适配层的清晰解耦；
 2. **后端权威计费与安全代理网关**，实现从预扣到结算/退款审计的完全闭环；
 3. **结合高性能渲染与统一缓存的无限画布资产系统**，提供极其流畅的多端协同体验；

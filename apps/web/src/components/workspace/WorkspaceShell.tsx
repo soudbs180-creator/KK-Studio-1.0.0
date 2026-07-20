@@ -28,7 +28,7 @@ const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   children,
 }) => (
   <div
-    id="canvas-container"
+    data-workspace-shell="true"
     className={`relative w-full overflow-hidden font-inter selection:bg-indigo-500/20 ${isMobile ? 'ios-mobile-shell' : ''}`}
     style={{
       backgroundColor: 'var(--bg-canvas)',

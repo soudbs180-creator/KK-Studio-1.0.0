@@ -11,4 +11,27 @@ export const KK_LAYOUT = {
   // 最小物理布局尺寸约束
   minCardWidth: 200,
   minSidebarWidth: 280,
+
+  // Shared workspace geometry. Keeping these values in the UI package makes
+  // the canvas, assistant drawer, and floating controls use the same frame.
+  workspace: {
+    navigationRailWidth: 260,
+    compactRailWidth: 60,
+    assistantSidebarDefaultWidth: 420,
+    assistantSidebarTakeoverWidth: 380,
+    assistantSidebarMinWidth: 320,
+    assistantSidebarMaxWidth: 800,
+    assistantEdgeToggleWidth: 24,
+  },
 } as const;
+
+export type WorkspaceLayout = typeof KK_LAYOUT.workspace;
+
+export const normalizeAssistantSidebarWidth = (value: unknown): number => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return KK_LAYOUT.workspace.assistantSidebarDefaultWidth;
+  return Math.min(
+    KK_LAYOUT.workspace.assistantSidebarMaxWidth,
+    Math.max(KK_LAYOUT.workspace.assistantSidebarMinWidth, Math.round(numeric)),
+  );
+};

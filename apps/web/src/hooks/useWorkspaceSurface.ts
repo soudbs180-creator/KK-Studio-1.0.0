@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 
 import type { Supplier } from '../services/billing/supplierService';
+import { KK_LAYOUT, normalizeAssistantSidebarWidth } from '@kk/ui';
 import type { AppSurface, MobilePrimaryTab, WorkspacePanel } from '../types';
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../utils/responsiveSurface';
@@ -38,7 +39,7 @@ export function useWorkspaceSurface({
 }: UseWorkspaceSurfaceOptions) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatSidebarWidth, setChatSidebarWidth] = useState(420);
+  const [chatSidebarWidth, setChatSidebarWidthState] = useState<number>(KK_LAYOUT.workspace.assistantSidebarDefaultWidth);
   const [responsiveSurface, setResponsiveSurface] = useState(() => resolveResponsiveSurface(window.innerWidth));
   const isMobile = isCompactResponsiveSurface(responsiveSurface);
   const [workspaceSurface, setWorkspaceSurface] = useState<Extract<AppSurface, 'workspace' | 'library' | 'favorites'>>('workspace');
@@ -104,6 +105,10 @@ export function useWorkspaceSurface({
 
   const toggleChatPanel = useCallback(() => {
     setIsChatOpen((prev) => !prev);
+  }, []);
+
+  const setChatSidebarWidth = useCallback((width: number) => {
+    setChatSidebarWidthState(normalizeAssistantSidebarWidth(width));
   }, []);
 
   const openProfileSurface = useCallback((view: UserProfileView = 'main') => {

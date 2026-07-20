@@ -1,5 +1,10 @@
 # 会话记忆规约 (Session Memory)
 
+> Current protocol plus historical engineering log. Sections carrying dated
+> build sizes, file paths or completed-session observations are evidence only;
+> resolve conflicts against `AGENTS.md`, `config/release-manifest.json`, current
+> source code and active OpenSpec changes.
+
 AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。
 
 ## 1. 记忆层级

@@ -4,8 +4,8 @@
 
 ## 📁 目录文件清单
 
-1. **[AI_ASSISTANT_ROADMAP.md](AI_ASSISTANT_ROADMAP.md) —— 助手升级路线图**
-   - **职责**：画布级/任务级 Agent 的演进路线，详细记录了关于 `CanvasRuntimeState`、`ToolRegistry`、`DurableQueue` 和 `KnowledgeSync` 的 Sprint 规划。
+1. **[AI_ASSISTANT_ROADMAP.md](AI_ASSISTANT_ROADMAP.md) —— 历史路线记录**
+   - **职责**：保留早期 Sprint 的决策背景。它不是当前实现的事实源；当前能力以本目录的协议、能力矩阵和 active OpenSpec 为准。
 
 2. **[RUNBOOKS.md](RUNBOOKS.md) —— 流程操作手册**
    - **职责**：提供高频、复杂的具体流程指令。包括：**下载选区内原图**、**批量生图**、**整理画布卡片**、**添加新工具**以及**会话中断恢复**的详细 Runbook。
@@ -32,3 +32,4 @@
 
 - **工具优先，不模拟 UI**：严禁采用模拟人在输入框填值、点击按钮来做批量生图或下载。必须直接通过 `DurableGenerationQueue` 或 ToolRegistry 提供的业务接口进行调用。
 - **选区感知**：下载和整理卡片时，必须优先获取并基于 `selectedNodeIds` 状态，而不是全量画布。
+- **当前 UI 方向**：工作台视觉规范见 [architecture/DESIGN.md](../architecture/DESIGN.md)；不要从历史路线图恢复旧 UI 或建立第二套助手。

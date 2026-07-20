@@ -4,12 +4,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-// Clay global UI source contract.
+// Global workspace UI source contract. Legacy Clay CSS contracts below remain
+// as compatibility checks for existing surfaces; the current manual is token-first.
 const ROOT_DIR = process.cwd();
 
 
 
-test('canonical design manuals define the Clay-first global UI system', () => {
+test('canonical design manuals define the canvas-first semantic UI system', () => {
   assert.equal(existsSync(path.join(ROOT_DIR, 'docs/architecture/DESIGN.md')), true);
 
   const rootManual = readSource('docs/architecture/DESIGN.md');
@@ -17,21 +18,13 @@ test('canonical design manuals define the Clay-first global UI system', () => {
   const agentRules = readSource('docs/architecture/DESIGN.md'); // 用 docs/architecture/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
 
   for (const source of [rootManual, docsManual, agentRules]) {
-    assert.match(source, /Clay/i);
-    assert.match(source, /#(?:fffaf0|ffffff)/i);
-    assert.match(source, /#0a0a0a/i);
-    assert.match(source, /#3a3a3a/i);
-    assert.match(source, /#6a6a6a/i);
-    assert.match(source, /#ff4d8b/i);
-    assert.match(source, /#1a3a3a/i);
-    assert.match(source, /#b8a4ed/i);
-    assert.match(source, /#ffb084/i);
-    assert.match(source, /#e8b94a/i);
-    assert.match(source, /#ff6b5a/i);
-    assert.match(source, /Plain Black|Inter/i);
-    assert.match(source, /color block|color-block|色块|饱和/i);
-    assert.match(source, /no heavy shadows|flat|无重阴影|低阴影/i);
-    assert.match(source, /mobile|desktop|响应式|手机|桌面/i);
+    assert.match(source, /Canvas-First Workspace UI/i);
+    assert.match(source, /semantic surfaces|semantic tokens/i);
+    assert.match(source, /--kk-color-(?:canvas|surface|border|text)/i);
+    assert.match(source, /packages\/ui/i);
+    assert.match(source, /thin borders|restrained elevation/i);
+    assert.match(source, /mobile|desktop|small screens/i);
+    assert.match(source, /direct[\s\S]*assist[\s\S]*takeover/i);
     assert.doesNotMatch(source, /Airtable-first|Airtable 风|Airtable-inspired/i);
     assert.doesNotMatch(source, /#181d26|#1b61c9|#e0e2e6/i);
   }

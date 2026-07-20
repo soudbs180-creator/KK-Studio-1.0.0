@@ -176,7 +176,8 @@ function isBrowserLaunchUnavailable(error) {
     || /Playwright npx cache directory not found/i.test(message)
     || /Playwright module was not found/i.test(message)
     || /browser-executable-not-found/i.test(message)
-    || /process-spawn-blocked/i.test(message);
+    || /process-spawn-blocked/i.test(message)
+    || /browser-preflight-(?:nonzero-exit|timeout|spawn-error|threw)/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {
@@ -386,7 +387,7 @@ function verifySourceContracts() {
     { source: chatSidebarSource, pattern: /kk-chat-sidebar-composer-actions[^"]*min-w-0[^"]*flex-wrap/, label: 'composer action wrapping' },
     { source: chatSidebarSource, pattern: /ai-takeover-run-timeline/, label: 'chat sidebar run timeline surface' },
     { source: chatSidebarSource, pattern: /ai-takeover-composer-input/, label: 'chat sidebar takeover input' },
-    { source: chatSidebarSource, pattern: /durableGenerationQueue,\s*type GenerationBatchJob/, label: 'durable queue runtime import' },
+    { source: chatSidebarSource, pattern: /durableGenerationQueue,[\s\S]{0,160}type GenerationBatchJob/, label: 'durable queue runtime import' },
     { source: chatSidebarSource, pattern: /ai-takeover-durable-queue-panel/, label: 'durable queue panel surface' },
     { source: chatSidebarSource, pattern: /data-action="resume-durable-job"/, label: 'durable queue resume action' },
     { source: chatSidebarSource, pattern: /data-action="retry-durable-job"/, label: 'durable queue retry action' },

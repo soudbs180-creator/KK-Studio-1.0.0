@@ -24,9 +24,9 @@
    - **职责**：详细定义 Google 官方原生接口协议与 OpenAI 兼容适配器（包括 SiliconFlow, gpt-best 等第三方中转和本地代理）之间的路由逻辑与参数映射。
    - **适用场景**：新增大模型对接、修改图片长宽比及分辨率参数时。
 
-6. **[DESIGN.md](DESIGN.md) —— 美学设计与视觉层级**
-   - **职责**：规定 Glassmorphism（毛玻璃态）、高对比度暗黑模式主题切换以及组件卡片微动效等商业级美学设计规范。
-   - **适用场景**：界面视觉效果优化、美化侧边栏及卡片容器。
+6. **[DESIGN.md](DESIGN.md) —— 画布优先的工作台视觉规范**
+   - **职责**：规定安静、低对比度、语义 Token 驱动的浅色/深色工作台，以及不阻断画布的 AI 计划、任务和验证布局。
+   - **适用场景**：界面重构、基础组件迁移、响应式和无障碍验收。
 
 7. **[ACTIVE_UI_SURFACES.md](ACTIVE_UI_SURFACES.md)**, **[CANONICAL_DATA_REGISTRY.md](CANONICAL_DATA_REGISTRY.md)**, **[VISIBILITY_MATRIX.md](VISIBILITY_MATRIX.md)**
    - **职责**：活动界面、数据类型注册表与渲染矩阵的架构定义。

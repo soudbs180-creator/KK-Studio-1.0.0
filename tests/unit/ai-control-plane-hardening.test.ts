@@ -556,6 +556,66 @@ test('an owner switch during an awaited tool stops the Run and persists the term
   assert.match(agentRunStore.getRun(run.id)?.nextStep || '', /owner changed/i);
 });
 
+test('an active canvas switch during an awaited tool cancels the Run before verification', async (t) => {
+  const previousHandoffGuard = process.env.KK_DISABLE_HANDOFF_FS_WRITE;
+  process.env.KK_DISABLE_HANDOFF_FS_WRITE = '1';
+  let releaseTool!: () => void;
+  let signalStarted!: () => void;
+  const started = new Promise<void>((resolve) => { signalStarted = resolve; });
+  const release = new Promise<void>((resolve) => { releaseTool = resolve; });
+  t.after(() => {
+    releaseTool?.();
+    if (previousHandoffGuard === undefined) delete process.env.KK_DISABLE_HANDOFF_FS_WRITE;
+    else process.env.KK_DISABLE_HANDOFF_FS_WRITE = previousHandoffGuard;
+  });
+
+  agentRunStore.clearRuns();
+  if (!toolRegistryInstance.getTool('test.canvasSwitchAwait')) {
+    toolRegistryInstance.register({
+      name: 'test.canvasSwitchAwait',
+      description: 'canvas switch await guard',
+      permission: 'safe',
+      control: { effect: 'read' },
+      inputSchema: { type: 'object' },
+      handler: async () => {
+        signalStarted();
+        await release;
+        return { success: true };
+      },
+    });
+  }
+  const plan = {
+    id: 'plan-canvas-switch-await',
+    intent: 'help',
+    reply: 'run once',
+    actions: [{ type: 'test.canvasSwitchAwait', payload: {} }],
+    requiresConfirmation: false,
+  } as any;
+  const run = agentRunStore.createRun('canvas switch', 'help', plan);
+  const runtime = new (await import('../../apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts')).AgentRuntime();
+  let activeCanvasId = 'canvas-a';
+  const execution = runtime.executePendingRun(run.id, {
+    currentPage: 'canvas',
+    collaborationMode: 'takeover',
+    trigger: 'takeover-auto',
+    selectedNodeIds: [],
+    getActiveCanvas: () => ({ id: activeCanvasId } as any),
+    getSelectedNodeIds: () => [],
+    getCanvasRuntimeState: () => undefined,
+    generationQueue: durableGenerationQueue,
+    runStore: agentRunStore,
+    notify: { success() {}, info() {}, warning() {}, error() {} },
+  });
+
+  await started;
+  activeCanvasId = 'canvas-b';
+  releaseTool();
+  await assert.rejects(execution, /active canvas changed/i);
+  assert.equal(agentRunStore.getRun(run.id)?.status, 'cancelled');
+  const results = agentRunStore.getRun(run.id)?.stepResults;
+  assert.equal(results?.[results.length - 1]?.outcome, 'cancelled');
+});
+
 test('AgentRuntime rejects a plan changed after the user confirmed the displayed snapshot', async () => {
   agentRunStore.clearRuns();
   const { AgentRuntime } = await import('../../apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts');

@@ -23,7 +23,7 @@
 | **资源管理器 Plus 按钮**| `#btn-takeover-plus-button` | 接管模式下的资源连结加号按钮 |
 | **AI 助手选项菜单** | `#btn-takeover-menu-container` | Plus 按钮弹出的文件/文件夹导入菜单 |
 | **无限画布容器** | `#canvas-container` | 主无限画布 DOM 容器 |
-| **缩放控制卡片** | `.desktop-zoom-rail` | 左下角毛玻璃缩放与版本展示面板 |
+| **缩放控制卡片** | `.desktop-zoom-rail` | 左下角低对比度缩放与版本展示面板 |
 
 ---
 

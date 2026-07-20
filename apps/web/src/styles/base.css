@@ -1438,7 +1438,7 @@ body.dark-mode .input-bar {
 }
 
 @media (max-width: 767px) {
-  #canvas-container.ios-mobile-shell {
+  [data-workspace-shell='true'].ios-mobile-shell {
     background:
       radial-gradient(120% 75% at 10% -10%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
       radial-gradient(110% 80% at 92% 0%, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 64%),

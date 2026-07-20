@@ -48,10 +48,10 @@ export interface AssistantStepVerificationBaseline {
 }
 
 export interface AssistantExecutionNotificationPort {
-  success: (...args: any[]) => any;
-  info: (...args: any[]) => any;
-  warning: (...args: any[]) => any;
-  error: (...args: any[]) => any;
+  success: (title: string, message: string, details?: string) => void;
+  info: (title: string, message: string, details?: string) => void;
+  warning: (title: string, message: string, details?: string) => void;
+  error: (title: string, message: string, details?: string) => void;
 }
 
 export type AssistantHostResult<Value> = Value | Promise<Value>;
@@ -150,6 +150,10 @@ export interface AssistantSiteCapabilityPorts {
 
 type AssistantHostCallback = (...args: any[]) => any;
 
+export interface AssistantGenerationRuntimeConfig {
+  model?: string;
+}
+
 /**
  * Web 运行时唯一的 Agent 执行宿主边界。
  *
@@ -183,8 +187,8 @@ export interface AssistantExecutionContext {
   siteCapabilities?: AssistantSiteCapabilityPorts;
 
   selectedModel?: { id?: string; [key: string]: unknown };
-  config?: any;
-  ecommerceState?: any;
+  config?: AssistantGenerationRuntimeConfig;
+  ecommerceState?: unknown;
   browserBridge?: BrowserBridgeClient;
   browserBridgeSnapshot?: BrowserBridgeStatusSnapshot;
   browserAssistantSnapshot?: unknown;
@@ -242,6 +246,7 @@ type AssistantToolCoreContext = Pick<
   | 'runStore'
 >;
 
+/** 渐进迁移适配器：公开字段有类型，额外宿主字段必须先经过 unknown 收窄。 */
 /** 渐进迁移适配器：核心执行字段有类型，旧宿主回调在领域工具迁移时逐个收紧。 */
 export type AssistantToolExecutionContext = Partial<AssistantToolCoreContext> & Record<string, any>;
 
@@ -389,7 +394,7 @@ export function sameAssistantStepAuthorizations(
 export function createUserActionConfirmation(
   toolName: string,
   input: unknown,
-  executionScope: Partial<AssistantExecutionContext> & Record<string, any> = {},
+  executionScope: Partial<AssistantExecutionContext> & Record<string, unknown> = {},
 ): AssistantToolExecutionContext {
   const runId = `user_action_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const planId = `${runId}:plan`;

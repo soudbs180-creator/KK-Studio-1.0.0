@@ -22,6 +22,8 @@ export interface AgentRunRecord {
   backendSyncState?: 'pending' | 'synced';
 }
 
+export type AgentRunStoreListener = (runs: AgentRunRecord[]) => void;
+
 const STORAGE_KEY = 'kk_agent_runs_history';
 
 const cloneRunRecord = (record: AgentRunRecord): AgentRunRecord => (
@@ -54,6 +56,7 @@ export class AgentRunStore {
   private readonly storage: Storage | null;
   private readonly ownerIdResolver: () => string;
   private readonly ownerRunCache = new Map<string, AgentRunRecord[]>();
+  private readonly listeners = new Set<AgentRunStoreListener>();
   private activeOwnerId: string;
 
   constructor(
@@ -109,6 +112,18 @@ export class AgentRunStore {
     this.ownerRunCache.set(this.activeOwnerId, cloneRunRecords(this.runs));
     this.activeOwnerId = ownerId;
     this.loadRuns();
+    this.notifyListeners();
+  }
+
+  private notifyListeners(): void {
+    const snapshot = cloneRunRecords(this.runs);
+    for (const listener of this.listeners) {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.error('[AgentRunStore] Run listener failed:', error);
+      }
+    }
   }
 
   private loadRuns() {
@@ -147,13 +162,22 @@ export class AgentRunStore {
 
   private saveRuns() {
     this.ownerRunCache.set(this.activeOwnerId, cloneRunRecords(this.runs));
-    if (!this.storage) return;
-    try {
-      const storageValue = JSON.stringify(this.runs);
-      this.storage.setItem(this.storageKey(), storageValue);
-    } catch (e) {
-      console.error('[AgentRunStore] 保存失败:', e);
+    if (this.storage) {
+      try {
+        const storageValue = JSON.stringify(this.runs);
+        this.storage.setItem(this.storageKey(), storageValue);
+      } catch (e) {
+        console.error('[AgentRunStore] 保存失败:', e);
+      }
     }
+    this.notifyListeners();
+  }
+
+  subscribe(listener: AgentRunStoreListener): () => void {
+    this.ensureOwnerScope();
+    this.listeners.add(listener);
+    listener(cloneRunRecords(this.runs));
+    return () => this.listeners.delete(listener);
   }
 
   createRun(userMessage: string, intent: string, plan: any): AgentRunRecord {
@@ -265,6 +289,9 @@ export class AgentRunStore {
     const authoritative: AgentRunRecord = {
       ...current,
       ...snapshot,
+      // The server DTO is intentionally untrusted at this boundary. Keep the
+      // locally validated plan that was authorized for this run.
+      plan: current.plan,
       toolCalls: [...mergedToolCalls.values()],
       stepResults: [...(snapshot.stepResults || [])],
       completedStepIds: snapshot.completedStepIds ? [...snapshot.completedStepIds] : current.completedStepIds,
@@ -324,6 +351,32 @@ export class AgentRunStore {
     this.ensureOwnerScope();
     this.runs = [];
     this.saveRuns();
+  }
+
+  archiveRun(id: string): boolean {
+    this.ensureOwnerScope();
+    const run = this.runs.find((candidate) => candidate.id === id);
+    if (!run || ['planning', 'waiting_confirmation', 'waiting_execution', 'running'].includes(run.status)) {
+      return false;
+    }
+    this.runs = this.runs.filter((candidate) => candidate.id !== id);
+    this.saveRuns();
+    return true;
+  }
+
+  archiveFinishedRuns(): number {
+    this.ensureOwnerScope();
+    const activeStatuses: AgentRunRecord['status'][] = [
+      'planning',
+      'waiting_confirmation',
+      'waiting_execution',
+      'running',
+    ];
+    const previousCount = this.runs.length;
+    this.runs = this.runs.filter((run) => activeStatuses.includes(run.status));
+    const archivedCount = previousCount - this.runs.length;
+    if (archivedCount > 0) this.saveRuns();
+    return archivedCount;
   }
 }
 

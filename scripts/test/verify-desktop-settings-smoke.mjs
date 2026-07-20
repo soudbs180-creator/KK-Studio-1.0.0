@@ -144,7 +144,8 @@ function isBrowserLaunchUnavailable(error) {
     || /Playwright npx cache directory not found/i.test(message)
     || /Playwright module was not found/i.test(message)
     || /browser-executable-not-found/i.test(message)
-    || /process-spawn-blocked/i.test(message);
+    || /process-spawn-blocked/i.test(message)
+    || /browser-preflight-(?:nonzero-exit|timeout|spawn-error|threw)/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {

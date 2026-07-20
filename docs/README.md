@@ -2,6 +2,10 @@
 
 欢迎使用 **KK Studio v1.6.0** 的项目文档知识库。本目录是 KK Studio 的开发与治理护城河。
 
+所有 Markdown（包括隐藏 Agent 规则）都由
+[DOCUMENTATION_INDEX.md](governance/DOCUMENTATION_INDEX.md) 分类为当前、历史、
+冲突或待归档；自动门禁是 `npm run governance:docs`。
+
 为了确保 AI 编程助手（如 Codex、Claude、Cursor、Antigravity）和人类开发人员能够以最低的信息摩擦理解项目规则，所有文档均按照职责和生命周期进行了重组，并与项目根目录下的 [README.md](../README.md) 和最高执行规范 [AGENTS.md](../AGENTS.md) 建立了强映射关系。关于具体的技术分层，请参见技术栈与运行时定义 (Tech Layout & Runtime)。
 
 ---
@@ -20,7 +24,7 @@
 | **系统安全 / 计费 / API 密钥** | [AGENTS.md](../AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
 | **KK Studio HTTP API / SDK** | [docs/api/README.md](api/README.md) | [运行时端点目录](api/runtime-endpoints.md)、[TypeScript Client](api/typescript-client.md)、[OpenAPI](specs/openapi.yaml) | 以 `server/` 挂载、共享 DTO 和 OpenAPI 稳定子集交叉核对 |
 | **编码格式 / 乱码防护** | [AGENTS.md](../AGENTS.md) §15 | [docs/governance/ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md) | 默认使用 `UTF-8 without BOM`、`LF` 换行，PowerShell 显式指定编码 |
-| **系统部署 / Supabase CLI** | [docs/setup/README.md](setup/README.md) | [docs/setup/GUIDE.md](setup/GUIDE.md) | 遵循自发布 VPS 定时与权限配置 |
+| **系统部署 / VPS 发布** | [docs/setup/README.md](setup/README.md) | [docs/setup/GUIDE.md](setup/GUIDE.md) | 遵循当前 VPS、PostgreSQL 和发布验证配置 |
 | **第三方接口规格 (gpt-best)** | [docs/specs/README.md](specs/README.md) | [docs/specs/API_DOCS.md](specs/API_DOCS.md) | 适配 Images/Videos/Audio v2 接口，轮询退避算法 |
 
 ---
@@ -34,7 +38,7 @@
 | 🏛️ [architecture/](architecture/README.md) | **架构底座与数据分层**。定义真实的项目模块所有权、数据库设计及多端 UI 架构。 | [PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md)<br>[DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md)<br>[DESIGN.md](architecture/DESIGN.md) |
 | 🔗 [api/](api/README.md) | **当前 HTTP API 与类型化客户端**。整理 Express 实际挂载端点、鉴权、兼容层、OpenAPI 覆盖和 SDK 方法。 | [runtime-endpoints.md](api/runtime-endpoints.md)<br>[typescript-client.md](api/typescript-client.md) |
 | 🔌 [specs/](specs/README.md) | **数据规格与 API 协议**。规范第三方提供商的 API 模型、轮询与对接参数。 | [openapi.yaml](specs/openapi.yaml)<br>[API_DOCS.md](specs/API_DOCS.md)<br>[NANO_BANANA.md](specs/NANO_BANANA.md) |
-| 🛠️ [setup/](setup/README.md) | **环境搭建与自发布部署**。系统在 VPS 和 Supabase 上运行、配置、启动的命令手册。 | [GUIDE.md](setup/GUIDE.md)<br>[SUPABASE_CLI.md](setup/SUPABASE_CLI.md) |
+| 🛠️ [setup/](setup/README.md) | **当前环境搭建与自发布部署**。系统在 `server/`、VPS 和 PostgreSQL 上运行；旧托管数据库资料只保留历史索引。 | [GUIDE.md](setup/GUIDE.md)<br>[ADMIN.md](setup/ADMIN.md) |
 | 💻 [development/](development/README.md) | **开发手册与交接模板**。指导多提供商架构设计、发布流以及 Durable 的会话交接。 | [session-handoff.md](development/session-handoff.md)<br>[multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) |
 | ⚡ [archive/superpowers/](archive/superpowers/README.md) | **具体业务功能计划归档**。留作历史架构与具体超级功能逻辑实现的开发参考。 | [plans/](archive/superpowers/plans/) 实施方案<br>[specs/](archive/superpowers/specs/) 业务定义 |
 | 📊 [reports/](reports/README.md) | **分析与优化报告**。收集各类自动化或人工输出的性能与安全审计报告。 | [mobile-ui-optimization.md](reports/mobile-ui-optimization.md) |
@@ -45,5 +49,5 @@
 ## 🛡️ 文档一致性保证
 
 1. **去冗余化**：docs/ 目录下不再允许保留同名冗余文件，如发现重复文件，以 `governance/`、`ai-assistant/` 和 `architecture/` 为最高优先级，其余一律归档或删除。
-2. **拒绝陈旧信息**：所有与 Supabase 时代相关的旧版鉴权和积分扣减说明均已移入 `archive/`。v1.6.0 的当前开发应严格以 VPS 上的 PostgreSQL 自建 DDL (`migrations/`) 和 `server/` 代码为准。
+2. **拒绝陈旧信息**：所有与旧托管数据库时代相关的鉴权和积分扣减说明均标记为历史索引，不属于当前 setup。v1.6.0 的当前开发应严格以 VPS 上的 PostgreSQL DDL (`migrations/`) 和 `server/` 代码为准。
 3. **编码防乱码**：所有在此知识库中新增或修改的 Markdown 文档，必须使用 `UTF-8 without BOM` 编码及 `LF` 换行符。
