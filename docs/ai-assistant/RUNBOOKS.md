@@ -4,6 +4,12 @@ Last updated: 2026-07-19
 Primary rules: `AGENTS.md`  
 Detailed roadmap: `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`
 
+## Source evidence
+
+- ZIP originals tool: `apps/web/src/features/assets/zipOutputs.ts`
+- Batch generate tool: `apps/web/src/hooks/useImageGeneration.ts`
+- Arrange cards: `apps/web/src/context/canvasAutoArrange.ts`
+
 ---
 
 ## 0. Runbook 使用规则

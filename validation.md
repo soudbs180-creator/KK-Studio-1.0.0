@@ -1,3 +1,5 @@
+Status: historical
+
 # KK Studio validation.md
 
 > 本文件是 CI 静态分析校验所需的文件。

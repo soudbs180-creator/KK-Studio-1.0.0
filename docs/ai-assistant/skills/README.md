@@ -1,3 +1,5 @@
+Status: reference
+
 # AI 助手可执行 Skills 目录 (docs/ai-assistant/skills/)
 
 本目录包含 KK Studio v1.6.0 中所有经过验证的 AI 助手和 Agent 可执行技能规约 (Skills)。

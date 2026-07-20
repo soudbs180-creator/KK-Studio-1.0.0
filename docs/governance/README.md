@@ -1,3 +1,5 @@
+Status: reference
+
 # 项目治理规范 (docs/governance/README.md)
 
 本目录包含 KK Studio 项目的**治理、安全性以及规范性准则**。此处的文件定义了在开发过程中必须严守的底线，具有最高的约束力，与项目根目录下的 `AGENTS.md` 规范强关联。

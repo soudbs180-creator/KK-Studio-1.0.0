@@ -1,3 +1,5 @@
+Status: reference
+
 # scripts/maintenance/python/
 
 本目录存放历史维护阶段使用的 Python 脚本。

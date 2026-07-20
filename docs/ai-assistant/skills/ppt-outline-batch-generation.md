@@ -1,3 +1,5 @@
+Status: reference
+
 # Skill: PPT 大纲与批量生成排版 (ppt-outline-batch-generation)
 
 ## 触发场景 (Trigger)

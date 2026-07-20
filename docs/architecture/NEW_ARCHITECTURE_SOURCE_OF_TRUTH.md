@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio Architecture Source of Truth (v1.6.0)
 
 Last Updated: 2026-07-13

@@ -1,3 +1,5 @@
+Status: reference
+
 # Skill: 多模态图像理解路由 (agent-image-understanding-routing)
 
 ## 触发场景 (Trigger)

@@ -1,3 +1,5 @@
+Status: historical
+
 # 多供应商 API 架构方案
 
 Current baseline: KK Studio v1.6.0. Provider facts are owned by the server dispatcher; Web code consumes typed routing and capability results.

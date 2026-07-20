@@ -1,3 +1,5 @@
+Status: reference
+
 # 整理卡片布局 Skill (arrange-selected-cards)
 
 - **触发词**: “整理这些卡片” / “帮我排版选中的卡片”

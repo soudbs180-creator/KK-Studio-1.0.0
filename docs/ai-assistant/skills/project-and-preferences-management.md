@@ -1,3 +1,5 @@
+Status: reference
+
 # 项目与生成偏好管理 Skill
 
 ## 目标

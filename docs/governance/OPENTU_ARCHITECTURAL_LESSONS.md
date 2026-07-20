@@ -1,3 +1,5 @@
+Status: reference
+
 # Opentu 架构开发教训与治理规范 (docs/governance/OPENTU_ARCHITECTURAL_LESSONS.md)
 
 本文件提炼并沉淀了来自 `opentu`（开图）平台在画布、多媒体、状态持久化及 Monorepo 治理等核心模块开发中的关键技术经验与教训 (Lessons Learned)，旨在指导 KK Studio 的后续架构迭代，防止引入同类设计缺陷。

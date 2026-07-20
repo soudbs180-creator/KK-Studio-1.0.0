@@ -1,3 +1,5 @@
+Status: historical
+
 # 分析与审计报告 (docs/reports/README.md)
 
 本目录包含 KK Studio 项目在各个开发里程碑中输出的**性能优化分析、安全审计报告以及各类移动端与音乐生成模块的验证记录**。

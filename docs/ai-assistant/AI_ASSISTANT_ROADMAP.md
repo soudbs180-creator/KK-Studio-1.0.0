@@ -1,3 +1,5 @@
+Status: historical
+
 # AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0
 
 > Status: historical planning record. Do not use unchecked Sprint items,

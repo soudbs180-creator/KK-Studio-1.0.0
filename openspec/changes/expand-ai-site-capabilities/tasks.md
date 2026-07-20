@@ -1,3 +1,5 @@
+Status: historical
+
 # Tasks: expand-ai-site-capabilities
 
 - [x] Publish the UI/business capability coverage matrix with autonomy classifications.

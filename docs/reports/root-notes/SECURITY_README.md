@@ -1,3 +1,5 @@
+Status: historical
+
 # 🔒 KK-Studio API密钥安全方案
 
 ## 核心保证

@@ -3,6 +3,11 @@
 Last verified: 2026-07-19  
 Source of truth: `ToolRegistry.ts`、`AssistantExecutionContext.ts`、CanvasContext 与本页列出的业务入口。
 
+## Source evidence
+
+- Capability matrix source: `apps/web/src/features/ai-takeover/core/browserActionCatalog.ts`
+- Browser bridge: `apps/web/src/features/ai-takeover/core/browserBridge.ts`
+
 ## 判定规则
 
 | 分类 | 含义 |

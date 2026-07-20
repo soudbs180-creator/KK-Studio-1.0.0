@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: upgrade-agent-capabilities
 
 ## 动机与背景

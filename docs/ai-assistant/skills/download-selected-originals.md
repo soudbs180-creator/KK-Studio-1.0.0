@@ -1,3 +1,5 @@
+Status: reference
+
 # 框选原图打包下载 Skill (download-selected-originals)
 
 - **触发词**: “下载选择的卡片” / “打包我框选的图片”

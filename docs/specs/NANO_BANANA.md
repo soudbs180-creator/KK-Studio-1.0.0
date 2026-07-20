@@ -1,3 +1,5 @@
+Status: reference
+
 # Nano-banana(Generations，推荐对接)
 
 ## OpenAPI Specification

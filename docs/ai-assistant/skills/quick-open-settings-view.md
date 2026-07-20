@@ -1,3 +1,5 @@
+Status: reference
+
 # 快速打开设置功能 Skill (quick-open-settings-view)
 
 - **触发词**: “帮我打开个人中心” / “帮我打开 API” / “打开日志” / “进入存储设置” / “查看计费”

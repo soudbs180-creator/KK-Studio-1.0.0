@@ -1,3 +1,5 @@
+Status: reference
+
 # PROJECT_STRUCTURE (docs/PROJECT_STRUCTURE.md)
 
 为了简化文档目录树，本文件已被重组并移至核心架构规范目录。

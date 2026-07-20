@@ -1,6 +1,6 @@
 # KK Studio AI Assistant Capability Baseline
 
-Status: current documentation contract (not a claim that every planned item
+Status: historical documentation contract (not a claim that every planned item
 is already implemented). Last reviewed: 2026-07-20. The release version is
 read from `config/release-manifest.json` (`KK Studio v1.6.0`).
 

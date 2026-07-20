@@ -1,3 +1,5 @@
+Status: historical
+
 # 供应商 API 路由 Bug 诊断矩阵 (Provider Routing Bug Matrix)
 
 本文件作为多厂家 API 路由收口治理的 Bug 冻结线，记录治理前的典型 API 路由、结构不一致与计费错误案例，用作防回归和诊断对照。

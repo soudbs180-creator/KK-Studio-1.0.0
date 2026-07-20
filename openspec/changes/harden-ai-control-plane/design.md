@@ -1,3 +1,5 @@
+Status: historical
+
 # Design: harden-ai-control-plane
 
 ## 1. 唯一执行入口

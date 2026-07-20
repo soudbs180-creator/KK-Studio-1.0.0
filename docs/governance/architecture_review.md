@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio 全栈架构审查与优化报告 (Architecture Review)
 
 > 报告版本：v1.6.0-Rev1

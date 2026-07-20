@@ -1,3 +1,5 @@
+Status: historical
+
 # Delta Spec: agent-capabilities
 
 ## ADDED Requirements

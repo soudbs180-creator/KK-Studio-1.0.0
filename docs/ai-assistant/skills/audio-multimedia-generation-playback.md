@@ -1,3 +1,5 @@
+Status: reference
+
 # Skill: 音频多媒体生成与播放 (audio-multimedia-generation-playback)
 
 ## 触发场景 (Trigger)

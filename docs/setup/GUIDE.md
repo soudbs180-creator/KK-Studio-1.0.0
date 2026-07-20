@@ -1,6 +1,6 @@
 # KK Studio 当前环境与发布指南
 
-Status: current. 这是 `apps/web/`、`server/` 和 VPS PostgreSQL 的部署说明；
+Status: reference 这是 `apps/web/`、`server/` 和 VPS PostgreSQL 的部署说明；
 旧托管数据库/边缘函数指南已归档，不得作为当前运行入口。
 
 ## 1. 前置条件

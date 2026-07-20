@@ -1,3 +1,5 @@
+Status: historical
+
 # Tasks: harden-ai-control-plane
 
 - [x] Remove automatic `action://` execution while preserving explicit user clicks.

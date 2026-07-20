@@ -1,0 +1,3570 @@
+openapi: 3.1.0
+info:
+  title: KK Studio API
+  version: 1.6.0
+  summary: KK Studio 完整 REST API 契约（OpenAPI 3.1）
+  description: |
+    KK Studio 是面向多模态 AI 创作、无限画布资产管理、多模型智能路由、用户自主密钥（BYOK）
+    与商业化积分计费审计的一体化 AI 工作台。本规范覆盖主服务（Express，默认端口 3001）的全部
+    HTTP 接口，按业务域分为：健康检查、认证与用户、AI 生成网关、BYOK 密钥/路由管理、计费支付、
+    画布工作区与资产、模型目录、管理后台、AI 助手持久化等分组。
+
+    ## 通用约定
+
+    ### 认证方式
+    1. **Bearer JWT** —— `Authorization: Bearer <jwt>`，主要方式。
+    2. **HttpOnly Cookie 会话** —— `kk.api.access_token` / `kk.api.refresh_token`。
+    3. **临时用户头** —— `X-KK-Temp-User-Id: temp-xxxx`（仅 `KKAI_LOCAL_ONLY=true` 时允许）。
+    4. **管理员二次会话头** —— `X-KK-Admin-Session-Token`（管理后台高危操作）。
+
+    响应头 `X-Refresh-Token` 用于滑动续签 JWT；CORS `credentials: true`，
+    `exposedHeaders: ['X-Refresh-Token']`。管理员分级：`admin_level` 1=超管，2=普通管理员。
+
+    ### 响应信封
+    新式路由统一返回：
+
+    ```json
+    // 成功
+    { "success": true, "data": { }, "meta": { "requestId": "req-...", "timestamp": "ISO-8601" } }
+    // 失败
+    { "success": false, "error": { "code": "UPPER_SNAKE_CODE", "message": "...", "details": {} }, "meta": { } }
+    ```
+
+    部分旧式路由（admin、generate-v1、ocr）使用扁平变体 `{ "success": false, "error": "msg", "code": "CODE" }`
+    或裸 `{ "error": "..." }`。全局兜底：404 `{ "error": "Endpoint not found or legacy route disabled." }`、
+    500 `{ "error": "Internal server error." }`。
+
+    ### 分页
+    - 管理列表：`page`(≥1)、`limit`(1–100，默认 20)、`search`，响应 `{ items, total, page, limit }`。
+    - 生成作业列表：cursor 分页 —— `limit`(≤100，默认 50)、`cursor`(ISO 时间，取 `created_at < cursor`)，响应 `{ jobs, cursor? }`。
+
+    ### 请求体限制
+    `/api/v1/generate*`、`/api/v1/assets`、`/api/generate/image|edit`：10mb JSON；其余：1mb JSON。
+  contact:
+    name: KK Studio Team
+servers:
+  - url: https://api.kkai.plus
+    description: 生产环境主 API / BFF
+  - url: http://localhost:3001
+    description: 本地开发主服务（Express）
+  - url: http://localhost:9099
+    description: 本地安全执行器（local-runner，独立服务）
+security:
+  - bearerAuth: []
+tags:
+  - name: System
+    description: 健康检查与遥测
+  - name: Auth
+    description: 注册、登录、会话、OAuth、临时用户
+  - name: Profile
+    description: 用户档案与密码管理
+  - name: Generation
+    description: AI 生成网关与代理（统一入口、异步任务、BYOK/系统代理）
+  - name: BYOK
+    description: 用户自带密钥与路由管理、供应商探测、价格同步
+  - name: Billing
+    description: 积分余额、流水、扣费退款、充值申请、支付渠道
+  - name: Workspace
+    description: 画布布局、卡片、工作流
+  - name: Assets
+    description: 资产库（图片/视频/音频/文档）
+  - name: Generation Jobs
+    description: 轻量任务与批量生成作业（Durable Queue）
+  - name: Model Catalog
+    description: 模型目录
+  - name: Admin
+    description: 管理后台（用户、积分、计费供应商、汇率、充值审核）
+  - name: AI Assistant
+    description: AI 助手运行记录、工具调用、技能与知识库持久化
+  - name: Local Runner
+    description: 本地执行器接口（端口 9099）
+
+paths:
+  # ==================== System ====================
+  /healthz:
+    get:
+      tags: [System]
+      summary: 综合健康检查
+      description: 返回服务、持久化、运行时、认证、数据库、上传、供应商等全方位健康状态。unhealthy 时返回 HTTP 500。
+      operationId: healthz
+      security: []
+      responses:
+        '200':
+          description: 服务健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthzResponse'
+              example:
+                ok: true
+                success: true
+                service: kk-studio-api
+                status: healthy
+                selfHostedCoreReady: true
+                canonicalPersistenceReady: true
+                config:
+                  hasPostgresConfig: true
+                runtime:
+                  localOnly: false
+                  blockers: []
+                auth:
+                  hasJwtSecret: true
+                database:
+                  postgres: true
+                uploads:
+                  uploadDirExists: true
+                  s3Enabled: false
+                provider:
+                  openai: true
+                  gemini: true
+        '500':
+          description: 服务不健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthzResponse'
+  /v1/health:
+    get:
+      tags: [System]
+      summary: 数据库与本地存储探测
+      operationId: v1Health
+      security: []
+      responses:
+        '200':
+          description: 探测结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  timestamp: { type: string, format: date-time }
+                  details:
+                    type: object
+                    properties:
+                      database: { type: string, example: ok }
+                      localStorage: { type: string, example: ok }
+              example:
+                status: ok
+                timestamp: '2026-07-21T04:00:00.000Z'
+                details:
+                  database: ok
+                  localStorage: ok
+  /v1/metrics:
+    get:
+      tags: [System]
+      summary: AI Router 运行指标
+      description: 返回 AI 路由器的请求统计与熔断器状态。
+      operationId: v1Metrics
+      security: []
+      responses:
+        '200':
+          description: 指标数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                data:
+                  totalRequests: 12840
+                  successRate: 0.987
+                  circuitBreaker:
+                    state: closed
+                    failures: 0
+  /api/config/keys:
+    get:
+      tags: [System]
+      summary: 渠道 Key 配置状态
+      description: 返回各渠道 API Key 是否已配置（不返回明文）。
+      operationId: configKeys
+      security: []
+      responses:
+        '200':
+          description: 配置状态
+          content:
+            application/json:
+              example:
+                ACTIVE_API_PROVIDER: suchuang
+                _configured:
+                  SUCHUANG_API_KEY: true
+                  YUNWU_API_KEY: false
+                  COMFLY_API_KEY: true
+
+  # ==================== Auth ====================
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: 邮箱注册
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: 至少 8 位 }
+            example:
+              email: user@example.com
+              password: Str0ngP@ssw0rd
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                data:
+                  userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  email: user@example.com
+                  status: registered
+        '400':
+          description: 参数错误（AUTH_INVALID_PAYLOAD / AUTH_WEAK_PASSWORD / AUTH_USER_ALREADY_EXISTS）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                success: false
+                error:
+                  code: AUTH_USER_ALREADY_EXISTS
+                  message: 该邮箱已被注册
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 邮箱登录
+      description: 登录成功返回会话信息，同时写入 HttpOnly Cookie 并通过 `X-Refresh-Token` 头下发刷新令牌。
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+            example:
+              email: user@example.com
+              password: Str0ngP@ssw0rd
+      responses:
+        '200':
+          description: 登录成功
+          headers:
+            X-Refresh-Token:
+              description: 滑动续签刷新令牌
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionEnvelope'
+              example:
+                success: true
+                data:
+                  user:
+                    id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                    email: user@example.com
+                    nickname: 创作者小K
+                    avatarUrl: https://cdn.kkai.plus/avatars/u1.png
+                    adminLevel: 0
+                    role: user
+                    status: active
+                    createdAt: '2026-01-15T08:00:00.000Z'
+                    updatedAt: '2026-07-20T12:00:00.000Z'
+                  accessToken: eyJhbGciOiJIUzI1NiIs...
+                  refreshToken: d2f4e6a8b0c2...
+                  sessionExpiresAt: '2026-07-28T04:00:00.000Z'
+        '401':
+          description: 凭证错误（AUTH_INVALID_CREDENTIALS）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新会话
+      operationId: refreshSession
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+            example:
+              refreshToken: d2f4e6a8b0c2...
+      responses:
+        '200':
+          description: 新会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionEnvelope'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 登出
+      description: 清除会话 Cookie。
+      operationId: logout
+      responses:
+        '200':
+          description: 已登出
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  loggedOut: true
+  /api/v1/auth/session:
+    get:
+      tags: [Auth]
+      summary: 获取当前会话
+      operationId: getSession
+      responses:
+        '200':
+          description: 当前会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/token:
+    get:
+      tags: [Auth]
+      summary: 换取 JWT
+      description: 基于当前会话换取访问 JWT。
+      operationId: getToken
+      responses:
+        '200':
+          description: JWT
+          content:
+            application/json:
+              example:
+                jwt: eyJhbGciOiJIUzI1NiIs...
+                user:
+                  id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  email: user@example.com
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: 请求密码重置
+      description: 出于隐私保护，无论邮箱是否存在都返回统一应答。
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+            example:
+              email: user@example.com
+      responses:
+        '200':
+          description: 统一应答
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  requested: true
+                  email: user@example.com
+                  delivery: email
+                  status: accepted
+                  code: AUTH_PASSWORD_RESET_REQUESTED
+                  message: 如果该邮箱已注册，重置邮件已发送
+  /api/v1/auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: 确认密码重置
+      operationId: confirmPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string, minLength: 24 }
+                newPassword: { type: string, minLength: 8 }
+            example:
+              token: 9f8e7d6c5b4a39281706f5e4d3c2b1a0
+              newPassword: N3wP@ssw0rd!
+      responses:
+        '200':
+          description: 重置完成
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  updated: true
+                  status: completed
+                  code: AUTH_PASSWORD_RESET_COMPLETED
+                  message: 密码已更新
+        '400':
+          description: 令牌无效（AUTH_INVALID_RESET_TOKEN）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/auth/temp-users:
+    post:
+      tags: [Auth]
+      summary: 创建临时用户
+      description: 创建 24 小时有效的临时用户（游客会话），无需注册。
+      operationId: createTempUser
+      security: []
+      responses:
+        '201':
+          description: 临时用户已创建
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  userId: temp-9b8a7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d
+                  email: temp-9b8a@guest.local
+                  nickname: 访客-9b8a
+                  createdAt: '2026-07-21T04:00:00.000Z'
+                  expiresAt: '2026-07-22T04:00:00.000Z'
+                  isTempUser: true
+  /api/v1/auth/{provider}/start:
+    get:
+      tags: [Auth]
+      summary: OAuth 登录起点
+      description: 获取第三方登录授权跳转 URL。
+      operationId: oauthStart
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [google, wechat] }
+      responses:
+        '200':
+          description: 授权 URL
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  provider: google
+                  mode: login
+                  authorizationUrl: https://accounts.google.com/o/oauth2/v2/auth?client_id=...
+                  state: 8f7e6d5c4b3a
+                  expiresAt: '2026-07-21T04:10:00.000Z'
+  /api/v1/auth/{provider}/bind/start:
+    get:
+      tags: [Auth]
+      summary: OAuth 绑定起点
+      description: 已登录用户绑定第三方账号的授权跳转 URL。
+      operationId: oauthBindStart
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [google, wechat] }
+      responses:
+        '200':
+          description: 授权 URL
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  provider: wechat
+                  mode: bind
+                  authorizationUrl: https://open.weixin.qq.com/connect/qrconnect?appid=...
+                  state: 1a2b3c4d5e6f
+                  expiresAt: '2026-07-21T04:10:00.000Z'
+
+  # ==================== Profile ====================
+  /api/v1/profile:
+    get:
+      tags: [Profile]
+      summary: 获取用户档案
+      operationId: getProfile
+      responses:
+        '200':
+          description: 用户档案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileEnvelope'
+              example:
+                success: true
+                data:
+                  id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  email: user@example.com
+                  nickname: 创作者小K
+                  avatarUrl: https://cdn.kkai.plus/avatars/u1.png
+                  adminLevel: 0
+                  role: user
+                  status: active
+                  credits: 1250
+                  createdAt: '2026-01-15T08:00:00.000Z'
+                  updatedAt: '2026-07-20T12:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Profile]
+      summary: 更新用户档案
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname: { type: string }
+                avatarUrl: { type: string, format: uri }
+            example:
+              nickname: 新昵称
+              avatarUrl: https://cdn.kkai.plus/avatars/u2.png
+      responses:
+        '200':
+          description: 更新后的档案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileEnvelope'
+  /api/v1/profile/password/send-code:
+    post:
+      tags: [Profile]
+      summary: 发送改密验证码
+      operationId: sendPasswordCode
+      responses:
+        '200':
+          description: 验证码已发送
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  sent: true
+                  email: user@example.com
+                  expiresAt: '2026-07-21T04:10:00.000Z'
+  /api/v1/profile/password:
+    post:
+      tags: [Profile]
+      summary: 修改密码
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword: { type: string, minLength: 8 }
+            example:
+              newPassword: N3wP@ssw0rd!
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  updated: true
+                  profile:
+                    id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                    email: user@example.com
+  /api/user/me:
+    get:
+      tags: [Profile]
+      summary: 获取当前用户（旧式）
+      operationId: getUserMe
+      responses:
+        '200':
+          description: 用户信息
+          content:
+            application/json:
+              example:
+                id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                email: user@example.com
+                credits: 1250
+                created_at: '2026-01-15T08:00:00.000Z'
+                adminLevel: 0
+    patch:
+      tags: [Profile]
+      summary: 更新当前用户（旧式）
+      operationId: updateUserMe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+            example:
+              email: newmail@example.com
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  # ==================== Generation ====================
+  /api/v1/generate:
+    post:
+      tags: [Generation]
+      summary: 统一同步生成
+      description: |
+        特权大模型"零直连前端"统一入口（请求体上限 10mb）。
+        - 带 `routeId`（或头 `X-Key-Slot-Id`）→ 走 BYOK 用户自有路由派发（白名单域名校验）。
+        - 不带 → 走系统积分模型派发（含积分预扣，失败自动退款）。
+      operationId: generate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                routeId: { type: string, description: BYOK 路由 ID }
+                task_type: { type: string, example: chat }
+                requestId: { type: string }
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role: { type: string, enum: [system, user, assistant] }
+                      content: { type: string }
+                model: { type: string, default: gpt-4o-mini }
+                temperature: { type: number, default: 0.7 }
+                prompt: { type: string, description: 图像模式提示词 }
+            examples:
+              chat:
+                summary: 对话生成
+                value:
+                  task_type: chat
+                  model: gpt-4o-mini
+                  temperature: 0.7
+                  messages:
+                    - role: user
+                      content: 帮我写一句产品 slogan
+              image:
+                summary: 图像生成（BYOK 路由）
+                value:
+                  routeId: route-01HXYZ
+                  task_type: image
+                  prompt: 一只在云端飞翔的橘猫，吉卜力风格
+      responses:
+        '200':
+          description: 上游生成结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  content: 让灵感，即刻成像。
+                  usage:
+                    total_tokens: 42
+        '400':
+          description: UNSUPPORTED_TASK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: FORBIDDEN_PROXY_TARGET（目标域名不在白名单）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: USER_ROUTE_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: AI_CHAT_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/generate/async:
+    post:
+      tags: [Generation]
+      summary: 异步任务提交 / 轮询
+      description: |
+        提交或查询异步生成任务（图像/视频/音频）。`mode=task_status` 时通过
+        `localTaskId` 或 `taskId` 轮询状态（可从任务 ID 解码 routeId）。
+      operationId: generateAsync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [image, video, audio, task_status] }
+                localTaskId: { type: string }
+                taskId: { type: string }
+                routeId: { type: string }
+                prompt: { type: string }
+            examples:
+              submit:
+                summary: 提交视频任务
+                value:
+                  mode: video
+                  routeId: route-01HXYZ
+                  prompt: 延时摄影：城市日落到夜晚
+              poll:
+                summary: 轮询任务状态
+                value:
+                  mode: task_status
+                  localTaskId: task-abc123
+      responses:
+        '200':
+          description: 上游任务结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  taskId: task-abc123
+                  status: processing
+        '400':
+          description: UNSUPPORTED_MODE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/model-proxy/user:
+    post:
+      tags: [Generation]
+      summary: BYOK 通用代理
+      description: 用户自有路由通用代理，支持 12AI / Wuyin 等策略渠道分流。
+      operationId: modelProxyUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [image, video, audio, chat, task_status] }
+                routeId: { type: string }
+                localTaskId: { type: string }
+            example:
+              mode: image
+              routeId: route-01HXYZ
+              prompt: 赛博朋克风格的城市夜景
+      responses:
+        '200':
+          description: 代理结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  taskId: task-xyz789
+                  providerTaskId: prov-12345
+                  status: succeeded
+                  url: https://cdn.provider.com/output/img.png
+                  endpointType: openai_images
+        '404':
+          description: USER_ROUTE_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '502':
+          description: LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/model-proxy/system:
+    post:
+      tags: [Generation]
+      summary: 系统积分模型代理
+      operationId: modelProxySystem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [chat, image, task_status, cancel_task, delete_task, download_task]
+                model: { type: string }
+                modelId: { type: string }
+                task_type: { type: string }
+            example:
+              mode: chat
+              model: gpt-4o-mini
+              messages:
+                - role: user
+                  content: 你好
+      responses:
+        '200':
+          description: 派发结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '502':
+          description: SYSTEM_MODEL_PROXY_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/secure-proxy:
+    post:
+      tags: [Generation]
+      summary: Chat 安全代理（旧式）
+      operationId: secureProxy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              model: gpt-4o-mini
+              messages:
+                - role: user
+                  content: 总结这段文字
+      responses:
+        '200':
+          description: OpenAI 风格响应
+          content:
+            application/json:
+              example:
+                role: assistant
+                content: 这段文字主要讲述……
+                choices:
+                  - message:
+                      role: assistant
+                      content: 这段文字主要讲述……
+                usage:
+                  total_tokens: 128
+                route: system-credit
+        '502':
+          description: SECURE_PROXY_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/ocr:
+    post:
+      tags: [Generation]
+      summary: OCR 识别（百度中转）
+      description: 百度 OCR 中转接口。成功响应为 `text/plain` 纯文本（非 JSON）。别名 `POST /api/ocr`。
+      operationId: ocr
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, baiduApiKey, baiduSecretKey, fileBase64]
+              properties:
+                provider: { type: string, enum: [baidu] }
+                baiduApiKey: { type: string }
+                baiduSecretKey: { type: string }
+                fileBase64: { type: string, description: 文件 Base64 内容 }
+                fileName: { type: string }
+                operation: { type: string }
+                ocrLanguage: { type: string }
+            example:
+              provider: baidu
+              baiduApiKey: your-api-key
+              baiduSecretKey: your-secret-key
+              fileBase64: iVBORw0KGgoAAAANSUhEUg...
+              fileName: receipt.png
+      responses:
+        '200':
+          description: 识别文本（text/plain）
+          content:
+            text/plain:
+              example: "发票号码: 12345678\n金额: ¥99.00"
+        '400':
+          description: INVALID_PROVIDER / MISSING_CREDENTIALS / MISSING_PAYLOAD
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  # ==================== BYOK ====================
+  /api/v1/profile/user-apis:
+    get:
+      tags: [BYOK]
+      summary: 获取用户 API 条目列表
+      operationId: listUserApis
+      responses:
+        '200':
+          description: 条目列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  entries:
+                    - id: entry-01
+                      name: 我的 OpenAI
+                      provider: openai
+                      type: official
+                      format: openai
+                      baseUrl: https://api.openai.com/v1
+                      supportedModels: [gpt-4o, gpt-4o-mini]
+                      disabled: false
+                      status: valid
+                      failCount: 0
+                      successCount: 230
+                      totalCost: 12.5
+                      budgetLimit: -1
+                      usedTokens: 152300
+                      createdAt: '2026-03-01T00:00:00.000Z'
+                      updatedAt: '2026-07-20T00:00:00.000Z'
+    put:
+      tags: [BYOK]
+      summary: 覆盖用户 API 条目
+      operationId: saveUserApis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserApiEntriesPayload'
+            example:
+              entries:
+                - id: entry-01
+                  key: sk-xxxxxxxx
+                  name: 我的 OpenAI
+                  provider: openai
+                  type: official
+                  format: openai
+                  baseUrl: https://api.openai.com/v1
+                  supportedModels: [gpt-4o]
+                  disabled: false
+                  budgetLimit: -1
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+    post:
+      tags: [BYOK]
+      summary: 覆盖用户 API 条目（POST 别名）
+      operationId: saveUserApisPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserApiEntriesPayload'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/profile/user-apis/payload:
+    put:
+      tags: [BYOK]
+      summary: 覆盖完整 user-apis 负载
+      description: 接收 `{ version, slots, providers, entries }` 完整负载并自动进行 Provider-Probe 增强。
+      operationId: saveUserApisPayload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              version: 3
+              slots: []
+              providers: []
+              entries:
+                - id: entry-01
+                  key: sk-xxxxxxxx
+                  name: 我的 OpenAI
+                  provider: openai
+                  type: official
+                  format: openai
+      responses:
+        '200':
+          description: 保存成功（含探测增强结果）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/profile/user-apis/reveal-secret:
+    post:
+      tags: [BYOK]
+      summary: 查看单条明文密钥
+      description: 显式请求查看某条目的明文 API Key。
+      operationId: revealSecret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id: entry-01
+      responses:
+        '200':
+          description: 明文密钥
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  id: entry-01
+                  key: sk-xxxxxxxx
+        '400':
+          description: INVALID_REVEAL_REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/profile/key-manager:
+    get:
+      tags: [BYOK]
+      summary: 读取 key-manager 状态
+      operationId: getKeyManager
+      responses:
+        '200':
+          description: key-manager 状态
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  version: 3
+                  slots: []
+                  providers: []
+    put:
+      tags: [BYOK]
+      summary: 覆盖 key-manager 状态
+      operationId: saveKeyManager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              version: 3
+              slots: []
+              providers: []
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/profile/user-routes/{routeId}/connectivity:
+    post:
+      tags: [BYOK]
+      summary: 路由连通性检测
+      description: 检测路由连通性并拉取可用模型列表。`routeId=test` 时使用请求体中的临时配置。
+      operationId: routeConnectivity
+      parameters:
+        - name: routeId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                baseUrl: { type: string, format: uri }
+                apiKey: { type: string }
+                format: { type: string, enum: [openai, gemini] }
+            example:
+              baseUrl: https://api.openai.com/v1
+              apiKey: sk-xxxxxxxx
+              format: openai
+      responses:
+        '200':
+          description: 检测结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  routeId: test
+                  ok: true
+                  endpointUrl: https://api.openai.com/v1
+                  latencyMs: 182
+                  resolvedFormat: openai
+                  models: [gpt-4o, gpt-4o-mini, gpt-4.1]
+  /api/v1/profile/user-routes/{routeId}/pricing-sync:
+    post:
+      tags: [BYOK]
+      summary: 同步渠道价格目录
+      description: 同步渠道模型价格目录（目前仅 Wuyin 渠道支持自动同步）。
+      operationId: routePricingSync
+      parameters:
+        - name: routeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 价格目录
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  routeId: route-01HXYZ
+                  ok: true
+                  endpointUrl: https://api.wuyin.example/v1
+                  count: 2
+                  pricingData:
+                    - modelId: gpt-4o
+                      modelName: GPT-4o
+                      inputPrice: '2.5'
+                      numeric: 2.5
+                      unit: 1M tokens
+                      displayPrice: $2.50/1M
+                      endpointUrl: https://api.wuyin.example/v1
+                      endpointPath: /chat/completions
+                  groupRatio: 1.0
+  /api/v1/profile/provider-probe:
+    post:
+      tags: [BYOK]
+      summary: 供应商协议探测（用户）
+      description: 探测供应商端点协议、拉取模型列表并给出诊断信息。
+      operationId: userProviderProbe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderProbeRequest'
+            example:
+              providerName: My Relay
+              providerKind: relay
+              baseUrl: https://relay.example.com/v1
+              apiKey: sk-xxxxxxxx
+              endpointType: auto
+      responses:
+        '200':
+          description: 探测结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  ok: true
+                  adapterId: openai-compatible
+                  requestProfileId: openai_chat_completions
+                  protocolFamily: openai
+                  normalizedBaseUrl: https://relay.example.com/v1
+                  models: [gpt-4o, claude-sonnet-4]
+                  confidence: high
+                  warnings: []
+                  diagnostics: []
+                  ownerKind: user
+                  billingMode: user-owned-api-no-system-credit
+        '400':
+          description: INVALID_PAYLOAD
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: PROVIDER_PROBE_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/wuyin/catalog:
+    get:
+      tags: [BYOK]
+      summary: 速创（Wuyin）模型目录
+      operationId: wuyinCatalog
+      parameters:
+        - name: refresh
+          in: query
+          schema: { type: boolean }
+          description: 强制刷新缓存
+      responses:
+        '200':
+          description: 模型目录
+          content:
+            application/json:
+              example:
+                success: true
+                source: cache
+                data:
+                  - modelId: gpt-4o
+                    modelName: GPT-4o
+                    inputPrice: '2.5'
+                    displayPrice: $2.50/1M
+  /api/v1/wuyin/catalog/refresh:
+    post:
+      tags: [BYOK]
+      summary: 刷新速创模型目录
+      operationId: wuyinCatalogRefresh
+      responses:
+        '200':
+          description: 刷新后的目录
+          content:
+            application/json:
+              example:
+                success: true
+                source: remote
+                data: []
+  /api/pricing-proxy:
+    post:
+      tags: [BYOK]
+      summary: 价格代理（仅 Wuyin）
+      operationId: pricingProxy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              baseUrl: https://api.wuyin.example/v1
+              provider: wuyin
+      responses:
+        '200':
+          description: 价格数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/provider-pricing-cache:
+    get:
+      tags: [BYOK]
+      summary: 读取供应商价格缓存（公开）
+      operationId: getProviderPricingCache
+      security: []
+      parameters:
+        - name: baseUrl
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+      responses:
+        '200':
+          description: 价格缓存
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  baseUrl: https://api.wuyin.example/v1
+                  pricing: []
+                  cachedAt: '2026-07-20T00:00:00.000Z'
+    put:
+      tags: [BYOK]
+      summary: 写入供应商价格缓存
+      operationId: putProviderPricingCache
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              baseUrl: https://api.wuyin.example/v1
+              pricing:
+                - modelId: gpt-4o
+                  inputPrice: '2.5'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  # ==================== Billing ====================
+  /api/v1/billing/credits/balance:
+    get:
+      tags: [Billing]
+      summary: 积分余额
+      operationId: creditBalance
+      responses:
+        '200':
+          description: 余额信息
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  accountId: acct-01HX
+                  userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  balance: 1250
+                  frozenBalance: 0
+  /api/v1/billing/credits/transactions:
+    get:
+      tags: [Billing]
+      summary: 积分流水
+      operationId: creditTransactions
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: 流水列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - id: txn-001
+                      userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                      delta: -20
+                      reason: 图像生成
+                      operationKey: image_generate
+                      balanceAfter: 1230
+                      transactionType: debit
+                      status: completed
+                      createdAt: '2026-07-20T10:00:00.000Z'
+  /api/v1/billing/credits/debit:
+    post:
+      tags: [Billing]
+      summary: 积分扣费
+      operationId: creditDebit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [creditAmount]
+              properties:
+                creditAmount: { type: integer, minimum: 1 }
+                businessRefType: { type: string }
+                businessRefId: { type: string }
+            example:
+              creditAmount: 20
+              businessRefType: generation_job
+              businessRefId: job-01HX
+      responses:
+        '200':
+          description: 扣费结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  ledgerId: ledger-001
+                  balanceAfter: 1230
+                  transactionType: debit
+        '400':
+          description: INVALID_CREDIT_AMOUNT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/billing/credits/refunds:
+    post:
+      tags: [Billing]
+      summary: 积分退款
+      operationId: creditRefund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactionId]
+              properties:
+                transactionId: { type: string }
+                reason: { type: string }
+            example:
+              transactionId: txn-001
+              reason: 生成失败自动退款
+      responses:
+        '200':
+          description: 退款结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  originalTransactionId: txn-001
+                  refundedLedgerId: ledger-002
+                  balanceAfter: 1250
+                  transactionType: refund
+  /api/billing/plans:
+    get:
+      tags: [Billing]
+      summary: 充值套餐列表
+      operationId: billingPlans
+      security: []
+      responses:
+        '200':
+          description: 套餐列表
+          content:
+            application/json:
+              example:
+                plans:
+                  - id: plan_basic
+                    name: 基础包
+                    amount: 3000
+                    credits: 1000
+                    currency: CNY
+  /api/billing/create-checkout:
+    post:
+      tags: [Billing]
+      summary: 创建 Stripe Checkout
+      description: 创建 Stripe 支付会话并生成 pending 订单记录。
+      operationId: createCheckout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planId]
+              properties:
+                planId: { type: string }
+                currency: { type: string }
+                successUrl: { type: string, format: uri }
+                cancelUrl: { type: string, format: uri }
+            example:
+              planId: plan_basic
+              currency: CNY
+              successUrl: https://kkai.plus/billing/success
+              cancelUrl: https://kkai.plus/billing/cancel
+      responses:
+        '200':
+          description: 支付会话
+          content:
+            application/json:
+              example:
+                url: https://checkout.stripe.com/c/pay/cs_test_xxx
+                stripeSessionId: cs_test_xxx
+        '500':
+          description: CHECKOUT_CREATE_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /webhook/stripe:
+    post:
+      tags: [Billing]
+      summary: Stripe Webhook
+      description: 处理 `checkout.session.completed` 事件，幂等结算加积分。需 `stripe-signature` 验签。
+      operationId: stripeWebhook
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 已接收
+          content:
+            application/json:
+              example:
+                received: true
+        '400':
+          description: 验签失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/billing/recharge-submissions:
+    post:
+      tags: [Billing]
+      summary: 创建充值申请
+      operationId: createRechargeSubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              creditAmount: 1000
+              amount: 30
+              currencyCode: CNY
+      responses:
+        '201':
+          description: 申请已创建
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  submission:
+                    submissionId: sub-01HX
+                    userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                    creditAmount: 1000
+                    amount: 30
+                    currencyCode: CNY
+                    status: draft
+                    createdAt: '2026-07-21T04:00:00.000Z'
+        '400':
+          description: INVALID_RECHARGE_PAYLOAD
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/billing/submit-recharge:
+    post:
+      tags: [Billing]
+      summary: 提交充值申请（直接置 pending）
+      operationId: submitRecharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              creditAmount: 1000
+              amount: 30
+              currencyCode: CNY
+      responses:
+        '200':
+          description: 已提交
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/billing/recharge-submissions/{submissionId}/proof:
+    post:
+      tags: [Billing]
+      summary: 提交充值凭证
+      operationId: rechargeProof
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              transferReferenceLast4: '8899'
+              note: 支付宝转账
+      responses:
+        '200':
+          description: 凭证已记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/billing/recharge-submissions/{submissionId}/mark-paid:
+    post:
+      tags: [Billing]
+      summary: 标记已支付
+      operationId: rechargeMarkPaid
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 已标记
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/billing/payment-channels:
+    get:
+      tags: [Billing]
+      summary: 支付渠道列表
+      operationId: paymentChannels
+      responses:
+        '200':
+          description: 渠道列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - channel: alipay
+                      label: 支付宝
+                      isActive: true
+                      instructionText: 转账后请提交凭证
+  /api/v1/billing/exchange-rates:
+    get:
+      tags: [Billing]
+      summary: 汇率列表
+      operationId: exchangeRates
+      responses:
+        '200':
+          description: 汇率列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - currencyCode: CNY
+                      creditsPerUnit: 33.3
+                      minAmount: 10
+                      maxAmount: 5000
+                      isActive: true
+                      updatedAt: '2026-07-01T00:00:00.000Z'
+
+  # ==================== Workspace ====================
+  /api/v1/workspaces/layout:
+    get:
+      tags: [Workspace]
+      summary: 获取画布布局
+      operationId: getLayout
+      responses:
+        '200':
+          description: 全部画布
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  canvases:
+                    - canvasId: canvas-01
+                      name: 灵感板
+                      folderName: 默认
+                      cards: []
+                      lastModified: '2026-07-20T12:00:00.000Z'
+    put:
+      tags: [Workspace]
+      summary: 整包保存画布布局
+      operationId: saveLayout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              canvases:
+                - canvasId: canvas-01
+                  name: 灵感板
+                  cards: []
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/workspaces/layout/meta:
+    get:
+      tags: [Workspace]
+      summary: 画布布局元信息
+      description: 返回画布与卡片元信息（坐标、尺寸、类型、缩略图），不含卡片详情。
+      operationId: getLayoutMeta
+      responses:
+        '200':
+          description: 元信息
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  canvases:
+                    - canvasId: canvas-01
+                      name: 灵感板
+                      folderName: 默认
+                      lastModified: '2026-07-20T12:00:00.000Z'
+                      cardMetas:
+                        - id: card-01
+                          x: 120
+                          y: 80
+                          width: 512
+                          height: 512
+                          type: image
+                          thumbnailUrl: https://cdn.kkai.plus/thumbs/card-01.jpg
+                          updatedAt: '2026-07-20T12:00:00.000Z'
+  /api/v1/workspaces/layout/batch-sync:
+    post:
+      tags: [Workspace]
+      summary: 画布增量同步
+      operationId: layoutBatchSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operations]
+              properties:
+                operations:
+                  type: array
+                  items:
+                    type: object
+                    required: [action, cardId, data]
+                    properties:
+                      canvasId: { type: string }
+                      action: { type: string, enum: [CREATE, UPDATE, MOVE, DELETE] }
+                      cardId: { type: string }
+                      data:
+                        type: object
+                        properties:
+                          type: { type: string, enum: [prompt, image, workflow] }
+            example:
+              operations:
+                - canvasId: canvas-01
+                  action: CREATE
+                  cardId: card-02
+                  data:
+                    type: prompt
+                    detail: 一只柴犬在樱花树下
+      responses:
+        '200':
+          description: 同步结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  success: true
+                  lastModified: '2026-07-21T04:00:00.000Z'
+  /api/v1/workspaces/cards/{cardId}:
+    get:
+      tags: [Workspace]
+      summary: 获取卡片详情
+      operationId: getCard
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 卡片详情
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  type: prompt
+                  detail: 一只柴犬在樱花树下
+        '404':
+          description: CARD_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/workspaces/layout/cloud-images:
+    delete:
+      tags: [Workspace]
+      summary: 清理未引用云端图片
+      description: 删除未被任何画布引用的图片资产。
+      operationId: cleanCloudImages
+      responses:
+        '200':
+          description: 清理结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  deletedCount: 12
+                  preservedLayout: true
+  /api/v1/workspaces/{workspaceId}/canvas:
+    get:
+      tags: [Workspace]
+      summary: 画布摘要
+      operationId: getCanvas
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: 画布摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/workspaces/{workspaceId}/workflows/{workflowId}:
+    get:
+      tags: [Workspace]
+      summary: 获取工作流
+      operationId: getWorkflow
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: 工作流
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  id: wf-01
+                  workspaceId: ws-01
+                  canvasId: canvas-01
+                  name: 商品图批量生成
+                  status: active
+                  version: 3
+                  nodes: []
+                  edges: []
+                  createdAt: '2026-06-01T00:00:00.000Z'
+                  updatedAt: '2026-07-20T00:00:00.000Z'
+        '404':
+          description: WORKFLOW_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      tags: [Workspace]
+      summary: 保存工作流
+      operationId: saveWorkflow
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                status: { type: string }
+                version: { type: integer }
+                nodes: { type: array, items: { type: object } }
+                edges: { type: array, items: { type: object } }
+            example:
+              name: 商品图批量生成
+              version: 4
+              nodes:
+                - id: n1
+                  type: prompt
+              edges: []
+      responses:
+        '200':
+          description: 保存后的工作流
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/generations:
+    get:
+      tags: [Workspace]
+      summary: 最近生成记录（旧式）
+      description: 返回当前用户最近 100 条生成记录。
+      operationId: generations
+      responses:
+        '200':
+          description: 生成记录
+          content:
+            application/json:
+              example:
+                generations:
+                  - id: gen-001
+                    user_id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                    prompt: 云端橘猫
+                    image_url: https://cdn.kkai.plus/gen/001.png
+                    created_at: '2026-07-20T10:00:00.000Z'
+
+  # ==================== Assets ====================
+  /api/v1/assets:
+    get:
+      tags: [Assets]
+      summary: 资产列表
+      operationId: listAssets
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [image, video, audio, document] }
+        - name: limit
+          in: query
+          schema: { type: integer, maximum: 500 }
+      responses:
+        '200':
+          description: 资产列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - id: asset-01
+                      kind: image
+                      storagePath: /api/v1/assets/asset-01/content
+                      mimeType: image/png
+                      sizeBytes: 204800
+                      metadata: {}
+                      createdAt: '2026-07-20T10:00:00.000Z'
+                      updatedAt: '2026-07-20T10:00:00.000Z'
+    post:
+      tags: [Assets]
+      summary: 上传资产
+      description: 以 data URL 方式上传资产（请求体上限 10mb）。
+      operationId: createAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, dataUrl]
+              properties:
+                kind: { type: string, enum: [image, video, audio, document] }
+                dataUrl: { type: string, description: 'data:mime;base64,...' }
+                mimeType: { type: string }
+                id: { type: string }
+                sizeBytes: { type: integer }
+                metadata: { type: object }
+            example:
+              kind: image
+              dataUrl: data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...
+              mimeType: image/png
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  asset:
+                    id: asset-01
+                    kind: image
+                    storagePath: /api/v1/assets/asset-01/content
+                    mimeType: image/png
+                    sizeBytes: 204800
+                    createdAt: '2026-07-21T04:00:00.000Z'
+                    updatedAt: '2026-07-21T04:00:00.000Z'
+                  url: /api/v1/assets/asset-01/content
+        '400':
+          description: ASSET_KIND_INVALID / ASSET_DATA_INVALID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/assets/{assetId}/content:
+    get:
+      tags: [Assets]
+      summary: 获取资产二进制内容
+      description: "返回资产原始二进制流（`Cache-Control: private, max-age=31536000, immutable`）。"
+      operationId: getAssetContent
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 二进制内容
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: ASSET_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  # ==================== Generation Jobs ====================
+  /api/v1/generation-tasks:
+    post:
+      tags: [Generation Jobs]
+      summary: 创建轻量生成任务（幂等）
+      operationId: createGenerationTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              idempotencyKey: idem-001
+              workspaceId: ws-01
+              workflowId: wf-01
+              modelCode: gpt-image-1
+              taskType: image
+              prompt: 云端橘猫
+              references: []
+      responses:
+        '201':
+          description: 任务已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/generation-tasks/{taskId}:
+    get:
+      tags: [Generation Jobs]
+      summary: 获取轻量生成任务
+      operationId: getGenerationTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/generation-jobs:
+    post:
+      tags: [Generation Jobs]
+      summary: 创建批量生成作业
+      description: Durable Queue 批量作业，一次提交多个 prompt，支持并发控制与输出分组。
+      operationId: createGenerationJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGenerationJobRequest'
+            example:
+              idempotencyKey: batch-001
+              workspaceId: ws-01
+              modelCode: gpt-image-1
+              taskType: image
+              concurrency: 3
+              parameters:
+                size: 1024x1024
+              prompts:
+                - id: p1
+                  prompt: 商品主图：白色背景
+                - id: p2
+                  prompt: 商品场景图：客厅
+                  referenceImageNodeId: node-01
+              outputGroup: group-01
+      responses:
+        '201':
+          description: 作业已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '400':
+          description: INVALID_GENERATION_JOB / GENERATION_JOB_CREATE_FAILED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    get:
+      tags: [Generation Jobs]
+      summary: 批量生成作业列表（cursor 分页）
+      operationId: listGenerationJobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [queued, running, paused, completed, failed, cancelled]
+        - name: limit
+          in: query
+          schema: { type: integer, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, format: date-time }
+          description: 取 created_at 早于该时间的记录
+      responses:
+        '200':
+          description: 作业列表
+          content:
+            application/json:
+              example:
+                jobs:
+                  - schemaVersion: 2
+                    id: job-01HX
+                    idempotencyKey: batch-001
+                    workspaceId: ws-01
+                    modelCode: gpt-image-1
+                    taskType: image
+                    status: running
+                    progress:
+                      total: 2
+                      completed: 1
+                      failed: 0
+                      percent: 50
+                    outputs: []
+                    items: []
+                    createdAt: '2026-07-21T03:00:00.000Z'
+                    updatedAt: '2026-07-21T03:05:00.000Z'
+                cursor: '2026-07-21T03:00:00.000Z'
+  /api/v1/generation-jobs/{jobId}:
+    get:
+      tags: [Generation Jobs]
+      summary: 获取批量生成作业
+      operationId: getGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/GenerationJobId'
+      responses:
+        '200':
+          description: 作业详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '404':
+          description: GENERATION_JOB_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      tags: [Generation Jobs]
+      summary: 更新批量生成作业（需持租约）
+      description: 更新作业状态/进度/输出。必须携带有效租约，冲突时返回 409。
+      operationId: updateGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leaseOwner, leaseExpiresAt]
+              properties:
+                status: { type: string, enum: [queued, running, paused, completed, failed, cancelled] }
+                progress:
+                  type: object
+                  properties:
+                    percent: { type: number }
+                outputs: { type: array, items: { type: object } }
+                items: { type: array, items: { type: object } }
+                leaseOwner: { type: string }
+                leaseExpiresAt: { type: string, format: date-time }
+            example:
+              status: running
+              progress:
+                percent: 75
+              leaseOwner: worker-01
+              leaseExpiresAt: '2026-07-21T04:30:00.000Z'
+      responses:
+        '200':
+          description: 更新后的作业
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '409':
+          description: GENERATION_JOB_LEASE_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/generation-jobs/{jobId}/control:
+    post:
+      tags: [Generation Jobs]
+      summary: 控制批量生成作业
+      operationId: controlGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [pause, resume, cancel] }
+            example:
+              action: pause
+      responses:
+        '200':
+          description: 控制结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '400':
+          description: INVALID_GENERATION_JOB_CONTROL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/generation-jobs/{jobId}/claim:
+    post:
+      tags: [Generation Jobs]
+      summary: 抢占作业租约
+      operationId: claimGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/GenerationJobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leaseOwner, leaseSeconds]
+              properties:
+                leaseOwner: { type: string }
+                leaseSeconds: { type: integer }
+            example:
+              leaseOwner: worker-01
+              leaseSeconds: 300
+      responses:
+        '200':
+          description: 租约获取结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '409':
+          description: GENERATION_JOB_LEASE_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  # ==================== Model Catalog ====================
+  /api/v1/model-catalog/models:
+    get:
+      tags: [Model Catalog]
+      summary: 模型目录
+      operationId: modelCatalog
+      security: []
+      responses:
+        '200':
+          description: 模型列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - id: model-01
+                      modelCode: gpt-image-1
+                      displayName: GPT Image 1
+                      kind: image
+                      availability: available
+                      billingMode: credits
+                      defaultCreditCost: 20
+  /api/v1/model-catalog/active:
+    get:
+      tags: [Model Catalog]
+      summary: 启用中的计费模型
+      operationId: activeModels
+      security: []
+      responses:
+        '200':
+          description: 按 provider 分组的启用模型
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items: []
+  /api/v1/model-catalog/active-credit-models:
+    get:
+      tags: [Model Catalog]
+      summary: 启用中的积分模型
+      operationId: activeCreditModels
+      security: []
+      responses:
+        '200':
+          description: 启用积分模型
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items: []
+
+  # ==================== Admin ====================
+  /api/v1/admin/access:
+    get:
+      tags: [Admin]
+      summary: 管理员访问状态
+      operationId: adminAccess
+      responses:
+        '200':
+          description: 访问状态
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  role: admin
+                  isAdmin: true
+                  requiresPasswordChange: false
+                  adminSessionActive: true
+                  adminSessionExpiresAt: '2026-07-21T06:00:00.000Z'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/session/verify-password:
+    post:
+      tags: [Admin]
+      summary: 验证管理密码并开启二次会话
+      description: 验证通过后返回 `adminSessionToken`，后续高危操作通过 `X-KK-Admin-Session-Token` 头携带。
+      operationId: adminVerifyPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              password: admin-secret
+      responses:
+        '200':
+          description: 验证通过
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  verified: true
+                  adminSessionToken: ast-9f8e7d6c
+                  adminSessionExpiresAt: '2026-07-21T06:00:00.000Z'
+        '400':
+          description: ADMIN_PASSWORD_REQUIRED / ADMIN_PASSWORD_INVALID / ADMIN_PASSWORD_NOT_CONFIGURED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/admin/password:
+    post:
+      tags: [Admin]
+      summary: 修改管理密码
+      operationId: adminSetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              newPassword: N3wAdminP@ss
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: ADMIN_WEAK_PASSWORD
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: 用户列表（分页）
+      operationId: adminUsers
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 用户列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  users:
+                    - id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                      email: user@example.com
+                      credits: 1250
+                      adminLevel: 0
+                      userType: registered
+                      rechargeAmount: 3000
+                      createdAt: '2026-01-15T08:00:00.000Z'
+                  total: 152
+                  page: 1
+                  limit: 20
+  /api/v1/admin/users/roles:
+    post:
+      tags: [Admin]
+      summary: 设置用户角色
+      operationId: adminSetRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              identity: user@example.com
+              role: admin
+      responses:
+        '200':
+          description: 设置成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: IDENTITY_REQUIRED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/admin/billing/recharges:
+    post:
+      tags: [Admin]
+      summary: 管理员充值
+      operationId: adminRecharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identity, creditAmount]
+              properties:
+                identity: { type: string, description: 用户邮箱或 ID }
+                creditAmount: { type: integer, minimum: 1 }
+                description: { type: string }
+            example:
+              identity: user@example.com
+              creditAmount: 500
+              description: 活动赠送
+      responses:
+        '200':
+          description: 充值结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  identity: user@example.com
+                  subjectId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  balanceAfter: 1750
+                  creditedAmount: 500
+                  subjectEmail: user@example.com
+  /api/v1/admin/billing/credit-adjustments:
+    post:
+      tags: [Admin]
+      summary: 积分调整
+      operationId: adminCreditAdjust
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identity]
+              properties:
+                identity: { type: string }
+                creditDelta: { type: integer, description: 非 0 }
+                description: { type: string }
+            example:
+              identity: user@example.com
+              creditDelta: -100
+              description: 违规扣减
+      responses:
+        '200':
+          description: 调整结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: INVALID_CREDIT_ADJUSTMENT_PAYLOAD
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/admin/billing/accounts/{identity}:
+    get:
+      tags: [Admin]
+      summary: 用户积分账户详情
+      operationId: adminBillingAccount
+      parameters:
+        - name: identity
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 账户详情
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  identity: user@example.com
+                  subjectId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  subjectEmail: user@example.com
+                  balance: 1250
+                  frozenBalance: 0
+                  transactions: []
+  /api/v1/admin/billing/exchange-rates:
+    put:
+      tags: [Admin]
+      summary: 设置汇率
+      operationId: adminSetExchangeRate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currencyCode, creditsPerUnit]
+              properties:
+                currencyCode: { type: string, enum: [CNY, USD] }
+                creditsPerUnit: { type: number }
+                minAmount: { type: number }
+                maxAmount: { type: number }
+                isActive: { type: boolean }
+            example:
+              currencyCode: CNY
+              creditsPerUnit: 33.3
+              minAmount: 10
+              maxAmount: 5000
+              isActive: true
+      responses:
+        '200':
+          description: 设置成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/admin/billing/recharge-submissions:
+    get:
+      tags: [Admin]
+      summary: 充值申请列表
+      operationId: adminRechargeSubmissions
+      responses:
+        '200':
+          description: 申请列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - submissionId: sub-01HX
+                      userId: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                      creditAmount: 1000
+                      status: pending
+                      createdAt: '2026-07-21T04:00:00.000Z'
+  /api/v1/admin/billing/recharge-submissions/{submissionId}:
+    get:
+      tags: [Admin]
+      summary: 充值申请详情
+      operationId: adminRechargeSubmission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 申请详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '404':
+          description: RECHARGE_SUBMISSION_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/admin/billing/recharge-submissions/{submissionId}/review:
+    post:
+      tags: [Admin]
+      summary: 审核充值申请
+      operationId: adminReviewRecharge
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+            example:
+              decision: approve
+      responses:
+        '200':
+          description: 审核结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/admin/models:
+    post:
+      tags: [Admin]
+      summary: 创建模型
+      operationId: adminCreateModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modelCode]
+              properties:
+                modelCode: { type: string }
+                displayName: { type: string }
+                kind: { type: string, enum: [image, chat] }
+                availability: { type: string, enum: [available, disabled] }
+                billingMode: { type: string }
+                defaultCreditCost: { type: integer }
+            example:
+              modelCode: gpt-image-1
+              displayName: GPT Image 1
+              kind: image
+              availability: available
+              billingMode: credits
+              defaultCreditCost: 20
+      responses:
+        '201':
+          description: 模型已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/admin/credit-providers:
+    get:
+      tags: [Admin]
+      summary: 计费供应商列表（L2）
+      operationId: adminCreditProviders
+      responses:
+        '200':
+          description: 供应商列表
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  items:
+                    - providerId: prov-01
+                      providerName: OpenAI Official
+                      providerKind: official
+                      baseUrl: https://api.openai.com/v1
+                      models: []
+  /api/v1/admin/credit-providers/{providerId}:
+    put:
+      tags: [Admin]
+      summary: 保存计费供应商（L2）
+      description: 保存供应商配置及其模型列表（1–500 个模型），含路由策略、积分价格、限流等。
+      operationId: adminSaveCreditProvider
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCreditProviderRequest'
+            example:
+              providerName: OpenAI Official
+              baseUrl: https://api.openai.com/v1
+              providerKind: official
+              apiKeys:
+                - sk-xxxxxxxx
+              models:
+                - modelId: gpt-4o
+                  displayName: GPT-4o
+                  endpointType: openai_chat_completions
+                  routeStrategy: priority-failover
+                  creditCost: 5
+                  advancedEnabled: false
+                  mixWithSameModel: false
+                  qualityPricing:
+                    key:
+                      enabled: false
+                      creditCost: 0
+                  priority: 1
+                  weight: 100
+                  isActive: true
+                  color: '#10a37f'
+                  textColor: '#ffffff'
+                  autoPauseOnLimit: true
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: DOCS_PENDING_PROVIDER_NOT_EXECUTABLE / 校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      tags: [Admin]
+      summary: 删除计费供应商（L2）
+      operationId: adminDeleteCreditProvider
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/admin/credit-providers/{providerId}/pricing-cache:
+    get:
+      tags: [Admin]
+      summary: 读取供应商价格缓存（L2）
+      operationId: adminGetPricingCache
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '200':
+          description: 价格缓存
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  providerId: prov-01
+                  pricing: []
+                  cachedAt: '2026-07-20T00:00:00.000Z'
+    put:
+      tags: [Admin]
+      summary: 写入供应商价格缓存（L2）
+      operationId: adminPutPricingCache
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              pricing:
+                - modelId: gpt-4o
+                  inputPrice: '2.5'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+  /api/v1/admin/provider-probe:
+    post:
+      tags: [Admin]
+      summary: 供应商协议探测（管理员，L2）
+      operationId: adminProviderProbe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderProbeRequest'
+            example:
+              providerKind: relay
+              baseUrl: https://relay.example.com/v1
+              apiKey: sk-xxxxxxxx
+      responses:
+        '200':
+          description: 探测结果
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  ok: true
+                  adapterId: openai-compatible
+                  protocolFamily: openai
+                  normalizedBaseUrl: https://relay.example.com/v1
+                  models: [gpt-4o]
+                  confidence: high
+                  warnings: []
+                  diagnostics: []
+                  ownerKind: admin
+                  billingMode: system-credit-before-request
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: 用户列表（旧式，L2）
+      operationId: legacyAdminUsers
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 用户列表
+          content:
+            application/json:
+              example:
+                users:
+                  - id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                    email: user@example.com
+                    credits: 1250
+                    adminLevel: 0
+                    userType: registered
+                    rechargeAmount: 3000
+                    createdAt: '2026-01-15T08:00:00.000Z'
+                total: 152
+                page: 1
+                limit: 20
+  /api/admin/users/{id}/recharge:
+    post:
+      tags: [Admin]
+      summary: 用户充值（旧式，L2）
+      operationId: legacyAdminRecharge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, minimum: 1, maximum: 100000 }
+                note: { type: string }
+            example:
+              amount: 500
+              note: 活动赠送
+      responses:
+        '200':
+          description: 充值结果
+          content:
+            application/json:
+              example:
+                success: true
+                newBalance: 1750
+  /api/admin/users/{id}/credits:
+    patch:
+      tags: [Admin]
+      summary: 积分调整（旧式，L2）
+      operationId: legacyAdminCreditAdjust
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta, note]
+              properties:
+                delta: { type: integer, description: 非 0 }
+                note: { type: string }
+            example:
+              delta: -100
+              note: 违规扣减
+      responses:
+        '200':
+          description: 调整结果
+          content:
+            application/json:
+              example:
+                success: true
+                newBalance: 1150
+  /api/admin/users/{id}/admin-level:
+    patch:
+      tags: [Admin]
+      summary: 设置管理员级别（L1 超管）
+      operationId: legacyAdminSetLevel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admin_level]
+              properties:
+                admin_level: { type: integer, enum: [0, 2] }
+            example:
+              admin_level: 2
+      responses:
+        '200':
+          description: 设置结果
+          content:
+            application/json:
+              example:
+                success: true
+                user:
+                  id: 3f8a1c2e-7b4d-4e1a-9c5f-2d8b6a0e1f3c
+                  email: user@example.com
+                  adminLevel: 2
+  /api/admin/api-config:
+    get:
+      tags: [Admin]
+      summary: 操作计费配置（旧式，L2）
+      operationId: legacyAdminApiConfig
+      responses:
+        '200':
+          description: 计费配置
+          content:
+            application/json:
+              example:
+                config:
+                  - operation_key: image_generate
+                    operation_name: 图像生成
+                    cost: 20
+                    is_active: true
+    patch:
+      tags: [Admin]
+      summary: 修改操作计费（旧式，L2）
+      operationId: legacyAdminApiConfigPatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operation_key, cost]
+              properties:
+                operation_key: { type: string }
+                cost: { type: integer, minimum: 0, maximum: 10000 }
+            example:
+              operation_key: image_generate
+              cost: 25
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  # ==================== AI Assistant ====================
+  /api/ai-assistant/runs:
+    post:
+      tags: [AI Assistant]
+      summary: 保存 Agent 运行记录
+      description: "乐观并发控制：`updatedAt` 过期时返回 `{ ok: true, stale: true, data }`。"
+      operationId: saveAgentRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id: run-001
+              userMessage: 帮我生成 10 张商品图
+              intent: batch_generate
+              plan:
+                steps: []
+              status: running
+              stepResults: []
+              updatedAt: '2026-07-21T04:00:00.000Z'
+      responses:
+        '200':
+          description: 保存结果（可能 stale）
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  id: run-001
+                  status: running
+                  updatedAt: '2026-07-21T04:00:00.000Z'
+  /api/ai-assistant/tool-calls:
+    post:
+      tags: [AI Assistant]
+      summary: 保存工具调用记录
+      operationId: saveToolCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id: tc-001
+              runId: run-001
+              stepId: step-1
+              toolName: generation_jobs.create
+              inputSummary: 创建批量生成作业
+              outputSummary: 作业已创建 job-01HX
+              status: completed
+              outcome: success
+              retryable: false
+              startedAt: '2026-07-21T04:00:00.000Z'
+              completedAt: '2026-07-21T04:00:05.000Z'
+              idempotencyKey: idem-tc-001
+      responses:
+        '200':
+          description: 保存结果
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  id: tc-001
+  /api/ai-assistant/skills:
+    post:
+      tags: [AI Assistant]
+      summary: 保存技能（版本化 upsert）
+      operationId: saveSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id: skill-001
+              name: 批量商品图
+              trigger: 批量生成商品图
+              tools: [generation_jobs.create]
+              steps:
+                - 收集商品信息
+                - 创建批量作业
+              safety: []
+              validation: []
+              knowledgeUpdates: []
+              updatedAt: '2026-07-21T04:00:00.000Z'
+      responses:
+        '200':
+          description: 保存结果（可能 stale）
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  id: skill-001
+  /api/ai-assistant/skills/{id}:
+    delete:
+      tags: [AI Assistant]
+      summary: 删除技能
+      operationId: deleteSkill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              name: 批量商品图
+              updatedAt: '2026-07-21T04:00:00.000Z'
+      responses:
+        '200':
+          description: 删除结果
+          content:
+            application/json:
+              example:
+                ok: true
+                stale: false
+                deleted: true
+                id: skill-001
+                authoritativeUpdatedAt: '2026-07-21T04:00:00.000Z'
+                authoritativeDeleted: true
+  /api/ai-assistant/changes:
+    post:
+      tags: [AI Assistant]
+      summary: 保存变更知识文档
+      operationId: saveChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              id: change-001
+              title: 新增批量作业接口
+              summary: generation-jobs 支持租约控制
+              source: code_change
+              paths: [server/routes/compat/workspace.js]
+      responses:
+        '200':
+          description: 保存结果
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  id: change-001
+  /api/ai-assistant/knowledge:
+    get:
+      tags: [AI Assistant]
+      summary: 查询知识库
+      description: 返回 system 级与个人知识文档（最多 20 条）。
+      operationId: getKnowledge
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 知识文档列表
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  - id: change-001
+                    title: 新增批量作业接口
+                    summary: generation-jobs 支持租约控制
+                    source: code_change
+
+  # ==================== Local Runner ====================
+  /api/health:
+    get:
+      tags: [Local Runner]
+      summary: local-runner 健康检查
+      description: "端口 9099。需 `Authorization: <local-token>`。"
+      operationId: localRunnerHealth
+      servers:
+        - url: http://localhost:9099
+      responses:
+        '200':
+          description: 健康状态
+          content:
+            application/json:
+              example:
+                ok: true
+  /api/browser/sessions:
+    get:
+      tags: [Local Runner]
+      summary: 浏览器会话列表
+      operationId: localBrowserSessions
+      servers:
+        - url: http://localhost:9099
+      responses:
+        '200':
+          description: 会话列表
+          content:
+            application/json:
+              example:
+                sessions: []
+        '401':
+          description: 本地 token 无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/opencli/execute:
+    post:
+      tags: [Local Runner]
+      summary: 执行本地 CLI 指令
+      description: 执行 allowlist 内的本地指令。400=allowlist 拦截，403=权限策略拒绝，401=token 无效。
+      operationId: localOpencliExecute
+      servers:
+        - url: http://localhost:9099
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              kind: browser
+              target: navigate
+              payload:
+                url: https://example.com
+      responses:
+        '200':
+          description: 执行结果
+          content:
+            application/json:
+              example:
+                id: exec-001
+                status: success
+                summary: 已打开页面
+                data: {}
+        '400':
+          description: allowlist 拦截
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: 权限策略拒绝
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  # ==================== 杂项 ====================
+  /api/ecommerce-analysis:
+    post:
+      tags: [System]
+      summary: 电商分析（未实现）
+      description: 恒返回 501。
+      operationId: ecommerceAnalysis
+      responses:
+        '501':
+          description: 未实现
+          content:
+            application/json:
+              example:
+                error: Not implemented
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 主要认证方式。也可使用 HttpOnly Cookie 会话（kk.api.access_token）。
+    tempUserHeader:
+      type: apiKey
+      in: header
+      name: X-KK-Temp-User-Id
+      description: 临时用户头（仅 KKAI_LOCAL_ONLY=true 时允许），格式 temp-xxxx。
+    adminSessionHeader:
+      type: apiKey
+      in: header
+      name: X-KK-Admin-Session-Token
+      description: 管理员二次会话令牌（verify-password 接口返回），用于管理后台高危操作。
+  parameters:
+    WorkspaceId:
+      in: path
+      name: workspaceId
+      required: true
+      schema:
+        type: string
+    WorkflowId:
+      in: path
+      name: workflowId
+      required: true
+      schema:
+        type: string
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema:
+        type: string
+    GenerationJobId:
+      in: path
+      name: jobId
+      required: true
+      schema:
+        type: string
+    ProviderId:
+      in: path
+      name: providerId
+      required: true
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: 未认证或认证无效（UNAUTHORIZED / AUTH_REQUIRED）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: 请先登录
+    Forbidden:
+      description: 无权限（FORBIDDEN）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 大写下划线错误码
+          example: AUTH_INVALID_CREDENTIALS
+        message:
+          type: string
+          example: 邮箱或密码错误
+        details:
+          type: object
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          $ref: '#/components/schemas/Meta'
+    Meta:
+      type: object
+      properties:
+        requestId:
+          type: string
+          example: req-01HXYZABC
+        timestamp:
+          type: string
+          format: date-time
+    HealthzResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        success: { type: boolean }
+        service: { type: string, example: kk-studio-api }
+        status: { type: string, enum: [healthy, unhealthy] }
+        selfHostedCoreReady: { type: boolean }
+        canonicalPersistenceReady: { type: boolean }
+        config: { type: object }
+        repositories: { type: object }
+        persistence: { type: object }
+        runtime:
+          type: object
+          properties:
+            localOnly: { type: boolean }
+            blockers: { type: array, items: { type: string } }
+        auth: { type: object }
+        database: { type: object }
+        uploads: { type: object }
+        provider: { type: object }
+    AuthSessionEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessToken: { type: string }
+            refreshToken: { type: string }
+            sessionExpiresAt: { type: string, format: date-time }
+        meta:
+          $ref: '#/components/schemas/Meta'
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        nickname: { type: string }
+        avatarUrl: { type: string, format: uri }
+        adminLevel: { type: integer, description: '0=普通用户 1=超管 2=管理员' }
+        role: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProfileEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/User'
+            - type: object
+              properties:
+                credits: { type: integer, example: 1250 }
+        meta:
+          $ref: '#/components/schemas/Meta'
+    UserApiEntry:
+      type: object
+      properties:
+        id: { type: string }
+        key: { type: string, description: API Key（响应中通常脱敏） }
+        name: { type: string }
+        provider: { type: string }
+        type: { type: string, enum: [official, proxy, third-party] }
+        format: { type: string, enum: [gemini, openai, auto, claude] }
+        baseUrl: { type: string, format: uri }
+        supportedModels: { type: array, items: { type: string } }
+        disabled: { type: boolean }
+        status: { type: string, enum: [valid, invalid, rate_limited, unknown] }
+        failCount: { type: integer }
+        successCount: { type: integer }
+        totalCost: { type: number }
+        budgetLimit: { type: number, description: '-1 表示无限制' }
+        tokenLimit: { type: integer }
+        usedTokens: { type: integer }
+        lastUsed: { type: string, format: date-time }
+        lastError: { type: string }
+        endpointType: { type: string }
+        adapterId: { type: string }
+        requestProfileId: { type: string }
+        protocolFamily: { type: string }
+        routeStrategy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UserApiEntriesPayload:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserApiEntry'
+    ProviderProbeRequest:
+      type: object
+      required: [baseUrl, apiKey]
+      properties:
+        providerName: { type: string }
+        providerHint: { type: string }
+        providerKind:
+          type: string
+          enum: [official, relay]
+          default: relay
+        baseUrl: { type: string, maxLength: 2048, format: uri }
+        apiKey: { type: string, maxLength: 4096 }
+        modelId: { type: string }
+        endpointType: { type: string, default: auto }
+        requestProfileId: { type: string }
+    CreateGenerationJobRequest:
+      type: object
+      required: [idempotencyKey, workspaceId, modelCode, taskType, prompts]
+      properties:
+        idempotencyKey: { type: string }
+        workspaceId: { type: string }
+        modelCode: { type: string }
+        taskType: { type: string, enum: [image, video, audio, chat] }
+        parameters: { type: object }
+        prompts:
+          type: array
+          items:
+            type: object
+            required: [id, prompt]
+            properties:
+              id: { type: string }
+              prompt: { type: string }
+              referenceImageNodeId: { type: string }
+        concurrency: { type: integer }
+        outputGroup: { type: string }
+    GenerationJob:
+      type: object
+      properties:
+        schemaVersion: { type: integer, example: 2 }
+        id: { type: string }
+        idempotencyKey: { type: string }
+        workspaceId: { type: string }
+        modelCode: { type: string }
+        taskType: { type: string, enum: [image, video, audio, chat] }
+        status:
+          type: string
+          enum: [queued, running, paused, completed, failed, cancelled]
+        parameters: { type: object }
+        progress:
+          type: object
+          properties:
+            total: { type: integer }
+            completed: { type: integer }
+            failed: { type: integer }
+            percent: { type: number }
+        outputs: { type: array, items: { type: object } }
+        items: { type: array, items: { type: object } }
+        outputGroup: { type: string }
+        leaseOwner: { type: string }
+        leaseExpiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    GenerationJobEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          $ref: '#/components/schemas/GenerationJob'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    SaveCreditProviderRequest:
+      type: object
+      required: [providerName, baseUrl, providerKind, models]
+      properties:
+        providerName: { type: string }
+        baseUrl: { type: string, format: uri }
+        providerKind: { type: string, enum: [official, relay] }
+        apiKeys: { type: array, items: { type: string } }
+        retainApiKeyFingerprints: { type: array, items: { type: string } }
+        models:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [modelId, displayName, creditCost]
+            properties:
+              modelId: { type: string }
+              displayName: { type: string }
+              description: { type: string }
+              endpointType: { type: string, default: openai_chat_completions }
+              requestProfileId: { type: string }
+              routeStrategy:
+                type: string
+                enum: [priority-failover, weighted-random, parallel-race]
+              creditCost: { type: integer }
+              advancedEnabled: { type: boolean }
+              mixWithSameModel: { type: boolean }
+              qualityPricing: { type: object }
+              priority: { type: integer }
+              weight: { type: integer }
+              isActive: { type: boolean }
+              color: { type: string }
+              colorSecondary: { type: string }
+              textColor: { type: string }
+              maxCallsLimit: { type: integer }
+              autoPauseOnLimit: { type: boolean }

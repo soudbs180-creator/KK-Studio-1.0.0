@@ -1,3 +1,5 @@
+Status: reference
+
 # TypeScript API Client
 
 `@kk/api-client` 是 KK Studio 跨端 HTTP 入口。当前 `packages/api-client/src/index.ts` 只执行：

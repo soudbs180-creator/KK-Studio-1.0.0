@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio 项目文档导航 (docs/README.md)
 
 欢迎使用 **KK Studio v1.6.0** 的项目文档知识库。本目录是 KK Studio 的开发与治理护城河。

@@ -1,3 +1,5 @@
+Status: historical
+
 # Hosted Release Runbook
 
 ## Goal

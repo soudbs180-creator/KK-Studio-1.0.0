@@ -1,3 +1,5 @@
+Status: reference
+
 # 批量重绘生图 Skill (batch-generate-to-canvas)
 
 - **触发词**: “批量生成 30 张商品主图，整理成卡片组” / “帮我把这个文件夹里面的图片全部修改成紧凑的排版布局，比例改成4:5”

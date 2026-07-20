@@ -1,3 +1,5 @@
+Status: reference
+
 ---
 name: arrange-selected-cards
 description: 画布卡片排版整理技能，获取当前选区内的图像与 Prompt 卡片，调用对应的局域网格排列或全局排版对齐逻辑，使大画布上的多节点布局整齐、无几何重叠。

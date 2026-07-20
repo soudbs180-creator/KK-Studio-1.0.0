@@ -1,3 +1,5 @@
+Status: historical
+
 # Delta Spec: workspace-ui
 
 ## ADDED Requirements

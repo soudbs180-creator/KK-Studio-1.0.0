@@ -1,3 +1,5 @@
+Status: reference
+
 # API 适配器路由说明
 
 ## 适配器分类

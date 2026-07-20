@@ -1,3 +1,5 @@
+Status: reference
+
 # Skill: 工具箱插件多实例运行时 (toolbox-plugin-multi-instance-runtime)
 
 ## 触发场景 (Trigger)

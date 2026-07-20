@@ -1,3 +1,5 @@
+Status: reference
+
 # Domain Modules
 
 建议按业务模块组织领域代码：

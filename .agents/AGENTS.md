@@ -1,3 +1,5 @@
+Status: reference
+
 # Workspace Agent Rules - KK Studio v1.6.0
 
 Last updated: 2026-07-20

@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: harden-ai-control-plane
 
 ## Motivation

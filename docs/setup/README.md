@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio 当前部署与本地运行
 
 本目录只描述 KK Studio v1.6.0 当前的 `apps/web/` + `server/` + VPS

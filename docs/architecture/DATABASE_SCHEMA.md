@@ -1,3 +1,5 @@
+Status: reference
+
 # VPS PostgreSQL Runtime Schema
 
 The canonical hosted database is a normal PostgreSQL database on the VPS. Schema changes belong in `migrations/` and `scripts/postgres/`; business code must not execute DDL.

@@ -1,3 +1,5 @@
+Status: reference
+
 # Nano-banana 官方格式 gemini-3-pro-image-preview
 
 ## OpenAPI Specification

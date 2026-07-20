@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Admin VPS Deployment
 
 This document is a tombstone for the retired standalone `apps/admin` deployment.

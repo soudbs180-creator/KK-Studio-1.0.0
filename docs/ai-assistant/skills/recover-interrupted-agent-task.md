@@ -1,3 +1,5 @@
+Status: reference
+
 # 恢复中断任务 Skill (recover-interrupted-agent-task)
 
 - **适用场景**: 页面刷新、意外网络中断或浏览器关闭导致批量处理卡死。

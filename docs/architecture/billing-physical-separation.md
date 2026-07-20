@@ -1,3 +1,5 @@
+Status: reference
+
 # Billing Physical Separation (Two Independent Databases)
 - 目标：实现两条计费线的完全物理分离，避免混用，提升可靠性与可观测性。
 - 核心原则

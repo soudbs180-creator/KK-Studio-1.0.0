@@ -1,3 +1,5 @@
+Status: historical
+
 # Capability Spec: agent-capabilities
 
 AI 助手多维控制能力规格书。

@@ -1,6 +1,6 @@
 # Supabase CLI 资料（历史索引）
 
-Status: archived; Supabase CLI 不属于当前 KK Studio 发布链路。当前数据库
+Status: reference Supabase CLI 不属于当前 KK Studio 发布链路。当前数据库
 迁移入口是 `migrations/`，发布与验证入口是 `docs/setup/GUIDE.md`。
 
 本文件不保留登录命令、项目引用、环境变量或访问令牌示例，以免旧托管

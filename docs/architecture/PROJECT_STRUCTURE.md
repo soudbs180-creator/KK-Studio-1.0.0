@@ -1,3 +1,5 @@
+Status: reference
+
 # Project Structure
 
 This document defines current ownership rules for KK Studio v1.6.0. It is aligned with `AGENTS.md` and the live repository layout.

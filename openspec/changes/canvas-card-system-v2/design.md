@@ -1,3 +1,5 @@
+Status: historical
+
 # Design: canvas-card-system-v2
 
 ## Runtime boundaries

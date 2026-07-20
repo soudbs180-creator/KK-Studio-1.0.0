@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio 文档文件速查索引 (docs/INDEX.md)
 
 以下为当前 **v1.6.0** 架构下，所有有效核心文档的文件路径及其定位的速查表。

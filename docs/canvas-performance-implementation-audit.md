@@ -1,3 +1,5 @@
+Status: historical
+
 # Canvas Performance Implementation Audit
 
 > 审核目标：对照 `docs/canvas-performance-refactor-plan.md`，检查当前 `main` 是否已经按要求完成画布性能与稳定性改造，并明确下一步必须推进的代码范围。

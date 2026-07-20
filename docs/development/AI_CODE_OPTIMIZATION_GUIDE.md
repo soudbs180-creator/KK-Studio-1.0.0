@@ -1,3 +1,5 @@
+Status: historical
+
 # AI Code Optimization Execution Guide — KK Studio
 
 Last updated: 2026-06-24

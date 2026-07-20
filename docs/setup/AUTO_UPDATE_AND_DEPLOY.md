@@ -1,3 +1,5 @@
+Status: reference
+
 # Auto Update And Deploy
 
 This guide keeps the repository tidy while enabling automatic updates for both the hosted app and the portable client.

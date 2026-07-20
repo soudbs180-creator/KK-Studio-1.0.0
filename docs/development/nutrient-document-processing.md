@@ -1,3 +1,5 @@
+Status: historical
+
 # Nutrient Document Processing
 
 KK Studio now includes a server-side Nutrient proxy at `/api/nutrient-document` for document workflows that should not expose secrets in the browser.

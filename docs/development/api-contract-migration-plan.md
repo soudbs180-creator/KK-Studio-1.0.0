@@ -1,3 +1,5 @@
+Status: historical
+
 # API 契约与过渡迁移方案 (API Contract Migration Plan)
 
 本文件说明 `KK Studio` 从旧图像生成协议向 `StandardImageGenerationResult` 统一标准契约过渡的演进细节与兼容方案。

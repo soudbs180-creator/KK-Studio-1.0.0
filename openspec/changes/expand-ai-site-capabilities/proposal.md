@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: expand-ai-site-capabilities
 
 ## Motivation

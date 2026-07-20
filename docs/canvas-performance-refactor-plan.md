@@ -1,3 +1,5 @@
+Status: historical
+
 # Canvas Performance Refactor Plan
 
 > 目标：把 KK Studio 画布从“效果优先、局部优化”收口到“交互优先、分层渲染、可度量、可回滚”的轻量化架构，确保多卡片场景下点击、拖拽、平移、缩放、选择菜单和分组操作保持跟手。

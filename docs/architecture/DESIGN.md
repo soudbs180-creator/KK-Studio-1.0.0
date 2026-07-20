@@ -1,6 +1,6 @@
 # KK Studio Canvas-First Workspace UI
 
-Status: current visual direction for KK Studio v1.6.0.
+Status: reference visual direction for KK Studio v1.6.0.
 Last reviewed: 2026-07-20.
 Owner: `packages/ui` tokens and primitives; feature composition remains in
 `apps/web/`.

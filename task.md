@@ -1,3 +1,5 @@
+Status: historical
+
 # Sprint 8: 智能 CDN 与工具箱多实例管理 任务列表
 
 - [x] Service Worker 离线回退与静态资源 CDN 降级

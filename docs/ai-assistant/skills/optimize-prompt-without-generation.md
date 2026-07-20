@@ -1,3 +1,5 @@
+Status: reference
+
 # 本地优化提示词而不出图 Skill (optimize-prompt-without-generation)
 
 - **触发词**: “优化提示词” / “帮我润色 prompt” / “给我个提示词”

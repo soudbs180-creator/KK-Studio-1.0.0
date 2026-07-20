@@ -1,3 +1,5 @@
+Status: historical
+
 # Capability Spec: canvas-card-system-v2
 
 ## Requirements

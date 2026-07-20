@@ -1,3 +1,5 @@
+Status: historical
+
 # 开发手册与会话交接 (docs/development/README.md)
 
 本目录包含 KK Studio 项目的**具体开发指南、多厂商提供商设计、托管发布流程以及 Agent 会话交接记录**。

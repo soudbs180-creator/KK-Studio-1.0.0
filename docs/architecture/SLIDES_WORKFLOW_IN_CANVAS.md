@@ -1,3 +1,5 @@
+Status: reference
+
 # Slides Workflow Integration in Canvas (v1.6.0)
 
 Last Updated: 2026-06-26

@@ -1,3 +1,5 @@
+Status: reference
+
 # 数据规格与 API 协议规范 (docs/specs/README.md)
 
 本目录定义了 KK Studio 的 **外部服务 API 规格协议、模型提供商的请求/响应参数映射规范、轮询行为机制以及 OpenAPI 标准描述**。

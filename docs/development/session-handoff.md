@@ -1,3 +1,5 @@
+Status: historical
+
 # Session Handoff - 卡片测量收口优化
 
 ## 版本合规声明

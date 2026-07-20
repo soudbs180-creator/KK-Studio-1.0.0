@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio 数据规格书
 
 文档状态：Draft Frozen v1  

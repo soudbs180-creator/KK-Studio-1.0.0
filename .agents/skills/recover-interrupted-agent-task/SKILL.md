@@ -1,3 +1,5 @@
+Status: reference
+
 ---
 name: recover-interrupted-agent-task
 description: 异常中断任务恢复技能，在系统加载初始化或网络恢复时，读取磁盘或后端持久化的待处理批量生成 Job 列表，重新拉起异步轮询队列，恢复中断任务状态。

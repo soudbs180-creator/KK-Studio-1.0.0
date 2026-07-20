@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio Execution Roadmap
 
 ## Product Goal

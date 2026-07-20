@@ -1,3 +1,5 @@
+Status: historical
+
 # 副卡闪烁问题优化总结
 
 ## 问题诊断

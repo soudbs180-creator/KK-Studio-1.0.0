@@ -1,3 +1,5 @@
+Status: reference
+
 ---
 name: diagnostics-and-debugging
 description: 错误快速定位与排障自愈技能，在遇到编译错误（typecheck）、架构边界审查异常（UI Token、z-index、物理层级越界）、编码格式校验失败、或者运行期服务崩溃时，使用此技能快速定位到错误原因并执行自愈修复。

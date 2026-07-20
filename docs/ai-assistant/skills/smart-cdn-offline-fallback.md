@@ -1,3 +1,5 @@
+Status: reference
+
 # Skill: 智能 CDN 与离线回退 (smart-cdn-offline-fallback)
 
 ## 触发场景 (Trigger)

@@ -1,3 +1,5 @@
+Status: reference
+
 # Current State Inventory
 
 This inventory records the current active runtime layout for KK Studio v1.6.0.

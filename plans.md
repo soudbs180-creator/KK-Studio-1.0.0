@@ -1,3 +1,5 @@
+Status: historical
+
 # KK Studio plans.md
 
 > Compatibility stub for CI and legacy Agent checks.

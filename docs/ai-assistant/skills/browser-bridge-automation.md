@@ -1,3 +1,5 @@
+Status: reference
+
 # Browser Bridge Automation Skill
 
 - **Trigger phrases**: "打开浏览器助手", "检查 Chrome 插件连接", "抓取这个商品链接的价格和主图", "网页直通多账号生图", "保存到小红书草稿", "回写网页 DOM".

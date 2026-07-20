@@ -1,3 +1,5 @@
+Status: historical
+
 # Tasks: modernize-ai-first-workspace-ui
 
 - [x] Inventory current shell measurements and duplicate canvas IDs.

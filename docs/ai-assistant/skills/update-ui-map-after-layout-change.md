@@ -1,3 +1,5 @@
+Status: reference
+
 # UI 变更后同步 UI Map 规约 (update-ui-map-after-layout-change)
 
 - **适用场景**: 重构前端组件、修改控制面板位置或操作按钮选择器时。

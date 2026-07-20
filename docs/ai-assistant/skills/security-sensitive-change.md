@@ -1,3 +1,5 @@
+Status: reference
+
 # 安全敏感修改防护 Skill (security-sensitive-change)
 
 - **适用场景**: 对 API Key、JWT 校验、计费与退款逻辑、数据库 Schema 及生产 VPS 部署环境进行任何改动时。

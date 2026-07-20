@@ -1,3 +1,5 @@
+Status: reference
+
 # 多设备 UI 分层规范
 
 本文档用于规范 `KK-Studio` 的手机端与桌面端界面拆分方式，目标是：

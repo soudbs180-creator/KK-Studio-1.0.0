@@ -1,3 +1,5 @@
+Status: reference
+
 # User-Owned Web Provider Safety Boundary (v1.6.0)
 
 Last Updated: 2026-06-26

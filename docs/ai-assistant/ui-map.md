@@ -1,3 +1,5 @@
+Status: reference
+
 # UI 映射表 (UI Map)
 
 本文件维护 KK Studio v1.6.0 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。

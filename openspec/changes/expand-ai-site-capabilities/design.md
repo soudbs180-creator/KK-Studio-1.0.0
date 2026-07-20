@@ -1,3 +1,5 @@
+Status: historical
+
 # Design: expand-ai-site-capabilities
 
 ## 1. 单一领域能力边界

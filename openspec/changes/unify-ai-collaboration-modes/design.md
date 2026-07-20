@@ -1,3 +1,5 @@
+Status: historical
+
 # Design: unify-ai-collaboration-modes
 
 ## 1. 单一模式事实源

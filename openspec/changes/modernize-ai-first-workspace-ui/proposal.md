@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: modernize-ai-first-workspace-ui
 
 ## Status

@@ -1,3 +1,5 @@
+Status: reference
+
 # Canonical Data Registry
 
 This registry defines the single source of truth for cross-cutting KK Studio data so cache layers and compatibility adapters do not become competing writers.

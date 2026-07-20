@@ -1,3 +1,5 @@
+Status: reference
+
 <!-- AI_ROUTING_KEY: provider, preset, official, relay, gateway, docs-compliance -->
 # 供应商预设规则（官方 / 中转站 / 浏览器会话）
 

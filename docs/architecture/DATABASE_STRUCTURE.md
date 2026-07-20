@@ -1,3 +1,5 @@
+Status: reference
+
 # VPS PostgreSQL Data Access Structure
 
 KK Studio data access is routed through the current `server/` backend and typed client packages. Browser code must not import database clients or call database RPCs directly.

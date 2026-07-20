@@ -1,3 +1,5 @@
+Status: reference
+
 ---
 name: batch-generate-to-canvas
 description: 批量图片、视频与音频生成及队列控制技能，支持电商紧凑排版、图生视频、异步调度、暂停、恢复、取消和失败子项重试。

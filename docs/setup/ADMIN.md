@@ -1,6 +1,6 @@
 # 管理员运维入口
 
-Status: current. 管理员功能属于 `server/` 的认证 API 和受保护的运维界面；
+Status: reference 管理员功能属于 `server/` 的认证 API 和受保护的运维界面；
 本文件不提供默认账号、默认密码、SQL 初始化片段或可复制的生产凭据。
 
 ## 初始化原则

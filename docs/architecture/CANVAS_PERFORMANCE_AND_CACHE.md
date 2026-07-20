@@ -1,3 +1,5 @@
+Status: reference
+
 <!-- AI_ROUTING_KEY: performance, cache, culling, indexeddb, blob, memory, self-healing -->
 # KK Studio 画布性能与缓存设计规范
 

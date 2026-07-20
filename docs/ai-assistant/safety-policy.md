@@ -2,6 +2,11 @@
 
 在 KK Studio v1.6.0 中，为了保障用户财产、隐私与 API 安全，AI 助手在处理任何计划前都必须严格遵守以下物理性隔离与门禁策略。
 
+## Source evidence
+
+- Safety policy implementation: `apps/web/src/features/ai-takeover/core/safetyPolicy.ts`
+- Confirmation policy: `apps/web/src/features/ai-takeover/core/confirmationPolicy.ts`
+
 ## 1. 密钥与凭证物理隔离原则
 
 - **硬性拦截**: AI 永远不得读取、录入、修改、上传或持久化任何明文 API Key (以 `sk-` 等开头)、JWT Token、Stripe Secret 或 Webhook Secret。

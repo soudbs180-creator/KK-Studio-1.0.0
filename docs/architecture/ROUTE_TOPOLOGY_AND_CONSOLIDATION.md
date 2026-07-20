@@ -1,3 +1,5 @@
+Status: reference
+
 <!-- AI_ROUTING_KEY: routing, dispatcher, consolidation, refactor, generate -->
 # server/routes 路由拓扑与合并方案（WS-3 只读分析）
 

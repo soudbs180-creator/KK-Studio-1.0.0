@@ -1,3 +1,5 @@
+Status: historical
+
 # KK Studio Progress Report - v1.6.0
 
 Current version source is `config/release-manifest.json` (`v1.6.0`).

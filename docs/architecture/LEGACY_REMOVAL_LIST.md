@@ -1,3 +1,5 @@
+Status: reference
+
 # Legacy Pruning and Anti-Regression Registry (v1.6.0)
 
 Last Updated: 2026-06-26

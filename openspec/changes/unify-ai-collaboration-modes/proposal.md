@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: unify-ai-collaboration-modes
 
 ## Motivation

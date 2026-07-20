@@ -1,6 +1,6 @@
 # Supabase Baseline（历史索引）
 
-Status: archived. 这是旧托管数据库时代的背景记录，不是 KK Studio 当前
+Status: reference 这是旧托管数据库时代的背景记录，不是 KK Studio 当前
 Schema、认证、Provider 或计费的来源。当前事实以 `server/`、
 `migrations/`、共享 DTO 和治理文档为准。
 

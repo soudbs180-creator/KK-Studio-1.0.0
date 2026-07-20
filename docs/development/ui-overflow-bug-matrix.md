@@ -1,3 +1,5 @@
+Status: historical
+
 # UI 层级遮挡与溢出 Bug 诊断矩阵 (UI Overflow Bug Matrix)
 
 本文件记录治理前典型的 UI 层级冲突、遮挡以及长文本/长表单在容器内溢出的案例，用作防回归和诊断对照。

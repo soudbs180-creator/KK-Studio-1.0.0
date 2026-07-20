@@ -1,3 +1,5 @@
+Status: historical
+
 # 会话记忆规约 (Session Memory)
 
 > Current protocol plus historical engineering log. Sections carrying dated

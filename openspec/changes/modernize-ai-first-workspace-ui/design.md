@@ -1,3 +1,5 @@
+Status: historical
+
 # Design: modernize-ai-first-workspace-ui
 
 ## 1. One workspace composition

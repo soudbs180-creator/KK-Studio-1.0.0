@@ -1,3 +1,5 @@
+Status: historical
+
 # Tasks: canvas-card-system-v2
 
 - [x] Add shared V2 card, geometry, viewport, note, and migration contracts.

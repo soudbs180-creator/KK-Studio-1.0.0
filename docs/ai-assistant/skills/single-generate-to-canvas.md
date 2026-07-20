@@ -1,3 +1,5 @@
+Status: reference
+
 # 单图生图 Skill (single-generate-to-canvas)
 
 - **触发词**: “帮我画一张猫咪的图片” / “生成一张科爱的壁纸”

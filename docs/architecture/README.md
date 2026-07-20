@@ -1,3 +1,5 @@
+Status: reference
+
 # 核心架构规范 (docs/architecture/README.md)
 
 本目录定义了 KK Studio 的 **底层架构分层、模块所有权边界、数据库物理与逻辑拓扑结构、多设备 UI 适配规范以及模型路由器适配器协议**。这是项目逻辑的核心物理框架。

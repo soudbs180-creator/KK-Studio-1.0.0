@@ -1,3 +1,5 @@
+Status: historical
+
 # 🔐 安全 vs 使用 - 对比说明
 
 ## 一句话总结

@@ -1,3 +1,5 @@
+Status: historical
+
 # Capability Design: agent-capabilities
 
 AI 助手控制能力的技术实现与接口规范。

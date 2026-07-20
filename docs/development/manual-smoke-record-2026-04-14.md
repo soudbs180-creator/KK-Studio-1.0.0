@@ -1,3 +1,5 @@
+Status: historical
+
 # 2026-04-14 Manual Smoke Record
 
 ## Purpose

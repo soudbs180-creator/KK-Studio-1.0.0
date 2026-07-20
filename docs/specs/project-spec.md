@@ -1,3 +1,5 @@
+Status: reference
+
 # KK Studio Project Spec
 
 ## Current Architecture

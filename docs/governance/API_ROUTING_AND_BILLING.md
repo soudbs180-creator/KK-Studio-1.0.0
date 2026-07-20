@@ -1,3 +1,5 @@
+Status: reference
+
 <!-- AI_ROUTING_KEY: billing, transaction, credit, saga, gateway, webhook -->
 # KK Studio API 路由与计费审计规范
 

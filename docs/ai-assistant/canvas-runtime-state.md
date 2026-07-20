@@ -2,6 +2,12 @@
 
 画布运行态是 AI 助手精准感知当前工作区的桥梁。生成辅助建议或发起 Agent 规划时，助手会将当前页面、视口、框选对象及近期事件的脱敏摘要组装为状态；执行期间 ToolRegistry 还会在每一步重新读取运行态，从而避免模型或工具依赖过期快照。
 
+## Source evidence
+
+- CanvasRuntimeState builder: `apps/web/src/features/ai-assistant-runtime/runtime/CanvasRuntimeStateBuilder.ts`
+- Runtime snapshot types: `packages/shared/src/types/agent.ts`
+- Canvas context integration: `apps/web/src/context/CanvasContext.tsx`
+
 当前构建器写入 `projectVersion: '1.6.0'`；版本更新时必须与 `config/release-manifest.json` 同步。
 
 ## 1. 运行态状态定义

@@ -1,3 +1,5 @@
+Status: historical
+
 # Change Proposal: canvas-card-system-v2
 
 ## Motivation

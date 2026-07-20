@@ -2,6 +2,11 @@
 
 在 KK Studio v1.6.0 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。
 
+## Source evidence
+
+- Tool registry: `apps/web/src/features/ai-assistant-runtime/toolRegistry.ts`
+- Tool types: `packages/shared/src/types/agent.ts`
+
 ## 1. 安全等级权限矩阵
 
 | 安全等级 (Permission) | 审计策略 | 典型示例 |

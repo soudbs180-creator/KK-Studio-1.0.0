@@ -1,3 +1,5 @@
+Status: reference
+
 # 增加新 AI 助手 Tool 规约 (add-new-agent-tool)
 
 - **适用场景**: 开发人员或助手在系统中开发和挂载新 API / 动作能力。

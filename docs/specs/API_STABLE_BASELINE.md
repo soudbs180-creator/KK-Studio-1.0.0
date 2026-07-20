@@ -1,3 +1,5 @@
+Status: reference
+
 # API Stable Baseline
 
 Current project baseline: KK Studio v1.6.0.

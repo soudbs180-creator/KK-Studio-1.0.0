@@ -43,10 +43,11 @@ const pendingArchivePath = (relativePath) => (
   || relativePath.startsWith("docs/superpowers/specs/")
 );
 
-const explicitHistoryMarker = (source) => (
-  /(?:^|\n)Status:\s*(?:archived|historical|history)(?:[;,.\s]|$)/i.test(source.slice(0, 800))
-  || /(?:^|\n)>?\s*(?:Historical|Archived)\s+(?:index|reference|document)/i.test(source.slice(0, 800))
-);
+const explicitStatusMarker = (source) => {
+  const header = source.slice(0, 800);
+  const match = /(?:^|\n)Status:\s*(\S+)/i.exec(header);
+  return match ? match[1].toLowerCase() : null;
+};
 
 const legacyPaymentRuntimeSegment = ["payment", "server"].join("-");
 
@@ -69,9 +70,51 @@ const forbiddenActivePatterns = [
   },
 ];
 
+function findBrokenLinks(relativePath, source) {
+  const broken = [];
+  const baseDir = path.dirname(relativePath);
+  // Match markdown links and bare relative paths that look like source files.
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = linkRegex.exec(source)) !== null) {
+    const link = match[2];
+    if (!link || link.startsWith("http") || link.startsWith("#") || link.startsWith("mailto:")) continue;
+    const target = link.split("#")[0];
+    if (!target) continue;
+    const resolved = normalizePath(
+      path.resolve(root, path.isAbsolute(target) ? path.join(root, ".", target) : path.join(baseDir, target))
+    );
+    if (!fs.existsSync(resolved)) {
+      broken.push(target);
+    }
+  }
+  return broken;
+}
+
+function checkCapabilityEvidence(relativePath, source) {
+  // Only check AI assistant skill/capability docs that claim to describe current behavior.
+  if (!relativePath.startsWith("docs/ai-assistant/")) return [];
+  const hasEvidence =
+    /(?:Source evidence|Evidence|当前证据|Source|Implemented in|Source of truth):/i.test(source)
+    || /\.[tj]sx?:\d+/i.test(source)
+    || /`[a-zA-Z0-9_\/\-]+\.[tj]sx?`/i.test(source);
+  if (hasEvidence) return [];
+  // Roadmaps and historical docs are exempt.
+  const status = explicitStatusMarker(source);
+  if (status === "historical" || status === "history" || status === "proposed" || status === "reference") return [];
+  return ["missing capability evidence (source path/line or status marker)"];
+}
+
 function classify(relativePath, source) {
-  if (historicalPath(relativePath) || explicitHistoryMarker(source)) {
+  const status = explicitStatusMarker(source);
+  if (status === "historical" || status === "history" || historicalPath(relativePath)) {
     return { status: "history", conflicts: [] };
+  }
+  if (status === "reference") {
+    return { status: "reference", conflicts: [] };
+  }
+  if (status === "proposed" || status === "draft") {
+    return { status: "proposed", conflicts: [] };
   }
   if (pendingArchivePath(relativePath)) {
     return { status: "pending-archive", conflicts: [] };
@@ -79,6 +122,15 @@ function classify(relativePath, source) {
   const conflicts = forbiddenActivePatterns
     .filter(({ pattern }) => pattern.test(source))
     .map(({ label }) => label);
+
+  const brokenLinks = findBrokenLinks(relativePath, source);
+  for (const target of brokenLinks) {
+    conflicts.push(`broken link: ${target}`);
+  }
+
+  const evidenceConflicts = checkCapabilityEvidence(relativePath, source);
+  conflicts.push(...evidenceConflicts);
+
   return {
     status: conflicts.length > 0 ? "conflict" : "current",
     conflicts,
@@ -105,6 +157,8 @@ const entries = markdownFiles.map((relativePath) => {
 });
 const grouped = {
   current: entries.filter((entry) => entry.status === "current"),
+  reference: entries.filter((entry) => entry.status === "reference"),
+  proposed: entries.filter((entry) => entry.status === "proposed"),
   history: entries.filter((entry) => entry.status === "history"),
   conflict: entries.filter((entry) => entry.status === "conflict"),
   "pending-archive": entries.filter((entry) => entry.status === "pending-archive"),
@@ -120,12 +174,16 @@ const indexSource = [
   "",
   "Classification rules:",
   "",
-  "- `current`: may describe the active v1.6.0 implementation.",
+  "- `current`: normative for the active v1.6.0 implementation; must be kept in sync with source.",
+  "- `reference`: stable API/contract/spec reference; not the implementation source of truth but authoritative for its domain.",
+  "- `proposed`: future plan, draft, or roadmap; not yet implemented.",
   "- `history`: archived material or chronological handoff evidence.",
-  "- `conflict`: active material containing a prohibited stale or secret-bearing pattern.",
+  "- `conflict`: active material containing a prohibited stale/secret pattern or a broken link.",
   "- `pending-archive`: non-normative reports/specs retained until a dedicated archive move.",
   "",
   ...renderSection("Current", grouped.current),
+  ...renderSection("Reference", grouped.reference),
+  ...renderSection("Proposed", grouped.proposed),
   ...renderSection("History", grouped.history),
   ...renderSection("Conflict", grouped.conflict),
   ...renderSection("Pending Archive", grouped["pending-archive"]),
@@ -155,6 +213,7 @@ if (grouped.conflict.length > 0) {
 
 console.log(
   `[documentation:check] ${entries.length} Markdown sources indexed; `
-  + `${grouped.current.length} current, ${grouped.history.length} history, `
-  + `${grouped["pending-archive"].length} pending archive, 0 conflicts.`,
+  + `${grouped.current.length} current, ${grouped.reference.length} reference, `
+  + `${grouped.proposed.length} proposed, ${grouped.history.length} history, `
+  + `${grouped["pending-archive"].length} pending archive, 0 conflicts.`
 );

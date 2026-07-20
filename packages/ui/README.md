@@ -1,3 +1,5 @@
+Status: reference
+
 # packages/ui
 
 目标角色：可复用 UI 基元与设计系统。

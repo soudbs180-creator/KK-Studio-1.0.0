@@ -1,3 +1,5 @@
+Status: reference
+
 # KK-Studio 密钥可见性矩阵
 
 ## 可见性规则总结

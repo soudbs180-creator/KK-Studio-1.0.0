@@ -1,3 +1,5 @@
+Status: historical
+
 # OpenSpec Tasks: upgrade-agent-capabilities
 
 - [x] Initialize OpenSpec directory and proposal

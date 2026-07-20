@@ -1,3 +1,5 @@
+Status: historical
+
 # Tasks: unify-ai-collaboration-modes
 
 - [x] Add the shared `direct | assist | takeover` collaboration-mode contract and persistence helper.

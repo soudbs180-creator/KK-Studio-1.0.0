@@ -1,3 +1,5 @@
+Status: historical
+
 # Gemini Coding Agent 对照指南
 
 本文档用于把 Google 官方的 Gemini coding agent 指南，映射到 KK Studio 当前的实现方式上。

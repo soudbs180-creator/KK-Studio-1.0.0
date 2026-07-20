@@ -1,3 +1,5 @@
+Status: reference
+
 ---
 name: download-selected-originals
 description: 框选原图打包下载技能，用于从画布中将选中的图像卡片（或 Prompt 卡片的子图片）根据 originalUrl -> apiResultUrl -> url -> storageId 优先级打包下载为带清单 (manifest.json) 的 ZIP 压缩文件。
