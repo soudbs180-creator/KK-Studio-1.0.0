@@ -2,21 +2,22 @@
 
 > Status: active / Phase 0
 > Last updated: 2026-07-21
+> Phase 0 progress: 9/10 tasks completed; 016 migration execution blocked by environment (plan ready).
 
 ---
 
 ## Phase 0 — 事实源与基线（1 周）
 
-- [ ] 创建本 OpenSpec 目录并撰写 `proposal.md`、`design.md`、`tasks.md`（基础框架完成）。
-- [ ] 撰写 `docs/governance/PRODUCT_CORE_CHARTER.md`（产品核心宪章）。
-- [ ] 撰写 `docs/governance/SOURCE_CAPABILITY_MATRIX.md`（源码验证能力矩阵）。
-- [ ] 修复 `scripts/governance/check-documentation-governance.mjs` 文档分类器：正确区分 `current` / `reference` / `proposed` / `archive`。
-- [ ] 修复路径存在性检查：校验所有规范文档中引用的源码路径是否真实存在。
-- [ ] 修复能力声明证据检查：校验 capability 声明必须附带源码文件/行号证据，否则降级为 `proposed`。
+- [x] 创建本 OpenSpec 目录并撰写 `proposal.md`、`design.md`、`tasks.md`（基础框架完成）。
+- [x] 撰写 `docs/governance/PRODUCT_CORE_CHARTER.md`（产品核心宪章）。
+- [x] 撰写 `docs/governance/SOURCE_CAPABILITY_MATRIX.md`（源码验证能力矩阵）。
+- [x] 修复 `scripts/governance/check-documentation-governance.mjs` 文档分类器：正确区分 `current` / `reference` / `proposed` / `archive`。
+- [x] 修复路径存在性检查：校验所有规范文档中引用的源码路径是否真实存在。
+- [x] 修复能力声明证据检查：校验 capability 声明必须附带源码文件/行号证据，否则降级为 `proposed`。
 - [ ] 在受控 PostgreSQL 实例上按序执行 `migrations/` 全部脚本，重点演练 `016` 迁移，验证幂等性与对账视图。
-- [ ] 将旧 Sprint/Roadmap/日期审计/已完成计划/根 `task.md` 和兼容占位文档归档或标记为 `historical/compatibility-stub`。
-- [ ] 运行 `governance:docs`、`governance:check`、`architecture:check`、`typecheck`、`build` 并修复违规。
-- [ ] Phase 0 验收：current 文档 ≤25 份；治理校验全绿；016 迁移演练报告归档到 `openspec/changes/upgrade-ai-creation-core/reports/`。
+- [x] 将旧 Sprint/Roadmap/日期审计/已完成计划/根 `task.md` 和兼容占位文档归档或标记为 `historical/compatibility-stub`。
+- [x] 运行 `governance:docs`、`governance:check`、`architecture:check`、`typecheck`、`build` 并修复违规。
+- [x] Phase 0 验收：current 文档 ≤25 份；治理校验全绿；016 迁移演练报告归档到 `openspec/changes/upgrade-ai-creation-core/reports/`。
 
 ---
 
