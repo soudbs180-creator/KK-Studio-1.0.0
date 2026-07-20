@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
   id UUID PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   token_hash TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,

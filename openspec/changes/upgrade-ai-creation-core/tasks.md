@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 0
+> Status: active / Phase 1 ready
 > Last updated: 2026-07-21
-> Phase 0 progress: 9/10 tasks completed; 016 migration execution blocked by environment (plan ready).
+> Phase 0 progress: 10/10 tasks completed. Phase 1 can start.
 
 ---
 
@@ -14,7 +14,7 @@
 - [x] 修复 `scripts/governance/check-documentation-governance.mjs` 文档分类器：正确区分 `current` / `reference` / `proposed` / `archive`。
 - [x] 修复路径存在性检查：校验所有规范文档中引用的源码路径是否真实存在。
 - [x] 修复能力声明证据检查：校验 capability 声明必须附带源码文件/行号证据，否则降级为 `proposed`。
-- [ ] 在受控 PostgreSQL 实例上按序执行 `migrations/` 全部脚本，重点演练 `016` 迁移，验证幂等性与对账视图。
+- [x] 在受控 PostgreSQL 实例上按序执行 `migrations/` 全部脚本，重点演练 `016` 迁移，验证幂等性与对账视图。发现并修复 `013` 的 `user_id` 类型不匹配；需先跑 `bootstrap-kk-vps.sql` 再跑 migrations。
 - [x] 将旧 Sprint/Roadmap/日期审计/已完成计划/根 `task.md` 和兼容占位文档归档或标记为 `historical/compatibility-stub`。
 - [x] 运行 `governance:docs`、`governance:check`、`architecture:check`、`typecheck`、`build` 并修复违规。
 - [x] Phase 0 验收：current 文档 ≤25 份；治理校验全绿；016 迁移演练报告归档到 `openspec/changes/upgrade-ai-creation-core/reports/`。
