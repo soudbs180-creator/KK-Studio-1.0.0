@@ -53,9 +53,14 @@ test('prompt and image cards request connector updates through the scheduler', (
 test('WorkspacePage virtualizes connector lines by viewport visible image ids', () => {
   const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const imageGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
+  const videoGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx');
 
   assert.match(workspacePageSource, /const visibleImageIdSet = React\.useMemo\(\(\) => \{/);
   assert.match(workspacePageSource, /visibleImageNodes\.forEach\(\(node\) => ids\.add\(node\.id\)\)/);
   assert.match(imageGroupRendererSource, /renderedConnectorLayouts\s*\.filter\(\(segment(?::\s*any)?\) =>/);
   assert.match(imageGroupRendererSource, /visibleImageIdSet\.has\(segment\.imageId\)/);
+  assert.match(imageGroupRendererSource, /data-left=\{connectorSvgLeft\}/);
+  assert.match(imageGroupRendererSource, /data-top=\{connectorSvgTop\}/);
+  assert.match(videoGroupRendererSource, /data-left=\{connectorSvgLeft\}/);
+  assert.match(videoGroupRendererSource, /data-top=\{connectorSvgTop\}/);
 });

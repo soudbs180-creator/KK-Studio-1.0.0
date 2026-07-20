@@ -36,8 +36,26 @@ test("prompt-group browser verification script checks both regrouping and connec
   assert.match(source, /childConnectorFollows/);
   assert.match(source, /const promptDockTolerance = 60;/);
   assert.match(source, /box\.top >= promptBottomDuringMainDrag - promptDockTolerance/);
+  assert.match(source, /getScreenCTM\?\.\(\)/);
+  assert.match(source, /new DOMPoint\(Number\(match\[1\]\), Number\(match\[2\]\)\)/);
   assert.match(source, /throw new Error\(`Main-card drag did not regroup child cards under the parent:/);
   assert.match(source, /throw new Error\(`Child-card connector did not stay aligned with the dragged image:/);
+});
+
+test("large-canvas browser verification derives drag and connector points from rendered screen geometry", () => {
+  const source = readSource("scripts/test/verify-large-canvas-10k-smoke.mjs");
+
+  assert.match(source, /resolvePromptDragStartScreen\(page, 'prompt-main'\)/);
+  assert.match(source, /surface\?\.getBoundingClientRect\(\)/);
+  assert.match(source, /document\.elementFromPoint\(x, candidateY\)/);
+  assert.match(source, /connector-prompt-main-\$\{imageId\}/);
+  assert.match(source, /getAttribute\('data-x'\)/);
+  assert.match(source, /getAttribute\('data-y'\)/);
+  assert.match(source, /promptRuntimePosition/);
+  assert.match(source, /imageBox\.centerX/);
+  assert.match(source, /imageBox\.top/);
+  assert.match(source, /ownerSvg\?\.getScreenCTM\?\.\(\)/);
+  assert.doesNotMatch(source, /resolveSeedCanvasPointToScreen/);
 });
 
 test("prompt-group browser verification script uses browser preflight and fallback verification when browser spawn is unavailable", () => {

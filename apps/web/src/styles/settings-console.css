@@ -913,6 +913,82 @@ body.dark-mode .settings-panel,
   gap: 18px;
 }
 
+.settings-console-mobile-overview {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 3px 0;
+}
+
+.settings-console-mobile-overview__copy {
+  min-width: 0;
+}
+
+.settings-console-mobile-overview__copy > span {
+  display: block;
+  color: var(--console-text-muted);
+  font-size: 10px;
+}
+
+.settings-console-mobile-overview__copy h2 {
+  margin: 3px 0 0;
+  color: var(--console-text);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.settings-console-mobile-overview__performance {
+  display: inline-flex;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--console-border);
+  border-radius: var(--console-control-radius);
+  color: var(--console-text-secondary);
+  background: var(--console-surface);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.settings-console-mobile-overview__performance:hover {
+  color: var(--console-text);
+  border-color: var(--console-border-strong);
+  background: var(--console-hover);
+}
+
+.settings-console-mobile-primary-list {
+  margin-top: -2px;
+}
+
+.settings-console-mobile-primary-list button > span:first-child {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--console-border);
+  border-radius: var(--console-control-radius);
+  color: var(--console-text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 420px) {
+  .settings-console-mobile-overview {
+    flex-direction: column;
+  }
+
+  .settings-console-mobile-overview__performance {
+    align-self: flex-start;
+  }
+}
+
 .settings-console-mobile-home section h2 {
   margin: 0 0 7px;
   padding: 0 3px;

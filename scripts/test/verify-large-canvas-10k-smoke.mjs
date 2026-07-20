@@ -523,57 +523,120 @@ async function measureGroupedScene(page) {
     const parsed = rawState ? JSON.parse(rawState) : null;
     const activeCanvas = parsed?.canvases?.find?.((canvas) => canvas?.id === parsed?.activeCanvasId) ?? parsed?.canvases?.[0] ?? null;
     const promptNode = activeCanvas?.promptNodes?.find?.((node) => node?.id === 'prompt-main') ?? null;
+    const promptShell = document.querySelector('[data-card-id="prompt-main"]');
+    const promptSurface = promptShell?.querySelector('[data-canvas-surface="prompt"]');
+    const promptRect = promptSurface?.getBoundingClientRect();
+    const promptRuntimeX = Number(promptShell?.getAttribute('data-x'));
+    const promptRuntimeY = Number(promptShell?.getAttribute('data-y'));
     const imageNodes = ['img-main-a', 'img-main-b']
       .map((id) => activeCanvas?.imageNodes?.find?.((node) => node?.id === id))
       .filter(Boolean);
-    const connectorPaths = Array.from(document.querySelectorAll('path[stroke-dasharray]'));
+    const imageBoxes = ['img-main-a', 'img-main-b']
+      .map((id) => {
+        const shell = document.querySelector(`[data-card-id="${id}"]`);
+        const surface = shell?.querySelector('[data-canvas-surface="image"]');
+        const box = surface?.getBoundingClientRect();
+        const runtimeX = Number(shell?.getAttribute('data-x'));
+        const runtimeY = Number(shell?.getAttribute('data-y'));
+        return box
+          ? {
+              id,
+              left: box.left,
+              top: box.top,
+              width: box.width,
+              height: box.height,
+              centerX: box.left + (box.width / 2),
+              position: Number.isFinite(runtimeX) && Number.isFinite(runtimeY)
+                ? { x: runtimeX, y: runtimeY }
+                : null,
+            }
+          : null;
+      })
+      .filter(Boolean);
+    const connectorPaths = ['img-main-a', 'img-main-b']
+      .map((imageId) => ({
+        imageId,
+        path: document.getElementById(`connector-prompt-main-${imageId}`),
+      }))
+      .filter((entry) => entry.path);
     const connectorEnds = connectorPaths
-      .map((path) => {
+      .map(({ imageId, path }) => {
         const match = /(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/.exec(path.getAttribute('d') || '');
         if (!match) return null;
         const ownerSvg = path.ownerSVGElement;
-        const svgLeft = ownerSvg ? Number.parseFloat(ownerSvg.style.left || '0') || 0 : 0;
-        const svgTop = ownerSvg ? Number.parseFloat(ownerSvg.style.top || '0') || 0 : 0;
-        return { x: Number(match[1]) + svgLeft, y: Number(match[2]) + svgTop };
+        const screenMatrix = ownerSvg?.getScreenCTM?.();
+        if (!screenMatrix) return null;
+        const point = new DOMPoint(Number(match[1]), Number(match[2])).matrixTransform(screenMatrix);
+        return { imageId, x: point.x, y: point.y };
       })
       .filter(Boolean);
 
     return {
       promptPosition: promptNode?.position ?? null,
+      promptRuntimePosition: Number.isFinite(promptRuntimeX) && Number.isFinite(promptRuntimeY)
+        ? { x: promptRuntimeX, y: promptRuntimeY }
+        : null,
+      promptBox: promptRect
+        ? {
+            left: promptRect.left,
+            top: promptRect.top,
+            width: promptRect.width,
+            height: promptRect.height,
+            bottom: promptRect.bottom,
+          }
+        : null,
       imagePositions: imageNodes.map((node) => ({
         id: node.id,
         position: node.position,
         parentPromptId: node.parentPromptId,
       })),
+      imageBoxes,
       connectorEnds,
     };
   }, STORAGE_KEY);
 }
 
-async function resolveCanvasPointToScreen(page, point) {
-  return await page.evaluate(({ canvasPoint }) => {
+async function resolvePromptDragStartScreen(page, promptId) {
+  return await page.evaluate((targetPromptId) => {
+    const surface = document.querySelector(`[data-card-id="${targetPromptId}"] [data-canvas-surface="prompt"]`);
+    const box = surface?.getBoundingClientRect();
     const viewport = document.querySelector('.canvas-viewport');
     const transform = viewport?.style.transform || '';
     const match = /translate\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)\s+scale\((-?\d+(?:\.\d+)?)\)/.exec(transform);
-    const x = match ? Number(match[1]) : 0;
-    const y = match ? Number(match[2]) : 0;
     const scale = match ? Number(match[3]) : 1;
+    if (!surface || !box) return null;
+
+    const visibleLeft = Math.max(0, box.left);
+    const visibleRight = Math.min(window.innerWidth, box.right);
+    const visibleTop = Math.max(0, box.top);
+    const visibleBottom = Math.min(window.innerHeight, box.bottom);
+    if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+    const x = visibleLeft + ((visibleRight - visibleLeft) / 2);
+    const candidateYs = [
+      visibleBottom - Math.min(12, (visibleBottom - visibleTop) / 4),
+      visibleTop + ((visibleBottom - visibleTop) / 2),
+      visibleTop + Math.min(12, (visibleBottom - visibleTop) / 4),
+    ];
+    const y = candidateYs.find((candidateY) => {
+      const hit = document.elementFromPoint(x, candidateY);
+      return Boolean(hit && (hit === surface || surface.contains(hit)));
+    });
+    if (y === undefined) return null;
+
     return {
-      x: x + canvasPoint.x * scale,
-      y: y + canvasPoint.y * scale,
+      x,
+      y,
       scale,
       transform,
+      box: {
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+      },
     };
-  }, { canvasPoint: point });
-}
-
-function resolveSeedCanvasPointToScreen(point) {
-  return {
-    x: 720 + point.x,
-    y: 480 + point.y,
-    scale: 1,
-    transform: 'translate(720px, 480px) scale(1)',
-  };
+  }, promptId);
 }
 
 async function withTimeout(promise, timeoutMs, label) {
@@ -868,7 +931,14 @@ try {
   mark(`input readiness ${JSON.stringify(inputReadiness)}`);
 
   mark('dragging grouped prompt');
-  const dragStartScreen = resolveSeedCanvasPointToScreen({ x: 0, y: -140 });
+  const dragStartScreen = await withTimeout(
+    resolvePromptDragStartScreen(page, 'prompt-main'),
+    5000,
+    'grouped prompt drag target measurement',
+  );
+  if (!dragStartScreen) {
+    throw new Error('Prompt group drag target was not rendered in the 10k canvas viewport.');
+  }
   const dragDeltaScreen = { x: 160, y: 120 };
   const expectedCanvasDelta = {
     x: dragDeltaScreen.x / dragStartScreen.scale,
@@ -913,34 +983,45 @@ try {
   await page.waitForTimeout(1200);
   const dragScene = await withTimeout(measureGroupedScene(page), 5000, 'drag scene measurement');
 
-  const promptMoved = dragScene.promptPosition
-    && Math.abs(dragScene.promptPosition.x - expectedCanvasDelta.x) < 8
-    && Math.abs(dragScene.promptPosition.y - expectedCanvasDelta.y) < 8;
-  const imagesDockedUnderPrompt = dragScene.imagePositions.length === 2 && dragScene.imagePositions.every((image) => (
-    image.parentPromptId === 'prompt-main'
-    && image.position.y >= dragScene.promptPosition.y + 300
-  ));
-  const childrenMovedWithPrompt = dragScene.imagePositions.every((image) => {
-    const expectedOffsetX = image.id === 'img-main-a' ? -154 : 154;
-    return Math.abs((image.position.x - dragScene.promptPosition.x) - expectedOffsetX) < 8
-      && image.position.y >= dragScene.promptPosition.y + 300;
+  const promptMoved = dragScene.promptRuntimePosition
+    && Math.abs(dragScene.promptRuntimePosition.x - expectedCanvasDelta.x) < 8
+    && Math.abs(dragScene.promptRuntimePosition.y - expectedCanvasDelta.y) < 8;
+  const parentLinksIntact = dragScene.imagePositions.length === 2
+    && dragScene.imagePositions.every((image) => image.parentPromptId === 'prompt-main');
+  const promptDockTolerance = 60;
+  const imagesDockedUnderPrompt = Boolean(
+    dragScene.promptBox
+    && dragScene.imageBoxes.length > 0
+    && dragScene.imageBoxes.every((box) => box.top >= dragScene.promptBox.bottom - promptDockTolerance),
+  );
+  const runtimeImageBoxes = dragScene.imageBoxes.filter((box) => box.position);
+  const childrenMovedWithPrompt = runtimeImageBoxes.length > 0 && runtimeImageBoxes.every((box) => {
+    const expectedOffsetX = box.id === 'img-main-a' ? -154 : 154;
+    return Math.abs((box.position.x - dragScene.promptRuntimePosition.x) - expectedOffsetX) < 8
+      && box.position.y >= dragScene.promptRuntimePosition.y + 300;
   });
-  const firstImageTopCenter = dragScene.imagePositions[0]
-    ? { x: dragScene.imagePositions[0].position.x, y: dragScene.imagePositions[0].position.y - 360 }
+  const connectorDistances = dragScene.connectorEnds.flatMap((end) => {
+    const imageBox = dragScene.imageBoxes.find((box) => box.id === end.imageId);
+    return imageBox
+      ? [Math.hypot(end.x - imageBox.centerX, end.y - imageBox.top)]
+      : [];
+  });
+  const nearestConnectorDistance = connectorDistances.length > 0
+    ? Math.min(...connectorDistances)
     : null;
-  const nearestConnectorDistance = firstImageTopCenter && dragScene.connectorEnds.length > 0
-    ? dragScene.connectorEnds
-        .map((end) => Math.hypot(end.x - firstImageTopCenter.x, end.y - firstImageTopCenter.y))
-        .sort((left, right) => left - right)[0] ?? null
-    : null;
-  const connectorFollows = nearestConnectorDistance === null || nearestConnectorDistance < 120;
+  const connectorFollows = dragScene.connectorEnds.length === 0
+    || (
+      connectorDistances.length === dragScene.connectorEnds.length
+      && connectorDistances.every((distance) => distance < 120)
+    );
 
-  if (!promptMoved || !imagesDockedUnderPrompt || !childrenMovedWithPrompt || !connectorFollows) {
+  if (!promptMoved || !parentLinksIntact || !imagesDockedUnderPrompt || !childrenMovedWithPrompt || !connectorFollows) {
     throw new Error(`Prompt group drag failed in 10k canvas: ${JSON.stringify({
       dragScene,
       dragStartScreen,
       expectedCanvasDelta,
       promptMoved,
+      parentLinksIntact,
       imagesDockedUnderPrompt,
       childrenMovedWithPrompt,
       nearestConnectorDistance,

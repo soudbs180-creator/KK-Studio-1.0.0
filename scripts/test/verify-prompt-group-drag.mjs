@@ -421,12 +421,14 @@ async function measureScene(page) {
     const connectorEnds = connectorPaths
       .map((path) => {
         const svg = path.ownerSVGElement;
-        const svgBox = svg?.getBoundingClientRect();
         const match = /(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s*$/.exec(path.getAttribute("d") || "");
-        if (!svgBox || !match) return null;
+        if (!svg || !match) return null;
+        const screenMatrix = svg.getScreenCTM?.();
+        if (!screenMatrix) return null;
+        const point = new DOMPoint(Number(match[1]), Number(match[2])).matrixTransform(screenMatrix);
         return {
-          x: svgBox.left + Number(match[1]),
-          y: svgBox.top + Number(match[2]),
+          x: point.x,
+          y: point.y,
         };
       })
       .filter(Boolean);

@@ -2,6 +2,8 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronRight,
+  Gauge,
+  KeyRound,
   Moon,
   RefreshCw,
   Sun,
@@ -157,12 +159,45 @@ const SettingsConsoleTopbar: React.FC<{
 const SettingsConsoleMobileHome: React.FC<{
   onNavigate: (view: CanonicalSettingsViewId) => void;
 }> = ({ onNavigate }) => {
-  const { language } = useLocale();
+  const { language, pick } = useLocale();
   const items = useMemo(() => getSettingsNavItems(language), [language]);
   const groups = useMemo(() => buildGroups(items, language === 'en-US'), [items, language]);
 
+  const performanceLabel = pick('网页性能', 'Web performance');
+  const capabilityLabel = pick('能力来源', 'Capability Sources');
+
   return (
-    <div className="settings-console-mobile-home">
+    <div className="settings-console-mobile-home" data-testid="settings-mobile-dashboard">
+      <section className="settings-console-mobile-overview" aria-labelledby="settings-console-mobile-overview-title">
+        <div className="settings-console-mobile-overview__copy">
+          <span>{pick('工作区策略', 'Workspace strategy')}</span>
+          <h2 id="settings-console-mobile-overview-title">{pick('创作系统状态', 'Creative system status')}</h2>
+        </div>
+        <button
+          type="button"
+          className="settings-console-mobile-overview__performance"
+          aria-label={performanceLabel}
+          onClick={() => onNavigate('appearance-motion')}
+        >
+          <Gauge size={15} aria-hidden="true" />
+          <span>{performanceLabel}</span>
+          <ChevronRight size={14} />
+        </button>
+      </section>
+
+      <div className="settings-console-mobile-list settings-console-mobile-primary-list">
+        <button
+          type="button"
+          aria-label={capabilityLabel}
+          data-ai-settings-target="capability-sources"
+          onClick={() => onNavigate('capability-sources')}
+        >
+          <span aria-hidden="true"><KeyRound size={17} /></span>
+          <span><strong>{capabilityLabel}</strong><small>{pick('API、OAuth 与本地 Runner。', 'API, OAuth, and local runners.')}</small></span>
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
       {groups.map((group) => (
         <section key={group.id}>
           <h2>{group.label}</h2>

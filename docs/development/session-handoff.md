@@ -2517,3 +2517,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - AI 接管、移动设置、桌面设置、Prompt Group 拖拽、启动横幅 smoke 均通过仓库 fallback（HTTP 与源码契约）；编码、乱码和 `git diff --check` 通过。
 - **未运行验证及原因**：系统没有 `npm`/`npx`，所以未执行字面量聚合命令；已直接执行对应底层 Node、TypeScript、Vite 和测试入口。`swagger-cli` 不在本地依赖中，OpenAPI Swagger 子校验未运行。Chrome 预检返回 `browser-preflight-nonzero-exit`（退出码 2147483651），Codex Node REPL 访问浏览器目录被宿主 `EPERM` 拒绝，因此没有真实浏览器交互证据；smoke 已按脚本设计完成 fallback。未连接真实 PostgreSQL、付费 Provider、支付、OAuth、公开发布或账户写操作。
 - **风险与下一步**：文档索引仍有 14 份待归档历史报告，下一阶段应按产品负责人确认逐份迁移到 `docs/archive/`，而不是在活跃文档中继续扩大兼容说明。生产发布前补装并运行 Swagger CLI、在受控浏览器 runner 重跑真实页面 smoke，并演练迁移 016；本提交不改变付费和账户安全边界。
+
+## 154. 2026-07-21 - 收口移动设置与画布连接线真实回归
+
+- **修改范围**：收口 #153 后真实浏览器门禁暴露的两组回归。移动设置继续只使用共享 `SettingsConsoleMobileHome`，补齐创作系统状态、网页性能和能力来源入口，不把旧 `SettingsMobileDashboard` 重新挂回新版 Shell。画布连接线测量统一使用 SVG `getScreenCTM()` 转换到屏幕坐标；Prompt Group 和 10k 画布 smoke 按真实卡片可见区域、运行时 `data-x/data-y`、目标连接线 ID 和对应子卡 DOM 几何验证拖拽与连线，不再依赖硬编码视口位置或超出配额后未更新的 `localStorage` 快照。
+- **修改文件**：
+  - `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`、`apps/web/src/styles/settings-console.css`
+  - `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`、`VideoGenerationGroupRenderer.tsx`
+  - `scripts/test/verify-prompt-group-drag.mjs`、`scripts/test/verify-large-canvas-10k-smoke.mjs`
+  - `tests/unit/mobile-settings-overview-metrics.test.ts`、`canvas-connector-scheduler-contract.test.ts`、`prompt-group-browser-verify-script.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：移动设置首页以 `SettingsConsoleMobileHome` 为唯一入口，旧 dashboard 只保留未挂载历史实现，避免形成第二套导航和状态。连接线 `data-left/data-top` 只作为可观测诊断元数据，浏览器断言以 `getScreenCTM()` 后的真实屏幕坐标为准。10k 场景允许虚拟化只渲染当前可见子卡与连接线，但每一条已渲染连接线必须按稳定 ID 与对应子卡配对；运行时交互验证读取实时 DOM/卡片位置，持久化配额告警不能覆盖已成功的内存状态判断。
+- **已运行验证**：
+  - 最终工作树执行 `npm run verify:changes`，明确返回退出码 0；架构、治理、生产依赖审计策略、类型、OpenAPI、Shared/UI/API Client/Web 构建和编码检查全部通过。
+  - 完整测试链通过：unit 1843 pass / 2 skipped、integration 13/13、contract 15/15、e2e 11/11；画布性能 3/3。
+  - Prompt Group、移动设置、桌面设置、AI 接管和启动横幅均使用真实 Chromium smoke 通过；移动设置确认共享首页、能力来源详情和返回语义可用。
+  - 独立 `verify:large-canvas-10k` 真实 Chromium smoke 通过：11103 个节点保持虚拟化，Prompt 拖拽、子卡跟随和缩放通过，目标连接线端点误差约 0.097px。
+  - 新增大画布屏幕几何契约测试 7/7 通过；`node --check scripts/test/verify-large-canvas-10k-smoke.mjs` 与 `git diff --check` 通过。
+- **未运行验证及原因**：未调用真实付费 Provider、支付、生产 OAuth、生产 PostgreSQL 或真实账户写操作，本次变更不涉及这些外部副作用；移动设置使用真实 Chromium 移动视口验证，未在物理手机和平板设备上执行手工验收。
+- **风险与下一步**：生产依赖审计仍有既存的 `morgan <= 1.10.1` 中危日志伪造告警，应作为独立依赖升级处理。10k smoke 的合成 data URL 数据会触发预期的 `localStorage` 备份配额告警，当前运行时会 fail-safe 且实时交互已验证通过；后续可独立加强超大画布的 IndexedDB/OPFS 持久化容量路径。文档索引中的 14 份待归档资料本轮按范围保持不动。

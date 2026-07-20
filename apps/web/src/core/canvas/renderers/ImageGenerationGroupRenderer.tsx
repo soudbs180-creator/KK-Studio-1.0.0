@@ -170,6 +170,8 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
           width={connectorSvgWidth}
           height={connectorSvgHeight}
           viewBox={`0 0 ${connectorSvgWidth} ${connectorSvgHeight}`}
+          data-left={connectorSvgLeft}
+          data-top={connectorSvgTop}
           style={{
             width: `${connectorSvgWidth}px`,
             height: `${connectorSvgHeight}px`,
