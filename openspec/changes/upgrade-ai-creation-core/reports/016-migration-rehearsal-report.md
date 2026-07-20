@@ -165,6 +165,10 @@ For a fresh install, apply in this order:
 2. `migrations/*.sql` in numeric order (001-016)
 
 ## Cleanup
-Rehearsal database and user can be dropped with:
-DROP DATABASE IF EXISTS kkstudio_rehearsal_016;
-DROP USER IF EXISTS kkstudio_rehearsal;
+Cleanup performed after report generation:
+- Dropped database `kkstudio_rehearsal_016`.
+- Dropped user `kkstudio_rehearsal`.
+- Removed `/tmp/kkstudio_rehearsal_016` from the VPS.
+- Removed local temporary Python scripts from the workstation.
+
+If you need to re-run, recreate the isolated database and user as described above.
