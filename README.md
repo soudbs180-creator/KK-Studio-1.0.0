@@ -176,6 +176,21 @@ nano-banana-KK-/
 
 ## 7. 快速启动指南
 
+### 7.0 环境要求
+
+在开始之前，请确认本机满足以下前置条件：
+
+| 依赖 | 版本要求 | 说明 |
+|---|---|---|
+| **Node.js** | `24.x`（严格） | 由根 `package.json` 的 `engines` 字段强制约束，其他版本可能无法安装依赖 |
+| **npm** | `11.12.1`（推荐） | 由 `packageManager` 字段声明；Monorepo 依赖关系以根 `package.json` 为准 |
+| **PostgreSQL** | 14+ | 后端积分、用户与生成记录的权威存储，本地与 VPS 部署均需要 |
+| **PowerShell** | 5.1+（Windows） | `dev:start` 等开发脚本基于 PowerShell 实现，Windows 下开箱即用 |
+| **Expo CLI**（可选） | 最新版 | 仅移动端开发需要，随 `npx expo` 自动调用 |
+
+> [!NOTE]
+> 若依赖安装过程中出现原生模块锁文件残留（Windows 常见），可执行 `npm run install:diagnose-locks` 诊断，或 `npm run install:recover` 自动清理并恢复。
+
 ### 7.1 安装依赖
 项目推荐使用 `npm` 进行依赖管理：
 ```bash
@@ -183,14 +198,47 @@ npm install
 ```
 
 ### 7.2 配置环境变量
-从模板复制配置文件，并填写本地区动信息：
+KK Studio 的环境变量分为**前端公开变量**与**服务端机密变量**两套，分别配置：
+
+**① 前端公开变量** —— 从模板复制配置文件，并填写本地启动信息：
 ```bash
 cp .env.example .env
 ```
-> [!WARNING]
-> 真实的 `.env`、API 密钥、数据库连接字符串以及 Stripe 密钥绝对禁止提交至 Git 仓库。
+关键项说明：
+| 变量 | 用途 | 本地默认值 |
+|---|---|---|
+| `VITE_KK_API_BASE_URL` | Web 端请求的后端 API 地址 | `http://127.0.0.1:3001` |
+| `VITE_AUTH_REDIRECT_ORIGIN` | 登录认证回调来源 | `http://127.0.0.1:5173` |
+| `VITE_TURNSTILE_ENABLED` | 是否启用 Cloudflare Turnstile 人机校验 | `false`（本地建议关闭） |
+| `EXPO_PUBLIC_API_BASE_URL` | 移动端请求的 API 地址 | `http://127.0.0.1:3001` |
 
-### 7.3 构建共享包
+**② 服务端机密变量** —— 复制服务端模板并填写真实密钥：
+```bash
+cp server/.env.local.example server/.env.local
+```
+关键项说明：
+| 变量 | 用途 |
+|---|---|
+| `DATABASE_URL` | PostgreSQL 连接串，如 `postgres://kkstudio:****@127.0.0.1:5432/kkstudio` |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | 特权大模型供应商密钥（仅服务端持有） |
+| `JWT_SECRET` / `PASSWORD_SALT` / `KK_API_SESSION_SIGNING_SECRET` / `USER_API_ENCRYPTION_SECRET` | 会话签名、口令散列与用户密钥加密的机密，**必须是长随机串** |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | 支付与 Webhook 验签（生产环境必须启用严格验签） |
+| `ALLOWED_ORIGINS` | CORS 白名单，逗号分隔 |
+
+> [!WARNING]
+> 真实的 `.env`、`server/.env.local`、API 密钥、数据库连接字符串以及 Stripe 密钥**绝对禁止提交至 Git 仓库**。服务端在读取特权环境变量失败时会拒绝启动，这是有意设计的安全红线。
+
+### 7.3 初始化数据库
+确保 PostgreSQL 已启动并创建了目标数据库，然后按序执行 `migrations/` 目录下的迁移脚本（数据库 Schema 的唯一权威来源）：
+```bash
+# 示例：使用 psql 按序执行全部迁移
+psql "$DATABASE_URL" -f migrations/001_points_schema.sql
+psql "$DATABASE_URL" -f migrations/002_token_schema.sql
+# …依次执行其余 NNN_*.sql
+```
+所有迁移脚本均为幂等设计，可重复执行而不会破坏已有数据。
+
+### 7.4 构建共享包
 在本地开发启动前，必须构建协议契约包与 API 客户端：
 ```bash
 npm run build -w packages/api-client
@@ -201,14 +249,126 @@ npm run build -w packages/shared
 npm run build -w packages/ui
 ```
 
-### 7.4 启动开发服务
+### 7.5 启动开发服务
 ```bash
 npm run dev:start
+```
+该命令会经由 `scripts/dev/dev-launch.ps1` 同时拉起 Web 前端与 API 服务端。常用的配套命令：
+```bash
+npm run dev:status    # 查看开发进程状态
+npm run dev:restart   # 重启开发服务
+npm run dev:stop      # 停止全部开发进程
 ```
 通常，开发环境会使用如下端口（具体以启动控制台日志为准）：
 * **Web 端**：`http://localhost:3000`
 * **服务端 API**：`http://localhost:3001`
 * **移动端 (Expo)**：运行 `cd apps/mobile && npx expo start` 启动调试器。
+
+---
+
+## 7A. 使用示例
+
+以下示例覆盖从日常开发到发布的最常见工作流。
+
+### 7A.1 一次完整的本地开发流程
+```bash
+# 1. 克隆仓库并安装依赖
+git clone <repo-url> nano-banana-KK-
+cd nano-banana-KK-
+npm install
+
+# 2. 配置环境变量（前端 + 服务端）
+cp .env.example .env
+cp server/.env.local.example server/.env.local
+# 编辑 server/.env.local，填入数据库连接串与各类密钥
+
+# 3. 构建共享包并启动
+npm run build -w packages/api-client
+npm run dev:start
+
+# 4. 打开浏览器访问 http://localhost:3000 开始创作
+```
+
+### 7A.2 修改共享契约后的联调
+当你修改了 `packages/shared` 中的 DTO 或枚举，需要按依赖顺序重新构建并验证：
+```bash
+# 跨层修改顺序：shared -> api-client -> server -> web -> tests -> docs
+npm run build -w packages/shared
+npm run build -w packages/api-client
+npm run dev:restart
+npm run typecheck
+```
+
+### 7A.3 提交前的一键校验
+任何代码修改在提交前，必须通过完整的本地质量门禁：
+```bash
+npm run verify:changes
+```
+该命令会依次执行：架构边界校验 → 治理校验 → 依赖审计 → 类型检查 → OpenAPI 规格校验 → 全量构建 → 全量测试（单元/集成/契约/E2E）→ 专项冒烟 → 编码防乱码校验 → 画布性能基准。
+
+只想快速跑测试时：
+```bash
+npm run test:unit          # 仅单元测试
+npm run test               # 单元 + 集成 + 契约 + E2E 全量
+```
+
+### 7A.4 构建生产产物与便携发布包
+```bash
+# 全量生产构建（shared + ui + api-client + web）
+npm run build
+
+# 生成便携发布包（可分发到 VPS 的独立产物）
+npm run package:portable
+
+# 生成并直接发布便携包
+npm run package:portable:publish
+```
+
+### 7A.5 移动端调试
+```bash
+cd apps/mobile
+npx expo start
+# 按提示在 Expo Go 或模拟器中打开；确保 EXPO_PUBLIC_API_BASE_URL 指向本机 API
+```
+
+---
+
+## 7B. 贡献指南
+
+欢迎参与 KK Studio 的开发。为了保证 Monorepo 的架构一致性与安全红线不被破坏，请遵循以下流程与约定。
+
+### 7B.1 贡献流程
+1. **Fork & 分支**：从主分支切出功能分支，命名建议 `feat/<主题>`、`fix/<主题>` 或 `docs/<主题>`。
+2. **阅读规范**：动手前必读 [AGENTS.md](./AGENTS.md)（AI 与人类开发者共享的最高执行规范）和第 0 节的文档路由表，确认你的修改落在正确的模块边界内。
+3. **小步提交**：每个提交聚焦一件事；跨层修改遵循 `packages/shared` → `packages/api-client` → `server` → `apps/web` → `tests` → `docs` 的顺序。
+4. **本地验证**：提交前必须执行 `npm run verify:changes` 并全部通过；仓库已配置 Husky pre-commit 钩子，请**不要**使用 `--no-verify` 跳过。
+5. **提交 PR**：在 PR 描述中说明改动动机、涉及模块、已执行的校验命令及结果；涉及计费、安全、数据库结构的改动需在 PR 中显式标注。
+
+### 7B.2 代码与提交约定
+* **语言与风格**：TypeScript 优先，遵循各 workspace 现有的 ESLint/TSConfig 约定；UI 层仅使用语义 Token，禁止硬编码颜色与 Z-Index 字面量。
+* **编码规约**：所有文件必须是 `UTF-8 without BOM` + `LF` 换行（详见第 9 节）；提交前 `npm run check:encoding` 必须通过。
+* **提交信息**：建议使用 Conventional Commits 风格，如 `feat(canvas): support zip export for selected originals`、`fix(server): rollback points on generation failure`。
+* **文档同步**：修改行为或契约时，同步更新对应 `docs/` 文档；重大 Bug 修复与性能优化需输出 `*_LESSONS.md` 复盘文档（见第 10 节）。
+
+### 7B.3 模块边界速查
+| 你要做的事 | 应修改的位置 | 绝对禁止 |
+|---|---|---|
+| Web 页面 / 画布交互 | `apps/web/` | 直连数据库、直连特权 Provider、引入 RN/Expo 库 |
+| 移动端交互 | `apps/mobile/` | 调用 DOM / BOM 专属 API |
+| DTO / 枚举 / 领域契约 | `packages/shared/` | 引入 React、DOM、Node 环境 API |
+| 鉴权 / HTTP 请求封装 | `packages/api-client/` | 硬编码平台存储（localStorage / SecureStore） |
+| 设计 Token / 基础组件 | `packages/ui/` | 混入业务状态或接口调用 |
+| API 代理 / 计费 / Stripe | `server/` | 提交真实密钥；特权环境变量缺失时必须拒绝启动 |
+| 数据库结构变更 | `migrations/` | 在业务代码中编写 DDL |
+
+### 7B.4 安全红线（不可协商）
+* 任何 API 密钥、数据库连接串、Stripe 密钥不得进入 Git 历史；发现误提交立即轮换密钥并清理历史。
+* 特权大模型 API 请求"零直连前端"——必须经 `server/` 网关代理。
+* 积分扣减必须走预扣 + 失败退款的原子事务，禁止绕过计费逻辑。
+* 生产环境 Stripe Webhook 必须启用签名强验。
+
+### 7B.5 报告问题
+提交 Issue 时请附上：复现步骤、预期与实际行为、`npm run dev:status` 输出、相关日志片段（脱敏后）。安全漏洞请**不要**公开提交 Issue，请私下联系维护者。
 
 ---
 
