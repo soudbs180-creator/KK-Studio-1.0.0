@@ -1,12 +1,14 @@
 # KK Studio AI 全站能力覆盖矩阵
 
-Last verified: 2026-07-19  
-Source of truth: `ToolRegistry.ts`、`AssistantExecutionContext.ts`、CanvasContext 与本页列出的业务入口。
+Last verified: 2026-07-22
+
+Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`、`apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts`、CanvasContext 与本页列出的业务入口。
 
 ## Source evidence
 
 - Capability matrix source: `apps/web/src/features/ai-takeover/core/browserActionCatalog.ts`
-- Browser bridge: `apps/web/src/features/ai-takeover/core/browserBridge.ts`
+- Browser bridge: `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts`
+- Canonical Provider catalog: `packages/shared/src/generation/providerCatalog.ts`
 
 ## 判定规则
 
@@ -34,6 +36,7 @@ Source of truth: `ToolRegistry.ts`、`AssistantExecutionContext.ts`、CanvasCont
 | Account | 查看登录存在性和 Key 配置状态 | Auth runtime、KeyManager | `account.getSummary` | safe | 只返回 owner ID、登录布尔值和 masked 状态；不返回 Key/Token。 |
 | Billing | 查看可展示余额 | BillingContext | `billing.getSummary` | safe | 只读；单位固定为 credits。 |
 | Browser | 状态、公开 URL 检查、外部生成/草稿 | Browser Bridge | `browser.*` | safe / confirm / dangerous | 保留已硬化的公开 URL、owner 和确认边界。 |
+| Capabilities | 查看当前用户可用的 Provider、Connection、Model、Capability、Channel 与 Runtime | 当前尚无统一领域入口 | 计划新增 `capabilities.listAvailable` | safe | **未实现**；必须先完成服务端 Capability Graph snapshot 与脱敏 Provider Connection 投影，不得从模型名或 UI preset 猜测。 |
 
 ## UI 动作映射
 
@@ -49,6 +52,7 @@ Source of truth: `ToolRegistry.ts`、`AssistantExecutionContext.ts`、CanvasCont
 | Agent Dock | Queue 暂停/恢复/重试/取消 | `generation.*Job` | 使用同一 DurableGenerationQueue。 |
 | Agent Dock | 折叠、资源面板、上下文压缩、定位输出、归档显示 | manual UI | 不创建第二套任务状态。 |
 | Settings | 打开模块 | `navigation.openSettings` | 只负责页面导航。 |
+| Settings | 配置 Provider Connection、验证能力、查看隐私/通道 | 当前 user API profile payload；计划迁移到规范化 Provider Connection API | 创建/更新/删除必须由用户界面或 confirm 工具触发；查询走 `capabilities.listAvailable` | safe read / confirm mutation | 迁移期 dual-read，响应永不返回 secret；旧 Key 无安全引用时要求重新验证。 |
 | Settings | 存储模式、缓存清理、日志筛选/导出、充值页表单 | manual UI | 需要用户手势、影响范围不统一，或尚未建立可验证领域事务。 |
 | Consumption / Admin | 充值审批、拒绝、支付确认、余额变更 | forbidden | 账户和计费只开放安全读取。 |
 
@@ -66,6 +70,8 @@ Source of truth: `ToolRegistry.ts`、`AssistantExecutionContext.ts`、CanvasCont
 | 8. 自动整理 | Queue arrange handler / `canvas.arrangeNodes` | 实际 node IDs 和布局结果。 |
 | 9. 验证失败项 | `generation.getJobStatus` | completed / failed / running / queued 精确计数。 |
 | 10. 导出原图 | `assets.zipOriginals` | ZIP manifest、成功项与失败项；部分失败不得伪装全成功。 |
+
+Capability Graph 图像纵向切片完成后，在步骤 3 与步骤 4 之间增加固定步骤：读取脱敏 capability snapshot、冻结 `connectionId/provider/model/capability/channel/requestProfile`，并把它写入 Quote route snapshot。执行期间不得切换 Connection 或 Channel。
 
 ## 明确禁止的自治入口
 

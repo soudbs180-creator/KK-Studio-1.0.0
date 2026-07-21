@@ -97,9 +97,11 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 9.1 | Capability Graph snapshot API | 不符合 | 全仓 grep `capability-graph` / `capability_bindings`（大小写不敏感）零匹配；无 DTO、表或 API。 | upgrade |
-| 9.2 | Provider Connection 领域模型 | 不符合 | 全仓 grep `provider_connections` 零匹配；用户 API 配置仍以 profile payload、slot、entry、provider 等兼容结构混合保存。 | upgrade |
-| 9.3 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 不符合 | 无 `secret_ref` 存储与 verify 流程（见 9.2 零匹配）。 | upgrade |
+| 9.1 | Canonical Provider catalog | 完全 | `packages/shared/src/generation/providerCatalog.ts` 与 Provider governance checks 维持前后端目录一致。 | keep |
+| 9.2 | Capability Graph snapshot API | 不符合 | 全仓 grep `capability-graph` / `capability_bindings`（大小写不敏感）零匹配；无 DTO、表或 API。 | upgrade |
+| 9.3 | Provider Connection 领域模型 | 不符合 | 全仓 grep `provider_connections` 零匹配；用户 API 配置仍以 profile payload、slot、entry、provider 等兼容结构混合保存。 | upgrade |
+| 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 不符合 | 无 `secret_ref` 存储与 verify 流程（见 9.3 零匹配）。 | upgrade |
+| 9.5 | Agent 查询可用能力 | 不符合 | ToolRegistry 尚无 `capabilities.listAvailable`；Planner 仍通过现有生成配置推断能力。 | upgrade |
 
 ## 10. 本地媒体与 Runtime
 
@@ -141,11 +143,13 @@
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |
 | 文档 233 / 18 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
 | Browser Bridge 白名单/脱敏 | `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts:108-147,149-190` / `browserActionCatalog.ts` |
+| Canonical Provider catalog | `packages/shared/src/generation/providerCatalog.ts` |
 | Capability Graph / provider_connections 不存在 | 全仓 grep 零匹配 |
+| Agent capability tool 不存在 | `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts` |
 | local-runner 独立构建未入 release 验证 | `local-runner/package.json` |
 
 ---
 
 ## 变更影响
 
-本矩阵中标记为 `upgrade` 的条目共 **26 项**，构成 `upgrade-ai-creation-core` OpenSpec 的全部改造范围。标记为 `keep` 的 12 项是当前已实现能力，不得在新实现中破坏。标记为 `verify` 的 3 项需要补测量或 E2E 证据。标记为 `archive` 的 1 项是文档治理债务。
+本矩阵中标记为 `upgrade` 的条目共 **27 项**，构成 `upgrade-ai-creation-core` OpenSpec 的全部改造范围。标记为 `keep` 的 13 项是当前已实现能力，不得在新实现中破坏。标记为 `verify` 的 3 项需要补测量或 E2E 证据。标记为 `archive` 的 1 项是文档治理债务。
