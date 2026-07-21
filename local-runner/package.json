@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/server.js"
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && node dist/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

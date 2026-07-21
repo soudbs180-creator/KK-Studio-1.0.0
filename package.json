@@ -4,7 +4,8 @@
   "version": "1.6.0",
   "workspaces": [
     "packages/*",
-    "apps/web"
+    "apps/web",
+    "local-runner"
   ],
   "type": "module",
   "packageManager": "npm@11.12.1",
@@ -19,8 +20,9 @@
     "dev:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/restart-dev.ps1",
     "install:diagnose-locks": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/diagnose-install-locks.ps1",
     "install:recover": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/diagnose-install-locks.ps1 -StopProjectDevProcesses -CleanStaleNativeAddonDirs",
-    "local-runner:start": "npm run start --prefix local-runner",
-    "local-runner:build": "npm run build --prefix local-runner",
+    "local-runner:start": "npm run start -w local-runner",
+    "local-runner:typecheck": "npm run typecheck -w local-runner",
+    "local-runner:build": "npm run build -w local-runner",
     "admin:dev": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",
     "admin:build": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",
     "admin:preview": "node -e \"throw new Error('apps/admin has been removed; see docs/deployment/admin-vps.md')\"",
@@ -65,7 +67,7 @@
     "test:contract": "node --test --test-isolation=none \"tests/contract/*.test.ts\"",
     "test:e2e": "node --test --test-isolation=none \"tests/e2e/*.test.ts\"",
     "test": "npm run test:unit && npm run test:integration && npm run test:contract && npm run test:e2e",
-    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
+    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run local-runner:typecheck && npm run spec:check && npm run build && npm run local-runner:build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
     "preview": "vite preview --configLoader native",
     "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
     "check:encoding": "node scripts/ci/check-encoding.js && node scripts/ci/check-mojibake.mjs",
