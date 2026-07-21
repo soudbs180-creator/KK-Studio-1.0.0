@@ -2557,3 +2557,19 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 移除 `react-router-hono-server` 后 `npm install` removed 5 packages，audited 823 packages，0 vulnerabilities。
 - **未运行验证及原因**：未运行 architecture:check、governance:check、test:unit 和 verify:changes，因为依赖修复仅涉及 package.json overrides 和移除未使用依赖，不影响源码行为。typecheck 和 build 已验证无 breaking change。
 - **风险与下一步**：`@react-router/fs-routes` 仍依赖 `minimatch@9.0.7` 但 `brace-expansion` 已修复至 5.0.7，无安全风险。后续推送 origin/main 前建议完整跑一次 `npm run verify:changes`。
+
+## 156. 2026-07-22 - 校准 Phase 2 Capability Graph 事实基线
+
+- **修改范围**：重新以当前源码、migration 018、专项测试和治理脚本为事实源，校准 `upgrade-ai-creation-core` 的 proposal/design/tasks、能力矩阵与项目状态；明确 Capability Graph / Provider Connection / asset lineage / Agent safe tool 已完成，server durable image Worker、灰度、续跑与恢复 E2E 尚未完成；重新生成文档索引。
+- **修改文件**：
+  - `openspec/changes/upgrade-ai-creation-core/proposal.md`
+  - `openspec/changes/upgrade-ai-creation-core/design.md`
+  - `openspec/changes/upgrade-ai-creation-core/tasks.md`
+  - `docs/governance/SOURCE_CAPABILITY_MATRIX.md`
+  - `docs/governance/PROJECT_STATE_AND_VALIDATION.md`
+  - `docs/governance/DOCUMENTATION_INDEX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：Capability Graph 基础与运行态 Worker 分开验收；已存在的 DTO、projection、snapshot API、Provider Connection CRUD/verify、secret reference、flag、asset lineage 和 `capabilities.listAvailable` 标记为完成，但 internal → invited → full 灰度、旧 profile 兼容读取删除、浏览器关闭续跑、Worker 重启/租约失效恢复和 Item 端到端幂等继续保持未完成。migration 018 保持 additive，禁止 destructive rollback。
+- **已运行验证**：文档治理 RED 用例先因索引过期失败；重建后 `documentation-governance-contract` 1/1 通过。文档索引为 227 份 Markdown、19 份 current、86 份 reference、119 份 history、3 份 pending archive、0 conflict。`architecture:check` 全部底层检查、`governance:check` 全部底层检查通过；Capability Graph 聚焦回归为 unit 20/20、integration 1/1 通过。
+- **未运行验证及原因**：本机没有系统 `npm`/`npx`，上述验证使用 bundled Node 24 直接执行 `package.json` 对应底层入口。本提交只校准文档事实与生成索引，未修改运行时代码，因此 `typecheck`、`build` 和完整测试链留到后续路由、门禁与 Worker 代码交付及最终 `verify:changes` 收口执行。
+- **风险与下一步**：低风险，运行时行为和公开 API 未改变。下一提交按 characterization 测试拆分 `services/api/routes/user/`：共享请求上下文只承载 owner/元数据/envelope，`auth.js`、`profile.js`、`wuyin.js` 各自成为单一职责 owner，并删除被挂载顺序遮蔽的重复路由。

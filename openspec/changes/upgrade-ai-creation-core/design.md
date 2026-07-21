@@ -1,6 +1,6 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 1 closed, entering Phase 2
+> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
 > Companion: proposal.md, tasks.md
 > Last verified: 2026-07-22
 

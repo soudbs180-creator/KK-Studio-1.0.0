@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 1 closed / Phase 2 ready
+> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
 > Last updated: 2026-07-22
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: server durable Worker + Capability Graph projection.
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection foundation completed; server durable Worker, rollout and recovery E2E remain open.
 
 ---
 
@@ -57,12 +57,13 @@
 
 ### 2a — Capability Graph / Connection 前置 + 图片 Worker（第 1–2 周）
 
-- [ ] migration `018_capability_graph_foundation.sql`：新增 `provider_connections`、`capability_bindings` 与 asset lineage relation；additive，不保存明文 secret。（迁移、兼容、flag、回滚、安全、性能、测试、残余风险、删除条件按文末 PR 验收模板填写）
-- [ ] Capability Graph DTO（Zod discriminated union）+ projection service + `GET /api/v1/capability-graph/snapshot`；Actor/Job/Run/Audit 从现有权威表投影，不建 EAV 节点表。
-- [ ] Provider Connection CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）；迁移期 dual-read 旧 profile payload，新写入只走新表。
-- [ ] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
-- [ ] 首个纵向切片：Google official image adapter（生产）+ `FakeProviderAdapter`（测试）；server flag `capability_graph.image_provider_slice` 按 internal → invited → full 放量；关闭 flag 只隐藏新 UI/tool 并恢复旧 connection 读取。
-- [ ] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
+- [x] migration `018_capability_graph_foundation.sql`：新增 `provider_connections`、`capability_bindings` 与 asset lineage relation；additive，不保存明文 secret；迁移专项测试已覆盖结构、幂等与安全约束。
+- [x] Capability Graph DTO（Zod discriminated union）+ projection service + `GET /api/v1/capability-graph/snapshot`；Actor/Job/Run/Audit 从现有权威表投影，不建 EAV 节点表。
+- [x] Provider Connection CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）；新写入走 `provider_connections`，兼容读取仍保留删除门禁。
+- [x] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
+- [x] 首个纵向切片的代码基础：Google official image credentials / adapter、`FakeProviderAdapter` 测试路径与 server flag `capability_graph.image_provider_slice` 已落地。
+- [ ] 完成 `capability_graph.image_provider_slice` 的 internal → invited → full 灰度与关闭 flag 回退验证；在切流验收前不删除旧 connection 读取。
+- [x] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
 - [ ] 在 `services/api/` 新增 Worker 子系统：租约表、心跳续约、任务领取、提交、轮询、超时、取消。
 - [ ] 实现 Worker 与图像 Provider Adapter 对接，完成图片 Job 的云端执行。
 - [ ] 浏览器关闭后 Worker 继续执行，重新登录时通过 SSE 事件流恢复投影。

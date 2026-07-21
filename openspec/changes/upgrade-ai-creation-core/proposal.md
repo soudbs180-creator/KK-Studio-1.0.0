@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 1 closed, entering Phase 2
+> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-22
@@ -15,9 +15,9 @@ KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地�
 - 报价、路由、队列、对账的统一事实源刚在同步图像链路建立，**尚未覆盖异步视频/音频与 Worker 执行**，浏览器侧队列仍是事实上的执行权威。
 - Agent 运行时仅有当前指令和画布上下文，没有跨轮对话历史、摘要和工具结果回填， reload 后 running Run 被直接标记为失败。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
-- 文档治理已收敛到 233 份 Markdown、18 份 current（达成 15–25 目标），但能力矩阵、项目状态文档与本 OpenSpec 状态头存在计数、源码路径与运行状态漂移。
+- 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
-- 用户 API 配置仍以 profile payload、slot、entry、provider 等兼容结构混合保存，缺少独立 Provider Connection 领域模型，凭据生命周期（加密存储、轮换、脱敏、撤销）不可治理。
+- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；用户 API 仍保留旧 profile payload 的兼容读取，需在完成切流和观测窗口后删除。
 - `local-runner` 仍是 Browser/OpenCLI 原型：固定 fallback token、token 日志、请求体无明确上限、隐式 `any`，独立 typecheck 未通过，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。
@@ -47,7 +47,7 @@ BYOK、云端用户 Key、平台积分、用户网页会员必须是四条互斥
 把 `handleSlides()` 旁路替换为 `PptDeckPlan -> Slide Jobs -> Editable Deck`，每页独立失败、重试、编辑；导出保留文字、图片和图层。
 
 2.6 **文档收敛并维持在 15–25 份真 current**
-已达成（233 份 Markdown / 18 份 current）。保持产品核心宪章、源码验证能力矩阵和单一 OpenSpec 为唯一入口；禁止新增平行总纲，其余文档维持 `reference`、`proposed` 或 `archive` 归类。
+已达成（当前 227 份 Markdown / 19 份 current）。保持产品核心宪章、源码验证能力矩阵和单一 OpenSpec 为唯一入口；禁止新增平行总纲，其余文档维持 `reference`、`proposed` 或 `archive` 归类。
 
 2.7 **透明能力图（Capability Graph）**
 以固定节点类型（`Actor | Provider | ProviderConnection | Model | Capability | Asset | Workflow | Step | Trigger | Runtime | Job | Run | ToolCall | Verification | Audit`）和版本化边构建用户可理解、Agent 可查询的能力图；`GET /api/v1/capability-graph/snapshot` 与只读 safe tool `capabilities.listAvailable` 对外暴露；UI 能直接解释每个能力的 Connection、Channel、隐私与成本。

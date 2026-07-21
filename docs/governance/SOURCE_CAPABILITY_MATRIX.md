@@ -88,8 +88,8 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 233 份 Markdown（不含生成索引本身）。 | keep |
-| 8.2 | current 分类正确 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:17`：18 份 current，达成 15–25 目标；本轮已修正旧记录（226/152）的计数漂移。 | keep |
+| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 227 份 Markdown（不含生成索引本身）。 | keep |
+| 8.2 | current 分类正确 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:17`：19 份 current，达成 15–25 目标。 | keep |
 | 8.3 | 版本事实源一致 | 部分 | `config/release-manifest.json` 是唯一版本源；但部分文档仍引用旧版本。 | archive |
 | 8.4 | OpenSpec 单一 active | 完全 | `DOCUMENTATION_INDEX.md` 中仅 `upgrade-ai-creation-core` 的文档标为 current；`canvas-card-system-v2`、`expand-ai-site-capabilities`、`harden-ai-control-plane`、`modernize-ai-first-workspace-ui`、`unify-ai-collaboration-modes` 均已归类 history。 | keep |
 
@@ -98,10 +98,10 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 9.1 | Canonical Provider catalog | 完全 | `packages/shared/src/generation/providerCatalog.ts` 与 Provider governance checks 维持前后端目录一致。 | keep |
-| 9.2 | Capability Graph snapshot API | 不符合 | 全仓 grep `capability-graph` / `capability_bindings`（大小写不敏感）零匹配；无 DTO、表或 API。 | upgrade |
-| 9.3 | Provider Connection 领域模型 | 不符合 | 全仓 grep `provider_connections` 零匹配；用户 API 配置仍以 profile payload、slot、entry、provider 等兼容结构混合保存。 | upgrade |
-| 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 不符合 | 无 `secret_ref` 存储与 verify 流程（见 9.3 零匹配）。 | upgrade |
-| 9.5 | Agent 查询可用能力 | 不符合 | ToolRegistry 尚无 `capabilities.listAvailable`；Planner 仍通过现有生成配置推断能力。 | upgrade |
+| 9.2 | Capability Graph snapshot API | 完全 | `packages/shared/src/capability-graph/` 定义契约；`services/api/lib/capability-graph/projection.js` 投影权威数据；`services/api/routes/capability-graph.js` 提供 snapshot API。 | keep |
+| 9.3 | Provider Connection 领域模型 | 部分 | migration `018_capability_graph_foundation.sql` 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立规范化写入、CRUD 和 verify；旧 profile payload 的兼容读取仍待切流后删除。 | upgrade |
+| 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 完全 | `providerConnectionService.js`、`connectionVerifier.js` 与 migration 018 使用 secret reference、URL/DNS/IP 检查、最小探测和诊断脱敏，不序列化明文 secret。 | keep |
+| 9.5 | Agent 查询可用能力 | 完全 | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` 注册只读 safe tool `capabilities.listAvailable`，并由 ToolRegistry 消费 snapshot。 | keep |
 
 ## 10. 本地媒体与 Runtime
 
@@ -141,15 +141,16 @@
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |
-| 文档 233 / 18 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
+| 文档 227 / 19 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
 | Browser Bridge 白名单/脱敏 | `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts:108-147,149-190` / `browserActionCatalog.ts` |
 | Canonical Provider catalog | `packages/shared/src/generation/providerCatalog.ts` |
-| Capability Graph / provider_connections 不存在 | 全仓 grep 零匹配 |
-| Agent capability tool 不存在 | `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts` |
+| Capability Graph 契约与投影 | `packages/shared/src/capability-graph/` / `services/api/lib/capability-graph/projection.js` / `services/api/routes/capability-graph.js` |
+| Provider Connection 存储与验证 | `infrastructure/database/migrations/018_capability_graph_foundation.sql` / `services/api/lib/capability-graph/providerConnectionService.js` / `connectionVerifier.js` |
+| Agent capability tool | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` |
 | local-runner 独立构建未入 release 验证 | `local-runner/package.json` |
 
 ---
 
 ## 变更影响
 
-本矩阵中标记为 `upgrade` 的条目共 **27 项**，构成 `upgrade-ai-creation-core` OpenSpec 的全部改造范围。标记为 `keep` 的 13 项是当前已实现能力，不得在新实现中破坏。标记为 `verify` 的 3 项需要补测量或 E2E 证据。标记为 `archive` 的 1 项是文档治理债务。
+本矩阵中标记为 `upgrade` 的条目共 **24 项**，构成 `upgrade-ai-creation-core` OpenSpec 的剩余改造范围。标记为 `keep` 的 16 项是当前已实现能力，不得在新实现中破坏。标记为 `verify` 的 3 项需要补测量或 E2E 证据。标记为 `archive` 的 1 项是文档治理债务。

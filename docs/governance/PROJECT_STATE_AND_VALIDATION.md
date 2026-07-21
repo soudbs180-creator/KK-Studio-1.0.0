@@ -17,7 +17,7 @@ API client: packages/api-client/
 UI package: packages/ui/
 Database migrations: infrastructure/database/migrations/
 Active OpenSpec: openspec/changes/upgrade-ai-creation-core/ (single active change)
-Docs governance: 233 Markdown / 18 current (docs/governance/DOCUMENTATION_INDEX.md)
+Docs governance: 227 Markdown / 19 current (docs/governance/DOCUMENTATION_INDEX.md)
 ```
 
 本文件只记录当前状态、验证入口和清理边界。历史事实、旧计划、旧版本和旧部署路径应归档到 `docs/archive/`，不得重新影响当前主链路。
@@ -35,6 +35,7 @@ Docs governance: 233 Markdown / 18 current (docs/governance/DOCUMENTATION_INDEX.
 | AI Takeover | `apps/web/src/features/ai-takeover/` | AI 接管体验入口。 |
 | AI Runtime | `apps/web/src/features/ai-assistant-runtime/` | ToolRegistry、CanvasRuntimeState、执行与知识同步。 |
 | Generation v3 | `services/api/lib/generation-v3/`、`services/api/routes/generation-v3.js` | Quote、Job、Billing、RouteEngine 与 Provider Adapter 当前控制面。 |
+| Capability Graph | `packages/shared/src/capability-graph/`、`services/api/lib/capability-graph/`、`services/api/routes/capability-graph.js` | DTO、snapshot projection、Provider Connection、verify、feature flag 与 asset lineage 基础已落地；image Worker 尚未接管执行。 |
 | Active OpenSpec | `openspec/changes/upgrade-ai-creation-core/` | 唯一活动升级计划；Capability Graph、Worker、Run 恢复、本地媒体与 IA 均在此跟踪。 |
 | Local Runner | `local-runner/` | 当前仅为 Browser/OpenCLI experimental runtime；在独立安全/build gate 通过前不是生产媒体运行时。 |
 
@@ -99,21 +100,23 @@ npm run local-runner:build
 9. `upgrade-ai-creation-core` 是唯一活动 change；禁止创建平行 Capability Graph、Provider registry、AI runtime 或 queue 计划。
 10. 每个 PR 的验收门禁见 `openspec/changes/upgrade-ai-creation-core/tasks.md` 文末"PR 验收模板"。
 
-## 5. 2026-07-22 - Phase 1 收口与 Phase 2 准备
+## 5. 2026-07-22 - Phase 2 Capability Graph 基础完成，Worker 待实现
 
 ### Current facts
 
-- Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 233 份 Markdown、18 份 current、0 conflict。
-- Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成；server durable Worker 尚未实现。
-- Capability Graph、规范化 Provider Connection、Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标，不得描述为当前能力。
+- Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 227 份 Markdown、19 份 current、0 conflict。
+- Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
+- Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。
+- Server durable Worker、灰度放量、浏览器关闭续跑、Worker 重启/租约失效恢复与 Item 端到端幂等仍未完成，不得描述为当前运行能力。
+- Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标。
 - 当前 GitHub HEAD 的外部失败状态来自 Vercel 团队归属；仓库代码和 GitHub Actions 日志无法修复该外部配置。
 
 ### Next execution gate
 
-1. 先完成活动 OpenSpec 与源码矩阵重新基线。
-2. 再以 additive migration 和 server flag 交付 Google/Fake image Provider 纵向切片。
-3. Capability Graph slice 通过后进入 server durable image Worker；Local Runner 安全加固与媒体 runtime 不与首个切片混合。
-4. 新 IA 最后以 visual flag 灰度，关闭 flag 只回退界面，不回滚业务数据。
+1. 先完成服务端用户路由职责拆分与热点文件可维护性递减门禁，不改变公开 HTTP 契约。
+2. 再实现 server durable image Worker 的租约、心跳、领取、轮询、取消、超时和恢复，并使用 server flag 灰度。
+3. 验证浏览器关闭续跑、Worker 重启、租约失效与 Item 幂等；migration 018 只做 additive 演进，不做 destructive rollback。
+4. Local Runner、真实媒体 runtime 与新版 IA 按后续阶段独立演进，关闭 visual flag 只回退界面，不回滚业务数据。
 
 ### Required PR evidence
 
