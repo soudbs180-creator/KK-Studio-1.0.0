@@ -2590,3 +2590,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：TDD 新职责测试初始 2/2 按预期失败，拆分后 3/3 通过并覆盖真实 Express catalog、pricing 405 与远端 pricing envelope。路由/认证/Wuyin 聚焦回归 43/43 通过。完整 unit 为 1906 pass / 0 fail / 2 skipped；integration 14/14、contract 15/15、e2e 11/11。根 TypeScript、架构 TypeScript、服务端 87 文件语法与 529 个测试文件语义检查通过；Shared esbuild、UI/API Client TypeScript 与 Web Vite 生产构建通过（2478 modules）。`architecture:check` 与 `governance:check` 全部底层入口通过，`git diff --check` 通过。
 - **未运行验证及原因**：本机没有系统 `npm`/`npx`，未执行字面量 `npm run build` / `npm run verify:changes`；已直接运行等价组件入口。尝试 bundled `pnpm` 时因项目声明 npm 而触发 package-manager/build-policy 拒绝，未产生 tracked 变更。未调用真实 Wuyin、付费 Provider、生产数据库或 OAuth；Wuyin 远端响应由测试 stub 验证。
 - **风险与下一步**：低到中风险。公开路由真实回归已覆盖，但 profile 内部仍包含历史用户 Provider 兼容代理，需等待 Provider Connection 切流完成后再缩减，不能提前删除。下一提交把单一 WorkspacePage 行数检查升级为热点文件 lines / explicit `any` / `console.log` 递减 baseline，并为 Capability Graph、Worker 和共享契约模块增加严格零新增门禁。
+
+## 158. 2026-07-22 - 建立热点文件可维护性递减门禁
+
+- **修改范围**：删除只允许 `WorkspacePage` 增长到 7000 行的单文件检查，新增 AST 驱动的统一 maintainability ratchet。8 个热点文件锁定当前 lines、TypeScript `AnyKeyword` 和真实 `console.log` 调用上限；Capability Graph、未来 generation Worker、共享请求上下文与 capability tool 进入严格目录，要求零显式 `any`、零 `console.log`、单函数不超过 50 行。门禁同时比较上一版配置，禁止 baseline 数值上调。
+- **修改文件**：
+  - `config/maintainability-ratchet.json`
+  - `scripts/governance/architecture/check-maintainability-ratchet.mjs`
+  - 删除 `scripts/governance/architecture/check-workspace-page-growth.mjs`
+  - `tests/unit/maintainability-ratchet-contract.test.ts`
+  - `package.json`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：显式 `any` 与 `console.log` 使用 TypeScript AST 统计，避免注释和字符串误报；行数保留为可直接理解的物理行。热点允许通过拆分降低配置，禁止升高任何既有上限；删除热点文件时必须在同一变更删除其 baseline。严格路径允许未来 Worker 目录暂不存在，一旦创建即自动递归纳入检查。
+- **已运行验证**：TDD 合同测试初始 3/3 按预期失败；实现后 3/3 通过，覆盖热点增长、严格模块超长函数与 baseline 上调拒绝。当前 8 个热点全部处于精确 baseline，13 个严格模块通过零 `any` / 零 `console.log` / 50 行函数检查。完整 `architecture:check` 通过；测试语义检查覆盖 530 个测试文件；完整 unit 为 1909 pass / 0 fail / 2 skipped。
+- **未运行验证及原因**：本提交只新增治理脚本、配置和测试，没有改变产品运行时；integration、contract、e2e、生产构建未重复执行，沿用上一提交同一代码基线的绿色结果。系统仍无 `npm`/`npx`，验证通过 bundled Node 24 直接执行底层入口。
+- **风险与下一步**：低风险。AST 指标能阻止热点继续恶化，但不会自动判定职责设计是否合理，拆分仍需按阶段每次只移动一个职责。下一提交实现 server durable image Worker；所有新 Worker 与共享契约文件从第一行起受严格门禁约束。

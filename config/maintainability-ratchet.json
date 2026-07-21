@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "hotspots": [
+    {
+      "path": "apps/web/src/components/layout/PromptBar.tsx",
+      "maxLines": 6709,
+      "maxExplicitAny": 6,
+      "maxConsoleLog": 0
+    },
+    {
+      "path": "apps/web/src/pages/Workspace/WorkspacePage.tsx",
+      "maxLines": 6396,
+      "maxExplicitAny": 25,
+      "maxConsoleLog": 13
+    },
+    {
+      "path": "apps/web/src/components/layout/ChatSidebar.tsx",
+      "maxLines": 4677,
+      "maxExplicitAny": 23,
+      "maxConsoleLog": 0
+    },
+    {
+      "path": "apps/web/src/components/settings/ApiSettingsView.tsx",
+      "maxLines": 4365,
+      "maxExplicitAny": 6,
+      "maxConsoleLog": 0
+    },
+    {
+      "path": "apps/web/src/services/auth/keyManager.ts",
+      "maxLines": 4272,
+      "maxExplicitAny": 20,
+      "maxConsoleLog": 45
+    },
+    {
+      "path": "apps/web/src/context/CanvasContext.tsx",
+      "maxLines": 3411,
+      "maxExplicitAny": 15,
+      "maxConsoleLog": 46
+    },
+    {
+      "path": "services/api/routes/user/profile.js",
+      "maxLines": 1876,
+      "maxExplicitAny": 0,
+      "maxConsoleLog": 0
+    },
+    {
+      "path": "apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts",
+      "maxLines": 1339,
+      "maxExplicitAny": 13,
+      "maxConsoleLog": 0
+    }
+  ],
+  "strictPaths": [
+    "packages/shared/src/capability-graph",
+    "packages/shared/src/generation-worker",
+    "services/api/lib/capability-graph",
+    "services/api/lib/generation-v3/worker",
+    "services/api/routes/capability-graph.js",
+    "services/api/routes/user/shared",
+    "apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts"
+  ]
+}
