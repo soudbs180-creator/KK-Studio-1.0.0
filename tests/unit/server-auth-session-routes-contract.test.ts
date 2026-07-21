@@ -17,6 +17,10 @@ function readServerProfileRoute(): string {
   return readFileSync(path.join(ROOT_DIR, 'services/api/routes/user/profile.js'), 'utf8');
 }
 
+function readUserRequestContext(): string {
+  return readFileSync(path.join(ROOT_DIR, 'services/api/routes/user/shared/requestContext.js'), 'utf8');
+}
+
 test('server exposes the typed profile and session routes used by mobile browser auth recovery', () => {
   const authSource = readServerAuthRoute();
   const profileSource = readServerProfileRoute();
@@ -30,14 +34,15 @@ test('server exposes the typed profile and session routes used by mobile browser
 });
 
 test('profile recovery accepts authorization headers, refresh tokens, and browser cookie tokens', () => {
-  const source = readServerAuthRoute();
+  const authSource = readServerAuthRoute();
+  const requestContextSource = readUserRequestContext();
 
-  assert.match(source, /function verifyRequestJwt\(req, tokenOverride = ''\)/);
-  assert.match(source, /verifyJWT\(req\.headers\.authorization\)/);
-  assert.match(source, /verifyJWT\(`Bearer \$\{explicitToken\}`\)/);
-  assert.match(source, /readCookieValue\(req, ACCESS_TOKEN_COOKIE_NAME\)/);
-  assert.match(source, /readCookieValue\(req, REFRESH_TOKEN_COOKIE_NAME\)/);
-  assert.match(source, /res\.setHeader\('X-Refresh-Token', signJWT\(\{ userId \}\)\)/);
+  assert.match(requestContextSource, /function verifyRequestJwt\(req, tokenOverride = ''\)/);
+  assert.match(requestContextSource, /verifyJWT\(req\.headers\.authorization\)/);
+  assert.match(requestContextSource, /verifyJWT\(`Bearer \$\{explicitToken\}`\)/);
+  assert.match(requestContextSource, /readCookieValue\(req, ACCESS_TOKEN_COOKIE_NAME\)/);
+  assert.match(requestContextSource, /readCookieValue\(req, REFRESH_TOKEN_COOKIE_NAME\)/);
+  assert.match(authSource, /res\.setHeader\('X-Refresh-Token', signJWT\(\{ userId \}\)\)/);
 });
 
 test('password login writes cookie fallback and keeps timing-safe password verification active', () => {

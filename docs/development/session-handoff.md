@@ -2573,3 +2573,20 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：文档治理 RED 用例先因索引过期失败；重建后 `documentation-governance-contract` 1/1 通过。文档索引为 227 份 Markdown、19 份 current、86 份 reference、119 份 history、3 份 pending archive、0 conflict。`architecture:check` 全部底层检查、`governance:check` 全部底层检查通过；Capability Graph 聚焦回归为 unit 20/20、integration 1/1 通过。
 - **未运行验证及原因**：本机没有系统 `npm`/`npx`，上述验证使用 bundled Node 24 直接执行 `package.json` 对应底层入口。本提交只校准文档事实与生成索引，未修改运行时代码，因此 `typecheck`、`build` 和完整测试链留到后续路由、门禁与 Worker 代码交付及最终 `verify:changes` 收口执行。
 - **风险与下一步**：低风险，运行时行为和公开 API 未改变。下一提交按 characterization 测试拆分 `services/api/routes/user/`：共享请求上下文只承载 owner/元数据/envelope，`auth.js`、`profile.js`、`wuyin.js` 各自成为单一职责 owner，并删除被挂载顺序遮蔽的重复路由。
+
+## 157. 2026-07-22 - 收敛服务端用户路由职责与共享请求上下文
+
+- **修改范围**：在不改变公开 HTTP 路径、状态码和响应 envelope 的前提下完成 `services/api/routes/user/` 职责拆分。新增共享请求上下文统一 Bearer/显式 refresh token/cookie owner 解析、本地临时 owner、请求元数据及成功/认证错误 envelope；`auth.js` 只保留认证、密码与 Session；`profile.js` 只保留用户资料、Key Manager、用户 Provider 路由与兼容代理；`wuyin.js` 成为 catalog、refresh、pricing-proxy 的唯一 owner。删除两千余行复制的 Wuyin catalog、认证、Session、本地存储 helper 与被挂载顺序遮蔽的重复路由。
+- **修改文件**：
+  - `services/api/routes/user/auth.js`
+  - `services/api/routes/user/profile.js`
+  - `services/api/routes/user/wuyin.js`
+  - `services/api/routes/user/shared/requestContext.js`
+  - `tests/unit/user-route-responsibility-contract.test.ts`
+  - `tests/unit/server-auth-session-routes-contract.test.ts`
+  - `tests/unit/profile-user-api-auth-guard.test.ts`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：共享模块只处理请求身份和 envelope，不承载密码、Session cookie、用户资料存储或 Provider 业务。认证与资料路由继续复用同一 JWT/cookie 兼容语义；Wuyin catalog 使用既有 strict documented contract，pricing-proxy 的 endpoint source 统一引用 `WUYIN_CATALOG_URL`。`user.js` 的挂载顺序保持不变，但不再依赖顺序遮蔽重复注册。
+- **已运行验证**：TDD 新职责测试初始 2/2 按预期失败，拆分后 3/3 通过并覆盖真实 Express catalog、pricing 405 与远端 pricing envelope。路由/认证/Wuyin 聚焦回归 43/43 通过。完整 unit 为 1906 pass / 0 fail / 2 skipped；integration 14/14、contract 15/15、e2e 11/11。根 TypeScript、架构 TypeScript、服务端 87 文件语法与 529 个测试文件语义检查通过；Shared esbuild、UI/API Client TypeScript 与 Web Vite 生产构建通过（2478 modules）。`architecture:check` 与 `governance:check` 全部底层入口通过，`git diff --check` 通过。
+- **未运行验证及原因**：本机没有系统 `npm`/`npx`，未执行字面量 `npm run build` / `npm run verify:changes`；已直接运行等价组件入口。尝试 bundled `pnpm` 时因项目声明 npm 而触发 package-manager/build-policy 拒绝，未产生 tracked 变更。未调用真实 Wuyin、付费 Provider、生产数据库或 OAuth；Wuyin 远端响应由测试 stub 验证。
+- **风险与下一步**：低到中风险。公开路由真实回归已覆盖，但 profile 内部仍包含历史用户 Provider 兼容代理，需等待 Provider Connection 切流完成后再缩减，不能提前删除。下一提交把单一 WorkspacePage 行数检查升级为热点文件 lines / explicit `any` / `console.log` 递减 baseline，并为 Capability Graph、Worker 和共享契约模块增加严格零新增门禁。

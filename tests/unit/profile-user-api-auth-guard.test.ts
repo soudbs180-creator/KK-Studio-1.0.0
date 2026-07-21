@@ -5,9 +5,14 @@ import { test } from "node:test";
 
 test("profile API key storage routes require authenticated user context and keep local payloads user-scoped", () => {
   const source = readFileSync(path.join(process.cwd(), "services/api/routes/user/profile.js"), "utf8");
+  const requestContextSource = readFileSync(
+    path.join(process.cwd(), "services/api/routes/user/shared/requestContext.js"),
+    "utf8",
+  );
 
   assert.match(source, /function requireProfileAuth/);
-  assert.match(source, /verifyJWT\(req\.headers\.authorization\)/);
+  assert.match(source, /require\('\.\/shared\/requestContext'\)/);
+  assert.match(requestContextSource, /verifyJWT\(req\.headers\.authorization\)/);
   assert.match(source, /Authentication is required for profile user API storage/);
   assert.match(source, /router\.use\(\[[\s\S]*'\/v1\/profile\/key-manager-state'[\s\S]*'\/v1\/profile\/user-apis'[\s\S]*\], requireProfileAuth\)/);
   assert.match(source, /router\.post\('\/v1\/profile\/user-apis\/reveal-secret'/);
