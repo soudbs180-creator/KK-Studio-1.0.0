@@ -59,7 +59,7 @@ async function createJob({ quote, userId, payload, canvasNodeIds, client }) {
       `INSERT INTO public.generation_job_items
          (item_id, job_id, sequence, status, payload_json, canvas_node_id, created_at, updated_at)
        VALUES ($1, $2, $3, 'pending', $4, $5, $6, $6)`,
-      [itemId, jobId, i, JSON.stringify({ prompt: payload?.prompt || '' }), canvasNodeId, now]
+      [itemId, jobId, i, JSON.stringify({ ...(payload || {}), prompt: payload?.prompt || '', mediaType: quote.mediaType }), canvasNodeId, now]
     );
     items.push({
       itemId,
@@ -115,6 +115,9 @@ async function getJob(jobId, userId, options = {}) {
     providerTaskId: row.provider_task_id || undefined,
     reconciliation: row.reconciliation_status,
     assetId: row.asset_id || undefined,
+    assetRecordId: row.output_json?.assetRecordId || undefined,
+    assetUrl: row.output_json?.assetUrl || undefined,
+    assetMetadata: row.output_json || undefined,
     canvasNodeId: row.canvas_node_id || undefined,
     errorCode: row.error_code || undefined,
     errorMessage: row.error_message || undefined,
@@ -147,6 +150,7 @@ async function getJob(jobId, userId, options = {}) {
  * @param {Object} [params.updates]
  * @param {string} [params.updates.providerTaskId]
  * @param {string} [params.updates.assetId]
+ * @param {Object} [params.updates.output]
  * @param {string} [params.updates.errorCode]
  * @param {string} [params.updates.errorMessage]
  * @param {import('pg').PoolClient} [params.client]
@@ -164,6 +168,10 @@ async function updateItemStatus({ itemId, status, updates = {}, client }) {
   if (updates.assetId !== undefined) {
     fields.push(`asset_id = $${idx++}`);
     values.push(updates.assetId);
+  }
+  if (updates.output !== undefined) {
+    fields.push(`output_json = $${idx++}::jsonb`);
+    values.push(JSON.stringify(updates.output));
   }
   if (updates.errorCode !== undefined) {
     fields.push(`error_code = $${idx++}`);

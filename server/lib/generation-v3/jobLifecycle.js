@@ -1,11 +1,39 @@
 // server/lib/generation-v3/jobLifecycle.js
 // 中文注释：GenerationJob v3 生命周期协调器：创建、预扣、提交 Provider、轮询、结算/退款。
 
+const crypto = require('crypto');
 const { getPool } = require('../db');
 const { createJob, getJob, updateItemStatus, updateJobStatus } = require('./jobStore');
 const { getActiveQuote, getQuote, consumeQuote } = require('./quoteEngine');
 const { selectRoute } = require('./routeEngine');
 const { reserveCredits, chargeFromReservation, refundItem } = require('./billingSaga');
+const { resolveExecutionConnectionAuth } = require('../capability-graph/generationConnectionResolver');
+const { recordDerivedAssetLineage } = require('../capability-graph/assetLineageStore');
+
+/** The submit path reuses the quote snapshot and refuses silent adapter upgrades. */
+async function resolveFrozenProviderRoute(userId, quote, options = {}) {
+  const snapshot = quote.routeSnapshot || {};
+  const connectionRoute = snapshot.connectionId ? snapshot : undefined;
+  const routeSelector = options.selectRoute || selectRoute;
+  const route = routeSelector({
+    mediaType: quote.mediaType,
+    model: quote.model,
+    channel: quote.channel,
+    options: { connectionRoute },
+  });
+  if (connectionRoute) {
+    const adapterVersion = route.adapter?.adapterVersion || route.adapterVersion;
+    if (adapterVersion !== snapshot.adapterVersion) {
+      const error = new Error('Provider adapter changed after the quote. Request a new quote.');
+      error.code = 'CONNECTION_ROUTE_STALE';
+      error.statusCode = 409;
+      throw error;
+    }
+  }
+  const resolveAuth = options.resolveExecutionConnectionAuth || resolveExecutionConnectionAuth;
+  const auth = await resolveAuth(userId, snapshot, options.connectionDependencies);
+  return { route, auth };
+}
 
 /**
  * 创建 Job（不执行）。
@@ -100,11 +128,7 @@ async function submitJob(userId, jobId) {
     }
 
     const quote = await getQuote(userId, job.quoteId, { client });
-    const route = selectRoute({
-      mediaType: quote.mediaType,
-      model: quote.model,
-      channel: quote.channel,
-    });
+    const { route, auth } = await resolveFrozenProviderRoute(userId, quote);
 
     await updateJobStatus({ jobId, status: 'submitted', client });
 
@@ -116,6 +140,7 @@ async function submitJob(userId, jobId) {
         aspectRatio: quote.routeSnapshot?.aspectRatio,
         size: quote.routeSnapshot?.size,
         payload: item.payload,
+        auth,
       };
 
       try {
@@ -155,6 +180,16 @@ async function submitJob(userId, jobId) {
   }
 }
 
+function buildGeneratedAssetOutput(item, assetUrl) {
+  return {
+    assetRecordId: crypto.randomUUID(),
+    assetUrl,
+    mediaType: item.payload_json?.mediaType || 'image',
+    source: 'provider',
+    createdAt: new Date().toISOString(),
+  };
+}
+
 async function completeItem(userId, itemId, assetUrl, { client }) {
   const itemRes = await client.query(
     `SELECT * FROM public.generation_job_items WHERE item_id = $1`,
@@ -168,17 +203,22 @@ async function completeItem(userId, itemId, assetUrl, { client }) {
     return;
   }
 
-  // Phase 1 过渡方案：将可直接访问的 asset URL 存入 asset_id 字段，
-  // 使旧版 /v1/generate/async 桥接能直接返回可预览地址。
-  // TODO: 后续新增 asset_url 字段，asset_id 恢复为唯一标识。
-  const assetId = assetUrl;
+  // asset_id remains the URL during dual-read compatibility; output_json carries stable identity.
+  const output = buildGeneratedAssetOutput(item, assetUrl);
 
   await updateItemStatus({
     itemId,
     status: 'completed',
-    updates: { assetId },
+    updates: { assetId: assetUrl, output },
     client,
   });
+  await recordDerivedAssetLineage(
+    userId,
+    output.assetRecordId,
+    item.payload_json?.referenceAssetIds,
+    { itemId, mediaType: output.mediaType },
+    client,
+  );
 
   // 结算：将预扣转为实际扣费
   if (item.reservation_id) {
@@ -253,6 +293,7 @@ async function recalcJobStatus(jobId, { client }) {
 module.exports = {
   createJobFromQuote,
   submitJob,
+  resolveFrozenProviderRoute,
   completeItem,
   failItem,
   recalcJobStatus,

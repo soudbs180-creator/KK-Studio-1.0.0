@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { getPool } = require('../db');
 const credits = require('../credits');
 const { selectRoute, buildRouteSnapshot } = require('./routeEngine');
+const { resolveQuoteConnectionRoute } = require('../capability-graph/generationConnectionResolver');
 const {
   CreateQuoteRequestSchema,
   GenerationQuoteDtoSchema,
@@ -55,89 +56,95 @@ async function computeCost({ mediaType, model, channel, count, client }) {
  * @param {Object} rawRequest
  * @returns {Promise<import('@kk/shared').GenerationQuoteDto>}
  */
-async function createQuote(userId, rawRequest) {
-  const request = CreateQuoteRequestSchema.parse(rawRequest);
-
-  // 默认通道：未指定时按是否有可用用户 Key Slot 推导；Phase 1 默认平台积分
-  const channel = request.preferredChannel || 'platform-credits';
-
+async function resolveQuoteRoute(userId, request, options) {
+  const resolveConnection = options.resolveQuoteConnectionRoute || resolveQuoteConnectionRoute;
+  const connectionRoute = await resolveConnection(userId, request, options.connectionDependencies);
+  const channel = connectionRoute?.channel || request.preferredChannel || 'platform-credits';
   const route = selectRoute({
     mediaType: request.mediaType,
     model: request.model,
     channel,
     providerHint: request.providerHint,
+    options: { connectionRoute },
   });
+  return { channel, connectionRoute, route };
+}
 
-  const cost = await computeCost({
+async function assertSufficientBalance(userId, channel, cost, creditsApi) {
+  if (channel !== 'platform-credits' || typeof cost.credits !== 'number') return;
+  const balance = await creditsApi.getUserCredits(userId);
+  if (balance >= cost.credits) return;
+  const error = new Error('Insufficient credits for quote.');
+  error.code = 'INSUFFICIENT_CREDITS';
+  error.statusCode = 402;
+  error.currentCredits = balance;
+  error.requiredCredits = cost.credits;
+  throw error;
+}
+
+function buildQuote(userId, request, routeContext, cost) {
+  const now = new Date();
+  const connectionRoute = routeContext.connectionRoute || {};
+  return {
+    quoteId: crypto.randomUUID(),
     mediaType: request.mediaType,
     model: request.model,
-    channel,
     count: request.count,
-  });
+    routeSnapshot: buildRouteSnapshot({
+      ...connectionRoute,
+      providerId: routeContext.route.providerId,
+      model: request.model,
+      adapterId: routeContext.route.adapterId,
+      capabilityVersion: routeContext.route.capabilityVersion,
+      baseUrl: connectionRoute.endpoint,
+      channel: routeContext.channel,
+    }),
+    channel: routeContext.channel,
+    cost: { ...cost, priceVersion: generatePriceVersion() },
+    expiresAt: new Date(now.getTime() + QUOTE_TTL_SECONDS * 1000).toISOString(),
+    createdAt: now.toISOString(),
+    ownerId: userId,
+  };
+}
 
-  // 平台积分通道检查余额
-  if (channel === 'platform-credits' && typeof cost.credits === 'number') {
-    const balance = await credits.getUserCredits(userId);
-    if (balance < cost.credits) {
-      const err = new Error('Insufficient credits for quote.');
-      err.code = 'INSUFFICIENT_CREDITS';
-      err.statusCode = 402;
-      err.currentCredits = balance;
-      err.requiredCredits = cost.credits;
-      throw err;
-    }
-  }
-
-  const quoteId = crypto.randomUUID();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + QUOTE_TTL_SECONDS * 1000);
-  const priceVersion = generatePriceVersion();
-  const routeSnapshot = buildRouteSnapshot({
-    providerId: route.providerId,
-    model: request.model,
-    adapterId: route.adapterId,
-    capabilityVersion: route.capabilityVersion,
-  });
-
-  const pool = getPool();
+async function persistQuote(pool, quote) {
   await pool.query(
     `INSERT INTO public.generation_quotes
        (quote_id, user_id, media_type, model, count, channel, cost_credits, cost_provider_quota,
         price_version, route_snapshot_json, expires_at, created_at, updated_at, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, 'active')`,
     [
-      quoteId,
-      userId,
-      request.mediaType,
-      request.model,
-      request.count,
-      channel,
-      cost.credits ?? null,
-      cost.providerQuota ?? null,
-      priceVersion,
-      JSON.stringify(routeSnapshot),
-      expiresAt.toISOString(),
-      now.toISOString(),
+      quote.quoteId,
+      quote.ownerId,
+      quote.mediaType,
+      quote.model,
+      quote.count,
+      quote.channel,
+      quote.cost.credits ?? null,
+      quote.cost.providerQuota ?? null,
+      quote.cost.priceVersion,
+      JSON.stringify(quote.routeSnapshot),
+      quote.expiresAt,
+      quote.createdAt,
     ]
   );
+}
 
-  const quote = {
-    quoteId,
+/** Creates a quote whose Provider route can be reproduced without client-side reselection. */
+async function createQuote(userId, rawRequest, options = {}) {
+  const request = CreateQuoteRequestSchema.parse(rawRequest);
+  const routeContext = await resolveQuoteRoute(userId, request, options);
+  const pool = options.pool || getPool();
+  const cost = await computeCost({
     mediaType: request.mediaType,
     model: request.model,
+    channel: routeContext.channel,
     count: request.count,
-    routeSnapshot,
-    channel,
-    cost: {
-      credits: cost.credits,
-      providerQuota: cost.providerQuota,
-      priceVersion,
-    },
-    expiresAt: expiresAt.toISOString(),
-    createdAt: now.toISOString(),
-    ownerId: userId,
-  };
-
+    client: pool,
+  });
+  await assertSufficientBalance(userId, routeContext.channel, cost, options.credits || credits);
+  const quote = buildQuote(userId, request, routeContext, cost);
+  await persistQuote(pool, quote);
   return GenerationQuoteDtoSchema.parse(quote);
 }
 

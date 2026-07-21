@@ -29,7 +29,12 @@ class GoogleImageAdapter {
 
       // 注意：这里采用动态 import 加载官方 SDK，对齐路由原有实现
       const { GoogleGenAI, Modality } = await import('@google/genai');
-      const apiKey = process.env.GEMINI_API_KEY || 'mock-key-for-testing-only';
+      const apiKey = input.apiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        const setupError = new Error('Gemini API key is missing.');
+        setupError.code = 'SETUP_REQUIRED';
+        throw setupError;
+      }
       const ai = new GoogleGenAI({ apiKey });
 
       const response = await ai.models.generateContent({

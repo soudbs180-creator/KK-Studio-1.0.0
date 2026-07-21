@@ -58,7 +58,9 @@ function selectRoute({ mediaType, model, channel, providerHint, options = {} }) 
   }
 
   let hint;
-  if (providerHint && MODEL_TO_PROVIDER_HINT[providerHint.toLowerCase()]) {
+  if (options.connectionRoute) {
+    hint = options.connectionRoute;
+  } else if (providerHint && MODEL_TO_PROVIDER_HINT[providerHint.toLowerCase()]) {
     hint = MODEL_TO_PROVIDER_HINT[providerHint.toLowerCase()];
   } else {
     hint = detectProviderHint(model, mediaType);
@@ -95,14 +97,32 @@ function selectRoute({ mediaType, model, channel, providerHint, options = {} }) 
  * @param {string} [params.baseUrl]
  * @returns {ProviderRouteSnapshot}
  */
-function buildRouteSnapshot({ providerId, model, adapterId, capabilityVersion, baseUrl }) {
+function buildRouteSnapshot({
+  providerId,
+  connectionId,
+  model,
+  capabilityId,
+  channel,
+  requestProfile,
+  adapterId,
+  capabilityVersion,
+  baseUrl,
+  connectionUpdatedAt,
+  bindingUpdatedAt,
+}) {
   return {
     providerId,
+    connectionId,
     modelId: model,
+    capabilityId,
+    channel,
+    requestProfile,
     adapterId,
     adapterVersion: capabilityVersion,
     baseUrl,
     capabilityVersion,
+    connectionUpdatedAt,
+    bindingUpdatedAt,
   };
 }
 

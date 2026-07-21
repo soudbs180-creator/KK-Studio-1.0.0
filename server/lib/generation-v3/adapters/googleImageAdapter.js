@@ -17,16 +17,14 @@ async function submit(input) {
     throw err;
   }
 
-  if (input.auth?.apiKey) {
-    process.env.GEMINI_API_KEY = apiKey;
-  }
-
   const result = await legacyAdapter.generateImage({
     requestId: input.requestId,
     modelId: input.modelId,
     prompt: input.prompt,
     aspectRatio: input.aspectRatio,
     referenceImages: input.referenceImages || [],
+    // Per-call credentials prevent one user's Connection from leaking into another request.
+    apiKey,
   });
 
   return {

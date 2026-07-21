@@ -137,6 +137,7 @@ export type AgentToolControlOverrides = {
 
 const READ_ONLY_TOOLS = new Set([
   'assets.resolveOriginals',
+  'capabilities.listAvailable',
   'browser.checkLocalLlm',
   'browser.extractProduct',
   'browser.getStatus',
@@ -1262,6 +1263,7 @@ import { uiTools } from './uiTools.ts';
 import { skillTools } from './skillTools.ts';
 import { browserTools } from './browserTools.ts';
 import { siteCapabilityTools } from './siteCapabilityTools.ts';
+import { capabilityTools } from './capabilityTools.ts';
 // 注册所有导入的工具
 [
   ...canvasTools,
@@ -1271,7 +1273,8 @@ import { siteCapabilityTools } from './siteCapabilityTools.ts';
   ...uiTools,
   ...skillTools,
   ...browserTools,
-  ...siteCapabilityTools
+  ...siteCapabilityTools,
+  ...capabilityTools
 ].forEach(tool => {
   toolRegistryInstance.register(tool);
 });
