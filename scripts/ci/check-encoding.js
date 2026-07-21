@@ -12,7 +12,7 @@ const scanRoots = [
   ".agent",
   "packages",
   "scripts",
-  "server",
+  "services/api",
   "supabase",
   "tests",
   "vite.config.ts",
@@ -20,7 +20,7 @@ const scanRoots = [
   "README.md",
   "PROJECT_ROOT_GUIDE.md",
   ".env.example",
-  path.join("server", ".env.local.example"),
+  path.join("services", "api", ".env.local.example"),
 ];
 
 const scanExtensions = new Set([
@@ -44,7 +44,7 @@ const broadMojibakePatternRoots = new Set([
   "api",
   "billing",
   "packages",
-  "server",
+  "services/api",
   "supabase",
 ]);
 const suspiciousFragments = [

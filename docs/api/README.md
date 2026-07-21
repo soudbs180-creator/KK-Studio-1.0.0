@@ -2,7 +2,7 @@ Status: reference
 
 # KK Studio API 文档
 
-适用版本：KK Studio v1.6.0（以 `config/release-manifest.json` 为准）。本目录整理当前 `server/` Express 运行时、`packages/shared/` 契约和 `packages/api-client/` 类型化客户端。历史后端目录和 `docs/archive/` 不属于当前 API。
+适用版本：KK Studio v1.6.0（以 `config/release-manifest.json` 为准）。本目录整理当前 `services/api/` Express 运行时、`packages/shared/` 契约和 `packages/api-client/` 类型化客户端。历史后端目录和 `docs/archive/` 不属于当前 API。
 
 ## 文档地图
 
@@ -15,11 +15,11 @@ Status: reference
 
 | 范围 | 权威来源 | 说明 |
 |---|---|---|
-| 实际可访问路由 | `server/index.js` 与 `server/routes/` | 必须计算 Express mount 前缀和挂载顺序。 |
+| 实际可访问路由 | `services/api/index.js` 与 `services/api/routes/` | 必须计算 Express mount 前缀和挂载顺序。 |
 | 稳定外部契约 | `docs/specs/openapi.yaml` | 只覆盖核心 API；未列出的兼容端点不自动获得稳定承诺。 |
 | DTO、枚举、信封 | `packages/shared/src/contracts/` | TypeScript 调用方的类型事实。 |
 | HTTP 客户端行为 | `packages/shared/src/contracts/client/kk-api-client.ts` | `packages/api-client` 当前仅重新导出 `@kk/shared`。 |
-| 上游 Provider 协议 | `docs/specs/` 与 `server/lib/dispatcher/adapters/` | 不是 KK Studio 自身对外路由。 |
+| 上游 Provider 协议 | `docs/specs/` 与 `services/api/lib/dispatcher/adapters/` | 不是 KK Studio 自身对外路由。 |
 
 运行时目前包含 126 条 `router.get/post/put/patch/delete` 注册语句。展开数组别名后是 130 条注册，其中 8 条被更早的同方法同路径路由覆盖；因此路由器产生 122 个唯一有效操作。再加 `/healthz`，共 123 个唯一 HTTP 操作；`/uploads/*` 另作为静态资源前缀存在。
 
@@ -31,7 +31,7 @@ Status: reference
 https://<your-host>
 ```
 
-`apiRouter` 在 `server/index.js` 中挂载到 `/api`。所以源文件中的 `/v1/generate` 实际地址是 `/api/v1/generate`。`contractCompatRouter` 已在自身路径中包含 `/api`，挂载时不再追加前缀。健康检查、遥测和 Webhook 使用根级路径。
+`apiRouter` 在 `services/api/index.js` 中挂载到 `/api`。所以源文件中的 `/v1/generate` 实际地址是 `/api/v1/generate`。`contractCompatRouter` 已在自身路径中包含 `/api`，挂载时不再追加前缀。健康检查、遥测和 Webhook 使用根级路径。
 
 ## 鉴权
 

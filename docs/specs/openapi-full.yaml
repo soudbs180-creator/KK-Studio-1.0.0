@@ -3126,7 +3126,7 @@ paths:
               title: 新增批量作业接口
               summary: generation-jobs 支持租约控制
               source: code_change
-              paths: [server/routes/compat/workspace.js]
+              paths: [services/api/routes/compat/workspace.js]
       responses:
         '200':
           description: 保存结果

@@ -8,7 +8,7 @@ const {
   mapAgentToolCallRow,
   mapKnowledgeDocumentRow,
   mapAgentSkillRow,
-} = require('../../server/lib/ai-assistant-dto.js');
+} = require('../../services/api/lib/ai-assistant-dto.js');
 
 test('AI assistant database rows are mapped to the public camelCase DTO contract', () => {
   assert.deepEqual(mapAgentRunRow({

@@ -23,7 +23,7 @@ Status: historical
 
 **修复状态**: ✅ 已创建修复脚本
 
-**修复文件**: `supabase/migrations/20260312000001_security_fix_api_key_exposure.sql`
+**修复文件**: `supabase/infrastructure/database/migrations/20260312000001_security_fix_api_key_exposure.sql`
 
 ---
 
@@ -78,7 +78,7 @@ localStorage.setItem(key, JSON.stringify(toSave));
 在 Supabase Dashboard SQL Editor 中执行：
 
 ```sql
--- 文件: supabase/migrations/20260312000001_security_fix_api_key_exposure.sql
+-- 文件: supabase/infrastructure/database/migrations/20260312000001_security_fix_api_key_exposure.sql
 -- [复制文件内容并执行]
 ```
 

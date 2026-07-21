@@ -7,7 +7,7 @@ Scripts run: bootstrap + 16 migrations
 ## Procedure
 1. Created isolated database `kkstudio_rehearsal_016` and user `kkstudio_rehearsal`.
 2. Enabled `uuid-ossp` and `pgcrypto` extensions.
-3. Ran `scripts/postgres/bootstrap-kk-vps.sql` as the base schema.
+3. Ran `scripts/ops/postgres/bootstrap-kk-vps.sql` as the base schema.
 4. Ran migrations 001-016 in order with `ON_ERROR_STOP=1`.
 
 ## Migration Results
@@ -157,12 +157,12 @@ psql:/tmp/kkstudio_rehearsal_016/016_ai_assistant_user_
 Result: PASS
 
 ## Fixes Applied During Rehearsal
-- `migrations/013_password_reset_tokens.sql`: changed `user_id` from `UUID` to `VARCHAR(255)` to match `public.users(id)` and `profiles(id)` text types.
+- `infrastructure/database/migrations/013_password_reset_tokens.sql`: changed `user_id` from `UUID` to `VARCHAR(255)` to match `public.users(id)` and `profiles(id)` text types.
 
 ## Deployment Procedure
 For a fresh install, apply in this order:
-1. `scripts/postgres/bootstrap-kk-vps.sql`
-2. `migrations/*.sql` in numeric order (001-016)
+1. `scripts/ops/postgres/bootstrap-kk-vps.sql`
+2. `infrastructure/database/migrations/*.sql` in numeric order (001-016)
 
 ## Cleanup
 Cleanup performed after report generation:

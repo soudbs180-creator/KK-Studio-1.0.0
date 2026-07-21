@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { readSource } from "../support/workspacePaths.js";
 
 test("server CORS keeps production exact while allowing private LAN phone browser development", () => {
-  const source = readSource("server/index.js");
+  const source = readSource("services/api/index.js");
 
   assert.match(source, /hostname === 'localhost' \|\| hostname === '::1' \|\| hostname\.startsWith\('127\.'\)/);
   assert.match(source, /\^192\\\.168\\\./);

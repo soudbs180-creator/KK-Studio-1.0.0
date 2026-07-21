@@ -2,7 +2,7 @@ Status: reference
 
 # 运行时端点目录
 
-本目录按 `server/index.js` 的实际挂载顺序整理。鉴权列含义：`公开` 表示没有用户中间件；`用户` 表示 JWT/兼容用户身份；`管理员` 表示用户身份加管理权限；`签名` 表示第三方签名；`特殊` 表示路由自身处理凭据或返回流。
+本目录按 `services/api/index.js` 的实际挂载顺序整理。鉴权列含义：`公开` 表示没有用户中间件；`用户` 表示 JWT/兼容用户身份；`管理员` 表示用户身份加管理权限；`签名` 表示第三方签名；`特殊` 表示路由自身处理凭据或返回流。
 
 > 稳定性：路径位于 `docs/specs/openapi.yaml` 才属于当前 OpenAPI 稳定子集。其他路径是运行时、运维或兼容能力，变更时仍需检查实际调用方。
 
@@ -198,20 +198,20 @@ Status: reference
 
 ## 路由重复与优先级
 
-`server/index.js` 先挂载 `/api` 下的 `apiRouter`，再挂载根级 `contractCompatRouter`。`apiRouter` 内部顺序为 generation → user API payload → user auth/profile/wuyin → admin → probe → OCR → AI assistant → config。Express 的首个完成响应的同方法同路径处理器生效。
+`services/api/index.js` 先挂载 `/api` 下的 `apiRouter`，再挂载根级 `contractCompatRouter`。`apiRouter` 内部顺序为 generation → user API payload → user auth/profile/wuyin → admin → probe → OCR → AI assistant → config。Express 的首个完成响应的同方法同路径处理器生效。
 
 展开数组别名后，以下 8 条注册被更早路由覆盖：
 
 | 方法与路径 | 生效处理器 | 后置重复处理器 |
 |---|---|---|
-| `GET /api/v1/profile` | `server/routes/user/auth.js` | `server/routes/user/profile.js` |
-| `PUT /api/v1/profile/key-manager` | `server/routes/user-api-payload-router.js` | `server/routes/user/profile.js` |
-| `PUT /api/v1/profile/key-manager-state` | `server/routes/user-api-payload-router.js` | `server/routes/user/profile.js` |
-| `PUT /api/v1/profile/user-apis` | `server/routes/user-api-payload-router.js` | `server/routes/user/profile.js` |
-| `PUT /api/v1/profile/user-apis/payload` | `server/routes/user-api-payload-router.js` | `server/routes/user/profile.js` |
-| `POST /api/v1/profile/user-apis` | `server/routes/user-api-payload-router.js` | `server/routes/user/profile.js` |
-| `GET /api/v1/wuyin/catalog` | `server/routes/user/profile.js` | `server/routes/user/wuyin.js` |
-| `POST /api/v1/wuyin/catalog/refresh` | `server/routes/user/profile.js` | `server/routes/user/wuyin.js` |
+| `GET /api/v1/profile` | `services/api/routes/user/auth.js` | `services/api/routes/user/profile.js` |
+| `PUT /api/v1/profile/key-manager` | `services/api/routes/user-api-payload-router.js` | `services/api/routes/user/profile.js` |
+| `PUT /api/v1/profile/key-manager-state` | `services/api/routes/user-api-payload-router.js` | `services/api/routes/user/profile.js` |
+| `PUT /api/v1/profile/user-apis` | `services/api/routes/user-api-payload-router.js` | `services/api/routes/user/profile.js` |
+| `PUT /api/v1/profile/user-apis/payload` | `services/api/routes/user-api-payload-router.js` | `services/api/routes/user/profile.js` |
+| `POST /api/v1/profile/user-apis` | `services/api/routes/user-api-payload-router.js` | `services/api/routes/user/profile.js` |
+| `GET /api/v1/wuyin/catalog` | `services/api/routes/user/profile.js` | `services/api/routes/user/wuyin.js` |
+| `POST /api/v1/wuyin/catalog/refresh` | `services/api/routes/user/profile.js` | `services/api/routes/user/wuyin.js` |
 
 ## 默认错误
 

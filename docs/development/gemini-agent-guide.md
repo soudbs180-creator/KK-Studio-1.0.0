@@ -43,10 +43,10 @@ Google 的 coding agent 指南和 `gemini-api-dev` skill，刚好就是为这种
 - `apps/web/src/services/llm/providerAdapterRouter.ts`
   负责 Web 侧 Provider adapter 路由，不创建平行的 Gemini 专用入口。
 
-- `server/lib/dispatcher/providerProfiles.js`
+- `services/api/lib/dispatcher/providerProfiles.js`
   负责 Google、Gemini 及兼容渠道的服务端画像事实。
 
-- `server/lib/dispatcher/adapters/`
+- `services/api/lib/dispatcher/adapters/`
   负责服务端 Provider 执行、错误归一化和受保护凭据传输。
 
 - `src/hooks/useImageGeneration.ts`

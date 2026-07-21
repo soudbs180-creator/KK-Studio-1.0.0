@@ -50,7 +50,7 @@ Status: reference
   - 内存/存储序列化: [taskPersistence.ts](../../apps/web/src/services/persistence/taskPersistence.ts)
   - 自动任务断线重连恢复: [useTaskRecovery.ts](../../apps/web/src/hooks/useTaskRecovery.ts)
 - **持久化批量任务队列**: [DurableGenerationQueue.ts](../../apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts)
-- **后端生成路由**: `server/routes/generate-image.js`
+- **后端生成路由**: `services/api/routes/generate-image.js`
 
 ---
 
@@ -80,7 +80,7 @@ Boundary: this runtime store is a browser projection/cache. It must not be treat
 
 - **Shared DTO and client contract**: `packages/shared/src/contracts/dto/ai-assistant.ts`, `packages/shared/src/contracts/client/kk-api-client.ts`
 - **Web API client**: `packages/api-client`
-- **Authenticated server routes**: `server/routes/ai-assistant.js`
-- **User-scope migration**: `migrations/016_ai_assistant_user_scope.sql`
+- **Authenticated server routes**: `services/api/routes/ai-assistant.js`
+- **User-scope migration**: `infrastructure/database/migrations/016_ai_assistant_user_scope.sql`
 
 The web runtime must not bypass this boundary with raw `fetch`. Agent runs retain per-step verification outcomes; tool calls retain outcome and failure metadata; Knowledge, UI layout Knowledge and Skill writes are bound to the current user. Server adapters map database rows to the public camelCase DTO, reject cross-owner access, and order Agent Run snapshots by the client `updatedAt` value. Browser Agent Run history, Knowledge projections and retry queues use owner-qualified keys and never reuse another owner's cache; same-owner tabs merge versioned projection records and re-read persisted pending tasks before mutation, so unrelated writes cannot erase another tab's tombstone or delete retry. An in-flight failure is queued for the owner that initiated it. Skill acknowledgements are version-matched, and name-scoped deletion versions plus the server `agent_skill_versions` gate prevent late same-name upserts—even with different tab-generated IDs—from clearing newer pending payloads or resurrecting deleted Skills. Unsynchronized Run snapshots stay durably marked pending until the typed client acknowledges the latest timestamp.

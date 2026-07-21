@@ -69,7 +69,7 @@ Status: reference
 |---|---|---|
 | `config/model_service_config.json` | vodeshop 中转预设未入注册表 + 密钥命名混淆 | 新增 `vodeshop-*` relay profile，密钥引用改名 |
 | `api/pricing-proxy.js` | Wuyin 线上目录 + fallback 价目单容易被误读成双预设 | 价目单一来源，fallback 显式标记且不作为预设 |
-| `server/providers/suchuangProvider.js` | 独立适配脱离统一引擎 | 折叠进 `wuyin-suchuang-form` profile + adapter |
+| `services/api/providers/suchuangProvider.js` | 独立适配脱离统一引擎 | 折叠进 `wuyin-suchuang-form` profile + adapter |
 
 ## 7. 落地路线
 1. **当前阶段（Phase P5已达成）**：建立了共享的 `providerCatalog.ts` 事实源，并在 CI 验证链（`verify:changes`）中挂载比对校验脚本 `check-provider-catalog.mjs`，消除前端与后端注册表的配置漂移（已对齐 DeepSeek, Aliyun, Volcengine, Tencent 的特定 Hosts 和密钥引用）。

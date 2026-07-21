@@ -6,6 +6,7 @@ import {
   GenerationQuoteDtoSchema,
   CreateJobRequestSchema,
   GenerationJobDtoV3Schema,
+  ProviderRouteSnapshotSchema,
 } from '../../packages/shared/src/index.ts';
 
 test('valid create quote request passes schema', () => {
@@ -24,6 +25,33 @@ test('invalid mediaType is rejected', () => {
     mediaType: '3d',
     model: 'gemini-2.5-flash',
   }));
+});
+
+test('connection-backed quote input and route snapshot freeze capability routing fields', () => {
+  const connectionId = '550e8400-e29b-41d4-a716-446655440000';
+  const request = CreateQuoteRequestSchema.parse({
+    mediaType: 'image',
+    model: 'gemini-2.5-flash-image',
+    connectionId,
+    capabilityId: 'image.generate',
+  });
+  const snapshot = ProviderRouteSnapshotSchema.parse({
+    providerId: 'google',
+    connectionId,
+    modelId: request.model,
+    capabilityId: request.capabilityId,
+    channel: 'byok',
+    requestProfile: 'google-generate-content-v1beta',
+    adapterId: 'google-image',
+    adapterVersion: '1.0.0',
+    capabilityVersion: '1.0.0',
+    connectionUpdatedAt: '2026-07-22T00:00:00.000Z',
+    bindingUpdatedAt: '2026-07-22T00:00:00.000Z',
+  });
+
+  assert.equal(request.connectionId, connectionId);
+  assert.equal(snapshot.connectionId, connectionId);
+  assert.equal(snapshot.requestProfile, 'google-generate-content-v1beta');
 });
 
 test('generation quote DTO requires priceVersion', () => {

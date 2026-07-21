@@ -19,7 +19,7 @@ const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
 
-const registryPath = resolve(repoRoot, 'server/lib/dispatcher/providerRegistry.js');
+const registryPath = resolve(repoRoot, 'services/api/lib/dispatcher/providerRegistry.js');
 
 let getProvider, listProviders;
 try {

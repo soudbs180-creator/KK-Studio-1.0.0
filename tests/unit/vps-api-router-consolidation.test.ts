@@ -18,10 +18,10 @@ describe('VPS API Router Consolidation and Unified Forwarding', () => {
 
   before(async () => {
     // 强制清理 index.js 缓存以重新加载修改后的路由挂载
-    const indexModulePath = require.resolve('../../server/index.js');
+    const indexModulePath = require.resolve('../../services/api/index.js');
     delete require.cache[indexModulePath];
 
-    const { createApp } = require('../../server/index.js');
+    const { createApp } = require('../../services/api/index.js');
     server = createApp().listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const address = server.address() as AddressInfo;

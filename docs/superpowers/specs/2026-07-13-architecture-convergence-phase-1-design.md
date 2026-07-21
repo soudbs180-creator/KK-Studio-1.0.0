@@ -10,7 +10,7 @@ Make KK Studio v1.6.0's governance output reflect the real compatibility surface
 
 This phase delivers two independently verifiable controls:
 
-1. `server/routes/compat/` becomes an explicitly registered compatibility layer. A registered directory covers its descendants, so governance does not require one registry record per route file.
+1. `services/api/routes/compat/` becomes an explicitly registered compatibility layer. A registered directory covers its descendants, so governance does not require one registry record per route file.
 2. Current guidance documents stop claiming v1.5.9 is current, linking to developer-machine paths, or directing implementation into the removed root `src/` runtime.
 
 Historical handoff entries and dated progress records remain historical evidence. They are not rewritten to pretend they were created under v1.6.0.
@@ -19,7 +19,7 @@ Historical handoff entries and dated progress records remain historical evidence
 
 Every registry entry must include an accountable `owner` and an ISO `reviewBy` date in addition to its purpose, canonical source, dependents, regression tests, and removal condition. Directory entries are allowed and cover files below that directory. The checker reports the number of registered layers and the number of discovered compatibility files covered by them.
 
-The server compatibility entry represents the whole `server/routes/compat/` boundary. Its removal condition is contract migration, not arbitrary deletion: consumers must move to typed `/api/v1` contracts and each compatibility operation must have an explicit replacement or deprecation decision.
+The server compatibility entry represents the whole `services/api/routes/compat/` boundary. Its removal condition is contract migration, not arbitrary deletion: consumers must move to typed `/api/v1` contracts and each compatibility operation must have an explicit replacement or deprecation decision.
 
 ## Documentation design
 

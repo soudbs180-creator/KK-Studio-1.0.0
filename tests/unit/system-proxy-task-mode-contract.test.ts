@@ -7,7 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'server/.kk-local/contract-compat.json');
+const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local/contract-compat.json');
 const TEMP_USER_HEADER = 'x-kk-temp-user-id';
 const TEMP_USER_ID = 'temp-system-proxy-task-test';
 const require = createRequire(import.meta.url);
@@ -113,7 +113,7 @@ test('system model proxy task modes use persisted generation tasks instead of re
     process.env.PASSWORD_SALT = 'system-proxy-task-test-salt';
     delete process.env.DATABASE_URL;
 
-    const { createApp } = require('../../server/index.js');
+    const { createApp } = require('../../services/api/index.js');
     server = createApp().listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const address = server.address() as AddressInfo;

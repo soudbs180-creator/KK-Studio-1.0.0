@@ -22,7 +22,7 @@ Status: reference
 | [ai-assistant/canvas-runtime-state.md](ai-assistant/canvas-runtime-state.md) | 结构化 CanvasRuntimeState 定义 | 画布状态通知与选区状态计算 |
 | **核心架构 (Architecture)** | | |
 | [architecture/PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md) | 真实模块所有权、桌面端与移动端分层界限、AI 升级路径 | 模块所有权调整、新增底层库 |
-| [architecture/DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md) | VPS PostgreSQL 运行时 Schema 以及必需的数据表描述 | 数据表变更（配合 `migrations/`） |
+| [architecture/DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md) | VPS PostgreSQL 运行时 Schema 以及必需的数据表描述 | 数据表变更（配合 `infrastructure/database/migrations/`） |
 | [architecture/DATABASE_STRUCTURE.md](architecture/DATABASE_STRUCTURE.md) | VPS 数据存取路由规范、服务端计费扣减与退款原则 | 积分扣减与退款的接口实现 |
 | [architecture/DEVICE_UI_ARCHITECTURE.md](architecture/DEVICE_UI_ARCHITECTURE.md) | 桌面端与 Expo 移动端 UI 界面拆分、共享逻辑设计规范 | 适配多端交互的组件重构 |
 | [architecture/ADAPTER_ROUTING.md](architecture/ADAPTER_ROUTING.md) | Google 官方协议与 OpenAI 兼容适配器路由与请求参数规范 | 对接新大模型或调整图片宽高比 |

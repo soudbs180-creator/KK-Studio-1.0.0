@@ -8,7 +8,7 @@ import { after, before, describe, test } from 'node:test';
 import { readSource } from '../support/workspacePaths.js';
 
 const ROOT_DIR = process.cwd();
-const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'server/.kk-local/contract-compat.json');
+const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local/contract-compat.json');
 const TEMP_USER_HEADER = 'x-kk-temp-user-id';
 const TEMP_USER_ID = 'temp-asset-sync-test';
 const require = createRequire(import.meta.url);
@@ -79,7 +79,7 @@ describe('workspace cloud asset sync contract', () => {
     process.env.PASSWORD_SALT = 'asset-sync-test-salt';
     delete process.env.DATABASE_URL;
 
-    const { createApp } = require('../../server/index.js');
+    const { createApp } = require('../../services/api/index.js');
     server = createApp().listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const address = server.address() as AddressInfo;
@@ -161,7 +161,7 @@ describe('workspace cloud asset sync contract', () => {
     const clientSource = readSource('packages/shared/src/contracts/client/kk-api-client.ts');
     const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const syncServiceSource = readSource('apps/web/src/services/system/syncService.ts');
-    const serverSource = readSource('server/index.js');
+    const serverSource = readSource('services/api/index.js');
 
     assert.match(clientSource, /createAsset\(/);
     assert.match(clientSource, /api\/v1\/assets/);

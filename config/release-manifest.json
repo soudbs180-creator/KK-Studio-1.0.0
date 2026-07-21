@@ -11,7 +11,7 @@
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",
     "rootPackage": "package.json",
-    "serverPackage": "server/package.json",
+    "serverPackage": "services/api/package.json",
     "workspacePackages": [
       "packages/shared/package.json",
       "packages/api-client/package.json",

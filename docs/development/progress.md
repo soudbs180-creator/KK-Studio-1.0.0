@@ -13,11 +13,11 @@ Last reviewed: 2026-07-20.
 
 - Web runtime: `apps/web/`
 - Mobile runtime: `apps/mobile/`
-- Backend/API: `server/`
+- Backend/API: `services/api/`
 - Shared contracts: `packages/shared/`
 - Typed transport: `packages/api-client/`
 - UI tokens and primitives: `packages/ui/`
-- PostgreSQL migrations: `migrations/`
+- PostgreSQL migrations: `infrastructure/database/migrations/`
 - AI runtime: `CanvasRuntimeState`, `ToolRegistry`, `DurableGenerationQueue`,
   and `AgentRunStore`
 

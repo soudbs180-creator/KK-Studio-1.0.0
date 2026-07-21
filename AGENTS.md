@@ -14,11 +14,11 @@ Version source of truth: `config/release-manifest.json`
 | 当前发布线 | KK Studio v1.6.0 |
 | 主版本源 | `config/release-manifest.json` |
 | Web 运行时 | `apps/web/` |
-| 后端运行时 | `server/` Express / VPS |
+| 后端运行时 | `services/api/` Express / VPS |
 | 共享契约 | `packages/shared/` |
 | HTTP Client | `packages/api-client/` |
 | UI / Token | `packages/ui/` |
-| 数据库迁移 | `migrations/` |
+| 数据库迁移 | `infrastructure/database/migrations/` |
 | AI 接管入口 | `apps/web/src/features/ai-takeover/` 与 `apps/web/src/features/ai-assistant-runtime/` |
 | AI 能力文档 | `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`、`docs/ai-assistant/` |
 
@@ -45,8 +45,8 @@ Version source of truth: `config/release-manifest.json`
 | 类型、DTO、枚举、领域契约 | `packages/shared/` | 禁止引入 React、DOM、Node 专属实现 |
 | 鉴权、Session、跨端 API | `packages/api-client/` | 禁止硬编码平台存储 |
 | 设计 Token、基础组件、UI Bridge | `packages/ui/` | 禁止放业务状态和模型调用逻辑 |
-| API 代理、计费、数据库、Stripe | `server/` | 禁止前端直连密钥、数据库或支付状态 |
-| 数据库结构变化 | `migrations/` | 禁止在业务代码里执行 DDL |
+| API 代理、计费、数据库、Stripe | `services/api/` | 禁止前端直连密钥、数据库或支付状态 |
+| 数据库结构变化 | `infrastructure/database/migrations/` | 禁止在业务代码里执行 DDL |
 | AI 助手与自动化能力 | `apps/web/src/features/ai-takeover/`、`apps/web/src/features/ai-assistant-runtime/` | 禁止另起平行助手 |
 
 跨层修改顺序：`packages/shared` -> `packages/api-client` -> `server` -> `apps/web` -> `tests` -> `docs`。

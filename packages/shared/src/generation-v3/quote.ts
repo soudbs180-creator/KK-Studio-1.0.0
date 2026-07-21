@@ -19,11 +19,17 @@ export type MediaType = z.infer<typeof MediaTypeSchema>;
 
 export const ProviderRouteSnapshotSchema = z.object({
   providerId: z.string().min(1),
+  connectionId: z.string().uuid().optional(),
   modelId: z.string().min(1),
+  capabilityId: z.string().min(1).optional(),
+  channel: GenerationChannelSchema.optional(),
+  requestProfile: z.string().min(1).optional(),
   adapterId: z.string().min(1),
   adapterVersion: z.string().min(1),
   baseUrl: z.string().optional(),
   capabilityVersion: z.string().min(1),
+  connectionUpdatedAt: z.string().datetime().optional(),
+  bindingUpdatedAt: z.string().datetime().optional(),
 });
 
 export type ProviderRouteSnapshot = z.infer<typeof ProviderRouteSnapshotSchema>;
@@ -60,6 +66,12 @@ export const CreateQuoteRequestSchema = z.object({
   keySlotId: z.string().optional(),
   // 可选：显式指定 Provider；否则由 RouteEngine 按 model 选择
   providerHint: z.string().optional(),
+  connectionId: z.string().uuid().optional(),
+  capabilityId: z.string().min(1).max(100).optional(),
+}).superRefine((request, context) => {
+  if (request.connectionId && !request.capabilityId) {
+    context.addIssue({ code: 'custom', path: ['capabilityId'], message: 'capabilityId is required with connectionId.' });
+  }
 });
 
 export type CreateQuoteRequest = z.infer<typeof CreateQuoteRequestSchema>;

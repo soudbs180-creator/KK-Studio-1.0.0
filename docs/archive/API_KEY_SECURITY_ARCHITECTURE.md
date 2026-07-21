@@ -148,8 +148,8 @@ const addUserApiKey = async (keyData) => {
 ## 代码文件清单
 
 ### 数据库迁移
-- `supabase/migrations/20260312000006_production_security_hardening.sql` - 安全加固
-- `supabase/migrations/20260312000007_security_verification.sql` - 验证函数
+- `supabase/infrastructure/database/migrations/20260312000006_production_security_hardening.sql` - 安全加固
+- `supabase/infrastructure/database/migrations/20260312000007_security_verification.sql` - 验证函数
 
 ### 前端服务
 - `src/services/security/apiKeySecureStorage.ts` - 安全存储服务
@@ -157,7 +157,7 @@ const addUserApiKey = async (keyData) => {
 
 ### 文档
 - `docs/SECURITY_DEPLOYMENT_GUIDE.md` - 部署指南
-- `scripts/security/verify-deployment.sh` - 验证脚本
+- `scripts/governance/security/verify-deployment.sh` - 验证脚本
 
 ## 安全审计联系
 

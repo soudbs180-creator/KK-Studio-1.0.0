@@ -14,10 +14,10 @@ const PROJECT_INDEX_PATH = path.join(
 );
 
 test("knowledge index generation preserves unchanged document timestamps", () => {
-  execSync("node scripts/ai-assistant/build-knowledge-index.mjs", { stdio: "pipe" });
+  execSync("node scripts/governance/ai-assistant/build-knowledge-index.mjs", { stdio: "pipe" });
   const firstRun = fs.readFileSync(PROJECT_INDEX_PATH, "utf-8");
 
-  execSync("node scripts/ai-assistant/build-knowledge-index.mjs", { stdio: "pipe" });
+  execSync("node scripts/governance/ai-assistant/build-knowledge-index.mjs", { stdio: "pipe" });
   const secondRun = fs.readFileSync(PROJECT_INDEX_PATH, "utf-8");
 
   assert.equal(secondRun, firstRun);

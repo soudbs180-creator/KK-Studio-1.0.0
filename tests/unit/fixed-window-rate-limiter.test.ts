@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { createFixedWindowRateLimiter } = require('../../server/lib/fixedWindowRateLimiter.js');
+const { createFixedWindowRateLimiter } = require('../../services/api/lib/fixedWindowRateLimiter.js');
 
 describe('fixedWindowRateLimiter', () => {
   it('blocks over-limit calls and allows the key again after the window resets', () => {

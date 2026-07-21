@@ -60,7 +60,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ALTER DATABASE your_db SET app.encryption_key = 'your-32-char-long-secret-key-here';
 
 -- 3. 运行安全加固迁移
--- supabase/migrations/20260312000006_production_security_hardening.sql
+-- supabase/infrastructure/database/migrations/20260312000006_production_security_hardening.sql
 ```
 
 ### 第二步：Supabase Dashboard 配置

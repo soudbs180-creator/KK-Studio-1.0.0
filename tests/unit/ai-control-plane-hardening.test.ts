@@ -1167,7 +1167,7 @@ test('running Agent runs keep a reachable cancellation action until terminal sta
 test('Agent Run backend synchronization is ordered and retains failed snapshots for retry', () => {
   const runtimeSource = readSource('apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts');
   const runStoreSource = readSource('apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts');
-  const routeSource = readSource('server/routes/ai-assistant.js');
+  const routeSource = readSource('services/api/routes/ai-assistant.js');
 
   assert.match(runtimeSource, /runSyncChains/);
   assert.match(runtimeSource, /pendingRunSyncs/);

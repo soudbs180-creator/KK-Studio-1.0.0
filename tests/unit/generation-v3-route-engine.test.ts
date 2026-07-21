@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const loadModule = async () => {
-  const mod: any = await import('../../server/lib/generation-v3/routeEngine.js');
+  const mod: any = await import('../../services/api/lib/generation-v3/routeEngine.js');
   return mod.default || mod;
 };
 

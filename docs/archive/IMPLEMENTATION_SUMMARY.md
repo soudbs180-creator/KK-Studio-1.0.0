@@ -36,7 +36,7 @@
   - 供应商定价标签
   - 积分系统标签
 
-### 4. 数据库迁移 (supabase/migrations/)
+### 4. 数据库迁移 (supabase/infrastructure/database/migrations/)
 - **20250303000004_complete_system.sql**
   - admin_models 表（积分模型配置）
   - admin_settings 表（系统设置）
@@ -103,7 +103,7 @@
 - src/components/ApiKeyManager.tsx
 - src/components/index.ts
 - src/pages/CostEstimation.tsx
-- supabase/migrations/20250303000004_complete_system.sql
+- supabase/infrastructure/database/migrations/20250303000004_complete_system.sql
 - docs/API_INTEGRATION_GUIDE.md
 - docs/IMPLEMENTATION_SUMMARY.md
 

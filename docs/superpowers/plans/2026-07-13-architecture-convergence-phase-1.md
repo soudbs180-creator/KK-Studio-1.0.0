@@ -33,7 +33,7 @@ Status: historical
 
 - [x] **Step 1: Write a failing directory-coverage test**
 
-Create an isolated fixture with `server/routes/compat/example.js`, a directory registry entry for `server/routes/compat`, and an existing regression test path. Execute the real checker with the fixture as `cwd` and assert exit code `0`.
+Create an isolated fixture with `services/api/routes/compat/example.js`, a directory registry entry for `services/api/routes/compat`, and an existing regression test path. Execute the real checker with the fixture as `cwd` and assert exit code `0`.
 
 - [x] **Step 2: Verify the test fails**
 
@@ -55,7 +55,7 @@ Normalize registry paths, detect whether each registered path is a directory, an
 
 - [x] **Step 5: Register current compatibility boundaries**
 
-Replace the obsolete `generatedFromPlan` description with a v1.6.0 governance source, add ownership/review metadata to existing entries, and add one `server/routes/compat` directory entry with concrete regression tests and a contract-migration removal condition.
+Replace the obsolete `generatedFromPlan` description with a v1.6.0 governance source, add ownership/review metadata to existing entries, and add one `services/api/routes/compat` directory entry with concrete regression tests and a contract-migration removal condition.
 
 - [x] **Step 6: Verify green**
 

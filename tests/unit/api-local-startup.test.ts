@@ -23,7 +23,7 @@ test("run-api-local exists as a standalone local-only startup entry", () => {
 
 test("local-only API startup skips database-backed reconciliation daemon", () => {
   const source = readFileSync(
-    path.join(ROOT_DIR, "server", "lib", "dispatcher", "reconciliation.js"),
+    path.join(ROOT_DIR, "services", "api", "lib", "dispatcher", "reconciliation.js"),
     "utf-8",
   );
 
@@ -50,7 +50,7 @@ test("local-only API startup skips database-backed reconciliation daemon", () =>
 });
 
 test("server health route exposes the canonical KK API health envelope", () => {
-  const source = readFileSync(path.join(ROOT_DIR, "server", "index.js"), "utf-8");
+  const source = readFileSync(path.join(ROOT_DIR, "services", "api", "index.js"), "utf-8");
 
   assert.match(source, /app\.get\('\/healthz'/);
   assert.match(

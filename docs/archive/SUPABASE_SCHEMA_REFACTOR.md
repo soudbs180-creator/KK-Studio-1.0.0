@@ -41,7 +41,7 @@
 
 所以这次最终收口文件使用了：
 
-- `supabase/migrations/zz_20260309000002_finalize_supabase_schema.sql`
+- `supabase/infrastructure/database/migrations/zz_20260309000002_finalize_supabase_schema.sql`
 
 这样在按文件名顺序执行时，它会最后跑，用来统一回收旧迁移造成的覆盖和冲突。
 

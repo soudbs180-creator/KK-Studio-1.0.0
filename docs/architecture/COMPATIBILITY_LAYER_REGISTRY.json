@@ -7,7 +7,7 @@
       "owner": "web-billing",
       "reviewBy": "2026-09-30",
       "currentPurpose": "Translates legacy frontend billing refresh triggers into the migrated billing/runtime model.",
-      "upstreamCanonicalSource": "server/routes",
+      "upstreamCanonicalSource": "services/api/routes",
       "downstreamDependents": [
         "apps/web/src/services/auth/keyManager.ts"
       ],
@@ -23,7 +23,7 @@
       "owner": "web-generation",
       "reviewBy": "2026-09-30",
       "currentPurpose": "Bridges legacy image-generation responses into the synchronized workspace/update pipeline.",
-      "upstreamCanonicalSource": "server/routes",
+      "upstreamCanonicalSource": "services/api/routes",
       "downstreamDependents": [
         "apps/web/src/services/llm/LLMService.ts"
       ],
@@ -39,7 +39,7 @@
       "owner": "web-model-catalog",
       "reviewBy": "2026-09-30",
       "currentPurpose": "Applies pricing overrides while old provider pricing snapshots coexist with migrated model catalog data.",
-      "upstreamCanonicalSource": "server/routes",
+      "upstreamCanonicalSource": "services/api/routes",
       "downstreamDependents": [
         "apps/web/src/services/auth/keyManager.ts"
       ],
@@ -55,7 +55,7 @@
       "owner": "web-workflow",
       "reviewBy": "2026-09-30",
       "currentPurpose": "Maps migrated workflow structures back into legacy canvas consumers during transition.",
-      "upstreamCanonicalSource": "server/routes",
+      "upstreamCanonicalSource": "services/api/routes",
       "downstreamDependents": [
         "apps/web/src/workflow/adapters/canvasToWorkflow.ts"
       ],
@@ -132,14 +132,14 @@
       "removalCondition": "Delete or rename when Browser Assistant transport is a stable first-party runtime module and no longer needs bridge-pattern compatibility registration."
     },
     {
-      "path": "server/routes/compat",
+      "path": "services/api/routes/compat",
       "role": "compatibility-layer",
       "owner": "server-platform",
       "reviewBy": "2026-09-30",
       "currentPurpose": "Keeps transitional auth, billing, workspace, and admin HTTP contracts available while clients migrate to typed /api/v1 operations.",
-      "upstreamCanonicalSource": "server/routes/apiRouter.js",
+      "upstreamCanonicalSource": "services/api/routes/apiRouter.js",
       "downstreamDependents": [
-        "server/routes/contract-compat.js"
+        "services/api/routes/contract-compat.js"
       ],
       "riskLevel": "high",
       "regressionTests": [

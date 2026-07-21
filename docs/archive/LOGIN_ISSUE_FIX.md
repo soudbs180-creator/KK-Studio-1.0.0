@@ -50,7 +50,7 @@ supabase db push
 
 或者手动执行：
 ```bash
-psql $DATABASE_URL -f supabase/migrations/20260312000008_fix_auth_permissions.sql
+psql $DATABASE_URL -f supabase/infrastructure/database/migrations/20260312000008_fix_auth_permissions.sql
 ```
 
 ## 验证修复成功

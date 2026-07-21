@@ -1,9 +1,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import path from 'node:path';
-import { isPrivateHost, fetchWithRetries } from '../../server/lib/fetchClient.js';
-import localUserRouteStore from '../../server/lib/dispatcher/localUserRouteStore.js';
-import metricsCollector from '../../server/lib/dispatcher/metricsCollector.js';
+import { isPrivateHost, fetchWithRetries } from '../../services/api/lib/fetchClient.js';
+import localUserRouteStore from '../../services/api/lib/dispatcher/localUserRouteStore.js';
+import metricsCollector from '../../services/api/lib/dispatcher/metricsCollector.js';
 
 describe('AI Router Hardening Tests', () => {
   test('isPrivateHost SSRF 防御拦截校验', () => {

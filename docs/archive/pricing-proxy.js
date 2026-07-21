@@ -8,7 +8,7 @@
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { listWuyinProducts } = require('../../server/lib/dispatcher/wuyinProducts.js');
+const { listWuyinProducts } = require('../../services/api/lib/dispatcher/wuyinProducts.js');
 
 const WUYIN_BASE_URL = process.env.SUCHUANG_BASE_URL || 'https://api.wuyinkeji.com';
 const WUYIN_PRICE_CATALOG_URL = `${WUYIN_BASE_URL.replace(/\/+$/, '')}/themes/DigitalBlue/api?action=api_list`;

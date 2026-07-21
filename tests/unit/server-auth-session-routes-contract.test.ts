@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 const require = createRequire(import.meta.url);
 
 function readServerAuthRoute(): string {
-  return readFileSync(path.join(ROOT_DIR, 'server/routes/user/auth.js'), 'utf8');
+  return readFileSync(path.join(ROOT_DIR, 'services/api/routes/user/auth.js'), 'utf8');
 }
 
 function readServerProfileRoute(): string {
-  return readFileSync(path.join(ROOT_DIR, 'server/routes/user/profile.js'), 'utf8');
+  return readFileSync(path.join(ROOT_DIR, 'services/api/routes/user/profile.js'), 'utf8');
 }
 
 test('server exposes the typed profile and session routes used by mobile browser auth recovery', () => {
@@ -76,12 +76,12 @@ test('password login cookie fallback restores mobile browser sessions through th
 
   // 简体中文注释：清理服务器模块及其依赖的缓存，防止被之前测试的 module._load 劫持及缓存污染
   for (const key of Object.keys(require.cache)) {
-    if (key.includes('/server/') || key.includes('\\server\\') || key.includes('express')) {
+    if (key.includes('/services/api/') || key.includes('\\services\\api\\') || key.includes('express')) {
       delete require.cache[key];
     }
   }
 
-  const { createApp } = require('../../server/index.js') as typeof import('../../server/index.js');
+  const { createApp } = require('../../services/api/index.js') as typeof import('../../services/api/index.js');
   const server = createApp().listen(0);
   t.after(() => server.close());
   await new Promise<void>((resolve) => server.once('listening', resolve));

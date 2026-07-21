@@ -6,7 +6,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 
 function readServerSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, 'server', relativePath), 'utf8');
+  return readFileSync(path.join(ROOT_DIR, 'services', 'api', relativePath), 'utf8');
 }
 
 test('platform image route rejects local user API requests before credit pricing or deduction', () => {

@@ -26,7 +26,7 @@ import { dirname, resolve } from 'node:path';
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
-const profilesPath = resolve(repoRoot, 'server/lib/dispatcher/providerProfiles.js');
+const profilesPath = resolve(repoRoot, 'services/api/lib/dispatcher/providerProfiles.js');
 
 if (!existsSync(profilesPath)) {
   console.error(`[FAIL] 找不到唯一供应商真相来源：${profilesPath}`);
@@ -123,7 +123,7 @@ for (const profile of PROVIDER_PROFILES) {
 // R5 遗留旁路预设（绕过 dispatcher/providerProfiles 的散装实现）
 const LEGACY_BYPASS = [
   ['config/model_service_config.json', 'transit/vodeshop 预设未纳入 PROVIDER_PROFILES，且 apiKeyEnv=GEMINI_API_KEY 混淆官方/中转命名（违背官方 vs 中转区分）。'],
-  ['server/providers/suchuangProvider.js', '独立 provider 适配应折叠进 wuyin-suchuang-form profile + 统一 adapter。'],
+  ['services/api/providers/suchuangProvider.js', '独立 provider 适配应折叠进 wuyin-suchuang-form profile + 统一 adapter。'],
 ];
 // 已知的 Vercel 部署代理薄层（非散装预设，仅做边缘反代转发，不含独立计费逻辑）
 const VERCEL_PROXY_KNOWN = [

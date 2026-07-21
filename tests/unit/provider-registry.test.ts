@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { safeValidateProviderItem } from "../../packages/shared/src/index.ts";
-import { getProvider, listProviders, listModels } from "../../server/lib/dispatcher/providerRegistry.js";
+import { getProvider, listProviders, listModels } from "../../services/api/lib/dispatcher/providerRegistry.js";
 
 describe("Provider Registry & Zod Schema Tests", () => {
   

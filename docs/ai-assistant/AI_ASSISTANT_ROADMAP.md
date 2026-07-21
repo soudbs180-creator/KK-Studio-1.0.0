@@ -161,7 +161,7 @@ apps/web/src/hooks/useImageGeneration.ts
 apps/web/src/hooks/useTaskRecovery.ts
 apps/web/src/services/persistence/taskPersistence.ts
 apps/web/src/services/llm/LLMService.ts
-server/routes/generate-image.js
+services/api/routes/generate-image.js
 ```
 
 已有能力：
@@ -170,7 +170,7 @@ server/routes/generate-image.js
 2. `useTaskRecovery` 会在页面加载、回前台、网络恢复时恢复 pending / processing 任务。
 3. `taskPersistence` 当前以本地任务缓存记录 taskId、taskType、status、prompt、model、resultUrls、resultStorageIds 等。
 4. `LLMService` 已有 Provider 能力、密钥路由、用户路由代理、系统代理等复杂逻辑。
-5. `server/routes/generate-image.js` 已有服务器端图像生成、积分扣除、限流、失败退款和静态文件落盘逻辑。
+5. `services/api/routes/generate-image.js` 已有服务器端图像生成、积分扣除、限流、失败退款和静态文件落盘逻辑。
 
 落地状态：批量生成队列已完全从旧 React 内存状态升级为 `DurableGenerationQueue`。它作为一个持久化异步生图任务队列，支持断线自动重跑、限制最大并发、并通过 UI 的 TaskCenterTray 允许用户进行暂停/恢复/重试等。
 
@@ -687,7 +687,7 @@ Generation Module
   - useTaskRecovery
   - LLMService
   - taskPersistence
-  - server/routes/generate-image.js
+  - services/api/routes/generate-image.js
 
 Assets Module
   - assetStore
@@ -709,8 +709,8 @@ Ecommerce / PPT / Redraw Modules
 新增：
 
 ```text
-scripts/ai-assistant/build-knowledge-index.mjs
-scripts/ai-assistant/check-skills-consistency.mjs
+scripts/governance/ai-assistant/build-knowledge-index.mjs
+scripts/governance/ai-assistant/check-skills-consistency.mjs
 ```
 
 输出：
@@ -879,8 +879,8 @@ apps/web/src/features/ai-assistant-runtime/memory/handoffWriter.ts
 
 apps/web/src/features/assets/resolveOriginalAssets.ts
 
-scripts/ai-assistant/build-knowledge-index.mjs
-scripts/ai-assistant/check-skills-consistency.mjs
+scripts/governance/ai-assistant/build-knowledge-index.mjs
+scripts/governance/ai-assistant/check-skills-consistency.mjs
 
 tests/unit/canvas-runtime-state-builder.test.ts
 tests/unit/ai-assistant-tool-registry.test.ts
@@ -940,7 +940,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ```json
 {
   "scripts": {
-    "ai-assistant:check": "node scripts/ai-assistant/check-skills-consistency.mjs"
+    "ai-assistant:check": "node scripts/governance/ai-assistant/check-skills-consistency.mjs"
   }
 }
 ```
@@ -1032,8 +1032,8 @@ apps/web/src/features/ai-assistant-runtime/memory/handoffWriter.ts
 
 apps/web/src/features/assets/resolveOriginalAssets.ts
 
-scripts/ai-assistant/build-knowledge-index.mjs
-scripts/ai-assistant/check-skills-consistency.mjs
+scripts/governance/ai-assistant/build-knowledge-index.mjs
+scripts/governance/ai-assistant/check-skills-consistency.mjs
 
 tests/unit/canvas-runtime-state-builder.test.ts
 tests/unit/ai-assistant-tool-registry.test.ts
@@ -1093,7 +1093,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ```json
 {
   "scripts": {
-    "ai-assistant:check": "node scripts/ai-assistant/check-skills-consistency.mjs"
+    "ai-assistant:check": "node scripts/governance/ai-assistant/check-skills-consistency.mjs"
   }
 }
 ```

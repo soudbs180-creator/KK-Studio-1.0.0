@@ -36,7 +36,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     }
 
     // 2. 强制清理模块缓存
-    const modulesToClean = ['/server/', '\\server\\', 'express', 'pg'];
+    const modulesToClean = ['/services/api/', '\\services\\api\\', 'express', 'pg'];
     for (const key of Object.keys(require.cache)) {
       if (modulesToClean.some(m => key.includes(m))) {
         delete require.cache[key];
@@ -49,7 +49,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     process.env.USER_API_ENCRYPTION_SECRET = 'my-super-encryption-secret-key-32-chars';
 
     // Mock 数据库模块 getPool
-    const dbHelper = require('../../server/lib/db.js');
+    const dbHelper = require('../../services/api/lib/db.js');
     dbHelper.getPool = () => {
       return {
         connect: async () => {
@@ -89,7 +89,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     };
 
     // 启动 Express 服务器
-    const { createApp } = require('../../server/index.js');
+    const { createApp } = require('../../services/api/index.js');
     server = createApp().listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const address = server.address() as AddressInfo;
@@ -128,7 +128,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     process.env.KKAI_LOCAL_ONLY = 'true';
     delete process.env.DATABASE_URL;
 
-    const store = require('../../server/lib/dispatcher/localUserRouteStore.js');
+    const store = require('../../services/api/lib/dispatcher/localUserRouteStore.js');
 
     const testPayload = {
       version: 2,
@@ -173,7 +173,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     process.env.DATABASE_URL = 'postgres://mock:mock@localhost:5432/mock_db';
     delete process.env.KKAI_LOCAL_ONLY;
 
-    const store = require('../../server/lib/dispatcher/localUserRouteStore.js');
+    const store = require('../../services/api/lib/dispatcher/localUserRouteStore.js');
 
     // 2.1 模拟 writeLocalStorage 并触发数据库事务插入
     const testPayload = {
@@ -222,7 +222,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
 
     // 2.3 模拟 readLocalStorage(userId) 从数据库拉取并解密还原
     // Mock 数据库返回数据
-    const { encrypt } = require('../../server/utils/crypto.js');
+    const { encrypt } = require('../../services/api/utils/crypto.js');
     const encryptedPayload = encrypt(JSON.stringify({
       id: 'db-entry-loaded',
       name: 'Postgres OpenAI Loaded',

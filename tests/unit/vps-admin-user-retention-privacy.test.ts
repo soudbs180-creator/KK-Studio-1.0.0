@@ -24,7 +24,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
 
   before(async () => {
     // 强制清理相关模块缓存以支持干净的测试环境
-    const modulesToClean = ['/server/', '\\server\\', 'express', 'pg'];
+    const modulesToClean = ['/services/api/', '\\services\\api\\', 'express', 'pg'];
     for (const key of Object.keys(require.cache)) {
       if (modulesToClean.some(m => key.includes(m))) {
         delete require.cache[key];
@@ -36,7 +36,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
     process.env.PASSWORD_SALT = 'vps-test-password-salt';
 
     // Mock 数据库模块
-    const dbHelper = require('../../server/lib/db.js');
+    const dbHelper = require('../../services/api/lib/db.js');
     dbHelper.getPool = () => {
       return {
         query: async (sql: string, params: any) => {
@@ -53,7 +53,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
     };
 
     // 启动 Express 服务器
-    const { createApp } = require('../../server/index.js');
+    const { createApp } = require('../../services/api/index.js');
     server = createApp().listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const address = server.address() as AddressInfo;
@@ -141,7 +141,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
     delete process.env.KKAI_LOCAL_ONLY;
 
     // 2.1 模拟管理员鉴权查询
-    const { signJWT } = require('../../server/lib/jwt.js');
+    const { signJWT } = require('../../services/api/lib/jwt.js');
     const adminToken = signJWT({ userId: 'admin-user-id' });
 
     // Mock 校验 admin level
@@ -219,7 +219,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
     process.env.KKAI_LOCAL_ONLY = 'true';
     delete process.env.DATABASE_URL;
 
-    const { signJWT } = require('../../server/lib/jwt.js');
+    const { signJWT } = require('../../services/api/lib/jwt.js');
     const adminToken = signJWT({ userId: 'admin-user-id' });
 
     // 请求用户列表
@@ -249,7 +249,7 @@ describe('VPS Admin Security, Privacy Shielding, and Data Retention', () => {
     process.env.DATABASE_URL = 'postgres://mock_user:mock_pass@localhost:5432/mock_db';
     delete process.env.KKAI_LOCAL_ONLY;
 
-    const { reconcilePendingJobs } = require('../../server/lib/dispatcher/reconciliation.js');
+    const { reconcilePendingJobs } = require('../../services/api/lib/dispatcher/reconciliation.js');
 
     // 触发对账
     await reconcilePendingJobs();

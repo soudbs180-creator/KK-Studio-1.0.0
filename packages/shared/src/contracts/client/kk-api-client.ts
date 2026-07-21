@@ -127,6 +127,14 @@ import type {
   AgentToolCallDto,
   AssistantApiResultDto,
 } from "../dto/ai-assistant.ts";
+import type {
+  CreateProviderConnectionRequest,
+  DeleteProviderConnectionResponseDto,
+  ProviderConnectionDto,
+  ProviderConnectionListDto,
+  UpdateProviderConnectionRequest,
+} from "../../capability-graph/connection.ts";
+import type { CapabilityGraphSnapshotDto } from "../../capability-graph/graph.ts";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -228,6 +236,30 @@ export interface KkApiClient {
     input: ReplaceKeyManagerCloudStateRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
+  /** Capability APIs share one client boundary so callers cannot bypass auth or rollout routing. */
+  getCapabilityGraphSnapshot(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<CapabilityGraphSnapshotDto>>;
+  listProviderConnections(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderConnectionListDto>>;
+  createProviderConnection(
+    input: CreateProviderConnectionRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderConnectionDto>>;
+  updateProviderConnection(
+    connectionId: string,
+    input: UpdateProviderConnectionRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderConnectionDto>>;
+  verifyProviderConnection(
+    connectionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderConnectionDto>>;
+  deleteProviderConnection(
+    connectionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<DeleteProviderConnectionResponseDto>>;
   checkUserRouteConnectivity(
     routeId: string,
     input?: { baseUrl?: string; apiKey?: string; format?: "gemini" | "openai" | "auto" | "claude"; name?: string } | ApiClientRequestOptions,
@@ -1170,6 +1202,60 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
           method: "PUT",
           body: JSON.stringify(input),
         },
+        options,
+      );
+    },
+
+    getCapabilityGraphSnapshot(options) {
+      return requestJson<CapabilityGraphSnapshotDto>(
+        config,
+        "api/v1/capability-graph/snapshot",
+        { method: "GET" },
+        options,
+      );
+    },
+
+    listProviderConnections(options) {
+      return requestJson<ProviderConnectionListDto>(
+        config,
+        "api/v1/provider-connections",
+        { method: "GET" },
+        options,
+      );
+    },
+
+    createProviderConnection(input, options) {
+      return requestJson<ProviderConnectionDto>(
+        config,
+        "api/v1/provider-connections",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    updateProviderConnection(connectionId, input, options) {
+      return requestJson<ProviderConnectionDto>(
+        config,
+        `api/v1/provider-connections/${encodeURIComponent(connectionId)}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    verifyProviderConnection(connectionId, options) {
+      return requestJson<ProviderConnectionDto>(
+        config,
+        `api/v1/provider-connections/${encodeURIComponent(connectionId)}/verify`,
+        { method: "POST" },
+        options,
+      );
+    },
+
+    deleteProviderConnection(connectionId, options) {
+      return requestJson<DeleteProviderConnectionResponseDto>(
+        config,
+        `api/v1/provider-connections/${encodeURIComponent(connectionId)}`,
+        { method: "DELETE" },
         options,
       );
     },

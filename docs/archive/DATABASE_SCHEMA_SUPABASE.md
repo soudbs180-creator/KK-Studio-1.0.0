@@ -117,7 +117,7 @@ usage_records.user_id → profiles.id
 
 ```sql
 -- 执行关系梳理脚本
--- 文件: supabase/migrations/20260312000005_database_relationships.sql
+-- 文件: supabase/infrastructure/database/migrations/20260312000005_database_relationships.sql
 ```
 
 或者执行简化版：

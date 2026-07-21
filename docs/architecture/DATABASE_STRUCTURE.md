@@ -2,17 +2,17 @@ Status: reference
 
 # VPS PostgreSQL Data Access Structure
 
-KK Studio data access is routed through the current `server/` backend and typed client packages. Browser code must not import database clients or call database RPCs directly.
+KK Studio data access is routed through the current `services/api/` backend and typed client packages. Browser code must not import database clients or call database RPCs directly.
 
 Canonical paths:
 
-- Auth and browser sessions: `server/routes/user.js`
-- User profile/API settings: `server/routes/user.js` and `server/routes/user-api-payload-router.js`
-- Billing balance, debit, recharge, and refund: `server/routes/credits.js` and related `server/routes`
-- Admin model pricing and provider route keys: `server/routes/admin.js`
-- Canvas persistence: current `server/` routes plus `packages/shared` contracts
-- System and user model proxy calls: `server/routes/user-wuyin-strict-router.js` and related model routes
-- Payment settlement: `server/routes/webhook.js`
+- Auth and browser sessions: `services/api/routes/user.js`
+- User profile/API settings: `services/api/routes/user.js` and `services/api/routes/user-api-payload-router.js`
+- Billing balance, debit, recharge, and refund: `services/api/routes/credits.js` and related `services/api/routes`
+- Admin model pricing and provider route keys: `services/api/routes/admin.js`
+- Canvas persistence: current `services/api/` routes plus `packages/shared` contracts
+- System and user model proxy calls: `services/api/routes/user-wuyin-strict-router.js` and related model routes
+- Payment settlement: `services/api/routes/webhook.js`
 
 Frontend access rules:
 

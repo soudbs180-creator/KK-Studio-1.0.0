@@ -7,12 +7,12 @@ Status: reference
 ## 📁 目录文件清单
 
 1. **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) —— 项目职责划分**
-   - **职责**：定义 `apps/web/`、`apps/mobile/`、`packages/shared/`、`packages/api-client/`、`packages/ui/` 和 `server/` 的物理职责边界。提供本地与云端 API 的升级路径。
+   - **职责**：定义 `apps/web/`、`apps/mobile/`、`packages/shared/`、`packages/api-client/`、`packages/ui/` 和 `services/api/` 的物理职责边界。提供本地与云端 API 的升级路径。
    - **适用场景**：重构组件依赖关系、定义新的跨端 DTO 时。
 
 2. **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) —— VPS 数据库表结构**
    - **职责**：VPS PostgreSQL 自建运行时的数据库表物理设计（含 `profiles`、`user_credits`、`credit_transactions`、`admin_credit_models` 等）。
-   - **适用场景**：执行数据库表结构的增量迁移（编写 `migrations/` 中的 SQL）。
+   - **适用场景**：执行数据库表结构的增量迁移（编写 `infrastructure/database/migrations/` 中的 SQL）。
 
 3. **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md) —— 数据库访问与计费原则**
    - **职责**：规范数据访问代理、充值扣费一致性。规定任务失败时必须在服务端执行退款交易审计并回滚余额。
@@ -36,4 +36,4 @@ Status: reference
 ## 🏛️ 架构铁律
 
 - **完全隔离**：`packages/shared/` 内绝对严禁引入平台专有（如 DOM, RN, Node）的 API。
-- **VPS 后端是唯一计费权威**：所有的计费、余额判定及退款必须在 `server/` 端闭环，前端绝不能拥有积分余额的修改权。
+- **VPS 后端是唯一计费权威**：所有的计费、余额判定及退款必须在 `services/api/` 端闭环，前端绝不能拥有积分余额的修改权。

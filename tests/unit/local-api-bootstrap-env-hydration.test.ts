@@ -48,7 +48,7 @@ test("local API bootstrap hydrates server env files before local-only startup", 
   });
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kk-local-api-bootstrap-"));
-  fs.mkdirSync(path.join(tempRoot, "server"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "services", "api"), { recursive: true });
 
   fs.writeFileSync(
     path.join(tempRoot, ".env.local"),
@@ -61,7 +61,7 @@ test("local API bootstrap hydrates server env files before local-only startup", 
   );
 
   fs.writeFileSync(
-    path.join(tempRoot, "server", ".env.local"),
+    path.join(tempRoot, "services", "api", ".env.local"),
     [
       "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
       "SUPABASE_URL=https://legacy-api-ref.supabase.co",
@@ -71,7 +71,7 @@ test("local API bootstrap hydrates server env files before local-only startup", 
   );
 
   fs.writeFileSync(
-    path.join(tempRoot, "server", "index.js"),
+    path.join(tempRoot, "services", "api", "index.js"),
     [
       "exports.startServer = function startServer(port) {",
       "  return {",

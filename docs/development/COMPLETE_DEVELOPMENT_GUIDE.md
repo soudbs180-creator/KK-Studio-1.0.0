@@ -17,8 +17,8 @@ KK Studio 是一个项目级、画布级、任务级 AI 驱动的无限画布媒
 | **`packages/shared/`** | 跨端纯 TS 共享契约 | 定义多端通用的数据结构、DTO、API 请求响应契约、枚举类型。 | 必须保持平台无关。禁止使用 React、DOM、Node.js 专用库。 |
 | **`packages/api-client/`** | 统一 HTTP 客户端接口 | 封装 API 请求与响应拦截。支持多端（Web, App）统一接入，具备 Session 状态代理。 | 禁止将特定存储平台（如 `localStorage` 或 `AsyncStorage`）硬编码。必须采用依赖注入。 |
 | **`packages/ui/`** | 设计系统与 UI 适配层 | 管理语义 Token、浅色/深色主题和核心基础 UI 组件（Bridge）。 | 禁止在此处写入任何具体的业务状态管理和模型生成逻辑。 |
-| **`server/`** | Express / VPS 后端 | 承载计费核算、退款、API 密钥代理与解密、Stripe 支付 Webhook 验签、资产文件落盘。 | 禁止引入前端 React 等交互库；禁止为必需的环境变量提供不安全的默认 fallback 密钥。 |
-| **`migrations/`** | 数据库结构变更唯一合法来源 | 承载所有 PostgreSQL 运行时 Schema 的 DDL 迁移脚本。 | 禁止通过普通业务代码或临时维护脚本隐式执行 `CREATE TABLE` / `ALTER TABLE` 等 DDL 操作。 |
+| **`services/api/`** | Express / VPS 后端 | 承载计费核算、退款、API 密钥代理与解密、Stripe 支付 Webhook 验签、资产文件落盘。 | 禁止引入前端 React 等交互库；禁止为必需的环境变量提供不安全的默认 fallback 密钥。 |
+| **`infrastructure/database/migrations/`** | 数据库结构变更唯一合法来源 | 承载所有 PostgreSQL 运行时 Schema 的 DDL 迁移脚本。 | 禁止通过普通业务代码或临时维护脚本隐式执行 `CREATE TABLE` / `ALTER TABLE` 等 DDL 操作。 |
 
 ---
 

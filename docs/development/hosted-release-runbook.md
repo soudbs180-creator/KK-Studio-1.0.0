@@ -7,9 +7,9 @@ Status: historical
 Release the hosted KK Studio frontend and the current VPS backend from one runtime line:
 
 - Frontend runtime: `apps/web/`
-- Backend runtime: `server/` Express / VPS
+- Backend runtime: `services/api/` Express / VPS
 - Version source: `config/release-manifest.json`
-- Database schema changes: `migrations/` and `scripts/postgres/`
+- Database schema changes: `infrastructure/database/migrations/` and `scripts/ops/postgres/`
 
 Hosted builds must not restore retired serverless or sidecar runtimes.
 
@@ -18,7 +18,7 @@ Hosted builds must not restore retired serverless or sidecar runtimes.
 Always release in this order:
 
 1. Apply PostgreSQL migrations.
-2. Deploy the `server/` backend to the VPS.
+2. Deploy the `services/api/` backend to the VPS.
 3. Deploy the hosted frontend.
 4. Run smoke tests against `/healthz`, `/api/`, auth, model proxy, and Stripe webhook configuration.
 
@@ -29,11 +29,11 @@ Do not deploy the frontend first when the VPS backend is still on an older runti
 Keep the runtime split explicit:
 
 - Root `.env` / `.env.local` are for frontend public env such as `VITE_KK_API_BASE_URL`, `VITE_AUTH_REDIRECT_ORIGIN`, and `VITE_TURNSTILE_SITE_KEY`.
-- `server/.env.local` is the local backend env source for `DATABASE_URL`, `USER_API_ENCRYPTION_SECRET`, provider keys, and Stripe secrets.
-- `scripts/vps/kk-api.env.example` is the VPS backend env template.
-- `scripts/postgres/runtime-migration.env.example` is the migration env template.
+- `services/api/.env.local` is the local backend env source for `DATABASE_URL`, `USER_API_ENCRYPTION_SECRET`, provider keys, and Stripe secrets.
+- `scripts/ops/vps/kk-api.env.example` is the VPS backend env template.
+- `scripts/ops/postgres/runtime-migration.env.example` is the migration env template.
 
-Optional local API JSON body-size overrides also live in `server/.env.local`:
+Optional local API JSON body-size overrides also live in `services/api/.env.local`:
 
 - `KK_API_MAX_JSON_BODY_BYTES`
 - `KK_API_PROFILE_MAX_JSON_BODY_BYTES`
@@ -107,7 +107,7 @@ Optional provider/runtime secrets should stay in the VPS runtime env, never in f
 
 Password reset is part of the hosted auth release surface. Before enabling it:
 
-- Apply `migrations/013_password_reset_tokens.sql` to the VPS PostgreSQL database.
+- Apply `infrastructure/database/migrations/013_password_reset_tokens.sql` to the VPS PostgreSQL database.
 - Set one public app origin in the VPS backend env: `PUBLIC_APP_URL`, `KK_PUBLIC_APP_URL`, or `WEB_PUBLIC_URL`.
 - Set `PASSWORD_RESET_TOKEN_SECRET` to a stable long random secret. Do not rotate it while active reset links may still exist.
 - Set `PASSWORD_RESET_EMAIL_FROM` and `RESEND_API_KEY` in the VPS backend env so reset links are actually delivered.
@@ -128,7 +128,7 @@ npm.cmd run verify:changes
 
 What must be true before release:
 
-- `server/` owns `/healthz`, `/api/`, and `/webhook`.
+- `services/api/` owns `/healthz`, `/api/`, and `/webhook`.
 - Root frontend env contains no server-only secrets.
 - Hosted frontend points at the deployed VPS backend.
 - Stripe webhook secrets are present in the VPS runtime env.

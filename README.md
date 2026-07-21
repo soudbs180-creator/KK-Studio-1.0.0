@@ -16,7 +16,7 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 | **Agent / 机器人修改代码** | [AGENTS.md](./AGENTS.md) | 按 [AGENTS.md](./AGENTS.md) 顶部任务表路由 | 必须读取的最高优先级规则、安全与模块边界 |
 | **开发 AI 助手与画布 Agent** | [AGENTS.md](./AGENTS.md) §7-§11 | [docs/ai-assistant/AI_ASSISTANT_ROADMAP.md](./docs/ai-assistant/AI_ASSISTANT_ROADMAP.md)<br>[docs/ai-assistant/RUNBOOKS.md](./docs/ai-assistant/RUNBOOKS.md) | 实现 CanvasRuntimeState 对齐与 ToolRegistry 声明 |
 | **安全 / 计费 / 后端 API** | [AGENTS.md](./AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](./docs/governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
-| **数据库结构变更** | [AGENTS.md](./AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](./docs/architecture/DATABASE_SCHEMA.md) | 必须走 migrations/ 目录，DDL 完全幂等且防冲突 |
+| **数据库结构变更** | [AGENTS.md](./AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](./docs/architecture/DATABASE_SCHEMA.md) | 必须走 infrastructure/database/migrations/ 目录，DDL 完全幂等且防冲突 |
 | **解决乱码与编写脚本** | [docs/governance/ENCODING_AND_POWERSHELL.md](./docs/governance/ENCODING_AND_POWERSHELL.md) | `.editorconfig` / `.gitattributes` | 规范 `UTF-8 without BOM`、`LF` 与 PowerShell 编码 |
 | **环境搭建与 VPS 发布** | [docs/setup/README.md](./docs/setup/README.md) | [docs/setup/GUIDE.md](./docs/setup/GUIDE.md) | 系统在 VPS 环境下的部署、CLI 权限与自发布命令 |
 | **第三方接口适配 (gpt-best)** | [docs/specs/README.md](./docs/specs/README.md) | [docs/specs/API_DOCS.md](./docs/specs/API_DOCS.md) | 遵循多模态 v2 接口、轮询机制与失败退避算法 |
@@ -31,8 +31,8 @@ KK Studio 在同一个高效的 Monorepo 仓库中，整合了基于 React 19 �
 * **版本事实唯一来源**：[config/release-manifest.json](./config/release-manifest.json)
 * **Web 主运行时**：`apps/web/`
 * **Mobile 运行时**：`apps/mobile/`
-* **后端运行时**：`server/` (Express / VPS)
-* **数据库迁移目录**：`migrations/`
+* **后端运行时**：`services/api/` (Express / VPS)
+* **数据库迁移目录**：`infrastructure/database/migrations/`
 
 > [!IMPORTANT]
 > 历史文档中可能仍残留 `1.4.x`、`1.5.0`、`1.5.1` 或旧部署口径。当前开发必须严格以源码类型、[config/release-manifest.json](./config/release-manifest.json)、[package.json](./package.json)、[AGENTS.md](./AGENTS.md) 及治理校验脚本为准。
@@ -94,8 +94,8 @@ nano-banana-KK-/
 │   ├── shared/                      # 跨端纯 TS 契约与领域规则 (DTO, 枚举, 类型)
 │   ├── api-client/                  # 统一 HTTP 客户端 (依赖注入持久存储)
 │   └── ui/                          # 设计令牌与 UI 适配层 (展现层, UI Bridge)
-├── server/                          # Express / VPS 后端、代理、积分、Webhook 验签
-├── migrations/                      # PostgreSQL DDL 唯一合法来源 (纯 SQL)
+├── services/api/                          # Express / VPS 后端、代理、积分、Webhook 验签
+├── infrastructure/database/migrations/                      # PostgreSQL DDL 唯一合法来源 (纯 SQL)
 ├── docs/
 │   ├── ai-assistant/                # AI 助手路线、Runbooks、知识库
 │   ├── governance/                  # 项目治理 (安全、编码规范、乱码防范、状态校验)
@@ -159,14 +159,14 @@ nano-banana-KK-/
 
 ### 6.3 服务端与底层 (Server & Database)
 
-#### [server/](./server)
+#### [services/api/](./services/api)
 * **核心职责**：项目后台运行时的权威源。负责特权大模型 API Key 代理请求、高安全积分预扣扣减与结算、退款审计流写入、Stripe 支付 Webhook 签名强验、静态资产落盘管理以及用户 JWT 校验。
 * **技术特性**：基于 Node.js 与 Express 框架部署于 VPS。
 * **核心边界与禁止事项**：
   * 🚫 严禁引入任何前端视图组件或 CSS 框架依赖；
   * 🚫 绝对禁止在 Git 提交中遗留 any 真实的私钥，且在读取特权环境变量失败时必须拒绝启动服务。
 
-#### [migrations/](./migrations)
+#### [infrastructure/database/migrations/](./infrastructure/database/migrations)
 * **核心职责**：存放 PostgreSQL 的所有 DDL (数据定义语言) 迁移文件，作为数据库 Schema 变更的**唯一权威物理目录**。
 * **技术特性**：纯 SQL 迁移文件，按 `NNN_<description>.sql` 顺序编写。
 * **核心边界与禁止事项**：
@@ -214,7 +214,7 @@ cp .env.example .env
 
 **② 服务端机密变量** —— 复制服务端模板并填写真实密钥：
 ```bash
-cp server/.env.local.example server/.env.local
+cp services/api/.env.local.example services/api/.env.local
 ```
 关键项说明：
 | 变量 | 用途 |
@@ -226,14 +226,14 @@ cp server/.env.local.example server/.env.local
 | `ALLOWED_ORIGINS` | CORS 白名单，逗号分隔 |
 
 > [!WARNING]
-> 真实的 `.env`、`server/.env.local`、API 密钥、数据库连接字符串以及 Stripe 密钥**绝对禁止提交至 Git 仓库**。服务端在读取特权环境变量失败时会拒绝启动，这是有意设计的安全红线。
+> 真实的 `.env`、`services/api/.env.local`、API 密钥、数据库连接字符串以及 Stripe 密钥**绝对禁止提交至 Git 仓库**。服务端在读取特权环境变量失败时会拒绝启动，这是有意设计的安全红线。
 
 ### 7.3 初始化数据库
-确保 PostgreSQL 已启动并创建了目标数据库，然后按序执行 `migrations/` 目录下的迁移脚本（数据库 Schema 的唯一权威来源）：
+确保 PostgreSQL 已启动并创建了目标数据库，然后按序执行 `infrastructure/database/migrations/` 目录下的迁移脚本（数据库 Schema 的唯一权威来源）：
 ```bash
 # 示例：使用 psql 按序执行全部迁移
-psql "$DATABASE_URL" -f migrations/001_points_schema.sql
-psql "$DATABASE_URL" -f migrations/002_token_schema.sql
+psql "$DATABASE_URL" -f infrastructure/database/migrations/001_points_schema.sql
+psql "$DATABASE_URL" -f infrastructure/database/migrations/002_token_schema.sql
 # …依次执行其余 NNN_*.sql
 ```
 所有迁移脚本均为幂等设计，可重复执行而不会破坏已有数据。
@@ -279,8 +279,8 @@ npm install
 
 # 2. 配置环境变量（前端 + 服务端）
 cp .env.example .env
-cp server/.env.local.example server/.env.local
-# 编辑 server/.env.local，填入数据库连接串与各类密钥
+cp services/api/.env.local.example services/api/.env.local
+# 编辑 services/api/.env.local，填入数据库连接串与各类密钥
 
 # 3. 构建共享包并启动
 npm run build -w packages/api-client
@@ -358,12 +358,12 @@ npx expo start
 | DTO / 枚举 / 领域契约 | `packages/shared/` | 引入 React、DOM、Node 环境 API |
 | 鉴权 / HTTP 请求封装 | `packages/api-client/` | 硬编码平台存储（localStorage / SecureStore） |
 | 设计 Token / 基础组件 | `packages/ui/` | 混入业务状态或接口调用 |
-| API 代理 / 计费 / Stripe | `server/` | 提交真实密钥；特权环境变量缺失时必须拒绝启动 |
-| 数据库结构变更 | `migrations/` | 在业务代码中编写 DDL |
+| API 代理 / 计费 / Stripe | `services/api/` | 提交真实密钥；特权环境变量缺失时必须拒绝启动 |
+| 数据库结构变更 | `infrastructure/database/migrations/` | 在业务代码中编写 DDL |
 
 ### 7B.4 安全红线（不可协商）
 * 任何 API 密钥、数据库连接串、Stripe 密钥不得进入 Git 历史；发现误提交立即轮换密钥并清理历史。
-* 特权大模型 API 请求"零直连前端"——必须经 `server/` 网关代理。
+* 特权大模型 API 请求"零直连前端"——必须经 `services/api/` 网关代理。
 * 积分扣减必须走预扣 + 失败退款的原子事务，禁止绕过计费逻辑。
 * 生产环境 Stripe Webhook 必须启用签名强验。
 

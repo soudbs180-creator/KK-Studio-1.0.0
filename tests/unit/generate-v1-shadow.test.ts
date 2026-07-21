@@ -3,13 +3,13 @@ import { describe, test } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const generateV1Router = require("../../server/routes/generate-v1.js");
-const metricsCollector = require("../../server/lib/dispatcher/metricsCollector.js");
-const BackendDispatcher = require("../../server/lib/dispatcher/index.js");
-const generationController = require("../../server/lib/generation/generationController.js");
-const userAiRouteHandler = require("../../server/lib/dispatcher/userAiRouteHandler.js");
-const wuyinRouteHandler = require("../../server/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
-const localUserRouteStore = require("../../server/lib/dispatcher/localUserRouteStore.js");
+const generateV1Router = require("../../services/api/routes/generate-v1.js");
+const metricsCollector = require("../../services/api/lib/dispatcher/metricsCollector.js");
+const BackendDispatcher = require("../../services/api/lib/dispatcher/index.js");
+const generationController = require("../../services/api/lib/generation/generationController.js");
+const userAiRouteHandler = require("../../services/api/lib/dispatcher/userAiRouteHandler.js");
+const wuyinRouteHandler = require("../../services/api/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
+const localUserRouteStore = require("../../services/api/lib/dispatcher/localUserRouteStore.js");
 
 describe("generate-v1.js 影子路由单元测试", () => {
   test("1. 平台积分对话请求被正确直接分发给 BackendDispatcher", async () => {
@@ -32,7 +32,7 @@ describe("generate-v1.js 影子路由单元测试", () => {
       json: (data: any) => data
     } as any;
     
-    const jwt = require("../../server/lib/jwt.js");
+    const jwt = require("../../services/api/lib/jwt.js");
     const originalVerify = jwt.verifyJWT;
     jwt.verifyJWT = () => "test-user-id";
 
@@ -76,7 +76,7 @@ describe("generate-v1.js 影子路由单元测试", () => {
       json: (data: any) => data
     } as any;
     
-    const jwt = require("../../server/lib/jwt.js");
+    const jwt = require("../../services/api/lib/jwt.js");
     const originalVerify = jwt.verifyJWT;
     jwt.verifyJWT = () => "test-user-id";
 
@@ -100,7 +100,7 @@ describe("generate-v1.js 影子路由单元测试", () => {
   });
 
   test("3. 自带 Key 对话与异步请求被正确分发给对应的 Handler 并通过安全白名单过滤", async () => {
-    const jwt = require("../../server/lib/jwt.js");
+    const jwt = require("../../services/api/lib/jwt.js");
     const originalVerify = jwt.verifyJWT;
     jwt.verifyJWT = () => "test-user-id";
 
@@ -183,7 +183,7 @@ describe("generate-v1.js 影子路由单元测试", () => {
   });
 
   test("4. 遥测埋点能够成功在响应返回时捕获记录", async () => {
-    const jwt = require("../../server/lib/jwt.js");
+    const jwt = require("../../services/api/lib/jwt.js");
     const originalVerify = jwt.verifyJWT;
     jwt.verifyJWT = () => "test-user-id";
     

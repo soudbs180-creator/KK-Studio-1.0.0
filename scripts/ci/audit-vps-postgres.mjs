@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.join(__dirname, "..", "..");
 
 export const POSTGRES_BOOTSTRAP_SQL_FILES = Object.freeze([
-  "scripts/postgres/bootstrap-kk-vps.sql",
+  "scripts/ops/postgres/bootstrap-kk-vps.sql",
 ]);
 
 export const REQUIRED_RUNTIME_TABLES = Object.freeze([
