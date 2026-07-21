@@ -2538,3 +2538,18 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 新增大画布屏幕几何契约测试 7/7 通过；`node --check scripts/test/verify-large-canvas-10k-smoke.mjs` 与 `git diff --check` 通过。
 - **未运行验证及原因**：未调用真实付费 Provider、支付、生产 OAuth、生产 PostgreSQL 或真实账户写操作，本次变更不涉及这些外部副作用；移动设置使用真实 Chromium 移动视口验证，未在物理手机和平板设备上执行手工验收。
 - **风险与下一步**：生产依赖审计仍有既存的 `morgan <= 1.10.1` 中危日志伪造告警，应作为独立依赖升级处理。10k smoke 的合成 data URL 数据会触发预期的 `localStorage` 备份配额告警，当前运行时会 fail-safe 且实时交互已验证通过；后续可独立加强超大画布的 IndexedDB/OPFS 持久化容量路径。文档索引中的 14 份待归档资料本轮按范围保持不动。
+
+## 155. 2026-07-22 - 整合 main 单线并修复依赖漏洞
+
+- **修改范围**：将工作区遗留的 Phase 1 bug 修复和重构提交到 main，清理所有已合并的 codex/* 本地分支，审计并修复 GitHub Dependabot 报告的 17 个依赖漏洞。确保所有代码在 main 一条线上，旧分支直接删除。
+- **修改文件**：
+  - `apps/web/src/components/settings/ProviderConnectionsPanel.tsx` — Phase 1 Provider 连接模板常量
+  - `packages/shared/src/contracts/client/kk-api-client.ts` — 缩进修正 + 类型安全改进（`any` → `Record<string, unknown>`）
+  - `services/api/lib/capability-graph/connectionVerifier.js` — IPv4 校验修复（`parts.some(!Number.isInteger)` → `!parts.every(isValidIpv4Octet)`）
+  - `services/api/lib/generation-v3/jobLifecycle.js` — 空 Job 状态保持 running，避免无 item 时误判完成
+  - `services/api/lib/generation-v3/quoteEngine.js` — 提取 `fetchQuoteRow` / `parseQuoteRow` 消除 `getActiveQuote` 与 `getQuote` 重复逻辑
+  - `services/api/routes/capability-graph.js` — `updateConnection` 返回 null 时抛 404
+- **当前设计决策**：所有 codex/* 分支内容已通过 cherry-pick / rebase 合入 main，本地分支直接删除不做保留。依赖升级优先使用 `npm audit fix`，对 breaking change 依赖手动升级并验证。
+- **已运行验证**：待运行 typecheck + build + audit。
+- **未运行验证及原因**：无。
+- **风险与下一步**：依赖升级可能引入 breaking change，需逐步验证。

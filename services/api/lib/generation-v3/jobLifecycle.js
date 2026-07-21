@@ -276,6 +276,12 @@ async function recalcJobStatus(jobId, { client }) {
   );
   const statuses = itemsRes.rows.map((r) => r.status);
 
+  // 空 Job 保持 running，避免无 item 时被误判为已完成
+  if (statuses.length === 0) {
+    await updateJobStatus({ jobId, status: 'running', client });
+    return;
+  }
+
   let newStatus = 'running';
   if (statuses.every((s) => s === 'completed')) {
     newStatus = 'completed';

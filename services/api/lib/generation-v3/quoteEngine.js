@@ -148,48 +148,21 @@ async function createQuote(userId, rawRequest, options = {}) {
   return GenerationQuoteDtoSchema.parse(quote);
 }
 
-/**
- * 读取并校验报价是否有效。
- * @param {string} userId
- * @param {string} quoteId
- * @param {Object} [options]
- * @param {import('pg').PoolClient} [options.client]
- * @returns {Promise<import('@kk/shared').GenerationQuoteDto>}
- */
-async function getActiveQuote(userId, quoteId, options = {}) {
-  const client = options.client || getPool();
-  const result = await client.query(
-    `SELECT * FROM public.generation_quotes
-      WHERE quote_id = $1 AND user_id = $2`,
-    [quoteId, userId]
-  );
+function createQuoteNotFoundError() {
+  const err = new Error('Quote not found.');
+  err.code = 'QUOTE_NOT_FOUND';
+  err.statusCode = 404;
+  return err;
+}
 
-  if (result.rows.length === 0) {
-    const err = new Error('Quote not found.');
-    err.code = 'QUOTE_NOT_FOUND';
-    err.statusCode = 404;
-    throw err;
-  }
+function createQuoteExpiredError() {
+  const err = new Error('Quote expired.');
+  err.code = 'QUOTE_EXPIRED';
+  err.statusCode = 410;
+  return err;
+}
 
-  const row = result.rows[0];
-  if (row.status !== 'active') {
-    const err = new Error(`Quote is ${row.status}.`);
-    err.code = 'QUOTE_EXPIRED';
-    err.statusCode = 410;
-    throw err;
-  }
-
-  if (new Date(row.expires_at) < new Date()) {
-    await client.query(
-      `UPDATE public.generation_quotes SET status = 'expired', updated_at = NOW() WHERE quote_id = $1`,
-      [quoteId]
-    );
-    const err = new Error('Quote expired.');
-    err.code = 'QUOTE_EXPIRED';
-    err.statusCode = 410;
-    throw err;
-  }
-
+function parseQuoteRow(row) {
   return GenerationQuoteDtoSchema.parse({
     quoteId: row.quote_id,
     mediaType: row.media_type,
@@ -206,6 +179,50 @@ async function getActiveQuote(userId, quoteId, options = {}) {
     createdAt: new Date(row.created_at).toISOString(),
     ownerId: row.user_id,
   });
+}
+
+async function fetchQuoteRow(client, userId, quoteId, { requireActive = false } = {}) {
+  const result = await client.query(
+    `SELECT * FROM public.generation_quotes
+      WHERE quote_id = $1 AND user_id = $2`,
+    [quoteId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw createQuoteNotFoundError();
+  }
+
+  const row = result.rows[0];
+
+  if (requireActive && row.status !== 'active') {
+    const err = new Error(`Quote is ${row.status}.`);
+    err.code = 'QUOTE_EXPIRED';
+    err.statusCode = 410;
+    throw err;
+  }
+
+  if (new Date(row.expires_at) < new Date()) {
+    await client.query(
+      `UPDATE public.generation_quotes SET status = 'expired', updated_at = NOW() WHERE quote_id = $1`,
+      [quoteId]
+    );
+    throw createQuoteExpiredError();
+  }
+
+  return parseQuoteRow(row);
+}
+
+/**
+ * 读取并校验报价是否有效。
+ * @param {string} userId
+ * @param {string} quoteId
+ * @param {Object} [options]
+ * @param {import('pg').PoolClient} [options.client]
+ * @returns {Promise<import('@kk/shared').GenerationQuoteDto>}
+ */
+async function getActiveQuote(userId, quoteId, options = {}) {
+  const client = options.client || getPool();
+  return fetchQuoteRow(client, userId, quoteId, { requireActive: true });
 }
 
 /**
@@ -233,48 +250,7 @@ async function consumeQuote(quoteId, client) {
  */
 async function getQuote(userId, quoteId, options = {}) {
   const client = options.client || getPool();
-  const result = await client.query(
-    `SELECT * FROM public.generation_quotes
-      WHERE quote_id = $1 AND user_id = $2`,
-    [quoteId, userId]
-  );
-
-  if (result.rows.length === 0) {
-    const err = new Error('Quote not found.');
-    err.code = 'QUOTE_NOT_FOUND';
-    err.statusCode = 404;
-    throw err;
-  }
-
-  const row = result.rows[0];
-
-  if (new Date(row.expires_at) < new Date()) {
-    await client.query(
-      `UPDATE public.generation_quotes SET status = 'expired', updated_at = NOW() WHERE quote_id = $1`,
-      [quoteId]
-    );
-    const err = new Error('Quote expired.');
-    err.code = 'QUOTE_EXPIRED';
-    err.statusCode = 410;
-    throw err;
-  }
-
-  return GenerationQuoteDtoSchema.parse({
-    quoteId: row.quote_id,
-    mediaType: row.media_type,
-    model: row.model,
-    count: row.count,
-    routeSnapshot: row.route_snapshot_json,
-    channel: row.channel,
-    cost: {
-      credits: row.cost_credits ?? undefined,
-      providerQuota: row.cost_provider_quota ?? undefined,
-      priceVersion: row.price_version,
-    },
-    expiresAt: new Date(row.expires_at).toISOString(),
-    createdAt: new Date(row.created_at).toISOString(),
-    ownerId: row.user_id,
-  });
+  return fetchQuoteRow(client, userId, quoteId);
 }
 
 module.exports = {

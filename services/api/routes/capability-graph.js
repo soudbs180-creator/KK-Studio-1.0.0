@@ -79,6 +79,9 @@ function createCapabilityGraphRouter(overrides = {}) {
     const connectionId = ProviderConnectionIdSchema.parse(request.params.connectionId);
     const input = UpdateProviderConnectionRequestSchema.parse(request.body);
     const connection = await service.updateConnection(request.authenticatedUserId, connectionId, input);
+    if (!connection) {
+      throw Object.assign(new Error('Provider Connection not found.'), { code: 'CONNECTION_NOT_FOUND', statusCode: 404 });
+    }
     response.json(wrapSuccess(connection, { surface: 'capability-graph' }));
   }));
   router.delete('/v1/provider-connections/:connectionId', asyncRoute(async (request, response) => {

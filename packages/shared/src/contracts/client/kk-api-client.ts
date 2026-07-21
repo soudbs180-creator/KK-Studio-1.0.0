@@ -50,23 +50,23 @@ import type {
 } from "../dto/auth.ts";
 import type {
   AdminCreditAccountLookupDto,
-    AdminRechargeCreditsRequestDto,
-    AdminRechargeCreditsResponseDto,
-    CreateRechargeSubmissionRequestDto,
-    CreateRechargeSubmissionResponseDto,
-    CreditTransactionListDto,
-    CreditBalanceDto,
-    CreditExchangeRateDto,
-    CreditExchangeRateListDto,
-    DebitCreditsRequestDto,
-    DebitCreditsResponseDto,
-    GetAdminRechargeSubmissionResponseDto,
-    ListAdminRechargeSubmissionsResponseDto,
-    ListCreditTransactionsQueryDto,
-    MarkRechargeSubmissionPaidResponseDto,
-    RechargePaymentChannelConfigListDto,
-    RefundCreditsRequestDto,
-    RefundCreditsResponseDto,
+  AdminRechargeCreditsRequestDto,
+  AdminRechargeCreditsResponseDto,
+  CreateRechargeSubmissionRequestDto,
+  CreateRechargeSubmissionResponseDto,
+  CreditTransactionListDto,
+  CreditBalanceDto,
+  CreditExchangeRateDto,
+  CreditExchangeRateListDto,
+  DebitCreditsRequestDto,
+  DebitCreditsResponseDto,
+  GetAdminRechargeSubmissionResponseDto,
+  ListAdminRechargeSubmissionsResponseDto,
+  ListCreditTransactionsQueryDto,
+  MarkRechargeSubmissionPaidResponseDto,
+  RechargePaymentChannelConfigListDto,
+  RefundCreditsRequestDto,
+  RefundCreditsResponseDto,
   ReviewRechargeSubmissionRequestDto,
   ReviewRechargeSubmissionResponseDto,
   SubmitRechargeProofRequestDto,
@@ -1261,11 +1261,11 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
     },
 
     checkUserRouteConnectivity(routeId, input, options) {
-      let requestBody: any = undefined;
+      let requestBody: Record<string, unknown> | undefined;
       let requestOptions = options;
 
-      if (input && (typeof input === 'object' && ('baseUrl' in input || 'apiKey' in input || 'format' in input || 'name' in input))) {
-        requestBody = input;
+      if (input && typeof input === 'object' && ('baseUrl' in input || 'apiKey' in input || 'format' in input || 'name' in input)) {
+        requestBody = input as Record<string, unknown>;
       } else if (input) {
         requestOptions = input as ApiClientRequestOptions;
       }
@@ -1602,24 +1602,24 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
           body: JSON.stringify(input),
         },
         options,
-        );
-      },
+      );
+    },
 
-      listRechargePaymentChannels(options) {
-        return requestJson<RechargePaymentChannelConfigListDto>(
-          config,
-          "api/v1/billing/payment-channels",
-          {
-            method: "GET",
-          },
-          options,
-        );
-      },
+    listRechargePaymentChannels(options) {
+      return requestJson<RechargePaymentChannelConfigListDto>(
+        config,
+        "api/v1/billing/payment-channels",
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
 
-      submitRecharge(input, options) {
-        return requestJson<SubmitRechargeResponseDto>(
-          config,
-          "api/v1/billing/submit-recharge",
+    submitRecharge(input, options) {
+      return requestJson<SubmitRechargeResponseDto>(
+        config,
+        "api/v1/billing/submit-recharge",
         {
           method: "POST",
           body: JSON.stringify(input),

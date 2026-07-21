@@ -12,9 +12,13 @@ function createVerificationError(code, message, statusCode = 400) {
   return error;
 }
 
+function isValidIpv4Octet(part) {
+  return Number.isInteger(part) && part >= 0 && part <= 255;
+}
+
 function isPrivateIpv4(address) {
   const parts = address.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return true;
+  if (parts.length !== 4 || !parts.every(isValidIpv4Octet)) return true;
   const [first, second] = parts;
   return first === 0
     || first === 10

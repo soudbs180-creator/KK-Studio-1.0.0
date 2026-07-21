@@ -24,6 +24,14 @@ import {
 
 const CAPABILITY_GRAPH_QUERY_KEY = ['capability-graph', 'snapshot'] as const;
 
+// Phase 1 仅支持单个开箱即用的 Provider 连接模板；后续通过 canonical catalog 驱动表单配置。
+const PHASE_ONE_PROVIDER_TEMPLATE = {
+  providerId: 'google',
+  protocolProfile: 'google-official',
+  title: 'Google official',
+  badge: 'Image / BYOK',
+} as const;
+
 type GraphAvailability = {
   enabled: boolean;
   snapshot?: CapabilityGraphSnapshotDto;
@@ -105,8 +113,8 @@ function ConnectionList({
   }
   return (
     <div className="grid grid-cols-1 gap-3">
-      {rows.map((row) => (
-        <ConnectionRow key={`${row.connectionId}:${row.modelName}`} {...{ row, busy, onDelete, onVerify }} />
+      {rows.map((row, index) => (
+        <ConnectionRow key={`${row.connectionId}:${row.modelName}:${index}`} {...{ row, busy, onDelete, onVerify }} />
       ))}
     </div>
   );
@@ -118,14 +126,17 @@ function ConnectionList({
 export const ProviderConnectionsPanel: React.FC = () => {
   const { pick } = useLocale();
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState('Google official');
+  const [displayName, setDisplayName] = useState(PHASE_ONE_PROVIDER_TEMPLATE.title);
   const [secret, setSecret] = useState('');
   const graphQuery = useQuery({ queryKey: CAPABILITY_GRAPH_QUERY_KEY, queryFn: loadCapabilityGraph, retry: false });
   const refreshGraph = () => queryClient.invalidateQueries({ queryKey: CAPABILITY_GRAPH_QUERY_KEY });
   const createMutation = useMutation({
     mutationFn: async () => {
       const created = unwrapConnection(await kkWebApiClient.createProviderConnection({
-        providerId: 'google', displayName: displayName.trim(), protocolProfile: 'google-official', secret,
+        providerId: PHASE_ONE_PROVIDER_TEMPLATE.providerId,
+        displayName: displayName.trim(),
+        protocolProfile: PHASE_ONE_PROVIDER_TEMPLATE.protocolProfile,
+        secret,
       }));
       return unwrapConnection(await kkWebApiClient.verifyProviderConnection(created.connectionId));
     },
@@ -158,11 +169,11 @@ export const ProviderConnectionsPanel: React.FC = () => {
   return (
     <SettingsSection title={pick('Provider 连接与能力', 'Provider Connections & Capabilities')}>
       <SettingsSystemCard
-        title="Google official"
+        title={PHASE_ONE_PROVIDER_TEMPLATE.title}
         description={pick('密钥仅用于创建请求，服务端保存加密引用并执行受限验证。', 'The credential is request-only; the server stores an encrypted reference and performs a restricted verification.')}
         icon={ShieldCheck}
         tone="emerald"
-        action={<SettingsBadge tone="indigo">Image / BYOK</SettingsBadge>}
+        action={<SettingsBadge tone="indigo">{PHASE_ONE_PROVIDER_TEMPLATE.badge}</SettingsBadge>}
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
           <label className="text-xs text-[var(--text-secondary)]">
