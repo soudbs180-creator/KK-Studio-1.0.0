@@ -212,20 +212,12 @@ async function enrichProfileState(profileState) {
   const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
   const entries = Array.isArray(profileState.entries) ? profileState.entries : [];
 
-  const enrichedProviders = [];
-  for (const provider of providers) {
-    enrichedProviders.push(await enrichApiRecord(provider, 'user'));
-  }
-
-  const enrichedSlots = [];
-  for (const slot of slots) {
-    enrichedSlots.push(await enrichApiRecord(slot, 'user'));
-  }
-
-  const enrichedEntries = [];
-  for (const entry of entries) {
-    enrichedEntries.push(await enrichApiRecord(entry, 'user'));
-  }
+  // 🚀 性能优化：并行探测所有 provider/slot/entry，替代原先的逐个串行调用
+  const [enrichedProviders, enrichedSlots, enrichedEntries] = await Promise.all([
+    Promise.all(providers.map((provider) => enrichApiRecord(provider, 'user'))),
+    Promise.all(slots.map((slot) => enrichApiRecord(slot, 'user'))),
+    Promise.all(entries.map((entry) => enrichApiRecord(entry, 'user'))),
+  ]);
 
   return {
     version: Number.parseInt(profileState.version, 10) || 2,

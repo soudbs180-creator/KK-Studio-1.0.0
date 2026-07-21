@@ -45,6 +45,7 @@ export class CanvasConnectorScheduler {
 
   // 简体中文：底层真正的 DOM 属性写入操作
   private static updateConnectorPath(promptId: string, imageId: string) {
+    if (typeof document === 'undefined') return;
     const pathEl = document.getElementById(`connector-${promptId}-${imageId}`) as SVGPathElement | null;
     if (!pathEl) return;
 

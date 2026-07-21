@@ -3,7 +3,7 @@ import { type GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music, Heart } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import { LayerPortal } from '../layout/LayerPortal';
-import { getCardDimensions, FOOTER_HEIGHT } from '../../utils/styleUtils';
+import { getCardDimensions } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -289,24 +289,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [image.id, isNew, onUpdate]);
 
     const getDims = () => {
-        const { width: theoreticalWidth, totalHeight: theoreticalHeight } = getCardDimensions(image.aspectRatio, true);
-        let finalWidth = theoreticalWidth;
-        let finalHeight = theoreticalHeight;
-
-        if (image.dimensions && typeof image.dimensions === 'string') {
-            // Extract purely the dimension part: "1:1 · 4096x4096" -> "4096x4096"
-            const match = image.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-            if (match && match[1] && match[2]) {
-                const w = parseInt(match[1], 10);
-                const h = parseInt(match[2], 10);
-                if (w > 0 && h > 0) {
-                    const aspect = w / h;
-                    const { width: realWidth } = getCardDimensions(image.aspectRatio, false);
-                    finalWidth = realWidth;
-                    finalHeight = (realWidth / aspect) + FOOTER_HEIGHT; // 40px for footer
-                }
-            }
-        }
+        // 使用声明的 aspectRatio 计算尺寸，保证同比例卡片大小一致，
+        // 避免实际像素尺寸与声明比例不一致时导致卡片变形或高度跳变。
+        const { width: finalWidth, totalHeight: finalHeight } = getCardDimensions(image.aspectRatio, true);
         return { w: finalWidth, h: finalHeight };
     };
     const { w: nodeWidth, h: nodeHeight } = getDims();

@@ -38,7 +38,7 @@ const httpsAgent = new https.Agent({
 });
 
 const ROUTE_CACHE = new Map();
-const CACHE_TTL_MS = 30000;
+const CACHE_TTL_MS = 60000; // 🚀 延长至 60s，减少 DB 查询频率
 
 const BREAKER_COOLDOWN_MS = 300000;
 const KEY_BREAKER = new Map();
@@ -441,10 +441,7 @@ class BackendDispatcher {
       currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
       creditsDeducted = true;
 
-      await pool.query(
-        'UPDATE public.billing_jobs SET status = $1, updated_at = NOW() WHERE id = $2',
-        ['pending_deducted', requestId]
-      );
+      // 🚀 移除中间状态更新，减少一次 DB 往返
 
       let requestSuccess = false;
       let finalContent = '';
@@ -529,10 +526,13 @@ class BackendDispatcher {
             requestSuccess = true;
 
             try {
-              await pool.query(
-                'UPDATE public.admin_credit_models SET call_count = call_count + 1, updated_at = NOW() WHERE provider_id = $1 AND model_id = $2',
-                [channel.provider_id, channel.model_id]
-              );
+              // 🚀 调用计数更新改为异步，不阻塞主响应
+              setImmediate(() => {
+                pool.query(
+                  'UPDATE public.admin_credit_models SET call_count = call_count + 1, updated_at = NOW() WHERE provider_id = $1 AND model_id = $2',
+                  [channel.provider_id, channel.model_id]
+                ).catch((auditErr) => console.error('[BackendDispatcher] 递增调用计数失败:', auditErr));
+              });
             } catch (auditErr) {
               console.error('[BackendDispatcher] 递增调用计数失败:', auditErr);
             }
@@ -577,11 +577,11 @@ class BackendDispatcher {
       }
 
       if (finalTokensUsed > 0 && usedChannelInfo) {
-        try {
-          await credits.recordTokenUsage(userId, finalTokensUsed, `dispatcher:${usedChannelInfo.model_id}`);
-        } catch (tokenErr) {
-          console.error('[BackendDispatcher] 记录 Token 用量失败:', tokenErr);
-        }
+        // 🚀 Token 用量记录改为异步执行，不阻塞主响应返回
+        setImmediate(() => {
+          credits.recordTokenUsage(userId, finalTokensUsed, `dispatcher:${usedChannelInfo.model_id}`)
+            .catch((tokenErr) => console.error('[BackendDispatcher] 记录 Token 用量失败:', tokenErr));
+        });
       }
 
       await pool.query(

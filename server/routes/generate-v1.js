@@ -9,6 +9,7 @@ const express = require('express');
 const { verifyJWT } = require('../lib/jwt');
 const { listProviders } = require('../lib/dispatcher/providerRegistry');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
+const generationV3 = require('../lib/generation-v3');
 
 const router = express.Router();
 
@@ -118,6 +119,118 @@ router.post('/v1/generate', requireAuth, async (req, res) => {
   }
 });
 
+function mapModeToMediaType(mode) {
+  if (mode === 'image' || mode === 'video' || mode === 'audio') return mode;
+  return null;
+}
+
+function defaultModelForMediaType(mediaType) {
+  if (mediaType === 'image') return 'image_nanoBanana2';
+  if (mediaType === 'video') return 'sora';
+  if (mediaType === 'audio') return 'voice';
+  return 'image_nanoBanana2';
+}
+
+function buildAsyncMeta(req) {
+  return {
+    requestId: req.headers['x-request-id'] || req.body?.requestId || `req-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function determineJobStatus(items) {
+  if (items.length === 0) return 'pending';
+  if (items.every((i) => i.status === 'completed')) return 'success';
+  if (items.every((i) => i.status === 'failed' || i.status === 'cancelled')) return 'failed';
+  if (items.some((i) => i.status === 'completed')) return 'success';
+  return 'pending';
+}
+
+async function submitAsyncViaGenerationV3(userId, req) {
+  const mode = req.body?.mode;
+  const mediaType = mapModeToMediaType(mode);
+  const model = String(req.body?.model || req.body?.modelId || defaultModelForMediaType(mediaType)).trim();
+  const count = Math.max(1, Number(req.body?.count || req.body?.n || 1));
+  const prompt = String(req.body?.prompt || req.body?.text || '').trim();
+
+  const quote = await generationV3.createQuote(userId, {
+    mediaType,
+    model,
+    count,
+    preferredChannel: 'platform-credits',
+  });
+
+  const job = await generationV3.createJobFromQuote(userId, {
+    quoteId: quote.quoteId,
+    payload: { prompt, ...(req.body || {}) },
+  });
+
+  const submitted = await generationV3.submitJob(userId, job.jobId);
+  const status = determineJobStatus(submitted.items);
+  const completedItems = submitted.items.filter((i) => i.status === 'completed');
+  const pendingLikeItems = submitted.items.filter((i) => ['pending', 'submitted', 'running'].includes(i.status));
+  const representativeItem = completedItems[0] || pendingLikeItems[0] || submitted.items[0];
+
+  return {
+    success: true,
+    data: {
+      urls: completedItems.map((i) => i.assetId || '').filter(Boolean),
+      url: completedItems[0]?.assetId || '',
+      taskId: job.jobId,
+      providerTaskId: representativeItem?.providerTaskId || '',
+      status,
+      endpointType: `generation-v3-${mediaType}`,
+      modelId: model,
+      requestId: req.body?.requestId,
+      quoteId: quote.quoteId,
+      jobId: job.jobId,
+      route: quote.routeSnapshot,
+    },
+    meta: buildAsyncMeta(req),
+  };
+}
+
+async function queryAsyncStatusViaGenerationV3(userId, req) {
+  const localTaskId = String(req.body?.localTaskId || req.body?.taskId || '').trim();
+  if (!localTaskId) {
+    const err = new Error('localTaskId/taskId is required.');
+    err.code = 'INVALID_REQUEST';
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const job = await generationV3.getJob(localTaskId, userId);
+  if (!job) {
+    const err = new Error('Job not found.');
+    err.code = 'JOB_NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const status = determineJobStatus(job.items);
+  const completedItems = job.items.filter((i) => i.status === 'completed');
+  const pendingLikeItems = job.items.filter((i) => ['pending', 'submitted', 'running'].includes(i.status));
+  const representativeItem = completedItems[0] || pendingLikeItems[0] || job.items[0];
+  const failedItem = job.items.find((i) => i.status === 'failed');
+
+  return {
+    success: true,
+    data: {
+      taskId: job.jobId,
+      providerTaskId: representativeItem?.providerTaskId || '',
+      status,
+      url: completedItems[0]?.assetId || '',
+      urls: completedItems.map((i) => i.assetId || '').filter(Boolean),
+      message: failedItem?.errorMessage,
+      error: failedItem ? (failedItem.errorMessage || 'Task failed.') : undefined,
+      endpointType: `generation-v3-${job.model}`,
+      modelId: job.model,
+      route: { provider: job.provider, adapter: job.provider },
+    },
+    meta: buildAsyncMeta(req),
+  };
+}
+
 // 统一异步与轮询状态端点 (WS-3)
 router.post('/v1/generate/async', requireAuth, async (req, res) => {
   const startTime = Date.now();
@@ -131,6 +244,31 @@ router.post('/v1/generate/async', requireAuth, async (req, res) => {
     const parsed = decodeLocalProxyTaskId(localTaskId);
     if (parsed.routeId) {
       routeId = parsed.routeId;
+    }
+  }
+
+  // 无 routeId 时走 generation-v3 平台积分通道，移除"必须带 routeId"的限制
+  if (!routeId) {
+    try {
+      let result;
+      if (mode === 'task_status') {
+        result = await queryAsyncStatusViaGenerationV3(req.userId, req);
+      } else if (['image', 'video', 'audio'].includes(mode)) {
+        result = await submitAsyncViaGenerationV3(req.userId, req);
+      } else {
+        return sendError(res, 400, 'UNSUPPORTED_MODE', 'Unsupported async mode.');
+      }
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate/async', success: true, latency: Date.now() - startTime });
+      return res.json(result);
+    } catch (err) {
+      metricsCollector.recordRouteCall({ routePath: '/api/v1/generate/async', success: false, latency: Date.now() - startTime });
+      if (err.code === 'INSUFFICIENT_CREDITS') {
+        return sendError(res, 402, err.code, err.message, { currentCredits: err.currentCredits, requiredCredits: err.requiredCredits });
+      }
+      if (err.code === 'SETUP_REQUIRED') {
+        return sendError(res, 403, err.code, err.message);
+      }
+      return sendError(res, err.statusCode || 500, err.code || 'INTERNAL_ERROR', err.message);
     }
   }
 
@@ -164,3 +302,10 @@ router.post('/v1/generate/async', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports._helpers = {
+  mapModeToMediaType,
+  defaultModelForMediaType,
+  determineJobStatus,
+  submitAsyncViaGenerationV3,
+  queryAsyncStatusViaGenerationV3,
+};

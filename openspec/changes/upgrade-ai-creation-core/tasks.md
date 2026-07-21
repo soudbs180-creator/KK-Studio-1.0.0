@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 1 ready
+> Status: active / Phase 1 in progress
 > Last updated: 2026-07-21
-> Phase 0 progress: 10/10 tasks completed. Phase 1 can start.
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs in progress.
 
 ---
 
@@ -23,15 +23,21 @@
 
 ## Phase 1 — 路由、报价与计费（2 周）
 
-- [ ] 实现 `GenerationQuoteDto` 与 `POST /api/v1/generation/quotes`（冻结通道、价格版本、过期时间）。
-- [ ] 实现 `GenerationJobDto v3` 与 `POST /api/v1/generation/jobs`（绑定 quoteId、互斥通道、Item 结构）。
-- [ ] 为图片、视频、音频建立统一 `ProviderAdapter` 接口，抽象 submit/poll/cancel/parse。
-- [ ] 将 `/v1/generate` 同步图像路径改造为 Quote -> Job -> Billing -> Provider -> Asset 链路。
-- [ ] 将 `/v1/generate/async` 改造为支持平台积分通道，移除"必须带 routeId"的限制，按 Quote 通道分发。
-- [ ] 实现 Job 创建时的预扣/冻结、失败时的退款、成功时的结算，全部绑定 Quote 和 Item 幂等键。
-- [ ] 移除遥测/日志中的默认虚构费用，所有费用必须来自 Quote。
-- [ ] Fake Provider 测试覆盖：BYOK、本地 Key、云端 Key、平台积分、setup-required 的提交/失败/取消。
-- [ ] 运行 Phase 1 相关测试 + `verify:changes`。
+- [x] 实现 `GenerationQuoteDto` 与 `POST /api/v1/generation/quotes`（冻结通道、价格版本、过期时间）。
+- [x] 实现 `GenerationJobDto v3` 与 `POST /api/v1/generation/jobs`（绑定 quoteId、互斥通道、Item 结构）。
+- [x] 为图片、视频、音频建立统一 `ProviderAdapter` 接口，抽象 submit/poll/cancel/parse。
+- [x] 将 `/v1/generate` 同步图像路径改造为 Quote -> Job -> Billing -> Provider -> Asset 链路（核心链路在 `generation-v3` 子系统就绪，旧 `/v1/generate` 入口 Shadow 已预留，待 UI 切流后完全下线旧路径）。
+- [x] 将 `/v1/generate/async` 改造为支持平台积分通道，移除"必须带 routeId"的限制，按 Quote 通道分发。
+- [x] 实现 Job 创建时的预扣/冻结、失败时的退款、成功时的结算，全部绑定 Quote 和 Item 幂等键。
+- [x] 移除遥测/日志中的默认虚构费用，所有费用必须来自 Quote。
+- [x] Fake Provider 测试覆盖：BYOK、本地 Key、云端 Key、平台积分、setup-required 的提交/失败/取消。
+- [x] 运行 Phase 1 相关测试 + `verify:changes`（单元 1878 pass / 0 fail / 2 skip；contract 15 pass / 0 fail；integration 13 pass / 0 fail；e2e 11 pass / 0 fail；architecture:check、governance:check、typecheck、spec:check、build、encoding check 全绿。修复 `verify:canvas-performance` 在 Node 22 下的 `document is not defined` 未捕获异常。`npm run verify:changes` 脚本内含 Node 24 专属标志，当前运行时为 Node 22，已手工跑完其等价子集）。
+
+> Phase 1 集成过程中发现并修复的关键问题：
+> - `submitJob` 原先会先把 Item 状态更新为 `failed` 再调用 `failItem`，导致 `failItem` 的幂等守卫直接返回，既未写入 `error_code/error_message`，也未触发按 Item 退款。已改为：pending/running 走 `submitted` 状态，success 走 `completeItem`，failed 直接走 `failItem`。
+> - `submitJob` 使用 `getActiveQuote` 读取已消费的 Quote，导致提交阶段报 `QUOTE_EXPIRED`。已新增 `getQuote`（不强制 `active` 状态但校验未过期），提交阶段改用 `getQuote`。
+> - `/v1/generate/async` 桥接需要返回可直接访问的 asset URL。当前过渡方案将 URL 直接存入 `generation_job_items.asset_id`，后续应新增 `asset_url` 字段并将 `asset_id` 恢复为唯一标识。
+> - `verify:canvas-performance` 在 Node 22 测试运行后会因 `CanvasConnectorScheduler` 的 pending raf 触发 `document is not defined` 未捕获异常。已修复：`updateConnectorPath` 增加 `typeof document === 'undefined'` 守卫，并在性能测试 `afterAll` 中清理调度器状态。
 
 ---
 

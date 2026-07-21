@@ -14,6 +14,56 @@ const { verifyJWT, signJWT } = require('../jwt');
 
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
 
+// 🚀 内存中 pending status 更新队列：防抖合并异步持久化，避免每次 401/429 都做完整 read→find→modify→write 周期
+const pendingStatusUpdates = new Map(); // key: `${userId}:${routeId}` → status
+let statusFlushTimer = null;
+const STATUS_FLUSH_DELAY_MS = 2000; // 2秒防抖
+
+function scheduleStatusFlush() {
+  if (statusFlushTimer) return;
+  statusFlushTimer = setTimeout(async () => {
+    statusFlushTimer = null;
+    const updates = new Map(pendingStatusUpdates);
+    pendingStatusUpdates.clear();
+
+    for (const [key, status] of updates.entries()) {
+      const [userId, ...routeIdParts] = key.split(':');
+      const routeId = routeIdParts.join(':');
+      try {
+        const data = await readLocalStorage();
+        const profileState = readProfileState(data, userId);
+        let found = false;
+
+        for (const slot of profileState.slots) {
+          const slotIdNormalized = String(slot.id || '').toLowerCase();
+          const decodedRouteId = (() => {
+            try { return decodeURIComponent(String(routeId || '')).trim(); } catch { return String(routeId || '').trim(); }
+          })();
+          const normalizedRouteId = decodedRouteId.toLowerCase();
+          let strippedRouteId = normalizedRouteId;
+          if (normalizedRouteId.startsWith('slot_key_')) strippedRouteId = normalizedRouteId.slice(9);
+          else if (normalizedRouteId.startsWith('slot_')) strippedRouteId = normalizedRouteId.slice(5);
+          else if (normalizedRouteId.startsWith('provider_')) strippedRouteId = normalizedRouteId.slice(9);
+
+          if (slotIdNormalized === normalizedRouteId || slotIdNormalized === strippedRouteId) {
+            slot.status = status;
+            slot.updatedAt = Date.now();
+            found = true;
+            break;
+          }
+        }
+
+        if (found) {
+          writeProfileState(data, userId, profileState);
+          await writeLocalStorage(data);
+        }
+      } catch (err) {
+        console.error(`[UserAiRouter] 防抖写入 slot 状态失败 userId=${userId}:`, err);
+      }
+    }
+  }, STATUS_FLUSH_DELAY_MS);
+}
+
 function buildMeta(req) {
   return {
     requestId: req.headers['x-request-id'] || req.body?.requestId || `req-${Date.now()}`,
@@ -98,38 +148,16 @@ function enforceStrictContract(req, res, { profileId, taskType, adapterId, model
 }
 
 async function updateLocalUserSlotStatus(userId, routeId, status) {
+  // 🚀 优化：不再每次做完整 read→find→modify→write，改为内存队列 + 防抖异步持久化
+  const key = `${userId}:${routeId}`;
+  pendingStatusUpdates.set(key, status);
+  scheduleStatusFlush();
+
+  // 🚀 同时立即更新内存中的路由缓存（如有），保持状态即时一致性
   try {
-    const data = await readLocalStorage();
-    const profileState = readProfileState(data, userId);
-    
-    const slot = profileState.slots.find(s => {
-      const slotIdNormalized = String(s.id || '').toLowerCase();
-      const decodedRouteId = (() => {
-        try {
-          return decodeURIComponent(String(routeId || '')).trim();
-        } catch {
-          return String(routeId || '').trim();
-        }
-      })();
-      const normalizedRouteId = decodedRouteId.toLowerCase();
-      let strippedRouteId = normalizedRouteId;
-      if (normalizedRouteId.startsWith('slot_key_')) strippedRouteId = normalizedRouteId.slice(9);
-      else if (normalizedRouteId.startsWith('slot_')) strippedRouteId = normalizedRouteId.slice(5);
-      else if (normalizedRouteId.startsWith('provider_')) strippedRouteId = normalizedRouteId.slice(9);
-
-      return slotIdNormalized === normalizedRouteId || slotIdNormalized === strippedRouteId;
-    });
-
-    if (slot) {
-      slot.status = status;
-      slot.updatedAt = Date.now();
-      writeProfileState(data, userId, profileState);
-      await writeLocalStorage(data);
-      console.log(`[UserAiRouter] 成功将用户 ${userId} 的 slot ${routeId} 状态变更为 ${status}`);
-    }
-  } catch (err) {
-    console.error(`[UserAiRouter] 变更用户 ${userId} 的 slot ${routeId} 状态时出错:`, err);
-  }
+    const { invalidateRouteCache } = require('./localUserRouteStore');
+    invalidateRouteCache(userId);
+  } catch {}
 }
 
 async function handleUnifiedUserChatMode(req, res, userId) {

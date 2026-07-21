@@ -6,6 +6,44 @@ const { READONLY_SECRET_PLACEHOLDER } = require('../userApiSecret');
 
 const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../../.kk-local/local-user-apis.json');
 
+// 🚀 路由解析结果的内存缓存：避免每次请求都做全量 DB 查询 + 解密 + 索引构建
+const ROUTE_CACHE_TTL_MS = 10000; // 10秒
+const routeResultCache = new Map(); // key: `${userId}:${routeId}` → { route, expiresAt }
+
+function getCachedRoute(userId, routeId) {
+  const key = `${userId}:${normalizeRouteValue(routeId)}`;
+  const cached = routeResultCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.route;
+  }
+  if (cached) {
+    routeResultCache.delete(key);
+  }
+  return undefined; // 缓存未命中
+}
+
+function setCachedRoute(userId, routeId, route) {
+  // 限制缓存大小，避免内存泄漏
+  if (routeResultCache.size > 2000) {
+    const oldestKey = routeResultCache.keys().next().value;
+    routeResultCache.delete(oldestKey);
+  }
+  const key = `${userId}:${normalizeRouteValue(routeId)}`;
+  routeResultCache.set(key, {
+    route,
+    expiresAt: Date.now() + ROUTE_CACHE_TTL_MS,
+  });
+}
+
+function invalidateRouteCache(userId) {
+  const prefix = `${userId}:`;
+  for (const key of routeResultCache.keys()) {
+    if (key.startsWith(prefix)) {
+      routeResultCache.delete(key);
+    }
+  }
+}
+
 let cache = {
   signature: '',
   payload: { version: 2, profiles: {} },
@@ -322,6 +360,12 @@ async function readLocalStorage(userId = null) {
 }
 
 async function resolveLocalUserRoute(userId, routeId) {
+  // 🚀 优先命中短 TTL 缓存，避免每次请求都做全量 DB 查询 + 解密 + 索引构建
+  const cachedRoute = getCachedRoute(userId, routeId);
+  if (cachedRoute !== undefined) {
+    return cachedRoute;
+  }
+
   const data = await readLocalStorage(userId);
   if (!isObjectRecord(data.profiles)) data.profiles = {};
 
@@ -335,8 +379,15 @@ async function resolveLocalUserRoute(userId, routeId) {
 
   for (const candidate of buildRouteLookupCandidates(routeId)) {
     const route = index.routeByAlias.get(candidate);
-    if (route) return route;
+    if (route) {
+      // 🚀 缓存成功命中的路由结果
+      setCachedRoute(userId, routeId, route);
+      return route;
+    }
   }
+
+  // 🚀 缓存 null 结果，避免重复查询不存在的路由
+  setCachedRoute(userId, routeId, null);
   return null;
 }
 
@@ -419,6 +470,10 @@ async function writeLocalStorage(data) {
 
         await client.query('DELETE FROM public.user_provider_credentials WHERE user_id = $1', [userId]);
 
+        // 🚀 批量构建 INSERT 语句，替代逐条 INSERT，减少数据库往返次数
+        const batchRows = [];
+        const values = [];
+        let paramIndex = 1;
         const groups = ['slots', 'providers', 'entries'];
         for (const group of groups) {
           const items = profileState[group] || [];
@@ -435,13 +490,17 @@ async function writeLocalStorage(data) {
             const itemToSave = { ...item, key: realKey, _group: group };
             const encryptedSecret = cryptoUtil.encrypt(JSON.stringify(itemToSave));
 
-            await client.query(
-              `INSERT INTO public.user_provider_credentials 
-               (user_id, provider, auth_type, encrypted_secret) 
-               VALUES ($1, $2, $3, $4)`,
-              [userId, provider, authType, encryptedSecret]
-            );
+            batchRows.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`);
+            values.push(userId, provider, authType, encryptedSecret);
+            paramIndex += 4;
           }
+        }
+
+        if (batchRows.length > 0) {
+          await client.query(
+            `INSERT INTO public.user_provider_credentials (user_id, provider, auth_type, encrypted_secret) VALUES ${batchRows.join(', ')}`,
+            values
+          );
         }
         await client.query('COMMIT');
       } catch (e) {
@@ -454,6 +513,11 @@ async function writeLocalStorage(data) {
     // 同时也使缓存签名失效，保证下次 resolve 会重新建立 index
     cache.signature = `db-${Date.now()}`;
     cache.indexes.clear();
+
+    // 🚀 写入后使所有相关用户的路由结果缓存失效
+    for (const userId of Object.keys(data.profiles || {})) {
+      invalidateRouteCache(userId);
+    }
     return;
   }
 
@@ -491,6 +555,13 @@ async function writeLocalStorage(data) {
     indexes: new Map(),
     readPromise: null,
   };
+
+  // 🚀 文件写入后使路由缓存失效（遍历所有 userId）
+  if (data && data.profiles) {
+    for (const uid of Object.keys(data.profiles)) {
+      invalidateRouteCache(uid);
+    }
+  }
 }
 
 module.exports = {
@@ -502,4 +573,5 @@ module.exports = {
   buildProfileRouteIndex,
   readProfileState,
   writeProfileState,
+  invalidateRouteCache,
 };

@@ -10,9 +10,49 @@ const { isPrivateHost } = require('../fetchClient');
 const { normalizeBaseUrl } = require('./adapterRegistry');
 const { matchProviderProfile } = require('./providerProfiles');
 const { getStrictProviderContract } = require('./strictProviderContracts');
+const crypto = require('crypto');
 
 const PROBE_TIMEOUT_MS = 12000;
+const PROBE_CACHE_TTL_MS = 300000; // 🚀 5分钟探测结果缓存
 const DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'chat_index'];
+
+// 🚀 内存探测缓存：基于 (baseUrl + apiKey) 的哈希
+const probeCache = new Map();
+
+function probeCacheKey(baseUrl, apiKey) {
+  return crypto.createHash('sha256')
+    .update(`${String(baseUrl || '').trim().toLowerCase()}\n${String(apiKey || '').trim()}`)
+    .digest('hex');
+}
+
+function getCachedProbe(baseUrl, apiKey) {
+  const key = probeCacheKey(baseUrl, apiKey);
+  const cached = probeCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
+  if (cached) {
+    probeCache.delete(key);
+  }
+  return null;
+}
+
+function setCachedProbe(baseUrl, apiKey, result) {
+  const key = probeCacheKey(baseUrl, apiKey);
+  probeCache.set(key, {
+    result,
+    expiresAt: Date.now() + PROBE_CACHE_TTL_MS,
+  });
+}
+
+function evictExpiredProbeCacheEntries() {
+  const now = Date.now();
+  for (const [key, entry] of probeCache.entries()) {
+    if (entry.expiresAt <= now) {
+      probeCache.delete(key);
+    }
+  }
+}
 
 function uniqueStrings(values) {
   return Array.from(new Set(
@@ -341,16 +381,33 @@ async function probeProvider(input) {
     throw error;
   }
 
+  // 🚀 优先命中缓存，避免重复探测
+  const cached = getCachedProbe(baseUrl, apiKey);
+  if (cached) {
+    return cached;
+  }
+
   const profile = matchProviderProfile(input);
+  let result;
   if (profile.protocolFamily === 'wuyin-form' || profile.protocolFamily === 'wuyin-documented-multi-task' || profile.modelDiscovery === 'manual') {
-    return probeProfileOnly(input, profile);
+    result = await probeProfileOnly(input, profile);
+  } else if (profile.protocolFamily === 'gemini-native') {
+    result = await probeGeminiNative(input, profile);
+  } else {
+    result = await probeOpenAICompatible(input, profile);
   }
-  if (profile.protocolFamily === 'gemini-native') {
-    return probeGeminiNative(input, profile);
+
+  // 🚀 缓存探测结果（仅缓存成功的探测）
+  if (result && result.ok) {
+    setCachedProbe(baseUrl, apiKey, result);
   }
-  return probeOpenAICompatible(input, profile);
+
+  return result;
 }
 
 module.exports = {
   probeProvider,
+  getCachedProbe,
+  setCachedProbe,
+  evictExpiredProbeCacheEntries,
 };

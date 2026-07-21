@@ -1,6 +1,6 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 0
+> Status: active / Phase 1
 > Companion: proposal.md, tasks.md
 > Last verified: 2026-07-21
 

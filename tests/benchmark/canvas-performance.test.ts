@@ -1,4 +1,4 @@
-import { test, expect } from 'vitest';
+import { test, expect, afterAll } from 'vitest';
 import { performance } from 'perf_hooks';
 import { CanvasSpatialIndex } from '../../apps/web/src/canvas/CanvasSpatialIndex';
 import { CanvasMeasurementScheduler } from '../../apps/web/src/canvas/CanvasMeasurementScheduler';
@@ -335,5 +335,10 @@ test('10000 card canvas virtualization keeps per-frame work bounded to visible c
   expect(scheduling.size).toBeLessThanOrEqual(nearViewportNodes.length);
   expect(selectTime).toBeLessThanOrEqual(4);
   expect(scheduleTime).toBeLessThanOrEqual(6);
+});
+
+afterAll(() => {
+  CanvasConnectorScheduler.clearCache();
+  CanvasMeasurementScheduler.cancel();
 });
 
