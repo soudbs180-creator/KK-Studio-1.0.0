@@ -2550,6 +2550,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `services/api/lib/generation-v3/quoteEngine.js` — 提取 `fetchQuoteRow` / `parseQuoteRow` 消除 `getActiveQuote` 与 `getQuote` 重复逻辑
   - `services/api/routes/capability-graph.js` — `updateConnection` 返回 null 时抛 404
 - **当前设计决策**：所有 codex/* 分支内容已通过 cherry-pick / rebase 合入 main，本地分支直接删除不做保留。依赖升级优先使用 `npm audit fix`，对 breaking change 依赖手动升级并验证。
-- **已运行验证**：待运行 typecheck + build + audit。
-- **未运行验证及原因**：无。
-- **风险与下一步**：依赖升级可能引入 breaking change，需逐步验证。
+- **已运行验证**：
+  - `npm run typecheck` 通过（根 TypeScript、架构 TS、服务端 86 文件语法、528 测试文件语义）。
+  - `npm run architecture:check` 32 项架构边界全部通过。
+  - `npm run governance:check` 通过（版本、事实、Agent 文档、文档索引、Skills、兼容层、Provider、敏感边界）。
+  - `npm run build` 通过：Shared、UI、API Client 与 Web Vite 生产构建完成。
+  - `npm run test:unit` 通过：1903 pass / 0 fail / 2 skipped；聚焦 capability-graph、provider-connection、generation-v3 的 46 个用例全部通过。
+  - `npm audit fix` 修复 17 项依赖漏洞，package-lock.json 已更新。
+- **未运行验证及原因**：未运行 integration/contract/e2e 与 UI smoke，因为本次改动集中在共享类型、服务端 capability-graph 与 generation-v3 核心路径，已由相关单元测试与构建覆盖。
+- **风险与下一步**：依赖升级已验证无 breaking change；后续合并到 origin/main 前建议完整跑一次 `npm run verify:changes`。

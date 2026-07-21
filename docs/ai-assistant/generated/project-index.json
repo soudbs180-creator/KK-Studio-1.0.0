@@ -5,8 +5,8 @@
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
     "title": "AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0",
     "summary": "Status: historical",
-    "contentHash": "eaeb5272733accc4a78feeb96007eb56",
-    "updatedAt": "2026-07-21T18:33:59.760Z"
+    "contentHash": "01867e641ff692f88655cf44eaa1274a",
+    "updatedAt": "2026-07-21T19:46:31.725Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -32,8 +32,8 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "Status: reference",
-    "contentHash": "e0c1878444592d6aac07e961ae4987a2",
-    "updatedAt": "2026-07-21T18:33:59.760Z"
+    "contentHash": "86e9971a35fc54db52442c39066fe445",
+    "updatedAt": "2026-07-21T19:46:31.726Z"
   },
   {
     "id": "doc_readme_md",
@@ -50,8 +50,8 @@
     "path": "docs/ai-assistant/RUNBOOKS.md",
     "title": "AI Assistant Runbooks — KK Studio v1.6.0",
     "summary": "Last updated: 2026-07-19",
-    "contentHash": "ec5095d84c683350f159f1e11196d87b",
-    "updatedAt": "2026-07-21T18:33:59.761Z"
+    "contentHash": "94d98977524230338a24c1964f385dd4",
+    "updatedAt": "2026-07-21T19:46:31.725Z"
   },
   {
     "id": "doc_safety_policy_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "Status: historical",
-    "contentHash": "11ebec26a6badd751e8ed5546b8d56a2",
-    "updatedAt": "2026-07-21T18:26:47.728Z"
+    "contentHash": "1485421cade648b8e85f5eab73c0c072",
+    "updatedAt": "2026-07-21T19:46:31.726Z"
   },
   {
     "id": "doc_site_capability_matrix_md",
@@ -86,8 +86,8 @@
     "path": "docs/ai-assistant/skills.md",
     "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.0",
     "summary": "Status: reference",
-    "contentHash": "ed15a0c05ec0495b99b35f4962feea19",
-    "updatedAt": "2026-07-21T18:26:47.728Z"
+    "contentHash": "5e3184cc947229bdc2eb645c284980d6",
+    "updatedAt": "2026-07-21T19:46:31.726Z"
   },
   {
     "id": "doc_tool_registry_md",

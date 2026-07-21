@@ -126,7 +126,7 @@ function ConnectionList({
 export const ProviderConnectionsPanel: React.FC = () => {
   const { pick } = useLocale();
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState(PHASE_ONE_PROVIDER_TEMPLATE.title);
+  const [displayName, setDisplayName] = useState<string>(PHASE_ONE_PROVIDER_TEMPLATE.title);
   const [secret, setSecret] = useState('');
   const graphQuery = useQuery({ queryKey: CAPABILITY_GRAPH_QUERY_KEY, queryFn: loadCapabilityGraph, retry: false });
   const refreshGraph = () => queryClient.invalidateQueries({ queryKey: CAPABILITY_GRAPH_QUERY_KEY });
