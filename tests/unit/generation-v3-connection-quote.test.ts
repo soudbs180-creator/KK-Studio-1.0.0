@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const generationV3 = require('../../server/lib/generation-v3/index.js');
+const generationV3 = require('../../services/api/lib/generation-v3/index.js');
 
 test('connection-backed quote freezes the verified route projection', async () => {
   const connectionId = '550e8400-e29b-41d4-a716-446655440000';

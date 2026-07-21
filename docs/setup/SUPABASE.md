@@ -1,7 +1,7 @@
 # Supabase 时代资料（历史索引）
 
-Status: reference not a setup guide. KK Studio 当前运行时使用 `server/`
-和 `migrations/`，本文件不再描述项目地址、客户端环境变量、访问令牌、
+Status: reference not a setup guide. KK Studio 当前运行时使用 `services/api/`
+和 `infrastructure/database/migrations/`，本文件不再描述项目地址、客户端环境变量、访问令牌、
 认证流程或可执行迁移。旧资料已从当前部署路径移除；请阅读
 [`docs/setup/GUIDE.md`](GUIDE.md) 和
 [`docs/governance/PROJECT_STATE_AND_VALIDATION.md`](../governance/PROJECT_STATE_AND_VALIDATION.md)。

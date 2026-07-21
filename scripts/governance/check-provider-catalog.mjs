@@ -15,7 +15,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
 
 const frontendRegistryPath = resolve(repoRoot, 'apps/web/src/services/api/providerRegistry.ts');
-const backendRegistryPath = resolve(repoRoot, 'server/lib/dispatcher/providerRegistry.js');
+const backendRegistryPath = resolve(repoRoot, 'services/api/lib/dispatcher/providerRegistry.js');
 
 // 1. 加载并构建 Shared Catalog 引用
 let CANONICAL_PROVIDER_CATALOG;

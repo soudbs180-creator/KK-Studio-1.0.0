@@ -10,14 +10,14 @@ const ROOT_DIR = process.cwd();
 
 test("project docs publish one truth table for current and transitional runtimes", () => {
   const projectStructureSource = readSource("docs/architecture/PROJECT_STRUCTURE.md");
-  const rootGuideSource = readSource("docs/PROJECT_ROOT_GUIDE.md");
+  const rootGuideSource = readSource("docs/archive/PROJECT_ROOT_GUIDE.md");
   const handoffSource = readSource("docs/development/session-handoff.md");
 
   assert.match(projectStructureSource, /## Runtime truth table/);
   assert.match(projectStructureSource, /\| `apps\/web\/` \| primary Web runtime \|/);
   assert.match(projectStructureSource, /\| `apps\/mobile\/` \| mobile workspace \|/);
   assert.match(projectStructureSource, /\| `packages\/shared\/` \| pure shared logic \|/);
-  assert.match(projectStructureSource, /\| `server\/` \| Express \/ VPS backend \|/);
+  assert.match(projectStructureSource, /\| `services\/api\/` \| Express \/ VPS backend \|/);
 
   assert.match(rootGuideSource, /Runtime Layout/);
   assert.match(rootGuideSource, /PROJECT_STRUCTURE/);
@@ -35,9 +35,9 @@ test("verification chain includes integration tests and current backend static c
     exclude?: string[];
   };
 
-  assert.equal(packageJson.scripts["test:integration"], "node --test --test-isolation=none \"tests/integration/*.test.ts\"");
-  assert.equal(packageJson.scripts["test:contract"], "node --test --test-isolation=none \"tests/contract/*.test.ts\"");
-  assert.equal(packageJson.scripts["test:e2e"], "node --test --test-isolation=none \"tests/e2e/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:integration"], "node scripts/test/run-tests.mjs none \"tests/integration/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:contract"], "node scripts/test/run-tests.mjs none \"tests/contract/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:e2e"], "node scripts/test/run-tests.mjs none \"tests/e2e/*.test.ts\"");
   assert.match(packageJson.scripts.test, /npm run test:integration/);
   assert.match(packageJson.scripts.typecheck, /npm run typecheck:server/);
   assert.equal(packageJson.scripts["typecheck:server"], "node scripts/ci/check-server.mjs");

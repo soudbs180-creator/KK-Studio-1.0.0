@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('server exposes typed admin credit provider routes with DB-backed admin auth', () => {
-  const source = readSource('server/routes/admin.js');
+  const source = readSource('services/api/routes/admin.js');
 
   assert.match(source, /router\.get\('\/v1\/admin\/credit-providers', adminAuth\(2\)/);
   assert.match(source, /router\.put\('\/v1\/admin\/credit-providers\/:providerId', adminAuth\(2\)/);
@@ -13,7 +13,7 @@ test('server exposes typed admin credit provider routes with DB-backed admin aut
 });
 
 test('shared provider pricing cache is writable only by signed-in users', () => {
-  const source = readSource('server/routes/admin.js');
+  const source = readSource('services/api/routes/admin.js');
 
   assert.match(source, /function userAuth\(\)/);
   assert.match(source, /router\.put\('\/v1\/provider-pricing-cache', userAuth\(\)/);
@@ -21,7 +21,7 @@ test('shared provider pricing cache is writable only by signed-in users', () => 
 });
 
 test('admin credit provider save route persists pricing with parameterized SQL and retains key fingerprints', () => {
-  const source = readSource('server/routes/admin.js');
+  const source = readSource('services/api/routes/admin.js');
 
   assert.match(source, /retainApiKeyFingerprints/);
   assert.match(source, /ON CONFLICT \(provider_id, model_id\) DO UPDATE SET/);
@@ -32,7 +32,7 @@ test('admin credit provider save route persists pricing with parameterized SQL a
 });
 
 test('admin credit model schema lives in migrations', () => {
-  const migration = readSource('migrations/007_admin_credit_models.sql');
+  const migration = readSource('infrastructure/database/migrations/007_admin_credit_models.sql');
 
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.admin_credit_models/);
   assert.match(migration, /quality_pricing jsonb/);

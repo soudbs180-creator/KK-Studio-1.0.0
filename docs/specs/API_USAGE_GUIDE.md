@@ -1,7 +1,7 @@
 # Secure API Client Usage
 
 Status: reference Browser and mobile features call KK Studio's authenticated API
-through `@kk/api-client`; Provider credentials remain behind `server/`.
+through `@kk/api-client`; Provider credentials remain behind `services/api/`.
 
 ## Create the client
 

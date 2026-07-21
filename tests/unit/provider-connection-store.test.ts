@@ -22,7 +22,7 @@ function createPool(returnedRow: Record<string, unknown>) {
 }
 
 test('connection creation sets RLS context, parameterizes the encrypted secret, and returns a safe DTO', async () => {
-  const module = await import('../../server/lib/capability-graph/providerConnectionStore.js');
+  const module = await import('../../services/api/lib/capability-graph/providerConnectionStore.js');
   const { createProviderConnection } = module.default || module;
   const timestamp = '2026-07-22T00:00:00.000Z';
   const { pool, calls } = createPool({

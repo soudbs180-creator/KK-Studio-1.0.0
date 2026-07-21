@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 test('image provider slice rollout is off by default and honors internal/invited/full scopes', async () => {
-  const module = await import('../../server/lib/capability-graph/featureFlag.js');
+  const module = await import('../../services/api/lib/capability-graph/featureFlag.js');
   const { isImageProviderSliceEnabled } = module.default || module;
 
   assert.equal(isImageProviderSliceEnabled('user-1', {}), false);

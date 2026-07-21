@@ -14,7 +14,7 @@
 - [x] 修复 `scripts/governance/check-documentation-governance.mjs` 文档分类器：正确区分 `current` / `reference` / `proposed` / `archive`。
 - [x] 修复路径存在性检查：校验所有规范文档中引用的源码路径是否真实存在。
 - [x] 修复能力声明证据检查：校验 capability 声明必须附带源码文件/行号证据，否则降级为 `proposed`。
-- [x] 在受控 PostgreSQL 实例上按序执行 `migrations/` 全部脚本，重点演练 `016` 迁移，验证幂等性与对账视图。发现并修复 `013` 的 `user_id` 类型不匹配；需先跑 `bootstrap-kk-vps.sql` 再跑 migrations。
+- [x] 在受控 PostgreSQL 实例上按序执行 `infrastructure/database/migrations/` 全部脚本，重点演练 `016` 迁移，验证幂等性与对账视图。发现并修复 `013` 的 `user_id` 类型不匹配；需先跑 `bootstrap-kk-vps.sql` 再跑 migrations。
 - [x] 将旧 Sprint/Roadmap/日期审计/已完成计划/根 `task.md` 和兼容占位文档归档或标记为 `historical/compatibility-stub`。
 - [x] 运行 `governance:docs`、`governance:check`、`architecture:check`、`typecheck`、`build` 并修复违规。
 - [x] Phase 0 验收：current 文档 ≤25 份；治理校验全绿；016 迁移演练报告归档到 `openspec/changes/upgrade-ai-creation-core/reports/`。
@@ -63,7 +63,7 @@
 - [ ] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
 - [ ] 首个纵向切片：Google official image adapter（生产）+ `FakeProviderAdapter`（测试）；server flag `capability_graph.image_provider_slice` 按 internal → invited → full 放量；关闭 flag 只隐藏新 UI/tool 并恢复旧 connection 读取。
 - [ ] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
-- [ ] 在 `server/` 新增 Worker 子系统：租约表、心跳续约、任务领取、提交、轮询、超时、取消。
+- [ ] 在 `services/api/` 新增 Worker 子系统：租约表、心跳续约、任务领取、提交、轮询、超时、取消。
 - [ ] 实现 Worker 与图像 Provider Adapter 对接，完成图片 Job 的云端执行。
 - [ ] 浏览器关闭后 Worker 继续执行，重新登录时通过 SSE 事件流恢复投影。
 - [ ] 验证已完成 Item 永不重复提交或换通道。

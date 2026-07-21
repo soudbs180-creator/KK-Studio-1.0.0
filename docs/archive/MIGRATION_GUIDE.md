@@ -8,7 +8,7 @@
 ### 2. 新建查询
 点击 "New Query"，将以下文件内容完整复制粘贴执行：
 
-**文件**: `supabase/migrations/20250303000006_restructure_database.sql`
+**文件**: `supabase/infrastructure/database/migrations/20250303000006_restructure_database.sql`
 
 ### 3. 执行顺序
 直接执行整个 SQL 文件即可，代码已包含：
@@ -55,7 +55,7 @@ AND table_name IN ('profiles', 'user_credits', 'admin_auth', 'credit_transaction
 已更新的文件：
 1. `src/services/creditService.ts` - 新的积分服务
 2. `src/components/AdminSystem.tsx` - 适配新表结构
-3. `supabase/migrations/20250303000006_restructure_database.sql` - 数据库迁移
+3. `supabase/infrastructure/database/migrations/20250303000006_restructure_database.sql` - 数据库迁移
 
 ## 关键函数说明
 

@@ -18,7 +18,7 @@ The runtime facts at the start of this work are:
 - `/uploads/*` is a static resource prefix and is tracked separately from the 123 method operations.
 - `docs/specs/openapi.yaml` contains 34 paths and 42 operations. All 42 map to runtime operations.
 - 81 runtime operations are not represented in OpenAPI.
-- `server/routes/compat/` physically contains many important implementations, including some operations that are already part of the stable OpenAPI surface. Physical location and contract status are therefore separate facts.
+- `services/api/routes/compat/` physically contains many important implementations, including some operations that are already part of the stable OpenAPI surface. Physical location and contract status are therefore separate facts.
 
 The existing behavior remains authoritative until a wave explicitly replaces it and passes its migration gates.
 
@@ -31,7 +31,7 @@ The remediation is complete when all of the following are true:
 3. Each operation records its implementation zone, owner, source, authentication class, response style, and relevant replacement or review metadata.
 4. Governance derives the effective runtime set from current route source and mount order, compares it with the registry, and fails on missing, duplicate, stale, or invalid entries.
 5. Every `stable` operation is described by OpenAPI. Application-consumable JSON operations also have shared DTOs and a typed API Client method unless the operation is an explicit platform exception.
-6. Canonical stable implementations no longer live in `server/routes/compat/`; that directory contains only thin compatibility adapters.
+6. Canonical stable implementations no longer live in `services/api/routes/compat/`; that directory contains only thin compatibility adapters.
 7. The eight known shadowed registrations are removed, and governance prevents new shadowed registrations.
 8. Compatibility and deprecated operations declare a canonical replacement, owner, ISO review date, and removal condition.
 9. No application UI directly fetches a server operation that is available through the typed API Client.
@@ -56,7 +56,7 @@ A supported adapter that preserves an older path, request shape, or response sha
 
 An operation scheduled for removal. It must identify its replacement, owner, review date, removal condition, and known caller state. Where the response form permits it, the server adds `Deprecation` and `Sunset` metadata during the migration window.
 
-Status is independent from implementation zone. For example, an OpenAPI operation currently implemented in `server/routes/compat/workspace.js` starts as `stable` in the contract dimension and `compat` in the implementation dimension; remediation moves its canonical implementation without downgrading the contract.
+Status is independent from implementation zone. For example, an OpenAPI operation currently implemented in `services/api/routes/compat/workspace.js` starts as `stable` in the contract dimension and `compat` in the implementation dimension; remediation moves its canonical implementation without downgrading the contract.
 
 ## Operation registry
 
@@ -83,7 +83,7 @@ OpenAPI remains the stable-contract source. The checker requires exact agreement
 
 ## Runtime discovery and governance
 
-A focused governance module extracts method/path registrations from the current Express route files, expands array aliases, applies the mount prefixes and declared router order from `server/index.js`, and identifies shadowed registrations. The discovery result includes the effective source handler and the later shadowed source handlers.
+A focused governance module extracts method/path registrations from the current Express route files, expands array aliases, applies the mount prefixes and declared router order from `services/api/index.js`, and identifies shadowed registrations. The discovery result includes the effective source handler and the later shadowed source handlers.
 
 The governance command fails when:
 
@@ -94,7 +94,7 @@ The governance command fails when:
 - the stable set differs from OpenAPI;
 - a compatibility/deprecated entry has no replacement, review date, or removal condition;
 - a new shadowed registration appears;
-- a stable canonical implementation remains under `server/routes/compat/` after its domain wave is marked migrated.
+- a stable canonical implementation remains under `services/api/routes/compat/` after its domain wave is marked migrated.
 
 The checker is included in `governance:check`. Unit tests run it against isolated fixtures to prove both acceptance and rejection behavior.
 
@@ -138,7 +138,7 @@ Every domain wave follows the project boundary order:
 
 1. `packages/shared/` defines DTOs, enums, errors, and envelopes.
 2. `packages/api-client/` exposes the cross-platform HTTP operation without platform storage assumptions.
-3. `server/` implements canonical business behavior and transport adapters.
+3. `services/api/` implements canonical business behavior and transport adapters.
 4. `apps/web/` migrates callers to the typed client and removes direct HTTP parsing.
 5. `tests/` lock the new contract and compatibility behavior.
 6. `docs/specs/openapi.yaml`, `docs/api/`, the operation registry, and Handoff record the current facts.
@@ -188,7 +188,7 @@ Real payment or paid-provider calls are not required for local verification. Any
 ## Out of scope
 
 - Changing product pricing, credit balances, payment state, or Stripe business rules.
-- Executing database DDL outside `migrations/` or redesigning the database without a separate approved change.
+- Executing database DDL outside `infrastructure/database/migrations/` or redesigning the database without a separate approved change.
 - Restoring removed runtimes such as root `src/`, `apps/api/`, or payment sidecars.
 - Replacing Express, changing deployment topology, or introducing a second API framework.
 - Blindly deleting externally reachable endpoints without migration evidence.

@@ -13,8 +13,8 @@ This document defines current ownership rules for KK Studio v1.6.0. It is aligne
 | `packages/shared/` | pure shared logic | Cross-runtime contracts, DTOs, and domain rules. No DOM, React, Node-only, or platform storage APIs. |
 | `packages/api-client/` | HTTP boundary | Typed API client surface. Platform-specific storage must be injected, not hard-coded. |
 | `packages/ui/` | design adapter layer | Tokens, base UI primitives, and adapters only. No business state or model-call logic. |
-| `server/` | Express / VPS backend | Backend routes, model proxying, billing authority, webhook handling, and file persistence. No frontend components. |
-| `migrations/` | database DDL | Only legal source for schema changes. Migrations must be idempotent. |
+| `services/api/` | Express / VPS backend | Backend routes, model proxying, billing authority, webhook handling, and file persistence. No frontend components. |
+| `infrastructure/database/migrations/` | database DDL | Only legal source for schema changes. Migrations must be idempotent. |
 | `docs/ai-assistant/` | assistant knowledge base | Module maps, flow maps, tool registry notes, UI map, safety policy, skills, and session memory. |
 | `scripts/` | automation | Governance, CI, release, verification, and maintenance scripts. |
 | `tests/` | verification | Unit, integration, contract, and E2E tests. |
@@ -26,7 +26,7 @@ This document defines current ownership rules for KK Studio v1.6.0. It is aligne
 - `apps/web/src/features/ai-takeover/` remains the compatibility entry for the existing assistant. New assistant capabilities must evolve from this system instead of creating a competing assistant.
 - `apps/web/src/context/` owns canvas, auth, billing, startup, and related runtime Contexts. Assistant prompts must receive sanitized summaries rather than raw high-frequency state.
 - `apps/web/src/services/llm/` owns model routing, provider capabilities, user-key routing, and secure proxy flows. Browser code must not directly call protected providers.
-- `server/` owns privileged backend behavior, including billing authority and protected provider proxying.
+- `services/api/` owns privileged backend behavior, including billing authority and protected provider proxying.
 - `packages/shared/`, `packages/api-client/`, and `packages/ui/` must stay inside their module boundaries as described in `AGENTS.md`.
 
 ## AI assistant structure

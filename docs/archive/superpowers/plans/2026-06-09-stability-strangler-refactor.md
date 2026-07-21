@@ -4,7 +4,7 @@
 
 **Goal:** Stabilize KK Studio before deeper refactoring, then reduce high-risk large modules through small behavior-preserving extraction phases.
 
-**Architecture:** Keep the current runtime chain (`apps/web/`, `server/`, `packages/*`) intact. Each phase starts with a failing structural or behavioral contract, extracts one focused boundary, then proves the phase with targeted tests, `npm run typecheck`, and finally `npm run verify:changes` before moving to the next phase.
+**Architecture:** Keep the current runtime chain (`apps/web/`, `services/api/`, `packages/*`) intact. Each phase starts with a failing structural or behavioral contract, extracts one focused boundary, then proves the phase with targeted tests, `npm run typecheck`, and finally `npm run verify:changes` before moving to the next phase.
 
 **Tech Stack:** React 19, TypeScript, Vite, Node test runner, Express backend, npm workspaces.
 

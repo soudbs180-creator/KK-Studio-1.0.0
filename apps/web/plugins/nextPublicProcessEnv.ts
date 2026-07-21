@@ -32,7 +32,7 @@ if (typeof window !== 'undefined') {
 
     /** Inject the stub at the top of every JS/TS module compiled for the browser. */
     transform(code, id, opts) {
-      if (opts?.ssr) return null;                          // server/SSR build → leave untouched
+      if (opts?.ssr) return null;                          // services/api/SSR build → leave untouched
       if (!/\.[cm]?[jt]sx?$/.test(id)) return null;  // ignore non-JS modules
       if (code.includes('globalThis.process ??=')) return null; // already injected
       return { code: stub + code, map: null };

@@ -18,8 +18,8 @@ test("dev powershell scripts resolve the repository root from scripts/dev", () =
   const runApiLocalSource = readSource("scripts/dev/run-api-local.mjs");
   const runApiRunnerSource = readSource("scripts/dev/run-api-runner.ps1");
   const diagnoseApiEnvSource = readSource("scripts/dev/diagnose-api-env.mjs");
-  const statusBatSource = readSource("scripts/查看 KK Studio 状态.bat");
-  const stopBatSource = readSource("scripts/停止 KK Studio.bat");
+  const statusBatSource = readSource("scripts/dev/查看 KK Studio 状态.bat");
+  const stopBatSource = readSource("scripts/dev/停止 KK Studio.bat");
 
   for (const source of [devLaunchSource, devStatusSource, devStopSource, devRestartSource]) {
     assert.match(

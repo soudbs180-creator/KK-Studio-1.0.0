@@ -87,7 +87,7 @@ describe("payment webhook raw body handling", () => {
       return originalModuleLoad.call(this, request, parent, isMain);
     };
 
-    const modulePath = require.resolve("../../server/index.js");
+    const modulePath = require.resolve("../../services/api/index.js");
     delete require.cache[modulePath];
 
     try {

@@ -49,7 +49,7 @@ test("local env contract hydrates server API config and ignores legacy app API e
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kk-env-contract-"));
   fs.mkdirSync(path.join(tempRoot, "apps", "api"), { recursive: true });
-  fs.mkdirSync(path.join(tempRoot, "server"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "services", "api"), { recursive: true });
   fs.mkdirSync(path.join(tempRoot, "supabase"), { recursive: true });
 
   fs.writeFileSync(
@@ -71,7 +71,7 @@ test("local env contract hydrates server API config and ignores legacy app API e
     "utf8",
   );
   fs.writeFileSync(
-    path.join(tempRoot, "server", ".env.local"),
+    path.join(tempRoot, "services", "api", ".env.local"),
     [
       "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
       "USER_API_ENCRYPTION_SECRET=server-encryption-secret",
@@ -90,7 +90,7 @@ test("local env contract hydrates server API config and ignores legacy app API e
     snapshots.activeSnapshots.map((snapshot) => snapshot.relativePath),
     [
       ".env",
-      path.join("server", ".env.local"),
+      path.join("services", "api", ".env.local"),
     ],
   );
   assert.deepEqual(
@@ -115,7 +115,7 @@ test("root frontend env files do not hydrate server-only API secrets or legacy S
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kk-env-contract-root-"));
   fs.mkdirSync(path.join(tempRoot, "apps", "api"), { recursive: true });
-  fs.mkdirSync(path.join(tempRoot, "server"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "services", "api"), { recursive: true });
 
   fs.writeFileSync(
     path.join(tempRoot, ".env"),
@@ -129,7 +129,7 @@ test("root frontend env files do not hydrate server-only API secrets or legacy S
     "utf8",
   );
   fs.writeFileSync(
-    path.join(tempRoot, "server", ".env.local"),
+    path.join(tempRoot, "services", "api", ".env.local"),
     [
       "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
       "USER_API_ENCRYPTION_SECRET=server-secret",

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import securityHeaders from "../../server/middleware/securityHeaders.js";
-import logRedactor from "../../server/middleware/logRedactor.js";
+import securityHeaders from "../../services/api/middleware/securityHeaders.js";
+import logRedactor from "../../services/api/middleware/logRedactor.js";
 
 test("securityHeaders middleware sets expected headers", () => {
   const headers: Record<string, string> = {};

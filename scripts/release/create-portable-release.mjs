@@ -12,7 +12,7 @@ const logsDir = path.join(releaseRoot, 'logs');
 const runDir = path.join(releaseRoot, 'run');
 
 const distSourceDir = path.join(rootDir, 'apps', 'web', 'dist');
-const serverSourceDir = path.join(rootDir, 'server');
+const serverSourceDir = path.join(rootDir, 'services', 'api');
 const serverTargetDir = path.join(appDir, 'server');
 const includeServerEnv = process.argv.includes('--include-server-env')
   || process.env.KK_STUDIO_INCLUDE_SERVER_ENV === '1';
@@ -23,7 +23,7 @@ const portableStopSource = path.join(releaseScriptSourceDir, 'portable-stop.ps1'
 const updateScriptSource = path.join(releaseScriptSourceDir, 'portable-self-update.ps1');
 const portableRuntimeSourceClosures = [
   {
-    source: path.join(rootDir, 'server'),
+    source: path.join(rootDir, 'services', 'api'),
     target: serverTargetDir,
   },
   {
@@ -131,7 +131,7 @@ async function runCommand(command, args, options = {}) {
 async function ensureServerDependencies() {
   const serverTargetNodeModules = path.join(serverTargetDir, 'node_modules');
   const appNodeModules = path.join(appDir, 'node_modules');
-  ensureExists(path.join(serverTargetDir, 'package-lock.json'), 'server/package-lock.json was not found.');
+  ensureExists(path.join(serverTargetDir, 'package-lock.json'), 'app/server/package-lock.json was not found.');
 
   const npmArgs = ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'];
   if (process.platform === 'win32') {

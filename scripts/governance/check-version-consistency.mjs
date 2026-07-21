@@ -94,12 +94,12 @@ if (rootPackage.version !== expectedVersion) {
 }
 
 if (targets.paymentServerPackage) {
-  fail("versionTargets.paymentServerPackage has been retired; use versionTargets.serverPackage for server/package.json");
+  fail("versionTargets.paymentServerPackage has been retired; use versionTargets.serverPackage for services/api/package.json");
 }
 
 const serverPackageTarget = targets.serverPackage || targets.paymentServerPackage;
 if (!serverPackageTarget) {
-  fail("versionTargets.serverPackage must point to server/package.json");
+  fail("versionTargets.serverPackage must point to services/api/package.json");
 } else {
   const serverPackage = JSON.parse(read(serverPackageTarget));
   if (serverPackage.version !== expectedVersion) {
@@ -116,7 +116,7 @@ for (const target of workspacePackageTargets) {
 
 const packageLockTargets = Array.from(new Set([
   "package-lock.json",
-  "server/package-lock.json",
+  "services/api/package-lock.json",
   "apps/mobile/package-lock.json",
   ...[
     targets.rootPackage,

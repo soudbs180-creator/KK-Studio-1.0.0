@@ -5,7 +5,7 @@ info:
   summary: REST + OpenAPI 3.1 contract for the server-backed API and current billing routes.
   description: |
     This contract freezes the first wave of external and internal-facing APIs used by KK Studio.
-    All routes return a unified JSON envelope and use typed DTOs through the current server/ backend.
+    All routes return a unified JSON envelope and use typed DTOs through the current services/api/ backend.
 servers:
   - url: https://api.kkai.plus
     description: Main API / BFF

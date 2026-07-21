@@ -94,20 +94,20 @@ export async function assertLocalApiConfig(options = {}) {
     problems.push(
       "Root .env/.env.local contain server-only API values that local API startup ignores: "
       + `${misplacedRootServerEnv.map((entry) => `${entry.key} from ${entry.source}`).join(", ")}. `
-      + "Move them into server/.env.local.",
+      + "Move them into services/api/.env.local.",
     );
   }
 
   if (!hasPostgresConfig) {
     problems.push(
       "DATABASE_URL is missing, or PGHOST/PGDATABASE/PGUSER are incomplete. "
-      + "Copy server/.env.local.example to server/.env.local and set your VPS PostgreSQL connection.",
+      + "Copy services/api/.env.local.example to services/api/.env.local and set your VPS PostgreSQL connection.",
     );
   }
 
   if (!userApiEncryptionSecret) {
     problems.push(
-      "USER_API_ENCRYPTION_SECRET is missing. Add it to server/.env.local.",
+      "USER_API_ENCRYPTION_SECRET is missing. Add it to services/api/.env.local.",
     );
   }
 
@@ -143,10 +143,10 @@ export async function startLocalApiServer(options = {}) {
   process.env.PORT = String(port);
   applyLocalApiBodyLimitDefaults();
 
-  const serverEntry = path.join(repoRoot, "server", "index.js");
+  const serverEntry = path.join(repoRoot, "services", "api", "index.js");
   const serverModule = require(serverEntry);
   if (typeof serverModule.startServer !== "function") {
-    throw new Error("server/index.js does not export startServer()");
+    throw new Error("services/api/index.js does not export startServer()");
   }
 
   const verifyTurnstileToken = resolveLocalApiTurnstileVerifier(process.env);

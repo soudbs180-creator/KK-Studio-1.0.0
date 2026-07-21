@@ -79,7 +79,7 @@ On startup, the portable launcher will:
 - download the new archive when the version is newer
 - verify SHA-256 when provided
 - update the bundle before the local services start
-- preserve `app/server/.env` and `support/update-config.json`
+- preserve `app/services/api/.env` and `support/update-config.json`
 
 When the portable bundle is launched from the repository-local path `<project-root>/release/KK-Studio-Portable`, the launcher also checks whether `<project-root>/dist` and the portable support scripts are newer than the bundled copies. If they are, it syncs the portable bundle from the workspace first so stale local release files do not override the latest source build.
 
@@ -94,4 +94,4 @@ It will:
 - run the configured VPS API deploy command when `KK_VPS_DEPLOY_COMMAND` is configured
 - deploy to Vercel if `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` are configured
 
-The current hosted frontend baseline is Vercel plus the VPS `server/` backend.
+The current hosted frontend baseline is Vercel plus the VPS `services/api/` backend.

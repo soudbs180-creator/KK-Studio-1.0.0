@@ -524,8 +524,8 @@ knowledge.recordChange
 ### Preconditions
 
 - 已读取 `docs/governance/SECURITY_AND_BACKLOG.md`。
-- 已确认当前事实是 `server/` Express / VPS。
-- 严禁引入已废弃的旧部署与支付逻辑，仅以当前 `server/` 后端为准。
+- 已确认当前事实是 `services/api/` Express / VPS。
+- 严禁引入已废弃的旧部署与支付逻辑，仅以当前 `services/api/` 后端为准。
 
 ### Steps
 

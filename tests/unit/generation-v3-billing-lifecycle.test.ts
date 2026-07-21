@@ -428,12 +428,12 @@ class FakeDatabase {
 const fakeDb = new FakeDatabase();
 
 // Patch getPool BEFORE requiring any module that destructures it at load time.
-const db = require('../../server/lib/db.js');
+const db = require('../../services/api/lib/db.js');
 db.getPool = () => fakeDb.pool();
 
-const quoteEngine = require('../../server/lib/generation-v3/quoteEngine.js');
-const jobLifecycle = require('../../server/lib/generation-v3/jobLifecycle.js');
-const { fakeProviderAdapter, clearFakeTasks } = require('../../server/lib/generation-v3/fakeProviderAdapter.js');
+const quoteEngine = require('../../services/api/lib/generation-v3/quoteEngine.js');
+const jobLifecycle = require('../../services/api/lib/generation-v3/jobLifecycle.js');
+const { fakeProviderAdapter, clearFakeTasks } = require('../../services/api/lib/generation-v3/fakeProviderAdapter.js');
 
 beforeEach(() => {
   fakeDb.reset();

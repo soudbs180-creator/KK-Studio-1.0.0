@@ -6,5 +6,5 @@ Status: reference
 
 使用规则：
 
-- 可以被 `server/`、`apps/web/`、`packages/api-client` 复用
+- 可以被 `services/api/`、`apps/web/`、`packages/api-client` 复用
 - 不承载具体业务流程

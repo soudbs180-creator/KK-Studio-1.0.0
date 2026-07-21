@@ -2,12 +2,12 @@ Status: reference
 
 # VPS PostgreSQL Runtime Schema
 
-The canonical hosted database is a normal PostgreSQL database on the VPS. Schema changes belong in `migrations/` and `scripts/postgres/`; business code must not execute DDL.
+The canonical hosted database is a normal PostgreSQL database on the VPS. Schema changes belong in `infrastructure/database/migrations/` and `scripts/ops/postgres/`; business code must not execute DDL.
 
 Canonical bootstrap files:
 
-- `scripts/postgres/bootstrap-kk-vps.sql`
-- `scripts/postgres/runtime-migration.env.example`
+- `scripts/ops/postgres/bootstrap-kk-vps.sql`
+- `scripts/ops/postgres/runtime-migration.env.example`
 
 Required runtime tables:
 
@@ -27,7 +27,7 @@ Required runtime tables:
 Runtime ownership:
 
 - The browser never writes these tables directly.
-- The `server/` backend owns login, session validation, billing mutations, admin model pricing, workspace persistence, and payment settlement.
+- The `services/api/` backend owns login, session validation, billing mutations, admin model pricing, workspace persistence, and payment settlement.
 - Model generation debit/refund happens server-side. Failed image/task generation must refund the debit transaction.
 
 Schema changes should be covered by the relevant unit, integration, and governance checks.

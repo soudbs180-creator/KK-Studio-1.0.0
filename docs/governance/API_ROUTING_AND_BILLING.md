@@ -9,8 +9,8 @@ Status: reference
 
 ## 1. 路由安全与密钥屏蔽
 
-- **特权密钥网关屏蔽 (Zero Browser Direct Link)**：浏览器端（Vite）和移动端（Expo）不存储或直连任何大模型供应商的特权 API Key。所有请求（文生图、音频合成等）必须由 API Client 统一打包后转发给后端 `server/` 网关，在服务端注入密钥并向 Provider 发起真正的生成任务。
-- **用户自有密钥隔离**：用户自有 Provider 凭据通过认证 API 写入受保护的服务端存储；浏览器只保留 masked/configured 状态。实际 Provider 请求仍由 `server/` adapter 发起，不把解密后的密钥或临时路由返回给页面。
+- **特权密钥网关屏蔽 (Zero Browser Direct Link)**：浏览器端（Vite）和移动端（Expo）不存储或直连任何大模型供应商的特权 API Key。所有请求（文生图、音频合成等）必须由 API Client 统一打包后转发给后端 `services/api/` 网关，在服务端注入密钥并向 Provider 发起真正的生成任务。
+- **用户自有密钥隔离**：用户自有 Provider 凭据通过认证 API 写入受保护的服务端存储；浏览器只保留 masked/configured 状态。实际 Provider 请求仍由 `services/api/` adapter 发起，不把解密后的密钥或临时路由返回给页面。
 
 ---
 

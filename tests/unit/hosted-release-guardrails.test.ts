@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { readSource } from "../support/workspacePaths.js";
 
 test("hosted release preflight allows disabled frontend bypass flags", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   assert.match(
     source,
@@ -24,7 +24,7 @@ test("hosted release preflight allows disabled frontend bypass flags", () => {
 });
 
 test("hosted release preflight rejects local API base URLs for hosted builds", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   assert.match(
     source,
@@ -44,7 +44,7 @@ test("hosted release preflight rejects local API base URLs for hosted builds", (
 });
 
 test("hosted release preflight checks canonical VPS backend startup secrets", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   [
     "DATABASE_URL",
@@ -66,7 +66,7 @@ test("hosted release preflight checks canonical VPS backend startup secrets", ()
 });
 
 test("hosted release preflight accepts scripted Vercel project metadata", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   assert.match(
     source,
@@ -86,8 +86,8 @@ test("hosted release preflight accepts scripted Vercel project metadata", () => 
 });
 
 test("hosted release scripts pass Vercel token through CLI args without exposing the value", () => {
-  const diagnoseSource = readSource("scripts/diagnose-hosted-release.mjs");
-  const releaseSource = readSource("scripts/release-hosted.mjs");
+  const diagnoseSource = readSource("scripts/release/diagnose-hosted-release.mjs");
+  const releaseSource = readSource("scripts/release/release-hosted.mjs");
 
   assert.match(
     diagnoseSource,
@@ -107,7 +107,7 @@ test("hosted release scripts pass Vercel token through CLI args without exposing
 });
 
 test("hosted release preflight accepts remotely verified Vercel Git deployments", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   assert.match(
     source,
@@ -137,9 +137,9 @@ test("hosted release preflight accepts remotely verified Vercel Git deployments"
 });
 
 test("hosted release preflight covers password reset production readiness", () => {
-  const diagnoseSource = readSource("scripts/diagnose-hosted-release.mjs");
-  const vpsApiEnvSource = readSource("scripts/vps/kk-api.env.example");
-  const localApiEnvSource = readSource("server/.env.local.example");
+  const diagnoseSource = readSource("scripts/release/diagnose-hosted-release.mjs");
+  const vpsApiEnvSource = readSource("scripts/ops/vps/kk-api.env.example");
+  const localApiEnvSource = readSource("services/api/.env.local.example");
   const runbookSource = readSource("docs/development/hosted-release-runbook.md");
 
   [
@@ -170,7 +170,7 @@ test("hosted release preflight covers password reset production readiness", () =
 
   assert.match(
     diagnoseSource,
-    /migrations\/013_password_reset_tokens\.sql/,
+    /infrastructure\/database\/migrations\/013_password_reset_tokens\.sql/,
     "hosted preflight should know the password reset token migration must ship before enabling reset confirmation",
   );
   assert.match(
@@ -186,7 +186,7 @@ test("hosted release preflight covers password reset production readiness", () =
 });
 
 test("hosted release preflight does not count blank or placeholder env values as present", () => {
-  const source = readSource("scripts/diagnose-hosted-release.mjs");
+  const source = readSource("scripts/release/diagnose-hosted-release.mjs");
 
   assert.match(
     source,

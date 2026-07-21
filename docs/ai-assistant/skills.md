@@ -80,4 +80,4 @@ Status: reference
 ---
 
 ## 🛡️ 静态 analysis 与校验支持
-本索引及子目录下的技能规范，通过静态脚本 `scripts/ai-assistant/check-skills-consistency.mjs` 与 ToolRegistry 进行双向校验，确保敏感控制等级与防护说明绝对对齐。
+本索引及子目录下的技能规范，通过静态脚本 `scripts/governance/ai-assistant/check-skills-consistency.mjs` 与 ToolRegistry 进行双向校验，确保敏感控制等级与防护说明绝对对齐。

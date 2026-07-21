@@ -57,7 +57,7 @@ Status: reference
 * **定位原因**: 尝试对不存在的数据表进行增删改查。
 * **修复方法**:
   * **禁止直接在业务层或命令行连接生产库运行 `CREATE TABLE`**。
-  * 在 `migrations/` 目录下创建幂等的 DDL SQL 迁移脚本（遵循 `migrations/` 时序文件命名），将表结构变更脚本固化在此，由 Express 启动时自动完成水合或迁移。
+  * 在 `infrastructure/database/migrations/` 目录下创建幂等的 DDL SQL 迁移脚本（遵循 `infrastructure/database/migrations/` 时序文件命名），将表结构变更脚本固化在此，由 Express 启动时自动完成水合或迁移。
 
 ---
 

@@ -8,8 +8,8 @@ export const FRONTEND_ENV_RELATIVE_PATHS = [
 ];
 
 export const API_ENV_RELATIVE_PATHS = [
-  path.join("server", ".env"),
-  path.join("server", ".env.local"),
+  path.join("services", "api", ".env"),
+  path.join("services", "api", ".env.local"),
 ];
 
 export const PRIMARY_ENV_RELATIVE_PATHS = [

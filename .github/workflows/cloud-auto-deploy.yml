@@ -25,13 +25,13 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            server/package-lock.json
+            services/api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install server dependencies
-        run: npm ci --prefix server
+        run: npm ci --prefix services/api
 
       - name: Architecture gates
         run: npm run architecture:check

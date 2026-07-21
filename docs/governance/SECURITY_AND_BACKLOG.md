@@ -12,7 +12,7 @@ Primary rules: `AGENTS.md`
 
 ```text
 当前项目版本：KK Studio v1.6.0
-当前后端事实：server/ Express / VPS
+当前后端事实：services/api/ Express / VPS
 当前 Web 入口：apps/web/
 旧独立支付后端描述：只作迁移追溯，不作为当前开发入口
 ```
@@ -23,14 +23,14 @@ Agent 处理安全敏感任务时必须先读 `AGENTS.md`，再读本文件。
 
 ## 1. P0：安全与线上稳定优先级
 
-### P0-01：清理旧后端 / 旧部署残留，收口到 server/ + 当前部署事实
+### P0-01：清理旧后端 / 旧部署残留，收口到 services/api/ + 当前部署事实
 
 目标：
 
 - 全仓不再把旧无服务器函数目录作为当前后端入口。
 - 全仓不再把 `payment-server` 作为主要后端入口。
 - `packages/api-client` baseURL 指向当前后端配置。
-- 文档明确当前事实是 `server/` Express / VPS。
+- 文档明确当前事实是 `services/api/` Express / VPS。
 
 检查关键词：
 
@@ -50,7 +50,7 @@ billing
 
 验收：
 
-- 当前开发入口清晰指向 `server/`。
+- 当前开发入口清晰指向 `services/api/`。
 - `packages/api-client` 不再指向废弃后端路径。
 - 文档不再把旧后端作为当前事实。
 
@@ -102,7 +102,7 @@ for (const key of REQUIRED_ENV_VARS) {
 
 目标：
 
-- `server/lib/cors.js` 提供统一 CORS origin 验证。
+- `services/api/lib/cors.js` 提供统一 CORS origin 验证。
 - 生产环境使用 `ALLOWED_ORIGINS` 白名单。
 - 本地开发允许 `localhost` / `127.0.0.1`。
 - 路由文件不手写分散 CORS header。
@@ -110,7 +110,7 @@ for (const key of REQUIRED_ENV_VARS) {
 验收：
 
 - 全仓无当前运行代码设置 `Access-Control-Allow-Origin: *`。
-- `server/index.js` 全局应用 CORS middleware。
+- `services/api/index.js` 全局应用 CORS middleware。
 - `.env.example` 包含 `ALLOWED_ORIGINS`。
 - 恶意 Origin 不返回允许头。
 
@@ -124,7 +124,7 @@ for (const key of REQUIRED_ENV_VARS) {
 
 目标：
 
-- `server/lib/credits.js` 封装积分操作。
+- `services/api/lib/credits.js` 封装积分操作。
 - 业务路由不直接散写积分 SQL。
 - 扣减使用 `WHERE credits >= amount` 原子更新。
 - 失败退款有日志和流水。
@@ -175,7 +175,7 @@ config: {
 目标文件：
 
 ```text
-server/middleware/rateLimit.js
+services/api/middleware/rateLimit.js
 ```
 
 建议限制：
@@ -199,8 +199,8 @@ authLimiter: 15 min / 20 req per IP
 目标文件：
 
 ```text
-server/middleware/auth.js
-server/lib/jwt.js
+services/api/middleware/auth.js
+services/api/lib/jwt.js
 ```
 
 规则：

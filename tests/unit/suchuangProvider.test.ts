@@ -3,7 +3,7 @@ import { describe, test, before, after } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { SuchuangProvider } = require("../../server/lib/dispatcher/adapters/wuyin/suchuangProvider.js");
+const { SuchuangProvider } = require("../../services/api/lib/dispatcher/adapters/wuyin/suchuangProvider.js");
 
 describe("SuchuangProvider 后端服务单元测试", () => {
   let originalApiKey: string | undefined;

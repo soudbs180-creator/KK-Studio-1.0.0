@@ -15,8 +15,8 @@ test("run-api-dev only uses primary env files and fails fast on missing VPS Post
   assert.match(bootstrapSource, /PGHOST/);
   assert.match(bootstrapSource, /USER_API_ENCRYPTION_SECRET is missing/);
   assert.match(bootstrapSource, /VPS PostgreSQL config is incomplete/);
-  assert.match(bootstrapSource, /server\/\.env\.local\.example/);
-  assert.match(bootstrapSource, /server", "index\.js"/);
+  assert.match(bootstrapSource, /services\/api\/\.env\.local\.example/);
+  assert.match(bootstrapSource, /services", "api", "index\.js"/);
   assert.match(bootstrapSource, /startServer/);
   assert.match(bootstrapSource, /KK_API_PROFILE_MAX_JSON_BODY_BYTES/);
   assert.match(bootstrapSource, /KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES/);

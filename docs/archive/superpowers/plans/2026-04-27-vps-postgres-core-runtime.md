@@ -87,7 +87,7 @@
   - Update password sign-in expectations for hosted login without browser-held refresh tokens.
 - `tests/unit/api-server-startup.test.ts`
   - Cover self-hosted Phase 1 readiness instead of Supabase-centric startup assumptions.
-- `scripts/vps/kk-api.env.example`
+- `scripts/ops/vps/kk-api.env.example`
   - Add cookie, CORS, and temp-user env knobs for VPS deployment.
 - `.env.example`
   - Remove Supabase-required root guidance and point hosted frontend runtime at the VPS KK API flow.
@@ -913,7 +913,7 @@ Expected: PASS
 - Modify: `src/context/AppStartupContext.tsx`
 - Modify: `src/services/api/kkApiServerHealth.ts`
 - Modify: `.env.example`
-- Modify: `scripts/vps/kk-api.env.example`
+- Modify: `scripts/ops/vps/kk-api.env.example`
 
 - [ ] **Step 1: Add a failing health-helper test for `self-hosted core ready`**
 

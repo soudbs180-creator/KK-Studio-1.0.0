@@ -147,7 +147,7 @@ interface ProviderProfile {
 当前实现已经收敛到以下边界，不再另建平行的根 `src/` Provider 系统：
 
 ```text
-server/lib/dispatcher/
+services/api/lib/dispatcher/
   providerProfiles.js
   providerRegistry.js
   strictProviderContracts.js

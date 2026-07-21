@@ -7,7 +7,7 @@ const {
   getBlockedUserApiSecretReason,
   isSendableUserApiSecret,
   normalizeUserApiSecretForTransport,
-} = require("../../server/lib/userApiSecret.js");
+} = require("../../services/api/lib/userApiSecret.js");
 
 test("user API secret transport guard blocks placeholders and encrypted envelopes", () => {
   const blockedCases: Array<[unknown, string]> = [

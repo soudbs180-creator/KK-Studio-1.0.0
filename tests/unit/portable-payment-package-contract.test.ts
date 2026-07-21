@@ -18,7 +18,7 @@ test('portable release packages the current server runtime closure', () => {
   assert.equal(releaseSource.includes("'runtime_payment_bridge.js'"), false);
   assert.equal(releaseSource.includes("'settlement_bridge.js'"), false);
 
-  assert.match(releaseSource, /source: path\.join\(rootDir, 'server'\)/);
+  assert.match(releaseSource, /source: path\.join\(rootDir, 'services', 'api'\)/);
   assert.match(releaseSource, /'packages', 'api-client', 'src'/);
   assert.match(releaseSource, /'packages', 'shared', 'src'/);
 
@@ -30,10 +30,10 @@ test('portable release exposes server dependencies to the current server and cop
   const releaseSource = readSource('scripts/release/create-portable-release.mjs');
   const serverPackage = readJson<{
     dependencies?: Record<string, string>;
-  }>('server/package.json');
+  }>('services/api/package.json');
   const serverLock = readJson<{
     packages?: Record<string, { dependencies?: Record<string, string>; version?: string }>;
-  }>('server/package-lock.json');
+  }>('services/api/package-lock.json');
 
   assert.match(releaseSource, /const appNodeModules = path\.join\(appDir, 'node_modules'\)/);
   assert.match(releaseSource, /shell: false/);

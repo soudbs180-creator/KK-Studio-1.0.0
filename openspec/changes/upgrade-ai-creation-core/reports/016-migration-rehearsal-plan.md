@@ -2,14 +2,14 @@
 
 > Status: planned / ready to execute
 > Related OpenSpec: `upgrade-ai-creation-core` Phase 0
-> Migration file: `migrations/016_ai_assistant_user_scope.sql`
+> Migration file: `infrastructure/database/migrations/016_ai_assistant_user_scope.sql`
 > Last updated: 2026-07-21
 
 ---
 
 ## 1. 目标
 
-在隔离的 PostgreSQL 环境中演练 `migrations/016_ai_assistant_user_scope.sql`，验证：
+在隔离的 PostgreSQL 环境中演练 `infrastructure/database/migrations/016_ai_assistant_user_scope.sql`，验证：
 1. 幂等性：多次执行不产生错误或数据损坏。
 2. 兼容性：从 001 到 015 按序迁移后执行 016 成功。
 3. 约束正确性：`user_id` 和 `owner_scope` 最终非空，索引生效。
@@ -40,7 +40,7 @@ export DATABASE_URL="postgres://postgres:****@localhost:5432/kkstudio_016_rehear
 ### 3.2 按序执行 001–015 迁移
 
 ```bash
-for f in migrations/001_*.sql migrations/002_*.sql ... migrations/015_*.sql; do
+for f in infrastructure/database/migrations/001_*.sql infrastructure/database/migrations/002_*.sql ... infrastructure/database/migrations/015_*.sql; do
   psql "$DATABASE_URL" -f "$f"
 done
 ```
@@ -65,13 +65,13 @@ VALUES ('skill-legacy-001', 'legacy skill', '{}', now(), now());
 ### 3.4 执行 016 迁移
 
 ```bash
-psql "$DATABASE_URL" -f migrations/016_ai_assistant_user_scope.sql
+psql "$DATABASE_URL" -f infrastructure/database/migrations/016_ai_assistant_user_scope.sql
 ```
 
 ### 3.5 验证幂等性：再次执行
 
 ```bash
-psql "$DATABASE_URL" -f migrations/016_ai_assistant_user_scope.sql
+psql "$DATABASE_URL" -f infrastructure/database/migrations/016_ai_assistant_user_scope.sql
 ```
 
 两次执行都应返回 `COMMIT` 且无错误。

@@ -55,7 +55,7 @@ supabase db push
 ## 文件清单
 
 ```
-supabase/migrations/
+supabase/infrastructure/database/migrations/
 ├── 20260312000006_production_security_hardening.sql  # 核心安全迁移
 └── 20260312000007_security_verification.sql          # 验证函数
 
@@ -65,7 +65,7 @@ src/services/security/
 src/components/settings/
 └── SecureApiKeyManager.tsx                            # 安全密钥管理UI
 
-scripts/security/
+scripts/governance/security/
 ├── verify-deployment.sh                               # Bash验证脚本
 └── deploy-security-check.ps1                          # PowerShell验证脚本
 

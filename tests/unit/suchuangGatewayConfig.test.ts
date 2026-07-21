@@ -3,7 +3,7 @@ import { describe, test, before, after } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const apiGatewayConfig = require("../../server/utils/apiGatewayConfig.js");
+const apiGatewayConfig = require("../../services/api/utils/apiGatewayConfig.js");
 
 describe("apiGatewayConfig 网关分流配置单元测试", () => {
   let originalProvider: string | undefined;

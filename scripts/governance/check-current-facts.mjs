@@ -110,7 +110,7 @@ function expectNoWuyinBrowserDirect() {
   const forbiddenPatterns = [
     {
       pattern: /export\s+async\s+function\s+callWuyinClientDirect(?:Image|Video)\b/,
-      message: "Frontend must not expose browser-direct Wuyin submit helpers; route Wuyin image/video through /api/v1/model-proxy/user and server/routes/user-wuyin-strict-router.js.",
+      message: "Frontend must not expose browser-direct Wuyin submit helpers; route Wuyin image/video through /api/v1/model-proxy/user and services/api/routes/user-wuyin-strict-router.js.",
     },
     {
       pattern: /export\s+async\s+function\s+checkWuyinClientDirectTaskStatus\b/,
@@ -199,11 +199,11 @@ if (!rootPackage.scripts?.["governance:check"]?.includes("governance:current")) 
 
 for (const requiredPath of [
   "apps/web",
-  "server",
+  "services/api",
   "packages/shared",
   "packages/api-client",
   "packages/ui",
-  "migrations",
+  "infrastructure/database/migrations",
   "AGENTS.md",
   "config/release-manifest.json",
   "docs/governance/PROJECT_STATE_AND_VALIDATION.md",
@@ -214,9 +214,9 @@ for (const requiredPath of [
 for (const [legacyPath, reason] of [
   ["src", "Web runtime has moved to apps/web/."],
   ["apps/admin", "Admin UI was removed from the active workspace."],
-  ["apps/api", "Backend runtime is server/ Express / VPS."],
+  ["apps/api", "Backend runtime is services/api/ Express / VPS."],
   ["apps/payment-sidecar", "Payment sidecar is not an active runtime."],
-  ["billing", "Billing code must live behind current server/API boundaries."],
+  ["billing", "Billing code must live behind current services/api/API boundaries."],
   ["payment-server", "Payment-server is historical and must not re-enter active runtime."],
   ["apps/web/public/newgenre_static", "Old captured landing assets must not ship with the current web runtime."],
   ["apps/web/public/pay/success", "Static payment success pages were replaced by the current billing flows."],
@@ -273,9 +273,9 @@ for (const currentGuidanceDoc of activeCurrentGuidanceDocs) {
 }
 
 expectIncludes("AGENTS.md", "apps/web/", "Current Web runtime must be explicit.");
-expectIncludes("AGENTS.md", "server/", "Current backend runtime must be explicit.");
+expectIncludes("AGENTS.md", "services/api/", "Current backend runtime must be explicit.");
 expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "apps/web/", "Current Web runtime must be explicit.");
-expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "server/", "Current backend runtime must be explicit.");
+expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "services/api/", "Current backend runtime must be explicit.");
 
 const activeRuntimeFiles = [
   "package.json",
@@ -285,7 +285,7 @@ const activeRuntimeFiles = [
   ...collectFiles("config"),
   ...collectFiles("apps/web"),
   ...collectFiles("packages"),
-  ...collectFiles("server"),
+  ...collectFiles("services/api"),
 ].filter((file) => file !== SELF_PATH);
 
 const activeDocs = collectFiles("docs", {
@@ -308,7 +308,7 @@ expectActiveFilesDoNotReference(
     "scripts/alipay",
     "ALIPAY_MCP.md",
   ],
-  "Active runtime code, scripts, docs, and workflows must use the current server/Vercel deployment baseline.",
+  "Active runtime code, scripts, docs, and workflows must use the current services/api/Vercel deployment baseline.",
 );
 
 expectNoWuyinBrowserDirect();

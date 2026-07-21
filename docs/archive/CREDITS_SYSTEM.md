@@ -3,11 +3,11 @@
 目的：描述对 credits/余额系统的架构与数据变更（迁移、回填、服务端兼容性、回滚策略），并给出可执行的部署步骤与验证检查表，以便开发/运维安全发布该迁移。
 
 概览
-- 发布时间：2025-03-03（迁移文件：`supabase/migrations/20250303000001_update_credits_system.sql`）
+- 发布时间：2025-03-03（迁移文件：`supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql`）
 - 影响范围：用户余额表（`credits` / `user_credits` / `account_balances` 等——请对照实际 SQL），相关触发器、视图、索引、函数与后端业务逻辑。
 - 风险等级：中 — 该变更会修改账面金额字段或累计逻辑，需谨慎回滚与验证。
 
-主要变更（从 `supabase/migrations/20250303000001_update_credits_system.sql` 提取）
+主要变更（从 `supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql` 提取）
 - 在 `public.profiles` 表上：
   - 如表不存在，创建 `public.profiles(id UUID PRIMARY KEY REFERENCES auth.users(id), email TEXT, credits DECIMAL DEFAULT 0, created_at, updated_at)`，并启用行级安全 (RLS) 及相应的 SELECT/UPDATE policy（仅允许用户读取/更新自己的 profile）。
   - 如果表已存在但缺少 `credits` 列，则添加 `credits DECIMAL DEFAULT 0`。
@@ -40,9 +40,9 @@
    - 使用 supabase CLI 或 psql 运行迁移文件：
 
      ```powershell
-     supabase db push --file supabase/migrations/20250303000001_update_credits_system.sql
+     supabase db push --file supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql
      # 或
-     psql "$DATABASE_URL" -f supabase/migrations/20250303000001_update_credits_system.sql
+     psql "$DATABASE_URL" -f supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql
      ```
 
 3. 运行数据回填/修正任务（如果迁移中包含 ALTER + UPDATE）：
@@ -99,7 +99,7 @@
 - DBA: @dba-on-call
 
 替换说明
-- 本文档为模板：请将“主要变更”与 SQL 片段替换为 `supabase/migrations/20250303000001_update_credits_system.sql` 中的实际内容，并补充任何特定回填脚本与注意事项。
+- 本文档为模板：请将“主要变更”与 SQL 片段替换为 `supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql` 中的实际内容，并补充任何特定回填脚本与注意事项。
 # 积分系统配置 / Update Credits System
 
 ## 快速操作指令
@@ -115,7 +115,7 @@
    - 点击 "+ New Query"
 
 3. **执行增量更新 SQL**
-   - 打开文件：`supabase/migrations/20250303000001_update_credits_system.sql`
+   - 打开文件：`supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql`
    - 复制全部内容
    - 粘贴到 SQL Editor
    - 点击 "Run"
@@ -233,11 +233,11 @@ SELECT * FROM public.profiles WHERE id = '你的用户ID';
 
 ```sql
 -- 完整配置在此文件中：
--- supabase/migrations/20250303000001_update_credits_system.sql
+-- supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql
 ```
 
 打开该文件，复制全部内容到 SQL Editor 执行即可。
-### 自动提取的迁移摘要（来自 supabase/migrations/20250303000001_update_credits_system.sql）
+### 自动提取的迁移摘要（来自 supabase/infrastructure/database/migrations/20250303000001_update_credits_system.sql）
 
 - Profiles 表
   - 创建 public.profiles（若不存在）：id UUID PK、email TEXT、credits DECIMAL DEFAULT 0、created_at/updated_at，并启用行级安全 (RLS) 以及 "Users can read own profile" 和 "Users can update own profile" 策略。

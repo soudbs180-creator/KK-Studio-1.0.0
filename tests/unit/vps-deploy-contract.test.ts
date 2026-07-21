@@ -12,14 +12,14 @@ const TURNSTILE_CSP_ORIGIN = "https://challenges.cloudflare.com";
 
 
 test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () => {
-  const bootstrapScript = "scripts/vps/bootstrap-kk-vps.sh";
-  const deployScript = "scripts/vps/deploy-kk-vps.sh";
-  const apiEnv = "scripts/vps/kk-vps.env.example";
-  const webEnv = "scripts/vps/kk-web.env.example";
-  const adminWebEnv = "scripts/vps/kk-admin.env.example";
+  const bootstrapScript = "scripts/ops/vps/bootstrap-kk-vps.sh";
+  const deployScript = "scripts/ops/vps/deploy-kk-vps.sh";
+  const apiEnv = "scripts/ops/vps/kk-vps.env.example";
+  const webEnv = "scripts/ops/vps/kk-web.env.example";
+  const adminWebEnv = "scripts/ops/vps/kk-admin.env.example";
   const apiService = "config/deploy/systemd/kk-api.service";
   const nginxConfig = "config/deploy/nginx/kk-vps-gateway.conf";
-  const postgresBootstrap = "scripts/postgres/bootstrap-kk-vps.sql";
+  const postgresBootstrap = "scripts/ops/postgres/bootstrap-kk-vps.sql";
 
   [
     bootstrapScript,
@@ -57,8 +57,8 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
 
 test("VPS default web entry serves the main login app while admin stays separate", () => {
   const attributesSource = readSource(".gitattributes");
-  const deploySource = readSource("scripts/vps/deploy-kk-vps.sh");
-  const bootstrapSource = readSource("scripts/vps/bootstrap-kk-vps.sh");
+  const deploySource = readSource("scripts/ops/vps/deploy-kk-vps.sh");
+  const bootstrapSource = readSource("scripts/ops/vps/bootstrap-kk-vps.sh");
   const nginxSource = readSource("config/deploy/nginx/kk-vps-gateway.conf");
 
   assert.match(attributesSource, /scripts\/vps\/\*\.sh text eol=lf/);
@@ -154,7 +154,7 @@ test("Nginx CSP declarations allow Cloudflare Turnstile scripts and frames", () 
 });
 
 test("VPS API TLS helper fails fast on DNS and keeps internal routes closed", () => {
-  const tlsScriptPath = "scripts/vps/configure-kk-vps-api-tls.sh";
+  const tlsScriptPath = "scripts/ops/vps/configure-kk-vps-api-tls.sh";
   assert.equal(existsSync(path.join(ROOT_DIR, tlsScriptPath)), true, `${tlsScriptPath} should exist`);
 
   const tlsSource = readSource(tlsScriptPath);

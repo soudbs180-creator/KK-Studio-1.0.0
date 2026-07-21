@@ -1,12 +1,12 @@
 Status: reference
 
 <!-- AI_ROUTING_KEY: routing, dispatcher, consolidation, refactor, generate -->
-# server/routes 路由拓扑与合并方案（WS-3 只读分析）
+# services/api/routes 路由拓扑与合并方案（WS-3 只读分析）
 
-> 本文档为**只读分析**，不改任何运行代码。依据 `server/index.js` 实际装配与各 router 体量。
+> 本文档为**只读分析**，不改任何运行代码。依据 `services/api/index.js` 实际装配与各 router 体量。
 > 关联 Issue #6（WS-3）、母 Issue #3（完善 API 路由系统）。
 
-## 1. 实际挂载拓扑（来自 server/index.js）
+## 1. 实际挂载拓扑（来自 services/api/index.js）
 
 按 `app.use` 注册顺序（顺序即优先级，先注册先匹配）：
 
@@ -31,7 +31,7 @@ Status: reference
 ## 2. 核心问题：脆弱的“顺序 + 回落”路由
 
 - **6 个 router 共用 `/api` 前缀**（第 2~13 行多数），**靠注册顺序 + `next()` 回落**到 98KB 的 legacy `user.js` / `admin.js` 才能正确工作。
-- `server/index.js` 自带注释印证脆弱性：
+- `services/api/index.js` 自带注释印证脆弱性：
   - “用户自带 Key 的新 AI Router 必须挂在 legacy userRouter 前；只接管 mode=chat，其它模式 next() 回落旧逻辑。”
   - “credit-provider-router 必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。”
 - 后果：任何挂载顺序调整、或某 router 误吞请求，都会**静默改变计费/路由行为**；新人/AI 极难安全改动。
@@ -39,7 +39,7 @@ Status: reference
 
 ## 3. 目标拓扑（收敛）
 
-所有“模型/供应商/生成/代理”请求收敛为两条标准入口，内部统一走 `server/lib/dispatcher`（已存在的 adapterRegistry + providerProfiles）：
+所有“模型/供应商/生成/代理”请求收敛为两条标准入口，内部统一走 `services/api/lib/dispatcher`（已存在的 adapterRegistry + providerProfiles）：
 
 ```
 POST /api/v1/generate          # 同步生成（chat/image 同步）

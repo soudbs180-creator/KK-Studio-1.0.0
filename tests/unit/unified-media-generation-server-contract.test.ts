@@ -6,7 +6,7 @@ import { readSource } from '../support/workspacePaths.js';
 const require = createRequire(import.meta.url);
 
 test('generation job APIs are user scoped and enforce an active client lease', () => {
-  const source = readSource('server/routes/compat/workspace.js');
+  const source = readSource('services/api/routes/compat/workspace.js');
 
   assert.match(source, /router\.post\('\/api\/v1\/generation-jobs', requireUser/);
   assert.match(source, /router\.patch\('\/api\/v1\/generation-jobs\/:jobId', requireUser/);
@@ -16,7 +16,7 @@ test('generation job APIs are user scoped and enforce an active client lease', (
 });
 
 test('generation job migration adds idempotency, outputs, and lease indexes', () => {
-  const migration = readSource('migrations/015_unified_media_generation_jobs.sql');
+  const migration = readSource('infrastructure/database/migrations/015_unified_media_generation_jobs.sql');
 
   assert.match(migration, /schema_version integer NOT NULL DEFAULT 2/);
   assert.match(migration, /outputs_json jsonb NOT NULL DEFAULT '\[\]'::jsonb/);
@@ -34,7 +34,7 @@ test('OpenAPI publishes the unified media job and lease contracts', () => {
 });
 
 test('ComfyUI rejects unapproved templates and arbitrary workflow input', async () => {
-  const adapter = require('../../server/lib/dispatcher/adapters/comfyUiWorkflowAdapter.js');
+  const adapter = require('../../services/api/lib/dispatcher/adapters/comfyUiWorkflowAdapter.js');
 
   assert.deepEqual(adapter.listApprovedTemplates(), []);
   await assert.rejects(

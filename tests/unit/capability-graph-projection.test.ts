@@ -4,7 +4,7 @@ import test from 'node:test';
 import { CapabilityGraphSnapshotDtoSchema } from '../../packages/shared/src/index.ts';
 
 test('projection derives a secret-free graph from canonical providers and user bindings', async () => {
-  const module = await import('../../server/lib/capability-graph/projection.js');
+  const module = await import('../../services/api/lib/capability-graph/projection.js');
   const { projectCapabilityGraph } = module.default || module;
   const generatedAt = '2026-07-22T00:00:00.000Z';
   const snapshot = projectCapabilityGraph({

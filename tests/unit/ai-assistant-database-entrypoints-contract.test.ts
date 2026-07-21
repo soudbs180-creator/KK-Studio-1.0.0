@@ -11,7 +11,7 @@ const assertBefore = (source: string, before: string, after: string, label: stri
 };
 
 test('old 011 AI tables receive compatibility columns before scoped indexes are created', () => {
-  const bootstrap = readSource('scripts/postgres/bootstrap-kk-vps.sql');
+  const bootstrap = readSource('scripts/ops/postgres/bootstrap-kk-vps.sql');
   assertBefore(bootstrap, 'ALTER TABLE public.agent_runs', 'CREATE INDEX IF NOT EXISTS agent_runs_user_updated_idx', 'agent_runs');
   assertBefore(bootstrap, 'ALTER TABLE public.agent_skills', 'CREATE UNIQUE INDEX IF NOT EXISTS agent_skills_user_name_idx', 'agent_skills');
   assertBefore(bootstrap, 'ALTER TABLE public.knowledge_documents', 'CREATE INDEX IF NOT EXISTS knowledge_documents_user_updated_idx', 'knowledge');
@@ -19,10 +19,10 @@ test('old 011 AI tables receive compatibility columns before scoped indexes are 
 });
 
 test('every database entrypoint applies canonical bootstrap and migration 016 to one explicit target', () => {
-  const linuxBootstrap = readSource('scripts/vps/bootstrap-kk-vps.sh');
-  const windowsSetup = readSource('scripts/setup/setup-database.bat');
-  const deploy = readSource('scripts/vps/deploy-kk-vps.sh');
-  const runtimeImport = readSource('scripts/postgres/import-runtime-into-vps.sh');
+  const linuxBootstrap = readSource('scripts/ops/vps/bootstrap-kk-vps.sh');
+  const windowsSetup = readSource('scripts/ops/setup/setup-database.bat');
+  const deploy = readSource('scripts/ops/vps/deploy-kk-vps.sh');
+  const runtimeImport = readSource('scripts/ops/postgres/import-runtime-into-vps.sh');
 
   assertBefore(linuxBootstrap, '-f "${REPO_BOOTSTRAP_SQL}"', '-f "${AI_ASSISTANT_SCOPE_MIGRATION}"', 'Linux bootstrap');
   assert.match(linuxBootstrap, /realpath "\$\{REPO_BOOTSTRAP_SQL\}"/);
@@ -35,7 +35,7 @@ test('every database entrypoint applies canonical bootstrap and migration 016 to
 });
 
 test('migration 016 conditionally interprets every legacy AI timestamp as UTC', () => {
-  const migration = readSource('migrations/016_ai_assistant_user_scope.sql');
+  const migration = readSource('infrastructure/database/migrations/016_ai_assistant_user_scope.sql');
   const legacyColumns = [
     ['agent_runs', 'created_at'],
     ['agent_runs', 'updated_at'],
@@ -59,7 +59,7 @@ test('migration 016 conditionally interprets every legacy AI timestamp as UTC', 
 });
 
 test('deploy fails closed on source identity, database identity, DDL authority, and schema probes', () => {
-  const deploy = readSource('scripts/vps/deploy-kk-vps.sh');
+  const deploy = readSource('scripts/ops/vps/deploy-kk-vps.sh');
   assert.match(deploy, /git rev-parse --verify HEAD/);
   assert.match(deploy, /\^\[0-9a-fA-F\]\{40\}\$/);
   assert.match(deploy, /git status --porcelain --untracked-files=all/);
@@ -83,8 +83,8 @@ test('deploy fails closed on source identity, database identity, DDL authority, 
 });
 
 test('runtime export/import never persists credentials or replays a conflicting schema dump', () => {
-  const runtimeExport = readSource('scripts/postgres/export-supabase-runtime.sh');
-  const runtimeImport = readSource('scripts/postgres/import-runtime-into-vps.sh');
+  const runtimeExport = readSource('scripts/ops/postgres/export-supabase-runtime.sh');
+  const runtimeImport = readSource('scripts/ops/postgres/import-runtime-into-vps.sh');
   const gitignore = readSource('.gitignore');
 
   assert.doesNotMatch(runtimeExport, /"source": "\$\{SUPABASE_DB_URL\}"/);

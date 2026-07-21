@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import cryptoUtils from "../../server/utils/crypto.js";
+import cryptoUtils from "../../services/api/utils/crypto.js";
 
 test("AES-256-GCM encryption and decryption round-trip works correctly", () => {
   const originalText = "sk-proj-sensitive-api-key-value-1234567890";

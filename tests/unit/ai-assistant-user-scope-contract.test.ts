@@ -7,8 +7,8 @@ import { readSource } from '../support/workspacePaths.js';
 const require = createRequire(import.meta.url);
 
 test('migration 016 scopes AI knowledge, skills and canvas snapshots without claiming legacy ownership', () => {
-  assert.equal(existsSync('migrations/016_ai_assistant_user_scope.sql'), true);
-  const migration = readSource('migrations/016_ai_assistant_user_scope.sql');
+  assert.equal(existsSync('infrastructure/database/migrations/016_ai_assistant_user_scope.sql'), true);
+  const migration = readSource('infrastructure/database/migrations/016_ai_assistant_user_scope.sql');
 
   assert.match(migration, /ALTER TABLE public\.knowledge_documents[\s\S]*ADD COLUMN IF NOT EXISTS user_id text/);
   assert.match(migration, /ALTER TABLE public\.agent_skills[\s\S]*ADD COLUMN IF NOT EXISTS user_id text/);
@@ -44,7 +44,7 @@ test('migration 016 scopes AI knowledge, skills and canvas snapshots without cla
 });
 
 test('AI assistant routes derive ownership from authentication and keep only system knowledge shared read-only', () => {
-  const source = readSource('server/routes/ai-assistant.js');
+  const source = readSource('services/api/routes/ai-assistant.js');
 
   assert.match(source, /INSERT INTO public\.agent_skills \([\s\S]*user_id[\s\S]*owner_scope/);
   assert.match(source, /ON CONFLICT \(user_id, name\)[\s\S]*owner_scope = 'user'/);
@@ -81,10 +81,10 @@ test('AI assistant routes derive ownership from authentication and keep only sys
 });
 
 test('VPS bootstrap and deploy paths apply the scoped AI assistant schema', () => {
-  const bootstrap = readSource('scripts/postgres/bootstrap-kk-vps.sql');
-  const deploy = readSource('scripts/vps/deploy-kk-vps.sh');
-  const provision = readSource('scripts/vps/bootstrap-kk-vps.sh');
-  const windowsSetup = readSource('scripts/setup/setup-database.bat');
+  const bootstrap = readSource('scripts/ops/postgres/bootstrap-kk-vps.sql');
+  const deploy = readSource('scripts/ops/vps/deploy-kk-vps.sh');
+  const provision = readSource('scripts/ops/vps/bootstrap-kk-vps.sh');
+  const windowsSetup = readSource('scripts/ops/setup/setup-database.bat');
 
   assert.match(bootstrap, /CREATE TABLE IF NOT EXISTS public\.agent_runs/);
   assert.match(bootstrap, /CREATE TABLE IF NOT EXISTS public\.knowledge_documents/);
@@ -130,16 +130,16 @@ test('VPS bootstrap and deploy paths apply the scoped AI assistant schema', () =
 });
 
 test('temporary user headers require explicit local-only mode and VPS defaults to production', () => {
-  const compat = readSource('server/routes/compat/compatHelper.js');
-  const adminRoute = readSource('server/routes/compat/admin.js');
-  const aiRoute = readSource('server/routes/ai-assistant.js');
+  const compat = readSource('services/api/routes/compat/compatHelper.js');
+  const adminRoute = readSource('services/api/routes/compat/admin.js');
+  const aiRoute = readSource('services/api/routes/ai-assistant.js');
   const directTempRoutes = [
-    'server/routes/user-api-payload-router.js',
-    'server/routes/user/auth.js',
-    'server/routes/user/profile.js',
-    'server/routes/user/wuyin.js',
+    'services/api/routes/user-api-payload-router.js',
+    'services/api/routes/user/auth.js',
+    'services/api/routes/user/profile.js',
+    'services/api/routes/user/wuyin.js',
   ].map(readSource).join('\n');
-  const envExample = readSource('scripts/vps/kk-api.env.example');
+  const envExample = readSource('scripts/ops/vps/kk-api.env.example');
   const systemd = readSource('config/deploy/systemd/kk-api.service');
 
   assert.match(compat, /const allowLocalTempUser = process\.env\.KKAI_LOCAL_ONLY === 'true'/);
@@ -154,7 +154,7 @@ test('temporary user headers require explicit local-only mode and VPS defaults t
 });
 
 test('temporary owner resolution is denied by default and enabled only in explicit local-only mode', () => {
-  const { resolveRequestUserId } = require('../../server/routes/compat/compatHelper.js');
+  const { resolveRequestUserId } = require('../../services/api/routes/compat/compatHelper.js');
   const previousLocalOnly = process.env.KKAI_LOCAL_ONLY;
   const previousNodeEnv = process.env.NODE_ENV;
   const request = {
@@ -182,8 +182,8 @@ test('temporary owner resolution is denied by default and enabled only in explic
 });
 
 test('AI assistant auth never falls back from an invalid Bearer credential to cookies or local headers', (t) => {
-  const routePath = require.resolve('../../server/routes/ai-assistant.js');
-  const jwtPath = require.resolve('../../server/lib/jwt.js');
+  const routePath = require.resolve('../../services/api/routes/ai-assistant.js');
+  const jwtPath = require.resolve('../../services/api/lib/jwt.js');
   const previousNodeEnv = process.env.NODE_ENV;
   const previousJwtSecret = process.env.JWT_SECRET;
   const previousLocalOnly = process.env.KKAI_LOCAL_ONLY;
@@ -265,8 +265,8 @@ test('AI assistant auth never falls back from an invalid Bearer credential to co
 });
 
 test('Skill delete rejects an owned id/name mismatch before writing a deletion version', async (t) => {
-  const dbPath = require.resolve('../../server/lib/db.js');
-  const routePath = require.resolve('../../server/routes/ai-assistant.js');
+  const dbPath = require.resolve('../../services/api/lib/db.js');
+  const routePath = require.resolve('../../services/api/routes/ai-assistant.js');
   const dbModule = require(dbPath) as { getPool: () => unknown };
   const originalGetPool = dbModule.getPool;
   const previousNodeEnv = process.env.NODE_ENV;
@@ -347,8 +347,8 @@ test('Skill delete rejects an owned id/name mismatch before writing a deletion v
 });
 
 test('Skill POST and DELETE stale responses return an authoritative Skill state or tombstone', async (t) => {
-  const dbPath = require.resolve('../../server/lib/db.js');
-  const routePath = require.resolve('../../server/routes/ai-assistant.js');
+  const dbPath = require.resolve('../../services/api/lib/db.js');
+  const routePath = require.resolve('../../services/api/routes/ai-assistant.js');
   const dbModule = require(dbPath) as { getPool: () => unknown };
   const originalGetPool = dbModule.getPool;
   const previousNodeEnv = process.env.NODE_ENV;

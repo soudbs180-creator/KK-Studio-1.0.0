@@ -5,7 +5,7 @@ import test from 'node:test';
 import express from 'express';
 
 async function startTestServer() {
-  const routeModule = await import('../../server/routes/capability-graph.js');
+  const routeModule = await import('../../services/api/routes/capability-graph.js');
   const { createCapabilityGraphRouter } = routeModule.default || routeModule;
   const timestamp = '2026-07-22T00:00:00.000Z';
   const safeConnection = {

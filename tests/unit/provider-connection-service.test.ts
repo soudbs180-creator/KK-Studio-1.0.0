@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 test('service resolves the canonical Google endpoint before encrypted storage', async () => {
-  const module = await import('../../server/lib/capability-graph/providerConnectionService.js');
+  const module = await import('../../services/api/lib/capability-graph/providerConnectionService.js');
   const { createConnection } = module.default || module;
   let storedInput: Record<string, unknown> | undefined;
   const expected = { connectionId: 'connection-1' };
@@ -26,7 +26,7 @@ test('service resolves the canonical Google endpoint before encrypted storage', 
 });
 
 test('service decrypts only for verify and persists a secret-free result', async () => {
-  const module = await import('../../server/lib/capability-graph/providerConnectionService.js');
+  const module = await import('../../services/api/lib/capability-graph/providerConnectionService.js');
   const { verifyConnection } = module.default || module;
   let verifierSecret = '';
   let savedBindings: unknown[] = [];

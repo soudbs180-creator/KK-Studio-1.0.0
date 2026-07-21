@@ -11,9 +11,9 @@ Primary repository: `soudbs180-creator/nano-banana-KK-`
 Current active architecture:
 
 - Frontend: Vercel-hosted `apps/web/` built with Vite, React 19, TypeScript, Tailwind, Ant Design / Lobe UI integration.
-- Backend: VPS-hosted `server/` Express runtime.
+- Backend: VPS-hosted `services/api/` Express runtime.
 - Shared contracts: `packages/shared/`, `packages/api-client/`, `packages/ui/`.
-- Data: PostgreSQL migrations in `migrations/` only.
+- Data: PostgreSQL migrations in `infrastructure/database/migrations/` only.
 - Provider governance: backend registry plus frontend provider metadata, display identity, runtime strategy, and governance scripts.
 
 This document is the execution manual for AI-led code optimization. It is intentionally prescriptive: follow the phases, verify assumptions from source, keep PR scope small, and never bypass governance or security checks.
@@ -40,7 +40,7 @@ When facts conflict, use this priority order:
 - Prefer small, reviewable patches over broad rewrites.
 - Never duplicate provider identity logic across multiple frontend files.
 - Never infer platform identity from protocol compatibility alone. OpenAI-compatible does not mean OpenAI Official.
-- Never move database DDL outside `migrations/`.
+- Never move database DDL outside `infrastructure/database/migrations/`.
 - Never allow frontend code to directly call privileged provider APIs with platform-owned keys.
 - Never commit real secrets, `.env`, API keys, database URLs, Stripe secrets, or deployment tokens.
 - Do not treat old deployment integrations as source-code deploy requirements. Current deployment is Vercel frontend plus VPS backend.
@@ -94,7 +94,7 @@ config/release-manifest.json
 ### 3.2 Provider/runtime work
 
 ```text
-server/lib/dispatcher/providerRegistry.js
+services/api/lib/dispatcher/providerRegistry.js
 scripts/governance/check-provider-registry.mjs
 scripts/governance/check-provider-presets.mjs
 scripts/governance/check-frontend-provider-presets.mjs

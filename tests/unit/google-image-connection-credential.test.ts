@@ -3,8 +3,8 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const legacyAdapter = require('../../server/lib/dispatcher/adapters/googleImageAdapter.js');
-const generationAdapter = require('../../server/lib/generation-v3/adapters/googleImageAdapter.js');
+const legacyAdapter = require('../../services/api/lib/dispatcher/adapters/googleImageAdapter.js');
+const generationAdapter = require('../../services/api/lib/generation-v3/adapters/googleImageAdapter.js');
 
 test('Google v3 adapter passes a Connection credential per call without mutating process.env', async (context) => {
   const originalGenerateImage = legacyAdapter.generateImage;

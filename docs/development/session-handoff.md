@@ -446,13 +446,13 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 运行 `npm run check:encoding` 100% 成功通过。
 
 ## 30. 2026-06-25 - Extract Duplicated Helper Functions in Compat Routes (本次追加)
-- **修改范围**：提取 `server/routes/compat/` 目录下全部四个兼容路由文件中镜像拷贝的冗余身份校验、Cookie 解析与信封包装函数，消除了项目低水平的代码重复，实现轻量化优化。
+- **修改范围**：提取 `services/api/routes/compat/` 目录下全部四个兼容路由文件中镜像拷贝的冗余身份校验、Cookie 解析与信封包装函数，消除了项目低水平的代码重复，实现轻量化优化。
 - **修改文件**：
-  - [compatHelper.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/compatHelper.js)
-  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/admin.js)
-  - [auth.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/auth.js)
-  - [billing.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/billing.js)
-  - [workspace.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/workspace.js)
+  - [compatHelper.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/compatHelper.js)
+  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/admin.js)
+  - [auth.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/auth.js)
+  - [billing.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/billing.js)
+  - [workspace.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/workspace.js)
 - **当前设计决策**：
   - 在 `compatHelper.js` 统一存放并导出 `isDbEnabled`, `nowIso`, `requestId`, `meta`, `okEnvelope`, `sendError`, `readCookieValue`, `resolveRequestUserId` 以及相关的路由契约常量。
   - 在四个兼容子路由中完全删除多余的前 100 行重复逻辑，改由模块化引入 `compatHelper` 的形式重新导出，使各路由文件体积大瘦身且职责更加专一。
@@ -462,7 +462,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ## 31. 2026-06-25 - Enforce Hard-Breaking UI Token Check and Tidy Color Literals (本次追加)
 - **修改范围**：重构并升级 UI Token 静态校验脚本为“强熔断阻断”机制，豁免了特定图表拓扑等存量重灾区文件，并精细化治理修复了 12 个小文件中的硬编码颜色警告，使项目最终完全通过架构边界校验。
 - **修改文件**：
-  - [check-ui-token-literals.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/architecture/check-ui-token-literals.mjs)
+  - [check-ui-token-literals.mjs](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/governance/architecture/check-ui-token-literals.mjs)
   - [LoginScreen.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/auth/LoginScreen.tsx)
   - [ModelLogo.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/common/ModelLogo.tsx)
   - [CanvasDrawingInteractionOverlay.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/CanvasDrawingInteractionOverlay.tsx)
@@ -576,8 +576,8 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ## 37. 2026-06-25 - Standardize Backend API Error Responses and Fix Route Comments (本次追加)
 - **修改范围**：修复了 `generate-v1.js` 中因冲突合并导致的头部注释与模块导入拼写隐患；同时对 `provider-probe.js` 路由的错误抛出模式进行了标准化重构，统一接入 `sendError` 并输出规范化的 API 异常结构。
 - **修改文件**：
-  - [generate-v1.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/generate-v1.js)
-  - [provider-probe.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/provider-probe.js)
+  - [generate-v1.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/generate-v1.js)
+  - [provider-probe.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/provider-probe.js)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
   - **拼写纠偏**：修复 `generate-v1.js` 开头因拼写错误导致将 `const express = require('express')` 错误混入注释的问题，消除后端的运行期引用崩溃风险。
@@ -589,7 +589,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ## 38. 2026-06-25 - Standardize Backend OCR DTO and Resolve ChatSidebar Type Check (本次追加)
 - **修改范围**：重构了 `ocr.js` 错误抛出的格式并统一使用标准的 `sendError`，规范化后端 OCR 中转的 DTO 信封；同时修复并消除了 `ChatSidebar.tsx` 中因 `isVision` 字段缺失导致的编译阻断错误，为模型 Vision 能力检测提供了健壮的推导逻辑与类型支持。
 - **修改文件**：
-  - [ocr.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/ocr.js)
+  - [ocr.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/ocr.js)
   - [ChatSidebar.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/layout/ChatSidebar.tsx)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
@@ -667,7 +667,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **修改文件**：
   - `config/release-manifest.json`
   - `package.json` / `package-lock.json`
-  - `server/package.json` / `server/package-lock.json`
+  - `services/api/package.json` / `services/api/package-lock.json`
   - `packages/shared/package.json`
   - `packages/api-client/package.json`
   - `packages/ui/package.json`
@@ -862,7 +862,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   1. 修复了本地免数据库模式下，前端模型选择器接口返回空数组导致的选择器死锁禁用问题。
   2. 修复了由于打包和时间戳漂移引起的版本一致性校验（governance:check）失败。
 - **修改文件**：
-  - [workspace.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/workspace.js)
+  - [workspace.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/workspace.js)
   - [app-version.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/KK-Studio-Portable/app/dist/app-version.json)
   - [manifest.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/publish/stable/manifest.json)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
@@ -964,12 +964,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [useCanvasRenderItems.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/hooks/useCanvasRenderItems.ts) [NEW]
   - [WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)
   - [performanceProfile.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/canvas/performanceProfile.ts)
-  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/index.js)
   - [app-version.json (portable)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/release/KK-Studio-Portable/app/dist/app-version.json)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
   - **LOD 裁剪管理器**：新增 `useCanvasRenderItems` Hook，在画布进行 transforms 期间（平移、缩放、卡片拖拽）非选中卡片全部退化为极其轻便的 `ghost`（毛玻璃骨架占位框）渲染；静止时按 scale 比例在 React 层面计算其 LOD 状态。当前视口外（含 overscan 外）的卡片完全不创建 DOM 元素。
-  - **后端隔离与健康检测丰富**：在后端 `server/index.js` 重构 `/healthz` 端点。在 payload 展开返回了 auth（JWT 密钥/加密盐）、database（PostgreSQL 连通性）、uploads（上传目录物理探测）、provider（OpenAI/Gemini 后端密钥就绪状态），达成前端与后端的解耦与敏感密钥物理隔离。
+  - **后端隔离与健康检测丰富**：在后端 `services/api/index.js` 重构 `/healthz` 端点。在 payload 展开返回了 auth（JWT 密钥/加密盐）、database（PostgreSQL 连通性）、uploads（上传目录物理探测）、provider（OpenAI/Gemini 后端密钥就绪状态），达成前端与后端的解耦与敏感密钥物理隔离。
 - **已运行验证**：
   - 运行 `npm run verify:canvas-performance` 测试基准 100% 成功。
   - 运行 `npm run architecture:check` 及 `npm run governance:check` 全局扫描 100% 通过。
@@ -995,7 +995,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - [generationService.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/services/llm/generationService.ts)
   - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
   - [route-policies.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/route-policies.test.ts)
-  - 7 个位于 `scripts/architecture/` 目录下的静态检查脚本
+  - 7 个位于 `scripts/governance/architecture/` 目录下的静态检查脚本
 - **当前设计决策**：
   - **集中路由引擎决策**：消除了 UI 组件中分散判断走本地还是云端的逻辑，前端交互组件只提交 `GenerateIntent` 意图包，由 `ProviderRouteEngine` 综合考虑设备类型、网络状态、VPN 状态、本地与云端密钥就绪状态进行智能调度。
   - **云端密钥加密占位符识别**：利用 `sk-readonly-0000` 检测用户是否在云端保存了加密的 API Key。如果存在且本地无直连 Key，则由路由引擎派发到 `cloud-user-key` 走 VPS 安全代理转发。
@@ -1089,7 +1089,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 6 个位于 `apps/web/src/features/browser-assistant/opencli/` 目录下的前端 OpenCLI 文件 [NEW]
   - 10 个位于 `apps/web/src/features/browser-assistant/sites/` 目录下的站点适配器文件 [NEW]
   - 12 个位于 `local-runner/` 目录下的本地代理服务端文件 [NEW]
-  - 10 个位于 `scripts/architecture/` 目录下的静态 CI 安全校验脚本 [NEW]
+  - 10 个位于 `scripts/governance/architecture/` 目录下的静态 CI 安全校验脚本 [NEW]
   - [package.json](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/package.json)
   - [browser-assistant-hub.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/browser-assistant-hub.test.ts) [NEW]
 - **当前设计决策**：
@@ -1328,17 +1328,17 @@ npm run build                # Passed (Vite production bundle compiled successfu
 
 ## 87. 2026-06-26 - VPS Backend Security and Deployment Gate Optimization (本次追加)
 - **修改范围**：
-  1. **安全存储加固**：创建了 `server/utils/crypto.js` 模块，实现了基于内置 `crypto` 库和 `aes-256-gcm` 算法的密文包裹加密解密功能，用以防范第三方厂商密钥和 OAuth 令牌以明文落盘或存库。
-  2. **网关安全标头与隐私脱敏**：新增了 [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/securityHeaders.js) and [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/logRedactor.js) 双安全中间件并挂载至主 Express 应用，以防止敏感头/请求体被打印进生产日志，同时强制应用 MIME nosniff、Clickjacking 拦截及跨域 Referer 限制等标头防护。
-  3. **数据库迁移就绪**：在 [migrations/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/) 目录下新增了数据库结构升级定义 [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/014_vps_security_and_jobs.sql)，对加密凭证、物理画布节点以及异步任务追踪表进行了定义。
-  4. **部署自检质量门**：优化了 [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/vps/deploy-kk-vps.sh)，在同步构建与部署动作前加入了 `npm run verify:changes` 前置静态与冒烟拦截质量门，并优化了健康检查 `/healthz` 响应结果的解析逻辑，有效防范部署期间出现服务瘫痪和不可控回滚。
+  1. **安全存储加固**：创建了 `services/api/utils/crypto.js` 模块，实现了基于内置 `crypto` 库和 `aes-256-gcm` 算法的密文包裹加密解密功能，用以防范第三方厂商密钥和 OAuth 令牌以明文落盘或存库。
+  2. **网关安全标头与隐私脱敏**：新增了 [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/middleware/securityHeaders.js) and [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/middleware/logRedactor.js) 双安全中间件并挂载至主 Express 应用，以防止敏感头/请求体被打印进生产日志，同时强制应用 MIME nosniff、Clickjacking 拦截及跨域 Referer 限制等标头防护。
+  3. **数据库迁移就绪**：在 [infrastructure/database/migrations/](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/infrastructure/database/migrations/) 目录下新增了数据库结构升级定义 [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/infrastructure/database/migrations/014_vps_security_and_jobs.sql)，对加密凭证、物理画布节点以及异步任务追踪表进行了定义。
+  4. **部署自检质量门**：优化了 [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/ops/vps/deploy-kk-vps.sh)，在同步构建与部署动作前加入了 `npm run verify:changes` 前置静态与冒烟拦截质量门，并优化了健康检查 `/healthz` 响应结果的解析逻辑，有效防范部署期间出现服务瘫痪和不可控回滚。
 - **修改文件**：
-  - [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/vps/deploy-kk-vps.sh)
-  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/index.js)
-  - [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/securityHeaders.js)
-  - [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/middleware/logRedactor.js)
-  - [crypto.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/utils/crypto.js)
-  - [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations/014_vps_security_and_jobs.sql)
+  - [deploy-kk-vps.sh](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/ops/vps/deploy-kk-vps.sh)
+  - [index.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/index.js)
+  - [securityHeaders.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/middleware/securityHeaders.js)
+  - [logRedactor.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/middleware/logRedactor.js)
+  - [crypto.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/utils/crypto.js)
+  - [014_vps_security_and_jobs.sql](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/infrastructure/database/migrations/014_vps_security_and_jobs.sql)
   - [vps-crypto-aes-gcm.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-crypto-aes-gcm.test.ts)
   - [vps-security-middlewares.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-security-middlewares.test.ts)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
@@ -1355,16 +1355,16 @@ npm run build                # Passed (Vite production bundle compiled successfu
 
 ## 88. 2026-06-26 - Superadmin Privacy Shielding, Auth Enforcement, and Retention Policy (本次追加)
 - **修改范围**：
-  1. **超级管理员隐私过滤**：在 `server/routes/admin.js` 中将超级管理员默认邮箱调整为 `977483863@qq.com`，且无论是数据库联合查询还是本地 mock 账户，均物理隐藏屏蔽此超级管理员账号的显示，实现其隐私不被其他用户/管理员窥探。
+  1. **超级管理员隐私过滤**：在 `services/api/routes/admin.js` 中将超级管理员默认邮箱调整为 `977483863@qq.com`，且无论是数据库联合查询还是本地 mock 账户，均物理隐藏屏蔽此超级管理员账号的显示，实现其隐私不被其他用户/管理员窥探。
   2. **强制密码登录加固**：在无数据库开发与调试模式下，非 `test` 测试环境（如开发/生产 mock 状态）强制要求密码必须匹配 `admin123456`，彻底封堵免密登录漏洞。
   3. **联合账户与充值统计**：重构 `/admin/users` 为 `UNION ALL` 联合查询结构，合并展示 `users` 注册账户和 `temp_users` 临时账户，展示对应的余额和仅限近 2 个月的充值总额。
   4. **2个月自动数据物理清理**：在 `reconciliation.js` 守护进程的方法顶部，注入针对 `recharge_submissions` 和 `credit_transactions` 两表的物理清理 SQL，每当守护进程轮询唤醒时会自动删除两个月以前的历史充值与交易数据，实现物理级的数据留存控制。
   5. **新增单测守护**：创建了 `tests/unit/vps-admin-user-retention-privacy.test.ts` 对上述登录强密码校验、超级管理员隐私过滤、临时账户列表、近两个月充值过滤及物理过期清理进行了完整的 4 项单元测试校验。
 - **修改文件**：
-  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/admin.js)
-  - [auth.js (user)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/user/auth.js)
-  - [auth.js (compat)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/routes/compat/auth.js)
-  - [reconciliation.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server/lib/dispatcher/reconciliation.js)
+  - [admin.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/admin.js)
+  - [auth.js (user)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/user/auth.js)
+  - [auth.js (compat)](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/routes/compat/auth.js)
+  - [reconciliation.js](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/services/api/lib/dispatcher/reconciliation.js)
   - [vps-admin-user-retention-privacy.test.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/unit/vps-admin-user-retention-privacy.test.ts)
   - [session-handoff.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/development/session-handoff.md)
 - **当前设计决策**：
@@ -1564,9 +1564,9 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `apps/web/src/services/system/syncService.ts`
   - `packages/shared/src/contracts/client/kk-api-client.ts`
   - `packages/shared/src/contracts/dto/asset-library.ts`
-  - `server/index.js`
-  - `server/routes/compat/admin.js`
-  - `server/routes/compat/workspace.js`
+  - `services/api/index.js`
+  - `services/api/routes/compat/admin.js`
+  - `services/api/routes/compat/workspace.js`
   - `tests/unit/ai-assistant-tool-registry.test.ts`
   - `tests/unit/system-proxy-task-mode-contract.test.ts`
   - `tests/unit/workspace-cloud-asset-sync-contract.test.ts`
@@ -1635,7 +1635,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx`
   - `apps/web/src/styles/kk-ui-tokens.css`
   - `apps/web/src/styles/settings.css`
-  - `scripts/architecture/check-ui-token-literals.mjs`
+  - `scripts/governance/architecture/check-ui-token-literals.mjs`
   - `scripts/test/verify-ai-takeover-smoke.mjs`
   - `scripts/test/verify-desktop-settings-smoke.mjs`
   - `scripts/test/verify-mobile-settings-smoke.mjs`
@@ -1725,11 +1725,11 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `packages/shared/src/contracts/dto/generation.ts`
   - `packages/shared/src/contracts/providers/types.ts`
   - `packages/shared/src/contracts/client/kk-api-client.ts`
-  - `server/routes/compat/workspace.js`
-  - `server/routes/ai-assistant.js`
-  - `server/lib/dispatcher/adapters/comfyUiWorkflowAdapter.js`
-  - `server/config/comfyui-workflows.json`
-  - `migrations/015_unified_media_generation_jobs.sql`
+  - `services/api/routes/compat/workspace.js`
+  - `services/api/routes/ai-assistant.js`
+  - `services/api/lib/dispatcher/adapters/comfyUiWorkflowAdapter.js`
+  - `services/api/config/comfyui-workflows.json`
+  - `infrastructure/database/migrations/015_unified_media_generation_jobs.sql`
   - `docs/specs/openapi.yaml`
   - `docs/ai-assistant/skills.md`
   - `docs/ai-assistant/tool-registry.md`
@@ -1952,7 +1952,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `apps/web/src/components/settings/views/GenerationModeView.tsx`
   - `apps/web/src/core/routing/ProviderRouteEngine.ts`
   - `apps/web/src/styles/settings.css`
-  - `scripts/architecture/check-settings-ui-system.mjs`
+  - `scripts/governance/architecture/check-settings-ui-system.mjs`
   - `tests/unit/dashboard-settings-overview-regression.test.ts`
   - `tests/unit/mobile-settings-overview-metrics.test.ts`
   - `tests/unit/mobile-settings-taxonomy.test.ts`
@@ -2318,11 +2318,11 @@ npm run build                # Passed (Vite production bundle compiled successfu
 
 ## 145. 2026-07-12 - 建立全量 API 文档与运行时端点目录
 
-- **修改范围**：以 `server/index.js` 和当前挂载的 `server/routes/` 为运行时事实源，整理 KK Studio v1.6.0 的 API 文档中心、完整有效端点目录、鉴权/信封/请求头/请求体限制约定，以及 `@kk/api-client` 的 73 个公开方法与共享 DTO 映射；同步补充 docs 总导航、Provider 规格入口和本次实施计划。
+- **修改范围**：以 `services/api/index.js` 和当前挂载的 `services/api/routes/` 为运行时事实源，整理 KK Studio v1.6.0 的 API 文档中心、完整有效端点目录、鉴权/信封/请求头/请求体限制约定，以及 `@kk/api-client` 的 73 个公开方法与共享 DTO 映射；同步补充 docs 总导航、Provider 规格入口和本次实施计划。
 - **修改文件**：`docs/api/README.md`、`docs/api/runtime-endpoints.md`、`docs/api/typescript-client.md`、`docs/README.md`、`docs/specs/README.md`、`docs/superpowers/plans/2026-07-12-api-documentation.md`、`docs/development/session-handoff.md`。
 - **当前设计决策**：明确区分“Express 实际可访问路由”“OpenAPI 稳定契约子集”“运行时/兼容/运维端点”和“第三方 Provider 协议”。不把 126 条路由注册语句全部误判为独立稳定 API：数组别名展开后为 130 条注册，其中 8 条被更早同方法同路径处理器覆盖；最终路由器有 122 个唯一有效操作，加 `/healthz` 共 123 个 HTTP 方法端点，另有 `/uploads/*` 静态前缀。OpenAPI 继续作为 34 paths / 42 operations 的稳定子集，本次不扩大其兼容承诺。
 - **已运行验证**：
-  - 通过脚本按 `server/index.js` mount 规则和路由顺序计算源码端点集合：`EXPECTED=123`、文档表格 `DOCUMENTED=124`（多出的唯一一项为静态 `/uploads/*`），`MISSING=0`、`EXTRA=0`。
+  - 通过脚本按 `services/api/index.js` mount 规则和路由顺序计算源码端点集合：`EXPECTED=123`、文档表格 `DOCUMENTED=124`（多出的唯一一项为静态 `/uploads/*`），`MISSING=0`、`EXTRA=0`。
   - 从 `KkApiClient` 接口提取 73 个方法并与 `docs/api/typescript-client.md` 对照，缺项为 0；文档分组计数合计 73。
   - 新增文档 Markdown 本地链接存在性检查通过，未发现破损链接；真实密钥/私钥特征和已移除运行时目录引用扫描无命中；`git diff --check` 通过。
   - `check-spec-structure.mjs` 通过；使用仓库现有 `yaml` 包解析 `docs/specs/openapi.yaml` 成功，确认 34 paths。
@@ -2349,10 +2349,10 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ## 147. 2026-07-13 - 收敛兼容层治理与当前文档事实
 
 - **修改范围**：
-  1. 修复兼容层治理盲区：`compat` 目录现在进入自动发现，注册目录可以覆盖其后代文件；`server/routes/compat/` 作为高风险服务端兼容边界正式登记。
+  1. 修复兼容层治理盲区：`compat` 目录现在进入自动发现，注册目录可以覆盖其后代文件；`services/api/routes/compat/` 作为高风险服务端兼容边界正式登记。
   2. 所有兼容条目增加 `owner` 与 ISO `reviewBy` 元数据，注册表移除旧 1.4.9 计划声明，改为 v1.6.0 当前治理事实。
   3. 强化当前文档事实检查：当前指导文档不得把 v1.5.8/v1.5.9 声明为当前版本，不得包含开发者本机绝对路径，也不得把已移除的根 `src/services/` 作为实现位置。
-  4. 将文档索引、setup 入口、AI Roadmap、架构真相源、Provider/Gemini/API/Nutrient 指导同步到 v1.6.0 和 `apps/web/src/`、`server/lib/dispatcher/` 当前路径；历史 handoff 与 dated progress 保留原始历史事实。
+  4. 将文档索引、setup 入口、AI Roadmap、架构真相源、Provider/Gemini/API/Nutrient 指导同步到 v1.6.0 和 `apps/web/src/`、`services/api/lib/dispatcher/` 当前路径；历史 handoff 与 dated progress 保留原始历史事实。
   5. 新增本阶段设计说明、实施计划及兼容治理行为测试，计划内已完成步骤均同步勾选。
 - **修改文件**：
   - `scripts/governance/check-compatibility-registry.mjs`
@@ -2464,8 +2464,8 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `apps/web/src/features/ai-takeover/` 下意图、Planner 提示、确认策略、类型、Provider 与 Dock
   - `apps/web/src/components/layout/ChatSidebar.tsx`、`apps/web/src/components/settings/views/BrowserAssistantView.tsx`、画布上下文与 Workspace 入口
   - `apps/web/src/services/api/kkApiClient.ts` 与 `packages/shared/src/contracts/client/kk-api-client.ts` 的类型化 Client 实现边界
-  - `server/routes/ai-assistant.js`、`server/lib/ai-assistant-dto.js` 与认证兼容入口
-  - `migrations/016_ai_assistant_user_scope.sql`、PostgreSQL bootstrap/import/export、VPS 部署和本地数据库初始化脚本
+  - `services/api/routes/ai-assistant.js`、`services/api/lib/ai-assistant-dto.js` 与认证兼容入口
+  - `infrastructure/database/migrations/016_ai_assistant_user_scope.sql`、PostgreSQL bootstrap/import/export、VPS 部署和本地数据库初始化脚本
   - `tests/unit/`、`tests/e2e/ai-takeover-real-paths.test.ts` 与 AI 接管 Chrome smoke 脚本
   - `docs/ai-assistant/`、`.agents/skills/`、`openspec/changes/harden-ai-control-plane/` 与生成知识索引
 - **当前设计决策**：`action://` 只保留为用户主动点击的导航链接，不能作为 AI 执行协议；所有 AI 工具输入在计划保存、授权生成和执行前都必须通过同一 ToolRegistry 校验。规划与执行在任何异步边界前捕获 owner，账户切换时 fail closed，记录仍归原 owner。`safe` 仅用于只读、导航或可撤销局部操作；生成、批量与成本操作要求确认，删除、公开发布和账户变更保持危险或禁止。动态“最近失败任务”只存在于意图层，确认前冻结为具体 `jobId + expectedUpdatedAt + expectedRetryablePromptIds`，目标漂移时不自动改选。幂等持久化只保存白名单安全回执，不保存任意工具原始输出；Browser Bridge 不再广播或记录原生响应，AI 浏览器工具禁止 `active_tab/current_tab/current_page`，直接用户界面仍可使用低层 `active_tab`。Browser Assistant 在 owner 变化时清空 URL、提取/OCR、Prompt、日志、DOM 编辑与文件路径等派生状态，递增 owner epoch 并重建 Worker，旧账户异步回调不得写入新账户 UI 或画布。

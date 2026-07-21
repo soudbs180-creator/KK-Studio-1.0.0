@@ -20,8 +20,8 @@
 
 - **`src/services/persistence/taskPersistence.ts`**: 数据库操作封装
 - **`src/hooks/useTaskRecovery.ts`**: 任务恢复逻辑
-- **`supabase/migrations/20260319142759_create_generation_tasks.sql`**: 数据库表结构
-- **`supabase/migrations/20260319142950_harden_generation_tasks_security.sql`**: 任务表安全加固
+- **`supabase/infrastructure/database/migrations/20260319142759_create_generation_tasks.sql`**: 数据库表结构
+- **`supabase/infrastructure/database/migrations/20260319142950_harden_generation_tasks_security.sql`**: 任务表安全加固
 
 ### 3. 集成点
 

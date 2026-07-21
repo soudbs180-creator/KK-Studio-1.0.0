@@ -495,7 +495,7 @@ function kkApiProxyPlugin(targetOrigin = 'http://127.0.0.1:3001'): Plugin {
 /**
  * 开发环境价格扫描代理插件
  * 从服务端去爬取供应商的 /pricing 页面数据（实际请求 /api/pricing）
- * 绕过浏览器 CORS 限制，生产环境由 server/ 后端或托管前端的同源代理处理
+ * 绕过浏览器 CORS 限制，生产环境由 services/api/ 后端或托管前端的同源代理处理
  */
 function pricingProxyPlugin(): Plugin {
     return {

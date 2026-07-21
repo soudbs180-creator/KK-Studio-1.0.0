@@ -6,16 +6,16 @@ Status: historical
 
 **Goal:** Produce a source-backed, complete API documentation set for KK Studio v1.6.0 that distinguishes canonical OpenAPI contracts, mounted runtime routes, compatibility endpoints, and the typed SDK.
 
-**Architecture:** Treat `server/index.js` and mounted routers as the runtime source of truth, `packages/shared/src/contracts/` as the DTO source of truth, and `packages/shared/src/contracts/client/kk-api-client.ts` as the SDK source of truth. Keep `docs/specs/openapi.yaml` as the canonical contract subset and document its coverage gap instead of presenting every compatibility route as a stable public contract.
+**Architecture:** Treat `services/api/index.js` and mounted routers as the runtime source of truth, `packages/shared/src/contracts/` as the DTO source of truth, and `packages/shared/src/contracts/client/kk-api-client.ts` as the SDK source of truth. Keep `docs/specs/openapi.yaml` as the canonical contract subset and document its coverage gap instead of presenting every compatibility route as a stable public contract.
 
 **Tech Stack:** Express/CommonJS server, TypeScript shared contracts, Fetch-based `@kk/api-client`, OpenAPI 3.0, Markdown.
 
 ## Global Constraints
 
 - Product and version are `KK Studio v1.6.0`, sourced from `config/release-manifest.json`.
-- Current server runtime is `server/`; archived or removed backends must not be documented as active.
+- Current server runtime is `services/api/`; archived or removed backends must not be documented as active.
 - Never include real secrets, credentials, payment state, user data, or local machine paths in API examples.
-- Effective paths must account for the `/api` mount applied by `server/index.js`.
+- Effective paths must account for the `/api` mount applied by `services/api/index.js`.
 - Duplicate route registrations must be documented according to Express mount order, with the first matching handler identified as authoritative.
 
 ---
@@ -28,7 +28,7 @@ Status: historical
 - Modify: `docs/specs/README.md`
 
 **Interfaces:**
-- Consumes: `server/index.js`, `packages/shared/src/contracts/http/envelope.ts`, `docs/specs/openapi.yaml`.
+- Consumes: `services/api/index.js`, `packages/shared/src/contracts/http/envelope.ts`, `docs/specs/openapi.yaml`.
 - Produces: Navigation, base URL, authentication, headers, envelope, limits, and source-of-truth rules used by every detailed reference.
 
 - [x] **Step 1: Document API surfaces and authority order**
@@ -55,7 +55,7 @@ Expected: all three files contain resolvable navigation entries.
 - Create: `docs/api/runtime-endpoints.md`
 
 **Interfaces:**
-- Consumes: `server/index.js`, `server/routes/api.js`, `server/routes/contract-compat.js`, and every router below `server/routes/`.
+- Consumes: `services/api/index.js`, `services/api/routes/api.js`, `services/api/routes/contract-compat.js`, and every router below `services/api/routes/`.
 - Produces: One method/path/auth/purpose row for every effective endpoint plus a duplicate/alias register.
 
 - [x] **Step 1: Record root, health, webhook, static, and telemetry endpoints**
@@ -72,7 +72,7 @@ Identify duplicate method/path registrations and explain that `apiRouter` is mou
 
 - [x] **Step 4: Compare counts against source**
 
-Run: `rg -n '^router\.(get|post|put|patch|delete)' server/routes -g '*.js'`
+Run: `rg -n '^router\.(get|post|put|patch|delete)' services/api/routes -g '*.js'`
 
 Expected: 126 route registration statements before expanding array aliases; the documentation explains why registration count differs from unique effective endpoint count.
 

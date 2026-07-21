@@ -6,7 +6,7 @@ interface VerificationError extends Error {
 }
 
 async function loadVerifier() {
-  const module = await import('../../server/lib/capability-graph/connectionVerifier.js');
+  const module = await import('../../services/api/lib/capability-graph/connectionVerifier.js');
   return module.default || module;
 }
 

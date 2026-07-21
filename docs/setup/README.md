@@ -2,9 +2,9 @@ Status: reference
 
 # KK Studio 当前部署与本地运行
 
-本目录只描述 KK Studio v1.6.0 当前的 `apps/web/` + `server/` + VPS
+本目录只描述 KK Studio v1.6.0 当前的 `apps/web/` + `services/api/` + VPS
 PostgreSQL 运行链路。版本事实来自 `config/release-manifest.json`，数据库
-结构变更来自 `migrations/`；浏览器和文档都不得直接连接 Provider、数据库
+结构变更来自 `infrastructure/database/migrations/`；浏览器和文档都不得直接连接 Provider、数据库
 或支付系统。
 
 ## 当前入口
@@ -26,11 +26,11 @@ PostgreSQL 运行链路。版本事实来自 `config/release-manifest.json`，�
 
 它们不包含项目地址、客户端环境变量、访问令牌、默认密码或可复制的旧
 迁移命令。需要了解历史迁移时，只读 `docs/archive/` 中明确标记的记录，
-并以当前源码和 `migrations/` 为准。
+并以当前源码和 `infrastructure/database/migrations/` 为准。
 
 ## 安全边界
 
 - 生产密钥、数据库 URL、会话令牌和管理员凭据只能通过部署环境注入。
-- 账户、计费和 Provider 写操作必须经过认证的 `server/` API；Agent 只能
+- 账户、计费和 Provider 写操作必须经过认证的 `services/api/` API；Agent 只能
   读取脱敏摘要或请求用户确认。
 - 缺少必需环境变量时服务应 fail closed，不得使用默认值启动。

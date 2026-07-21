@@ -4,17 +4,17 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("payment webhook rejects compatibility-bridge failures instead of treating them as successful settlements", () => {
-  const source = readFileSync(path.join(process.cwd(), "server/routes/webhook.js"), "utf8");
+  const source = readFileSync(path.join(process.cwd(), "services/api/routes/webhook.js"), "utf8");
 
   assert.match(source, /if \(settlementSuccess\) \{/);
   assert.match(source, /Database error during settlement/);
 });
 
 test("payment settlement validates positive order credits before account recharge", () => {
-  const webhookSource = readFileSync(path.join(process.cwd(), "server/routes/webhook.js"), "utf8");
-  const creditsSource = readFileSync(path.join(process.cwd(), "server/lib/credits.js"), "utf8");
+  const webhookSource = readFileSync(path.join(process.cwd(), "services/api/routes/webhook.js"), "utf8");
+  const creditsSource = readFileSync(path.join(process.cwd(), "services/api/lib/credits.js"), "utf8");
   const migrationSource = readFileSync(
-    path.join(process.cwd(), "migrations/010_orders_positive_credits_constraint.sql"),
+    path.join(process.cwd(), "infrastructure/database/migrations/010_orders_positive_credits_constraint.sql"),
     "utf8",
   );
 

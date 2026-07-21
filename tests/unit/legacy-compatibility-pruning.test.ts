@@ -169,13 +169,13 @@ test("retired public static surfaces are removed from the current web runtime", 
 
 test("current runtime no longer exposes payment/v1 or Alipay callback protocol", () => {
   const activeFiles = [
-    "server/routes/compat/admin.js",
-    "server/routes/compat/billing.js",
+    "services/api/routes/compat/admin.js",
+    "services/api/routes/compat/billing.js",
     "packages/shared/src/contracts/client/kk-api-client.ts",
     "packages/shared/src/contracts/index.ts",
     "packages/shared/src/contracts/enums/status.ts",
     "docs/specs/openapi.yaml",
-    "scripts/architecture/check-spec-structure.mjs",
+    "scripts/governance/architecture/check-spec-structure.mjs",
   ];
 
   const source = activeFiles

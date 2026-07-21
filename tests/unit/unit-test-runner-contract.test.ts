@@ -14,10 +14,10 @@ test('unit test script uses the dedicated Windows-safe runner', () => {
   };
   const runnerSource = readSource('scripts/test/run-unit-suite.cmd');
 
-  assert.equal(packageJson.scripts['test:unit'], 'node --import ./scripts/test/set-log-level.mjs --test --test-isolation=process "tests/unit/*.test.ts"');
-  assert.equal(packageJson.scripts['test:integration'], 'node --test --test-isolation=none "tests/integration/*.test.ts"');
-  assert.equal(packageJson.scripts['test:contract'], 'node --test --test-isolation=none "tests/contract/*.test.ts"');
-  assert.equal(packageJson.scripts['test:e2e'], 'node --test --test-isolation=none "tests/e2e/*.test.ts"');
+  assert.equal(packageJson.scripts['test:unit'], 'node scripts/test/run-tests.mjs process "tests/unit/*.test.ts"');
+  assert.equal(packageJson.scripts['test:integration'], 'node scripts/test/run-tests.mjs none "tests/integration/*.test.ts"');
+  assert.equal(packageJson.scripts['test:contract'], 'node scripts/test/run-tests.mjs none "tests/contract/*.test.ts"');
+  assert.equal(packageJson.scripts['test:e2e'], 'node scripts/test/run-tests.mjs none "tests/e2e/*.test.ts"');
   assert.match(runnerSource, /for %%F in \(tests\\unit\\\*\.test\.ts\) do \(/);
-  assert.match(runnerSource, /node --import \.\/scripts\/test\/set-log-level\.mjs --test --test-concurrency=1 --test-isolation=none "%%F"/);
+  assert.match(runnerSource, /node scripts\/test\/run-tests\.mjs none "%%F"/);
 });

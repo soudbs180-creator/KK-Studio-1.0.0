@@ -5,8 +5,8 @@
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
     "title": "AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0",
     "summary": "Status: historical",
-    "contentHash": "3d56c74e2955b465c663e161175c776e",
-    "updatedAt": "2026-07-20T20:43:51.370Z"
+    "contentHash": "eaeb5272733accc4a78feeb96007eb56",
+    "updatedAt": "2026-07-21T18:33:59.760Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -32,8 +32,8 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "Status: reference",
-    "contentHash": "b39b3f65b61943bda7ca513c00a24c16",
-    "updatedAt": "2026-07-20T20:45:33.267Z"
+    "contentHash": "e0c1878444592d6aac07e961ae4987a2",
+    "updatedAt": "2026-07-21T18:33:59.760Z"
   },
   {
     "id": "doc_readme_md",
@@ -50,8 +50,8 @@
     "path": "docs/ai-assistant/RUNBOOKS.md",
     "title": "AI Assistant Runbooks — KK Studio v1.6.0",
     "summary": "Last updated: 2026-07-19",
-    "contentHash": "579ab39f098308f9e91685c70909461d",
-    "updatedAt": "2026-07-20T20:45:33.281Z"
+    "contentHash": "ec5095d84c683350f159f1e11196d87b",
+    "updatedAt": "2026-07-21T18:33:59.761Z"
   },
   {
     "id": "doc_safety_policy_md",
@@ -68,17 +68,17 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "Status: historical",
-    "contentHash": "2f13cd9cc414a33364cbf381f379765a",
-    "updatedAt": "2026-07-20T20:43:51.371Z"
+    "contentHash": "11ebec26a6badd751e8ed5546b8d56a2",
+    "updatedAt": "2026-07-21T18:26:47.728Z"
   },
   {
     "id": "doc_site_capability_matrix_md",
     "source": "doc",
     "path": "docs/ai-assistant/site-capability-matrix.md",
     "title": "KK Studio AI 全站能力覆盖矩阵",
-    "summary": "Last verified: 2026-07-19",
-    "contentHash": "f6d1166b1ce56a91cd812ccaa9d99acd",
-    "updatedAt": "2026-07-20T20:45:33.283Z"
+    "summary": "Last verified: 2026-07-22",
+    "contentHash": "37be6e1c3c46290fe34f75d5168b2d48",
+    "updatedAt": "2026-07-21T16:59:21.142Z"
   },
   {
     "id": "doc_skills_md",
@@ -86,8 +86,8 @@
     "path": "docs/ai-assistant/skills.md",
     "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.0",
     "summary": "Status: reference",
-    "contentHash": "00ecad251760675523a8841da028c17e",
-    "updatedAt": "2026-07-20T20:45:33.269Z"
+    "contentHash": "ed15a0c05ec0495b99b35f4962feea19",
+    "updatedAt": "2026-07-21T18:26:47.728Z"
   },
   {
     "id": "doc_tool_registry_md",

@@ -4,7 +4,7 @@ import { readSource } from "../support/workspacePaths.js";
 
 describe("Wuyin / Suchuang documented API routing", () => {
   test("strict Wuyin router is mounted before the legacy user router", () => {
-    const indexSource = readSource("server/routes/api.js");
+    const indexSource = readSource("services/api/routes/api.js");
     const strictRouterIndex = indexSource.indexOf("generateV1Router");
     const legacyRouterIndex = indexSource.indexOf("userRouter");
 
@@ -17,7 +17,7 @@ describe("Wuyin / Suchuang documented API routing", () => {
   });
 
   test("legacy target-url Wuyin proxy is converted into the documented strict contract", () => {
-    const strictSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
+    const strictSource = readSource("services/api/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
 
     assert.match(strictSource, /parseWuyinTargetUrl/);
     assert.match(strictSource, /handleGenericWuyinProxy/);
@@ -32,7 +32,7 @@ describe("Wuyin / Suchuang documented API routing", () => {
   });
 
   test("strict status routing requires model-bearing task ids and documented detail endpoints", () => {
-    const strictSource = readSource("server/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
+    const strictSource = readSource("services/api/lib/dispatcher/adapters/wuyin/wuyinRouteHandler.js");
 
     assert.match(strictSource, /decodeLocalProxyTaskId/);
     assert.match(strictSource, /getWuyinProduct\(parsed\.modelId\)/);

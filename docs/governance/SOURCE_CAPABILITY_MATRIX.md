@@ -26,27 +26,27 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 1.1 | 用户 API Key 生图 | 完全 | Provider 适配器、本地/云端 Key 路由已存在；BYOK 路径支持多模型。 | keep |
-| 1.2 | 用户 API Key 视频/音频 | 部分 | `server/routes/generate-v1.js:235` 的 `/v1/generate/async`（核心实现 `submitAsyncViaGenerationV3` :149）支持 Wuyin 异步提交；`server/lib/generation-v3/adapters/` 仅有 4 个图像 adapter，无视频/音频 adapter，仍由浏览器轮询。 | upgrade |
-| 1.3 | 平台积分生图 | 完全 | `server/lib/generation-v3/`（quoteEngine/billingSaga/jobLifecycle）已建立 Quote -> Job -> Billing -> Provider 闭环；旧同步路径 `server/lib/generation/generationController.js:95` billingSaga 仍在，`/v1/generate` Shadow 待 UI 切流后下线。 | keep |
-| 1.4 | 平台积分视频/音频 | 部分 | `/v1/generate/async` 已移除"必须带 routeId"限制，经 `submitAsyncViaGenerationV3`（`server/routes/generate-v1.js:149`）按 Quote 通道分发并走 v3 计费闭环；但无视频/音频 v3 adapter，执行与轮询仍在浏览器。 | upgrade |
-| 1.5 | BYOK 不扣平台积分 | 完全 | 通道在 Quote 创建时冻结：`server/lib/generation-v3/quoteEngine.js:93-95`（expiresAt/priceVersion/routeSnapshot）并落库 `:105-119`；预扣仅在 platform-credits 通道发生（`server/lib/generation-v3/billingSaga.js:20`）；Phase 1 Fake Provider 全通道测试通过。 | keep |
+| 1.2 | 用户 API Key 视频/音频 | 部分 | `services/api/routes/generate-v1.js:235` 的 `/v1/generate/async`（核心实现 `submitAsyncViaGenerationV3` :149）支持 Wuyin 异步提交；`services/api/lib/generation-v3/adapters/` 仅有 4 个图像 adapter，无视频/音频 adapter，仍由浏览器轮询。 | upgrade |
+| 1.3 | 平台积分生图 | 完全 | `services/api/lib/generation-v3/`（quoteEngine/billingSaga/jobLifecycle）已建立 Quote -> Job -> Billing -> Provider 闭环；旧同步路径 `services/api/lib/generation/generationController.js:95` billingSaga 仍在，`/v1/generate` Shadow 待 UI 切流后下线。 | keep |
+| 1.4 | 平台积分视频/音频 | 部分 | `/v1/generate/async` 已移除"必须带 routeId"限制，经 `submitAsyncViaGenerationV3`（`services/api/routes/generate-v1.js:149`）按 Quote 通道分发并走 v3 计费闭环；但无视频/音频 v3 adapter，执行与轮询仍在浏览器。 | upgrade |
+| 1.5 | BYOK 不扣平台积分 | 完全 | 通道在 Quote 创建时冻结：`services/api/lib/generation-v3/quoteEngine.js:93-95`（expiresAt/priceVersion/routeSnapshot）并落库 `:105-119`；预扣仅在 platform-credits 通道发生（`services/api/lib/generation-v3/billingSaga.js:20`）；Phase 1 Fake Provider 全通道测试通过。 | keep |
 
 ## 2. 任务执行与 Worker
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 2.1 | 浏览器侧持久化队列 | 完全 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365`，localStorage 持久化。 | upgrade |
-| 2.2 | 服务端 Durable Worker | 不符合 | `server/` 下 grep `worker`/`heartbeat` 零匹配；`server/lib/dispatcher/reconciliation.js` 是计费对账守护进程（`server/index.js:328-329` 启动），非执行 Worker。 | upgrade |
-| 2.3 | 关闭浏览器后续跑 | 不符合 | 异步视频/音频由浏览器轮询（提交入口 `server/routes/generate-v1.js:235`），关闭浏览器后无人轮询。 | upgrade |
+| 2.2 | 服务端 Durable Worker | 不符合 | `services/api/` 下 grep `worker`/`heartbeat` 零匹配；`services/api/lib/dispatcher/reconciliation.js` 是计费对账守护进程（`services/api/index.js:328-329` 启动），非执行 Worker。 | upgrade |
+| 2.3 | 关闭浏览器后续跑 | 不符合 | 异步视频/音频由浏览器轮询（提交入口 `services/api/routes/generate-v1.js:235`），关闭浏览器后无人轮询。 | upgrade |
 | 2.4 | 双轨执行 | 不符合 | `DurableGenerationQueue.ts:365`（前端）与 `apps/web/src/core/generation/GenerationEngine.ts:15` 并行存在。 | upgrade |
 
 ## 3. 计费与对账
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 3.1 | 预扣/结算/退款审计 | 完全 | `server/lib/generation-v3/billingSaga.js`：`reserveCredits` :20、`chargeFromReservation` :60、`refundItem` :81；调用点 `server/lib/generation-v3/jobLifecycle.js:45`（创建预扣）、`:185`（成功结算）、`:220`（失败退款）。 | keep |
-| 3.2 | Quote 冻结机制 | 完全 | `packages/shared/src/generation-v3/quote.ts:39`；路由 `server/routes/generation-v3.js:33-51`；TTL 300s（`quoteEngine.js:13`）、`expiresAt` :93、`priceVersion` :94、`routeSnapshot` 冻结 :95 并落库 :105-119。 | keep |
-| 3.3 | Item 级幂等 | 部分 | `migrations/017_quote_job_v3_and_ledger.sql:65` `UNIQUE(job_id, sequence)`；`jobStore.js:55-63` 按 sequence 建 Item；Job 级防重靠 `consumeQuote`（`jobLifecycle.js:62`）；item_id 为 randomUUID，尚无客户端提交的幂等键。 | upgrade |
+| 3.1 | 预扣/结算/退款审计 | 完全 | `services/api/lib/generation-v3/billingSaga.js`：`reserveCredits` :20、`chargeFromReservation` :60、`refundItem` :81；调用点 `services/api/lib/generation-v3/jobLifecycle.js:45`（创建预扣）、`:185`（成功结算）、`:220`（失败退款）。 | keep |
+| 3.2 | Quote 冻结机制 | 完全 | `packages/shared/src/generation-v3/quote.ts:39`；路由 `services/api/routes/generation-v3.js:33-51`；TTL 300s（`quoteEngine.js:13`）、`expiresAt` :93、`priceVersion` :94、`routeSnapshot` 冻结 :95 并落库 :105-119。 | keep |
+| 3.3 | Item 级幂等 | 部分 | `infrastructure/database/migrations/017_quote_job_v3_and_ledger.sql:65` `UNIQUE(job_id, sequence)`；`jobStore.js:55-63` 按 sequence 建 Item；Job 级防重靠 `consumeQuote`（`jobLifecycle.js:62`）；item_id 为 randomUUID，尚无客户端提交的幂等键。 | upgrade |
 | 3.4 | 账本与确认卡一致 | 需验证 | Item 级 ledger 已在 v3 形成（见 3.1）；确认 UI 与 ledger 金额一致性缺 E2E 证据——当前无真实 Provider 凭据，未覆盖真实生成/退款。 | verify |
 
 ## 4. Agent 运行时
@@ -81,7 +81,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 7.1 | 编译期 Feature Flag | 完全 | `apps/web/src/config/featureFlags.ts:1-4`、`apps/web/src/app/kkaiFeatureFlags.ts:1-7` 均为硬编码常量。 | upgrade |
-| 7.2 | 运行时能力 Flag | 不符合 | `server/` 下 grep `feature.?flag`（大小写不敏感）零匹配：无服务端 Flag 接口，无管理员 Kill Switch。 | upgrade |
+| 7.2 | 运行时能力 Flag | 不符合 | `services/api/` 下 grep `feature.?flag`（大小写不敏感）零匹配：无服务端 Flag 接口，无管理员 Kill Switch。 | upgrade |
 | 7.3 | 视觉 Flag 与能力 Flag 分离 | 不符合 | 当前视觉/能力开关均为同一常量（见 7.1）。 | upgrade |
 
 ## 8. 文档治理
@@ -126,14 +126,14 @@
 
 | 论断 | 源码路径 |
 |---|---|
-| /v1/generate 同步入口 | `server/routes/generate-v1.js:61` |
-| /v1/generate/async 入口与 v3 桥接 | `server/routes/generate-v1.js:235`（`submitAsyncViaGenerationV3` :149） |
-| v3 Quote 路由与冻结 | `server/routes/generation-v3.js:33-51`；`server/lib/generation-v3/quoteEngine.js:93-95,105-119` |
-| v3 Job 路由 | `server/routes/generation-v3.js:53-71` |
-| 统一 ProviderAdapter | `server/lib/generation-v3/providerAdapter.js:35-42`（Registry :44-78；adapters 目录仅图像 ×4 + fake） |
-| v3 计费 Saga | `server/lib/generation-v3/billingSaga.js:20,60,81`；`jobLifecycle.js:45,185,220` |
-| Item 幂等约束 | `migrations/017_quote_job_v3_and_ledger.sql:65` |
-| 旧同步 billingSaga | `server/lib/generation/generationController.js:95` |
+| /v1/generate 同步入口 | `services/api/routes/generate-v1.js:61` |
+| /v1/generate/async 入口与 v3 桥接 | `services/api/routes/generate-v1.js:235`（`submitAsyncViaGenerationV3` :149） |
+| v3 Quote 路由与冻结 | `services/api/routes/generation-v3.js:33-51`；`services/api/lib/generation-v3/quoteEngine.js:93-95,105-119` |
+| v3 Job 路由 | `services/api/routes/generation-v3.js:53-71` |
+| 统一 ProviderAdapter | `services/api/lib/generation-v3/providerAdapter.js:35-42`（Registry :44-78；adapters 目录仅图像 ×4 + fake） |
+| v3 计费 Saga | `services/api/lib/generation-v3/billingSaga.js:20,60,81`；`jobLifecycle.js:45,185,220` |
+| Item 幂等约束 | `infrastructure/database/migrations/017_quote_job_v3_and_ledger.sql:65` |
+| 旧同步 billingSaga | `services/api/lib/generation/generationController.js:95` |
 | 前端 DurableGenerationQueue | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365` |
 | 前端 GenerationEngine | `apps/web/src/core/generation/GenerationEngine.ts:15` |
 | Agent Run reload 置 failed | `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts:142-156` |

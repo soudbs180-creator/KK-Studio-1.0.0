@@ -4,8 +4,8 @@ import { test, beforeEach } from 'node:test';
 
 const require = createRequire(import.meta.url);
 
-const dataCollection = require('../../server/lib/data-collection/index.js');
-const { registerPresetTools } = require('../../server/lib/data-collection/presetTools.js');
+const dataCollection = require('../../services/api/lib/data-collection/index.js');
+const { registerPresetTools } = require('../../services/api/lib/data-collection/presetTools.js');
 
 beforeEach(() => {
   dataCollection.clearTools();

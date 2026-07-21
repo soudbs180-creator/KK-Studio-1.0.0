@@ -5,7 +5,7 @@ const connectionId = '550e8400-e29b-41d4-a716-446655440000';
 const timestamp = '2026-07-22T00:00:00.000Z';
 
 test('quote resolver selects an available user binding and preserves its routing versions', async () => {
-  const module = await import('../../server/lib/capability-graph/generationConnectionResolver.js');
+  const module = await import('../../services/api/lib/capability-graph/generationConnectionResolver.js');
   const { resolveQuoteConnectionRoute } = module.default || module;
   const route = await resolveQuoteConnectionRoute('user-1', {
     connectionId,
@@ -36,7 +36,7 @@ test('quote resolver selects an available user binding and preserves its routing
 });
 
 test('execution resolver decrypts only a binding that still matches the frozen snapshot', async () => {
-  const module = await import('../../server/lib/capability-graph/generationConnectionResolver.js');
+  const module = await import('../../services/api/lib/capability-graph/generationConnectionResolver.js');
   const { resolveExecutionConnectionAuth } = module.default || module;
   const routeSnapshot = {
     connectionId,

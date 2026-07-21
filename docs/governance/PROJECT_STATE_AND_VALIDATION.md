@@ -10,12 +10,12 @@ Project version: KK Studio v1.6.0
 Version source of truth: config/release-manifest.json
 Node / package manager: root package.json engines.node and packageManager
 AI rules entry: AGENTS.md
-Backend current fact: server/ Express / VPS
+Backend current fact: services/api/ Express / VPS
 Web current fact: apps/web/
 Shared contracts: packages/shared/
 API client: packages/api-client/
 UI package: packages/ui/
-Database migrations: migrations/
+Database migrations: infrastructure/database/migrations/
 Active OpenSpec: openspec/changes/upgrade-ai-creation-core/ (single active change)
 Docs governance: 233 Markdown / 18 current (docs/governance/DOCUMENTATION_INDEX.md)
 ```
@@ -27,14 +27,14 @@ Docs governance: 233 Markdown / 18 current (docs/governance/DOCUMENTATION_INDEX.
 | 领域 | 当前入口 | 说明 |
 |---|---|---|
 | Web | `apps/web/` | 当前 Web 主运行时，不回退到根 `src/`。 |
-| Backend | `server/` | 当前 Express / VPS 后端入口。 |
+| Backend | `services/api/` | 当前 Express / VPS 后端入口。 |
 | Shared | `packages/shared/` | DTO、枚举、领域契约和共享类型。 |
 | API Client | `packages/api-client/` | 前端和跨端 HTTP 出口。 |
 | UI | `packages/ui/` | 设计 token、基础组件和 UI bridge。 |
-| Migrations | `migrations/` | 数据库结构变更唯一合法目录。 |
+| Migrations | `infrastructure/database/migrations/` | 数据库结构变更唯一合法目录。 |
 | AI Takeover | `apps/web/src/features/ai-takeover/` | AI 接管体验入口。 |
 | AI Runtime | `apps/web/src/features/ai-assistant-runtime/` | ToolRegistry、CanvasRuntimeState、执行与知识同步。 |
-| Generation v3 | `server/lib/generation-v3/`、`server/routes/generation-v3.js` | Quote、Job、Billing、RouteEngine 与 Provider Adapter 当前控制面。 |
+| Generation v3 | `services/api/lib/generation-v3/`、`services/api/routes/generation-v3.js` | Quote、Job、Billing、RouteEngine 与 Provider Adapter 当前控制面。 |
 | Active OpenSpec | `openspec/changes/upgrade-ai-creation-core/` | 唯一活动升级计划；Capability Graph、Worker、Run 恢复、本地媒体与 IA 均在此跟踪。 |
 | Local Runner | `local-runner/` | 当前仅为 Browser/OpenCLI experimental runtime；在独立安全/build gate 通过前不是生产媒体运行时。 |
 
@@ -91,7 +91,7 @@ npm run local-runner:build
 1. `config/release-manifest.json` 是唯一版本事实源。
 2. `package.json` 的 `governance:check` 必须包含 `governance:current`。
 3. `AGENTS.md` 和本文件不得保留过期的当前版本断言。
-4. 当前 Web 入口固定为 `apps/web/`，当前后端入口固定为 `server/`。
+4. 当前 Web 入口固定为 `apps/web/`，当前后端入口固定为 `services/api/`。
 5. 旧目录不存在或只能在 archive 文档中出现；不得在 active runtime 中恢复。
 6. Provider、Provider Connection、Model 与 Capability 必须是不同领域对象；UI、Agent 与 RouteEngine 只消费 canonical catalog 和服务端 Connection 投影。
 7. Browser 只持有交互和离线投影；VPS 是 Job/Run/Quote/Billing 权威源；Local Runner 只执行声明式、受权限约束的本地能力。

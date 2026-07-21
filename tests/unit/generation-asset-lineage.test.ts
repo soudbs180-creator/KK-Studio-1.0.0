@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 test('completed generation item records stable asset metadata and reference lineage', async () => {
-  const module = await import('../../server/lib/generation-v3/jobLifecycle.js');
+  const module = await import('../../services/api/lib/generation-v3/jobLifecycle.js');
   const { completeItem } = module.default || module;
   const calls: Array<{ text: string; values: unknown[] }> = [];
   const client = {

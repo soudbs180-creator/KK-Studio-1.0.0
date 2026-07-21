@@ -8,7 +8,7 @@ database, default-admin-password and browser-to-Provider examples.
 ```text
 apps/web or apps/mobile
   -> @kk/api-client / createKkApiClient
-    -> authenticated server/ endpoint
+    -> authenticated services/api/ endpoint
       -> provider dispatcher and adapter
         -> external Provider
 ```
@@ -50,7 +50,7 @@ Agent-autonomous capabilities.
 
 There is no documented default administrator password. Admin access uses the
 current authenticated server API and deployment-managed bootstrap process.
-Database changes use reviewed files under `migrations/`; application code and
+Database changes use reviewed files under `infrastructure/database/migrations/`; application code and
 documentation must not carry copied setup SQL or password hashes.
 
 ## Verification checklist

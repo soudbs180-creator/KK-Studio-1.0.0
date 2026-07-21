@@ -3,7 +3,7 @@ import test from 'node:test';
 
 // 通过 dynamic import 加载 CommonJS 模块，ESM 会把 module.exports 包装为 default
 const loadModule = async () => {
-  const mod: any = await import('../../server/lib/generation-v3/fakeProviderAdapter.js');
+  const mod: any = await import('../../services/api/lib/generation-v3/fakeProviderAdapter.js');
   return mod.default || mod;
 };
 

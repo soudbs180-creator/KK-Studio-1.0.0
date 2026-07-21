@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 test('migration 018 adds tenant-scoped connection, binding, and lineage tables', () => {
-  const migrationPath = 'migrations/018_capability_graph_foundation.sql';
+  const migrationPath = 'infrastructure/database/migrations/018_capability_graph_foundation.sql';
   assert.equal(fs.existsSync(migrationPath), true);
   const migration = fs.readFileSync(migrationPath, 'utf8');
 

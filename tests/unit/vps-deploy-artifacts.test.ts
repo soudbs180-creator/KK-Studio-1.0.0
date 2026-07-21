@@ -11,12 +11,12 @@ const ROOT_DIR = process.cwd();
 
 
 test("VPS bootstrap and deploy scripts reference the expected runtime artifacts", () => {
-  const bootstrapSource = readSource("scripts/vps/bootstrap-kk-vps.sh");
-  const deploySource = readSource("scripts/vps/deploy-kk-vps.sh");
-  const envSource = readSource("scripts/vps/kk-vps.env.example");
+  const bootstrapSource = readSource("scripts/ops/vps/bootstrap-kk-vps.sh");
+  const deploySource = readSource("scripts/ops/vps/deploy-kk-vps.sh");
+  const envSource = readSource("scripts/ops/vps/kk-vps.env.example");
   const apiServiceSource = readSource("config/deploy/systemd/kk-api.service");
   const nginxSource = readSource("config/deploy/nginx/kk-vps.conf.legacy");
-  const postgresAccessSource = readSource("scripts/vps/repair-postgres-client-access.sh");
+  const postgresAccessSource = readSource("scripts/ops/vps/repair-postgres-client-access.sh");
 
   assert.match(bootstrapSource, /bootstrap-kk-vps\.sql/);
   assert.match(bootstrapSource, /postgresql/);

@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test("postgres migration scripts exist for Supabase runtime export and VPS import", () => {
-  const envTemplate = "scripts/postgres/runtime-migration.env.example";
-  const exportScript = "scripts/postgres/export-supabase-runtime.sh";
-  const importScript = "scripts/postgres/import-runtime-into-vps.sh";
-  const importLocalAuthScript = "scripts/postgres/import-local-auth-identities.mjs";
-  const migrateScript = "scripts/postgres/migrate-supabase-runtime.sh";
-  const bootstrapSql = "scripts/postgres/bootstrap-kk-vps.sql";
+  const envTemplate = "scripts/ops/postgres/runtime-migration.env.example";
+  const exportScript = "scripts/ops/postgres/export-supabase-runtime.sh";
+  const importScript = "scripts/ops/postgres/import-runtime-into-vps.sh";
+  const importLocalAuthScript = "scripts/ops/postgres/import-local-auth-identities.mjs";
+  const migrateScript = "scripts/ops/postgres/migrate-supabase-runtime.sh";
+  const bootstrapSql = "scripts/ops/postgres/bootstrap-kk-vps.sql";
 
   [envTemplate, exportScript, importScript, importLocalAuthScript, migrateScript, bootstrapSql].forEach((relativePath) => {
     assert.equal(existsSync(path.join(ROOT_DIR, relativePath)), true, `${relativePath} should exist`);

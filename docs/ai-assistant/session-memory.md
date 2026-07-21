@@ -149,7 +149,7 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 
 - `@lobehub/icons` and `@lobehub/fluent-emoji` are no longer production dependencies. Keep `npm ls @lobehub/icons @lobehub/fluent-emoji @lobehub/ui antd --all` empty.
 - `apps/web/src/utils/lobeIconCdn.ts` may continue to generate Lobe static icon CDN URLs. Do not replace that helper with npm package imports.
-- `scripts/architecture/check-ui-import-boundaries.mjs` blocks direct imports of `@lobehub/ui`, `@lobehub/icons`, `@lobehub/fluent-emoji`, and `antd`, including side-effect and dynamic imports.
+- `scripts/governance/architecture/check-ui-import-boundaries.mjs` blocks direct imports of `@lobehub/ui`, `@lobehub/icons`, `@lobehub/fluent-emoji`, and `antd`, including side-effect and dynamic imports.
 - Production build expectation after this pass remains 4398 transformed modules; the benefit is lower install/audit/supply-chain surface rather than a smaller runtime chunk.
 - Remaining production bundle debt is `vendor`, `canvas-core`, `workspace-layout`, and `index.css`.
 

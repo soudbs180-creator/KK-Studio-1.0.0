@@ -47,7 +47,7 @@ Replace the current Supabase-centered hosted runtime with a fully self-hosted VP
   - backend login issues 1-hour access tokens
   - frontend stores only `accessToken`
   - refresh session persistence is not implemented as a durable server-managed browser session
-- The existing `supabase/migrations/*.sql` files cannot be used as-is on a normal VPS PostgreSQL instance because they rely on Supabase-specific features such as `auth.users`, RLS, and `auth.uid()`.
+- The existing `supabase/infrastructure/database/migrations/*.sql` files cannot be used as-is on a normal VPS PostgreSQL instance because they rely on Supabase-specific features such as `auth.users`, RLS, and `auth.uid()`.
 
 **Approved Product Decisions**
 
