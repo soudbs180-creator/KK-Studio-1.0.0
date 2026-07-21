@@ -1,7 +1,7 @@
 <!-- AI_ROUTING_KEY: state, validation, verification, milestone, handoff -->
 # Project State and Validation — KK Studio v1.6.0
 
-Last updated: 2026-06-09
+Last updated: 2026-07-22
 
 ## 0. 当前验证基线
 
@@ -16,6 +16,8 @@ Shared contracts: packages/shared/
 API client: packages/api-client/
 UI package: packages/ui/
 Database migrations: migrations/
+Active OpenSpec: openspec/changes/upgrade-ai-creation-core/ (single active change)
+Docs governance: 233 Markdown / 18 current (docs/governance/DOCUMENTATION_INDEX.md)
 ```
 
 本文件只记录当前状态、验证入口和清理边界。历史事实、旧计划、旧版本和旧部署路径应归档到 `docs/archive/`，不得重新影响当前主链路。
@@ -55,6 +57,14 @@ Database migrations: migrations/
 npm run verify:changes
 ```
 
+> 注意：`verify:changes` 脚本内含 Node 24 专属标志（engines.node 为 24.x）；在 Node 22 运行时下需手工执行其等价子集，Phase 1 验收即按此完成（记录见 `openspec/changes/upgrade-ai-creation-core/tasks.md`）。
+
+大画布 10K 节点 smoke：
+
+```bash
+npm run verify:large-canvas-10k
+```
+
 项目清理与事实一致性：
 
 ```bash
@@ -78,6 +88,8 @@ npm run build
 3. `AGENTS.md` 和本文件不得保留过期的当前版本断言。
 4. 当前 Web 入口固定为 `apps/web/`，当前后端入口固定为 `server/`。
 5. 旧目录不存在或只能在 archive 文档中出现；不得在 active runtime 中恢复。
+6. 活动 OpenSpec 唯一入口为 `openspec/changes/upgrade-ai-creation-core/`；新工作追加到该 change，不创建平行 change。
+7. 每个 PR 的验收门禁见 `openspec/changes/upgrade-ai-creation-core/tasks.md` 文末"PR 验收模板"。
 
 ## 5. 2026-06-09 - 当前事实清洗与轻量化基线
 

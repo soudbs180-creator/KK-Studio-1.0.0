@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 1 in progress
-> Last updated: 2026-07-21
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs in progress.
+> Status: active / Phase 1 closed / Phase 2 ready
+> Last updated: 2026-07-22
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: server durable Worker + Capability Graph projection.
 
 ---
 
@@ -41,14 +41,33 @@
 
 ---
 
-## Phase 2 — 云端 Durable Worker（3 周，拆 2a + 2b）
+## Phase 1 Closure Gate — 文档与契约对齐（docs-only）
 
-### 2a — 图片 Worker（第 1 周）
+- [x] 修正 proposal / design / tasks 三处状态头语义不一致：统一为 "Phase 1 closed, entering Phase 2"，Last verified 更新为 2026-07-22。
+- [x] 修正文档计数漂移：实际为 233 份 Markdown / 18 份 current（达成 15–25 目标），同步 proposal、能力矩阵与项目状态文档。
+- [x] 修正能力矩阵证据坐标：Browser Bridge 等条目改写为完整路径 + 行号，并按 Phase 1 交付事实刷新符合度与 upgrade/keep/archive 统计。
+- [x] 将 Capability Graph、Provider Connection、三 Runtime、Local Media、AI Workspace 控制链、新 IA 契约写入 `design.md` 第 9–15 节。
+- [x] 记录当前测试证据基线：Phase 1 verify 记录、Provider governance 38 tests、Canvas benchmark 3/3、10K smoke（伴随 quota 警告与 long task）、`local-runner` 独立 typecheck 未通过。
+- [x] 在本文档建立 PR 验收模板（见文末），后续每个 PR 按模板填写。
+- [x] 同步 `docs/governance/PROJECT_STATE_AND_VALIDATION.md` 验证入口与治理状态。
 
+---
+
+## Phase 2 — 云端 Durable Worker + Capability Graph 前置（3 周，拆 2a + 2b）
+
+### 2a — Capability Graph / Connection 前置 + 图片 Worker（第 1–2 周）
+
+- [ ] migration `018_capability_graph_foundation.sql`：新增 `provider_connections`、`capability_bindings` 与 asset lineage relation；additive，不保存明文 secret。（迁移、兼容、flag、回滚、安全、性能、测试、残余风险、删除条件按文末 PR 验收模板填写）
+- [ ] Capability Graph DTO（Zod discriminated union）+ projection service + `GET /api/v1/capability-graph/snapshot`；Actor/Job/Run/Audit 从现有权威表投影，不建 EAV 节点表。
+- [ ] Provider Connection CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）；迁移期 dual-read 旧 profile payload，新写入只走新表。
+- [ ] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
+- [ ] 首个纵向切片：Google official image adapter（生产）+ `FakeProviderAdapter`（测试）；server flag `capability_graph.image_provider_slice` 按 internal → invited → full 放量；关闭 flag 只隐藏新 UI/tool 并恢复旧 connection 读取。
+- [ ] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
 - [ ] 在 `server/` 新增 Worker 子系统：租约表、心跳续约、任务领取、提交、轮询、超时、取消。
 - [ ] 实现 Worker 与图像 Provider Adapter 对接，完成图片 Job 的云端执行。
 - [ ] 浏览器关闭后 Worker 继续执行，重新登录时通过 SSE 事件流恢复投影。
 - [ ] 验证已完成 Item 永不重复提交或换通道。
+- [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 
 ### 2b — 视频/音频 Worker（第 2–3 周）
 
@@ -67,8 +86,9 @@
 - [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
 - [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。
 - [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
+- [ ] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名。
 - [ ] 将 `AgentRunStore` 从 localStorage 升级为服务端权威源，reload 时不再置 failed。
-- [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理。
+- [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。
 
@@ -76,7 +96,7 @@
 
 ## Phase 4 — PPT Agent 全流程（2 周）
 
-- [ ] 实现 `PptDeckPlanDto`、`PptSlideSpecDto`、`PptDeckJobDto` 和数据库表。
+- [ ] 实现 `PptDeckPlanDto`、`PptSlideSpecDto`、`PptDeckJobDto` 和数据库表；不扩大 scope，Deck Job 复用既有 Job/Asset/Lineage 契约。
 - [ ] 实现 `ppt.createDeckJob`、`ppt.getDeckJob`、`ppt.updateDeck`、`ppt.exportEditableDeck` 工具。
 - [ ] 将 `TaskOrchestrator.handleSlides()` 旁路替换为 `PptDeckPlan -> Slide Jobs -> Editable Deck`。
 - [ ] 每页独立生成可编辑图层（文本/图片/形状），不生成整页位图。
@@ -88,9 +108,11 @@
 
 ## Phase 5 — Browser Bridge 与 Grok Worker（1–2 周）
 
-- [ ] 增强 `browserBridge.ts`：站点能力清单、冻结目标、结构化结果验证。
+- [ ] 增强 `browserBridge.ts`：站点能力清单（capability manifest）、冻结目标、结构化结果验证。
 - [ ] 保留白名单、确认、审计、脱敏，禁止任意 selector/URL/Shell/自动公开发布。
-- [ ] 实现 Browser Bridge 断连 setup_required 处理与 SSRF 防护。
+- [ ] 实现 Browser Bridge 断连 setup_required 处理与 SSRF 防护；Browser Bridge 与未来 Local Media Runtime 共用受控 runtime manifest。
+- [ ] Local Runtime 安全加固：移除 fallback token 与 token 日志、token 文件 ACL/轮换、body/尺寸上限、Zod 校验、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额。
+- [ ] `local-runner:build` 与独立测试纳入 `verify:changes` 或 release manifest；通过前只标记 experimental。
 - [ ] 建立 ACP Gateway，隔离 Grok 输出 patch/artifact。
 - [ ] 管理员审批流程：Grok 输出必须经审批后执行 typecheck/build/test，禁止访问计费/生成/数据库/发布。
 - [ ] 运行 Phase 5 相关测试 + `verify:changes`。
@@ -102,6 +124,9 @@
 - [ ] 将 `apps/web/src/config/featureFlags.ts` 和 `app/kkaiFeatureFlags.ts` 硬编码常量升级为服务端 Feature Flag。
 - [ ] 实现 `/api/v1/admin/feature-flags` 与客户端广播（SSE 或短轮询）。
 - [ ] 使用 `workspaceUiVariant` 等视觉 Flag 分阶段切换工作台 UI。
+- [ ] 渐进式 IA：统一 layout state、左侧 Connections/Capabilities、右侧单一 AI + Inspector dock、底部 task/assets tray、全局 command palette、minimap 基于真实 viewport 重排、DOM 单一 AI toggle。
+- [ ] UI 依赖收敛须先有 import/bundle 测量数据，再决定 Chakra、Motion、GSAP 等去留。
+- [ ] 旧路径删除门禁：迁移完成 + 兼容期结束 + flag 回滚验证 + 观测窗口通过后，才删除重复 pricing catalog、旧队列写路径与兼容 alias。
 - [ ] 确保新旧 UI 同时读取相同 Job、Run、Canvas、Deck 投影；关闭 Flag 只回滚界面，不回滚业务数据。
 - [ ] 验证 Kill Switch 在 5 秒内生效。
 - [ ] 运行 Phase 6 相关测试 + `verify:changes`。
@@ -116,5 +141,48 @@
 - [ ] Agent 验收：多轮指代、上下文裁剪、工具结果回填、确认过期、owner/画布切换、崩溃恢复、最多三次受控重规划。
 - [ ] PPT 验收：OpenXML 解包、文字/图片层、顺序、关系文件；PowerPoint/LibreOffice 可编辑。
 - [ ] Browser Bridge 验收：SSRF、动态目标、脱敏、二次确认、断连 setup_required，无模拟成功。
-- [ ] 治理验收：current 文档 ≤25 份，`architecture:check`、`governance:check`、`typecheck`、`build`、完整测试、`verify:changes` 全绿。
+- [ ] Contract 验收：DTO discriminated union、未知版本拒绝、secret 永不序列化、edge ownership/status/constraints 完整。
+- [ ] Migration 验收：空库、已有用户、重复执行、dual-read、回滚 flag、跨用户隔离。
+- [ ] Integration 验收：Connection verify、quote 过期、route snapshot 冻结、Job 幂等、Adapter 失败、退款/对账、Asset lineage、刷新恢复。
+- [ ] Security 验收：SSRF/私网/重定向、IDOR、quote replay、callback spoof、路径穿越、symlink、超大/伪 MIME 媒体、过期 confirmation。
+- [ ] E2E 验收：连接 Google（自动化用 Fake）→ AI 规划 → 确认 → 生成 → thumbnail → canvas → Task Center → 刷新恢复 → audit。
+- [ ] UX 验收：单一 AI toggle、键盘/焦点顺序、dock/tray/minimap 不重叠、失败状态提供可执行恢复动作。
+- [ ] 10K 验收：现有 smoke 零回归、DOM 峰值不高于当前 1,305、连接线误差小于 1px。
+- [ ] 真实媒体验收：1K 混合代理输入响应 p95 ≤100ms；只 hydrate viewport+overscan；三轮导入/删除后内存相对首轮稳定点增长 ≤10%；object URL 回落到活动资产数。
+- [ ] 治理验收：current 文档 15–25 份，`architecture:check`、`governance:check`、`typecheck`、`build`、完整测试、`verify:changes` 全绿。
 - [ ] 灰度发布：内部管理员 → 受邀测试用户 → 全量三阶段；监控报价不一致、重复扣费、退款失败、Worker 延迟、Run 恢复率、PPT 导出失败率。
+
+---
+
+## PR 验收模板（每个 PR 必须填写）
+
+每个 PR 必跑检查：
+
+```bash
+npm run architecture:check
+npm run governance:check
+npm run typecheck
+npm run spec:check
+# 以及相关 tests / build
+```
+
+合并前必跑：
+
+```bash
+npm run verify:changes
+npm run verify:large-canvas-10k
+```
+
+每个 task / PR 描述必须包含以下字段：
+
+1. **问题**：要解决什么，证据是什么。
+2. **决策**：方案与关键取舍，为什么不选替代方案。
+3. **迁移**：数据/配置如何迁移，是否 additive。
+4. **兼容**：旧 API / 旧数据 / 旧 UI 的兼容策略与期限。
+5. **flag**：使用的 feature flag 名称、默认值、灰度阶段。
+6. **回滚**：关闭 flag 的行为；禁止 destructive rollback。
+7. **安全**：威胁模型相关项（IDOR/SSRF/凭据/replay/路径/媒体/XSS 等）与处理。
+8. **性能**：是否影响 10K / 真实媒体基线，附测量数据。
+9. **测试**：contract / migration / integration / security / E2E / UX 覆盖情况。
+10. **残余风险**：已知未覆盖项与跟踪方式。
+11. **删除条件**：旧路径/兼容 alias 的删除前置（迁移完成 + 兼容期 + flag 回滚验证 + 观测窗口）。
