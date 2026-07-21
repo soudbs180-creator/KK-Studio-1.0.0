@@ -59,7 +59,6 @@
 		"react-resizable-panels": "^4.11.2",
 		"react-router": "^7.17.0",
 		"react-router-dom": "^7.17.0",
-		"react-router-hono-server": "^2.13.0",
 		"recharts": "^3.8.1",
 		"remark-gfm": "^4.0.1",
 		"serialize-error": "^13.0.1",

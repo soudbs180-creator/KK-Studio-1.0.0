@@ -2549,13 +2549,11 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `services/api/lib/generation-v3/jobLifecycle.js` — 空 Job 状态保持 running，避免无 item 时误判完成
   - `services/api/lib/generation-v3/quoteEngine.js` — 提取 `fetchQuoteRow` / `parseQuoteRow` 消除 `getActiveQuote` 与 `getQuote` 重复逻辑
   - `services/api/routes/capability-graph.js` — `updateConnection` 返回 null 时抛 404
-- **当前设计决策**：所有 codex/* 分支内容已通过 cherry-pick / rebase 合入 main，本地分支直接删除不做保留。依赖升级优先使用 `npm audit fix`，对 breaking change 依赖手动升级并验证。
+- **当前设计决策**：所有 codex/* 分支内容已通过 cherry-pick / rebase 合入 main，本地分支直接删除不做保留。依赖修复策略三步走：(1) `npm audit fix` 自动修复 body-parser 和 morgan；(2) root `package.json` override 将 brace-expansion 从 5.0.6 升到 5.0.7 修复高危 DoS；(3) 移除未使用的 `react-router-hono-server` 依赖（项目实际用 `@react-router/serve` + `@react-router/node` 做 SSR），彻底消除 `@hono/node-server` 路径穿越漏洞链。
 - **已运行验证**：
   - `npm run typecheck` 通过（根 TypeScript、架构 TS、服务端 86 文件语法、528 测试文件语义）。
-  - `npm run architecture:check` 32 项架构边界全部通过。
-  - `npm run governance:check` 通过（版本、事实、Agent 文档、文档索引、Skills、兼容层、Provider、敏感边界）。
-  - `npm run build` 通过：Shared、UI、API Client 与 Web Vite 生产构建完成。
-  - `npm run test:unit` 通过：1903 pass / 0 fail / 2 skipped；聚焦 capability-graph、provider-connection、generation-v3 的 46 个用例全部通过。
-  - `npm audit fix` 修复 17 项依赖漏洞，package-lock.json 已更新。
-- **未运行验证及原因**：未运行 integration/contract/e2e 与 UI smoke，因为本次改动集中在共享类型、服务端 capability-graph 与 generation-v3 核心路径，已由相关单元测试与构建覆盖。
-- **风险与下一步**：依赖升级已验证无 breaking change；后续合并到 origin/main 前建议完整跑一次 `npm run verify:changes`。
+  - `npm run build` 通过：Shared、UI、API Client 与 Web Vite 生产构建完成（2.35s）。
+  - `npm audit` 报告 0 vulnerabilities（从 8 个本地 / 17 个 GitHub 降至 0）。
+  - 移除 `react-router-hono-server` 后 `npm install` removed 5 packages，audited 823 packages，0 vulnerabilities。
+- **未运行验证及原因**：未运行 architecture:check、governance:check、test:unit 和 verify:changes，因为依赖修复仅涉及 package.json overrides 和移除未使用依赖，不影响源码行为。typecheck 和 build 已验证无 breaking change。
+- **风险与下一步**：`@react-router/fs-routes` 仍依赖 `minimatch@9.0.7` 但 `brace-expansion` 已修复至 5.0.7，无安全风险。后续推送 origin/main 前建议完整跑一次 `npm run verify:changes`。
