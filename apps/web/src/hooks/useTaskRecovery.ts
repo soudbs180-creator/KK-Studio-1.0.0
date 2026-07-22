@@ -5,12 +5,20 @@ import {
   getPendingTasks,
   saveTask,
   updateTaskStatus,
-  modeToTaskType
+  modeToTaskType,
+  type PersistedTask,
 } from '../services/persistence/taskPersistence';
 import { keyManager } from '../services/auth/keyManager';
 import { resolveProviderRuntime } from '../services/api/providerStrategy';
 import { normalizePersistentResultUrl } from '../utils/imageResultPersistence';
 import { resumeGenerationTask } from '../services/generation/generationJobRecovery';
+import {
+  discoverPendingGenerationJobs,
+  findRecoveryPromptNode,
+  mergeRecoveryCandidates,
+  type GenerationJobRecoveryCandidate,
+} from '../services/generation/generationJobDiscovery';
+import { getRuntimeOwnerId } from '../services/auth/runtimeSessionProfile';
 import {
   getLatestStartupSnapshot,
   isStartupStageReady,
@@ -39,8 +47,20 @@ const checkTaskStatuses: LlmServiceModule['generationService']['checkTaskStatuse
 };
 
 type TaskRecoveryCanvasSnapshot = {
+  id?: string;
   promptNodes?: PromptNode[];
 } | null | undefined;
+
+type HydrateDiscoveredTask = (
+  node: PromptNode,
+  taskId: string,
+  expectedOwnerId: string,
+) => PromptNode | null;
+
+type RecoverableEntry = {
+  task: GenerationJobRecoveryCandidate;
+  node: PromptNode;
+};
 
 const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): TaskProviderType => {
   const normalizedModel = String(model || '').trim().toLowerCase();
@@ -65,6 +85,14 @@ function abortRecoveryControllers(controllers: Map<string, AbortController>): vo
   controllers.clear();
 }
 
+function isRecoveryActive(ownerId: string, signal: AbortSignal): boolean {
+  return !signal.aborted && getRuntimeOwnerId() === ownerId;
+}
+
+function filterPendingTasks(tasks: PersistedTask[]): PersistedTask[] {
+  return tasks.filter((task) => task.status === 'pending' || task.status === 'processing');
+}
+
 /**
  * 任务恢复 Hook
  * 在页面加载、回到前台和网络恢复后自动恢复进行中的任务
@@ -73,6 +101,7 @@ export function useTaskRecovery(
   activeCanvas: TaskRecoveryCanvasSnapshot,
   pollTaskFn: (node: PromptNode, taskId: string) => Promise<void>,
   enabled = true,
+  hydrateDiscoveredTask?: HydrateDiscoveredTask,
 ) {
   const [state, setState] = useState<TaskRecoveryState>({
     isLoading: false,
@@ -82,6 +111,10 @@ export function useTaskRecovery(
   const isRecoveringRef = useRef(false);
   const lastRecoveredAtRef = useRef(new Map<string, number>());
   const activeRecoveryControllersRef = useRef(new Map<string, AbortController>());
+  const discoveryControllerRef = useRef<AbortController | null>(null);
+  const activeCanvasSnapshotRef = useRef(activeCanvas);
+  activeCanvasSnapshotRef.current = activeCanvas;
+  const canvasRecoveryKey = `${activeCanvas?.id || 'no-canvas'}:${Boolean(activeCanvas?.promptNodes?.length)}`;
 
   /**
    * 恢复数据库中的待处理任务
@@ -91,27 +124,49 @@ export function useTaskRecovery(
     isRecoveringRef.current = true;
 
     setState(prev => ({ ...prev, isLoading: true }));
+    const recoveryOwnerId = getRuntimeOwnerId();
+    const discoveryController = new AbortController();
+    discoveryControllerRef.current = discoveryController;
 
     try {
-      const tasks = await getPendingTasks();
-      const recoverableTasks = tasks.filter(
-        task => task.status === 'pending' || task.status === 'processing'
-      );
+      const localTasks = filterPendingTasks(await getPendingTasks());
+      if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
+      let serverTasks: GenerationJobRecoveryCandidate[] = [];
+      try {
+        serverTasks = await discoverPendingGenerationJobs({ signal: discoveryController.signal });
+      } catch (error) {
+        if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
+        console.warn('[TaskRecovery] Server Job discovery unavailable:', error);
+      }
+      if (getRuntimeOwnerId() !== recoveryOwnerId || discoveryController.signal.aborted) return;
+      const recoverableTasks = mergeRecoveryCandidates(localTasks, serverTasks);
       const now = Date.now();
-      const recoverableEntries: Array<{ task: typeof recoverableTasks[number]; node: PromptNode }> = [];
+      const recoverableEntries: RecoverableEntry[] = [];
+      const claimedPromptNodeIds = new Set<string>();
       let recovered = 0;
 
       for (const task of recoverableTasks) {
-        const node = activeCanvas?.promptNodes?.find(
-          n => n.jobId === task.taskId || n.id === task.promptNodeId
-        );
+        let node = findRecoveryPromptNode(activeCanvasSnapshotRef.current?.promptNodes || [], task);
 
         if (!node) {
           console.log(`[TaskRecovery] Found orphaned task: ${task.taskId}`);
           continue;
         }
+        if (claimedPromptNodeIds.has(node.id)) continue;
 
-        if (reason === 'online' && node.jobId === task.taskId) {
+        if (task.discoveredFromServer && node.jobId !== task.taskId) {
+          if (node.jobId || !hydrateDiscoveredTask) continue;
+          if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
+          const hydratedNode = hydrateDiscoveredTask(node, task.taskId, recoveryOwnerId);
+          if (!hydratedNode) continue;
+          if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
+          claimedPromptNodeIds.add(hydratedNode.id);
+          node = hydratedNode;
+        } else {
+          claimedPromptNodeIds.add(node.id);
+        }
+
+        if (reason === 'online' && !task.discoveredFromServer && node.jobId === task.taskId) {
           continue;
         }
 
@@ -142,6 +197,7 @@ export function useTaskRecovery(
 
       for (const group of midjourneyGroups.values()) {
         if (group.length < 2) continue;
+        if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
 
         try {
           await checkTaskStatuses(
@@ -156,6 +212,7 @@ export function useTaskRecovery(
       }
 
       for (const { task, node } of recoverableEntries) {
+        if (!isRecoveryActive(recoveryOwnerId, discoveryController.signal)) return;
         recovered++;
         const controller = new AbortController();
         activeRecoveryControllersRef.current.set(task.taskId, controller);
@@ -170,26 +227,35 @@ export function useTaskRecovery(
         });
       }
 
-      setState({
-        isLoading: false,
-        recoveredCount: recovered,
-        pendingCount: recoverableTasks.length,
-      });
+      if (isRecoveryActive(recoveryOwnerId, discoveryController.signal)) {
+        setState({
+          isLoading: false,
+          recoveredCount: recovered,
+          pendingCount: recoverableTasks.length,
+        });
+      }
     } catch (error) {
-      console.error('[TaskRecovery] Failed to recover tasks:', error);
-      setState(prev => ({ ...prev, isLoading: false }));
+      if (isRecoveryActive(recoveryOwnerId, discoveryController.signal)) {
+        console.error('[TaskRecovery] Failed to recover tasks:', error);
+        setState(prev => ({ ...prev, isLoading: false }));
+      }
     } finally {
+      if (discoveryControllerRef.current === discoveryController) {
+        discoveryControllerRef.current = null;
+      }
       isRecoveringRef.current = false;
     }
-  }, [activeCanvas, pollTaskFn]);
+  }, [canvasRecoveryKey, hydrateDiscoveredTask, pollTaskFn]);
 
   useEffect(() => {
     if (enabled) return undefined;
+    discoveryControllerRef.current?.abort();
     abortRecoveryControllers(activeRecoveryControllersRef.current);
     return undefined;
   }, [enabled]);
 
   useEffect(() => () => {
+    discoveryControllerRef.current?.abort();
     abortRecoveryControllers(activeRecoveryControllersRef.current);
   }, []);
 

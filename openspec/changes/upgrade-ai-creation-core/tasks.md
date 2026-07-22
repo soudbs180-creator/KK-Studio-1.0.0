@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2a foundations landed / local control-plane gaps and external rollout gates pending
+> Status: active / Phase 2a local recovery discovery landed / external rollout gates pending
 > Last updated: 2026-07-22
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection and server image Worker code foundations landed; image-slice data-plane gating, Worker drain-safe rollback, cross-device Job discovery, migration rehearsal and rollout remain open.
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback 与本地 pending Job discovery/hydration 已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E 与 Provider dual-read 仍未完成。
 
 ---
 
@@ -82,7 +82,7 @@
 - [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E。
   - [x] 服务端 `/api/v1/generation/jobs/:jobId/events` 已提供 owner-scoped 全量 Job 投影：owner 校验命中后才打开 SSE，投影变化时推送共享 `GenerationJobEvent`，含 heartbeat、终态关闭与断连清理。浏览器消费、重连和跨设备 E2E 仍未完成。
   - [x] Web `useTaskRecovery` 已接入鉴权 fetch-stream consumer：共享 schema 校验投影、单会话一次 token refresh、非终态断流指数退避、owner 变化/卸载 abort，UUID 任务在 404 或网络失败时回退旧轮询。真实浏览器关闭/重新登录与跨设备 E2E 仍未执行。
-  - [ ] 新增 owner-scoped v3 pending Job list/discovery 与 Web hydration；当前恢复只扫描本机 localStorage 且要求画布已有对应节点，第二设备无法发现 Job ID。
+  - [x] 新增 owner-scoped v3 pending Job list/discovery 与 Web hydration：集合接口仅返回当前 owner、`schemaVersion: 3`、非终态 Job（最多 50 条），Web 只自动观察 `submitted/running`，在 owner 复核通过后绑定到已同步的 Prompt 节点；不创建新画布节点、不覆盖本地任务元数据，无法安全关联时继续本地恢复。真实 PostgreSQL、浏览器关闭/重新登录与跨设备 E2E 仍未执行。
 - [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
 - [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 

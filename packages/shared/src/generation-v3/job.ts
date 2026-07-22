@@ -97,6 +97,13 @@ export const GenerationJobDtoV3Schema = z.object({
 
 export type GenerationJobDto = z.infer<typeof GenerationJobDtoV3Schema>;
 
+/** Owner-scoped Generation v3 Job collection projection. */
+export const GenerationJobListDtoV3Schema = z.object({
+  jobs: z.array(GenerationJobDtoV3Schema).max(50),
+});
+
+export type GenerationJobListDtoV3 = z.infer<typeof GenerationJobListDtoV3Schema>;
+
 export const CreateJobRequestSchema = z.object({
   quoteId: z.string().uuid(),
   // 可选：覆盖 quote 中的部分参数；必须保持 channel 不变

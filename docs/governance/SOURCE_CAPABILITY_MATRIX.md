@@ -37,7 +37,7 @@
 |---|---|---|---|---|
 | 2.1 | 浏览器侧持久化队列 | 完全 | `DurableGenerationQueue.ts:391-427,511-512` 提供 owner-scoped localStorage；`GenerationQueueSync.ts:60-75,151-205,228-240` 提供 IndexedDB mirror、鉴权服务端投影与 claim 同步。未切流任务仍由浏览器执行，跨设备续跑未验收。 | upgrade |
 | 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；`featureFlag.js` 将新任务 admission 与 migration-ready execution 分离，`workerLoop.js` 和 `generation-v3.js` 只按 execution readiness 处理存量执行/取消。characterization 已覆盖 admission `off` + execution `true` 的 drain、聚合观测与新提交同步回退；真实数据库/internal 灰度仍未验收。 | upgrade |
-| 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，Web `generationJobEventClient.ts`/`generationJobRecovery.ts` 已接入鉴权、重连、abort 和旧轮询回退。但恢复发现仍依赖本机 `taskPersistence.ts:194-230,348-353` 与当前画布节点，v3 API 无 owner-scoped pending Job 列表；真实重新登录/跨设备 E2E 尚不能成立，视频/音频仍由浏览器轮询。 | upgrade |
+| 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，`GET /api/v1/generation/jobs`/`jobStore.listPendingJobs` 提供 schema v3、非终态、最多 50 条的 owner-scoped discovery；Web `generationJobDiscovery.ts`、`generationJobEventClient.ts` 与 `useTaskRecovery.ts` 负责严格校验、合并本地候选并只把 `submitted/running` Job 绑定到已同步 Prompt 节点。当前不会新建节点，真实 PostgreSQL、重新登录/跨设备浏览器 E2E 仍未完成，视频/音频仍由浏览器轮询。 | upgrade |
 | 2.4 | 执行权威未统一 | 不符合 | AI batch 生命周期先进入 `DurableGenerationQueue`，随后仍经 `useImageGeneration → generationService → TaskOrchestrator → GenerationEngine` 分发；部分 direct UI/legacy 路径绕过 Queue，server image Worker 又只在 flag 命中时接管。当前问题是执行生命周期权威未统一，而非两个完全独立 engine。 | upgrade |
 
 ## 3. 计费与对账
@@ -148,6 +148,7 @@
 | Provider Connection 存储与验证 | `infrastructure/database/migrations/018_capability_graph_foundation.sql` / `services/api/lib/capability-graph/providerConnectionService.js` / `connectionVerifier.js` |
 | Agent capability tool | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` |
 | Server image Durable Worker | `infrastructure/database/migrations/019_generation_image_worker.sql` / `packages/shared/src/generation-worker/` / `services/api/lib/generation-v3/worker/` |
+| Generation v3 pending Job discovery | `services/api/lib/generation-v3/jobStore.js` / `services/api/routes/generation-v3.js` / `packages/shared/src/contracts/client/kk-api-client.ts` / `apps/web/src/services/generation/generationJobDiscovery.ts` / `apps/web/src/hooks/useTaskRecovery.ts` |
 | local-runner build/typecheck 已纳入 verify:changes，但安全 gate 未闭环 | `package.json` / `local-runner/package.json` / `local-runner/src/security/localToken.ts` |
 
 ---

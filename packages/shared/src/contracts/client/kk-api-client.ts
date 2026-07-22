@@ -135,6 +135,7 @@ import type {
   UpdateProviderConnectionRequest,
 } from "../../capability-graph/connection.ts";
 import type { CapabilityGraphSnapshotDto } from "../../capability-graph/graph.ts";
+import type { GenerationJobListDtoV3 } from "../../generation-v3/job.ts";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -446,6 +447,9 @@ export interface KkApiClient {
     input?: { statuses?: GenerationJobStatus[]; cursor?: string; limit?: number },
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<GenerationBatchJobListDto>>;
+  listPendingGenerationV3Jobs(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GenerationJobListDtoV3>>;
   getGenerationJob(
     jobId: string,
     options?: ApiClientRequestOptions,
@@ -1870,6 +1874,15 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         ? `api/v1/generation-jobs?${query.toString()}`
         : "api/v1/generation-jobs";
       return requestJson<GenerationBatchJobListDto>(config, path, { method: "GET" }, options);
+    },
+
+    listPendingGenerationV3Jobs(options) {
+      return requestJson<GenerationJobListDtoV3>(
+        config,
+        "api/v1/generation/jobs",
+        { method: "GET" },
+        options,
+      );
     },
 
     getGenerationJob(jobId, options) {

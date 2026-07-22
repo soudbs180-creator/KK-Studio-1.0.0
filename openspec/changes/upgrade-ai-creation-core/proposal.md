@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 2a foundations landed / local control-plane gaps and external rollout gates pending
+> Status: active / Phase 2a local recovery discovery landed / external rollout gates pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-22
@@ -12,7 +12,7 @@
 KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地，Phase 0/1 已交付统一报价（Quote）、GenerationJobDto v3、统一 Provider Adapter 与冻结通道，但 AI 创作核心的关键闭环仍未完成：
 
 - image Durable Worker 的代码基础已进入服务端控制面，新任务 admission 与存量 execution/drain 已使用两个默认关闭的 server flag 解耦；关闭 admission 并保持 execution 开启时，既有 lease 仍可完成或取消。在完成 migration 019 受控演练和 internal 灰度前，仍不能描述为服务端权威或已上线。
-- 报价、路由、租约、计费与图像 Provider Adapter 已形成纵向切片基础；`capability_graph.image_provider_slice` 已在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前门禁，关闭后不阻断已入队 Worker drain。v3 仍缺 owner-scoped pending Job discovery，跨设备恢复不能仅靠现有 SSE。
+- 报价、路由、租约、计费与图像 Provider Adapter 已形成纵向切片基础；`capability_graph.image_provider_slice` 已在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前门禁，关闭后不阻断已入队 Worker drain。v3 已新增 owner-scoped pending Job discovery，Web 可把可恢复 Job 绑定到已同步的 Prompt 节点；真实 PostgreSQL、浏览器关闭/重新登录与跨设备 E2E 仍未完成。
 - Agent 运行时仅有当前指令和画布上下文，没有跨轮对话历史、摘要和工具结果回填， reload 后 running Run 被直接标记为失败。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
@@ -127,6 +127,7 @@ Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、
 - 服务端 Feature Flag 默认关闭新 Worker 流程，按管理员/受邀测试/全量三阶段灰度开启。
 - Provider 配置先新增旧 profile 到新 `provider_connections` 的安全迁移/dual-read adapter，再切换新写入；旧 payload 只有在兼容测试、两个稳定版本与观测窗口通过后才停止读取。当前旧栈仍平行读写，不能提前视为迁移完成。
 - 既有 Quote/Job v3 API 保持兼容；Capability Graph 只新增只读 API 与 safe tool，不改变现有路由语义。
+- `GET /api/v1/generation/jobs` 作为 v3 owner-scoped pending Job collection discovery additive 接口；旧 `/api/v1/generation-jobs` v2 列表保持原路径、DTO 与语义。
 
 ---
 

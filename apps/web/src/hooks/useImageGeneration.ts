@@ -20,6 +20,7 @@ import {
 import { saveOriginalImage, getImage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { keyManager, getModelMetadata } from '../services/auth/keyManager';
+import { getRuntimeOwnerId } from '../services/auth/runtimeSessionProfile';
 import { 
   normalizePptSlidesForCount, 
   buildAutoPptSlides, 
@@ -1483,7 +1484,26 @@ export const useImageGeneration = (options: {
     }
   }, [addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
-  useTaskRecovery(activeCanvas, pollTaskStatus, true);
+  const hydrateDiscoveredTask = useCallback((
+    node: PromptNode,
+    taskId: string,
+    expectedOwnerId: string,
+  ): PromptNode | null => {
+    if (getRuntimeOwnerId() !== expectedOwnerId) return null;
+    const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id);
+    if (!latestNode || (latestNode.jobId && latestNode.jobId !== taskId)) return null;
+    const otherPendingTask = getPendingTaskIds(latestNode).some((pendingId) => pendingId !== taskId);
+    if (otherPendingTask) return null;
+    const hydratedNode = {
+      ...registerPendingTaskId(latestNode, taskId),
+      isGenerating: true,
+    };
+    if (getRuntimeOwnerId() !== expectedOwnerId) return null;
+    urgentUpdatePromptNode(hydratedNode);
+    return hydratedNode;
+  }, [getPendingTaskIds, registerPendingTaskId, urgentUpdatePromptNode]);
+
+  useTaskRecovery(activeCanvas, pollTaskStatus, true, hydrateDiscoveredTask);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

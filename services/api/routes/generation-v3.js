@@ -75,6 +75,17 @@ router.post('/v1/generation/jobs', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/v1/generation/jobs
+router.get('/v1/generation/jobs', requireAuth, async (req, res) => {
+  try {
+    const jobs = await generationV3.listPendingJobs(req.userId);
+    return res.json(envelope.wrapSuccess({ jobs }));
+  } catch (err) {
+    console.error('[generation-v3/jobs/list]', err);
+    return sendError(res, err.statusCode || 500, err.code || 'INTERNAL_ERROR', err.message);
+  }
+});
+
 // POST /api/v1/generation/jobs/:jobId/submit
 router.post('/v1/generation/jobs/:jobId/submit', requireAuth, async (req, res) => {
   try {

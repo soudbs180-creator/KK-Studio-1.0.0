@@ -7,7 +7,7 @@ require('./adapters');
 
 const { createQuote, getActiveQuote, getQuote, consumeQuote } = require('./quoteEngine');
 const { createJobFromQuote, submitJob } = require('./jobLifecycle');
-const { getJob } = require('./jobStore');
+const { getJob, listPendingJobs } = require('./jobStore');
 const { selectRoute, buildRouteSnapshot } = require('./routeEngine');
 const { enqueueImageJob, requestJobCancellation } = require('./worker/workerStore');
 
@@ -22,6 +22,7 @@ module.exports = {
   enqueueImageJob,
   requestJobCancellation,
   getJob,
+  listPendingJobs,
   selectRoute,
   buildRouteSnapshot,
 };

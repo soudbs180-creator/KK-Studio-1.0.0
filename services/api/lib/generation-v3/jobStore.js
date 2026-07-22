@@ -9,6 +9,51 @@ const {
 } = require('@kk/shared');
 
 const DEFAULT_MAX_RETRIES = 3;
+const PENDING_JOB_STATUSES = ['quoted', 'reserved', 'submitted', 'running', 'paused'];
+const PENDING_JOB_LIMIT = 50;
+
+function mapJobItem(row) {
+  return GenerationJobItemV3Schema.parse({
+    itemId: row.item_id,
+    sequence: row.sequence,
+    status: row.status,
+    providerTaskId: row.provider_task_id || undefined,
+    reconciliation: row.reconciliation_status,
+    assetId: row.asset_id || undefined,
+    assetRecordId: row.output_json?.assetRecordId || undefined,
+    assetUrl: row.output_json?.assetUrl || undefined,
+    assetMetadata: row.output_json || undefined,
+    canvasNodeId: row.canvas_node_id || undefined,
+    errorCode: row.error_code || undefined,
+    errorMessage: row.error_message || undefined,
+    payload: row.payload_json || undefined,
+  });
+}
+
+function mapJob(row, items) {
+  return GenerationJobDtoV3Schema.parse({
+    jobId: row.job_id,
+    quoteId: row.quote_id,
+    channel: row.channel,
+    provider: row.provider,
+    model: row.model_code,
+    anonymousKeySlotId: row.anonymous_key_slot_id || undefined,
+    capabilityVersion: row.capability_version,
+    status: row.status,
+    items,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    ownerId: row.user_id,
+    retryCount: 0,
+    maxRetries: DEFAULT_MAX_RETRIES,
+  });
+}
+
+function comparePendingJobRows(left, right) {
+  const updatedAtDifference = new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+  if (Number.isFinite(updatedAtDifference) && updatedAtDifference !== 0) return updatedAtDifference;
+  return String(right.job_id).localeCompare(String(left.job_id));
+}
 
 /**
  * 创建 Job 与 Items。
@@ -97,7 +142,7 @@ async function createJob({ quote, userId, payload, canvasNodeIds, client }) {
 async function getJob(jobId, userId, options = {}) {
   const poolOrClient = options.client || getPool();
   const jobRes = await poolOrClient.query(
-    `SELECT * FROM public.generation_jobs WHERE job_id = $1 AND user_id = $2`,
+    `SELECT * FROM public.generation_jobs WHERE job_id = $1 AND user_id = $2 AND schema_version = 3`,
     [jobId, userId]
   );
   if (jobRes.rows.length === 0) return null;
@@ -108,38 +153,47 @@ async function getJob(jobId, userId, options = {}) {
     [jobId]
   );
 
-  const items = itemsRes.rows.map((row) => GenerationJobItemV3Schema.parse({
-    itemId: row.item_id,
-    sequence: row.sequence,
-    status: row.status,
-    providerTaskId: row.provider_task_id || undefined,
-    reconciliation: row.reconciliation_status,
-    assetId: row.asset_id || undefined,
-    assetRecordId: row.output_json?.assetRecordId || undefined,
-    assetUrl: row.output_json?.assetUrl || undefined,
-    assetMetadata: row.output_json || undefined,
-    canvasNodeId: row.canvas_node_id || undefined,
-    errorCode: row.error_code || undefined,
-    errorMessage: row.error_message || undefined,
-    payload: row.payload_json,
-  }));
+  return mapJob(jobRow, itemsRes.rows.map(mapJobItem));
+}
 
-  return GenerationJobDtoV3Schema.parse({
-    jobId: jobRow.job_id,
-    quoteId: jobRow.quote_id,
-    channel: jobRow.channel,
-    provider: jobRow.provider,
-    model: jobRow.model_code,
-    anonymousKeySlotId: jobRow.anonymous_key_slot_id || undefined,
-    capabilityVersion: jobRow.capability_version,
-    status: jobRow.status,
-    items,
-    createdAt: new Date(jobRow.created_at).toISOString(),
-    updatedAt: new Date(jobRow.updated_at).toISOString(),
-    ownerId: jobRow.user_id,
-    retryCount: 0,
-    maxRetries: DEFAULT_MAX_RETRIES,
-  });
+/**
+ * Lists owner-scoped non-terminal v3 Jobs without N+1 Item reads.
+ * @param {string} userId
+ * @param {Object} [options]
+ * @param {import('pg').PoolClient} [options.client]
+ * @returns {Promise<import('@kk/shared').GenerationJobDto[]>}
+ */
+async function listPendingJobs(userId, options = {}) {
+  const poolOrClient = options.client || getPool();
+  const jobsResult = await poolOrClient.query(
+    `SELECT * FROM public.generation_jobs
+     WHERE user_id = $1 AND schema_version = 3 AND status = ANY($2::text[])
+     ORDER BY updated_at DESC, job_id DESC
+     LIMIT $3`,
+    [userId, PENDING_JOB_STATUSES, PENDING_JOB_LIMIT]
+  );
+  const rows = jobsResult.rows
+    .filter((row) => row.user_id === userId && row.schema_version === 3 && PENDING_JOB_STATUSES.includes(row.status))
+    .sort(comparePendingJobRows)
+    .slice(0, PENDING_JOB_LIMIT);
+  if (rows.length === 0) return [];
+
+  const jobIds = rows.map((row) => row.job_id);
+  const itemsResult = await poolOrClient.query(
+    `SELECT * FROM public.generation_job_items
+     WHERE job_id = ANY($1::uuid[])
+     ORDER BY job_id, sequence`,
+    [jobIds]
+  );
+  const itemsByJobId = new Map(jobIds.map((jobId) => [jobId, []]));
+  for (const itemRow of itemsResult.rows) {
+    const items = itemsByJobId.get(itemRow.job_id);
+    if (items) items.push(mapJobItem(itemRow));
+  }
+  return rows.map((row) => mapJob(
+    row,
+    itemsByJobId.get(row.job_id).sort((left, right) => left.sequence - right.sequence)
+  ));
 }
 
 /**
@@ -206,6 +260,7 @@ async function updateJobStatus({ jobId, status, client }) {
 module.exports = {
   createJob,
   getJob,
+  listPendingJobs,
   updateItemStatus,
   updateJobStatus,
 };

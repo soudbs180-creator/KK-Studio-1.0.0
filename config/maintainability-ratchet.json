@@ -58,6 +58,7 @@
     "services/api/lib/generation-v3/worker",
     "services/api/routes/capability-graph.js",
     "services/api/routes/user/shared",
+    "apps/web/src/services/generation/generationJobDiscovery.ts",
     "apps/web/src/components/layout/chat-sidebar/model",
     "apps/web/src/components/layout/chat-sidebar/session",
     "apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts"
