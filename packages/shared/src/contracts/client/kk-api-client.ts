@@ -122,6 +122,8 @@ import type {
   AgentKnowledgeDocumentDto,
   AgentKnowledgeSearchQueryDto,
   AgentRunDto,
+  AgentRunEventDto,
+  AgentRunEventQueryDto,
   AgentSkillDeleteDto,
   AgentSkillDto,
   AgentToolCallDto,
@@ -478,6 +480,12 @@ export interface KkApiClient {
     runId: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto>>>;
+  /** Reads metadata-only Run events after a per-Run sequence cursor. */
+  listAgentRunEvents(
+    runId: string,
+    input?: AgentRunEventQueryDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentRunEventDto[]>>>;
   upsertAgentRun(
     input: AgentRunDto,
     options?: ApiClientRequestOptions,
@@ -1943,6 +1951,20 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<AssistantApiResultDto<AgentRunDto>>(
         config,
         `api/ai-assistant/runs/${encodeURIComponent(runId)}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    listAgentRunEvents(runId, input, options) {
+      const query = new URLSearchParams();
+      if (typeof input?.afterSequence === "number") {
+        query.set("afterSequence", String(input.afterSequence));
+      }
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return requestJson<AssistantApiResultDto<AgentRunEventDto[]>>(
+        config,
+        `api/ai-assistant/runs/${encodeURIComponent(runId)}/events${suffix}`,
         { method: "GET" },
         options,
       );

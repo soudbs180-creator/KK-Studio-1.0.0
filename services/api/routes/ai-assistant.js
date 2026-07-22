@@ -14,6 +14,7 @@ const {
 const { TEMP_USER_ID_HEADER } = require('./compat/compatHelper');
 const { verifyJWT } = require('../lib/jwt');
 const agentRunReadStore = require('../lib/agent-run-read-store');
+const agentRunEventStore = require('../lib/agent-run-event-store');
 
 /**
  * 验证请求头中的 JWT 令牌，杜绝非法调用和越权审计。
@@ -55,6 +56,15 @@ function verifyAuth(req, res, next) {
 
   req.userId = userId;
   next();
+}
+
+function parseAfterSequence(value) {
+  if (value === undefined) return 0;
+  if (Array.isArray(value)) return null;
+  const normalized = String(value).trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const sequence = Number(normalized);
+  return Number.isSafeInteger(sequence) ? sequence : null;
 }
 
 async function readAuthoritativeSkillState(pool, userId, skillName) {
@@ -112,6 +122,29 @@ router.get('/ai-assistant/runs/:runId', verifyAuth, async (req, res) => {
   } catch (err) {
     console.error('[后端AI助手] 读取 Run 失败:', err);
     return res.status(500).json({ error: '读取失败' });
+  }
+});
+
+/**
+ * GET /api/ai-assistant/runs/:runId/events
+ * Returns bounded metadata-only events for incremental projection recovery.
+ */
+router.get('/ai-assistant/runs/:runId/events', verifyAuth, async (req, res) => {
+  const afterSequence = parseAfterSequence(req.query.afterSequence);
+  if (afterSequence === null) {
+    return res.status(400).json({ error: 'afterSequence must be a non-negative safe integer' });
+  }
+  try {
+    const events = await agentRunEventStore.listAgentRunEvents(
+      req.userId,
+      req.params.runId,
+      afterSequence,
+    );
+    if (events === null) return res.status(404).json({ error: 'Agent run not found' });
+    return res.json({ ok: true, data: events });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read Agent Run events:', err);
+    return res.status(500).json({ error: 'Failed to read Agent Run events' });
   }
 });
 

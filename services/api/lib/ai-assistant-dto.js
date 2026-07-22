@@ -25,6 +25,17 @@ function mapAgentRunRow(row = {}, toolCalls = []) {
   });
 }
 
+function mapAgentRunEventRow(row = {}) {
+  return compact({
+    runId: row.run_id,
+    sequence: Number(row.sequence),
+    type: row.event_type,
+    status: row.status,
+    runUpdatedAt: toIsoString(row.run_updated_at),
+    createdAt: toIsoString(row.created_at),
+  });
+}
+
 function mapAgentToolCallRow(row = {}) {
   return compact({
     id: row.id,
@@ -78,6 +89,7 @@ function mapAgentSkillRow(row = {}) {
 
 module.exports = {
   mapAgentRunRow,
+  mapAgentRunEventRow,
   mapAgentToolCallRow,
   mapKnowledgeDocumentRow,
   mapAgentSkillRow,

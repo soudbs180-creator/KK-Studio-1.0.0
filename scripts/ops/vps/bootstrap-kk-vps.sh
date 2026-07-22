@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 APP_USER="${KK_APP_USER:-kkstudio}"
 APP_GROUP="${KK_APP_GROUP:-$APP_USER}"
@@ -14,8 +14,9 @@ POSTGRES_DB="${KK_PG_DB:-kkstudio}"
 POSTGRES_USER="${KK_PG_USER:-kkstudio}"
 POSTGRES_PASSWORD="${KK_PG_PASSWORD:-}"
 POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
-REPO_BOOTSTRAP_SQL="${KK_BOOTSTRAP_SQL:-scripts/postgres/bootstrap-kk-vps.sql}"
-AI_ASSISTANT_SCOPE_MIGRATION="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-migrations/016_ai_assistant_user_scope.sql}"
+REPO_BOOTSTRAP_SQL="${KK_BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/ops/postgres/bootstrap-kk-vps.sql}"
+AI_ASSISTANT_SCOPE_MIGRATION="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
+AGENT_RUN_EVENT_MIGRATION="${KK_AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/020_agent_run_events.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -90,9 +91,14 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required AI assistant migration not found at ${AI_ASSISTANT_SCOPE_MIGRATION}." >&2
     exit 1
   fi
+  if [[ ! -f "${AGENT_RUN_EVENT_MIGRATION}" ]]; then
+    echo "[bootstrap-kk-vps] Required Agent Run event migration not found at ${AGENT_RUN_EVENT_MIGRATION}." >&2
+    exit 1
+  fi
 
   REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
   AI_ASSISTANT_SCOPE_MIGRATION="$(realpath "${AI_ASSISTANT_SCOPE_MIGRATION}")"
+  AGENT_RUN_EVENT_MIGRATION="$(realpath "${AGENT_RUN_EVENT_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -100,6 +106,10 @@ setup_postgres() {
   case "${AI_ASSISTANT_SCOPE_MIGRATION}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] AI assistant migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+  case "${AGENT_RUN_EVENT_MIGRATION}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] Agent Run event migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
 
   for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
@@ -145,7 +155,8 @@ SQL
     -d "${POSTGRES_DB}" \
     -c "SET ROLE \"${POSTGRES_USER}\"" \
     -f "${REPO_BOOTSTRAP_SQL}" \
-    -f "${AI_ASSISTANT_SCOPE_MIGRATION}"
+    -f "${AI_ASSISTANT_SCOPE_MIGRATION}" \
+    -f "${AGENT_RUN_EVENT_MIGRATION}"
 }
 
 install_runtime_templates() {
@@ -173,9 +184,9 @@ print_next_steps() {
 [bootstrap-kk-vps] Base bootstrap complete.
 
 Next steps:
-1. Copy env templates from scripts/vps/kk-vps.env.example and scripts/vps/*.env.example into ${ENV_DIR}
+1. Copy env templates from scripts/ops/vps/kk-vps.env.example and scripts/ops/vps/*.env.example into ${ENV_DIR}
 2. Clone or sync the repo into ${APP_ROOT}/current
-3. Run scripts/vps/deploy-kk-vps.sh from the repo root
+3. Run scripts/ops/vps/deploy-kk-vps.sh from the repo root
 4. Start services:
    systemctl restart kk-api
    systemctl reload nginx

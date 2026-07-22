@@ -1,6 +1,6 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
+> Status: active / Phase 2 external gates pending / Phase 3 Run recovery foundations in progress
 > Companion: proposal.md, tasks.md
 > Last verified: 2026-07-22
 
@@ -152,11 +152,11 @@ interface AgentContextSnapshotDto {
 }
 
 interface AgentRunEventDto {
-  eventId: string;
   runId: string;
-  sessionId: string;
-  type: 'plan_created' | 'confirmation_requested' | 'tool_called' | 'tool_result' | 'status_changed' | 'error' | 'rescheduled' | 'completed' | 'failed';
-  payload: unknown;
+  sequence: number;
+  type: 'run_snapshot';
+  status: AgentRunStatus;
+  runUpdatedAt: string;
   createdAt: string;
 }
 ```
@@ -164,7 +164,8 @@ interface AgentRunEventDto {
 **关键规则**：
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
-- Run 恢复时从服务端事件日志重建，而非本地 localStorage。
+- migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
+- 当前 Web 仍以 Run 快照 hydration 为主；只有在 Web 消费 sequence cursor、拉取权威快照并完成跨设备 E2E 后，才能声明从服务端事件日志恢复而非本地 localStorage。
 
 ### 2.4 PPT 契约
 
@@ -250,7 +251,7 @@ Authorization: Bearer <jwt>
 Accept: text/event-stream
 ```
 
-SSE 流推送 `AgentRunEventDto` 与 Job 状态变更。
+SSE 流推送 `GenerationJobEvent` 与 Job 状态变更。
 
 ### 3.4 Job 控制
 

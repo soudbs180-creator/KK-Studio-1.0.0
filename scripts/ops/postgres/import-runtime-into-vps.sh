@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_FILE="${1:-${REPO_ROOT}/scripts/postgres/runtime-migration.env}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+ENV_FILE="${1:-${REPO_ROOT}/scripts/ops/postgres/runtime-migration.env}"
 
 if [[ -f "${ENV_FILE}" ]]; then
   # shellcheck disable=SC1090
@@ -12,8 +12,9 @@ fi
 
 TARGET_DATABASE_URL="${TARGET_DATABASE_URL:-}"
 EXPORT_ROOT="${EXPORT_ROOT:-${REPO_ROOT}/.tmp-postgres-migration}"
-BOOTSTRAP_SQL="${BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/postgres/bootstrap-kk-vps.sql}"
-AI_ASSISTANT_SCOPE_MIGRATION="${AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/migrations/016_ai_assistant_user_scope.sql}"
+BOOTSTRAP_SQL="${BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/ops/postgres/bootstrap-kk-vps.sql}"
+AI_ASSISTANT_SCOPE_MIGRATION="${AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
+AGENT_RUN_EVENT_MIGRATION="${AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/020_agent_run_events.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -37,6 +38,11 @@ if [[ ! -f "${AI_ASSISTANT_SCOPE_MIGRATION}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${AGENT_RUN_EVENT_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing Agent Run event migration: ${AGENT_RUN_EVENT_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -52,6 +58,9 @@ psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${BOOTSTRAP_SQL}"
 
 echo "[import-runtime-into-vps] Applying mandatory AI assistant user-scope migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AI_ASSISTANT_SCOPE_MIGRATION}"
+
+echo "[import-runtime-into-vps] Applying mandatory Agent Run event migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_EVENT_MIGRATION}"
 
 echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only; canonical bootstrap and migrations own the target schema"
 

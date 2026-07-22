@@ -20,6 +20,17 @@ export type AgentRunStatus =
   | "failed"
   | "cancelled";
 
+const AgentRunStatusSchema = z.enum([
+  "planning",
+  "waiting_confirmation",
+  "waiting_execution",
+  "running",
+  "completed",
+  "completed_with_errors",
+  "failed",
+  "cancelled",
+]);
+
 export type AgentStepOutcome =
   | "success"
   | "partial_success"
@@ -93,6 +104,19 @@ export interface AgentRunDto {
   replanCount?: number;
 }
 
+export interface AgentRunEventDto {
+  runId: string;
+  sequence: number;
+  type: "run_snapshot";
+  status: AgentRunStatus;
+  runUpdatedAt: string;
+  createdAt: string;
+}
+
+export interface AgentRunEventQueryDto {
+  afterSequence?: number;
+}
+
 const AgentStepOutcomeSchema = z.enum([
   "success",
   "partial_success",
@@ -157,16 +181,7 @@ export const AgentRunDtoSchema = z.object({
   userMessage: z.string(),
   intent: z.string(),
   plan: z.unknown(),
-  status: z.enum([
-    "planning",
-    "waiting_confirmation",
-    "waiting_execution",
-    "running",
-    "completed",
-    "completed_with_errors",
-    "failed",
-    "cancelled",
-  ]),
+  status: AgentRunStatusSchema,
   toolCalls: z.array(AgentToolCallDtoSchema),
   stepResults: z.array(AgentStepResultDtoSchema).optional(),
   createdAt: z.iso.datetime(),
@@ -180,6 +195,19 @@ export const AgentRunDtoSchema = z.object({
 
 /** Validates the bounded server collection before it enters Web runtime state. */
 export const AgentRunListDtoSchema = z.array(AgentRunDtoSchema).max(50);
+
+/** Keeps the event log metadata-only so prompts, plans, and tool payloads cannot leak through replay. */
+export const AgentRunEventDtoSchema = z.object({
+  runId: z.string().min(1).max(200),
+  sequence: z.number().int().positive(),
+  type: z.literal("run_snapshot"),
+  status: AgentRunStatusSchema,
+  runUpdatedAt: z.iso.datetime(),
+  createdAt: z.iso.datetime(),
+}).strict();
+
+/** Bounds one incremental replay page independently from the Run snapshot list. */
+export const AgentRunEventListDtoSchema = z.array(AgentRunEventDtoSchema).max(100);
 
 export type AssistantOwnerScope = "system" | "user" | "legacy";
 
