@@ -8,6 +8,7 @@ const { getActiveQuote, getQuote, consumeQuote } = require('./quoteEngine');
 const { selectRoute } = require('./routeEngine');
 const { reserveCredits, chargeFromReservation, refundItem } = require('./billingSaga');
 const { resolveExecutionConnectionAuth } = require('../capability-graph/generationConnectionResolver');
+const { assertImageProviderSliceAdmission } = require('./imageProviderSliceAdmission');
 const { recordDerivedAssetLineage } = require('../capability-graph/assetLineageStore');
 const { generationV3Metrics } = require('./generationMetrics');
 
@@ -130,6 +131,7 @@ async function submitJob(userId, jobId) {
     }
 
     const quote = await getQuote(userId, job.quoteId, { client });
+    assertImageProviderSliceAdmission(userId, quote.routeSnapshot);
     const { route, auth } = await resolveFrozenProviderRoute(userId, quote);
 
     await updateJobStatus({ jobId, status: 'submitted', client });

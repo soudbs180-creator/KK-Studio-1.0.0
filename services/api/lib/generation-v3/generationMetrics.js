@@ -13,9 +13,14 @@ const EVENT_KEYS = Object.freeze([
   'terminalConflictPrevented',
   'unknown',
 ]);
+const IMAGE_PROVIDER_SLICE_ADMISSION_KEYS = Object.freeze(['allowed', 'blocked']);
 
 function createEventCounters() {
   return Object.fromEntries(EVENT_KEYS.map((eventName) => [eventName, 0]));
+}
+
+function createImageProviderSliceAdmissionCounters() {
+  return Object.fromEntries(IMAGE_PROVIDER_SLICE_ADMISSION_KEYS.map((decision) => [decision, 0]));
 }
 
 class GenerationV3Metrics {
@@ -30,12 +35,20 @@ class GenerationV3Metrics {
     this.lastEventAt = new Date(this.now()).toISOString();
   }
 
+  /** Records only the rollout decision so telemetry cannot retain request identity. */
+  recordImageProviderSliceAdmission(decision) {
+    if (!IMAGE_PROVIDER_SLICE_ADMISSION_KEYS.includes(decision)) return;
+    this.imageProviderSliceAdmission[decision] += 1;
+    this.lastEventAt = new Date(this.now()).toISOString();
+  }
+
   getSnapshot() {
     return {
       schemaVersion: 1,
       startedAt: this.startedAt,
       lastEventAt: this.lastEventAt,
       events: { ...this.events },
+      imageProviderSliceAdmission: { ...this.imageProviderSliceAdmission },
     };
   }
 
@@ -43,6 +56,7 @@ class GenerationV3Metrics {
     this.startedAt = new Date(this.now()).toISOString();
     this.lastEventAt = null;
     this.events = createEventCounters();
+    this.imageProviderSliceAdmission = createImageProviderSliceAdmissionCounters();
   }
 }
 

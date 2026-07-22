@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import test from 'node:test';
+
+const require = createRequire(import.meta.url);
 
 type WorkerState = {
   attemptCount: number;
@@ -171,6 +174,80 @@ test('server worker continues an image job after the submitting browser is gone 
   assert.equal(submitCount, 1);
   assert.equal(pollCount, 1);
   assert.deepEqual(metrics.getSnapshot().providerOperations, { cancel: 0, poll: 1, submit: 1 });
+});
+
+test('an admitted durable claim still drains after the Connection image slice flag is off', async () => {
+  const { createImageGenerationWorker } = await loadWorker();
+  const previousScope = process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE;
+  process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE = 'off';
+  const harness = createHarness();
+  let providerCalls = 0;
+  const worker = createImageGenerationWorker({
+    workerId: 'rollback-drain-worker',
+    store: harness.store,
+    resolveExecution: async () => ({
+      adapter: {
+        async submit() {
+          providerCalls += 1;
+          return { status: 'success', urls: ['https://assets.local/drained.png'] };
+        },
+        async poll() {
+          return { status: 'pending' };
+        },
+        async cancel() {},
+      },
+      auth: {},
+      input: {},
+    }),
+  });
+
+  try {
+    assert.equal((await worker.runOnce()).status, 'completed');
+    assert.equal(providerCalls, 1);
+  } finally {
+    if (previousScope === undefined) delete process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE;
+    else process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE = previousScope;
+  }
+});
+
+test('production resolver builds Connection execution after the live admission flag is off', async () => {
+  const quoteEnginePath = require.resolve('../../services/api/lib/generation-v3/quoteEngine.js');
+  const productionWorkerPath = require.resolve('../../services/api/lib/generation-v3/worker/productionWorker.js');
+  const quoteEngine = require(quoteEnginePath) as { getQuote: (...args: unknown[]) => Promise<unknown> };
+  const originalGetQuote = quoteEngine.getQuote;
+  quoteEngine.getQuote = async () => { throw new Error('default quote getter must not run'); };
+  delete require.cache[productionWorkerPath];
+  const productionWorker = require(productionWorkerPath) as {
+    resolveExecution: (claim: Record<string, unknown>, options?: Record<string, unknown>) => Promise<{
+      adapter: Record<string, unknown>;
+      auth: Record<string, unknown>;
+      input: Record<string, unknown>;
+    }>;
+  };
+  const previousScope = process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE;
+  process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE = 'off';
+  const adapter = { submit() {}, poll() {}, cancel() {}, adapterVersion: '1.0.0' };
+  let execution: Awaited<ReturnType<typeof productionWorker.resolveExecution>> | undefined;
+
+  try {
+    await assert.doesNotReject(async () => {
+      execution = await productionWorker.resolveExecution({ jobId: 'job-1', itemId: 'item-1', quoteId: 'quote-1', userId: 'user-1', payload: { prompt: 'drain' } }, {
+        getQuote: async () => ({ channel: 'byok', mediaType: 'image', model: 'model-1', routeSnapshot: { adapterVersion: '1.0.0', connectionId: 'connection-1' } }),
+        routeOptions: {
+          selectRoute: () => ({ adapter, adapterVersion: '1.0.0' }),
+          resolveExecutionConnectionAuth: async () => ({ mode: 'connection-auth' }),
+        },
+      });
+    });
+    assert.equal(execution?.adapter, adapter);
+    assert.deepEqual(execution?.auth, { mode: 'connection-auth' });
+    assert.equal(execution?.input.prompt, 'drain');
+  } finally {
+    quoteEngine.getQuote = originalGetQuote;
+    delete require.cache[productionWorkerPath];
+    if (previousScope === undefined) delete process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE;
+    else process.env.CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE = previousScope;
+  }
 });
 
 test('an expired lease with a persisted provider task is reclaimed without duplicate submit', async () => {

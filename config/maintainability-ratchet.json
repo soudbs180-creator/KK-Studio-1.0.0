@@ -54,6 +54,7 @@
     "packages/shared/src/capability-graph",
     "packages/shared/src/generation-worker",
     "services/api/lib/capability-graph",
+    "services/api/lib/generation-v3/imageProviderSliceAdmission.js",
     "services/api/lib/generation-v3/worker",
     "services/api/routes/capability-graph.js",
     "services/api/routes/user/shared",

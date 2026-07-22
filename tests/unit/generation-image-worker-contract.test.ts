@@ -40,6 +40,31 @@ test('postgres worker store claims with skip-locked and guards writes by lease t
   assert.match(source, /cancel_requested_at = NOW\(\)/);
 });
 
+test('Connection image admission is checked before sync Provider and durable lease side effects', () => {
+  const lifecycle = readSource('services/api/lib/generation-v3/jobLifecycle.js');
+  const submit = lifecycle.slice(lifecycle.indexOf('async function submitJob'));
+  const workerStore = readSource('services/api/lib/generation-v3/worker/workerStore.js');
+  const enqueue = workerStore.slice(workerStore.indexOf('async function enqueueImageJob'));
+
+  const syncGate = submit.indexOf('assertImageProviderSliceAdmission(userId, quote.routeSnapshot)');
+  const credentialResolution = submit.indexOf('resolveFrozenProviderRoute(userId, quote)');
+  const enqueueGate = enqueue.indexOf('assertImageProviderSliceAdmission(userId, row.route_snapshot_json)');
+  const leaseInsert = enqueue.indexOf('INSERT INTO public.generation_image_worker_leases');
+  assert.ok(syncGate >= 0 && syncGate < credentialResolution);
+  assert.ok(enqueueGate >= 0 && enqueueGate < leaseInsert);
+});
+
+test('capability graph rollout policy stays independent from generation runtime composition', () => {
+  const featureFlag = readSource('services/api/lib/capability-graph/featureFlag.js');
+  const admissionPath = 'services/api/lib/generation-v3/imageProviderSliceAdmission.js';
+
+  assert.doesNotMatch(featureFlag, /generation-v3|generationMetrics/);
+  assert.equal(fs.existsSync(admissionPath), true);
+  const admission = readSource(admissionPath);
+  assert.match(admission, /capability-graph\/featureFlag/);
+  assert.match(admission, /generationMetrics/);
+});
+
 test('durable worker remains server-gated and preserves the existing submit and control paths', () => {
   const route = readSource('services/api/routes/generation-v3.js');
   const flag = readSource('services/api/lib/generation-v3/worker/featureFlag.js');
@@ -69,4 +94,11 @@ test('durable worker publishes aggregate metrics through the existing telemetry 
   assert.doesNotMatch(metrics, /userId|jobId|itemId|prompt|providerTaskId/);
   assert.match(telemetry, /imageDurableWorker/);
   assert.match(telemetry, /getSnapshot/);
+});
+
+test('capability graph image rollout variables default closed without embedding identifiers', () => {
+  const envTemplate = readSource('services/api/.env.local.example');
+  assert.match(envTemplate, /^CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE=off$/m);
+  assert.match(envTemplate, /^CAPABILITY_GRAPH_INTERNAL_USER_IDS=$/m);
+  assert.match(envTemplate, /^CAPABILITY_GRAPH_INVITED_USER_IDS=$/m);
 });

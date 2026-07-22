@@ -23,12 +23,15 @@ test('generation metrics aggregate only known quote, billing, and terminal guard
   metrics.recordEvent('quoteCreated');
   metrics.recordEvent('refundFailed');
   metrics.recordEvent('unknown-event');
+  metrics.recordImageProviderSliceAdmission?.('allowed');
+  metrics.recordImageProviderSliceAdmission?.('blocked');
   const snapshot = metrics.getSnapshot();
   const serialized = JSON.stringify(snapshot);
 
   assert.equal(snapshot.events.quoteCreated, 1);
   assert.equal(snapshot.events.refundFailed, 1);
   assert.equal(snapshot.events.unknown, 1);
+  assert.deepEqual(snapshot.imageProviderSliceAdmission, { allowed: 1, blocked: 1 });
   assert.doesNotMatch(serialized, /userId|jobId|itemId|quoteId|amount|errorMessage/);
 });
 

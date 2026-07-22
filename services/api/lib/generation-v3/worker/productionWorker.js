@@ -18,9 +18,11 @@ function buildSubmitInput(claim, quote, auth) {
   };
 }
 
-async function resolveExecution(claim) {
-  const quote = await getQuote(claim.userId, claim.quoteId);
-  const { route, auth } = await resolveFrozenProviderRoute(claim.userId, quote);
+async function resolveExecution(claim, options = {}) {
+  const loadQuote = options.getQuote || getQuote;
+  const resolveRoute = options.resolveFrozenProviderRoute || resolveFrozenProviderRoute;
+  const quote = await loadQuote(claim.userId, claim.quoteId);
+  const { route, auth } = await resolveRoute(claim.userId, quote, options.routeOptions);
   return {
     adapter: route.adapter,
     auth,

@@ -6,6 +6,7 @@ const { getPool } = require('../db');
 const credits = require('../credits');
 const { selectRoute, buildRouteSnapshot } = require('./routeEngine');
 const { resolveQuoteConnectionRoute } = require('../capability-graph/generationConnectionResolver');
+const { assertImageProviderSliceAdmission } = require('./imageProviderSliceAdmission');
 const { generationV3Metrics } = require('./generationMetrics');
 const {
   CreateQuoteRequestSchema,
@@ -134,6 +135,7 @@ async function persistQuote(pool, quote) {
 /** Creates a quote whose Provider route can be reproduced without client-side reselection. */
 async function createQuote(userId, rawRequest, options = {}) {
   const request = CreateQuoteRequestSchema.parse(rawRequest);
+  assertImageProviderSliceAdmission(userId, request, { env: options.env });
   const routeContext = await resolveQuoteRoute(userId, request, options);
   const pool = options.pool || getPool();
   const cost = await computeCost({

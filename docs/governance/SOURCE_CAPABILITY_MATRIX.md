@@ -81,7 +81,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 7.1 | 编译期 Feature Flag | 完全 | `apps/web/src/config/featureFlags.ts:1-4`、`apps/web/src/app/kkaiFeatureFlags.ts:1-7` 均为硬编码常量。 | upgrade |
-| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供 image provider slice scope，但当前只保护 snapshot/Connection 管理 API，`quoteEngine.js` 与 `generationConnectionResolver.js` 的实际数据面尚未门禁；Worker flag 提供默认 `off` 和 `internal → invited → full` user scope，但 admission 与存量 drain 未拆分。仍无统一管理员 Flag API、广播和 5 秒 Kill Switch 验证。 | upgrade |
+| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供纯 server scope；`services/api/lib/generation-v3/imageProviderSliceAdmission.js` 在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前统一 fail closed，并通过既有 Generation v3 metrics 输出无业务标识的 allowed/blocked 计数。非 Connection legacy 路径不变，已入队 Worker 不重读 live slice flag。Worker 自身 flag 的 admission 与存量 drain 仍未拆分；统一管理员 Flag API、广播和 5 秒 Kill Switch 也未实现。 | upgrade |
 | 7.3 | 视觉 Flag 与能力 Flag 分离 | 不符合 | 当前视觉/能力开关均为同一常量（见 7.1）。 | upgrade |
 
 ## 8. 文档治理

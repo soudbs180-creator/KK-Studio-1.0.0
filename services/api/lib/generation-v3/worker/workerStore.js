@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { getPool } = require('../../db');
 const { getJob, updateJobStatus } = require('../jobStore');
 const { cancelItem, completeItem, failItem, recalcJobStatus } = require('../jobLifecycle');
+const { assertImageProviderSliceAdmission } = require('../imageProviderSliceAdmission');
 
 const CLAIM_SQL = `
   WITH candidate AS (
@@ -101,15 +102,19 @@ async function withTransaction(operation) {
 async function enqueueImageJob(jobId, userId) {
   const wasEnqueued = await withTransaction(async (client) => {
     const result = await client.query(
-      `SELECT task_type, status FROM public.generation_jobs
-        WHERE job_id = $1 AND user_id = $2 FOR UPDATE`,
+      `SELECT job.task_type, job.status, quote.route_snapshot_json
+         FROM public.generation_jobs job
+         JOIN public.generation_quotes quote ON quote.quote_id = job.quote_id
+        WHERE job.job_id = $1 AND job.user_id = $2 FOR UPDATE`,
       [jobId, userId],
     );
     if (result.rows.length === 0) throw createJobError('JOB_NOT_FOUND', 'Job not found.', 404);
-    if (result.rows[0].task_type !== 'image') return false;
-    if (!['quoted', 'reserved'].includes(result.rows[0].status)) {
-      throw createJobError('INVALID_JOB_STATUS', `Job cannot be submitted from status ${result.rows[0].status}.`, 409);
+    const row = result.rows[0];
+    if (row.task_type !== 'image') return false;
+    if (!['quoted', 'reserved'].includes(row.status)) {
+      throw createJobError('INVALID_JOB_STATUS', `Job cannot be submitted from status ${row.status}.`, 409);
     }
+    assertImageProviderSliceAdmission(userId, row.route_snapshot_json);
     await client.query(
       `INSERT INTO public.generation_image_worker_leases (item_id, job_id)
        SELECT item_id, job_id FROM public.generation_job_items WHERE job_id = $1

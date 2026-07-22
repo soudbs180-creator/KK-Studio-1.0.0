@@ -63,8 +63,10 @@
 - [ ] 建立旧 `ApiSettings`/profile 凭据栈到 `provider_connections` 的安全迁移/dual-read adapter，完成切流与观测窗口后再停止旧写入和读取；当前两套栈仍平行运行。
 - [x] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
 - [x] 首个纵向切片的代码基础：Google official image credentials / adapter、`FakeProviderAdapter` 测试路径与 server flag `capability_graph.image_provider_slice` 已落地。
-- [ ] 将 `capability_graph.image_provider_slice` 接入实际 Quote/生成数据面；当前 flag 只保护 Capability Graph/Connection 管理 API，已知 `connectionId` 仍可在 off 时进入新路由。
+- [x] 将 `capability_graph.image_provider_slice` 接入实际 Quote/生成数据面：Connection-backed Quote、同步 submit 与 durable enqueue 均在 resolver/credential/Provider/lease 副作用前 fail closed；无 `connectionId` 的 legacy 路径不变，已入队 Worker 不重读 live flag。
 - [ ] 完成 `capability_graph.image_provider_slice` 的 off → internal → invited → full → off 集成测试、环境模板、匿名 rollout 指标与真实灰度；切流验收前不删除旧凭据栈。
+  - [x] 本地控制面已覆盖 scope fail-closed、Quote 行为、同步/durable admission 顺序、生产 Worker 关闭后 drain、环境模板与 aggregate-only allowed/blocked metrics；新 admission module 纳入严格可维护性门禁。
+  - [ ] 在受控实例执行真实 internal → invited → full → off 用户流量与观测窗口。
 - [x] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
 - [x] 在 `services/api/` 新增 image Worker 子系统：migration 019 租约表、`FOR UPDATE SKIP LOCKED` 领取、token 防陈旧写、心跳续约、提交、指数退避轮询、取消、单次调用超时、Job 总时限与租约失效恢复。
 - [x] 实现 Worker 与冻结图像 Provider Adapter 对接；`GENERATION_IMAGE_DURABLE_WORKER_ENABLED=off` 默认保持原同步路径，并支持 `internal → invited → full` user allowlist scope，命中用户的 `POST .../submit` 才入服务端队列。
