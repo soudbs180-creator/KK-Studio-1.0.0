@@ -1,6 +1,8 @@
 import {
+  AgentContextSnapshotDtoSchema,
   AgentSessionDtoSchema,
   AgentSessionListDtoSchema,
+  type AgentContextSnapshotDto,
   type AgentSessionDto,
   type AgentSessionListItemDto,
 } from '@kk/shared';
@@ -59,6 +61,10 @@ const cloneSession = (session: AgentSessionDto): AgentSessionDto => (
   JSON.parse(JSON.stringify(session)) as AgentSessionDto
 );
 
+const cloneContextSnapshot = (snapshot: AgentContextSnapshotDto): AgentContextSnapshotDto => (
+  JSON.parse(JSON.stringify(snapshot)) as AgentContextSnapshotDto
+);
+
 function toListItem(session: AgentSessionDto): AgentSessionListItemDto {
   return {
     sessionId: session.sessionId,
@@ -87,6 +93,7 @@ function mergeListItem(
 export class AgentSessionProjectionStore {
   private sessions: AgentSessionListItemDto[] = [];
   private readonly sessionDetails = new Map<string, AgentSessionDto>();
+  private readonly contextSnapshots = new Map<string, AgentContextSnapshotDto>();
   private readonly ownerIdResolver: () => string;
   private activeOwnerId: string;
 
@@ -101,6 +108,7 @@ export class AgentSessionProjectionStore {
     this.activeOwnerId = ownerId;
     this.sessions = [];
     this.sessionDetails.clear();
+    this.contextSnapshots.clear();
   }
 
   listSessions(): AgentSessionListItemDto[] {
@@ -114,6 +122,13 @@ export class AgentSessionProjectionStore {
     return session ? cloneSession(session) : undefined;
   }
 
+  /** Returns a clone so Planner consumers cannot mutate the owner-scoped latest projection. */
+  getContextSnapshot(sessionId: string): AgentContextSnapshotDto | undefined {
+    this.ensureOwnerScope();
+    const snapshot = this.contextSnapshots.get(sessionId);
+    return snapshot ? cloneContextSnapshot(snapshot) : undefined;
+  }
+
   replaceOwnerProjection(ownerId: string, sessions: AgentSessionListItemDto[]): boolean {
     this.ensureOwnerScope();
     const normalizedOwnerId = normalizeOwnerId(ownerId);
@@ -121,6 +136,7 @@ export class AgentSessionProjectionStore {
     if (sessions.some((session) => session.ownerId !== normalizedOwnerId)) return false;
     this.sessions = sessions.map(cloneListItem);
     this.sessionDetails.clear();
+    this.contextSnapshots.clear();
     return true;
   }
 
@@ -130,6 +146,23 @@ export class AgentSessionProjectionStore {
     if (normalizedOwnerId !== this.activeOwnerId || session.ownerId !== normalizedOwnerId) return false;
     this.sessionDetails.set(session.sessionId, cloneSession(session));
     this.sessions = mergeListItem(this.sessions, session);
+    return true;
+  }
+
+  /** Accepts only a schema-valid Snapshot whose parent Session is already authoritative locally. */
+  storeOwnerContextSnapshot(ownerId: string, snapshot: AgentContextSnapshotDto): boolean {
+    this.ensureOwnerScope();
+    const normalizedOwnerId = normalizeOwnerId(ownerId);
+    const parsed = AgentContextSnapshotDtoSchema.safeParse(snapshot);
+    if (normalizedOwnerId !== this.activeOwnerId || !parsed.success) return false;
+    const session = this.sessionDetails.get(parsed.data.sessionId);
+    if (!session || session.ownerId !== normalizedOwnerId) return false;
+    const current = this.contextSnapshots.get(parsed.data.sessionId);
+    if (current && parsed.data.sequence < current.sequence) return true;
+    if (current && parsed.data.sequence === current.sequence && parsed.data.snapshotId !== current.snapshotId) {
+      return false;
+    }
+    this.contextSnapshots.set(parsed.data.sessionId, cloneContextSnapshot(parsed.data));
     return true;
   }
 }

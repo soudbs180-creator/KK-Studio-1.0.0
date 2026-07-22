@@ -8,6 +8,7 @@ import type {
 import type { AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
 import { LocalAssistantBrain } from '../../ai-takeover/core/localBrain.ts';
 import { LLMBrain } from '../../ai-takeover/core/llmBrain.ts';
+import { buildAgentContextSnapshotInput } from '../../ai-takeover/core/agentContextSnapshot.ts';
 import { agentPermissionPolicy } from './AgentPermissionPolicy.ts';
 import {
   agentRunStore,
@@ -24,10 +25,15 @@ import {
 } from './agentRunHydration.ts';
 import { refreshAgentRunEventProjection } from './agentRunEventRecovery.ts';
 import {
+  agentSessionProjectionStore,
   hydrateAgentSessionProjection,
   type AgentSessionHydrationResult,
 } from './agentSessionProjection.ts';
 import { resolveAgentPlannerSessionContext } from './agentPlannerSessionContext.ts';
+import {
+  appendAgentContextSnapshotProjection,
+  hydrateAgentContextSnapshotProjection,
+} from './agentContextSnapshotProjection.ts';
 import {
   durableGenerationQueue,
   type DurableGenerationQueue,
@@ -51,6 +57,7 @@ const llmBrain = new LLMBrain();
 const MAX_AGENT_STEPS = 20;
 const MAX_AUTO_REPLANS = 3;
 const MAX_READ_ONLY_CONCURRENCY = 4;
+const SNAPSHOT_HYDRATION_TIMEOUT_MS = 1_500;
 const READ_ONLY_TOOLS = new Set([
   'knowledge.searchProject',
   'provider.getModelCapabilities',
@@ -59,6 +66,40 @@ const READ_ONLY_TOOLS = new Set([
 ]);
 
 type GenerationPlanningQueue = Pick<DurableGenerationQueue, 'getJob' | 'getJobs'>;
+
+let contextSnapshotSequence = 0;
+
+function createContextSnapshotId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  contextSnapshotSequence += 1;
+  return `snapshot_${Date.now()}_${contextSnapshotSequence}`;
+}
+
+async function hydratePlannerContextSnapshot(sessionId: string | undefined, ownerId: string): Promise<void> {
+  if (!sessionId) return;
+  const abortController = new AbortController();
+  const timeout = globalThis.setTimeout(() => abortController.abort(), SNAPSHOT_HYDRATION_TIMEOUT_MS);
+  try {
+    await hydrateAgentContextSnapshotProjection(sessionId, { ownerId, signal: abortController.signal });
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function appendCurrentContextSnapshot(
+  sessionId: string | undefined,
+  ownerId: string,
+  context: SanitizedProjectContext,
+): void {
+  if (!sessionId) return;
+  const input = buildAgentContextSnapshotInput(context, {
+    snapshotId: createContextSnapshotId(),
+    capturedAt: new Date().toISOString(),
+    availableTools: toolRegistryInstance.getAllTools().map((tool) => tool.name).sort(),
+  });
+  if (!input) return;
+  void appendAgentContextSnapshotProjection(sessionId, input, { ownerId });
+}
 
 const retryableFailedPromptIds = (job: ReturnType<GenerationPlanningQueue['getJob']>): string[] => (
   (job?.prompts || [])
@@ -490,8 +531,10 @@ export class AgentRuntime {
     sessionId?: string,
   ): Promise<PlannedAgentRunRecord> {
     const planningOwnerId = getRuntimeOwnerId();
-    const sessionContext = resolveAgentPlannerSessionContext(sessionId);
+    await hydratePlannerContextSnapshot(sessionId, planningOwnerId);
+    const sessionContext = resolveAgentPlannerSessionContext(sessionId, agentSessionProjectionStore, context);
     const validatedSessionId = sessionContext?.sessionId;
+    appendCurrentContextSnapshot(validatedSessionId, planningOwnerId, context);
     const localPlan = await localBrain.plan(text, context, sessionContext);
     if (getRuntimeOwnerId() !== planningOwnerId) {
       throw new Error('Agent planning stopped because the authenticated owner changed.');

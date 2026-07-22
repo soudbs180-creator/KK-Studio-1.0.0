@@ -42,6 +42,15 @@ export {
   hydrateAgentSessionDetail,
   hydrateAgentSessionProjection,
 } from './runtime/agentSessionProjection.ts';
+export {
+  appendAgentContextSnapshotProjection,
+  hydrateAgentContextSnapshotProjection,
+} from './runtime/agentContextSnapshotProjection.ts';
+export type {
+  AgentContextSnapshotProjectionClient,
+  AgentContextSnapshotProjectionOutcome,
+  AgentContextSnapshotProjectionResult,
+} from './runtime/agentContextSnapshotProjection.ts';
 export type {
   AgentSessionDetailHydrationResult,
   AgentSessionHydrationOutcome,

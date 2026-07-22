@@ -151,7 +151,7 @@ test('AgentRuntime 源码契约：本地可处理的意图即使已有模型也�
   assert.match(source, /localPlan\.intent === 'unknown'/);
   assert.match(source, /plan = localPlan/);
   assert.match(source, /llmBrain\.plan\(text, context, modelId, sessionContext\)/);
-  assert.match(source, /resolveAgentPlannerSessionContext\(sessionId\)/);
+  assert.match(source, /resolveAgentPlannerSessionContext\(sessionId, agentSessionProjectionStore, context\)/);
   assert.match(source, /createRun\(text, plan\.intent, plan, validatedSessionId\)/);
 });
 

@@ -1,4 +1,4 @@
-import type { AgentSessionDto } from '@kk/shared';
+import type { AgentContextSnapshotDto, AgentSessionDto } from '@kk/shared';
 import type { SanitizedProjectContext } from '../types.ts';
 import {
   allocateAgentContextBudget,
@@ -43,6 +43,20 @@ interface AgentPlannerKnowledgeRef {
   excerpt?: string;
 }
 
+/** Authority-free canvas metadata admitted under the dedicated Planner budget. */
+export interface AgentPlannerCanvasSnapshot {
+  sequence: number;
+  activeSurface: AgentContextSnapshotDto['activeSurface'];
+  canvasId?: string;
+  canvasSummary: AgentContextSnapshotDto['canvasSummary'];
+  selectedNodeIds: string[];
+  viewport: AgentContextSnapshotDto['viewport'];
+  recentEvents: AgentContextSnapshotDto['recentEvents'];
+  inputBox?: AgentContextSnapshotDto['inputBox'];
+  availableTools: string[];
+  capturedAt: string;
+}
+
 /** Authority-free Session data accepted by LocalBrain and LLMBrain as bounded historical context. */
 export interface AgentPlannerSessionContext {
   sessionId: string;
@@ -51,6 +65,7 @@ export interface AgentPlannerSessionContext {
   messages: AgentPlannerSessionMessage[];
   toolResults: AgentPlannerToolResult[];
   knowledgeRefs: AgentPlannerKnowledgeRef[];
+  canvasSnapshot?: AgentPlannerCanvasSnapshot;
   tokenBudget: AgentSessionDto['tokenBudget'];
   contextBudgetTokens: number;
   lastHeartbeatAt: string;
@@ -116,9 +131,52 @@ function selectBySerializedValue<T extends { id: string }>(
   return values.filter((value) => selectedIds.has(value.id));
 }
 
+function selectSnapshotValues<T>(
+  values: T[],
+  budget: number,
+  id: (value: T, index: number) => string,
+): T[] {
+  const entries = values.map((value, index) => ({
+    id: id(value, index),
+    text: JSON.stringify(value),
+    updatedAt: index,
+  }));
+  const selectedIds = new Set(selectAgentContextEntries(entries, budget, () => false).selectedIds);
+  return values.filter((value, index) => selectedIds.has(id(value, index)));
+}
+
+function projectCanvasSnapshot(
+  snapshot: AgentContextSnapshotDto | undefined,
+  budget: number,
+): AgentPlannerCanvasSnapshot | undefined {
+  if (!snapshot || budget <= 0) return undefined;
+  const base: AgentPlannerCanvasSnapshot = {
+    sequence: snapshot.sequence,
+    activeSurface: snapshot.activeSurface,
+    ...(snapshot.canvasId ? { canvasId: snapshot.canvasId } : {}),
+    canvasSummary: { ...snapshot.canvasSummary },
+    selectedNodeIds: [],
+    viewport: { ...snapshot.viewport },
+    recentEvents: [],
+    ...(snapshot.inputBox ? { inputBox: { ...snapshot.inputBox } } : {}),
+    availableTools: [],
+    capturedAt: snapshot.capturedAt,
+  };
+  const remainingBudget = budget - estimateAgentContextTokens(JSON.stringify(base));
+  if (remainingBudget <= 0) return undefined;
+  const candidate: AgentPlannerCanvasSnapshot = {
+    ...base,
+    selectedNodeIds: selectSnapshotValues(snapshot.selectedNodeIds, remainingBudget * 0.25, (id) => `node:${id}`),
+    recentEvents: selectSnapshotValues(snapshot.recentEvents, remainingBudget * 0.45, (event) => `event:${event.id}`),
+    availableTools: selectSnapshotValues(snapshot.availableTools, remainingBudget * 0.25, (tool) => `tool:${tool}`),
+  };
+  return estimateAgentContextTokens(JSON.stringify(candidate)) <= budget ? candidate : undefined;
+}
+
 function buildContextCandidate(
   session: AgentSessionDto,
   contextBudgetTokens: number,
+  canvasSnapshot?: AgentContextSnapshotDto,
 ): AgentPlannerSessionContext | undefined {
   const allocation = allocateAgentContextBudget(contextBudgetTokens - CONTEXT_ENVELOPE_RESERVE_TOKENS);
   if (!allocation || session.summary.coveredMessageCount > session.messages.length) return undefined;
@@ -145,6 +203,7 @@ function buildContextCandidate(
     knowledgeRefs: selectBySerializedValue(
       knowledgeRefs, allocation.knowledgeRefs, (_reference, index) => index,
     ).map(({ id: _id, ...reference }) => reference),
+    canvasSnapshot: projectCanvasSnapshot(canvasSnapshot, allocation.canvasSnapshot),
     tokenBudget: { ...session.tokenBudget },
     contextBudgetTokens,
     lastHeartbeatAt: session.lastHeartbeatAt,
@@ -155,10 +214,11 @@ function buildContextCandidate(
 /** Builds a second bounded projection from a validated Session DTO before Planner consumption. */
 export function buildAgentPlannerSessionContext(
   session: AgentSessionDto,
+  canvasSnapshot?: AgentContextSnapshotDto,
 ): AgentPlannerSessionContext | undefined {
   const contextBudgetTokens = validContextBudget(session);
   if (!contextBudgetTokens) return undefined;
-  const candidate = buildContextCandidate(session, contextBudgetTokens);
+  const candidate = buildContextCandidate(session, contextBudgetTokens, canvasSnapshot);
   if (!candidate) return undefined;
   return estimateAgentContextTokens(JSON.stringify(candidate)) <= contextBudgetTokens
     ? candidate
