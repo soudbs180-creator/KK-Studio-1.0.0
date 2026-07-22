@@ -14,6 +14,7 @@ const {
   hasImageDurableWorkerRollout,
 } = require('../lib/generation-v3/worker/featureFlag');
 const { submitJobWithWorkerRollout } = require('../lib/generation-v3/worker/workerSubmissionRouter');
+const { startJobEventStream } = require('../lib/generation-v3/jobEventStream');
 
 const router = express.Router();
 
@@ -102,6 +103,30 @@ router.get('/v1/generation/jobs/:jobId', requireAuth, async (req, res) => {
     return res.json(envelope.wrapSuccess(job, { jobId: job.jobId }));
   } catch (err) {
     console.error('[generation-v3/jobs/get]', err);
+    return sendError(res, err.statusCode || 500, err.code || 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/v1/generation/jobs/:jobId/events
+router.get('/v1/generation/jobs/:jobId/events', requireAuth, async (req, res) => {
+  try {
+    const stream = await startJobEventStream({
+      getJob: generationV3.getJob,
+      jobId: req.params.jobId,
+      request: req,
+      response: res,
+      userId: req.userId,
+    });
+    if (!stream) {
+      return sendError(res, 404, 'JOB_NOT_FOUND', 'Job not found.');
+    }
+    return undefined;
+  } catch (err) {
+    console.error('[generation-v3/jobs/events]', err);
+    if (res.headersSent) {
+      res.end();
+      return undefined;
+    }
     return sendError(res, err.statusCode || 500, err.code || 'INTERNAL_ERROR', err.message);
   }
 });

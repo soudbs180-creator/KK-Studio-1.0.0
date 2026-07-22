@@ -74,7 +74,8 @@
 - [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
   - [x] 控制面 characterization 已覆盖：`off`/未命中用户只走旧同步提交，命中 internal 的 image 才入队，非 image 回退同步；Worker loop 在 `off` 不启动。既有 `/v1/metrics` envelope 增加无 user/job/payload 的聚合 Worker outcome、延迟、submit/poll/cancel 与 durable/legacy 计数。真实 internal 放量和观测窗口仍未执行。
   - [x] 计费/报价聚合观测已接入同一 metrics envelope：覆盖 quote expired、frozen route stale、重复 completion 拦截、reserve/charge/refund 成功与失败、charge no-op；不记录用户、Job、Quote、金额或错误文本。`chargeFromReservation` 只允许 `committed reserve` 单向结算并通过 `RETURNING` 识别重复写。真实账本观测窗口仍未执行。
-- [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E；当前只有 server-side characterization，不声明该 E2E 已完成。
+- [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E。
+  - [x] 服务端 `/api/v1/generation/jobs/:jobId/events` 已提供 owner-scoped 全量 Job 投影：owner 校验命中后才打开 SSE，投影变化时推送共享 `GenerationJobEvent`，含 heartbeat、终态关闭与断连清理。浏览器消费、重连和跨设备 E2E 仍未完成。
 - [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
 - [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 
