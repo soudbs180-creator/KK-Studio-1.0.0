@@ -15,8 +15,8 @@
     },
     {
       "path": "apps/web/src/components/layout/ChatSidebar.tsx",
-      "maxLines": 4677,
-      "maxExplicitAny": 23,
+      "maxLines": 4501,
+      "maxExplicitAny": 22,
       "maxConsoleLog": 0
     },
     {
@@ -57,6 +57,7 @@
     "services/api/lib/generation-v3/worker",
     "services/api/routes/capability-graph.js",
     "services/api/routes/user/shared",
+    "apps/web/src/components/layout/chat-sidebar/model",
     "apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts"
   ]
 }

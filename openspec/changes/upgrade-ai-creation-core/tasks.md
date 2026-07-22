@@ -93,6 +93,8 @@
 
 ## Phase 3 — Agent 上下文与 Run 恢复（2 周）
 
+- [x] Phase 3 前置可维护性拆分（模型状态）：`ChatSidebar` 的模型目录构建、assistant capability 默认路由、Key 优先级、目录订阅与 selected-model owner 已迁入严格 controller；热点 baseline 从 4677 行/23 `any` 降至 4501 行/22 `any`，公开交互不变。
+- [ ] Phase 3 前置可维护性拆分（会话状态）：迁移会话持久化、树投影、分支与导入合并；保持 storage key、导入导出格式和 Chat shell action 不变。
 - [ ] 实现 `AgentSessionDto`、`AgentContextSnapshotDto`、`AgentRunEventDto` 表结构与 API。
 - [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
 - [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。

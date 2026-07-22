@@ -107,16 +107,17 @@ test('enabled-only capability resolver preserves raw assignments while blocking 
 
 test('chat sidebar prefers the assistant capability route as its default model and preferred key source without removing manual model choice', () => {
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const modelStateSource = readSource('apps/web/src/components/layout/chat-sidebar/model/useChatModelCatalog.ts');
 
-  assert.match(chatSidebarSource, /resolveEnabledCapabilityRouteAssignment\('assistant'\)/);
-  assert.match(chatSidebarSource, /subscribeCapabilityRouteAssignments\(updateModels\)/);
-  assert.match(chatSidebarSource, /const selectableModels = models\.filter\(\(model\) => !isCapabilityRouteAssignmentModelDisabled\('assistant', model\.id\)\)/);
-  assert.match(chatSidebarSource, /isCapabilityRouteAssignmentModelDisabled\('assistant', selectedModel\.id\)/);
-  assert.match(chatSidebarSource, /if \(!exists \|\| staleDisabledCapabilityModel\)/);
-  assert.match(chatSidebarSource, /const resolveAssistantPreferredModel = useCallback/);
-  assert.match(chatSidebarSource, /const resolveAssistantPreferredKeyId = useCallback/);
+  assert.match(modelStateSource, /resolveEnabledCapabilityRouteAssignment\('assistant'\)/);
+  assert.match(modelStateSource, /subscribeCapabilityRouteAssignments\(updateModels\)/);
+  assert.match(modelStateSource, /const selectableModels = models\.filter\(\(model\) => !isCapabilityRouteAssignmentModelDisabled\('assistant', model\.id\)\)/);
+  assert.match(modelStateSource, /isCapabilityRouteAssignmentModelDisabled\('assistant', options\.selectedModel\.id\)/);
+  assert.match(modelStateSource, /const nextModel = !currentModel \|\| disabled \? preferredModel : currentModel;/);
+  assert.match(modelStateSource, /export function resolveAssistantPreferredModel/);
+  assert.match(modelStateSource, /export function resolveAssistantPreferredKeyId/);
   assert.match(chatSidebarSource, /preferredKeyId: resolveAssistantPreferredKeyId\(\)/);
-  assert.match(chatSidebarSource, /const assistantPreferredModel = resolveAssistantPreferredModel\(models\);/);
-  assert.match(chatSidebarSource, /setSelectedModel\(assistantPreferredModel\);/);
+  assert.match(modelStateSource, /const preferredModel = resolveAssistantPreferredModel\(models\);/);
+  assert.match(modelStateSource, /options\.setSelectedModel\(nextModel\);/);
   assert.match(chatSidebarSource, /onClick=\{\(\) => onSelect\(model\)\}/);
 });

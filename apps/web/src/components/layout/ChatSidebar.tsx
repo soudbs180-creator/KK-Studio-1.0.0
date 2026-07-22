@@ -31,11 +31,6 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
 import { getRuntimeOwnerId } from '../../services/auth/runtimeSessionProfile';
-import {
-    isCapabilityRouteAssignmentModelDisabled,
-    resolveEnabledCapabilityRouteAssignment,
-    subscribeCapabilityRouteAssignments,
-} from '../../services/api/capabilityRouteAssignments';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
@@ -79,6 +74,13 @@ import {
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
 import { estimateTokens, getModelContextLimit } from '../../utils/contextHelper';
+import {
+    buildAvailableChatModels,
+    resolveAssistantPreferredKeyId,
+    useChatModelCatalog,
+    useSelectedChatModelState,
+    type ChatModel,
+} from './chat-sidebar/model/useChatModelCatalog';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -185,20 +187,6 @@ interface Message {
     attachments?: Attachment[]; // 附件列表
     isImageGeneration?: boolean; // 标记是否为图片生成结果
     modelId?: string; // 生成该消息的供应商模型ID
-}
-
-interface ChatModel {
-    id: string;
-    name: string;
-    provider: string;
-    isCustom: boolean;
-    isSystemInternal?: boolean;
-    type?: 'chat' | 'image' | 'video' | 'image+chat' | 'audio';  // ✨ 支持多模态
-    isVision?: boolean; // ✨ 是否支持多模态（图片/视频）输入
-    icon?: string;
-    displayName?: string;
-    description?: string;
-    creditCost?: number;
 }
 
 interface ChatSessionItem {
@@ -477,43 +465,6 @@ const buildMessageWithAttachments = (
     return { messageContent, inlineData };
 };
 
-const buildAvailableChatModels = (includeSystemCreditModels = true): ChatModel[] => {
-    const rawModels = keyManager.getGlobalModelList().filter(model => {
-        if (model.isSystemInternal && !includeSystemCreditModels) return false;
-
-        const idLower = model.id.toLowerCase();
-
-        // 🚀 Allow Image Models (for /image command usage)
-        if (model.type === 'image') return true;
-        if (model.type === 'video') return false;
-
-        if (idLower.includes('flux') || idLower.includes('midjourney') || idLower.includes('dall-e') || idLower.includes('stable-diffusion') || idLower.includes('sdxl')) return false;
-        if (idLower.includes('nano') && idLower.includes('banana') && model.type !== 'image+chat') return false;
-
-        return model.type === 'chat' || model.type === 'image+chat';
-    });
-
-    const uniqueMap = new Map<string, ChatModel>();
-    rawModels.forEach(model => {
-        if (!uniqueMap.has(model.id)) {
-            const isVision = model.type === 'image+chat' || 
-                model.id.toLowerCase().includes('vision') || 
-                model.id.toLowerCase().includes('gpt-4o') || 
-                model.id.toLowerCase().includes('gemini-2.0') || 
-                model.id.toLowerCase().includes('claude-3-5') ||
-                model.id.toLowerCase().includes('gemini-1.5') ||
-                model.id.toLowerCase().includes('gemini-2.5') ||
-                model.id.toLowerCase().includes('grok-2-vision');
-            uniqueMap.set(model.id, {
-                ...model,
-                isVision
-            });
-        }
-    });
-
-    return Array.from(uniqueMap.values());
-};
-
 // 简体中文：预置对项目的理解以及常见报错调试的知识库
 interface KnowledgeItem {
     keywords: string[];
@@ -568,8 +519,6 @@ const matchLocalKnowledge = (query: string): string | null => {
     }
     return null;
 };
-
-const resolveAssistantCapabilityRoute = () => resolveEnabledCapabilityRouteAssignment('assistant');
 
 interface NormalChatSidebarProps extends ChatSidebarProps {
     selectedModel: ChatModel;
@@ -1083,41 +1032,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
     const canBrowseSystemCreditModels = billingUiEnabled;
-    const resolveAssistantPreferredModel = useCallback((models: ChatModel[]) => {
-        const selectableModels = models.filter((model) => !isCapabilityRouteAssignmentModelDisabled('assistant', model.id));
-        const assignment = resolveAssistantCapabilityRoute();
-        const preferredModelId = String(assignment?.primaryModelId || '').trim();
-        if (!preferredModelId) {
-            return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
-        }
-
-        const exact = selectableModels.find((model) => model.id === preferredModelId);
-        if (exact) {
-            return exact;
-        }
-
-        const suffix = preferredModelId.split('@')[1];
-        if (suffix) {
-            const matched = selectableModels.find((model) => model.id.endsWith(`@${suffix}`));
-            if (matched) {
-                return matched;
-            }
-        }
-
-        return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
-    }, []);
-    const resolveAssistantPreferredKeyId = useCallback(() => {
-        const assignment = resolveAssistantCapabilityRoute();
-        const preferredRouteId = String(assignment?.primaryRouteId || '').trim();
-        if (!preferredRouteId) {
-            return undefined;
-        }
-        return keyManager.getKey(preferredRouteId) ? preferredRouteId : undefined;
-    }, []);
+    const { availableModels, setAvailableModels } = useChatModelCatalog({
+        canBrowseSystemCreditModels,
+        onSelectedModelChange: ctxSetSelectedModel,
+        selectedModel,
+        setSelectedModel,
+    });
 
     // 1. Model State Management
-    // ✨ 支持多模态模型 (image+chat) + 🚀 去重
-    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
     // selectedModel, setSelectedModel 已由 props 传入
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
@@ -1204,77 +1126,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             window.removeEventListener('scroll', onReposition, true);
         };
     }, [showModelMenu, updateModelMenuLayout]);
-
-    // 简体中文：实时同步选择的生图模型给 AI 接管 Context
-    useEffect(() => {
-        if (selectedModel) {
-            ctxSetSelectedModel((prev: any) => {
-                if (prev?.id === selectedModel.id && prev?.name === selectedModel.name && prev?.description === selectedModel.description) {
-                    return prev;
-                }
-                return selectedModel;
-            });
-        }
-    }, [selectedModel, ctxSetSelectedModel]);
-
-    // Subscribe to keyManager updates
-    const lastPreferredModelIdRef = useRef<string>('');
-    useEffect(() => {
-        const updateModels = () => {
-            const models = buildAvailableChatModels(canBrowseSystemCreditModels);
-            
-            // 简体中文：在模型列表内容一致时跳过更新，避免触发子组件不必要的重新渲染
-            setAvailableModels((prevModels) => {
-                if (JSON.stringify(prevModels) === JSON.stringify(models)) {
-                    return prevModels;
-                }
-                return models;
-            });
-
-            if (models.length > 0) {
-                const assistantPreferredModel = resolveAssistantPreferredModel(models);
-                const assignment = resolveAssistantCapabilityRoute();
-                const preferredModelId = String(assignment?.primaryModelId || '').trim();
-
-                // 简体中文：如果最新获取到的首选模型ID与上次记录的不同，说明能力分配被修改，我们强行同步切换默认模型
-                if (preferredModelId && preferredModelId !== lastPreferredModelIdRef.current) {
-                    lastPreferredModelIdRef.current = preferredModelId;
-                    const match = models.find(m => m.id === preferredModelId);
-                    if (match) {
-                        // 简体中文：如果当前选择的模型与最新首选模型不同，则切换默认模型
-                        if (!(selectedModel?.id === match.id && selectedModel?.name === match.name && selectedModel?.description === match.description)) {
-                            setSelectedModel(match);
-                        }
-                        return;
-                    }
-                }
-
-                const exists = models.find(m => m.id === selectedModel.id);
-                const staleDisabledCapabilityModel = isCapabilityRouteAssignmentModelDisabled('assistant', selectedModel.id);
-                if (!exists || staleDisabledCapabilityModel) {
-                    // 简体中文：如果模型不存在或被禁用，则切换至推荐的 assistantPreferredModel
-                    if (!(selectedModel?.id === assistantPreferredModel.id && selectedModel?.name === assistantPreferredModel.name && selectedModel?.description === assistantPreferredModel.description)) {
-                        setSelectedModel(assistantPreferredModel);
-                    }
-                } else {
-                    if (exists.name !== selectedModel.name || exists.description !== selectedModel.description) {
-                        // 简体中文：如果模型的名称或描述有更新，重新同步更新模型
-                        if (!(selectedModel?.id === exists.id && selectedModel?.name === exists.name && selectedModel?.description === exists.description)) {
-                            setSelectedModel(exists);
-                        }
-                    }
-                }
-            }
-        };
-
-        updateModels();
-        const unsubscribeKeys = keyManager.subscribe(updateModels);
-        const unsubscribeAssignments = subscribeCapabilityRouteAssignments(updateModels);
-        return () => {
-            unsubscribeKeys();
-            unsubscribeAssignments();
-        };
-    }, [canBrowseSystemCreditModels, resolveAssistantPreferredModel, selectedModel.id]);
 
     const getRequiredCredits = useCallback((model?: ChatModel | null) => {
         if (!model?.isSystemInternal) return 0;
@@ -4340,30 +4191,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     );
 };
 
-const resolveAssistantPreferredModelGlobal = (models: ChatModel[]) => {
-    const selectableModels = models.filter((model) => !isCapabilityRouteAssignmentModelDisabled('assistant', model.id));
-    const assignment = resolveEnabledCapabilityRouteAssignment('assistant');
-    const preferredModelId = String(assignment?.primaryModelId || '').trim();
-    if (!preferredModelId) {
-        return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false } as ChatModel;
-    }
-
-    const exact = selectableModels.find((model) => model.id === preferredModelId);
-    if (exact) {
-        return exact;
-    }
-
-    const suffix = preferredModelId.split('@')[1];
-    if (suffix) {
-        const matched = selectableModels.find((model) => model.id.endsWith(`@${suffix}`));
-        if (matched) {
-            return matched;
-        }
-    }
-
-    return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false } as ChatModel;
-};
-
 const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; setSelectedModel: (m: ChatModel) => void }> = (props) => {
     return <NormalChatSidebar {...props} />;
 };
@@ -4613,10 +4440,7 @@ const ChatSidebarLoaded: React.FC<ChatSidebarProps> = (props) => {
         },
     }), [waitForHostState]);
 
-    const [selectedModel, setSelectedModel] = useState<ChatModel>(() => {
-        const models = buildAvailableChatModels(KKAI_FEATURE_FLAGS.billing);
-        return resolveAssistantPreferredModelGlobal(models);
-    });
+    const [selectedModel, setSelectedModel] = useSelectedChatModelState(KKAI_FEATURE_FLAGS.billing);
 
     return (
         <AITakeoverProvider
