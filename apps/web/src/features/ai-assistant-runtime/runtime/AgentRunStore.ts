@@ -8,7 +8,7 @@ export interface AgentRunRecord {
   id: string;
   userMessage: string;
   intent: string;
-  plan: any;
+  plan: unknown;
   status: AgentRunStatus;
   toolCalls: AgentToolCallLog[];
   stepResults?: AgentStepResultDto[];
@@ -20,6 +20,7 @@ export interface AgentRunRecord {
   completedStepIds?: string[];
   replanCount?: number;
   backendSyncState?: 'pending' | 'synced';
+  executionAuthority?: 'local_validated' | 'server_projection';
 }
 
 export type AgentRunStoreListener = (runs: AgentRunRecord[]) => void;
@@ -31,6 +32,49 @@ const cloneRunRecord = (record: AgentRunRecord): AgentRunRecord => (
 );
 
 const cloneRunRecords = (records: AgentRunRecord[]): AgentRunRecord[] => records.map(cloneRunRecord);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+const clonePlan = (plan: unknown): unknown => (
+  plan === undefined ? undefined : JSON.parse(JSON.stringify(plan))
+);
+
+const planRequiresConfirmation = (plan: unknown): boolean => (
+  isRecord(plan) && plan.requiresConfirmation === true
+);
+
+const getPlanStepCount = (plan: unknown): number => {
+  if (!isRecord(plan)) return 0;
+  if (Array.isArray(plan.steps)) return plan.steps.length;
+  return Array.isArray(plan.actions) ? plan.actions.length : 0;
+};
+
+const mergeToolCalls = (
+  localCalls: AgentToolCallLog[],
+  remoteCalls: AgentRunDto['toolCalls'],
+): AgentToolCallLog[] => {
+  const calls = new Map<string, AgentToolCallLog>();
+  for (const call of localCalls) calls.set(call.id, call);
+  for (const call of remoteCalls) calls.set(call.id, call);
+  return [...calls.values()];
+};
+
+const createServerProjection = (snapshot: AgentRunDto): AgentRunRecord => ({
+  ...snapshot,
+  plan: clonePlan(snapshot.plan),
+  toolCalls: snapshot.toolCalls.map((call) => ({ ...call })),
+  stepResults: snapshot.stepResults?.map((result) => ({ ...result })),
+  completedStepIds: snapshot.completedStepIds ? [...snapshot.completedStepIds] : undefined,
+  backendSyncState: 'synced',
+  executionAuthority: 'server_projection',
+});
+
+/** Only locally planned or legacy Runs may be resumed by this browser. */
+export const hasLocalAgentRunExecutionAuthority = (record?: AgentRunRecord): boolean => (
+  Boolean(record) && record?.executionAuthority !== 'server_projection'
+);
 
 const cloneRunUpdates = (updates: Partial<AgentRunRecord>): Partial<AgentRunRecord> => {
   const cloned = JSON.parse(JSON.stringify(updates)) as Partial<AgentRunRecord>;
@@ -126,7 +170,21 @@ export class AgentRunStore {
     }
   }
 
-  private loadRuns() {
+  private repairLegacyLocalRuns(): boolean {
+    if (this.activeOwnerId !== 'local_user') return false;
+    let changed = false;
+    for (const run of this.runs) {
+      if (run.status !== 'running' && run.status !== 'waiting_execution') continue;
+      run.status = 'failed';
+      run.nextStep = '任务运行异常中断，请重试。';
+      run.updatedAt = new Date().toISOString();
+      run.backendSyncState = 'pending';
+      changed = true;
+    }
+    return changed;
+  }
+
+  private loadRuns(): void {
     this.runs = [];
     const cached = this.ownerRunCache.get(this.activeOwnerId);
     if (cached) {
@@ -138,21 +196,7 @@ export class AgentRunStore {
       const stored = this.storage.getItem(this.storageKey());
       if (stored) {
         this.runs = JSON.parse(stored);
-        
-        // 修正历史遗留的僵尸任务状态，防止 UI 一直卡在 loading 或执行中
-        let changed = false;
-        this.runs.forEach(run => {
-          if (run.status === 'running' || run.status === 'waiting_execution') {
-            run.status = 'failed';
-            run.nextStep = '任务运行异常中断，请重试。';
-            run.updatedAt = new Date().toISOString();
-            run.backendSyncState = 'pending';
-            changed = true;
-          }
-        });
-        if (changed) {
-          this.saveRuns();
-        }
+        if (this.repairLegacyLocalRuns()) this.saveRuns();
       }
     } catch (e) {
       console.error('[AgentRunStore] 加载失败:', e);
@@ -180,21 +224,22 @@ export class AgentRunStore {
     return () => this.listeners.delete(listener);
   }
 
-  createRun(userMessage: string, intent: string, plan: any): AgentRunRecord {
+  createRun(userMessage: string, intent: string, plan: unknown): AgentRunRecord {
     this.ensureOwnerScope();
     const now = new Date().toISOString();
     const newRun: AgentRunRecord = {
       id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       userMessage,
       intent,
-      plan: JSON.parse(JSON.stringify(plan)),
-      status: plan?.requiresConfirmation ? 'waiting_confirmation' : 'waiting_execution',
+      plan: clonePlan(plan),
+      status: planRequiresConfirmation(plan) ? 'waiting_confirmation' : 'waiting_execution',
       toolCalls: [],
-      totalSteps: Array.isArray(plan?.steps) ? plan.steps.length : Array.isArray(plan?.actions) ? plan.actions.length : 0,
+      totalSteps: getPlanStepCount(plan),
       completedStepIds: [],
       stepResults: [],
       replanCount: 0,
       backendSyncState: 'pending',
+      executionAuthority: 'local_validated',
       createdAt: now,
       updatedAt: now
     };
@@ -279,20 +324,13 @@ export class AgentRunStore {
     if (!Number.isFinite(authoritativeTime) || (Number.isFinite(currentTime) && authoritativeTime < currentTime)) {
       return undefined;
     }
-    const mergedToolCalls = new Map<string, AgentToolCallLog>();
-    for (const toolCall of current.toolCalls || []) {
-      mergedToolCalls.set(toolCall.id, toolCall);
-    }
-    for (const toolCall of snapshot.toolCalls || []) {
-      mergedToolCalls.set(toolCall.id, toolCall as AgentToolCallLog);
-    }
     const authoritative: AgentRunRecord = {
       ...current,
       ...snapshot,
       // The server DTO is intentionally untrusted at this boundary. Keep the
       // locally validated plan that was authorized for this run.
       plan: current.plan,
-      toolCalls: [...mergedToolCalls.values()],
+      toolCalls: mergeToolCalls(current.toolCalls || [], snapshot.toolCalls || []),
       stepResults: [...(snapshot.stepResults || [])],
       completedStepIds: snapshot.completedStepIds ? [...snapshot.completedStepIds] : current.completedStepIds,
       backendSyncState: 'synced',
@@ -302,11 +340,47 @@ export class AgentRunStore {
     return cloneRunRecord(authoritative);
   }
 
+  /** Merges owner-scoped server history without making remote plans executable. */
+  hydrateAuthoritativeRuns(ownerId: string, snapshots: AgentRunDto[]): AgentRunRecord[] {
+    this.ensureOwnerScope();
+    const normalizedOwnerId = String(ownerId || '').trim() || 'local_user';
+    if (normalizedOwnerId !== this.activeOwnerId) return [];
+    let changed = false;
+    for (const snapshot of snapshots) {
+      const index = this.runs.findIndex((candidate) => candidate.id === snapshot.id);
+      if (index < 0) {
+        this.runs.push(createServerProjection(snapshot));
+        changed = true;
+        continue;
+      }
+      const current = this.runs[index];
+      if (Date.parse(snapshot.updatedAt) < Date.parse(current.updatedAt)) continue;
+      this.runs[index] = {
+        ...current,
+        ...snapshot,
+        plan: current.plan,
+        toolCalls: mergeToolCalls(current.toolCalls || [], snapshot.toolCalls || []),
+        stepResults: snapshot.stepResults?.map((result) => ({ ...result })) || [],
+        completedStepIds: snapshot.completedStepIds ? [...snapshot.completedStepIds] : current.completedStepIds,
+        backendSyncState: 'synced',
+        executionAuthority: current.executionAuthority || 'local_validated',
+      };
+      changed = true;
+    }
+    if (changed) {
+      this.runs.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+      this.runs = this.runs.slice(0, 100);
+      this.saveRuns();
+    }
+    return cloneRunRecords(this.runs);
+  }
+
   getPendingRun(): AgentRunRecord | undefined {
     this.ensureOwnerScope();
     const now = Date.now();
     let changed = false;
     this.runs.forEach(r => {
+      if (this.activeOwnerId !== 'local_user') return;
       if (r.status === 'waiting_execution' || r.status === 'running') {
         const diff = now - new Date(r.updatedAt).getTime();
         if (diff >= 5 * 60 * 1000) {
@@ -331,6 +405,7 @@ export class AgentRunStore {
         return false;
       }
       if (r.status === 'waiting_confirmation') return true;
+      if (this.activeOwnerId !== 'local_user') return true;
       const diff = now - new Date(r.updatedAt).getTime();
       return diff < 5 * 60 * 1000;
     });

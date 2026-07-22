@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type AssistantCollaborationMode = "direct" | "assist" | "takeover";
 
 export type AssistantWorkspaceSurface =
@@ -90,6 +92,94 @@ export interface AgentRunDto {
   completedStepIds?: string[];
   replanCount?: number;
 }
+
+const AgentStepOutcomeSchema = z.enum([
+  "success",
+  "partial_success",
+  "retryable_failure",
+  "rolled_back_failure",
+  "cancelled",
+]);
+
+const AgentToolCallStatusSchema = z.enum([
+  "success",
+  "partial_success",
+  "retryable_failure",
+  "rolled_back",
+  "cancelled",
+  "failed",
+  "blocked",
+  "setup_required",
+  "verification_failed",
+]);
+
+const AgentFailureClassSchema = z.enum([
+  "validation",
+  "permission",
+  "setup",
+  "network",
+  "provider",
+  "verification",
+  "cancelled",
+  "unknown",
+]);
+
+export const AgentStepResultDtoSchema = z.object({
+  stepId: z.string().min(1).max(200),
+  toolName: z.string().min(1).max(200),
+  outcome: AgentStepOutcomeSchema,
+  verificationRule: z.enum(["tool", "queue_job", "canvas_state", "asset_manifest", "none"]),
+  message: z.string().optional(),
+  retryable: z.boolean(),
+  verifiedAt: z.iso.datetime(),
+});
+
+export const AgentToolCallDtoSchema = z.object({
+  id: z.string().min(1).max(200),
+  runId: z.string().min(1).max(200),
+  stepId: z.string().max(200).optional(),
+  toolName: z.string().min(1).max(200),
+  inputSummary: z.string(),
+  outputSummary: z.string().optional(),
+  status: AgentToolCallStatusSchema,
+  outcome: AgentStepOutcomeSchema.optional(),
+  failureClass: AgentFailureClassSchema.optional(),
+  errorCode: z.string().optional(),
+  retryable: z.boolean().optional(),
+  error: z.string().optional(),
+  startedAt: z.iso.datetime(),
+  completedAt: z.iso.datetime().optional(),
+  idempotencyKey: z.string().optional(),
+});
+
+export const AgentRunDtoSchema = z.object({
+  id: z.string().min(1).max(200),
+  userMessage: z.string(),
+  intent: z.string(),
+  plan: z.unknown(),
+  status: z.enum([
+    "planning",
+    "waiting_confirmation",
+    "waiting_execution",
+    "running",
+    "completed",
+    "completed_with_errors",
+    "failed",
+    "cancelled",
+  ]),
+  toolCalls: z.array(AgentToolCallDtoSchema),
+  stepResults: z.array(AgentStepResultDtoSchema).optional(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  nextStep: z.string().optional(),
+  confirmationGrantedAt: z.iso.datetime().optional(),
+  totalSteps: z.number().int().nonnegative().optional(),
+  completedStepIds: z.array(z.string()).optional(),
+  replanCount: z.number().int().nonnegative().optional(),
+});
+
+/** Validates the bounded server collection before it enters Web runtime state. */
+export const AgentRunListDtoSchema = z.array(AgentRunDtoSchema).max(50);
 
 export type AssistantOwnerScope = "system" | "user" | "legacy";
 

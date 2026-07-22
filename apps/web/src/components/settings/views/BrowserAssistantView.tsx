@@ -45,7 +45,7 @@ import {
 } from '../../../features/ai-assistant-runtime/browser/browserBridge';
 import { BROWSER_ACTIONS, BROWSER_LOCAL_ACTIONS } from '../../../features/ai-assistant-runtime/browser/browserActionCatalog';
 import { agentRuntimeInstance, toolRegistryInstance } from '../../../features/ai-assistant-runtime';
-import type { AssistantAction, SanitizedProjectContext } from '../../../features/ai-takeover/types';
+import type { AssistantAction, AssistantPlan, SanitizedProjectContext } from '../../../features/ai-takeover/types';
 import { subscribeAuthSessionChange } from '../../../services/auth/authSessionEvents';
 import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile';
 
@@ -1690,7 +1690,7 @@ export const BrowserAssistantView: React.FC = () => {
       if (!isBrowserOwnerScopeCurrent(ownerScope)) return;
       setTakeoverLoading(false);
 
-      const plan = record.plan;
+      const plan = record.plan as AssistantPlan;
       const firstAction = plan.actions[0] as any;
       const isProxyRoute = plan.actions.some((action: AssistantAction) => action.type === 'browser.generateExternal');
       const isExtractRoute = plan.actions.some((action: AssistantAction) => action.type === 'browser.extractProduct');

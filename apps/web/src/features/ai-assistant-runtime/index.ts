@@ -1,7 +1,7 @@
 // 简体中文：AI 助手运行时统一入口出口 (ai-assistant-runtime entry)
 
 export { agentRuntimeInstance, AgentRuntime, verifyAgentPlanStep } from './runtime/AgentRuntime.ts';
-export type { AgentPlanStepVerificationResult } from './runtime/AgentRuntime.ts';
+export type { AgentPlanStepVerificationResult, PlannedAgentRunRecord } from './runtime/AgentRuntime.ts';
 export type {
   AssistantAuthorizationScopeSnapshot,
   AssistantConfirmedStepAuthorization,
@@ -34,7 +34,7 @@ export {
   isAssistantConfirmationGrantFresh,
   sameAssistantStepAuthorizations,
 } from './runtime/AssistantExecutionContext.ts';
-export { agentRunStore } from './runtime/AgentRunStore.ts';
+export { agentRunStore, hasLocalAgentRunExecutionAuthority } from './runtime/AgentRunStore.ts';
 export type { AgentRunRecord, AgentRunStoreListener } from './runtime/AgentRunStore.ts';
 export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';

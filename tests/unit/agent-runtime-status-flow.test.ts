@@ -65,15 +65,54 @@ describe('AgentRunStore Status Flow Tests', () => {
       nested: { value: 'original' },
     });
     created.status = 'running';
-    created.plan.nested.value = 'tampered';
+    (created.plan as { nested: { value: string } }).nested.value = 'tampered';
     const fetched = store.getRun(created.id)!;
     assert.equal(fetched.status, 'waiting_confirmation');
-    assert.equal(fetched.plan.nested.value, 'original');
+    assert.equal((fetched.plan as { nested: { value: string } }).nested.value, 'original');
     fetched.status = 'completed';
     assert.equal(store.getRun(created.id)?.status, 'waiting_confirmation');
   });
 
-  it('P0: zombie running/waiting_execution jobs should heal to failed on load', () => {
+  it('preserves authenticated active Runs on load so the server can hydrate them first', () => {
+    mockLocalStorage.clear();
+    const ownerId = 'authenticated-recovery-user';
+    const activeRuns = [
+      {
+        id: 'run_server_running',
+        userMessage: 'continue on server',
+        intent: 'test',
+        plan: {},
+        status: 'running',
+        toolCalls: [],
+        backendSyncState: 'synced',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'run_waiting_execution',
+        userMessage: 'wait for recovery',
+        intent: 'test',
+        plan: {},
+        status: 'waiting_execution',
+        toolCalls: [],
+        backendSyncState: 'synced',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    mockLocalStorage.setItem(
+      `kk_agent_runs_history:owner:${encodeURIComponent(ownerId)}`,
+      JSON.stringify(activeRuns),
+    );
+
+    const store = new AgentRunStore(mockLocalStorage as any, () => ownerId);
+
+    assert.equal(store.getRun('run_server_running')?.status, 'running');
+    assert.equal(store.getRun('run_waiting_execution')?.status, 'waiting_execution');
+    assert.equal(store.getRun('run_server_running')?.backendSyncState, 'synced');
+  });
+
+  it('keeps the legacy local-only zombie repair when no authenticated server owner exists', () => {
     globalThis.localStorage = mockLocalStorage as any;
     mockLocalStorage.clear();
     
@@ -109,7 +148,6 @@ describe('AgentRunStore Status Flow Tests', () => {
     const run1 = tempStore.getRun('run_1')!;
     const run2 = tempStore.getRun('run_2')!;
 
-    // 状态必须被修正为 failed
     assert.equal(run1.status, 'failed');
     assert.equal(run1.nextStep, '任务运行异常中断，请重试。');
     assert.equal(run2.status, 'failed');

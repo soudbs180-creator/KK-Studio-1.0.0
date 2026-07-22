@@ -62,13 +62,19 @@ function pendingSteps(): AgentRunTimelineStep[] {
   }));
 }
 
+function getPlanActions(plan: unknown): unknown[] {
+  if (typeof plan !== 'object' || plan === null || Array.isArray(plan)) return [];
+  const actions = (plan as Record<string, unknown>).actions;
+  return Array.isArray(actions) ? actions : [];
+}
+
 export function buildAgentRunTimeline(record?: AgentRunRecord | null): AgentRunTimelineStep[] {
   if (!record) {
     return pendingSteps();
   }
 
   const status = record.status;
-  const actions = Array.isArray(record.plan?.actions) ? record.plan.actions : [];
+  const actions = getPlanActions(record.plan);
   const toolCalls = Array.isArray(record.toolCalls) ? record.toolCalls : [];
   const nextStep = typeof record.nextStep === 'string' ? record.nextStep : '';
   const blockedByPolicy = status === 'failed' && /安全|拦截|blocked|permission|policy/i.test(nextStep);

@@ -16,7 +16,7 @@ const waitFor = async (predicate: () => boolean, message: string, timeoutMs = 1_
 
 const waitForRunSyncIdle = async (runtime: AgentRuntime, runId: string) => {
   await waitFor(
-    () => !(runtime as any).runSyncChains.has(runId),
+    () => !(runtime as any).runHydration && !(runtime as any).runSyncChains.has(runId),
     `Agent Run sync did not become idle: ${runId}`,
   );
 };
@@ -42,6 +42,7 @@ const createToolCall = (runId: string): AgentToolCallDto => ({
 });
 
 test('Agent Run backend reconciliation is fail-closed for stale, partial, and racing responses', async (t) => {
+  const originalListAgentRuns = kkWebApiClient.listAgentRuns;
   const originalUpsertAgentRun = kkWebApiClient.upsertAgentRun;
   const originalRecordAgentToolCall = kkWebApiClient.recordAgentToolCall;
   const ownerId = 'agent-sync-reconciliation-user';
@@ -53,15 +54,38 @@ test('Agent Run backend reconciliation is fail-closed for stale, partial, and ra
     success: true,
     data: { ok: true },
   });
+  kkWebApiClient.listAgentRuns = (async () => ({
+    success: true,
+    data: { ok: true, data: [] },
+  })) as typeof kkWebApiClient.listAgentRuns;
   kkWebApiClient.upsertAgentRun = ((record: AgentRunRecord) => upsertImpl(record)) as typeof kkWebApiClient.upsertAgentRun;
   kkWebApiClient.recordAgentToolCall = ((toolCall: AgentToolCallDto) => toolCallImpl(toolCall)) as typeof kkWebApiClient.recordAgentToolCall;
 
   t.after(() => {
     agentRunStore.clearRuns();
     emitAuthSessionChange({ hasSession: false, userId: null, isTempUser: false });
+    kkWebApiClient.listAgentRuns = originalListAgentRuns;
     kkWebApiClient.upsertAgentRun = originalUpsertAgentRun;
     kkWebApiClient.recordAgentToolCall = originalRecordAgentToolCall;
   });
+
+  // Hydration must complete before the first pending local snapshot is uploaded.
+  agentRunStore.clearRuns();
+  const hydrationFirstRun = agentRunStore.createRun('hydrate first', 'test', { requiresConfirmation: false });
+  const syncOrder: string[] = [];
+  kkWebApiClient.listAgentRuns = (async () => {
+    syncOrder.push('list');
+    return { success: true, data: { ok: true, data: [] } };
+  }) as typeof kkWebApiClient.listAgentRuns;
+  upsertImpl = async () => {
+    syncOrder.push('upsert');
+    return { success: true, data: { ok: true } };
+  };
+  const hydrationFirstRuntime = new AgentRuntime();
+  hydrationFirstRuntime.requestPendingRunSync();
+  await waitFor(() => syncOrder.includes('upsert'), 'pending Run upload did not follow hydration');
+  await waitForRunSyncIdle(hydrationFirstRuntime, hydrationFirstRun.id);
+  assert.deepEqual(syncOrder, ['list', 'upsert']);
 
   // A stale response without its authoritative DTO cannot clear the durable retry marker.
   agentRunStore.clearRuns();
@@ -143,15 +167,15 @@ test('Agent Run backend reconciliation is fail-closed for stale, partial, and ra
   assert.equal(agentRunStore.getRun(racingRun.id)?.updatedAt, newerLocal.updatedAt);
   assert.equal(agentRunStore.getRun(racingRun.id)?.backendSyncState, 'pending');
 
-  // A timeout repair created by getPendingRun is itself sent as the newest authoritative local state.
+  // Authenticated active state remains recoverable until server hydration resolves its authority.
   agentRunStore.clearRuns();
   const timeoutRun = agentRunStore.createRun('timeout marker', 'test', { requiresConfirmation: false });
   agentRunStore.restoreRunSnapshot({
     ...timeoutRun,
     updatedAt: new Date(Date.now() - 6 * 60 * 1_000).toISOString(),
   });
-  assert.equal(agentRunStore.getPendingRun(), undefined);
-  assert.equal(agentRunStore.getRun(timeoutRun.id)?.status, 'failed');
+  assert.equal(agentRunStore.getPendingRun()?.id, timeoutRun.id);
+  assert.equal(agentRunStore.getRun(timeoutRun.id)?.status, 'waiting_execution');
   let sentTimeoutSnapshot: AgentRunRecord | undefined;
   upsertImpl = async (record) => {
     sentTimeoutSnapshot = JSON.parse(JSON.stringify(record));
@@ -160,7 +184,6 @@ test('Agent Run backend reconciliation is fail-closed for stale, partial, and ra
   const timeoutRuntime = new AgentRuntime();
   timeoutRuntime.requestPendingRunSync();
   await waitForRunSyncIdle(timeoutRuntime, timeoutRun.id);
-  assert.equal(sentTimeoutSnapshot?.status, 'failed');
-  assert.match(sentTimeoutSnapshot?.nextStep || '', /timeout|超时/i);
+  assert.equal(sentTimeoutSnapshot?.status, 'waiting_execution');
   assert.equal(agentRunStore.getRun(timeoutRun.id)?.backendSyncState, 'synced');
 });

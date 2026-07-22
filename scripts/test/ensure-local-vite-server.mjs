@@ -1,7 +1,7 @@
 import { createServer as createViteServer } from 'vite';
 import path from 'node:path';
 
-async function isUrlReady(url, timeoutMs = 5000) {
+async function isKkStudioReady(url, timeoutMs = 5000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -10,7 +10,9 @@ async function isUrlReady(url, timeoutMs = 5000) {
       redirect: 'manual',
       signal: controller.signal,
     });
-    return response.ok;
+    if (!response.ok) return false;
+    const html = await response.text();
+    return html.includes('<title>KK Studio') && html.includes('/src/bootstrap.tsx');
   } catch {
     return false;
   } finally {
@@ -27,7 +29,7 @@ export async function ensureLocalViteServer({
   const requestedPort = Number(requestedUrl.port || (requestedUrl.protocol === 'https:' ? '443' : '80'));
   const candidatePorts = [requestedPort, ...fallbackPorts.filter((port) => port !== requestedPort)];
 
-  if (await isUrlReady(url)) {
+  if (await isKkStudioReady(url)) {
     return { server: null, started: false, url: requestedUrl.origin };
   }
 
@@ -36,7 +38,7 @@ export async function ensureLocalViteServer({
   for (const port of candidatePorts) {
     const candidateOrigin = `${requestedUrl.protocol}//${requestedUrl.hostname}:${port}`;
 
-    if (port !== requestedPort && await isUrlReady(candidateOrigin)) {
+    if (port !== requestedPort && await isKkStudioReady(candidateOrigin)) {
       return { server: null, started: false, url: candidateOrigin };
     }
 

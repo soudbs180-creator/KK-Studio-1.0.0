@@ -65,13 +65,31 @@ test("prompt-group browser verification script uses browser preflight and fallba
   assert.match(source, /import \{ runBrowserPreflight \} from '\.\/browser-preflight\.mjs';/);
   assert.match(source, /import \{\s*closeLocalViteServer,\s*ensureLocalViteServer,\s*\} from '\.\/ensure-local-vite-server\.mjs';/);
   assert.match(source, /function isBrowserLaunchUnavailable\(error\)/);
-  assert.match(source, /await runFallbackVerification\(error, browserPreflight\);/);
+  assert.match(source, /await runFallbackVerification\(error, browserPreflight, targetUrl\);/);
   assert.match(source, /mode: 'fallback'/);
   assert.match(source, /prompt-group-drag-fallback\.json/);
   assert.match(source, /await closeLocalViteServer\(viteServer\);/);
   assert.match(viteHelperSource, /export async function closeLocalViteServer\(server\)/);
   assert.match(viteHelperSource, /server\.waitForRequestsIdle\(\)/);
   assert.match(viteHelperSource, /setTimeout\(resolve, 5000\)/);
+});
+
+test("prompt-group browser verification navigates to the Vite helper fallback URL", () => {
+  const source = readSource("scripts/test/verify-prompt-group-drag.mjs");
+
+  assert.match(source, /let targetUrl = TARGET_URL;/);
+  assert.match(source, /targetUrl = ensured\.url \|\| TARGET_URL;/);
+  assert.match(source, /await gotoWithRetry\(page, targetUrl\);/);
+  assert.match(source, /assertHttpHtml\(targetUrl\)/);
+});
+
+test("local Vite helper reuses only a KK Studio page", () => {
+  const source = readSource("scripts/test/ensure-local-vite-server.mjs");
+
+  assert.match(source, /async function isKkStudioReady\(url/);
+  assert.match(source, /html\.includes\('<title>KK Studio'/);
+  assert.match(source, /if \(await isKkStudioReady\(url\)\)/);
+  assert.match(source, /if \(port !== requestedPort && await isKkStudioReady\(candidateOrigin\)\)/);
 });
 
 test("prompt-group browser verification script accepts hook-based drag wiring contracts", () => {

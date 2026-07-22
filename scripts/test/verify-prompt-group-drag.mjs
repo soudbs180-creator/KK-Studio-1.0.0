@@ -173,11 +173,11 @@ function verifyPromptGroupSourceContracts() {
   }
 }
 
-async function runFallbackVerification(error, browserPreflight) {
+async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyPromptGroupSourceContracts();
 
   const routes = await Promise.all([
-    assertHttpHtml(TARGET_URL),
+    assertHttpHtml(targetUrl),
   ]);
 
   const summary = {
@@ -468,10 +468,12 @@ rmStaleFallbackArtifact("prompt-group-drag-fallback.json");
 let browser;
 let viteServer;
 let browserPreflight = null;
+let targetUrl = TARGET_URL;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
   viteServer = ensured.server;
+  targetUrl = ensured.url || TARGET_URL;
   browserPreflight = await runBrowserPreflight();
 
   if (!browserPreflight.ok) {
@@ -540,7 +542,7 @@ try {
   });
 
 
-  await gotoWithRetry(page, TARGET_URL);
+  await gotoWithRetry(page, targetUrl);
   await page.waitForTimeout(1000);
   await dismissStorageModalIfPresent(page);
 
@@ -683,7 +685,7 @@ try {
     throw error;
   }
   console.warn(`[Smoke Check] Playwright 运行时异常或超时，正在执行降级契约校验...`);
-  await runFallbackVerification(error, browserPreflight);
+  await runFallbackVerification(error, browserPreflight, targetUrl);
 } finally {
   if (browser) {
     await browser.close().catch(() => {});

@@ -9,11 +9,19 @@ import type { AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
 import { LocalAssistantBrain } from '../../ai-takeover/core/localBrain.ts';
 import { LLMBrain } from '../../ai-takeover/core/llmBrain.ts';
 import { agentPermissionPolicy } from './AgentPermissionPolicy.ts';
-import { agentRunStore, type AgentRunRecord } from './AgentRunStore.ts';
+import {
+  agentRunStore,
+  hasLocalAgentRunExecutionAuthority,
+  type AgentRunRecord,
+} from './AgentRunStore.ts';
 import { redactToolText, toolRegistryInstance } from '../tools/ToolRegistry.ts';
 import { writeHandoff } from '../memory/handoffWriter.ts';
 import { kkWebApiClient } from '../../../services/api/kkApiClient.ts';
 import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.ts';
+import {
+  hydrateAgentRunProjection,
+  type AgentRunHydrationResult,
+} from './agentRunHydration.ts';
 import {
   durableGenerationQueue,
   type DurableGenerationQueue,
@@ -436,6 +444,9 @@ interface AgentRecoveryReport {
   recoveredStepIds: string[];
 }
 
+/** A Run created by this planner has a locally validated, executable plan shape. */
+export type PlannedAgentRunRecord = Omit<AgentRunRecord, 'plan'> & { plan: AssistantPlan };
+
 export class AgentRuntime {
   private readonly runAbortControllers = new Map<string, AbortController>();
   private readonly runExecutions = new Map<string, Promise<void>>();
@@ -446,14 +457,16 @@ export class AgentRuntime {
   private readonly pendingRunSyncs = new Map<string, AgentRunRecord>();
   private readonly planningGenerationQueue: GenerationPlanningQueue;
   private activeRunSyncOwnerId = agentRunStore.getOwnerScopeId();
+  private hydratedRunSyncOwnerId = '';
+  private runHydration?: { ownerId: string; promise: Promise<AgentRunHydrationResult> };
 
   constructor(planningGenerationQueue: GenerationPlanningQueue = durableGenerationQueue) {
     this.planningGenerationQueue = planningGenerationQueue;
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => this.requestPendingRunSync());
+      window.addEventListener('online', () => void this.requestRunHydration());
       queueMicrotask(() => {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-          this.requestPendingRunSync();
+          void this.requestRunHydration();
         }
       });
     }
@@ -463,7 +476,7 @@ export class AgentRuntime {
     text: string,
     context: SanitizedProjectContext,
     modelId?: string,
-  ): Promise<AgentRunRecord> {
+  ): Promise<PlannedAgentRunRecord> {
     const planningOwnerId = getRuntimeOwnerId();
     const localPlan = await localBrain.plan(text, context);
     if (getRuntimeOwnerId() !== planningOwnerId) {
@@ -552,7 +565,7 @@ export class AgentRuntime {
       void writeHandoff(agentRunStore.getRun(record.id)!, planningOwnerId);
     }
     this.syncRunToBackend(agentRunStore.getRun(record.id)!);
-    return agentRunStore.getRun(record.id)!;
+    return agentRunStore.getRun(record.id)! as PlannedAgentRunRecord;
   }
 
   createConfirmationGrant(
@@ -689,6 +702,9 @@ export class AgentRuntime {
     );
     const record = getOwnedRun();
     if (!record) throw new Error(`Agent run not found: ${runId}`);
+    if (!hasLocalAgentRunExecutionAuthority(record)) {
+      throw new Error(`Agent run is a server projection and cannot execute in this browser: ${runId}`);
+    }
     if (!['waiting_confirmation', 'waiting_execution', 'running'].includes(record.status)) return;
 
     const plan = record.plan as AssistantPlan;
@@ -974,8 +990,9 @@ export class AgentRuntime {
     }
 
     for (const runId of new Set([...restoredRunIds, snapshot.id])) {
-      this.scheduleRunSync(runId, ownerId);
+      if (this.hydratedRunSyncOwnerId === ownerId) this.scheduleRunSync(runId, ownerId);
     }
+    if (this.hydratedRunSyncOwnerId !== ownerId) void this.requestRunHydration();
   }
 
   private ensureRunSyncOwner(): string {
@@ -984,6 +1001,7 @@ export class AgentRuntime {
       this.activeRunSyncOwnerId = ownerId;
       this.pendingRunSyncs.clear();
       this.runSyncChains.clear();
+      this.hydratedRunSyncOwnerId = '';
     }
     return ownerId;
   }
@@ -1016,13 +1034,37 @@ export class AgentRuntime {
     }).catch(() => undefined);
   }
 
-  requestPendingRunSync(): void {
-    const ownerId = this.ensureRunSyncOwner();
+  private flushPendingRunSyncs(ownerId = this.ensureRunSyncOwner()): void {
     this.restorePendingRunSyncsFromStore(ownerId);
     if (ownerId === 'local_user') return;
     for (const runId of this.pendingRunSyncs.keys()) {
       this.scheduleRunSync(runId, ownerId);
     }
+  }
+
+  requestRunHydration(): Promise<AgentRunHydrationResult> {
+    const ownerId = this.ensureRunSyncOwner();
+    if (this.hydratedRunSyncOwnerId === ownerId) {
+      this.flushPendingRunSyncs(ownerId);
+      return Promise.resolve({ outcome: ownerId === 'local_user' ? 'local_only' : 'hydrated', runCount: 0 });
+    }
+    if (this.runHydration?.ownerId === ownerId) return this.runHydration.promise;
+    const promise = hydrateAgentRunProjection({ ownerId })
+      .then((result) => {
+        if (ownerId !== this.ensureRunSyncOwner()) return { outcome: 'owner_changed', runCount: 0 } as const;
+        this.hydratedRunSyncOwnerId = ownerId;
+        this.flushPendingRunSyncs(ownerId);
+        return result;
+      })
+      .finally(() => {
+        if (this.runHydration?.promise === promise) this.runHydration = undefined;
+      });
+    this.runHydration = { ownerId, promise };
+    return promise;
+  }
+
+  requestPendingRunSync(): void {
+    void this.requestRunHydration();
   }
 
   private async flushRunSync(runId: string, ownerId: string): Promise<void> {

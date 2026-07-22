@@ -25,6 +25,7 @@ import {
   agentRunStore,
   buildAgentRunTimeline,
   captureAssistantAuthorizationScope,
+  hasLocalAgentRunExecutionAuthority,
   type AssistantAuthorizationScopeSnapshot,
   type AssistantExecutionContext,
   type AssistantExecutionTrigger,
@@ -33,6 +34,7 @@ import {
   type AgentRunTimelineStep,
   toolRegistryInstance,
 } from '../../ai-assistant-runtime';
+import { subscribeAuthSessionChange } from '../../../services/auth/authSessionEvents.ts';
 
 type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
 
@@ -269,13 +271,13 @@ export function AITakeoverProvider({
   const [restoredPendingRun] = useState<AgentRunRecord | null>(() => agentRunStore.getPendingRun() ?? null);
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(() => {
-    if (!restoredPendingRun?.plan) return null;
+    if (!restoredPendingRun?.plan || !hasLocalAgentRunExecutionAuthority(restoredPendingRun)) return null;
     return collaborationMode === 'assist'
       ? buildAssistancePreviewPlan(restoredPendingRun.plan as AssistantPlan)
       : restoredPendingRun.plan as AssistantPlan;
   });
   const [pendingAuthorizationScope, setPendingAuthorizationScope] = useState<AssistantAuthorizationScopeSnapshot | null>(() => (
-    restoredPendingRun
+    restoredPendingRun && hasLocalAgentRunExecutionAuthority(restoredPendingRun)
       ? captureAssistantAuthorizationScope({
           currentPage,
           activeCanvas,
@@ -292,9 +294,28 @@ export function AITakeoverProvider({
   const agentRunTimeline = React.useMemo(() => buildAgentRunTimeline(currentRun), [currentRun]);
 
   useEffect(() => {
-    // getPendingRun() can convert an interrupted run into a pending failed snapshot.
-    // Trigger the durable backend flush after React has restored that local state.
-    agentRuntimeInstance.requestPendingRunSync();
+    const syncProjection = (runs: AgentRunRecord[]) => {
+      setCurrentRunId((selectedRunId) => {
+        const selected = runs.find((run) => run.id === selectedRunId)
+          || runs.find((run) => ['planning', 'waiting_confirmation', 'waiting_execution', 'running'].includes(run.status));
+        setCurrentRun(selected || null);
+        if (!selected
+          || selected.status !== 'waiting_confirmation'
+          || !hasLocalAgentRunExecutionAuthority(selected)) {
+          setPendingPlan(null);
+          setPendingAuthorizationScope(null);
+        }
+        return selected?.id || null;
+      });
+    };
+    const unsubscribeRuns = agentRunStore.subscribe(syncProjection);
+    const requestHydration = () => void agentRuntimeInstance.requestRunHydration();
+    const unsubscribeAuth = subscribeAuthSessionChange(requestHydration);
+    requestHydration();
+    return () => {
+      unsubscribeRuns();
+      unsubscribeAuth();
+    };
   }, []);
 
 
@@ -457,7 +478,7 @@ export function AITakeoverProvider({
       await new Promise(resolve => setTimeout(resolve, 800));
 
       const record = await agentRuntimeInstance.run(text, projectContext, selectedModel?.id);
-      const plan = record.plan;
+      const plan = record.plan as AssistantPlan;
 
       const assistantMsg: Message = {
         id: record.id,
@@ -515,6 +536,9 @@ export function AITakeoverProvider({
   // 用户点击“确认执行”
   const executePendingPlan = useCallback(async () => {
     if (!currentRunId || !pendingPlan || !pendingAuthorizationScope) return;
+    const executableRun = agentRunStore.getRun(currentRunId);
+    if (executableRun?.status !== 'waiting_confirmation'
+      || !hasLocalAgentRunExecutionAuthority(executableRun)) return;
     const runId = currentRunId;
     const confirmedPlanSnapshot = pendingPlan;
     const confirmedAuthorizationScope = pendingAuthorizationScope;
