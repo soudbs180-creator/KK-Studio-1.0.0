@@ -27,6 +27,7 @@ import {
   hydrateAgentSessionProjection,
   type AgentSessionHydrationResult,
 } from './agentSessionProjection.ts';
+import { resolveAgentPlannerSessionContext } from './agentPlannerSessionContext.ts';
 import {
   durableGenerationQueue,
   type DurableGenerationQueue,
@@ -489,7 +490,9 @@ export class AgentRuntime {
     sessionId?: string,
   ): Promise<PlannedAgentRunRecord> {
     const planningOwnerId = getRuntimeOwnerId();
-    const localPlan = await localBrain.plan(text, context);
+    const sessionContext = resolveAgentPlannerSessionContext(sessionId);
+    const validatedSessionId = sessionContext?.sessionId;
+    const localPlan = await localBrain.plan(text, context, sessionContext);
     if (getRuntimeOwnerId() !== planningOwnerId) {
       throw new Error('Agent planning stopped because the authenticated owner changed.');
     }
@@ -497,7 +500,7 @@ export class AgentRuntime {
     plan = localPlan;
     if (context.settings.apiKeyStatus !== 'missing' && localPlan.intent === 'unknown') {
       try {
-        plan = await llmBrain.plan(text, context, modelId);
+        plan = await llmBrain.plan(text, context, modelId, sessionContext);
       } catch (error) {
         console.warn(
           '[AgentRuntime] Cloud planner failed; using LocalBrain.',
@@ -567,7 +570,7 @@ export class AgentRuntime {
       }
     }
 
-    const record = agentRunStore.createRun(text, plan.intent, plan, sessionId);
+    const record = agentRunStore.createRun(text, plan.intent, plan, validatedSessionId);
     if (isBlocked) {
       agentRunStore.updateRun(record.id, {
         status: 'failed',

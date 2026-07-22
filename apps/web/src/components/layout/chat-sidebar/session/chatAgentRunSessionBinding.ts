@@ -1,16 +1,14 @@
 import type { AgentSessionDto } from '@kk/shared';
 import { agentSessionProjectionStore } from '../../../../features/ai-assistant-runtime/runtime/agentSessionProjection.ts';
+import { AGENT_PLANNER_SYSTEM_RULES } from '../../../../features/ai-takeover/core/agentPlannerContext.ts';
+export {
+  AGENT_PLANNER_SYSTEM_RULES as CHAT_AGENT_SESSION_SYSTEM_RULES,
+} from '../../../../features/ai-takeover/core/agentPlannerContext.ts';
 import {
   writeChatAgentSession,
   type ChatAgentSessionWriteOptions,
 } from './chatAgentSessionWriteCoordinator.ts';
 import type { ChatSessionItem } from './chatSessionData.ts';
-
-/** Canonical execution constraints counted in every promoted Chat Session budget. */
-export const CHAT_AGENT_SESSION_SYSTEM_RULES = [
-  'IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update.',
-  'Preserve direct interaction and require explicit confirmation for costly, destructive, or irreversible actions.',
-].join(' ');
 
 /** Local Chat evidence available when one Agent Run is about to be created. */
 export interface ChatAgentRunSessionBindingRequest {
@@ -71,7 +69,7 @@ export async function resolveChatAgentRunSessionId(
     session,
     collaborationMode: request.collaborationMode,
     maxTokens: request.maxTokens,
-    systemRules: CHAT_AGENT_SESSION_SYSTEM_RULES,
+    systemRules: AGENT_PLANNER_SYSTEM_RULES,
     createdAt,
     heartbeatAt,
     approvedDocumentAttachmentIds: new Set<string>(),

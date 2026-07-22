@@ -1,5 +1,9 @@
 // 简体中文：云端大模型接管规划器 (LLM Brain)
 import type { AssistantPlan, SanitizedProjectContext } from '../types';
+import {
+  buildAgentPlannerLlmMessages,
+  type AgentPlannerSessionContext,
+} from './agentPlannerContext.ts';
 type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
 
 const chatWithLlm: LlmChat = async (...args) => {
@@ -12,7 +16,12 @@ export class LLMBrain {
    * 负责接收脱敏的 SanitizedProjectContext 及用户输入，生成符合 JSON Plan 的 AssistantPlan。
    * 此模块在云端连接可用时工作。在无 Key 状态时应当平滑回退到 LocalBrain。
    */
-  async plan(userInput: string, context: SanitizedProjectContext, modelId?: string): Promise<AssistantPlan> {
+  async plan(
+    userInput: string,
+    context: SanitizedProjectContext,
+    modelId?: string,
+    sessionContext?: AgentPlannerSessionContext,
+  ): Promise<AssistantPlan> {
     const activeModelId = modelId || context.settings.selectedModel || 'gemini-2.5-flash';
     const isGemini = activeModelId.toLowerCase().includes('gemini');
 
@@ -110,10 +119,12 @@ export class LLMBrain {
 
     const responseText = await chatWithLlm({
       modelId: activeModelId,
-      messages: [
-        { role: 'system', content: systemPrompt + retryJobToolPrompt },
-        { role: 'user', content: `当前项目脱敏上下文信息：\n${JSON.stringify(context, null, 2)}\n\n用户最新的聊天指令：\n${userInput}` }
-      ],
+      messages: buildAgentPlannerLlmMessages(
+        systemPrompt + retryJobToolPrompt,
+        context,
+        userInput,
+        sessionContext,
+      ),
       temperature: 0.2,
       providerConfig
     });

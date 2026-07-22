@@ -8,6 +8,10 @@ import { matchPromptTemplates } from '../prompts/promptMatcher.ts';
 import { optimizePromptLocally } from '../prompts/localPromptOptimizer.ts';
 import { safetyPolicy } from './safetyPolicy.ts';
 import { confirmationPolicy } from './confirmationPolicy.ts';
+import {
+  describeAgentPlannerSessionContinuity,
+  type AgentPlannerSessionContext,
+} from './agentPlannerContext.ts';
 
 const SETTINGS_VIEW_LABELS: Record<string, string> = {
   dashboard: '设置总览',
@@ -30,7 +34,11 @@ const SURFACE_LABELS: Record<string, string> = {
 };
 
 export class LocalAssistantBrain {
-  async plan(userInput: string, context: SanitizedProjectContext): Promise<AssistantPlan> {
+  async plan(
+    userInput: string,
+    context: SanitizedProjectContext,
+    sessionContext?: AgentPlannerSessionContext,
+  ): Promise<AssistantPlan> {
     const intentResult = analyzeIntent(userInput, context);
     const actions: AssistantAction[] = [];
     let reply = '';
@@ -745,6 +753,7 @@ AgentRuntime 会在展示确认卡前把${retryTargetLabel}冻结为具体 Job�
 对于您刚才的输入，我未能在本地匹配到精准的执行指令。
 为了获得完整的 AI 智能接管与规划能力，建议您前往配置相应的对话和图片模型。
 您可以直接点击 👉 [去配置模型](action://open-settings-api) 快速进行设置。`;
+        reply += describeAgentPlannerSessionContinuity(sessionContext);
         break;
       }
     }
