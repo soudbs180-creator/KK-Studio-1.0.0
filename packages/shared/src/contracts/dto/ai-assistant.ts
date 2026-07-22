@@ -100,6 +100,7 @@ export interface AgentToolCallDto {
 
 export interface AgentRunDto {
   id: string;
+  sessionId?: string;
   userMessage: string;
   intent: string;
   plan: unknown;
@@ -189,6 +190,7 @@ export const AgentToolCallDtoSchema = z.object({
 
 export const AgentRunDtoSchema = z.object({
   id: z.string().min(1).max(200),
+  sessionId: z.string().min(1).max(200).optional(),
   userMessage: z.string(),
   intent: z.string(),
   plan: z.unknown(),

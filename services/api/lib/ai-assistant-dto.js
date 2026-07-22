@@ -14,6 +14,7 @@ function toIsoString(value) {
 function mapAgentRunRow(row = {}, toolCalls = []) {
   return compact({
     id: row.id,
+    sessionId: row.session_id,
     userMessage: row.user_message,
     intent: row.intent,
     plan: row.plan,

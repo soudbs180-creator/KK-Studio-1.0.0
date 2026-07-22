@@ -14,6 +14,7 @@ BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/ops/postgres/bootstrap-kk-vps.sq
 AI_ASSISTANT_SCOPE_MIGRATION_PATH="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_EVENT_MIGRATION:-infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/database/migrations/021_agent_sessions.sql}"
+AGENT_RUN_SESSION_BINDING_MIGRATION_PATH="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -197,7 +198,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016, 020 and 021 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify schemas 016, 020, 021 and 022 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -364,6 +365,10 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Agent Session migration not found at ${NEW_RELEASE_DIR}/${AGENT_SESSION_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SESSION_BINDING_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] Agent Run Session binding migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_SESSION_BINDING_MIGRATION_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -382,6 +387,9 @@ apply_database_migrations() {
 
   echo "[deploy-kk-vps] Applying mandatory Agent Session migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_SESSION_MIGRATION_PATH}"
+
+  echo "[deploy-kk-vps] Applying mandatory Agent Run Session binding migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SESSION_BINDING_MIGRATION_PATH}"
 
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
@@ -491,6 +499,23 @@ BEGIN
         AND contype = 'f'
     ) THEN
     RAISE EXCEPTION 'agent_sessions schema is missing or invalid';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'agent_runs'
+      AND column_name = 'session_id'
+      AND data_type = 'text'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_runs_session_owner_fkey'
+      AND conrelid = 'public.agent_runs'::regclass
+      AND confrelid = 'public.agent_sessions'::regclass
+      AND contype = 'f'
+      AND array_length(conkey, 1) = 2
+      AND array_length(confkey, 1) = 2
+  ) THEN
+    RAISE EXCEPTION 'agent_runs.session_id is missing or its owner binding is invalid';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns

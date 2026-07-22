@@ -359,6 +359,7 @@ CREATE TABLE IF NOT EXISTS public.agent_runs (
   intent text NOT NULL,
   plan jsonb NOT NULL,
   status text NOT NULL,
+  session_id text,
   step_results jsonb NOT NULL DEFAULT '[]'::jsonb,
   event_sequence integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -368,6 +369,7 @@ CREATE TABLE IF NOT EXISTS public.agent_runs (
 -- 兼容已由 011 创建的旧表；CREATE TABLE IF NOT EXISTS 不会补充新列。
 ALTER TABLE public.agent_runs
   ADD COLUMN IF NOT EXISTS user_id text,
+  ADD COLUMN IF NOT EXISTS session_id text,
   ADD COLUMN IF NOT EXISTS step_results jsonb NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS event_sequence integer NOT NULL DEFAULT 0;
 
@@ -408,8 +410,8 @@ AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     NEW.event_sequence := 1;
-  ELSIF ROW(NEW.status, NEW.plan, NEW.step_results, NEW.updated_at)
-    IS DISTINCT FROM ROW(OLD.status, OLD.plan, OLD.step_results, OLD.updated_at) THEN
+  ELSIF ROW(NEW.status, NEW.plan, NEW.step_results, NEW.session_id, NEW.updated_at)
+    IS DISTINCT FROM ROW(OLD.status, OLD.plan, OLD.step_results, OLD.session_id, OLD.updated_at) THEN
     NEW.event_sequence := OLD.event_sequence + 1;
   ELSE
     NEW.event_sequence := OLD.event_sequence;
@@ -466,6 +468,37 @@ CREATE TABLE IF NOT EXISTS public.agent_sessions (
 
 CREATE INDEX IF NOT EXISTS agent_sessions_user_updated_idx
   ON public.agent_sessions(user_id, updated_at DESC, id DESC);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_sessions_id_user_unique'
+      AND conrelid = 'public.agent_sessions'::regclass
+  ) THEN
+    ALTER TABLE public.agent_sessions
+      ADD CONSTRAINT agent_sessions_id_user_unique UNIQUE (id, user_id);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_runs_session_owner_fkey'
+      AND conrelid = 'public.agent_runs'::regclass
+  ) THEN
+    ALTER TABLE public.agent_runs
+      ADD CONSTRAINT agent_runs_session_owner_fkey
+      FOREIGN KEY (session_id, user_id)
+      REFERENCES public.agent_sessions (id, user_id)
+      ON DELETE RESTRICT;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS agent_runs_session_updated_idx
+  ON public.agent_runs(session_id, updated_at DESC)
+  WHERE session_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.agent_context_snapshots (
   snapshot_id text PRIMARY KEY,

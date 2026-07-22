@@ -16,6 +16,7 @@ BOOTSTRAP_SQL="${BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/ops/postgres/bootstrap-kk-v
 AI_ASSISTANT_SCOPE_MIGRATION="${AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION="${AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION="${AGENT_SESSION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/021_agent_sessions.sql}"
+AGENT_RUN_SESSION_BINDING_MIGRATION="${AGENT_RUN_SESSION_BINDING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -49,6 +50,11 @@ if [[ ! -f "${AGENT_SESSION_MIGRATION}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${AGENT_RUN_SESSION_BINDING_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing Agent Run Session binding migration: ${AGENT_RUN_SESSION_BINDING_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -70,6 +76,9 @@ psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_EVENT_MIGRATION
 
 echo "[import-runtime-into-vps] Applying mandatory Agent Session migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_SESSION_MIGRATION}"
+
+echo "[import-runtime-into-vps] Applying mandatory Agent Run Session binding migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_SESSION_BINDING_MIGRATION}"
 
 echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only; canonical bootstrap and migrations own the target schema"
 

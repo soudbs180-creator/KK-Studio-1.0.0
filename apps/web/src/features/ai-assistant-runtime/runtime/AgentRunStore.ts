@@ -6,6 +6,7 @@ import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.
 
 export interface AgentRunRecord {
   id: string;
+  sessionId?: string;
   userMessage: string;
   intent: string;
   plan: unknown;
@@ -224,11 +225,12 @@ export class AgentRunStore {
     return () => this.listeners.delete(listener);
   }
 
-  createRun(userMessage: string, intent: string, plan: unknown): AgentRunRecord {
+  createRun(userMessage: string, intent: string, plan: unknown, sessionId?: string): AgentRunRecord {
     this.ensureOwnerScope();
     const now = new Date().toISOString();
     const newRun: AgentRunRecord = {
       id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      sessionId,
       userMessage,
       intent,
       plan: clonePlan(plan),

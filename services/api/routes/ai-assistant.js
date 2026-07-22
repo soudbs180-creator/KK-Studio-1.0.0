@@ -6,7 +6,6 @@ const express = require('express');
 const router = express.Router();
 const { getPool } = require('../lib/db');
 const {
-  mapAgentRunRow,
   mapAgentToolCallRow,
   mapKnowledgeDocumentRow,
   mapAgentSkillRow,
@@ -14,6 +13,7 @@ const {
 const { TEMP_USER_ID_HEADER } = require('./compat/compatHelper');
 const { verifyJWT } = require('../lib/jwt');
 const agentRunReadStore = require('../lib/agent-run-read-store');
+const agentRunWriteStore = require('../lib/agent-run-write-store');
 const agentRunEventStore = require('../lib/agent-run-event-store');
 const agentSessionStore = require('../lib/agent-session-store');
 const {
@@ -228,32 +228,36 @@ router.get('/ai-assistant/runs/:runId/events', verifyAuth, async (req, res) => {
  * 职责：同步持久化 Agent 运行计划记录，状态变化时自动更新。
  */
 router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
-  const { id, userMessage, intent, plan, status, stepResults = [], updatedAt = new Date().toISOString() } = req.body;
+  const {
+    id, sessionId, userMessage, intent, plan, status,
+    stepResults = [], updatedAt = new Date().toISOString(),
+  } = req.body;
   if (!id || !userMessage || !intent || !plan || !status) {
     return res.status(400).json({ error: '缺少必要字段' });
   }
+  if (sessionId !== undefined && (
+    typeof sessionId !== 'string' || !sessionId.trim() || sessionId.trim().length > 200
+  )) {
+    return res.status(400).json({ error: 'Invalid Agent Session binding' });
+  }
 
-  const pool = getPool();
   try {
-    const query = `
-      INSERT INTO public.agent_runs (id, user_id, user_message, intent, plan, status, step_results, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)
-      ON CONFLICT (id) 
-      DO UPDATE SET status = EXCLUDED.status, plan = EXCLUDED.plan, step_results = EXCLUDED.step_results, updated_at = EXCLUDED.updated_at
-      WHERE public.agent_runs.user_id = EXCLUDED.user_id
-        AND public.agent_runs.updated_at <= EXCLUDED.updated_at
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [id, req.userId, userMessage, intent, JSON.stringify(plan), status, JSON.stringify(stepResults), updatedAt]);
-    if (!result.rows[0]) {
-      const existing = await pool.query(
-        'SELECT * FROM public.agent_runs WHERE id = $1 AND user_id = $2',
-        [id, req.userId],
-      );
-      if (!existing.rows[0]) return res.status(403).json({ error: 'Agent run ownership conflict' });
-      return res.json({ ok: true, stale: true, data: mapAgentRunRow(existing.rows[0]) });
+    const outcome = await agentRunWriteStore.upsertAgentRun(req.userId, {
+      id, sessionId: sessionId?.trim(), userMessage, intent, plan, status, stepResults, updatedAt,
+    });
+    if (outcome.outcome === 'ownership_conflict') {
+      return res.status(403).json({ error: 'Agent run ownership conflict' });
     }
-    res.json({ ok: true, data: mapAgentRunRow(result.rows[0]) });
+    if (outcome.outcome === 'session_conflict') {
+      return res.status(409).json({ error: 'Agent session ownership conflict' });
+    }
+    if (outcome.outcome === 'binding_conflict') {
+      return res.status(409).json({ error: 'Agent run Session binding conflict' });
+    }
+    if (outcome.outcome === 'stale') {
+      return res.json({ ok: true, stale: true, data: outcome.data });
+    }
+    return res.json({ ok: true, data: outcome.data });
   } catch (err) {
     console.error('[后端AI助手] 同步 Runs 失败:', err);
     res.status(500).json({ error: '同步失败' });

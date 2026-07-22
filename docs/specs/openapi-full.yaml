@@ -3104,7 +3104,7 @@ paths:
     post:
       tags: [AI Assistant]
       summary: 保存 Agent 运行记录
-      description: "乐观并发控制：`updatedAt` 过期时返回 `{ ok: true, stale: true, data }`。"
+      description: "乐观并发控制：`updatedAt` 过期时返回 `{ ok: true, stale: true, data }`。可选 `sessionId` 只接受当前 owner 的 Session；首次绑定后不可改绑或解除。"
       operationId: saveAgentRun
       requestBody:
         required: true
@@ -3112,6 +3112,7 @@ paths:
           application/json:
             example:
               id: run-001
+              sessionId: session-001
               userMessage: 帮我生成 10 张商品图
               intent: batch_generate
               plan:

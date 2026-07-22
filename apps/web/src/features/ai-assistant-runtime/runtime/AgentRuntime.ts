@@ -486,6 +486,7 @@ export class AgentRuntime {
     text: string,
     context: SanitizedProjectContext,
     modelId?: string,
+    sessionId?: string,
   ): Promise<PlannedAgentRunRecord> {
     const planningOwnerId = getRuntimeOwnerId();
     const localPlan = await localBrain.plan(text, context);
@@ -566,7 +567,7 @@ export class AgentRuntime {
       }
     }
 
-    const record = agentRunStore.createRun(text, plan.intent, plan);
+    const record = agentRunStore.createRun(text, plan.intent, plan, sessionId);
     if (isBlocked) {
       agentRunStore.updateRun(record.id, {
         status: 'failed',

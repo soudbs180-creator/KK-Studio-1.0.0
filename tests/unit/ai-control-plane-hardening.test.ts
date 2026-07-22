@@ -1168,6 +1168,7 @@ test('Agent Run backend synchronization is ordered and retains failed snapshots 
   const runtimeSource = readSource('apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts');
   const runStoreSource = readSource('apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts');
   const routeSource = readSource('services/api/routes/ai-assistant.js');
+  const writeStoreSource = readSource('services/api/lib/agent-run-write-store.js');
 
   assert.match(runtimeSource, /runSyncChains/);
   assert.match(runtimeSource, /pendingRunSyncs/);
@@ -1176,5 +1177,6 @@ test('Agent Run backend synchronization is ordered and retains failed snapshots 
   assert.match(runtimeSource, /addEventListener\('online'/);
   assert.match(runStoreSource, /backendSyncState/);
   assert.match(runStoreSource, /owner:/);
-  assert.match(routeSource, /public\.agent_runs\.updated_at\s*<=\s*EXCLUDED\.updated_at/);
+  assert.match(routeSource, /agentRunWriteStore\.upsertAgentRun/);
+  assert.match(writeStoreSource, /current_run\.updated_at\s*<=\s*EXCLUDED\.updated_at/);
 });
