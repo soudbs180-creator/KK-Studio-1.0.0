@@ -67,6 +67,7 @@
 - [x] 在 `services/api/` 新增 image Worker 子系统：migration 019 租约表、`FOR UPDATE SKIP LOCKED` 领取、token 防陈旧写、心跳续约、提交、指数退避轮询、取消、单次调用超时、Job 总时限与租约失效恢复。
 - [x] 实现 Worker 与冻结图像 Provider Adapter 对接；`GENERATION_IMAGE_DURABLE_WORKER_ENABLED=off` 默认保持原同步路径，并支持 `internal → invited → full` user allowlist scope，命中用户的 `POST .../submit` 才入服务端队列。
 - [x] Characterization 覆盖无浏览器参与的续跑、Worker 重建、过期租约接管、Provider cancel、总时限与完成 Item 幂等；专项测试位于 `tests/unit/generation-image-worker*.test.ts`。
+- [x] 修复 migration 015 旧 `generation_jobs_status_check` 与 v3 生命周期不兼容：migration 017 现在同时保留 v2 只读状态并接受 `quoted / reserved / submitted` 等 v3 写入状态；真实 PostgreSQL 演练仍由下一项 gate 跟踪。
 - [ ] 在受控 PostgreSQL 按 001→019 顺序演练 migration 019 的空库、存量库与重复执行，并验证 migration 018 数据原样保留。
 - [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
 - [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E；当前只有 server-side characterization，不声明该 E2E 已完成。

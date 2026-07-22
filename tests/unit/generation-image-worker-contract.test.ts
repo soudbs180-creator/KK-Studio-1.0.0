@@ -4,6 +4,16 @@ import test from 'node:test';
 
 const readSource = (relativePath: string) => fs.readFileSync(relativePath, 'utf8');
 
+test('migration 017 accepts every v3 job lifecycle state before Worker leases are added', () => {
+  const migration = readSource('infrastructure/database/migrations/017_quote_job_v3_and_ledger.sql');
+  const statusConstraint = migration.match(/ADD CONSTRAINT generation_jobs_status_check CHECK \([\s\S]*?\);/)?.[0] || '';
+
+  assert.match(migration, /DROP CONSTRAINT IF EXISTS generation_jobs_status_check/);
+  for (const status of ['quoted', 'reserved', 'submitted', 'running', 'paused', 'completed', 'failed', 'cancelled']) {
+    assert.match(statusConstraint, new RegExp(`'${status}'`), `migration 017 must accept ${status}`);
+  }
+});
+
 test('migration 019 adds durable image leases without altering capability graph migration 018', () => {
   const migration = readSource('infrastructure/database/migrations/019_generation_image_worker.sql');
   assert.equal(fs.existsSync('infrastructure/database/migrations/018_capability_graph_foundation.sql'), true);

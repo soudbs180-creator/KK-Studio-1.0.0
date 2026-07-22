@@ -44,6 +44,16 @@ ALTER TABLE public.generation_jobs
 -- 新创建的行默认使用 schema_version = 3；已有 v2 行保持不变
 ALTER TABLE public.generation_jobs ALTER COLUMN schema_version SET DEFAULT 3;
 
+-- migration 015 的旧约束不包含 v3 生命周期；保留 v2 只读状态并加入 v3 写入状态。
+ALTER TABLE public.generation_jobs DROP CONSTRAINT IF EXISTS generation_jobs_status_check;
+ALTER TABLE public.generation_jobs
+  ADD CONSTRAINT generation_jobs_status_check CHECK (
+    status IN (
+      'queued', 'quoted', 'reserved', 'submitted', 'running', 'paused',
+      'completed', 'completed_with_errors', 'failed', 'cancelled'
+    )
+  );
+
 -- 3. Job Item 表：每个子任务独立计费、对账、失败、重试
 CREATE TABLE IF NOT EXISTS public.generation_job_items (
   item_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

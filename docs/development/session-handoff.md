@@ -2632,3 +2632,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：characterization 新用例初始按预期失败，显示治理脚本未覆盖 route/database/UI/matrix reference；修正后 targeted 2/2 通过。architecture 32 项、governance 11 项通过；根/架构/local-runner TypeScript、服务端 92 文件语法、532 个测试文件语义检查通过。Shared/UI/API Client/Web/local-runner 构建通过，Web 转换 2479 modules；完整 unit 1923 pass / 0 fail / 2 skipped，integration 14/14、contract 15/15、e2e 11/11。
 - **未运行验证及原因**：系统仍没有 `npm`/`npx`，因此没有执行字面量 `npm run verify:changes`、`npm audit` 与 Swagger CLI；其余本任务相关入口使用 bundled Node 24 直接执行。此次只修正文档与治理门禁，未连接 PostgreSQL、Provider 或浏览器运行态，也未把这些外部 gate 标记为完成。
 - **风险与下一步**：低风险，运行时与公开 API 未改变。下一步先建立 migration 019 的可审计演练入口；当前机器无 `psql`、Docker、PostgreSQL 服务、`DATABASE_URL` 或 WSL 发行版，真实数据库演练仍必须在受控实例执行，不能用 SQL 静态检查替代。随后修复 Worker 终态/租约丢失边界并补 internal rollout 与可观测性证据。
+
+## 161. 2026-07-22 - 修复 generation v3 数据库状态约束偏差
+
+- **修改范围**：在准备 migration 019 演练时复核 014→015→017→019 迁移链，确认 migration 015 建立的 `generation_jobs_status_check` 不接受 v3 代码正在写入的 `quoted`、`reserved`、`submitted`，会让真实 PostgreSQL 上的 v3 Job 创建或提交失败。migration 017 现在显式替换该约束，并用 characterization 测试锁定完整 v3 生命周期。
+- **修改文件**：`infrastructure/database/migrations/017_quote_job_v3_and_ledger.sql`、`tests/unit/generation-image-worker-contract.test.ts`、`openspec/changes/upgrade-ai-creation-core/tasks.md`、`docs/development/session-handoff.md`。
+- **当前设计决策**：约束采用 v2/v3 兼容并集，继续接受历史只读状态 `queued`、`completed_with_errors`，同时加入 v3 的 `quoted`、`reserved`、`submitted`、`running`、`paused`、`completed`、`failed`、`cancelled`。修复放在首次引入 v3 写入语义的 migration 017，而不是让 019 的 Worker 租约迁移承担无关职责；公开 HTTP、DTO、envelope 和 migration 018 数据均不改变。
+- **已运行验证**：TDD 红灯为新增迁移契约 3 pass / 1 fail，失败原因精确为 migration 017 未替换旧约束；实现后专项 4/4，通过 generation-v3、Capability Graph 与 Worker 聚焦回归 35/35。最终 architecture 32 项、governance 11 项、根/架构/local-runner TypeScript、服务端 92 文件语法与 532 个测试文件语义检查、Shared/UI/API Client/Web/local-runner 构建全部通过；完整 unit 1924 pass / 0 fail / 2 skipped，integration 14/14、contract 15/15、e2e 11/11。
+- **未运行验证及原因**：当前机器没有 `psql`、Docker、PostgreSQL 服务、WSL 发行版或演练数据库连接，因此未把 001→019 应用到真实 PostgreSQL；该外部 gate 仍保持未完成。系统也没有 `npm`/`npx`，对应验证使用 bundled Node 24 直接执行底层入口；未运行依赖 npm client 的 audit 与 Swagger CLI。
+- **风险与下一步**：风险低且修复是 additive-compatible，但只有真实 PostgreSQL 演练才能证明完整迁移链和存量数据行为。下一提交建立 fail-closed、不会打印凭据的 migration 019 演练入口，验证空隔离库、018 sentinel 保留和 019 重复执行；工具就绪不会被记录成数据库已演练。
