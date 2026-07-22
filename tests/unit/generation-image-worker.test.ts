@@ -53,6 +53,21 @@ test('worker server flag supports off, internal, invited, and full rollout scope
   }), true);
 });
 
+test('worker execution flag defaults closed and accepts only explicit true', async () => {
+  const { isImageWorkerExecutionEnabled } = await loadFeatureFlag();
+
+  assert.equal(isImageWorkerExecutionEnabled({}), false);
+  assert.equal(isImageWorkerExecutionEnabled({
+    GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: ' true ',
+  }), true);
+  assert.equal(isImageWorkerExecutionEnabled({
+    GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: 'false',
+  }), false);
+  assert.equal(isImageWorkerExecutionEnabled({
+    GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: 'enabled',
+  }), false);
+});
+
 test('worker poll delay uses bounded exponential backoff', async () => {
   const { calculateRetryDelay } = await loadWorker();
   assert.equal(calculateRetryDelay(1, 1_000, 30_000), 1_000);

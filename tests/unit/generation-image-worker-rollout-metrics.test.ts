@@ -33,7 +33,10 @@ test('worker submission rollout keeps off and nonmatching users on the synchrono
   };
 
   const offResult = await submitJobWithWorkerRollout({
-    env: { GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'off' },
+    env: {
+      GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'off',
+      GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: 'true',
+    },
     generation,
     jobId: 'job-off',
     metrics,
@@ -84,14 +87,14 @@ test('worker metrics expose aggregate rollout, outcome, error, and latency data 
   const { createImageWorkerMetrics } = await loadWorkerMetrics();
   const metrics = createImageWorkerMetrics({ now: () => 1_000 });
 
-  metrics.configure({ running: true, scope: 'internal' });
+  metrics.configure({ running: true, scope: 'off' });
   metrics.recordResult('completed', 20);
   metrics.recordResult('lease_lost', 40);
   metrics.recordLoopError(60);
   const snapshot = metrics.getSnapshot();
   const serialized = JSON.stringify(snapshot);
 
-  assert.equal(snapshot.scope, 'internal');
+  assert.equal(snapshot.scope, 'off');
   assert.equal(snapshot.running, true);
   assert.equal(snapshot.ticks, 3);
   assert.equal(snapshot.outcomes.completed, 1);
@@ -101,7 +104,40 @@ test('worker metrics expose aggregate rollout, outcome, error, and latency data 
   assert.doesNotMatch(serialized, /userId|jobId|itemId|prompt|providerTaskId/);
 });
 
-test('worker loop stays stopped when off and records aggregate ticks when enabled', async () => {
+test('worker loop drains existing work when admission is off and execution is enabled', async () => {
+  const { createImageWorkerMetrics } = await loadWorkerMetrics();
+  const { startImageWorkerLoop } = await loadWorkerLoop();
+  const metrics = createImageWorkerMetrics();
+  let runCalls = 0;
+  const worker = {
+    async runOnce() {
+      runCalls += 1;
+      return { status: 'completed' };
+    },
+  };
+
+  const running = startImageWorkerLoop({
+    env: {
+      GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'off',
+      GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: 'true',
+      GENERATION_IMAGE_WORKER_TICK_INTERVAL_MS: '60000',
+    },
+    metrics,
+    worker,
+  });
+  assert.notEqual(running, null);
+  assert.deepEqual(
+    { running: metrics.getSnapshot().running, scope: metrics.getSnapshot().scope },
+    { running: true, scope: 'off' },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  running.stop();
+  assert.equal(runCalls, 1);
+  assert.equal(metrics.getSnapshot().outcomes.completed, 1);
+  assert.equal(metrics.getSnapshot().running, false);
+});
+
+test('worker loop stays stopped when execution is disabled even if admission is enabled', async () => {
   const { createImageWorkerMetrics } = await loadWorkerMetrics();
   const { startImageWorkerLoop } = await loadWorkerLoop();
   const metrics = createImageWorkerMetrics();
@@ -114,26 +150,16 @@ test('worker loop stays stopped when off and records aggregate ticks when enable
   };
 
   const stopped = startImageWorkerLoop({
-    env: { GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'off' },
+    env: {
+      GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'internal',
+      GENERATION_IMAGE_WORKER_EXECUTION_ENABLED: 'false',
+    },
     metrics,
     worker,
   });
   assert.equal(stopped, null);
   assert.equal(runCalls, 0);
-  assert.equal(metrics.getSnapshot().running, false);
-
-  const running = startImageWorkerLoop({
-    env: {
-      GENERATION_IMAGE_DURABLE_WORKER_ENABLED: 'internal',
-      GENERATION_IMAGE_WORKER_TICK_INTERVAL_MS: '60000',
-    },
-    metrics,
-    worker,
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  running.stop();
-  assert.equal(runCalls, 1);
-  assert.equal(metrics.getSnapshot().outcomes.completed, 1);
+  assert.equal(metrics.getSnapshot().scope, 'internal');
   assert.equal(metrics.getSnapshot().running, false);
 });
 

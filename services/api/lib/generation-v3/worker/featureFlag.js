@@ -15,6 +15,11 @@ function hasImageDurableWorkerRollout(env = process.env) {
   return readImageDurableWorkerScope(env) !== 'off';
 }
 
+/** Reports whether migration-ready Worker execution may process existing leases. */
+function isImageWorkerExecutionEnabled(env = process.env) {
+  return String(env.GENERATION_IMAGE_WORKER_EXECUTION_ENABLED || '').trim().toLowerCase() === 'true';
+}
+
 function isImageDurableWorkerEnabled(userId, env = process.env) {
   const scope = readImageDurableWorkerScope(env);
   if (!userId || scope === 'off') return false;
@@ -28,5 +33,6 @@ function isImageDurableWorkerEnabled(userId, env = process.env) {
 module.exports = {
   hasImageDurableWorkerRollout,
   isImageDurableWorkerEnabled,
+  isImageWorkerExecutionEnabled,
   readImageDurableWorkerScope,
 };

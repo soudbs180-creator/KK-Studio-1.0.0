@@ -1,4 +1,7 @@
-const { readImageDurableWorkerScope } = require('./featureFlag');
+const {
+  isImageWorkerExecutionEnabled,
+  readImageDurableWorkerScope,
+} = require('./featureFlag');
 const { createProductionImageWorker } = require('./productionWorker');
 const { imageWorkerMetrics } = require('./workerMetrics');
 
@@ -26,7 +29,7 @@ function startImageWorkerLoop(options = {}) {
   const metrics = options.metrics || imageWorkerMetrics;
   const scope = readImageDurableWorkerScope(env);
   metrics.configure({ running: false, scope });
-  if (scope === 'off') return null;
+  if (!isImageWorkerExecutionEnabled(env)) return null;
   const worker = options.worker || createProductionImageWorker({
     ...readWorkerOptions(env),
     metrics,

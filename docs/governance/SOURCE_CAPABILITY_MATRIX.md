@@ -36,7 +36,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 2.1 | 浏览器侧持久化队列 | 完全 | `DurableGenerationQueue.ts:391-427,511-512` 提供 owner-scoped localStorage；`GenerationQueueSync.ts:60-75,151-205,228-240` 提供 IndexedDB mirror、鉴权服务端投影与 claim 同步。未切流任务仍由浏览器执行，跨设备续跑未验收。 | upgrade |
-| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；同目录 Worker 已覆盖恢复、切流、指标与关闭后新提交回退。但同一个 flag 也令 `workerLoop.js:24-30` 停止处理存量任务，`generation-v3.js:165-167` 在 off 时跳过 durable cancel，尚缺 admission-off 后 drain/cancel 的安全回滚语义；真实数据库/internal 灰度亦未验收。 | upgrade |
+| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；`featureFlag.js` 将新任务 admission 与 migration-ready execution 分离，`workerLoop.js` 和 `generation-v3.js` 只按 execution readiness 处理存量执行/取消。characterization 已覆盖 admission `off` + execution `true` 的 drain、聚合观测与新提交同步回退；真实数据库/internal 灰度仍未验收。 | upgrade |
 | 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，Web `generationJobEventClient.ts`/`generationJobRecovery.ts` 已接入鉴权、重连、abort 和旧轮询回退。但恢复发现仍依赖本机 `taskPersistence.ts:194-230,348-353` 与当前画布节点，v3 API 无 owner-scoped pending Job 列表；真实重新登录/跨设备 E2E 尚不能成立，视频/音频仍由浏览器轮询。 | upgrade |
 | 2.4 | 执行权威未统一 | 不符合 | AI batch 生命周期先进入 `DurableGenerationQueue`，随后仍经 `useImageGeneration → generationService → TaskOrchestrator → GenerationEngine` 分发；部分 direct UI/legacy 路径绕过 Queue，server image Worker 又只在 flag 命中时接管。当前问题是执行生命周期权威未统一，而非两个完全独立 engine。 | upgrade |
 
@@ -81,7 +81,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 7.1 | 编译期 Feature Flag | 完全 | `apps/web/src/config/featureFlags.ts:1-4`、`apps/web/src/app/kkaiFeatureFlags.ts:1-7` 均为硬编码常量。 | upgrade |
-| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供纯 server scope；`services/api/lib/generation-v3/imageProviderSliceAdmission.js` 在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前统一 fail closed，并通过既有 Generation v3 metrics 输出无业务标识的 allowed/blocked 计数。非 Connection legacy 路径不变，已入队 Worker 不重读 live slice flag。Worker 自身 flag 的 admission 与存量 drain 仍未拆分；统一管理员 Flag API、广播和 5 秒 Kill Switch 也未实现。 | upgrade |
+| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供纯 server scope；`services/api/lib/generation-v3/imageProviderSliceAdmission.js` 在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前统一 fail closed，并输出无业务标识的 allowed/blocked 计数。Worker 已把 admission scope 与默认关闭的 migration-ready execution flag 分离，支持停止新 durable 提交并继续 drain；统一管理员 Flag API、广播和 5 秒 Kill Switch 仍未实现。 | upgrade |
 | 7.3 | 视觉 Flag 与能力 Flag 分离 | 不符合 | 当前视觉/能力开关均为同一常量（见 7.1）。 | upgrade |
 
 ## 8. 文档治理

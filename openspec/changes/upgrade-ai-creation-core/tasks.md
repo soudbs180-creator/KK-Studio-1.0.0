@@ -77,7 +77,7 @@
   - 安全入口已就绪：`npm run rehearse:migration:019` 只接受专用 `KK_MIGRATION_*` 变量、名称含 `rehearsal` 且明确确认的空数据库；工具执行 bootstrap + 001→018、写入 018 sentinel、执行 019 两次并核对 sentinel/lease。当前机器无真实 PostgreSQL，故本 gate 保持未完成。
 - [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
   - [x] 新任务 admission characterization 已覆盖：`off`/未命中用户只走旧同步提交，命中 internal 的 image 才入队，非 image 回退同步。既有 `/v1/metrics` envelope 增加无 user/job/payload 的聚合 Worker outcome、延迟、submit/poll/cancel 与 durable/legacy 计数。
-  - [ ] 将新任务 admission 与存量 execution/drain 解耦；当前 `off` 同时停止 Worker loop 并跳过 durable cancel，可能冻结已入队 lease。补 internal → off 后存量完成/取消的非破坏性回滚测试。
+  - [x] 将新任务 admission 与存量 execution/drain 解耦：`GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 只控制新提交切流，默认关闭的 `GENERATION_IMAGE_WORKER_EXECUTION_ENABLED` 只在 migration 019 就绪后启动 loop/cancel；回滚时关闭 admission、保持 execution 开启直到 lease drain，并由 characterization 锁定 `scope: off, running: true`。
   - [x] 计费/报价聚合观测已接入同一 metrics envelope：覆盖 quote expired、frozen route stale、重复 completion 拦截、reserve/charge/refund 成功与失败、charge no-op；不记录用户、Job、Quote、金额或错误文本。`chargeFromReservation` 只允许 `committed reserve` 单向结算并通过 `RETURNING` 识别重复写。真实账本观测窗口仍未执行。
 - [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E。
   - [x] 服务端 `/api/v1/generation/jobs/:jobId/events` 已提供 owner-scoped 全量 Job 投影：owner 校验命中后才打开 SSE，投影变化时推送共享 `GenerationJobEvent`，含 heartbeat、终态关闭与断连清理。浏览器消费、重连和跨设备 E2E 仍未完成。

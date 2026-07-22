@@ -11,7 +11,7 @@
 
 KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地，Phase 0/1 已交付统一报价（Quote）、GenerationJobDto v3、统一 Provider Adapter 与冻结通道，但 AI 创作核心的关键闭环仍未完成：
 
-- image Durable Worker 的代码基础已进入服务端控制面，但关闭 admission flag 会同时停止存量 Worker loop/cancel；在完成 drain-safe 回滚、migration 019 受控演练和 internal 灰度前，不能描述为服务端权威或已上线。
+- image Durable Worker 的代码基础已进入服务端控制面，新任务 admission 与存量 execution/drain 已使用两个默认关闭的 server flag 解耦；关闭 admission 并保持 execution 开启时，既有 lease 仍可完成或取消。在完成 migration 019 受控演练和 internal 灰度前，仍不能描述为服务端权威或已上线。
 - 报价、路由、租约、计费与图像 Provider Adapter 已形成纵向切片基础；`capability_graph.image_provider_slice` 已在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前门禁，关闭后不阻断已入队 Worker drain。v3 仍缺 owner-scoped pending Job discovery，跨设备恢复不能仅靠现有 SSE。
 - Agent 运行时仅有当前指令和画布上下文，没有跨轮对话历史、摘要和工具结果回填， reload 后 running Run 被直接标记为失败。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。

@@ -65,18 +65,23 @@ test('capability graph rollout policy stays independent from generation runtime 
   assert.match(admission, /generationMetrics/);
 });
 
-test('durable worker remains server-gated and preserves the existing submit and control paths', () => {
+test('durable worker separates submission admission from execution and preserves existing paths', () => {
   const route = readSource('services/api/routes/generation-v3.js');
   const flag = readSource('services/api/lib/generation-v3/worker/featureFlag.js');
   const submissionRouter = readSource('services/api/lib/generation-v3/worker/workerSubmissionRouter.js');
   const server = readSource('services/api/index.js');
   assert.match(flag, /GENERATION_IMAGE_DURABLE_WORKER_ENABLED/);
+  assert.match(flag, /GENERATION_IMAGE_WORKER_EXECUTION_ENABLED/);
   assert.match(route, /submitJobWithWorkerRollout/);
-  assert.match(route, /hasImageDurableWorkerRollout/);
+  assert.match(route, /isImageWorkerExecutionEnabled/);
+  assert.doesNotMatch(route, /hasImageDurableWorkerRollout/);
   assert.match(submissionRouter, /isImageDurableWorkerEnabled/);
   assert.match(submissionRouter, /enqueueImageJob/);
   assert.match(submissionRouter, /submitJob/);
-  assert.match(route, /requestJobCancellation/);
+  assert.match(
+    route,
+    /if \(request\.action === 'cancel' && isImageWorkerExecutionEnabled\(\)\) \{\s*await generationV3\.requestJobCancellation/,
+  );
   assert.match(route, /\/v1\/generation\/jobs\/:jobId\/submit/);
   assert.match(route, /\/v1\/generation\/jobs\/:jobId\/control/);
   assert.match(server, /startImageWorkerLoop/);
@@ -101,4 +106,12 @@ test('capability graph image rollout variables default closed without embedding 
   assert.match(envTemplate, /^CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE=off$/m);
   assert.match(envTemplate, /^CAPABILITY_GRAPH_INTERNAL_USER_IDS=$/m);
   assert.match(envTemplate, /^CAPABILITY_GRAPH_INVITED_USER_IDS=$/m);
+});
+
+test('durable worker execution defaults closed and documents drain-safe rollback ordering', () => {
+  const envTemplate = readSource('services/api/.env.local.example');
+
+  assert.match(envTemplate, /^GENERATION_IMAGE_WORKER_EXECUTION_ENABLED=false$/m);
+  assert.match(envTemplate, /After migration 019, enable execution before admission/i);
+  assert.match(envTemplate, /During rollback, turn admission off but leave execution on until leases drain/i);
 });

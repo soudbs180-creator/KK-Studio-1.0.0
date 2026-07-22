@@ -11,7 +11,7 @@ const generationV3 = require('../lib/generation-v3');
 const envelope = require('../lib/generation/generationResponseEnvelope');
 const { JobControlRequestSchema } = require('@kk/shared');
 const {
-  hasImageDurableWorkerRollout,
+  isImageWorkerExecutionEnabled,
 } = require('../lib/generation-v3/worker/featureFlag');
 const { submitJobWithWorkerRollout } = require('../lib/generation-v3/worker/workerSubmissionRouter');
 const { startJobEventStream } = require('../lib/generation-v3/jobEventStream');
@@ -162,7 +162,7 @@ router.post('/v1/generation/jobs/:jobId/control', requireAuth, async (req, res) 
       }
 
       await updateJobStatus({ jobId: request.jobId, status: newStatus, client });
-      if (request.action === 'cancel' && hasImageDurableWorkerRollout()) {
+      if (request.action === 'cancel' && isImageWorkerExecutionEnabled()) {
         await generationV3.requestJobCancellation(request.jobId, req.userId, { client });
       }
       await client.query('COMMIT');
