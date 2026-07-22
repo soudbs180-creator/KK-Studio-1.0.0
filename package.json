@@ -29,6 +29,7 @@
     "api:dev": "node --watch scripts/dev/run-api-dev.mjs",
     "api:start": "node scripts/dev/run-api-dev.mjs",
     "api:diagnose": "node scripts/dev/diagnose-api-env.mjs",
+    "rehearse:migration:019": "node scripts/ops/postgres/rehearse-generation-image-worker.mjs",
     "release:hosted:check": "node scripts/release/diagnose-hosted-release.mjs",
     "release:hosted": "node scripts/release/release-hosted.mjs",
     "release:hosted:preview": "node scripts/release/release-hosted.mjs --preview",

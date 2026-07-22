@@ -69,6 +69,7 @@
 - [x] Characterization 覆盖无浏览器参与的续跑、Worker 重建、过期租约接管、Provider cancel、总时限与完成 Item 幂等；专项测试位于 `tests/unit/generation-image-worker*.test.ts`。
 - [x] 修复 migration 015 旧 `generation_jobs_status_check` 与 v3 生命周期不兼容：migration 017 现在同时保留 v2 只读状态并接受 `quoted / reserved / submitted` 等 v3 写入状态；真实 PostgreSQL 演练仍由下一项 gate 跟踪。
 - [ ] 在受控 PostgreSQL 按 001→019 顺序演练 migration 019 的空库、存量库与重复执行，并验证 migration 018 数据原样保留。
+  - 安全入口已就绪：`npm run rehearse:migration:019` 只接受专用 `KK_MIGRATION_*` 变量、名称含 `rehearsal` 且明确确认的空数据库；工具执行 bootstrap + 001→018、写入 018 sentinel、执行 019 两次并核对 sentinel/lease。当前机器无真实 PostgreSQL，故本 gate 保持未完成。
 - [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
 - [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E；当前只有 server-side characterization，不声明该 E2E 已完成。
 - [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
