@@ -109,14 +109,14 @@ npm run local-runner:build
 - Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。
 - 服务端用户路由职责已收敛，共享请求上下文与热点文件可维护性递减门禁已建立。
 - image Durable Worker 的 migration 019、租约领取、token/heartbeat、冻结路由提交、指数退避轮询、取消、超时、恢复和 Item 幂等代码已实现，并通过无浏览器参与、Worker 重建与过期租约的 characterization 测试；lease 丢失不再伪报终态或重试，迟到回调不能复活或降级终态 Item。
-- `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`；migration 019 的 fail-closed 演练入口和专用环境模板已就绪，但尚未在受控 PostgreSQL 执行。实际 internal 放量、真实浏览器关闭/重新登录、SSE/跨设备恢复和生产观测仍未完成，不得描述为已上线能力。
+- `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`；切流 helper 与 Worker loop characterization 已证明 `off`/未命中用户保留旧同步提交，既有 `/v1/metrics` 现提供不含用户、Job 或 payload 的 Worker outcome、延迟、Provider operation 和 durable/legacy 聚合计数。migration 019 尚未在受控 PostgreSQL 执行，实际 internal 放量、真实浏览器关闭/重新登录、SSE/跨设备恢复和生产观测窗口仍未完成，不得描述为已上线能力。
 - Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标。
 - 当前 GitHub HEAD 的外部失败状态来自 Vercel 团队归属；仓库代码和 GitHub Actions 日志无法修复该外部配置。
 
 ### Next execution gate
 
 1. 在受控空 PostgreSQL 配置专用 `KK_MIGRATION_*` 变量并运行 `npm run rehearse:migration:019`，按序演练 bootstrap、001→018、带 sentinel 的存量状态和 019 重复执行，确认 migration 018 数据未变化。
-2. 开启 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度，验证关闭 flag 可回退旧同步提交且不删除 lease/Capability Graph 数据。
+2. 在受控实例开启 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED=internal`，通过既有 `/v1/metrics` 观察 Worker 延迟、lease_lost、submit/poll 比例和 durable/legacy 切流；随后关闭 flag，实证回退旧同步提交且不删除 lease/Capability Graph 数据。
 3. 补真实浏览器关闭、Worker 进程重启、租约失效、重新登录/SSE 投影和跨设备 E2E，并观察延迟、重复 submit、扣费与退款指标。
 4. 通过上述 gate 后再扩展视频/音频 Worker；Local Runner、真实媒体 runtime 与新版 IA 按后续阶段独立演进。
 

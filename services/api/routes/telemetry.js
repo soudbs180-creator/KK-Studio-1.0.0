@@ -9,6 +9,7 @@ const { getPool } = require('../lib/db');
 const localUserRouteStore = require('../lib/dispatcher/localUserRouteStore');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
 const dispatcher = require('../lib/dispatcher/index');
+const { imageWorkerMetrics } = require('../lib/generation-v3/worker/workerMetrics');
 
 const router = express.Router();
 
@@ -64,6 +65,7 @@ router.get('/v1/metrics', (req, res) => {
     data: {
       ...metrics,
       circuitBreaker: breakerStatus,
+      imageDurableWorker: imageWorkerMetrics.getSnapshot(),
     },
   });
 });

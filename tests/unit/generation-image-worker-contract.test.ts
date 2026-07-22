@@ -43,13 +43,30 @@ test('postgres worker store claims with skip-locked and guards writes by lease t
 test('durable worker remains server-gated and preserves the existing submit and control paths', () => {
   const route = readSource('services/api/routes/generation-v3.js');
   const flag = readSource('services/api/lib/generation-v3/worker/featureFlag.js');
+  const submissionRouter = readSource('services/api/lib/generation-v3/worker/workerSubmissionRouter.js');
   const server = readSource('services/api/index.js');
   assert.match(flag, /GENERATION_IMAGE_DURABLE_WORKER_ENABLED/);
-  assert.match(route, /isImageDurableWorkerEnabled/);
+  assert.match(route, /submitJobWithWorkerRollout/);
   assert.match(route, /hasImageDurableWorkerRollout/);
-  assert.match(route, /enqueueImageJob/);
+  assert.match(submissionRouter, /isImageDurableWorkerEnabled/);
+  assert.match(submissionRouter, /enqueueImageJob/);
+  assert.match(submissionRouter, /submitJob/);
   assert.match(route, /requestJobCancellation/);
   assert.match(route, /\/v1\/generation\/jobs\/:jobId\/submit/);
   assert.match(route, /\/v1\/generation\/jobs\/:jobId\/control/);
   assert.match(server, /startImageWorkerLoop/);
+});
+
+test('durable worker publishes aggregate metrics through the existing telemetry envelope', () => {
+  const loop = readSource('services/api/lib/generation-v3/worker/workerLoop.js');
+  const metrics = readSource('services/api/lib/generation-v3/worker/workerMetrics.js');
+  const telemetry = readSource('services/api/routes/telemetry.js');
+
+  assert.match(loop, /recordResult/);
+  assert.match(loop, /recordLoopError/);
+  assert.match(metrics, /averageLatencyMs/);
+  assert.match(metrics, /lease_lost/);
+  assert.doesNotMatch(metrics, /userId|jobId|itemId|prompt|providerTaskId/);
+  assert.match(telemetry, /imageDurableWorker/);
+  assert.match(telemetry, /getSnapshot/);
 });

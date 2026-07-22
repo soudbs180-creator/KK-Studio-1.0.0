@@ -36,7 +36,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 2.1 | 浏览器侧持久化队列 | 完全 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365`，localStorage 持久化。 | upgrade |
-| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js:99-271` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；`imageWorker.js:29-167` 实现提交/轮询/退避/超时/恢复；`services/api/index.js:329-338` 启动 server loop。flag 默认关闭且真实数据库灰度未验收。 | upgrade |
+| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；同目录 `imageWorker.js`、`workerSubmissionRouter.js`、`workerLoop.js` 实现恢复、切流与关闭回退，`workerMetrics.js` 通过既有 `services/api/routes/telemetry.js` 输出无业务 payload 的聚合指标。flag 默认关闭且真实数据库/internal 灰度未验收。 | upgrade |
 | 2.3 | 关闭浏览器后续跑 | 部分 | `tests/unit/generation-image-worker.test.ts` 已证明 server loop 无浏览器参与可续跑、Worker 重建与过期租约恢复；真实浏览器关闭/重新登录、SSE/跨设备 E2E 未完成，视频/音频仍由浏览器轮询。 | upgrade |
 | 2.4 | 双轨执行 | 不符合 | `DurableGenerationQueue.ts:365`（前端）与 `apps/web/src/core/generation/GenerationEngine.ts:15` 并行存在。 | upgrade |
 
@@ -46,7 +46,7 @@
 |---|---|---|---|---|
 | 3.1 | 预扣/结算/退款审计 | 完全 | `services/api/lib/generation-v3/billingSaga.js`：`reserveCredits` :20、`chargeFromReservation` :60、`refundItem` :81；调用点 `services/api/lib/generation-v3/jobLifecycle.js:45`（创建预扣）、`:185`（成功结算）、`:220`（失败退款）。 | keep |
 | 3.2 | Quote 冻结机制 | 完全 | `packages/shared/src/generation-v3/quote.ts:39`；路由 `services/api/routes/generation-v3.js:33-51`；TTL 300s（`quoteEngine.js:13`）、`expiresAt` :93、`priceVersion` :94、`routeSnapshot` 冻结 :95 并落库 :105-119。 | keep |
-| 3.3 | Item 级幂等 | 部分 | migration 017 保持 `UNIQUE(job_id, sequence)`；migration 019 对 `item_id` 唯一建 lease；`workerStore.js:155-169` 只在空值时按 token 写 `providerTaskId`，恢复路径只 poll；`imageWorker.js` 使用稳定 `jobId:itemId` requestId。客户端创建 Job 的显式幂等键仍未实现。 | upgrade |
+| 3.3 | Item 级幂等 | 部分 | migration 017 保持 `UNIQUE(job_id, sequence)`；migration 019 对 `item_id` 唯一建 lease；`workerStore.js` 只在空值时按 token 写 `providerTaskId`，恢复路径只 poll；`imageWorker.js` 使用稳定 `jobId:itemId` requestId，lease 丢失不伪报成功；`jobLifecycle.js` 禁止迟到回调复活或降级终态 Item。客户端创建 Job 的显式幂等键仍未实现。 | upgrade |
 | 3.4 | 账本与确认卡一致 | 需验证 | Item 级 ledger 已在 v3 形成（见 3.1）；确认 UI 与 ledger 金额一致性缺 E2E 证据——当前无真实 Provider 凭据，未覆盖真实生成/退款。 | verify |
 
 ## 4. Agent 运行时

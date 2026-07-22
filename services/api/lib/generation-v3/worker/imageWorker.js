@@ -63,7 +63,10 @@ async function cancelClaim(claim, execution, context) {
   if (claim.providerTaskId) {
     await runWithHeartbeat(
       claim,
-      () => execution.adapter.cancel(claim.providerTaskId, execution.auth),
+      () => {
+        context.metrics?.recordProviderOperation('cancel');
+        return execution.adapter.cancel(claim.providerTaskId, execution.auth);
+      },
       context,
     );
   }
@@ -101,9 +104,13 @@ async function settleProviderResult(claim, result, context) {
 async function executeClaim(claim, execution, context) {
   const isCancelled = await context.store.isCancellationRequested(claim);
   if (isCancelled) return cancelClaim(claim, execution, context);
-  const invokeProvider = claim.providerTaskId
-    ? () => execution.adapter.poll(claim.providerTaskId, execution.auth)
-    : () => execution.adapter.submit(execution.input);
+  const providerOperation = claim.providerTaskId ? 'poll' : 'submit';
+  const invokeProvider = () => {
+    context.metrics?.recordProviderOperation(providerOperation);
+    return claim.providerTaskId
+      ? execution.adapter.poll(claim.providerTaskId, execution.auth)
+      : execution.adapter.submit(execution.input);
+  };
   const result = await runWithHeartbeat(claim, invokeProvider, context);
   if (!claim.providerTaskId && result.providerTaskId) {
     const recorded = await context.store.recordSubmission(claim, result.providerTaskId);
@@ -158,6 +165,7 @@ function buildContext(options) {
     leaseMs,
     maxAttempts: options.maxAttempts || DEFAULT_MAX_ATTEMPTS,
     maxPollIntervalMs: options.maxPollIntervalMs || DEFAULT_MAX_POLL_INTERVAL_MS,
+    metrics: options.metrics,
     operationTimeoutMs: options.operationTimeoutMs || DEFAULT_OPERATION_TIMEOUT_MS,
     pollIntervalMs: options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
     resolveExecution: options.resolveExecution,

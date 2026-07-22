@@ -4,6 +4,7 @@ const { getQuote } = require('../quoteEngine');
 const { resolveFrozenProviderRoute } = require('../jobLifecycle');
 const { createImageGenerationWorker } = require('./imageWorker');
 const { createPostgresWorkerStore } = require('./workerStore');
+const { imageWorkerMetrics } = require('./workerMetrics');
 
 function buildSubmitInput(claim, quote, auth) {
   return {
@@ -38,6 +39,7 @@ function createProductionImageWorker(options = {}) {
     leaseMs: options.leaseMs,
     maxAttempts: options.maxAttempts,
     maxPollIntervalMs: options.maxPollIntervalMs,
+    metrics: options.metrics || imageWorkerMetrics,
     operationTimeoutMs: options.operationTimeoutMs,
     pollIntervalMs: options.pollIntervalMs,
     resolveExecution: options.resolveExecution || resolveExecution,

@@ -12,8 +12,8 @@ const envelope = require('../lib/generation/generationResponseEnvelope');
 const { JobControlRequestSchema } = require('@kk/shared');
 const {
   hasImageDurableWorkerRollout,
-  isImageDurableWorkerEnabled,
 } = require('../lib/generation-v3/worker/featureFlag');
+const { submitJobWithWorkerRollout } = require('../lib/generation-v3/worker/workerSubmissionRouter');
 
 const router = express.Router();
 
@@ -77,10 +77,11 @@ router.post('/v1/generation/jobs', requireAuth, async (req, res) => {
 // POST /api/v1/generation/jobs/:jobId/submit
 router.post('/v1/generation/jobs/:jobId/submit', requireAuth, async (req, res) => {
   try {
-    const queuedJob = isImageDurableWorkerEnabled(req.userId)
-      ? await generationV3.enqueueImageJob(req.params.jobId, req.userId)
-      : null;
-    const job = queuedJob || await generationV3.submitJob(req.userId, req.params.jobId);
+    const job = await submitJobWithWorkerRollout({
+      generation: generationV3,
+      jobId: req.params.jobId,
+      userId: req.userId,
+    });
     return res.json(envelope.wrapSuccess(job, { jobId: job.jobId }));
   } catch (err) {
     console.error('[generation-v3/jobs/submit]', err);

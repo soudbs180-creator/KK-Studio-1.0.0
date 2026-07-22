@@ -1,5 +1,6 @@
-const { hasImageDurableWorkerRollout } = require('./featureFlag');
+const { readImageDurableWorkerScope } = require('./featureFlag');
 const { createProductionImageWorker } = require('./productionWorker');
+const { imageWorkerMetrics } = require('./workerMetrics');
 
 const DEFAULT_TICK_INTERVAL_MS = 500;
 
@@ -22,19 +23,29 @@ function readWorkerOptions(env) {
 
 function startImageWorkerLoop(options = {}) {
   const env = options.env || process.env;
-  if (!hasImageDurableWorkerRollout(env)) return null;
-  const worker = options.worker || createProductionImageWorker(readWorkerOptions(env));
+  const metrics = options.metrics || imageWorkerMetrics;
+  const scope = readImageDurableWorkerScope(env);
+  metrics.configure({ running: false, scope });
+  if (scope === 'off') return null;
+  const worker = options.worker || createProductionImageWorker({
+    ...readWorkerOptions(env),
+    metrics,
+  });
   const tickIntervalMs = readPositiveInteger(
     env.GENERATION_IMAGE_WORKER_TICK_INTERVAL_MS,
     DEFAULT_TICK_INTERVAL_MS,
   );
   let active = false;
+  metrics.configure({ running: true, scope });
   const tick = async () => {
     if (active) return;
     active = true;
+    const startedAt = Date.now();
     try {
-      await worker.runOnce();
+      const result = await worker.runOnce();
+      metrics.recordResult(result?.status || 'unknown', Date.now() - startedAt);
     } catch (error) {
+      metrics.recordLoopError(Date.now() - startedAt);
       (options.onError || console.error)('[generation-image-worker]', error);
     } finally {
       active = false;
@@ -43,7 +54,13 @@ function startImageWorkerLoop(options = {}) {
   const timer = setInterval(tick, tickIntervalMs);
   timer.unref?.();
   void tick();
-  return { stop: () => clearInterval(timer), tick };
+  return {
+    stop() {
+      clearInterval(timer);
+      metrics.configure({ running: false, scope });
+    },
+    tick,
+  };
 }
 
 module.exports = { startImageWorkerLoop };

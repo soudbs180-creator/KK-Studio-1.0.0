@@ -1,6 +1,6 @@
 const ROLLOUT_SCOPES = new Set(['off', 'internal', 'invited', 'full']);
 
-function readScope(env) {
+function readImageDurableWorkerScope(env) {
   const rawScope = String(env.GENERATION_IMAGE_DURABLE_WORKER_ENABLED || 'off').trim().toLowerCase();
   if (rawScope === 'true') return 'full';
   if (rawScope === 'false') return 'off';
@@ -12,11 +12,11 @@ function readUserIds(value = '') {
 }
 
 function hasImageDurableWorkerRollout(env = process.env) {
-  return readScope(env) !== 'off';
+  return readImageDurableWorkerScope(env) !== 'off';
 }
 
 function isImageDurableWorkerEnabled(userId, env = process.env) {
-  const scope = readScope(env);
+  const scope = readImageDurableWorkerScope(env);
   if (!userId || scope === 'off') return false;
   if (scope === 'full') return true;
   const internalUsers = readUserIds(env.GENERATION_IMAGE_WORKER_INTERNAL_USER_IDS);
@@ -25,4 +25,8 @@ function isImageDurableWorkerEnabled(userId, env = process.env) {
   return readUserIds(env.GENERATION_IMAGE_WORKER_INVITED_USER_IDS).has(userId);
 }
 
-module.exports = { hasImageDurableWorkerRollout, isImageDurableWorkerEnabled };
+module.exports = {
+  hasImageDurableWorkerRollout,
+  isImageDurableWorkerEnabled,
+  readImageDurableWorkerScope,
+};

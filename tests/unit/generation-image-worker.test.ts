@@ -26,6 +26,11 @@ const loadFeatureFlag = async () => {
   return module.default || module;
 };
 
+const loadWorkerMetrics = async () => {
+  const module: any = await import('../../services/api/lib/generation-v3/worker/workerMetrics.js');
+  return module.default || module;
+};
+
 test('worker server flag supports off, internal, invited, and full rollout scopes', async () => {
   const { hasImageDurableWorkerRollout, isImageDurableWorkerEnabled } = await loadFeatureFlag();
   assert.equal(isImageDurableWorkerEnabled('internal-1', {}), false);
@@ -134,7 +139,9 @@ function createHarness(initial: Partial<WorkerState> = {}) {
 
 test('server worker continues an image job after the submitting browser is gone and across restart', async () => {
   const { createImageGenerationWorker } = await loadWorker();
+  const { createImageWorkerMetrics } = await loadWorkerMetrics();
   const harness = createHarness();
+  const metrics = createImageWorkerMetrics();
   let submitCount = 0;
   let pollCount = 0;
   const adapter = {
@@ -150,6 +157,7 @@ test('server worker continues an image job after the submitting browser is gone 
   };
   const dependencies = {
     pollIntervalMs: 0,
+    metrics,
     resolveExecution: async () => ({ adapter, auth: {}, input: {} }),
     store: harness.store,
   };
@@ -162,6 +170,7 @@ test('server worker continues an image job after the submitting browser is gone 
   assert.equal(harness.state.itemStatus, 'completed');
   assert.equal(submitCount, 1);
   assert.equal(pollCount, 1);
+  assert.deepEqual(metrics.getSnapshot().providerOperations, { cancel: 0, poll: 1, submit: 1 });
 });
 
 test('an expired lease with a persisted provider task is reclaimed without duplicate submit', async () => {
