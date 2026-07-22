@@ -81,6 +81,24 @@ import {
     useSelectedChatModelState,
     type ChatModel,
 } from './chat-sidebar/model/useChatModelCatalog';
+import {
+    TEMP_SESSION_ID,
+    TEMP_SESSION_STORAGE_KEY,
+    createBranchSession,
+    createWelcomeMessage,
+    ensureUniqueIds,
+    formatSessionMeta,
+    getSessionLabel,
+    mergeImportedSessions,
+    parseSessionImport,
+    type Attachment,
+    type ChatSessionItem,
+    type Message,
+    type SessionContextMenu,
+    type SessionImportMode,
+    type SessionImportPreview,
+} from './chat-sidebar/session/chatSessionData';
+import { useChatSessionState } from './chat-sidebar/session/useChatSessionState';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -169,69 +187,6 @@ const ChatSidebarModelMenuButton = React.memo(function ChatSidebarModelMenuButto
     );
 });
 
-// 附件类型
-interface Attachment {
-    id: string;
-    type: 'image' | 'document' | 'video' | 'audio' | 'url';
-    name: string;
-    data: string; // base64 或 URL
-    mimeType?: string;
-    size?: number;
-}
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string; // 可能是Markdown文本，也可能包含图片Markdown
-    timestamp: number;
-    attachments?: Attachment[]; // 附件列表
-    isImageGeneration?: boolean; // 标记是否为图片生成结果
-    modelId?: string; // 生成该消息的供应商模型ID
-}
-
-interface ChatSessionItem {
-    isTemp?: boolean;
-    id: string;
-    title: string;
-    messages: Message[];
-    updatedAt: number;
-    customTitle?: boolean;
-    parentSessionId?: string;
-    branchFromMessageId?: string;
-    archived?: boolean;
-}
-
-interface SessionContextMenu {
-    x: number;
-    y: number;
-    sessionId: string;
-}
-
-type SessionImportMode = 'replace' | 'append' | 'smart';
-
-interface SessionImportPreview {
-    sessions: ChatSessionItem[];
-    activeSessionId?: string;
-    stats: {
-        imported: number;
-        conflictsById: number;
-        duplicatesByFingerprint: number;
-        newById: number;
-        conflictTitles: string[];
-        duplicateTitles: string[];
-        newTitles: string[];
-        conflictIds: string[];
-        duplicateIds: string[];
-        newIds: string[];
-        conflictPairs: Array<{ incoming: string; existing: string }>;
-        duplicatePairs: Array<{ incoming: string; existing: string }>;
-    };
-}
-
-const CHAT_SESSION_STORAGE_KEY = 'kk_chat_sidebar_sessions_v1';
-const TEMP_SESSION_ID = 'session_temp';
-const TEMP_SESSION_STORAGE_KEY = 'kk_temp_session_messages';
-const CHAT_SESSION_TREE_EXPAND_KEY = 'kk_chat_sidebar_tree_expand_v1';
 const MODEL_MENU_SKELETON_COUNT = 3;
 
 type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
@@ -248,13 +203,6 @@ const generateImageOnDemand = async (...args: Parameters<GenerateImageFn>): Prom
     const { generationService } = await import('../../features/generation/generateService');
     return generationService.generateImage(...args);
 };
-
-const createWelcomeMessage = (): Message => ({
-    id: 'welcome',
-    role: 'assistant',
-    content: '你好！我是 KK Studio 数字助手。\n有什么我可以帮您？\n\n试试输入 "/image 一只猫" 来生成图片！',
-    timestamp: 0
-});
 
 const getDurableQueueJobNodeIds = (job: GenerationBatchJob): string[] => Array.from(new Set([
     ...(job.outputGroup?.nodeIds || []),
@@ -296,21 +244,6 @@ const getDurableQueueJobCounts = (job: GenerationBatchJob) => {
     return { total, completed, failed, retryableFailed, running, queued, percent, firstFailure };
 };
 
-const cleanGreeting = (text: string): string => {
-    let cleaned = text.trim();
-    // 移除开头的“你好”、“在吗”、“hello”、“hi”、“哈喽”及常见标点
-    cleaned = cleaned.replace(/^(你好[，！,!]?|在吗[？?]?|hello[,\s]?|hi[,\s]?|哈喽[，！,!]?)/i, '');
-    return cleaned.trim() || text.trim();
-};
-
-const getFirstSubstantialQuestion = (messages: Message[]): Message | undefined => {
-    return messages.find(m => {
-        if (m.role !== 'user' || !m.content || m.content === '(附件)') return false;
-        const cleaned = cleanGreeting(m.content);
-        return cleaned.length > 0 && !/^[\s,.:!?;，。：！？；、]+$/.test(cleaned);
-    });
-};
-
 const summarizeSessionTitle = async (
     questionContent: string,
     modelId: string,
@@ -333,112 +266,6 @@ const summarizeSessionTitle = async (
         console.warn('[ChatSidebar] Summarize title failed:', e);
         return '';
     }
-};
-
-const getSessionTitle = (messages: Message[]): string => {
-    const firstSubstantial = getFirstSubstantialQuestion(messages);
-    if (!firstSubstantial) return '新对话';
-    return cleanGreeting(firstSubstantial.content).slice(0, 18);
-};
-
-const formatSessionMeta = (session: ChatSessionItem): string => {
-    const count = Math.max(0, (session.messages || []).filter(m => m.id !== 'welcome').length);
-    const date = new Date(session.updatedAt || Date.now());
-    const hh = String(date.getHours()).padStart(2, '0');
-    const mm = String(date.getMinutes()).padStart(2, '0');
-    return `${count}条 · ${hh}:${mm}`;
-};
-
-const makeSessionFingerprint = (session: ChatSessionItem): string => {
-    const lastMsg = (session.messages || [])[session.messages.length - 1];
-    const lastContent = (lastMsg?.content || '').slice(0, 64);
-    const messageCount = (session.messages || []).length;
-    return `${session.title || ''}::${messageCount}::${lastContent}`;
-};
-
-const getSessionLabel = (session: ChatSessionItem): string => {
-    const title = session.title || '未命名会话';
-    const count = Math.max(0, (session.messages || []).filter(m => m.id !== 'welcome').length);
-    return `${title} (${count})`;
-};
-
-const ensureUniqueIds = (existing: ChatSessionItem[], imported: ChatSessionItem[]): ChatSessionItem[] => {
-    const used = new Set(existing.map(s => s.id));
-    const idMap = new Map<string, string>();
-
-    const withIds = imported.map((s, idx) => {
-        let nextId = s.id || `session_import_${Date.now()}_${idx}`;
-        if (used.has(nextId)) {
-            nextId = `${nextId}_import_${Date.now()}_${idx}`;
-        }
-        used.add(nextId);
-        idMap.set(s.id, nextId);
-        return { ...s, id: nextId };
-    });
-
-    return withIds.map(session => ({
-        ...session,
-        parentSessionId: session.parentSessionId ? (idMap.get(session.parentSessionId) || session.parentSessionId) : undefined
-    }));
-};
-
-const buildImportPreview = (existing: ChatSessionItem[], imported: ChatSessionItem[]): SessionImportPreview['stats'] => {
-    const existingById = new Map(existing.map(s => [s.id, s]));
-    const existingByFp = new Map(existing.map(s => [makeSessionFingerprint(s), s]));
-
-    let conflictsById = 0;
-    let duplicatesByFingerprint = 0;
-    let newById = 0;
-    const conflictTitles: string[] = [];
-    const duplicateTitles: string[] = [];
-    const newTitles: string[] = [];
-    const conflictIds: string[] = [];
-    const duplicateIds: string[] = [];
-    const newIds: string[] = [];
-    const conflictPairs: Array<{ incoming: string; existing: string }> = [];
-    const duplicatePairs: Array<{ incoming: string; existing: string }> = [];
-
-    imported.forEach(session => {
-        const existingBySameId = existingById.get(session.id);
-        if (existingBySameId) {
-            conflictsById += 1;
-            conflictTitles.push(getSessionLabel(session));
-            conflictIds.push(session.id);
-            if (conflictPairs.length < 20) {
-                conflictPairs.push({ incoming: getSessionLabel(session), existing: getSessionLabel(existingBySameId) });
-            }
-        } else {
-            newById += 1;
-            newTitles.push(getSessionLabel(session));
-            newIds.push(session.id);
-        }
-
-        const fp = makeSessionFingerprint(session);
-        const existingBySameFp = existingByFp.get(fp);
-        if (existingBySameFp) {
-            duplicatesByFingerprint += 1;
-            duplicateTitles.push(getSessionLabel(session));
-            duplicateIds.push(session.id);
-            if (duplicatePairs.length < 20) {
-                duplicatePairs.push({ incoming: getSessionLabel(session), existing: getSessionLabel(existingBySameFp) });
-            }
-        }
-    });
-
-    return {
-        imported: imported.length,
-        conflictsById,
-        duplicatesByFingerprint,
-        newById,
-        conflictTitles,
-        duplicateTitles,
-        newTitles,
-        conflictIds,
-        duplicateIds,
-        newIds,
-        conflictPairs,
-        duplicatePairs
-    };
 };
 
 const buildMessageWithAttachments = (
@@ -649,53 +476,28 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     }, [showTakeoverMenu]);
 
     // 2. Chat State
-    const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
-        let loadedSessions: ChatSessionItem[] = [];
-        try {
-            const raw = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    loadedSessions = parsed;
-                }
-            }
-        } catch {
-            // ignore
-        }
-
-        if (loadedSessions.length === 0) {
-            loadedSessions = [{
-                id: `session_${Date.now()}`,
-                title: '新对话',
-                messages: [createWelcomeMessage()],
-                updatedAt: Date.now()
-            }];
-        }
-
-        try {
-            const tempRaw = sessionStorage.getItem(TEMP_SESSION_STORAGE_KEY);
-            if (tempRaw) {
-                const tempMsgs = JSON.parse(tempRaw);
-                if (Array.isArray(tempMsgs)) {
-                    const tempSession: ChatSessionItem = {
-                        id: TEMP_SESSION_ID,
-                        title: '临时对话',
-                        messages: tempMsgs,
-                        updatedAt: Date.now(),
-                        isTemp: true
-                    };
-                    loadedSessions = [tempSession, ...loadedSessions.filter(s => s.id !== TEMP_SESSION_ID)];
-                }
-            }
-        } catch {
-            // ignore
-        }
-
-        return loadedSessions;
+    const chatMessages = messages as Message[];
+    const {
+        activeBranchTrail,
+        activeSession,
+        activeSessionId,
+        expandedNodes,
+        sessionSearch,
+        sessionTreeRows,
+        sessions,
+        setActiveSessionId,
+        setExpandedNodes,
+        setSessionSearch,
+        setSessions,
+        setShowArchived,
+        showArchived,
+    } = useChatSessionState({
+        messages: chatMessages,
+        preferredKeyId: resolveAssistantPreferredKeyId(),
+        selectedModelId: selectedModel.id,
+        setMessages: setMessages as React.Dispatch<React.SetStateAction<Message[]>>,
+        summarizeTitle: summarizeSessionTitle,
     });
-    const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
-    
-    
     const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
     const [isCompressing, setIsCompressing] = useState(false);
 
@@ -1162,21 +964,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         return true;
     }, [authLoading, balance, billingUiEnabled, canAccessSystemCreditModels, getRequiredCredits, setShowRechargeModal]);
 
-    const [sessionSearch, setSessionSearch] = useState('');
-    const [showArchived, setShowArchived] = useState(false);
     const [importPreview, setImportPreview] = useState<SessionImportPreview | null>(null);
     const [importPreviewSearch, setImportPreviewSearch] = useState('');
     const [importPreviewShowAll, setImportPreviewShowAll] = useState(false);
     const [importExcludedIds, setImportExcludedIds] = useState<string[]>([]);
     const [importPreviewOnlyExcluded, setImportPreviewOnlyExcluded] = useState(false);
-    const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>(() => {
-        try {
-            const raw = localStorage.getItem(CHAT_SESSION_TREE_EXPAND_KEY);
-            return raw ? JSON.parse(raw) : {};
-        } catch {
-            return {};
-        }
-    });
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -1495,210 +1287,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         setContextMenu({ x: event.clientX, y: event.clientY, modelId });
     }, []);
 
-    const sessionMap = useMemo(() => {
-        const map = new Map<string, ChatSessionItem>();
-        sessions.forEach(session => map.set(session.id, session));
-        return map;
-    }, [sessions]);
-
-    const activeSession = useMemo(() => {
-        return sessions.find(s => s.id === activeSessionId) || null;
-    }, [sessions, activeSessionId]);
-
-    const activeBranchTrail = useMemo(() => {
-        if (!activeSession) return [] as ChatSessionItem[];
-        const trail: ChatSessionItem[] = [];
-        let cursor: ChatSessionItem | undefined | null = activeSession;
-        const guard = new Set<string>();
-
-        while (cursor && !guard.has(cursor.id)) {
-            trail.unshift(cursor);
-            guard.add(cursor.id);
-            cursor = cursor.parentSessionId ? (sessionMap.get(cursor.parentSessionId) || null) : null;
-        }
-        return trail;
-    }, [activeSession, sessionMap]);
-
-    const sessionTreeRows = useMemo(() => {
-        // 简体中文：支持通过 sessionSearch 对会话树进行过滤
-        // 如果关键字不为空，我们需要确保只要会话标题或消息包含关键字，那么此节点以及它的所有祖辈节点都会保持可见
-        const query = sessionSearch.toLowerCase().trim();
-        const matchesQuery = (session: ChatSessionItem) => {
-            if (!query) return true;
-            const matchTitle = (session.title || '').toLowerCase().includes(query);
-            const matchMessages = session.messages?.some(m => (m.content || '').toLowerCase().includes(query));
-            return matchTitle || matchMessages;
-        };
-
-        const visibleSet = new Set<string>();
-        if (query) {
-            sessions.forEach(session => {
-                if (matchesQuery(session)) {
-                    let curr: ChatSessionItem | null = session;
-                    while (curr) {
-                        visibleSet.add(curr.id);
-                        curr = curr.parentSessionId ? (sessionMap.get(curr.parentSessionId) || null) : null;
-                    }
-                }
-            });
-        }
-
-        const visibleSessions = sessions.filter(session => {
-            const matchArchive = showArchived || !session.archived;
-            if (!matchArchive) return false;
-            if (query) {
-                return visibleSet.has(session.id);
-            }
-            return true;
-        });
-
-        const childMap = new Map<string, ChatSessionItem[]>();
-        visibleSessions.forEach(session => {
-            if (!session.parentSessionId) return;
-            if (!childMap.has(session.parentSessionId)) childMap.set(session.parentSessionId, []);
-            childMap.get(session.parentSessionId)!.push(session);
-        });
-
-        childMap.forEach(list => list.sort((a, b) => b.updatedAt - a.updatedAt));
-
-        const roots = visibleSessions
-            .filter(session => !session.parentSessionId || !sessionMap.has(session.parentSessionId))
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-
-        const rows: Array<{ session: ChatSessionItem; depth: number; hasChildren: boolean }> = [];
-        const activePath = new Set(activeBranchTrail.map(item => item.id));
-
-        const dfs = (session: ChatSessionItem, depth: number) => {
-            const children = childMap.get(session.id) || [];
-            const hasChildren = children.length > 0;
-            rows.push({ session, depth, hasChildren });
-
-            // 简体中文：在搜索模式下，匹配的会话及其祖先被展示出来，如果未手动展开，我们默认在搜索状态下展开其祖辈路径，以便展现匹配项
-            const expanded = query ? true : (expandedNodes[session.id] ?? (depth === 0 || activePath.has(session.id)));
-            if (!expanded) return;
-
-            children.forEach(child => dfs(child, depth + 1));
-        };
-
-        roots.forEach(root => dfs(root, 0));
-        return rows;
-    }, [activeBranchTrail, expandedNodes, sessionMap, sessions, showArchived, sessionSearch]);
-
-    const prevActiveSessionIdRef = useRef(activeSessionId);
-    const summarizingSessionIdsRef = useRef<Set<string>>(new Set());
     const lastSessionIdRef = useRef(activeSessionId);
-
-    useEffect(() => {
-        const active = sessions.find(s => s.id === activeSessionId);
-        if (active) {
-            // 简体中文：在内容一致时跳过更新，阻断双向同步死循环
-            setMessages((prevMessages) => {
-                if (JSON.stringify(prevMessages) === JSON.stringify(active.messages)) {
-                    return prevMessages;
-                }
-                return active.messages?.length ? active.messages : [createWelcomeMessage()];
-            });
-            return;
-        }
-
-        if (sessions.length > 0) {
-            setActiveSessionId(sessions[0].id);
-        }
-    }, [activeSessionId, sessions]);
-
-    useEffect(() => {
-        // 1. 如果 activeSessionId 改变了，说明是切换会话，更新 Ref 后直接跳过，防止旧消息覆盖新会话
-        if (prevActiveSessionIdRef.current !== activeSessionId) {
-            prevActiveSessionIdRef.current = activeSessionId;
-            return;
-        }
-
-        let needsSummary = false;
-        let substantialQuestion: string | undefined;
-
-        setSessions(prev => {
-            const active = prev.find(s => s.id === activeSessionId);
-            // 简体中文：如果活动会话不存在或者内容没有变化，直接返回原数组引用，防止产生新数组引用触发外部副作用
-            if (!active || JSON.stringify(active.messages) === JSON.stringify(messages)) {
-                return prev;
-            }
-
-            return prev.map(session => {
-                if (session.id !== activeSessionId) return session;
-
-                const firstSubstantial = getFirstSubstantialQuestion(messages);
-                let updatedTitle = session.title;
-                let customTitle = session.customTitle;
-
-                // 发现第一个实质性提问且标题未锁定时，立刻生成本地临时标题并锁定 customTitle
-                if (firstSubstantial && !customTitle) {
-                    const cleanedText = cleanGreeting(firstSubstantial.content);
-                    updatedTitle = cleanedText.slice(0, 16) || '新对话';
-                    customTitle = true; // 锁定标题，后面就算问什么内容都不会被影响
-                    needsSummary = true;
-                    substantialQuestion = firstSubstantial.content;
-                }
-
-                return {
-                    ...session,
-                    messages,
-                    title: updatedTitle,
-                    customTitle,
-                    updatedAt: Date.now()
-                };
-            });
-        });
-
-        // 2. 发起大模型异步标题总结
-        if (needsSummary && substantialQuestion && selectedModel && !summarizingSessionIdsRef.current.has(activeSessionId)) {
-            const currentSessionId = activeSessionId;
-            const currentModelId = selectedModel.id;
-            const preferredKeyId = resolveAssistantPreferredKeyId();
-
-            summarizingSessionIdsRef.current.add(currentSessionId);
-
-            (async () => {
-                const aiTitle = await summarizeSessionTitle(substantialQuestion!, currentModelId, preferredKeyId);
-                if (aiTitle) {
-                    setSessions(prev => prev.map(session => {
-                        if (session.id !== currentSessionId) return session;
-                        return {
-                            ...session,
-                            title: aiTitle,
-                            customTitle: true,
-                            updatedAt: Date.now()
-                        };
-                    }));
-                }
-            })();
-        }
-    }, [messages, activeSessionId, selectedModel]);
-
-    useEffect(() => {
-        try {
-            const persistentSessions = sessions.filter(s => !s.isTemp);
-            localStorage.setItem(CHAT_SESSION_STORAGE_KEY, JSON.stringify(persistentSessions.slice(0, 20)));
-            
-            const tempSession = sessions.find(s => s.isTemp);
-            if (tempSession) {
-                sessionStorage.setItem(TEMP_SESSION_STORAGE_KEY, JSON.stringify(tempSession.messages));
-            } else {
-                sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
-            }
-        } catch {
-            // ignore
-        }
-    }, [sessions]);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(CHAT_SESSION_TREE_EXPAND_KEY, JSON.stringify(expandedNodes));
-        } catch {
-            // ignore
-        }
-    }, [expandedNodes]);
-
-    const activeMessages = messages as Message[];
+    const activeMessages = chatMessages;
 
     const activeIsThinking = isAgentCollaboration ? takeoverIsThinking : isThinking;
 
@@ -2337,20 +1927,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         const forkBase = messages.slice(0, index + 1);
         if (forkBase.length === 0) return;
 
-        const branchId = `session_${Date.now()}`;
-        const branchTitle = `分支 · ${getSessionTitle(forkBase)}`;
-        const branchSession: ChatSessionItem = {
-            id: branchId,
-            title: branchTitle,
-            customTitle: true,
-            messages: forkBase,
-            updatedAt: Date.now(),
-            parentSessionId: activeSessionId,
-            branchFromMessageId: messages[index]?.id
-        };
-
+        const branchSession = createBranchSession(messages, index, activeSessionId);
         setSessions(prev => [branchSession, ...prev]);
-        setActiveSessionId(branchId);
+        setActiveSessionId(branchSession.id);
         setInput('');
         setAttachments([]);
         notify.success('已创建分支会话', '可以在新分支继续对话');
@@ -2612,27 +2191,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             return;
         }
 
-        const byId = new Map<string, ChatSessionItem>();
-        sessions.forEach(s => byId.set(s.id, s));
-        importedSessions.forEach(s => {
-            const prev = byId.get(s.id);
-            if (!prev || (s.updatedAt || 0) >= (prev.updatedAt || 0)) {
-                byId.set(s.id, s);
-            }
-        });
-
-        const byFingerprint = new Map<string, ChatSessionItem>();
-        Array.from(byId.values()).forEach(session => {
-            const fp = makeSessionFingerprint(session);
-            const prev = byFingerprint.get(fp);
-            if (!prev || (session.updatedAt || 0) > (prev.updatedAt || 0)) {
-                byFingerprint.set(fp, session);
-            }
-        });
-
-        const smartMerged = Array.from(byFingerprint.values())
-            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-            .slice(0, 50);
+        const smartMerged = mergeImportedSessions(sessions, importedSessions);
         setSessions(smartMerged);
 
         const preferredActive = importPreview.activeSessionId || activeSessionId;
@@ -2650,27 +2209,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         const reader = new FileReader();
         reader.onload = () => {
             try {
-                const parsed = JSON.parse(String(reader.result || '{}'));
-                if (!parsed || !Array.isArray(parsed.sessions)) {
-                    throw new Error('格式不正确');
-                }
-                const importedSessions: ChatSessionItem[] = parsed.sessions.map((s: any, idx: number) => ({
-                    id: s.id || `session_import_${Date.now()}_${idx}`,
-                    title: s.title || '导入会话',
-                    messages: Array.isArray(s.messages) && s.messages.length > 0 ? s.messages : [createWelcomeMessage()],
-                    updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : Date.now(),
-                    customTitle: !!s.customTitle,
-                    parentSessionId: s.parentSessionId,
-                    branchFromMessageId: s.branchFromMessageId,
-                    archived: !!s.archived
-                }));
-
-                if (importedSessions.length === 0) throw new Error('没有可导入会话');
-                setImportPreview({
-                    sessions: importedSessions,
-                    activeSessionId: parsed.activeSessionId,
-                    stats: buildImportPreview(sessions, importedSessions)
-                });
+                setImportPreview(parseSessionImport(String(reader.result || '{}'), sessions));
                 setImportPreviewSearch('');
                 setImportPreviewShowAll(false);
                 setImportExcludedIds([]);

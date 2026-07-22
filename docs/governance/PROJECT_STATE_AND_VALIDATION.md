@@ -108,7 +108,7 @@ npm run local-runner:build
 - Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
 - Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。
 - 服务端用户路由职责已收敛，共享请求上下文与热点文件可维护性递减门禁已建立。
-- `ChatSidebar` 的模型目录、assistant capability 默认选择、Key 优先级与订阅同步已迁入严格 model controller；热点 baseline 已从 4677 行/23 个显式 `any` 降至 4501 行/22 个，下一职责边界是会话持久化与树投影。
+- `ChatSidebar` 的模型目录、assistant capability 默认选择、Key 优先级与订阅同步已迁入严格 model controller；会话持久化、活动消息同步、树投影、分支与导入算法已迁入严格 session controller/data 模块。热点 baseline 已从 4677 行/23 个显式 `any` 连续降至 4040 行/21 个，公开交互、storage key 和导入导出格式不变。
 - image Durable Worker 的 migration 019、租约领取、token/heartbeat、冻结路由提交、指数退避轮询、取消、超时、恢复和 Item 幂等代码已实现，并通过无浏览器参与、Worker 重建与过期租约的 characterization 测试；lease 丢失不再伪报终态或重试，迟到回调不能复活或降级终态 Item。
 - `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`；切流 helper 与 Worker loop characterization 已证明 `off`/未命中用户保留旧同步提交。既有 `/v1/metrics` 现提供不含业务标识或 payload 的 Worker 与计费聚合指标；owner-scoped Job SSE 已具备服务端投影和 Web 鉴权 fetch-stream 恢复代码，404/网络异常继续回退旧轮询。migration 019 尚未在受控 PostgreSQL 执行，实际 internal 放量、真实浏览器关闭/重新登录、跨设备恢复和生产观测窗口仍未完成，不得描述为已上线能力。
 - Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标。
