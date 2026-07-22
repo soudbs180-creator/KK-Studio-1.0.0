@@ -24,6 +24,10 @@ import {
 } from './agentRunHydration.ts';
 import { refreshAgentRunEventProjection } from './agentRunEventRecovery.ts';
 import {
+  hydrateAgentSessionProjection,
+  type AgentSessionHydrationResult,
+} from './agentSessionProjection.ts';
+import {
   durableGenerationQueue,
   type DurableGenerationQueue,
 } from '../queue/DurableGenerationQueue.ts';
@@ -460,14 +464,19 @@ export class AgentRuntime {
   private activeRunSyncOwnerId = agentRunStore.getOwnerScopeId();
   private hydratedRunSyncOwnerId = '';
   private runHydration?: { ownerId: string; promise: Promise<AgentRunHydrationResult> };
+  private sessionHydration?: { ownerId: string; promise: Promise<AgentSessionHydrationResult> };
 
   constructor(planningGenerationQueue: GenerationPlanningQueue = durableGenerationQueue) {
     this.planningGenerationQueue = planningGenerationQueue;
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => void this.requestRunHydration());
+      window.addEventListener('online', () => {
+        void this.requestRunHydration();
+        void this.requestSessionHydration();
+      });
       queueMicrotask(() => {
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           void this.requestRunHydration();
+          void this.requestSessionHydration();
         }
       });
     }
@@ -1075,6 +1084,18 @@ export class AgentRuntime {
         if (this.runHydration?.promise === promise) this.runHydration = undefined;
       });
     this.runHydration = { ownerId, promise };
+    return promise;
+  }
+
+  /** Refreshes the owner-qualified Session list without merging it into local Chat history. */
+  requestSessionHydration(): Promise<AgentSessionHydrationResult> {
+    const ownerId = getRuntimeOwnerId();
+    if (this.sessionHydration?.ownerId === ownerId) return this.sessionHydration.promise;
+    const promise = hydrateAgentSessionProjection({ ownerId })
+      .finally(() => {
+        if (this.sessionHydration?.promise === promise) this.sessionHydration = undefined;
+      });
+    this.sessionHydration = { ownerId, promise };
     return promise;
   }
 

@@ -36,6 +36,18 @@ export {
 } from './runtime/AssistantExecutionContext.ts';
 export { agentRunStore, hasLocalAgentRunExecutionAuthority } from './runtime/AgentRunStore.ts';
 export type { AgentRunRecord, AgentRunStoreListener } from './runtime/AgentRunStore.ts';
+export {
+  agentSessionProjectionStore,
+  AgentSessionProjectionStore,
+  hydrateAgentSessionDetail,
+  hydrateAgentSessionProjection,
+} from './runtime/agentSessionProjection.ts';
+export type {
+  AgentSessionDetailHydrationResult,
+  AgentSessionHydrationOutcome,
+  AgentSessionHydrationResult,
+  AgentSessionProjectionClient,
+} from './runtime/agentSessionProjection.ts';
 export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
 export { AGENT_CONTROL_ACTIONS } from './runtime/agentControlActions.ts';

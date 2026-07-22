@@ -69,6 +69,7 @@
     "apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentRunHydration.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentRunEventRecovery.ts",
+    "apps/web/src/features/ai-assistant-runtime/runtime/agentSessionProjection.ts",
     "apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts"
   ]
 }

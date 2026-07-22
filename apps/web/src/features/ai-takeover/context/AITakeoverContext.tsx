@@ -309,7 +309,10 @@ export function AITakeoverProvider({
       });
     };
     const unsubscribeRuns = agentRunStore.subscribe(syncProjection);
-    const requestHydration = () => void agentRuntimeInstance.requestRunHydration();
+    const requestHydration = () => {
+      void agentRuntimeInstance.requestRunHydration();
+      void agentRuntimeInstance.requestSessionHydration();
+    };
     const unsubscribeAuth = subscribeAuthSessionChange(requestHydration);
     requestHydration();
     return () => {

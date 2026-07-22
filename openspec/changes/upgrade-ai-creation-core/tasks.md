@@ -108,7 +108,8 @@
 - [ ] 实现 `AgentSessionDto`、`AgentContextSnapshotDto`、`AgentRunEventDto` 表结构与 API。
   - [x] `AgentRunEventDto` metadata-only 基础已落地：migration 020 以事务 trigger 为每个 accepted Run snapshot 追加 sequence，owner-scoped 查询与 typed client 已提供；不保存 user message、plan 或 tool payload。
   - [x] `AgentSessionDto` 与 `AgentContextSnapshotDto` 权威数据面已落地：migration 021、strict schema、owner-scoped list/get/upsert、幂等 Snapshot append/latest 与 typed client 已提供；附件只接受 Asset 引用，Context 不保存输入原文或任意 payload。
-  - [ ] Web Session 投影、Run/Session 绑定与语义事件 discriminated union 仍待实现。
+  - [x] Web 已建立 owner-scoped Session 只读投影：list/detail 必须通过 shared schema、owner 与 Session ID 校验，owner 切换即清空；投影不读取或改写本地 Chat storage。
+  - [ ] Chat Session 安全写投影、Run/Session 绑定与语义事件 discriminated union 仍待实现。
 - [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
 - [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。
 - [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
@@ -119,8 +120,8 @@
   - [x] Web 使用共享 Zod schema 恢复 owner-scoped Run projection；认证 reload 保留 active Run，启动顺序固定为 hydration 后再上传 pending，本地较新快照与 owner 切换均 fail closed，远端独有计划不可在当前浏览器执行。
   - [x] Run event 持久日志/增量查询基础已落地；`GET /api/ai-assistant/runs/:runId/events` 最多返回 100 条 metadata-only 事件并使用 owner + sequence cursor 约束。
   - [x] Web 已消费 owner-qualified Run event cursor：首次列表 hydration 后以及后续 online/认证恢复请求只查询最近 20 个 active + synced Run，最多 4 并发；事件仅触发详情读取和严格校验，权威快照成功合并后才推进游标，远端投影不获得执行权。
-  - [x] Session list/get/upsert 与 Context Snapshot append/latest API 已落地；当前未接入 Web，不改变本地 Chat storage 的运行时角色。
-  - [ ] Web Session 投影、Run/Session 绑定、语义事件 replay、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation 不等同于可执行 Run replay。
+  - [x] Session list/get/upsert 与 Context Snapshot append/latest API 已落地；Web 在 startup/认证恢复/online 时读取 owner-scoped Session list，并可按需校验 detail，但不改变本地 Chat storage 的运行时角色。
+  - [ ] Chat Session 安全写投影、Run/Session 绑定、语义事件 replay、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation 不等同于可执行 Run replay。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。
