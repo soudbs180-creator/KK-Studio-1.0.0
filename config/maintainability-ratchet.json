@@ -70,6 +70,7 @@
     "apps/web/src/features/ai-takeover/core/agentContextBudget.ts",
     "apps/web/src/features/ai-takeover/core/agentContextSnapshot.ts",
     "apps/web/src/features/ai-takeover/core/agentPlannerContext.ts",
+    "apps/web/src/features/ai-takeover/core/agentPlannerReferencePolicy.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentPlannerSessionContext.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentContextSnapshotProjection.ts",

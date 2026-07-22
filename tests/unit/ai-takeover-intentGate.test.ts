@@ -147,10 +147,12 @@ test('本地脑源码契约：批量电商计划携带比例、紧凑布局和�
 test('AgentRuntime 源码契约：本地可处理的意图即使已有模型也不调用云端 Planner', () => {
   const source = readSource('apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts');
 
-  assert.match(source, /const localPlan = await localBrain\.plan\(text, context, sessionContext\)/);
+  assert.match(source, /const plannerContext = applyAgentPlannerReferenceContext\(text, context, sessionContext\)/);
+  assert.match(source, /const localPlan = await localBrain\.plan\(text, plannerContext, sessionContext\)/);
   assert.match(source, /localPlan\.intent === 'unknown'/);
   assert.match(source, /plan = localPlan/);
-  assert.match(source, /llmBrain\.plan\(text, context, modelId, sessionContext\)/);
+  assert.match(source, /llmBrain\.plan\(text, plannerContext, modelId, sessionContext\)/);
+  assert.match(source, /enforceAgentPlannerReferencePolicy\(text, plan, context, sessionContext\)/);
   assert.match(source, /resolveAgentPlannerSessionContext\(sessionId, agentSessionProjectionStore, context\)/);
   assert.match(source, /createRun\(text, plan\.intent, plan, validatedSessionId\)/);
 });

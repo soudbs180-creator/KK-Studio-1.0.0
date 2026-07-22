@@ -9,6 +9,10 @@ import type { AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
 import { LocalAssistantBrain } from '../../ai-takeover/core/localBrain.ts';
 import { LLMBrain } from '../../ai-takeover/core/llmBrain.ts';
 import { buildAgentContextSnapshotInput } from '../../ai-takeover/core/agentContextSnapshot.ts';
+import {
+  applyAgentPlannerReferenceContext,
+  enforceAgentPlannerReferencePolicy,
+} from '../../ai-takeover/core/agentPlannerReferencePolicy.ts';
 import { agentPermissionPolicy } from './AgentPermissionPolicy.ts';
 import {
   agentRunStore,
@@ -535,7 +539,8 @@ export class AgentRuntime {
     const sessionContext = resolveAgentPlannerSessionContext(sessionId, agentSessionProjectionStore, context);
     const validatedSessionId = sessionContext?.sessionId;
     appendCurrentContextSnapshot(validatedSessionId, planningOwnerId, context);
-    const localPlan = await localBrain.plan(text, context, sessionContext);
+    const plannerContext = applyAgentPlannerReferenceContext(text, context, sessionContext);
+    const localPlan = await localBrain.plan(text, plannerContext, sessionContext);
     if (getRuntimeOwnerId() !== planningOwnerId) {
       throw new Error('Agent planning stopped because the authenticated owner changed.');
     }
@@ -543,7 +548,7 @@ export class AgentRuntime {
     plan = localPlan;
     if (context.settings.apiKeyStatus !== 'missing' && localPlan.intent === 'unknown') {
       try {
-        plan = await llmBrain.plan(text, context, modelId, sessionContext);
+        plan = await llmBrain.plan(text, plannerContext, modelId, sessionContext);
       } catch (error) {
         console.warn(
           '[AgentRuntime] Cloud planner failed; using LocalBrain.',
@@ -554,6 +559,7 @@ export class AgentRuntime {
     if (getRuntimeOwnerId() !== planningOwnerId) {
       throw new Error('Agent planning stopped because the authenticated owner changed.');
     }
+    plan = enforceAgentPlannerReferencePolicy(text, plan, context, sessionContext);
 
     let isBlocked = false;
     let blockReason = '';
@@ -606,7 +612,7 @@ export class AgentRuntime {
         confirmation: undefined,
       };
     } else {
-      const confirmation = agentPermissionPolicy.evaluateConfirmation(plan, context);
+      const confirmation = agentPermissionPolicy.evaluateConfirmation(plan, plannerContext);
       if (confirmation.required) {
         plan.requiresConfirmation = true;
         plan.confirmation = confirmation;

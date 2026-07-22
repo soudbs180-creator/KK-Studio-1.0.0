@@ -336,7 +336,7 @@ System rules (固定预算)
 - `usedTokens` 是上下文准入的保守预算证据，不是 Provider 计费量：文本以 UTF-8 bytes 作为 provider-independent upper bound，每条结构化消息/结果另计 4 个单位；类别之间不借用空闲配额。
 - system/summary 可按 Unicode code point 截断到本类配额；消息、工具、画布、知识条目保持不可拆分。选择时按优先级后时间倒序准入，最终恢复时间正序；最近两个 user-led round 与 `confirmed=false` 的工具结果优先。
 - Planner 消费权威 Session 时使用同一分配器做第二次裁剪：扣除 Session 已声明的 output reserve 后最多使用 64,000 UTF-8 单位，并预留 1,024 单位给 JSON envelope；少于 2,048 单位、summary 覆盖越界或最终 envelope 超限均 fail closed。只保留未被 summary 覆盖的 user/assistant 消息，附件、owner、confirmation、checkpoint、content hash 与历史 system/tool message 均排除。
-- `llmBrain.ts` / `localBrain.ts` 已消费该 authority-free Session context；无 binding 时 LLM 保持原 system + current-user 两消息形状。Web 已生产并 owner-scoped hydrate latest metadata-only Context Snapshot，Planner 仅在 exact Session、surface、canvas、summary freshness 和时钟偏差门禁通过后按画布硬预算消费。多轮指代回归、语义事件 replay 与跨设备执行接管仍是后续任务。
+- `llmBrain.ts` / `localBrain.ts` 已消费该 authority-free Session context；无 binding 时 LLM 保持原 system + current-user 两消息形状。Web 已生产并 owner-scoped hydrate latest metadata-only Context Snapshot，Planner 仅在 exact Session、surface、canvas、summary freshness 和时钟偏差门禁通过后按画布硬预算消费。多轮选区指代由 `agentPlannerReferencePolicy.ts` 再与当前画布节点求交并冻结目标：通用 continuation、多候选单数指代、缺失目标、历史 Job ID 或 Planner 目标替换均 fail closed；只有当前消息明确提供的 paused Job `jobId` 可进入 resume。语义事件 replay、真实 LLM 多轮验证与跨设备执行接管仍是后续任务。
 
 ### 5.2 Run 恢复
 

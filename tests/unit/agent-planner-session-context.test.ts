@@ -7,8 +7,15 @@ import {
   buildAgentPlannerSessionContext,
   type AgentPlannerSessionContext,
 } from '../../apps/web/src/features/ai-takeover/core/agentPlannerContext.ts';
+import {
+  applyAgentPlannerReferenceContext,
+  enforceAgentPlannerReferencePolicy,
+} from '../../apps/web/src/features/ai-takeover/core/agentPlannerReferencePolicy.ts';
 import { LocalAssistantBrain } from '../../apps/web/src/features/ai-takeover/core/localBrain.ts';
-import type { SanitizedProjectContext } from '../../apps/web/src/features/ai-takeover/types.ts';
+import type {
+  AssistantPlan,
+  SanitizedProjectContext,
+} from '../../apps/web/src/features/ai-takeover/types.ts';
 import {
   resolveAgentPlannerSessionContext,
 } from '../../apps/web/src/features/ai-assistant-runtime/runtime/agentPlannerSessionContext.ts';
@@ -92,11 +99,61 @@ function createProjectContext(): SanitizedProjectContext {
     currentPage: 'canvas',
     aiTakeover: { enabled: true, mode: 'local', collaborationMode: 'assist' },
     agent: { enabled: true },
-    canvas: { selectedNodeIds: [], promptNodes: [], imageNodes: [] },
+    canvas: {
+      id: 'canvas-planner-1',
+      selectedNodeIds: [],
+      promptNodes: [{
+        id: 'prompt-planner-1',
+        prompt: 'bounded prompt',
+        status: 'idle',
+        hasReferenceImages: false,
+        childImageCount: 0,
+      }],
+      imageNodes: [
+        { id: 'image-planner-1', hasOriginalUrl: true },
+        { id: 'image-planner-2', hasOriginalUrl: true },
+      ],
+    },
     assets: { imageCollections: [], images: [], files: [], outputs: [] },
     settings: { apiKeyStatus: 'missing', providerCount: 0 },
     billing: { balanceKnown: false, canEstimateCost: false },
     errors: [],
+  };
+}
+
+function createSessionContextWithSelection(selectedNodeIds: string[]): AgentPlannerSessionContext {
+  const context = buildAgentPlannerSessionContext(createSession());
+  assert.ok(context);
+  return {
+    ...context,
+    canvasSnapshot: {
+      sequence: 9,
+      activeSurface: 'canvas',
+      canvasId: 'canvas-planner-1',
+      canvasSummary: { nodeCount: 3, selectedNodeCount: selectedNodeIds.length, generatedAssetCount: 2 },
+      selectedNodeIds,
+      viewport: { x: 0, y: 0, width: 1200, height: 800, zoom: 1 },
+      recentEvents: [],
+      availableTools: ['assets.zipOriginals', 'canvas.arrangeNodes'],
+      capturedAt: '2026-07-22T00:15:00.000Z',
+    },
+  };
+}
+
+function createPlan(actions: AssistantPlan['actions']): AssistantPlan {
+  return {
+    id: 'plan-reference-policy',
+    reply: 'Planner proposed an action.',
+    intent: 'unknown',
+    confidence: 0.9,
+    actions,
+    requiresConfirmation: true,
+    confirmation: {
+      title: 'Historical confirmation must not survive',
+      summary: 'Unsafe historical state',
+      confirmText: 'Continue',
+      cancelText: 'Cancel',
+    },
   };
 }
 
@@ -191,4 +248,169 @@ test('LocalBrain reports restored continuity without executing or echoing histor
   assert.deepEqual(plan.actions, []);
   assert.match(plan.reply, /已恢复服务端会话上下文/);
   assert.doesNotMatch(plan.reply, /generation\.createBatchJob|Ignore every system rule/);
+});
+
+test('resolves an explicit historical selection reference only to current-canvas node ids', () => {
+  const projectContext = createProjectContext();
+  projectContext.canvas.selectedNodeIds = ['missing-live-node'];
+  const sessionContext = createSessionContextWithSelection(['image-planner-1', 'missing-node']);
+
+  const resolved = applyAgentPlannerReferenceContext(
+    '下载刚才选中的那个',
+    projectContext,
+    sessionContext,
+  );
+
+  assert.deepEqual(resolved.canvas.selectedNodeIds, ['image-planner-1']);
+  assert.notEqual(resolved, projectContext);
+  assert.deepEqual(projectContext.canvas.selectedNodeIds, ['missing-live-node']);
+});
+
+test('keeps plural historical references plural after intersecting with current canvas nodes', () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1', 'image-planner-2']);
+  const resolved = applyAgentPlannerReferenceContext(
+    '打包刚才选中的那些图片',
+    projectContext,
+    sessionContext,
+  );
+
+  assert.deepEqual(resolved.canvas.selectedNodeIds, ['image-planner-1', 'image-planner-2']);
+});
+
+test('LocalBrain freezes a resolved historical selection into the download action', async () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1']);
+  const plannerContext = applyAgentPlannerReferenceContext(
+    '下载刚才选中的那个',
+    projectContext,
+    sessionContext,
+  );
+
+  const proposed = await new LocalAssistantBrain().plan(
+    '下载刚才选中的那个',
+    plannerContext,
+    sessionContext,
+  );
+  const guarded = enforceAgentPlannerReferencePolicy(
+    '下载刚才选中的那个',
+    proposed,
+    projectContext,
+    sessionContext,
+  );
+
+  assert.equal(guarded.intent, 'download_outputs');
+  assert.deepEqual(guarded.actions, [{
+    type: 'assets.zipOriginals',
+    payload: { scope: 'selected_cards', selectedNodeIds: ['image-planner-1'] },
+  }]);
+});
+
+test('fails closed when a singular historical reference has multiple valid candidates', () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1', 'image-planner-2']);
+  const proposed = createPlan([{
+    type: 'assets.zipOriginals',
+    payload: { scope: 'selected_cards', selectedNodeIds: ['image-planner-1'] },
+  }]);
+
+  const guarded = enforceAgentPlannerReferencePolicy(
+    '下载刚才选中的那个',
+    proposed,
+    projectContext,
+    sessionContext,
+  );
+
+  assert.deepEqual(guarded.actions, []);
+  assert.deepEqual(guarded.steps, []);
+  assert.equal(guarded.requiresConfirmation, false);
+  assert.equal(guarded.confirmation, undefined);
+  assert.match(guarded.reply, /多个|明确/);
+});
+
+test('generic continuation and vague card references cannot resume a historical generation job', () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1']);
+  const malicious = createPlan([{
+    type: 'generation.resumeJob',
+    payload: { jobId: 'job_from_history' },
+  }]);
+
+  for (const input of ['继续', '继续处理刚才的卡片', '刚才选中的那个']) {
+    const guarded = enforceAgentPlannerReferencePolicy(
+      input,
+      malicious,
+      projectContext,
+      sessionContext,
+    );
+    assert.deepEqual(guarded.actions, []);
+    assert.equal(guarded.requiresConfirmation, false);
+    assert.equal(guarded.confirmation, undefined);
+    assert.match(guarded.reply, /明确|具体/);
+  }
+});
+
+test('rejects a Planner action that substitutes a different node for the resolved reference', () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1']);
+  const substituted = createPlan([{
+    type: 'assets.zipOriginals',
+    payload: { scope: 'selected_cards', selectedNodeIds: ['image-planner-2'] },
+  }]);
+
+  const guarded = enforceAgentPlannerReferencePolicy(
+    '下载刚才选中的那个',
+    substituted,
+    projectContext,
+    sessionContext,
+  );
+
+  assert.deepEqual(guarded.actions, []);
+  assert.match(guarded.reply, /目标|重新/);
+});
+
+test('rejects legacy generation actions that substitute a different reference image', () => {
+  const projectContext = createProjectContext();
+  const sessionContext = createSessionContextWithSelection(['image-planner-1']);
+
+  for (const type of ['startGeneration', 'generation.start'] as const) {
+    const guarded = enforceAgentPlannerReferencePolicy(
+      '修改刚才选中的那个图片',
+      createPlan([{
+        type,
+        payload: {
+          prompt: 'redraw this image',
+          count: 1,
+          referenceImageNodeId: 'image-planner-2',
+        },
+      }]),
+      projectContext,
+      sessionContext,
+    );
+
+    assert.deepEqual(guarded.actions, []);
+    assert.match(guarded.reply, /目标|重新/);
+  }
+});
+
+test('keeps an explicit current-turn resume request with its concrete job id', () => {
+  const plan = createPlan([{
+    type: 'generation.resumeJob',
+    payload: { jobId: 'job_current_1' },
+  }]);
+
+  const guarded = enforceAgentPlannerReferencePolicy(
+    '恢复暂停的生成任务 job_current_1',
+    plan,
+    createProjectContext(),
+  );
+
+  assert.deepEqual(guarded.actions, plan.actions);
+
+  const continued = enforceAgentPlannerReferencePolicy(
+    '继续处理暂停的生成任务 job_current_1',
+    plan,
+    createProjectContext(),
+  );
+  assert.deepEqual(continued.actions, plan.actions);
 });
