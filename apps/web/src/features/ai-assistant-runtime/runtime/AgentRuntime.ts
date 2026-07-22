@@ -22,6 +22,7 @@ import {
   hydrateAgentRunProjection,
   type AgentRunHydrationResult,
 } from './agentRunHydration.ts';
+import { refreshAgentRunEventProjection } from './agentRunEventRecovery.ts';
 import {
   durableGenerationQueue,
   type DurableGenerationQueue,
@@ -1042,20 +1043,34 @@ export class AgentRuntime {
     }
   }
 
+  private async restoreRunProjection(ownerId: string): Promise<AgentRunHydrationResult> {
+    const needsInitialHydration = this.hydratedRunSyncOwnerId !== ownerId;
+    let initialResult: AgentRunHydrationResult = {
+      outcome: ownerId === 'local_user' ? 'local_only' : 'hydrated',
+      runCount: 0,
+    };
+    if (needsInitialHydration) {
+      initialResult = await hydrateAgentRunProjection({ ownerId });
+      if (ownerId !== this.ensureRunSyncOwner()) return { outcome: 'owner_changed', runCount: 0 };
+      if (!['hydrated', 'local_only'].includes(initialResult.outcome)) return initialResult;
+      this.hydratedRunSyncOwnerId = ownerId;
+    }
+    this.flushPendingRunSyncs(ownerId);
+    if (ownerId === 'local_user') return initialResult;
+    const recovery = await refreshAgentRunEventProjection({ ownerId });
+    if (ownerId !== this.ensureRunSyncOwner() || recovery.outcome === 'owner_changed') {
+      return { outcome: 'owner_changed', runCount: 0 };
+    }
+    const outcome = recovery.outcome === 'invalid_payload' ? 'invalid_payload'
+      : recovery.outcome === 'unavailable' ? 'unavailable'
+        : 'hydrated';
+    return { outcome, runCount: initialResult.runCount + recovery.refreshedRunCount };
+  }
+
   requestRunHydration(): Promise<AgentRunHydrationResult> {
     const ownerId = this.ensureRunSyncOwner();
-    if (this.hydratedRunSyncOwnerId === ownerId) {
-      this.flushPendingRunSyncs(ownerId);
-      return Promise.resolve({ outcome: ownerId === 'local_user' ? 'local_only' : 'hydrated', runCount: 0 });
-    }
     if (this.runHydration?.ownerId === ownerId) return this.runHydration.promise;
-    const promise = hydrateAgentRunProjection({ ownerId })
-      .then((result) => {
-        if (ownerId !== this.ensureRunSyncOwner()) return { outcome: 'owner_changed', runCount: 0 } as const;
-        this.hydratedRunSyncOwnerId = ownerId;
-        this.flushPendingRunSyncs(ownerId);
-        return result;
-      })
+    const promise = this.restoreRunProjection(ownerId)
       .finally(() => {
         if (this.runHydration?.promise === promise) this.runHydration = undefined;
       });

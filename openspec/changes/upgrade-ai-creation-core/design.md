@@ -172,7 +172,7 @@ interface AgentRunEventDto {
 - migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；当前 Web 尚未接入，因此运行时仍不能宣称 Session 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
 - migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
-- 当前 Web 仍以 Run 快照 hydration 为主；只有在 Web 消费 sequence cursor、拉取权威快照并完成跨设备 E2E 后，才能声明从服务端事件日志恢复而非本地 localStorage。
+- 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），metadata event 仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。该机制仍是只读投影恢复，不是语义事件 replay，也不向远端计划授予执行权；Web Session 投影和真实跨设备 E2E 完成前，不能宣称服务端已接管完整 Run 恢复。
 
 ### 2.4 PPT 契约
 
@@ -336,6 +336,9 @@ System rules (固定预算)
 ### 5.2 Run 恢复
 
 - 浏览器打开或跨设备登录时，向服务端查询 `running`/`paused` 状态 Run 和 Job。
+- Web Run 恢复分为首次 bounded snapshot hydration 与后续 event-cursor invalidation；startup、认证恢复与 online 触发刷新，事件只导致重新读取共享 schema 校验后的权威 Run 详情。
+- cursor 按 owner + Run 持久化；owner 变化、跨 Run/乱序事件、陈旧详情、网络失败或本地较新 pending snapshot 均不得推进 cursor。
+- 服务端独有 Run 始终是 `server_projection`，当前浏览器只能展示或请求服务端控制，不能执行未在本地验证和确认的 plan。
 - 恢复后不重新执行已完成步骤；未执行步骤重新进入 Worker 队列。
 - 最多允许三次**受控重规划**：每次重规划必须在服务端事件日志中记录原因和触发条件。
 
