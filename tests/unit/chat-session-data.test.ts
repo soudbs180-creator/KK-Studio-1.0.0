@@ -115,12 +115,30 @@ test('branch creation and smart import merge preserve the existing newest-sessio
 test('session import parser normalizes loose JSON without explicit any', () => {
   const parsed = parseSessionImport(JSON.stringify({
     activeSessionId: 'session_imported',
-    sessions: [{ id: 'session_imported', title: '', messages: [] }],
+    sessions: [{
+      id: 'session_imported',
+      title: '',
+      messages: [],
+      agentSummary: {
+        text: 'Canonical imported summary',
+        coveredMessageCount: 2,
+        updatedAt: '2026-07-22T10:00:00.000Z',
+      },
+    }],
   }), []);
 
   assert.equal(parsed.activeSessionId, 'session_imported');
   assert.equal(parsed.sessions[0].title, '导入会话');
   assert.equal(parsed.sessions[0].messages[0].id, 'welcome');
+  assert.deepEqual(parsed.sessions[0].agentSummary, {
+    text: 'Canonical imported summary',
+    coveredMessageCount: 2,
+    updatedAt: '2026-07-22T10:00:00.000Z',
+  });
+  const invalidSummary = parseSessionImport(JSON.stringify({
+    sessions: [{ id: 'invalid-summary', messages: [], agentSummary: { text: 'unsafe' } }],
+  }), []);
+  assert.equal(invalidSummary.sessions[0].agentSummary, undefined);
   assert.throws(() => parseSessionImport('{"sessions":null}', []), /格式不正确/);
 });
 
@@ -136,7 +154,12 @@ test('session storage keeps the 20 newest persistent entries and restores an emp
       createSession(`session_${index + 1}`, `session ${index + 1}`, [])
     ));
     persistChatSessions([
-      ...persistentSessions,
+      { ...persistentSessions[0], agentSummary: {
+        text: 'Persisted summary',
+        coveredMessageCount: 1,
+        updatedAt: '2026-07-22T10:00:00.000Z',
+      } },
+      ...persistentSessions.slice(1),
       { ...createSession(TEMP_SESSION_ID, 'temporary', []), isTemp: true },
     ]);
 
@@ -146,6 +169,7 @@ test('session storage keeps the 20 newest persistent entries and restores an emp
     const restored = loadInitialChatSessions();
     assert.equal(restored[0].id, TEMP_SESSION_ID);
     assert.deepEqual(restored[0].messages, []);
+    assert.equal(restored.find((session) => session.id === 'session_1')?.agentSummary?.text, 'Persisted summary');
   } finally {
     if (localStorageDescriptor) Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor);
     else Reflect.deleteProperty(globalThis, 'localStorage');

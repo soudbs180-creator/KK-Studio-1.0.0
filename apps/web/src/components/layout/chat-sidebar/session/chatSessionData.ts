@@ -1,3 +1,5 @@
+import type { AgentSessionUpsertDto } from '@kk/shared';
+
 export interface Attachment {
   id: string;
   type: 'image' | 'document' | 'video' | 'audio' | 'url';
@@ -17,6 +19,9 @@ export interface Message {
   modelId?: string;
 }
 
+/** Canonical rolling-summary evidence persisted separately from compatibility chat messages. */
+export type ChatAgentSummary = AgentSessionUpsertDto['summary'];
+
 export interface ChatSessionItem {
   isTemp?: boolean;
   id: string;
@@ -27,6 +32,7 @@ export interface ChatSessionItem {
   parentSessionId?: string;
   branchFromMessageId?: string;
   archived?: boolean;
+  agentSummary?: ChatAgentSummary;
 }
 
 export interface SessionContextMenu {
@@ -235,6 +241,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function normalizeAgentSummary(value: unknown): ChatAgentSummary | undefined {
+  if (!isRecord(value)) return undefined;
+  const timestamp = typeof value.updatedAt === 'string' ? new Date(value.updatedAt).getTime() : Number.NaN;
+  if (
+    typeof value.text !== 'string'
+    || value.text.length > 32_000
+    || !Number.isInteger(value.coveredMessageCount)
+    || Number(value.coveredMessageCount) < 0
+    || Number(value.coveredMessageCount) > 10_000
+    || !Number.isFinite(timestamp)
+  ) return undefined;
+  return {
+    text: value.text,
+    coveredMessageCount: Number(value.coveredMessageCount),
+    updatedAt: new Date(timestamp).toISOString(),
+  };
+}
+
 function normalizeImportedSession(value: unknown, index: number): ChatSessionItem {
   const session = isRecord(value) ? value : {};
   const messages = Array.isArray(session.messages) && session.messages.length > 0
@@ -249,6 +273,7 @@ function normalizeImportedSession(value: unknown, index: number): ChatSessionIte
     parentSessionId: typeof session.parentSessionId === 'string' ? session.parentSessionId : undefined,
     branchFromMessageId: typeof session.branchFromMessageId === 'string' ? session.branchFromMessageId : undefined,
     archived: Boolean(session.archived),
+    agentSummary: normalizeAgentSummary(session.agentSummary),
   };
 }
 

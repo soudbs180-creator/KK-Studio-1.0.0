@@ -99,6 +99,10 @@ import {
     type SessionImportPreview,
 } from './chat-sidebar/session/chatSessionData';
 import { useChatSessionState } from './chat-sidebar/session/useChatSessionState';
+import {
+    createChatContextCompression,
+    prepareChatContextCompression,
+} from './chat-sidebar/session/chatContextCompression';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -485,6 +489,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         sessionSearch,
         sessionTreeRows,
         sessions,
+        commitContextCompression,
         setActiveSessionId,
         setExpandedNodes,
         setSessionSearch,
@@ -529,45 +534,31 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         registerActivity();
 
         try {
-            let boundaryIndex = -1;
-            for (let i = messages.length - 1; i >= 0; i--) {
-                if (messages[i].content.includes('上下文压缩分界线')) {
-                    boundaryIndex = i;
-                }
-            }
-            const filteredMsgs = boundaryIndex !== -1 ? messages.slice(boundaryIndex) : messages;
-
-            const history = filteredMsgs
-                .filter(m => m.id !== 'welcome')
-                .map(m => ({ role: m.role, content: m.content }));
-
+            const compressionSessionId = activeSessionId;
+            const prepared = prepareChatContextCompression(messages as Message[]);
             const promptText = "请为我们之前的对话内容进行一次高度精炼的摘要总结，提炼出核心的事实、当前的任务状态和关键决策。要求言简意赅，不要有任何客套话。";
-            
             const responseText = await chatWithLlm({
                 modelId: selectedModel.id,
                 messages: [
-                    ...history,
+                    ...prepared.history,
                     { role: 'user', content: promptText }
                 ],
                 preferredKeyId: resolveAssistantPreferredKeyId(),
             });
 
             if (!responseText) throw new Error("大模型未能返回摘要内容");
-
-            const summaryContent = `--- 📌 上下文压缩分界线 (已归档历史) ---\n以下是此前对话内容的摘要总结：\n\n${responseText}\n\n此前的历史已被压缩归档，后续对话将基于此摘要进行。`;
-            const boundaryMessage: Message = {
-                id: `boundary_${Date.now()}`,
-                role: 'assistant',
-                content: summaryContent,
+            const compression = createChatContextCompression({
+                summaryText: responseText,
+                coveredMessageCount: prepared.coveredMessageCount,
+                modelId: selectedModel.id,
                 timestamp: Date.now(),
-                modelId: selectedModel.id
-            };
-
-            setMessages(prev => [...prev, boundaryMessage]);
+            });
+            if (!compression) throw new Error("摘要证据不符合 Session 约束");
+            commitContextCompression(compressionSessionId, compression);
             notify.success("上下文压缩成功！", "已通过大模型摘要进行上下文压缩并归档。");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Context compression failed:", error);
-            notify.error("上下文压缩失败", error.message || "未知错误");
+            notify.error("上下文压缩失败", error instanceof Error ? error.message : "未知错误");
         } finally {
             setIsCompressing(false);
         }
@@ -2015,6 +2006,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             return {
                 ...session,
                 messages: [welcomeMsg],
+                agentSummary: undefined,
                 updatedAt: Date.now()
             };
         }));

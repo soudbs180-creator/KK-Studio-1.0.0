@@ -5,6 +5,8 @@ import {
   buildAgentSessionProjection,
   type ChatSessionProjectionEvidence,
 } from '../../apps/web/src/components/layout/chat-sidebar/session/chatAgentSessionProjection.ts';
+import { buildChatAgentContextPlan } from '../../apps/web/src/components/layout/chat-sidebar/session/chatAgentContextBudget.ts';
+import { createChatContextCompression } from '../../apps/web/src/components/layout/chat-sidebar/session/chatContextCompression.ts';
 import type {
   ChatSessionItem,
   Message,
@@ -54,6 +56,34 @@ test('Chat projection requires explicit summary and token evidence before creati
   assert.equal(result.data.messages[0].createdAt, '2026-07-22T08:00:00.000Z');
   assert.deepEqual(result.data.summary, createEvidence().summary);
   assert.deepEqual(result.data.tokenBudget, createEvidence().tokenBudget);
+});
+
+test('canonical compression and budget outputs satisfy the strict Session projection gate', () => {
+  const compression = createChatContextCompression({
+    summaryText: 'Structured summary',
+    coveredMessageCount: 1,
+    modelId: 'model-1',
+    timestamp,
+  });
+  assert.ok(compression);
+  const plan = buildChatAgentContextPlan({
+    maxTokens: 100_000,
+    systemRules: 'Follow the verified plan.',
+    summary: compression.summary,
+    messages: [userMessage()],
+  });
+  assert.equal(plan.ok, true);
+  if (!plan.ok) return;
+
+  const result = buildAgentSessionProjection(createSession([userMessage()]), createEvidence({
+    summary: compression.summary,
+    tokenBudget: plan.data.tokenBudget,
+  }));
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.data.summary, compression.summary);
+  assert.deepEqual(result.data.tokenBudget, plan.data.tokenBudget);
 });
 
 test('Chat projection never infers an Asset id from attachment data, URLs, or local ids', () => {

@@ -169,7 +169,7 @@ interface AgentRunEventDto {
 
 **关键规则**：
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
-- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。canonical Asset 协调器复用现有 owner-scoped `/api/v1/assets` typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内 data URL；document 必须有显式敏感性批准，响应必须通过 Asset Zod schema 且 owner 在异步期间不变。协调器和映射尚未接入 Session 写请求或主动传入 binding，因此运行时仍不能宣称 Chat 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
+- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。canonical Asset 协调器复用现有 owner-scoped `/api/v1/assets` typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内 data URL；document 必须有显式敏感性批准，响应必须通过 Asset Zod schema 且 owner 在异步期间不变。Chat 压缩现会把 canonical rolling summary 作为 `agentSummary` 独立持久化，原分界消息仅保留 UI/旧格式兼容；压缩完成时按源 Session ID 原子提交，切换会话和重复回调不会污染其他 Session 或重复边界。Provider-independent `TokenBudget` 分配器也已产生可通过 strict Session mapper 的预算证据。Asset 协调器、预算计划和映射尚未组合成 Session 写请求或主动传入 binding，因此运行时仍不能宣称 Chat 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
 - migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
 - 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），metadata event 仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，但该机制仍是只读投影恢复，不是语义事件 replay，也不向远端计划授予执行权；Chat Session 安全写投影、绑定激活和真实跨设备 E2E 完成前，不能宣称服务端已接管完整 Run 恢复。
@@ -332,6 +332,10 @@ System rules (固定预算)
 
 - 裁剪按时间倒序，优先保留最近 2 轮对话和未确认工具结果。
 - 画布快照只保留摘要（节点数量、选中、视口），不嵌入完整 Base64 图片。
+- `maxTokens` 必须为 `1..2,000,000` 的整数。`reservedTokens = max(1, floor(maxTokens * 5%))`，`inputCapacity = maxTokens - reservedTokens`；输入先为系统规则分配 `min(4096, max(1, floor(inputCapacity * 5%)))`，再按 `20:30:20:15:10` 分配摘要、消息、工具结果、画布和知识，整数余量归最近消息，所有配额之和必须严格等于 `maxTokens`。
+- `usedTokens` 是上下文准入的保守预算证据，不是 Provider 计费量：文本以 UTF-8 bytes 作为 provider-independent upper bound，每条结构化消息/结果另计 4 个单位；类别之间不借用空闲配额。
+- system/summary 可按 Unicode code point 截断到本类配额；消息、工具、画布、知识条目保持不可拆分。选择时按优先级后时间倒序准入，最终恢复时间正序；最近两个 user-led round 与 `confirmed=false` 的工具结果优先。
+- 当前分配器和结构化摘要生产已通过 pure tests 与 strict Session mapper 互操作测试，但 `llmBrain.ts` / `localBrain.ts` 尚未消费该计划，工具结果回填和多轮指代仍是后续任务。
 
 ### 5.2 Run 恢复
 

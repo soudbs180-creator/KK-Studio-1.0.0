@@ -15,8 +15,8 @@
     },
     {
       "path": "apps/web/src/components/layout/ChatSidebar.tsx",
-      "maxLines": 4040,
-      "maxExplicitAny": 21,
+      "maxLines": 4032,
+      "maxExplicitAny": 20,
       "maxConsoleLog": 0
     },
     {

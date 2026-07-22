@@ -105,6 +105,7 @@
 
 - [x] Phase 3 前置可维护性拆分（模型状态）：`ChatSidebar` 的模型目录构建、assistant capability 默认路由、Key 优先级、目录订阅与 selected-model owner 已迁入严格 controller；热点 baseline 从 4677 行/23 `any` 降至 4501 行/22 `any`，公开交互不变。
 - [x] Phase 3 前置可维护性拆分（会话状态）：会话持久化、活动消息双向同步、树投影、分支构造、导入解析与 smart merge 已迁入严格 session controller/data 模块；保持 storage key、导入导出格式和 Chat shell action 不变，热点 baseline 从 4501 行/22 `any` 降至 4040 行/21 `any`。
+- [x] Phase 3 上下文证据拆分：压缩结果以结构化 `agentSummary` 独立持久化，兼容分界消息不再承担权威语义；预算/压缩模块纳入 strict ratchet，`ChatSidebar` baseline 继续降至 4032 行/20 `any`。
 - [ ] 实现 `AgentSessionDto`、`AgentContextSnapshotDto`、`AgentRunEventDto` 表结构与 API。
   - [x] `AgentRunEventDto` metadata-only 基础已落地：migration 020 以事务 trigger 为每个 accepted Run snapshot 追加 sequence，owner-scoped 查询与 typed client 已提供；不保存 user message、plan 或 tool payload。
   - [x] `AgentSessionDto` 与 `AgentContextSnapshotDto` 权威数据面已落地：migration 021、strict schema、owner-scoped list/get/upsert、幂等 Snapshot append/latest 与 typed client 已提供；附件只接受 Asset 引用，Context 不保存输入原文或任意 payload。
@@ -112,10 +113,13 @@
   - [x] Run/Session 可选绑定底座已落地：migration 022 增加 owner 复合外键，Run 首次绑定后不可改绑或解除；旧客户端省略 `sessionId` 时行为不变。
   - [x] Chat-to-Agent Session 安全映射资格已落地：只有显式提供 canonical Asset 映射、结构化摘要、TokenBudget、owner 与创建时间证据时才生成 strict DTO；临时会话、URL 附件、未解析附件和跨 owner base 均 fail closed，且保留权威非 Chat 状态。
   - [x] canonical Chat Asset 解析协调器已落地：复用 owner-scoped Asset Library typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内的 data URL Asset；URL、MIME 不一致、超限内容、未经批准的 document、非法响应和 owner 切换均 fail closed。
+  - [x] Chat 结构化 rolling summary 已落地：canonical summary 与兼容 UI 分界消息分离，按源 Session ID 幂等提交并随既有 storage/import 格式 additive 持久化；会话切换期间的迟到压缩不会污染当前 Session。
   - [ ] Chat Session 安全写投影与语义事件 discriminated union 仍待实现；本地 Chat 尚未主动传入 `sessionId`。
 - [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
-- [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。
+- [x] 实现 Token 预算分配规则并写入 OpenSpec 可测契约：5% headroom、系统规则上限、`20:30:20:15:10` 类别权重、UTF-8 byte upper bound、每条 4 单位结构开销、类别硬配额和 deterministic trimming 均有专项测试；该值不是 Provider 计费 token。
 - [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
+  - [x] 上下文裁剪基础已实现：最近两个 user-led round 与未确认工具结果优先，条目不可拆分，准入后恢复时间正序。
+  - [ ] 将权威工具结果/画布摘要/知识引用接入 Planner，并完成多轮指代回归。
 - [ ] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名。
 - [x] Agent Run 单向服务端同步基础：owner-scoped local projection、pending sync marker、启动/online 重试与陈旧服务端快照协调已落地。
 - [ ] 将 `AgentRunStore` 升级为服务端读取/事件恢复权威源，新增 Session/Run list/get API；reload 时不再把 active Run 置 failed。
@@ -127,6 +131,7 @@
   - [x] Run 写入已支持可选 owner-enforced Session binding；服务端拒绝跨 owner、改绑和解除绑定，Web 仅保留默认不使用的 additive 参数，不改变现有 Chat 行为。
   - [x] Chat Session 写入前的纯映射门禁已实现，不从 attachment data/URL/local id 推断 Asset，也不以 UI token estimate 或普通 assistant message 冒充权威证据。
   - [x] Chat attachment 可通过现有 owner-scoped Asset Library API 转换为经运行时 schema 校验的 canonical Asset id；协调器尚未由 ChatSidebar 调用。
+  - [x] Chat compression 与 TokenBudget 生产器可直接通过 strict Session mapper；普通 assistant 分界消息和旧 UI token estimate 不作为证据。
   - [ ] Chat Session 安全写投影、语义事件 replay、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation 和未启用的 binding 参数不等同于可执行 Run replay。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。

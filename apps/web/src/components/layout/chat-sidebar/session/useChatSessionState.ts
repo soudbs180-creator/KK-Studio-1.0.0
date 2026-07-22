@@ -22,6 +22,10 @@ import {
   type Message,
   type SessionTreeRow,
 } from './chatSessionData';
+import {
+  applyChatContextCompression,
+  type ChatContextCompressionResult,
+} from './chatContextCompression';
 
 interface ChatSessionStateOptions {
   messages: Message[];
@@ -40,6 +44,7 @@ interface ChatSessionState {
   sessionTreeRows: SessionTreeRow[];
   sessions: ChatSessionItem[];
   setActiveSessionId: Dispatch<SetStateAction<string>>;
+  commitContextCompression: (sessionId: string, compression: ChatContextCompressionResult) => void;
   setExpandedNodes: Dispatch<SetStateAction<Record<string, boolean>>>;
   setSessionSearch: Dispatch<SetStateAction<string>>;
   setSessions: Dispatch<SetStateAction<ChatSessionItem[]>>;
@@ -168,6 +173,15 @@ export function useChatSessionState(options: ChatSessionStateOptions): ChatSessi
   const [sessionSearch, setSessionSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>(loadSessionTreeExpansion);
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+  const commitContextCompression = (sessionId: string, compression: ChatContextCompressionResult) => {
+    setSessions((currentSessions) => applyChatContextCompression(currentSessions, sessionId, compression));
+    if (activeSessionIdRef.current !== sessionId) return;
+    options.setMessages((currentMessages) => currentMessages.some((message) => (
+      message.id === compression.boundaryMessage.id
+    )) ? currentMessages : [...currentMessages, compression.boundaryMessage]);
+  };
   const sessionMap = useMemo(() => createSessionMap(sessions), [sessions]);
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) || null,
@@ -190,6 +204,7 @@ export function useChatSessionState(options: ChatSessionStateOptions): ChatSessi
   useSessionPersistence(sessions, expandedNodes);
   return {
     activeBranchTrail, activeSession, activeSessionId, expandedNodes, sessionSearch, sessionTreeRows,
-    sessions, setActiveSessionId, setExpandedNodes, setSessionSearch, setSessions, setShowArchived, showArchived,
+    sessions, commitContextCompression, setActiveSessionId, setExpandedNodes,
+    setSessionSearch, setSessions, setShowArchived, showArchived,
   };
 }
