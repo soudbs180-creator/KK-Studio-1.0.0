@@ -352,3 +352,86 @@ test('worker times out an expired job deadline without another provider call', a
   assert.equal(harness.state.errorCode, 'WORKER_JOB_TIMEOUT');
   assert.equal(providerCalls, 0);
 });
+
+test('worker reports lease_lost when a successful provider result cannot be committed', async () => {
+  const { createImageGenerationWorker } = await loadWorker();
+  const harness = createHarness();
+  const store = { ...harness.store, complete: async () => false };
+  const adapter = {
+    async submit() {
+      return { status: 'success', urls: ['https://assets.local/stale-worker.png'] };
+    },
+    async poll() {
+      return { status: 'pending' };
+    },
+    async cancel() {},
+  };
+  const worker = createImageGenerationWorker({
+    workerId: 'stale-completion-worker',
+    store,
+    resolveExecution: async () => ({ adapter, auth: {}, input: {} }),
+  });
+
+  assert.equal((await worker.runOnce()).status, 'lease_lost');
+  assert.equal(harness.state.itemStatus, 'pending');
+});
+
+test('worker reports lease_lost when a pending poll cannot release its lease', async () => {
+  const { createImageGenerationWorker } = await loadWorker();
+  const harness = createHarness({ providerTaskId: 'provider-task-stale-poll' });
+  const store = { ...harness.store, requeue: async () => false };
+  const adapter = {
+    async submit() {
+      throw new Error('submit must not run for a persisted provider task');
+    },
+    async poll() {
+      return { status: 'pending' };
+    },
+    async cancel() {},
+  };
+  const worker = createImageGenerationWorker({
+    workerId: 'stale-poll-worker',
+    store,
+    resolveExecution: async () => ({ adapter, auth: {}, input: {} }),
+  });
+
+  assert.equal((await worker.runOnce()).status, 'lease_lost');
+});
+
+test('worker reports lease_lost when an exhausted failure cannot be persisted', async () => {
+  const { createImageGenerationWorker } = await loadWorker();
+  const harness = createHarness();
+  const store = { ...harness.store, fail: async () => false };
+  const adapter = {
+    async submit() {
+      throw new Error('provider unavailable');
+    },
+    async poll() {
+      return { status: 'pending' };
+    },
+    async cancel() {},
+  };
+  const worker = createImageGenerationWorker({
+    maxAttempts: 1,
+    workerId: 'stale-failure-worker',
+    store,
+    resolveExecution: async () => ({ adapter, auth: {}, input: {} }),
+  });
+
+  assert.equal((await worker.runOnce()).status, 'lease_lost');
+});
+
+test('worker reports lease_lost when queued cancellation loses ownership', async () => {
+  const { createImageGenerationWorker } = await loadWorker();
+  const harness = createHarness({ cancelRequested: true });
+  const store = { ...harness.store, cancel: async () => false };
+  const worker = createImageGenerationWorker({
+    workerId: 'stale-cancel-worker',
+    store,
+    resolveExecution: async () => {
+      throw new Error('queued cancellation must not resolve provider credentials');
+    },
+  });
+
+  assert.equal((await worker.runOnce()).status, 'lease_lost');
+});

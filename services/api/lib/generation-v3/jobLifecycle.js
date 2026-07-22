@@ -198,8 +198,8 @@ async function completeItem(userId, itemId, assetUrl, { client }) {
   if (itemRes.rows.length === 0) return;
   const item = itemRes.rows[0];
 
-  // 已完成 item 永不重复提交或扣费
-  if (item.status === 'completed') {
+  // 终态 item 永不被迟到的 Provider 回调复活、重复扣费或改写。
+  if (['completed', 'failed', 'cancelled'].includes(item.status)) {
     return;
   }
 
@@ -243,8 +243,8 @@ async function failItem(userId, itemId, errorMessage, { client, errorCode }) {
   if (itemRes.rows.length === 0) return;
   const item = itemRes.rows[0];
 
-  // 防止重复退款/重复失败标记
-  if (item.status === 'failed' || item.status === 'cancelled') {
+  // 防止终态降级、重复退款或重复失败标记
+  if (['completed', 'failed', 'cancelled'].includes(item.status)) {
     return;
   }
 

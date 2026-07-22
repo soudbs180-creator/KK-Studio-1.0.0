@@ -613,3 +613,61 @@ test('failed item is idempotent and does not double-refund', async () => {
   const ledger = [...fakeDb.ledger.values()];
   assert.equal(ledger.filter((l) => l.type === 'refund').length, 1);
 });
+
+test('failed item cannot be resurrected and charged by a late completion', async () => {
+  seedStandardUser();
+
+  const quote = await quoteEngine.createQuote(TEST_USER, makeQuoteRequest({ count: 1 }));
+  const job = await jobLifecycle.createJobFromQuote(TEST_USER, { quoteId: quote.quoteId });
+  const item = job.items[0];
+  const client = await fakeDb.pool().connect();
+  try {
+    await client.query('BEGIN');
+    await jobLifecycle.failItem(TEST_USER, item.itemId, 'terminal failure', { client, errorCode: 'TERMINAL' });
+    await jobLifecycle.completeItem(
+      TEST_USER,
+      item.itemId,
+      'https://fake-provider.kkstudio.local/artifacts/late.png',
+      { client },
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+
+  const stored = fakeDb.items.get(item.itemId);
+  assert.equal(stored.status, 'failed');
+  assert.equal(stored.asset_id, undefined);
+  const ledger = [...fakeDb.ledger.values()];
+  assert.equal(ledger.filter((entry) => entry.type === 'charge').length, 0);
+  assert.equal(ledger.filter((entry) => entry.type === 'refund').length, 1);
+});
+
+test('completed item cannot be downgraded by a late provider failure', async () => {
+  seedStandardUser();
+
+  const quote = await quoteEngine.createQuote(TEST_USER, makeQuoteRequest({ count: 1 }));
+  const job = await jobLifecycle.createJobFromQuote(TEST_USER, { quoteId: quote.quoteId });
+  const item = job.items[0];
+  const client = await fakeDb.pool().connect();
+  try {
+    await client.query('BEGIN');
+    await jobLifecycle.completeItem(
+      TEST_USER,
+      item.itemId,
+      'https://fake-provider.kkstudio.local/artifacts/final.png',
+      { client },
+    );
+    await jobLifecycle.failItem(TEST_USER, item.itemId, 'late failure', { client, errorCode: 'LATE' });
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+
+  const stored = fakeDb.items.get(item.itemId);
+  assert.equal(stored.status, 'completed');
+  assert.equal(stored.error_code, undefined);
+  const ledger = [...fakeDb.ledger.values()];
+  assert.equal(ledger.filter((entry) => entry.type === 'charge').length, 1);
+  assert.equal(ledger.filter((entry) => entry.type === 'refund').length, 0);
+});

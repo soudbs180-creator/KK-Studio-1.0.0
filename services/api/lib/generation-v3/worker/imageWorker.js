@@ -26,6 +26,13 @@ function createLeaseLostError() {
   return error;
 }
 
+function storeMutationResult(claim, persisted, status) {
+  return {
+    status: persisted === false ? 'lease_lost' : status,
+    itemId: claim.itemId,
+  };
+}
+
 async function runWithHeartbeat(claim, operation, context) {
   let heartbeatError;
   const heartbeat = async () => {
@@ -60,35 +67,35 @@ async function cancelClaim(claim, execution, context) {
       context,
     );
   }
-  await context.store.cancel(claim);
-  return { status: 'cancelled', itemId: claim.itemId };
+  const persisted = await context.store.cancel(claim);
+  return storeMutationResult(claim, persisted, 'cancelled');
 }
 
 async function cancelQueuedClaim(claim, context) {
-  await context.store.cancel(claim);
-  return { status: 'cancelled', itemId: claim.itemId };
+  const persisted = await context.store.cancel(claim);
+  return storeMutationResult(claim, persisted, 'cancelled');
 }
 
 async function settleProviderResult(claim, result, context) {
   if (result.status === 'success' && result.urls?.[0]) {
-    await context.store.complete(claim, result.urls[0]);
-    return { status: 'completed', itemId: claim.itemId };
+    const persisted = await context.store.complete(claim, result.urls[0]);
+    return storeMutationResult(claim, persisted, 'completed');
   }
   if (result.status === 'failed') {
-    await context.store.fail(claim, {
+    const persisted = await context.store.fail(claim, {
       errorCode: 'PROVIDER_ERROR',
       errorMessage: result.errorMessage || 'Provider operation failed.',
     });
-    return { status: 'failed', itemId: claim.itemId };
+    return storeMutationResult(claim, persisted, 'failed');
   }
   if (result.status === 'cancelled') {
-    await context.store.cancel(claim);
-    return { status: 'cancelled', itemId: claim.itemId };
+    const persisted = await context.store.cancel(claim);
+    return storeMutationResult(claim, persisted, 'cancelled');
   }
-  await context.store.requeue(claim, {
+  const persisted = await context.store.requeue(claim, {
     delayMs: calculateRetryDelay(claim.attemptCount, context.pollIntervalMs, context.maxPollIntervalMs),
   });
-  return { status: 'pending', itemId: claim.itemId };
+  return storeMutationResult(claim, persisted, 'pending');
 }
 
 async function executeClaim(claim, execution, context) {
@@ -112,18 +119,21 @@ async function executeClaim(claim, execution, context) {
 async function handleClaimError(claim, error, context) {
   const errorCode = error?.code || 'WORKER_PROVIDER_ERROR';
   const errorMessage = error?.message || 'Durable image worker failed.';
+  if (errorCode === 'WORKER_LEASE_LOST') {
+    return { status: 'lease_lost', itemId: claim.itemId };
+  }
   const nextFailureCount = (claim.failureCount || 0) + 1;
   if (nextFailureCount >= context.maxAttempts || error?.retryable === false) {
     const terminalStatus = errorCode === 'WORKER_OPERATION_TIMEOUT' ? 'timed_out' : 'failed';
-    await context.store.fail(claim, { errorCode, errorMessage, terminalStatus });
-    return { status: terminalStatus, itemId: claim.itemId };
+    const persisted = await context.store.fail(claim, { errorCode, errorMessage, terminalStatus });
+    return storeMutationResult(claim, persisted, terminalStatus);
   }
-  await context.store.requeue(claim, {
+  const persisted = await context.store.requeue(claim, {
     delayMs: calculateRetryDelay(claim.attemptCount, context.pollIntervalMs, context.maxPollIntervalMs),
     errorCode,
     errorMessage,
   });
-  return { status: 'retrying', itemId: claim.itemId };
+  return storeMutationResult(claim, persisted, 'retrying');
 }
 
 function isClaimTimedOut(claim, context) {
@@ -132,12 +142,12 @@ function isClaimTimedOut(claim, context) {
 }
 
 async function timeoutClaim(claim, context) {
-  await context.store.fail(claim, {
+  const persisted = await context.store.fail(claim, {
     errorCode: 'WORKER_JOB_TIMEOUT',
     errorMessage: 'Image generation exceeded the durable job deadline.',
     terminalStatus: 'timed_out',
   });
-  return { status: 'timed_out', itemId: claim.itemId };
+  return storeMutationResult(claim, persisted, 'timed_out');
 }
 
 function buildContext(options) {
