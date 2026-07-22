@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 2a local recovery discovery landed / external rollout gates pending
+> Status: active / Phase 2a local recovery and Google migration bridge landed / external rollout gates pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-22
@@ -17,7 +17,7 @@ KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地�
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
-- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；旧 `ApiSettings`/profile 凭据栈仍平行读写，当前没有 dual-read adapter，需先完成迁移/桥接、切流和观测窗口再删除旧栈。
+- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；Web 已能把旧设置中的 Google 名称/endpoint 安全投影为迁移候选，并要求用户显式重输 secret 后通过现有 create/verify API 建立新 Connection。旧 `ApiSettings`/profile 凭据栈仍平行读写，服务端权威 dual-read、全 Provider 切流和观测窗口尚未完成，不能删除旧栈。
 - `local-runner` 仍是 Browser/OpenCLI 原型：当前独立 typecheck/build 已通过并纳入 `verify:changes`，但固定 fallback token、token 日志、请求体无明确上限与显式 `any` 等安全债仍在，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。
@@ -53,7 +53,7 @@ BYOK、云端用户 Key、平台积分、用户网页会员必须是四条互斥
 以固定节点类型（`Actor | Provider | ProviderConnection | Model | Capability | Asset | Workflow | Step | Trigger | Runtime | Job | Run | ToolCall | Verification | Audit`）和版本化边构建用户可理解、Agent 可查询的能力图；`GET /api/v1/capability-graph/snapshot` 与只读 safe tool `capabilities.listAvailable` 对外暴露；UI 能直接解释每个能力的 Connection、Channel、隐私与成本。
 
 2.8 **Provider Connection 领域模型**
-`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测。目标迁移链要求先建立旧 profile 到 `provider_connections` 的安全桥接/dual-read，再切换新写入并经过观测窗口；这条迁移链当前尚未实现。
+`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测。目标迁移链要求先建立旧 profile 到 `provider_connections` 的安全桥接/dual-read，再切换新写入并经过观测窗口；当前只完成 Web 端 Google 安全元数据投影和显式 secret 重输，服务端权威 dual-read、全 Provider 切流与观测窗口仍未实现。
 
 2.9 **三 Runtime 架构**
 Browser/Vercel 只做交互与状态投影；VPS Express 是身份、Connection、能力图、Quote、Job、账务、Worker、Asset 元数据、Audit、feature flag 与恢复的控制面；Local Media/Automation Runtime 只执行已声明能力的本地媒体任务与 Browser Bridge，使用短期配对凭据、opaque asset handle 和受控根目录，不接收任意路径或 Shell。三端以版本化 DTO、幂等 id、签名事件和 capability manifest 通信；任何 runtime 重启后由 VPS Job/Run 状态恢复。
@@ -125,7 +125,7 @@ Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、
 - 新创建任务（无论生图/视频/音频/PPT/网页自动化）统一使用 v3 Job 契约和 Quote 流程。
 - 前端旧代码中引用 v2 字段的内部调用可保留一个完整迭代，但新代码必须引用 v3。
 - 服务端 Feature Flag 默认关闭新 Worker 流程，按管理员/受邀测试/全量三阶段灰度开启。
-- Provider 配置先新增旧 profile 到新 `provider_connections` 的安全迁移/dual-read adapter，再切换新写入；旧 payload 只有在兼容测试、两个稳定版本与观测窗口通过后才停止读取。当前旧栈仍平行读写，不能提前视为迁移完成。
+- Provider 配置先新增旧 profile 到新 `provider_connections` 的安全迁移/dual-read adapter，再切换新写入；旧 payload 只有在兼容测试、两个稳定版本与观测窗口通过后才停止读取。当前 Web 仅对 Google 提供不读取旧 secret 的显式迁移桥，旧栈仍平行读写，不能提前视为迁移完成。
 - 既有 Quote/Job v3 API 保持兼容；Capability Graph 只新增只读 API 与 safe tool，不改变现有路由语义。
 - `GET /api/v1/generation/jobs` 作为 v3 owner-scoped pending Job collection discovery additive 接口；旧 `/api/v1/generation-jobs` v2 列表保持原路径、DTO 与语义。
 

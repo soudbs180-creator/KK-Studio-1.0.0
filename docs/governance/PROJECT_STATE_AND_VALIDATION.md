@@ -35,7 +35,7 @@ Docs governance: 227 Markdown / 19 current (docs/governance/DOCUMENTATION_INDEX.
 | AI Takeover | `apps/web/src/features/ai-takeover/` | AI 接管体验入口。 |
 | AI Runtime | `apps/web/src/features/ai-assistant-runtime/` | ToolRegistry、CanvasRuntimeState、执行与知识同步。 |
 | Generation v3 | `services/api/lib/generation-v3/`、`services/api/routes/generation-v3.js` | Quote、Job、Billing、RouteEngine 与 Provider Adapter 当前控制面。 |
-| Capability Graph / Image Worker | `packages/shared/src/capability-graph/`、`packages/shared/src/generation-worker/`、`services/api/lib/capability-graph/`、`services/api/lib/generation-v3/worker/` | Capability Graph、Provider Connection、image-slice 数据面准入、server image Worker 与 owner-scoped pending Job discovery/hydration 的代码基础已落地；Worker 新任务 admission 与存量 drain/cancel 已解耦，真实 migration rehearsal、灰度和恢复 E2E 仍待完成。 |
+| Capability Graph / Image Worker | `packages/shared/src/capability-graph/`、`packages/shared/src/generation-worker/`、`services/api/lib/capability-graph/`、`services/api/lib/generation-v3/worker/` | Capability Graph、Provider Connection、Google 安全迁移桥、image-slice 数据面准入、server image Worker 与 owner-scoped pending Job discovery/hydration 的代码基础已落地；Worker 新任务 admission 与存量 drain/cancel 已解耦，服务端 dual-read、真实 migration rehearsal、灰度和恢复 E2E 仍待完成。 |
 | Active OpenSpec | `openspec/changes/upgrade-ai-creation-core/` | 唯一活动升级计划；Capability Graph、Worker、Run 恢复、本地媒体与 IA 均在此跟踪。 |
 | Local Runner | `local-runner/` | 当前仅为 Browser/OpenCLI experimental runtime；typecheck/build 当前通过，但安全 gate 未通过，仍不是生产媒体运行时。 |
 
@@ -107,7 +107,7 @@ npm run local-runner:build
 - Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 227 份 Markdown、19 份 current、0 conflict。
 - Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
 - Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。image slice 现同时保护管理面和实际数据面：Connection-backed Quote、同步 submit 与 durable enqueue 均在 resolver/credential/Provider/lease 副作用前按 server scope fail closed；无 `connectionId` 的 legacy 路径不变，已入队 Worker 在 flag 关闭后继续使用冻结路由 drain。
-- 新 Provider Connection 与旧 `ApiSettings`/profile 凭据栈仍是平行读写；当前没有把旧 payload 投影为新 Connection 的 dual-read adapter，不能把兼容迁移描述为已完成。
+- 新 Provider Connection 与旧 `ApiSettings`/profile 凭据栈仍是平行读写。Web Provider Connections 面板现可从内存中的旧 Google 设置读取非敏感名称/endpoint，投影并去重安全迁移候选；用户必须显式重输 secret，再调用现有 create/verify API。旧 secret 不读取、不复制、不传输；服务端权威 dual-read、全 Provider 切流与观测窗口仍未完成，不能把兼容迁移描述为已完成。
 - 服务端用户路由职责已收敛，共享请求上下文与热点文件可维护性递减门禁已建立。
 - `ChatSidebar` 的模型目录、assistant capability 默认选择、Key 优先级与订阅同步已迁入严格 model controller；会话持久化、活动消息同步、树投影、分支与导入算法已迁入严格 session controller/data 模块。热点 baseline 已从 4677 行/23 个显式 `any` 连续降至 4040 行/21 个，公开交互、storage key 和导入导出格式不变。
 - image Durable Worker 的 migration 019、租约领取、token/heartbeat、冻结路由提交、指数退避轮询、取消、超时、恢复和 Item 幂等代码已实现，并通过无浏览器参与、Worker 重建与过期租约的 characterization 测试；lease 丢失不再伪报终态或重试，迟到回调不能复活或降级终态 Item。
