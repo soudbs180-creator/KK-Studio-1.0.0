@@ -9,6 +9,10 @@ test("profile API key storage routes require authenticated user context and keep
     path.join(process.cwd(), "services/api/routes/user/shared/requestContext.js"),
     "utf8",
   );
+  const routeStoreSource = readFileSync(
+    path.join(process.cwd(), "services/api/lib/dispatcher/localUserRouteStore.js"),
+    "utf8",
+  );
 
   assert.match(source, /function requireProfileAuth/);
   assert.match(source, /require\('\.\/shared\/requestContext'\)/);
@@ -24,7 +28,11 @@ test("profile API key storage routes require authenticated user context and keep
   assert.match(source, /USER_API_SECRET_NOT_AVAILABLE/);
   assert.match(source, /const apiKey = getLocalRouteApiKeyForTransport\(route\);/);
   assert.match(source, /appendWuyinApiKeyToTargetUrl\(targetUrl, apiKey\)/);
-  assert.match(source, /profiles\[userId\]/);
-  assert.match(source, /delete data\.slots/);
+  assert.match(source, /readOwnerProfileState\(req\.profileUserId\)/);
+  assert.match(source, /writeOwnerProfileState\(req\.profileUserId, nextData\)/);
+  assert.doesNotMatch(source, /readLocalStorage\(\)/);
+  assert.match(routeStoreSource, /profiles: \{ \[ownerId\]: normalizedProfile \}/);
+  assert.match(routeStoreSource, /const data = await readLocalStorage\(ownerId\)/);
+  assert.match(routeStoreSource, /delete data\.slots/);
   assert.match(source, /router\.put\(\['\/v1\/profile\/user-apis', '\/v1\/profile\/user-apis\/payload'\]/);
 });

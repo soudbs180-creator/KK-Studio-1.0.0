@@ -39,7 +39,7 @@
     },
     {
       "path": "services/api/routes/user/profile.js",
-      "maxLines": 1876,
+      "maxLines": 1793,
       "maxExplicitAny": 0,
       "maxConsoleLog": 0
     },

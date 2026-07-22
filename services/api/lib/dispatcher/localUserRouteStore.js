@@ -443,6 +443,44 @@ function writeProfileState(data, userId, profileState) {
   delete data.entries;
 }
 
+function requireOwnerId(userId) {
+  const ownerId = safeString(userId);
+  if (!ownerId) {
+    throw new Error('A non-empty owner ID is required for user Provider credential storage.');
+  }
+  return ownerId;
+}
+
+async function readOwnerProfileState(userId) {
+  const ownerId = requireOwnerId(userId);
+  const data = await readLocalStorage(ownerId);
+  const hadStoredProfile = isObjectRecord(data.profiles)
+    && isObjectRecord(data.profiles[ownerId]);
+  const profileState = readProfileState(data, ownerId);
+
+  if (!isDbEnabled() && !hadStoredProfile) {
+    await writeLocalStorage(data);
+  }
+  return profileState;
+}
+
+async function writeOwnerProfileState(userId, profileState) {
+  const ownerId = requireOwnerId(userId);
+  const normalizedProfile = normalizeProfileState(profileState);
+  if (isDbEnabled()) {
+    await writeLocalStorage({
+      version: 2,
+      profiles: { [ownerId]: normalizedProfile },
+    });
+    return normalizedProfile;
+  }
+
+  const data = await readLocalStorage(ownerId);
+  writeProfileState(data, ownerId, normalizedProfile);
+  await writeLocalStorage(data);
+  return normalizedProfile;
+}
+
 async function writeLocalStorage(data) {
   if (isDbEnabled()) {
     const pool = getPool();
@@ -573,5 +611,7 @@ module.exports = {
   buildProfileRouteIndex,
   readProfileState,
   writeProfileState,
+  readOwnerProfileState,
+  writeOwnerProfileState,
   invalidateRouteCache,
 };

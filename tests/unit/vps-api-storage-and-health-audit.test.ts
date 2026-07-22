@@ -277,4 +277,83 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     assert.equal(healthyBody.ok, true);
     assert.equal(healthyBody.status, 'healthy');
   });
+
+  test('hosted profile reads load legacy credentials for the authenticated owner', async () => {
+    process.env.DATABASE_URL = 'postgres://mock:mock@localhost:5432/mock_db';
+    delete process.env.KKAI_LOCAL_ONLY;
+
+    const ownerId = 'owner-db-read';
+    const { encrypt } = require('../../services/api/utils/crypto.js');
+    const { signJWT } = require('../../services/api/lib/jwt.js');
+    mockQueryResults['SELECT encrypted_secret FROM public.user_provider_credentials WHERE user_id = $1'] = {
+      rows: [{
+        encrypted_secret: encrypt(JSON.stringify({
+          id: 'owner-entry',
+          name: 'Owner credential',
+          provider: 'openai',
+          key: 'sk-owner-only',
+          _group: 'entries',
+        })),
+      }],
+    };
+    dbQueries = [];
+
+    const response = await nativeFetch(`${baseUrl}/api/v1/profile/user-apis`, {
+      headers: { Authorization: `Bearer ${signJWT({ userId: ownerId })}` },
+    });
+    const body = await response.json() as {
+      success: boolean;
+      data: { entries: Array<{ id: string }> };
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(body.success, true);
+    assert.deepEqual(body.data.entries.map((entry) => entry.id), ['owner-entry']);
+    const credentialReads = dbQueries.filter(({ sql }) => (
+      sql.includes('SELECT encrypted_secret FROM public.user_provider_credentials')
+    ));
+    assert.deepEqual(credentialReads.map(({ params }) => params), [[ownerId]]);
+  });
+
+  test('hosted profile writes replace credentials for only the authenticated owner', async () => {
+    process.env.DATABASE_URL = 'postgres://mock:mock@localhost:5432/mock_db';
+    delete process.env.KKAI_LOCAL_ONLY;
+
+    const store = require('../../services/api/lib/dispatcher/localUserRouteStore.js');
+    const { encrypt } = require('../../services/api/utils/crypto.js');
+    const { signJWT } = require('../../services/api/lib/jwt.js');
+    mockQueryResults['SELECT encrypted_secret FROM public.user_provider_credentials WHERE user_id = $1'] = {
+      rows: [{
+        encrypted_secret: encrypt(JSON.stringify({
+          id: 'stale-entry',
+          name: 'Other owner credential',
+          provider: 'openai',
+          key: 'sk-other-owner',
+          _group: 'entries',
+        })),
+      }],
+    };
+    await store.readLocalStorage('owner-stale-cache');
+
+    const ownerId = 'owner-db-write';
+    mockQueryResults['SELECT encrypted_secret FROM public.user_provider_credentials WHERE user_id = $1'] = {
+      rows: [],
+    };
+    dbQueries = [];
+
+    const response = await nativeFetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${signJWT({ userId: ownerId })}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ version: 2, slots: [], providers: [], entries: [] }),
+    });
+
+    assert.equal(response.status, 200);
+    const replacedOwners = dbQueries
+      .filter(({ sql }) => sql.includes('DELETE FROM public.user_provider_credentials'))
+      .map(({ params }) => params[0]);
+    assert.deepEqual(replacedOwners, [ownerId]);
+  });
 });

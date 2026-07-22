@@ -10,10 +10,8 @@ const express = require('express');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { probeProvider } = require('../lib/dispatcher/providerProbe');
 const {
-  readLocalStorage,
-  writeLocalStorage,
-  readProfileState,
-  writeProfileState,
+  readOwnerProfileState,
+  writeOwnerProfileState,
 } = require('../lib/dispatcher/localUserRouteStore');
 
 const router = express.Router();
@@ -237,9 +235,7 @@ function readPayloadFromRequest(req) {
 }
 
 async function saveEnrichedProfile(req, profileState) {
-  const data = await readLocalStorage(req.profileUserId);
-  writeProfileState(data, req.profileUserId, profileState);
-  await writeLocalStorage(data);
+  await writeOwnerProfileState(req.profileUserId, profileState);
 }
 
 router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], requireProfileAuth, async (req, res) => {
@@ -255,31 +251,27 @@ router.put('/v1/profile/user-apis/payload', requireProfileAuth, async (req, res)
 });
 
 router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = await readLocalStorage(req.profileUserId);
-  const profileState = readProfileState(data, req.profileUserId);
+  const profileState = await readOwnerProfileState(req.profileUserId);
   const nextData = {
     ...profileState,
     entries: req.body.entries || [],
   };
 
   const enriched = await enrichProfileState(nextData);
-  writeProfileState(data, req.profileUserId, enriched);
-  await writeLocalStorage(data);
+  await writeOwnerProfileState(req.profileUserId, enriched);
 
   return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });
 
 router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = await readLocalStorage(req.profileUserId);
-  const profileState = readProfileState(data, req.profileUserId);
+  const profileState = await readOwnerProfileState(req.profileUserId);
   const nextData = {
     ...profileState,
     entries: req.body.entries || [],
   };
 
   const enriched = await enrichProfileState(nextData);
-  writeProfileState(data, req.profileUserId, enriched);
-  await writeLocalStorage(data);
+  await writeOwnerProfileState(req.profileUserId, enriched);
 
   return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });
