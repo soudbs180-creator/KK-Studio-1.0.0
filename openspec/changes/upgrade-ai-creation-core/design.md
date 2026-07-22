@@ -169,7 +169,7 @@ interface AgentRunEventDto {
 
 **关键规则**：
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
-- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，但不会把服务端消息合并进本地 Chat，也尚未安全写入 Session 或主动传入绑定，因此运行时仍不能宣称 Chat 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
+- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。该映射尚未接入写请求或主动传入 binding，因此运行时仍不能宣称 Chat 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
 - migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
 - 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），metadata event 仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，但该机制仍是只读投影恢复，不是语义事件 replay，也不向远端计划授予执行权；Chat Session 安全写投影、绑定激活和真实跨设备 E2E 完成前，不能宣称服务端已接管完整 Run 恢复。
