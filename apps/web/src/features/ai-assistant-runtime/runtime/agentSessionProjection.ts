@@ -59,6 +59,30 @@ const cloneSession = (session: AgentSessionDto): AgentSessionDto => (
   JSON.parse(JSON.stringify(session)) as AgentSessionDto
 );
 
+function toListItem(session: AgentSessionDto): AgentSessionListItemDto {
+  return {
+    sessionId: session.sessionId,
+    ownerId: session.ownerId,
+    collaborationMode: session.collaborationMode,
+    messageCount: session.messages.length,
+    lastHeartbeatAt: session.lastHeartbeatAt,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  };
+}
+
+function mergeListItem(
+  sessions: AgentSessionListItemDto[],
+  session: AgentSessionDto,
+): AgentSessionListItemDto[] {
+  return [
+    toListItem(session),
+    ...sessions.filter((candidate) => candidate.sessionId !== session.sessionId),
+  ].sort((left, right) => (
+    right.updatedAt.localeCompare(left.updatedAt) || right.sessionId.localeCompare(left.sessionId)
+  )).slice(0, 50);
+}
+
 /** Holds server-owned Session projections without mutating the local Chat session model. */
 export class AgentSessionProjectionStore {
   private sessions: AgentSessionListItemDto[] = [];
@@ -105,6 +129,7 @@ export class AgentSessionProjectionStore {
     const normalizedOwnerId = normalizeOwnerId(ownerId);
     if (normalizedOwnerId !== this.activeOwnerId || session.ownerId !== normalizedOwnerId) return false;
     this.sessionDetails.set(session.sessionId, cloneSession(session));
+    this.sessions = mergeListItem(this.sessions, session);
     return true;
   }
 }
