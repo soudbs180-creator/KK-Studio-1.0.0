@@ -9,6 +9,7 @@ const { createQuote, getActiveQuote, getQuote, consumeQuote } = require('./quote
 const { createJobFromQuote, submitJob } = require('./jobLifecycle');
 const { getJob } = require('./jobStore');
 const { selectRoute, buildRouteSnapshot } = require('./routeEngine');
+const { enqueueImageJob, requestJobCancellation } = require('./worker/workerStore');
 
 module.exports = {
   registry,
@@ -18,6 +19,8 @@ module.exports = {
   consumeQuote,
   createJobFromQuote,
   submitJob,
+  enqueueImageJob,
+  requestJobCancellation,
   getJob,
   selectRoute,
   buildRouteSnapshot,

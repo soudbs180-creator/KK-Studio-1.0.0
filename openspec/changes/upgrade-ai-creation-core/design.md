@@ -1,6 +1,6 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
+> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
 > Companion: proposal.md, tasks.md
 > Last verified: 2026-07-22
 
@@ -288,16 +288,17 @@ reserved ──► submitted ──► running ──► completed
 
 1. **reserved**：Job 创建后按 Quote 预扣/冻结额度。
 2. **submitted**：Worker 拿到租约，向 Provider 提交任务。
-3. **running**：Provider 返回任务 ID，Worker 按指数退避轮询。
+3. **running**：Provider 返回任务 ID，Worker 按有上限的指数退避轮询。
 4. **completed / failed**：Worker 写入结果/错误，触发结算或退款。
-5. **paused**：用户或策略暂停，保留租约但不提交/轮询。
+5. **paused**：用户或策略暂停；已落库的 Item lease row 保留，但不再领取新租约或发起下一轮 poll。
 6. **cancelled**：用户取消，未结算的预扣全部释放。
-7. **timeout**：Worker 租约过期，任务重新进入可领取状态（最多 3 次）。
+7. **timeout**：短租约过期后 Item 重新进入可领取状态；Provider 错误重试受次数限制，整个 Item 还受 enqueue-to-deadline 总时限约束。内部 lease 使用 `timed_out`，公开 DTO 仍以 Item/Job `failed` 表达，不增加 HTTP 状态枚举。
 
 **Worker 安全规则**：
-- 一个 Job 同一时刻只有一个 Worker 持有租约。
-- 租约每 30 秒续约，60 秒未续约则视为失效。
-- 已完成 Item 的 providerTaskId 写入不可变记录，防止重复提交。
+- 一个 Item 同一时刻只有一个 Worker 持有 token 绑定的短租约；同一 Job 的不同 Item 可安全并行。
+- 默认 lease 为 30 秒、heartbeat 为 10 秒，均可由 server env 调整；token 不匹配的陈旧 Worker 无权写入 Item 或结算。
+- submit 使用稳定的 `jobId:itemId` requestId；`providerTaskId` 只在空值时写入。已完成 Item 不再领取，恢复 Worker 对已有 task 只 poll、不重复 submit。
+- migration 019 只新增 `generation_image_worker_leases`，不修改或删除 migration 018 Capability Graph 数据；server flag 使用 `off → internal → invited → full` scope，默认 `off`，回滚只关闭执行切流。
 - 失败退款必须生成对账记录，失败 Job 可重试但须重新 Quote（价格不变时复用原 quoteId）。
 
 ---

@@ -17,6 +17,9 @@ export * from "./generation/providerCatalog.ts";
 // 中文注释：AI 创作核心升级 Phase 1（路由/报价/计费）DTO 与契约
 export * from "./generation-v3/index.ts";
 
+// Phase 2 Durable Worker internal contracts; HTTP generation DTOs remain unchanged.
+export * from "./generation-worker/index.ts";
+
 // 中文注释：Phase 2a Capability Graph 与 Provider Connection 公共契约
 export * from "./capability-graph/index.ts";
 

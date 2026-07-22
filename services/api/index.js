@@ -326,11 +326,15 @@ function startServer(port = Number(process.env.PORT || DEFAULT_PORT), options = 
   assertRequiredEnv(options);
   ensureUploadsDirectoryWritable();
   const { startReconciliationDaemon } = require('./lib/dispatcher/reconciliation');
+  const { startImageWorkerLoop } = require('./lib/generation-v3/worker/workerLoop');
   startReconciliationDaemon();
+  const imageWorkerLoop = startImageWorkerLoop();
   const runtimeApp = options.app || app;
-  return runtimeApp.listen(port, '0.0.0.0', () => {
+  const server = runtimeApp.listen(port, '0.0.0.0', () => {
     console.log(`[server] 后端主服务已启动，正在运行在端口 :${port}`);
   });
+  server.once('close', () => imageWorkerLoop?.stop());
+  return server;
 }
 
 if (require.main === module) {

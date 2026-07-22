@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
+> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-22
@@ -11,14 +11,14 @@
 
 KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地，Phase 0/1 已交付统一报价（Quote）、GenerationJobDto v3、统一 Provider Adapter 与冻结通道，但 AI 创作核心的关键闭环仍未完成：
 
-- 服务端是请求代理与计费网关，却不是生成任务的**权威控制面**；关闭浏览器后异步任务（视频/音频/批量）无人继续推进。
-- 报价、路由、队列、对账的统一事实源刚在同步图像链路建立，**尚未覆盖异步视频/音频与 Worker 执行**，浏览器侧队列仍是事实上的执行权威。
+- image Durable Worker 的代码基础已进入服务端权威控制面，但 migration 019 尚待受控数据库演练、flag 仍默认关闭，不能描述为已灰度上线；视频/音频/批量任务关闭浏览器后仍无人继续推进。
+- 报价、路由、租约、计费与图像 Provider Adapter 已形成 server-gated 纵向切片；**尚未覆盖异步视频/音频、SSE/跨设备恢复与真实灰度观测**，浏览器侧队列仍承担未切流能力的执行权威。
 - Agent 运行时仅有当前指令和画布上下文，没有跨轮对话历史、摘要和工具结果回填， reload 后 running Run 被直接标记为失败。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
 - Provider Connection 规范化存储、verify 与凭据脱敏已经落地；用户 API 仍保留旧 profile payload 的兼容读取，需在完成切流和观测窗口后删除。
-- `local-runner` 仍是 Browser/OpenCLI 原型：固定 fallback token、token 日志、请求体无明确上限、隐式 `any`，独立 typecheck 未通过，不得进入生产链。
+- `local-runner` 仍是 Browser/OpenCLI 原型：当前独立 typecheck/build 已通过并纳入 `verify:changes`，但固定 fallback token、token 日志、请求体无明确上限与显式 `any` 等安全债仍在，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。
 

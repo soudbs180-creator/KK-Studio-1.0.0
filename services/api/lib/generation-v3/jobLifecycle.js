@@ -269,6 +269,34 @@ async function failItem(userId, itemId, errorMessage, { client, errorCode }) {
   }
 }
 
+async function cancelItem(userId, itemId, { client }) {
+  const itemRes = await client.query(
+    `SELECT ji.*, j.channel, jq.media_type,
+            (SELECT amount FROM public.ledger_entries WHERE ledger_id = ji.reservation_id AND type = 'reserve') AS reserved_amount
+       FROM public.generation_job_items ji
+       JOIN public.generation_jobs j ON j.job_id = ji.job_id
+       LEFT JOIN public.generation_quotes jq ON jq.quote_id = j.quote_id
+      WHERE ji.item_id = $1 AND j.user_id = $2`,
+    [itemId, userId]
+  );
+  if (itemRes.rows.length === 0) return;
+  const item = itemRes.rows[0];
+  if (['completed', 'failed', 'cancelled'].includes(item.status)) return;
+
+  await updateItemStatus({ itemId, status: 'cancelled', client });
+  if (item.channel === 'platform-credits' && item.reservation_id && item.reserved_amount > 0) {
+    await refundItem({
+      userId,
+      ledgerId: item.reservation_id,
+      amount: Number(item.reserved_amount),
+      itemId,
+      mediaType: item.media_type || 'image',
+      reason: 'item-cancelled-refund',
+      client,
+    });
+  }
+}
+
 async function recalcJobStatus(jobId, { client }) {
   const itemsRes = await client.query(
     `SELECT status FROM public.generation_job_items WHERE job_id = $1`,
@@ -302,5 +330,6 @@ module.exports = {
   resolveFrozenProviderRoute,
   completeItem,
   failItem,
+  cancelItem,
   recalcJobStatus,
 };

@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2a Capability Graph foundation landed / image Worker pending
+> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
 > Last updated: 2026-07-22
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection foundation completed; server durable Worker, rollout and recovery E2E remain open.
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection and server image Worker code foundations completed; migration rehearsal, rollout and recovery E2E remain open.
 
 ---
 
@@ -47,7 +47,7 @@
 - [x] 修正文档计数漂移：实际为 233 份 Markdown / 18 份 current（达成 15–25 目标），同步 proposal、能力矩阵与项目状态文档。
 - [x] 修正能力矩阵证据坐标：Browser Bridge 等条目改写为完整路径 + 行号，并按 Phase 1 交付事实刷新符合度与 upgrade/keep/archive 统计。
 - [x] 将 Capability Graph、Provider Connection、三 Runtime、Local Media、AI Workspace 控制链、新 IA 契约写入 `design.md` 第 9–15 节。
-- [x] 记录当前测试证据基线：Phase 1 verify 记录、Provider governance 38 tests、Canvas benchmark 3/3、10K smoke（伴随 quota 警告与 long task）、`local-runner` 独立 typecheck 未通过。
+- [x] 记录 Phase 1 当时的测试证据基线：Provider governance 38 tests、Canvas benchmark 3/3、10K smoke（伴随 quota 警告与 long task）；当时 `local-runner` typecheck 未通过，2026-07-22 当前复验已通过 typecheck/build，但安全门禁仍未完成。
 - [x] 在本文档建立 PR 验收模板（见文末），后续每个 PR 按模板填写。
 - [x] 同步 `docs/governance/PROJECT_STATE_AND_VALIDATION.md` 验证入口与治理状态。
 
@@ -64,10 +64,13 @@
 - [x] 首个纵向切片的代码基础：Google official image credentials / adapter、`FakeProviderAdapter` 测试路径与 server flag `capability_graph.image_provider_slice` 已落地。
 - [ ] 完成 `capability_graph.image_provider_slice` 的 internal → invited → full 灰度与关闭 flag 回退验证；在切流验收前不删除旧 connection 读取。
 - [x] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
-- [ ] 在 `services/api/` 新增 Worker 子系统：租约表、心跳续约、任务领取、提交、轮询、超时、取消。
-- [ ] 实现 Worker 与图像 Provider Adapter 对接，完成图片 Job 的云端执行。
-- [ ] 浏览器关闭后 Worker 继续执行，重新登录时通过 SSE 事件流恢复投影。
-- [ ] 验证已完成 Item 永不重复提交或换通道。
+- [x] 在 `services/api/` 新增 image Worker 子系统：migration 019 租约表、`FOR UPDATE SKIP LOCKED` 领取、token 防陈旧写、心跳续约、提交、指数退避轮询、取消、单次调用超时、Job 总时限与租约失效恢复。
+- [x] 实现 Worker 与冻结图像 Provider Adapter 对接；`GENERATION_IMAGE_DURABLE_WORKER_ENABLED=off` 默认保持原同步路径，并支持 `internal → invited → full` user allowlist scope，命中用户的 `POST .../submit` 才入服务端队列。
+- [x] Characterization 覆盖无浏览器参与的续跑、Worker 重建、过期租约接管、Provider cancel、总时限与完成 Item 幂等；专项测试位于 `tests/unit/generation-image-worker*.test.ts`。
+- [ ] 在受控 PostgreSQL 按 001→019 顺序演练 migration 019 的空库、存量库与重复执行，并验证 migration 018 数据原样保留。
+- [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
+- [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E；当前只有 server-side characterization，不声明该 E2E 已完成。
+- [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
 - [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 
 ### 2b — 视频/音频 Worker（第 2–3 周）

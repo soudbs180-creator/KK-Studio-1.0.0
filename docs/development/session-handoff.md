@@ -2605,3 +2605,21 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：TDD 合同测试初始 3/3 按预期失败；实现后 3/3 通过，覆盖热点增长、严格模块超长函数与 baseline 上调拒绝。当前 8 个热点全部处于精确 baseline，13 个严格模块通过零 `any` / 零 `console.log` / 50 行函数检查。完整 `architecture:check` 通过；测试语义检查覆盖 530 个测试文件；完整 unit 为 1909 pass / 0 fail / 2 skipped。
 - **未运行验证及原因**：本提交只新增治理脚本、配置和测试，没有改变产品运行时；integration、contract、e2e、生产构建未重复执行，沿用上一提交同一代码基线的绿色结果。系统仍无 `npm`/`npx`，验证通过 bundled Node 24 直接执行底层入口。
 - **风险与下一步**：低风险。AST 指标能阻止热点继续恶化，但不会自动判定职责设计是否合理，拆分仍需按阶段每次只移动一个职责。下一提交实现 server durable image Worker；所有新 Worker 与共享契约文件从第一行起受严格门禁约束。
+
+## 159. 2026-07-22 - 落地服务端图片 Durable Worker 基础
+
+- **修改范围**：在保持公开 HTTP 路径、DTO、状态码与响应 envelope 不变的前提下，新增 server-gated image Durable Worker。migration 019 以独立表保存 Item lease；Worker 通过 `FOR UPDATE SKIP LOCKED`、lease token、heartbeat、稳定 `jobId:itemId` requestId 与只写一次的 `providerTaskId` 完成领取、提交、指数退避轮询、取消、Provider 调用超时、Job 总时限和进程重建/租约失效恢复。`POST /api/v1/generation/jobs/:jobId/submit` 仅在 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 的 `internal/invited/full` scope 命中当前用户且 media type 为 image 时入队，默认 `off` 继续原同步路径；无 provider task 的 queued cancel 不解析 Provider 凭据。
+- **修改文件**：
+  - `infrastructure/database/migrations/019_generation_image_worker.sql`
+  - `packages/shared/src/generation-worker/index.ts`、`packages/shared/src/index.ts`
+  - `services/api/lib/generation-v3/worker/`
+  - `services/api/lib/generation-v3/jobLifecycle.js`、`services/api/lib/generation-v3/index.js`
+  - `services/api/routes/generation-v3.js`、`services/api/index.js`、`services/api/.env.local.example`
+  - `tests/unit/generation-image-worker.test.ts`、`tests/unit/generation-image-worker-contract.test.ts`
+  - `openspec/changes/upgrade-ai-creation-core/{proposal,design,tasks}.md`
+  - `docs/governance/PROJECT_STATE_AND_VALIDATION.md`、`docs/governance/SOURCE_CAPABILITY_MATRIX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：租约以 Item 而非 Job 为并发粒度；token 不匹配的陈旧 Worker 无写入或结算权。短租约默认 30 秒、heartbeat 默认 10 秒，轮询采用 1 秒起步、30 秒封顶的指数退避，Job 总时限默认 15 分钟，均可由 server env 调整。内部 lease 可进入 `timed_out`，公开 Item/Job 仍使用既有 `failed`，不扩张 HTTP 契约。migration 019 只做 additive 演进，不修改/删除 migration 018；flag 使用 `off → internal → invited → full` 且兼容 `false/true`，回滚到 `off` 不删除 lease 或 Capability Graph 数据。
+- **已运行验证**：TDD 先确认 Worker/migration/flag 缺失与固定轮询、queued cancel 凭据依赖、缺少用户灰度 scope、pending poll 误耗失败预算等用例失败，实现后 Worker 专项 13/13 通过，覆盖无浏览器参与续跑、Worker 重建、过期租约只 poll、heartbeat、Provider cancel、queued cancel、单次调用超时、Job 总时限、指数退避、独立 failure count、终态幂等和四阶段 server scope。最终完整 unit 1922 pass / 0 fail / 2 skipped，integration 14/14、contract 15/15、e2e 11/11。32 项 architecture、11 项 governance、根/架构/local-runner TypeScript、服务端语法、532 个测试文件语义检查全部通过；Shared/UI/API Client/Web/local-runner 五组构建通过；spec 结构、5 项 smoke、encoding/mojibake 与 Canvas benchmark 共 9 个验证入口通过。首次 unit 因子进程 PATH 缺少裸 `node` 出现 3 个环境失败，补入 bundled Node 后通过；最终全量复验另有 2 项既有 mock/路由并发测试瞬时失败，分别单独复现通过，随后完整 unit 原样重跑全绿，均未改无关代码规避。
+- **未运行验证及原因**：系统没有 `npm`/`npx`，因此未执行字面量 `npm run verify:changes`；已直接执行除依赖审计与 Swagger validation 外的对应底层入口。`swagger-cli` 不在本地依赖中，`npm audit` 也无法在无 npm client 的环境运行。未将 migration 019 应用于真实 PostgreSQL，未开启 internal flag，未调用真实付费 Provider，也未完成真实浏览器关闭/重新登录、SSE/跨设备恢复或生产观测；本次 smoke 按仓库脚本执行，不作为这些外部 E2E 的替代证据。
+- **风险与下一步**：中等风险但默认关闭。下一 gate 是按 001→019 在受控空库、存量库和重复执行场景演练 migration 019，确认 migration 018 数据保持不变；随后只对 internal 用户开启 Worker flag，验证关闭 flag 回退旧同步路径、进程重启/租约失效、重复 submit、扣费/退款和延迟指标。真实浏览器/SSE/跨设备 E2E 通过前不扩展到视频/音频 Worker，也不删除旧执行数据。

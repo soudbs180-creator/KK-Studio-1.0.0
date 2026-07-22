@@ -10,6 +10,10 @@ const { verifyJWT } = require('../lib/jwt');
 const generationV3 = require('../lib/generation-v3');
 const envelope = require('../lib/generation/generationResponseEnvelope');
 const { JobControlRequestSchema } = require('@kk/shared');
+const {
+  hasImageDurableWorkerRollout,
+  isImageDurableWorkerEnabled,
+} = require('../lib/generation-v3/worker/featureFlag');
 
 const router = express.Router();
 
@@ -73,7 +77,10 @@ router.post('/v1/generation/jobs', requireAuth, async (req, res) => {
 // POST /api/v1/generation/jobs/:jobId/submit
 router.post('/v1/generation/jobs/:jobId/submit', requireAuth, async (req, res) => {
   try {
-    const job = await generationV3.submitJob(req.userId, req.params.jobId);
+    const queuedJob = isImageDurableWorkerEnabled(req.userId)
+      ? await generationV3.enqueueImageJob(req.params.jobId, req.userId)
+      : null;
+    const job = queuedJob || await generationV3.submitJob(req.userId, req.params.jobId);
     return res.json(envelope.wrapSuccess(job, { jobId: job.jobId }));
   } catch (err) {
     console.error('[generation-v3/jobs/submit]', err);
@@ -129,6 +136,9 @@ router.post('/v1/generation/jobs/:jobId/control', requireAuth, async (req, res) 
       }
 
       await updateJobStatus({ jobId: request.jobId, status: newStatus, client });
+      if (request.action === 'cancel' && hasImageDurableWorkerRollout()) {
+        await generationV3.requestJobCancellation(request.jobId, req.userId, { client });
+      }
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
