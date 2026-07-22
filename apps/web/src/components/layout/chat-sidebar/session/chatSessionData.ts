@@ -27,6 +27,7 @@ export interface ChatSessionItem {
   id: string;
   title: string;
   messages: Message[];
+  createdAt?: number;
   updatedAt: number;
   customTitle?: boolean;
   parentSessionId?: string;
@@ -84,6 +85,48 @@ export function createWelcomeMessage(): Message {
   };
 }
 
+/** Creates one persistent local Session with an auditable creation timestamp. */
+export function createNewChatSession(timestamp = Date.now()): ChatSessionItem {
+  return {
+    id: `session_${timestamp}`,
+    title: '新对话',
+    messages: [createWelcomeMessage()],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+/** Creates a tab-scoped Session that remains ineligible for server promotion. */
+export function createTemporaryChatSession(
+  messages: Message[] = [createWelcomeMessage()],
+  timestamp = Date.now(),
+): ChatSessionItem {
+  return {
+    id: TEMP_SESSION_ID,
+    title: '临时对话',
+    messages,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    isTemp: true,
+  };
+}
+
+/** Copies local history into a distinct Session with a new creation identity. */
+export function duplicateChatSession(
+  session: ChatSessionItem,
+  timestamp = Date.now(),
+): ChatSessionItem {
+  return {
+    ...session,
+    id: `session_${timestamp}`,
+    title: `${session.title || '新对话'} 副本`,
+    customTitle: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    archived: false,
+  };
+}
+
 export function cleanGreeting(text: string): string {
   const cleaned = text.trim().replace(/^(你好[，！,!]?|在吗[？?]?|hello[,\s]?|hi[,\s]?|哈喽[，！,!]?)/i, '');
   return cleaned.trim() || text.trim();
@@ -115,6 +158,7 @@ export function createBranchSession(
     title: `分支 · ${getSessionTitle(branchMessages)}`,
     customTitle: true,
     messages: branchMessages,
+    createdAt: timestamp,
     updatedAt: timestamp,
     parentSessionId,
     branchFromMessageId: messages[messageIndex]?.id,
@@ -259,6 +303,10 @@ function normalizeAgentSummary(value: unknown): ChatAgentSummary | undefined {
   };
 }
 
+function normalizeTimestamp(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function normalizeImportedSession(value: unknown, index: number): ChatSessionItem {
   const session = isRecord(value) ? value : {};
   const messages = Array.isArray(session.messages) && session.messages.length > 0
@@ -268,6 +316,7 @@ function normalizeImportedSession(value: unknown, index: number): ChatSessionIte
     id: typeof session.id === 'string' && session.id ? session.id : `session_import_${Date.now()}_${index}`,
     title: typeof session.title === 'string' && session.title ? session.title : '导入会话',
     messages,
+    createdAt: normalizeTimestamp(session.createdAt),
     updatedAt: typeof session.updatedAt === 'number' ? session.updatedAt : Date.now(),
     customTitle: Boolean(session.customTitle),
     parentSessionId: typeof session.parentSessionId === 'string' ? session.parentSessionId : undefined,
@@ -307,15 +356,13 @@ export function loadInitialChatSessions(): ChatSessionItem[] {
     sessions = [];
   }
   if (sessions.length === 0) {
-    sessions = [{ id: `session_${Date.now()}`, title: '新对话', messages: [createWelcomeMessage()], updatedAt: Date.now() }];
+    sessions = [createNewChatSession()];
   }
   try {
     const temporaryRawValue = globalThis.sessionStorage?.getItem(TEMP_SESSION_STORAGE_KEY);
     if (temporaryRawValue) {
       const temporaryMessages = parseStoredArray<Message>(temporaryRawValue);
-      const temporarySession: ChatSessionItem = {
-        id: TEMP_SESSION_ID, title: '临时对话', messages: temporaryMessages, updatedAt: Date.now(), isTemp: true,
-      };
+      const temporarySession = createTemporaryChatSession(temporaryMessages);
       sessions = [temporarySession, ...sessions.filter((session) => session.id !== TEMP_SESSION_ID)];
     }
   } catch {

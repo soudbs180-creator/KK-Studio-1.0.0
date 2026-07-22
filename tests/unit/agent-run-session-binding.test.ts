@@ -120,3 +120,14 @@ test('Run routes delegate writes and preserve conflict-specific envelopes', () =
   assert.doesNotMatch(route, /stale: outcome\.outcome === 'stale'/);
   assert.match(mapping, /sessionId: row\.session_id/);
 });
+
+test('Chat takeover passes only the asynchronously resolved authoritative Session binding into a new Run', () => {
+  const sidebar = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const takeoverContext = readSource('apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx');
+
+  assert.match(sidebar, /resolveChatAgentRunSessionId\(\{[\s\S]*session: activeSession, collaborationMode, maxTokens/);
+  assert.match(sidebar, /sendTakeoverMessage\(userText, sessionBinding\)/);
+  assert.match(takeoverContext, /sessionBinding\?: Promise<string \| undefined>/);
+  assert.match(takeoverContext, /const sessionId = await sessionBinding\?\.catch\(\(\) => undefined\)/);
+  assert.match(takeoverContext, /agentRuntimeInstance\.run\(text, projectContext, selectedModel\?\.id, sessionId\)/);
+});

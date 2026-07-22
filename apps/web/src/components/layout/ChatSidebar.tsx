@@ -85,7 +85,10 @@ import {
     TEMP_SESSION_ID,
     TEMP_SESSION_STORAGE_KEY,
     createBranchSession,
+    createNewChatSession,
+    createTemporaryChatSession,
     createWelcomeMessage,
+    duplicateChatSession,
     ensureUniqueIds,
     formatSessionMeta,
     getSessionLabel,
@@ -103,6 +106,7 @@ import {
     createChatContextCompression,
     prepareChatContextCompression,
 } from './chat-sidebar/session/chatContextCompression';
+import { resolveChatAgentRunSessionId } from './chat-sidebar/session/chatAgentRunSessionBinding';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -359,8 +363,6 @@ interface NormalChatSidebarProps extends ChatSidebarProps {
 const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel } = props;
     const { user, isTempUser, loading: authLoading } = useAuth();
-
-
     // 简体中文：AI接管与本地资源池相关状态和 Hook 注入
     const {
         collaborationMode,
@@ -1735,7 +1737,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         if (collaborationMode !== 'direct') {
             setInput('');
             setAttachments([]);
-            await sendTakeoverMessage(userText);
+            const sessionBinding = resolveChatAgentRunSessionId({
+                session: activeSession, collaborationMode, maxTokens,
+            });
+            await sendTakeoverMessage(userText, sessionBinding);
             return;
         }
 
@@ -2014,13 +2019,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     const handleNewTempSession = useCallback(() => {
         sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
-        const tempSession: ChatSessionItem = {
-            id: TEMP_SESSION_ID,
-            title: '临时对话',
-            messages: [createWelcomeMessage()],
-            updatedAt: Date.now(),
-            isTemp: true
-        };
+        const tempSession = createTemporaryChatSession();
         setSessions(prev => [tempSession, ...prev.filter(s => s.id !== TEMP_SESSION_ID)]);
         setActiveSessionId(TEMP_SESSION_ID);
         setInput('');
@@ -2028,13 +2027,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     }, []);
 
     const handleNewSession = useCallback(() => {
-        const id = `session_${Date.now()}`;
-        const item: ChatSessionItem = {
-            id,
-            title: '新对话',
-            messages: [createWelcomeMessage()],
-            updatedAt: Date.now()
-        };
+        const item = createNewChatSession();
+        const id = item.id;
         setSessions(prev => [item, ...prev.filter(s => s.id !== TEMP_SESSION_ID)]);
         setActiveSessionId(id);
         setInput('');
@@ -2109,15 +2103,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const handleDuplicateSession = useCallback((id: string) => {
         const target = sessions.find(s => s.id === id);
         if (!target) return;
-
-        const cloned: ChatSessionItem = {
-            ...target,
-            id: `session_${Date.now()}`,
-            title: `${target.title || '新对话'} 副本`,
-            customTitle: true,
-            updatedAt: Date.now(),
-            archived: false
-        };
+        const cloned = duplicateChatSession(target);
         setSessions(prev => [cloned, ...prev]);
         setActiveSessionId(cloned.id);
         setSessionContextMenu(null);

@@ -169,10 +169,10 @@ interface AgentRunEventDto {
 
 **关键规则**：
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
-- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。canonical Asset 协调器复用现有 owner-scoped `/api/v1/assets` typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内 data URL；document 必须有显式敏感性批准，响应必须通过 Asset Zod schema 且 owner 在异步期间不变。Chat 压缩现会把 canonical rolling summary 作为 `agentSummary` 独立持久化，原分界消息仅保留 UI/旧格式兼容；压缩完成时按源 Session ID 原子提交，切换会话和重复回调不会污染其他 Session 或重复边界。Provider-independent `TokenBudget` 分配器也已产生可通过 strict Session mapper 的预算证据。新的写协调器已把权威 detail/404 新建判断、expected-subject Asset 解析、预算计划、strict mapper、Session upsert 与服务端响应 hydration 串成单一 fail-closed 边界；stale upsert 只接受服务端权威数据，不用本地候选覆盖。该协调器尚未由 ChatSidebar 激活，也未主动传入 Run binding，因此运行时仍不能宣称 Chat 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
+- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。canonical Asset 协调器复用现有 owner-scoped `/api/v1/assets` typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内 data URL；document 必须有显式敏感性批准，响应必须通过 Asset Zod schema 且 owner 在异步期间不变。Chat 压缩现会把 canonical rolling summary 作为 `agentSummary` 独立持久化，原分界消息仅保留 UI/旧格式兼容；压缩完成时按源 Session ID 原子提交，切换会话和重复回调不会污染其他 Session 或重复边界。Provider-independent `TokenBudget` 分配器也已产生可通过 strict Session mapper 的预算证据。写协调器已把权威 detail/404 新建判断、expected-subject Asset 解析、预算计划、strict mapper、Session upsert 与服务端响应 hydration 串成单一 fail-closed 边界；stale upsert 只接受服务端权威数据，不用本地候选覆盖。ChatSidebar 现在只在创建协作模式 Run 前按需调用该边界：本地 Session 必须具有显式 `createdAt` 和结构化摘要，已有权威 detail 还必须精确匹配 createdAt 且不旧于本地投影；否则先写入并 hydrate，只有成功结果才传入 Run binding。提升尝试最多等待 3 秒，任一失败继续创建未绑定 Run。该增量接线不代表 Chat 已整体切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
 - migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
-- 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），metadata event 仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，但该机制仍是只读投影恢复，不是语义事件 replay，也不向远端计划授予执行权；Chat Session 安全写投影、绑定激活和真实跨设备 E2E 完成前，不能宣称服务端已接管完整 Run 恢复。
+- 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），metadata event 仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，本地新 Run 已可在权威 Session write/hydrate 成功后首次携带 `sessionId`；但该机制仍不是语义事件 replay，也不向远端计划授予执行权，真实跨设备 E2E 完成前不能宣称服务端已接管完整 Run 恢复。
 
 ### 2.4 PPT 契约
 
@@ -283,7 +283,7 @@ GET  /api/ai-assistant/runs/:runId
 GET  /api/ai-assistant/runs/:runId/events
 ```
 
-Session/Context 与 Run/event 仍是两个独立恢复数据面。migration 022 和现有 Run upsert 已 additive 支持可选 `sessionId`：只接受当前 owner 的 Session，既有绑定不可改绑或解除，省略字段保持旧行为；Web 默认不传该字段。Chat 只有在 Attachment Asset 引用、TokenBudget 与摘要语义可安全映射后才能激活绑定；confirm/cancel/recover 端点仍须等待确认授权协议定型，禁止通过复用浏览器本地 Session ID 暗中授予执行权。
+Session/Context 与 Run/event 仍是两个独立恢复数据面。migration 022 和现有 Run upsert 已 additive 支持可选 `sessionId`：只接受当前 owner 的 Session，既有绑定不可改绑或解除，省略字段保持旧行为。Web 仅对具备显式创建时间和结构化摘要的非临时 Chat 尝试安全提升，并在 Attachment Asset 引用、TokenBudget、owner、创建身份、权威写入与 detail hydration 全部通过后为新 Run 传入该字段；任何失败或超时都保持未绑定兼容路径。confirm/cancel/recover 端点仍须等待确认授权协议定型，禁止通过复用浏览器本地 Session ID 暗中授予执行权。
 
 ---
 

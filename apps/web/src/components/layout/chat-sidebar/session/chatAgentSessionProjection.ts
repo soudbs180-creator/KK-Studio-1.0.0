@@ -105,7 +105,11 @@ export function buildAgentSessionProjection(
   )) {
     return { ok: false, reason: 'invalid_projection' };
   }
-  const createdAt = evidence.authoritativeBase?.createdAt || toIsoString(evidence.createdAt);
+  const evidencedCreatedAt = toIsoString(evidence.createdAt);
+  if (evidence.authoritativeBase && evidence.authoritativeBase.createdAt !== evidencedCreatedAt) {
+    return { ok: false, reason: 'invalid_projection' };
+  }
+  const createdAt = evidence.authoritativeBase?.createdAt || evidencedCreatedAt;
   const updatedAt = toIsoString(session.updatedAt);
   if (!createdAt || !updatedAt) return { ok: false, reason: 'invalid_projection' };
   const messages: ProjectedMessage[] = [];

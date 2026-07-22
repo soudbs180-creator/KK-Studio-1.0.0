@@ -81,7 +81,7 @@ interface AITakeoverContextType {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isThinking: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, sessionBinding?: Promise<string | undefined>) => Promise<void>;
   pendingPlan: AssistantPlan | null;
   setPendingPlan: (plan: AssistantPlan | null) => void;
   executePendingPlan: () => Promise<void>;
@@ -437,7 +437,7 @@ export function AITakeoverProvider({
 
 
   // 发送消息
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, sessionBinding?: Promise<string | undefined>) => {
     if (!text.trim() || isThinking) return;
 
     const userMsg: Message = {
@@ -480,7 +480,8 @@ export function AITakeoverProvider({
       // 模拟大脑思考用时，提升拟人化感官
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      const record = await agentRuntimeInstance.run(text, projectContext, selectedModel?.id);
+      const sessionId = await sessionBinding?.catch(() => undefined);
+      const record = await agentRuntimeInstance.run(text, projectContext, selectedModel?.id, sessionId);
       const plan = record.plan as AssistantPlan;
 
       const assistantMsg: Message = {

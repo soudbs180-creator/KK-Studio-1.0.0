@@ -9,7 +9,10 @@ import {
   buildImportPreview,
   buildSessionTreeRows,
   createBranchSession,
+  createNewChatSession,
   createSessionMap,
+  createTemporaryChatSession,
+  duplicateChatSession,
   ensureUniqueIds,
   loadInitialChatSessions,
   mergeImportedSessions,
@@ -102,6 +105,7 @@ test('branch creation and smart import merge preserve the existing newest-sessio
   ]);
   const branch = createBranchSession(parent.messages, 1, parent.id, 100);
   assert.equal(branch.title, '分支 · hello');
+  assert.equal(branch.createdAt, 100);
   assert.equal(branch.parentSessionId, parent.id);
   assert.equal(branch.branchFromMessageId, 'message_2');
 
@@ -112,12 +116,24 @@ test('branch creation and smart import merge preserve the existing newest-sessio
   assert.deepEqual(merged.map((session) => session.id), [newer.id]);
 });
 
+test('new, temporary, branch, and duplicate Sessions preserve explicit creation identity', () => {
+  const session = createNewChatSession(100);
+  const temporary = createTemporaryChatSession([], 200);
+  const duplicate = duplicateChatSession(session, 300);
+
+  assert.deepEqual([session.id, session.createdAt, session.updatedAt], ['session_100', 100, 100]);
+  assert.deepEqual([temporary.id, temporary.createdAt, temporary.isTemp], [TEMP_SESSION_ID, 200, true]);
+  assert.deepEqual([duplicate.id, duplicate.createdAt, duplicate.updatedAt], ['session_300', 300, 300]);
+  assert.equal(duplicate.title, '新对话 副本');
+});
+
 test('session import parser normalizes loose JSON without explicit any', () => {
   const parsed = parseSessionImport(JSON.stringify({
     activeSessionId: 'session_imported',
     sessions: [{
       id: 'session_imported',
       title: '',
+      createdAt: 1_700_000_000_000,
       messages: [],
       agentSummary: {
         text: 'Canonical imported summary',
@@ -129,6 +145,7 @@ test('session import parser normalizes loose JSON without explicit any', () => {
 
   assert.equal(parsed.activeSessionId, 'session_imported');
   assert.equal(parsed.sessions[0].title, '导入会话');
+  assert.equal(parsed.sessions[0].createdAt, 1_700_000_000_000);
   assert.equal(parsed.sessions[0].messages[0].id, 'welcome');
   assert.deepEqual(parsed.sessions[0].agentSummary, {
     text: 'Canonical imported summary',
@@ -136,9 +153,15 @@ test('session import parser normalizes loose JSON without explicit any', () => {
     updatedAt: '2026-07-22T10:00:00.000Z',
   });
   const invalidSummary = parseSessionImport(JSON.stringify({
-    sessions: [{ id: 'invalid-summary', messages: [], agentSummary: { text: 'unsafe' } }],
+    sessions: [{
+      id: 'invalid-summary',
+      createdAt: 'not-a-timestamp',
+      messages: [],
+      agentSummary: { text: 'unsafe' },
+    }],
   }), []);
   assert.equal(invalidSummary.sessions[0].agentSummary, undefined);
+  assert.equal(invalidSummary.sessions[0].createdAt, undefined);
   assert.throws(() => parseSessionImport('{"sessions":null}', []), /格式不正确/);
 });
 

@@ -182,6 +182,13 @@ test('Chat projection preserves authoritative non-Chat state instead of erasing 
   assert.deepEqual(
     buildAgentSessionProjection(
       createSession([userMessage()]),
+      createEvidence({ createdAt: '2026-07-22T07:58:00.000Z', authoritativeBase }),
+    ),
+    { ok: false, reason: 'invalid_projection' },
+  );
+  assert.deepEqual(
+    buildAgentSessionProjection(
+      createSession([userMessage()]),
       createEvidence({ ownerId: 'owner-b', authoritativeBase }),
     ),
     { ok: false, reason: 'invalid_projection' },
