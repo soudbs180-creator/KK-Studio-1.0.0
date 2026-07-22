@@ -284,11 +284,12 @@ class FakeDatabase {
 
     if (n.startsWith('update public.ledger_entries set type = \'charge\'')) {
       const row = this.ledger.get(params[0]);
-      if (row) {
+      if (row && row.type === 'reserve' && row.status === 'committed') {
         row.type = 'charge';
         row.item_id = params[1];
         row.status = 'committed';
         Object.assign(row.metadata_json, this.parseJson(params[2]));
+        return { rows: [{ ledger_id: row.ledger_id }] };
       }
       return { rows: [] };
     }
@@ -670,4 +671,29 @@ test('completed item cannot be downgraded by a late provider failure', async () 
   const ledger = [...fakeDb.ledger.values()];
   assert.equal(ledger.filter((entry) => entry.type === 'charge').length, 1);
   assert.equal(ledger.filter((entry) => entry.type === 'refund').length, 0);
+});
+
+test('item cannot complete when its reservation is no longer chargeable', async () => {
+  seedStandardUser();
+
+  const quote = await quoteEngine.createQuote(TEST_USER, makeQuoteRequest({ count: 1 }));
+  const job = await jobLifecycle.createJobFromQuote(TEST_USER, { quoteId: quote.quoteId });
+  const item = job.items[0];
+  const storedItem = fakeDb.items.get(item.itemId);
+  const reservation = fakeDb.ledger.get(storedItem.reservation_id);
+  reservation.type = 'charge';
+  const client = await fakeDb.pool().connect();
+
+  await assert.rejects(
+    () => jobLifecycle.completeItem(
+      TEST_USER,
+      item.itemId,
+      'https://fake-provider.kkstudio.local/artifacts/unpaid.png',
+      { client },
+    ),
+    (error: any) => error.code === 'BILLING_SETTLEMENT_CONFLICT' && error.retryable === false,
+  );
+
+  assert.equal(fakeDb.items.get(item.itemId).status, 'pending');
+  assert.equal(fakeDb.items.get(item.itemId).asset_id, undefined);
 });

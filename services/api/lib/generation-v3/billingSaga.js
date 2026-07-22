@@ -4,6 +4,7 @@
 
 const { getPool } = require('../db');
 const credits = require('../credits');
+const { generationV3Metrics } = require('./generationMetrics');
 
 /**
  * 创建预扣记录并实际扣减用户积分。
@@ -38,8 +39,10 @@ async function reserveCredits({ userId, quoteId, jobId, itemId, amount, mediaTyp
         WHERE ledger_id = $1`,
       [ledgerId]
     );
+    generationV3Metrics.recordEvent('reserveCommitted');
     return { ledgerId, balanceAfter };
   } catch (err) {
+    generationV3Metrics.recordEvent('reserveFailed');
     await client.query(
       `UPDATE public.ledger_entries
           SET status = 'failed', updated_at = NOW(), metadata_json = metadata_json || $2
@@ -58,13 +61,22 @@ async function reserveCredits({ userId, quoteId, jobId, itemId, amount, mediaTyp
  * @param {import('pg').PoolClient} params.client
  */
 async function chargeFromReservation({ ledgerId, itemId, client }) {
-  await client.query(
-    `UPDATE public.ledger_entries
-        SET type = 'charge', item_id = $2, status = 'committed', updated_at = NOW(),
-            metadata_json = metadata_json || $3
-      WHERE ledger_id = $1`,
-    [ledgerId, itemId, JSON.stringify({ reason: 'item-charge' })]
-  );
+  try {
+    const result = await client.query(
+      `UPDATE public.ledger_entries
+          SET type = 'charge', item_id = $2, status = 'committed', updated_at = NOW(),
+              metadata_json = metadata_json || $3
+        WHERE ledger_id = $1 AND type = 'reserve' AND status = 'committed'
+        RETURNING ledger_id`,
+      [ledgerId, itemId, JSON.stringify({ reason: 'item-charge' })]
+    );
+    const eventName = result.rows.length === 1 ? 'chargeCommitted' : 'chargeNoop';
+    generationV3Metrics.recordEvent(eventName);
+    return result.rows.length === 1;
+  } catch (err) {
+    generationV3Metrics.recordEvent('chargeFailed');
+    throw err;
+  }
 }
 
 /**
@@ -99,8 +111,10 @@ async function refundItem({ userId, ledgerId, amount, itemId, mediaType, reason,
         WHERE ledger_id = $1`,
       [refundLedgerId]
     );
+    generationV3Metrics.recordEvent('refundCommitted');
     return { ledgerId: refundLedgerId, balanceAfter };
   } catch (err) {
+    generationV3Metrics.recordEvent('refundFailed');
     await client.query(
       `UPDATE public.ledger_entries
           SET status = 'failed', updated_at = NOW(), metadata_json = metadata_json || $2

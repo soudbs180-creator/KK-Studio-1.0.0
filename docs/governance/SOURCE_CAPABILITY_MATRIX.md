@@ -44,10 +44,10 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 3.1 | 预扣/结算/退款审计 | 完全 | `services/api/lib/generation-v3/billingSaga.js`：`reserveCredits` :20、`chargeFromReservation` :60、`refundItem` :81；调用点 `services/api/lib/generation-v3/jobLifecycle.js:45`（创建预扣）、`:185`（成功结算）、`:220`（失败退款）。 | keep |
+| 3.1 | 预扣/结算/退款审计 | 完全 | `services/api/lib/generation-v3/billingSaga.js` 统一实现 reserve/charge/refund；charge 仅允许 `committed reserve` 单向转换并识别 no-op。`generationMetrics.js` 通过既有 telemetry envelope 暴露无金额和业务标识的成功/失败聚合计数。 | keep |
 | 3.2 | Quote 冻结机制 | 完全 | `packages/shared/src/generation-v3/quote.ts:39`；路由 `services/api/routes/generation-v3.js:33-51`；TTL 300s（`quoteEngine.js:13`）、`expiresAt` :93、`priceVersion` :94、`routeSnapshot` 冻结 :95 并落库 :105-119。 | keep |
 | 3.3 | Item 级幂等 | 部分 | migration 017 保持 `UNIQUE(job_id, sequence)`；migration 019 对 `item_id` 唯一建 lease；`workerStore.js` 只在空值时按 token 写 `providerTaskId`，恢复路径只 poll；`imageWorker.js` 使用稳定 `jobId:itemId` requestId，lease 丢失不伪报成功；`jobLifecycle.js` 禁止迟到回调复活或降级终态 Item。客户端创建 Job 的显式幂等键仍未实现。 | upgrade |
-| 3.4 | 账本与确认卡一致 | 需验证 | Item 级 ledger 已在 v3 形成（见 3.1）；确认 UI 与 ledger 金额一致性缺 E2E 证据——当前无真实 Provider 凭据，未覆盖真实生成/退款。 | verify |
+| 3.4 | 账本与确认卡一致 | 需验证 | Item 级 ledger 已在 v3 形成（见 3.1），并可观测 stale route、终态冲突、charge no-op 与 refund failure；确认 UI 与 ledger 金额一致性仍缺 E2E 证据——当前无真实 Provider 凭据，未覆盖真实生成/退款。 | verify |
 
 ## 4. Agent 运行时
 

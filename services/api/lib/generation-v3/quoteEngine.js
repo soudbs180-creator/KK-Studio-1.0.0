@@ -6,6 +6,7 @@ const { getPool } = require('../db');
 const credits = require('../credits');
 const { selectRoute, buildRouteSnapshot } = require('./routeEngine');
 const { resolveQuoteConnectionRoute } = require('../capability-graph/generationConnectionResolver');
+const { generationV3Metrics } = require('./generationMetrics');
 const {
   CreateQuoteRequestSchema,
   GenerationQuoteDtoSchema,
@@ -145,6 +146,7 @@ async function createQuote(userId, rawRequest, options = {}) {
   await assertSufficientBalance(userId, routeContext.channel, cost, options.credits || credits);
   const quote = buildQuote(userId, request, routeContext, cost);
   await persistQuote(pool, quote);
+  generationV3Metrics.recordEvent('quoteCreated');
   return GenerationQuoteDtoSchema.parse(quote);
 }
 
@@ -195,6 +197,7 @@ async function fetchQuoteRow(client, userId, quoteId, { requireActive = false } 
   const row = result.rows[0];
 
   if (requireActive && row.status !== 'active') {
+    generationV3Metrics.recordEvent('quoteExpired');
     const err = new Error(`Quote is ${row.status}.`);
     err.code = 'QUOTE_EXPIRED';
     err.statusCode = 410;
@@ -206,6 +209,7 @@ async function fetchQuoteRow(client, userId, quoteId, { requireActive = false } 
       `UPDATE public.generation_quotes SET status = 'expired', updated_at = NOW() WHERE quote_id = $1`,
       [quoteId]
     );
+    generationV3Metrics.recordEvent('quoteExpired');
     throw createQuoteExpiredError();
   }
 

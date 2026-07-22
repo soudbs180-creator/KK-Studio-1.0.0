@@ -277,11 +277,12 @@ class FakeDatabase {
 
     if (n.startsWith("update public.ledger_entries set type = 'charge'")) {
       const row = this.ledger.get(params[0]);
-      if (row) {
+      if (row && row.type === 'reserve' && row.status === 'committed') {
         row.type = 'charge';
         row.item_id = params[1];
         row.status = 'committed';
         Object.assign(row.metadata_json, this.parseJson(params[2]));
+        return { rows: [{ ledger_id: row.ledger_id }] };
       }
       return { rows: [] };
     }

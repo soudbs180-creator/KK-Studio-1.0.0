@@ -10,6 +10,7 @@ const localUserRouteStore = require('../lib/dispatcher/localUserRouteStore');
 const metricsCollector = require('../lib/dispatcher/metricsCollector');
 const dispatcher = require('../lib/dispatcher/index');
 const { imageWorkerMetrics } = require('../lib/generation-v3/worker/workerMetrics');
+const { generationV3Metrics } = require('../lib/generation-v3/generationMetrics');
 
 const router = express.Router();
 
@@ -65,6 +66,7 @@ router.get('/v1/metrics', (req, res) => {
     data: {
       ...metrics,
       circuitBreaker: breakerStatus,
+      generationV3: generationV3Metrics.getSnapshot(),
       imageDurableWorker: imageWorkerMetrics.getSnapshot(),
     },
   });

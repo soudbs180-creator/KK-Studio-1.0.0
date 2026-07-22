@@ -9,6 +9,7 @@ const { selectRoute } = require('./routeEngine');
 const { reserveCredits, chargeFromReservation, refundItem } = require('./billingSaga');
 const { resolveExecutionConnectionAuth } = require('../capability-graph/generationConnectionResolver');
 const { recordDerivedAssetLineage } = require('../capability-graph/assetLineageStore');
+const { generationV3Metrics } = require('./generationMetrics');
 
 /** The submit path reuses the quote snapshot and refuses silent adapter upgrades. */
 async function resolveFrozenProviderRoute(userId, quote, options = {}) {
@@ -24,6 +25,7 @@ async function resolveFrozenProviderRoute(userId, quote, options = {}) {
   if (connectionRoute) {
     const adapterVersion = route.adapter?.adapterVersion || route.adapterVersion;
     if (adapterVersion !== snapshot.adapterVersion) {
+      generationV3Metrics.recordEvent('staleRoute');
       const error = new Error('Provider adapter changed after the quote. Request a new quote.');
       error.code = 'CONNECTION_ROUTE_STALE';
       error.statusCode = 409;
@@ -190,6 +192,23 @@ function buildGeneratedAssetOutput(item, assetUrl) {
   };
 }
 
+function createBillingSettlementConflict() {
+  const error = new Error('Generation item reservation is no longer available for settlement.');
+  error.code = 'BILLING_SETTLEMENT_CONFLICT';
+  error.retryable = false;
+  return error;
+}
+
+async function settleItemReservation(item, itemId, client) {
+  if (!item.reservation_id) return;
+  const charged = await chargeFromReservation({ ledgerId: item.reservation_id, itemId, client });
+  if (charged === false) throw createBillingSettlementConflict();
+  await client.query(
+    `UPDATE public.generation_job_items SET ledger_id = $2 WHERE item_id = $1`,
+    [itemId, item.reservation_id]
+  );
+}
+
 async function completeItem(userId, itemId, assetUrl, { client }) {
   const itemRes = await client.query(
     `SELECT * FROM public.generation_job_items WHERE item_id = $1`,
@@ -200,11 +219,16 @@ async function completeItem(userId, itemId, assetUrl, { client }) {
 
   // 终态 item 永不被迟到的 Provider 回调复活、重复扣费或改写。
   if (['completed', 'failed', 'cancelled'].includes(item.status)) {
+    const eventName = item.status === 'completed'
+      ? 'duplicateCompletionPrevented'
+      : 'terminalConflictPrevented';
+    generationV3Metrics.recordEvent(eventName);
     return;
   }
 
   // asset_id remains the URL during dual-read compatibility; output_json carries stable identity.
   const output = buildGeneratedAssetOutput(item, assetUrl);
+  await settleItemReservation(item, itemId, client);
 
   await updateItemStatus({
     itemId,
@@ -219,15 +243,6 @@ async function completeItem(userId, itemId, assetUrl, { client }) {
     { itemId, mediaType: output.mediaType },
     client,
   );
-
-  // 结算：将预扣转为实际扣费
-  if (item.reservation_id) {
-    await chargeFromReservation({ ledgerId: item.reservation_id, itemId, client });
-    await client.query(
-      `UPDATE public.generation_job_items SET ledger_id = $2 WHERE item_id = $1`,
-      [itemId, item.reservation_id]
-    );
-  }
 }
 
 async function failItem(userId, itemId, errorMessage, { client, errorCode }) {
@@ -245,6 +260,7 @@ async function failItem(userId, itemId, errorMessage, { client, errorCode }) {
 
   // 防止终态降级、重复退款或重复失败标记
   if (['completed', 'failed', 'cancelled'].includes(item.status)) {
+    generationV3Metrics.recordEvent('terminalConflictPrevented');
     return;
   }
 
@@ -281,7 +297,10 @@ async function cancelItem(userId, itemId, { client }) {
   );
   if (itemRes.rows.length === 0) return;
   const item = itemRes.rows[0];
-  if (['completed', 'failed', 'cancelled'].includes(item.status)) return;
+  if (['completed', 'failed', 'cancelled'].includes(item.status)) {
+    generationV3Metrics.recordEvent('terminalConflictPrevented');
+    return;
+  }
 
   await updateItemStatus({ itemId, status: 'cancelled', client });
   if (item.channel === 'platform-credits' && item.reservation_id && item.reserved_amount > 0) {
