@@ -37,7 +37,7 @@
 |---|---|---|---|---|
 | 2.1 | 浏览器侧持久化队列 | 完全 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365`，localStorage 持久化。 | upgrade |
 | 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；同目录 `imageWorker.js`、`workerSubmissionRouter.js`、`workerLoop.js` 实现恢复、切流与关闭回退，`workerMetrics.js` 通过既有 `services/api/routes/telemetry.js` 输出无业务 payload 的聚合指标。flag 默认关闭且真实数据库/internal 灰度未验收。 | upgrade |
-| 2.3 | 关闭浏览器后续跑 | 部分 | `tests/unit/generation-image-worker.test.ts` 已证明 server loop 无浏览器参与可续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 与 `/api/v1/generation/jobs/:jobId/events` 已实现 owner-scoped 全量投影、heartbeat、终态/断连清理。浏览器消费、重连和跨设备 E2E 未完成，视频/音频仍由浏览器轮询。 | upgrade |
+| 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，Web `generationJobEventClient.ts`/`generationJobRecovery.ts` 已接入鉴权、重连、abort 和旧轮询回退。真实浏览器关闭/重新登录及跨设备 E2E 未完成，视频/音频仍由浏览器轮询。 | upgrade |
 | 2.4 | 双轨执行 | 不符合 | `DurableGenerationQueue.ts:365`（前端）与 `apps/web/src/core/generation/GenerationEngine.ts:15` 并行存在。 | upgrade |
 
 ## 3. 计费与对账

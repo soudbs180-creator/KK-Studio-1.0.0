@@ -10,6 +10,7 @@ import {
 import { keyManager } from '../services/auth/keyManager';
 import { resolveProviderRuntime } from '../services/api/providerStrategy';
 import { normalizePersistentResultUrl } from '../utils/imageResultPersistence';
+import { resumeGenerationTask } from '../services/generation/generationJobRecovery';
 import {
   getLatestStartupSnapshot,
   isStartupStageReady,
@@ -59,6 +60,11 @@ const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): Tas
   return 'generic';
 };
 
+function abortRecoveryControllers(controllers: Map<string, AbortController>): void {
+  controllers.forEach((controller) => controller.abort());
+  controllers.clear();
+}
+
 /**
  * 任务恢复 Hook
  * 在页面加载、回到前台和网络恢复后自动恢复进行中的任务
@@ -75,6 +81,7 @@ export function useTaskRecovery(
   });
   const isRecoveringRef = useRef(false);
   const lastRecoveredAtRef = useRef(new Map<string, number>());
+  const activeRecoveryControllersRef = useRef(new Map<string, AbortController>());
 
   /**
    * 恢复数据库中的待处理任务
@@ -105,6 +112,10 @@ export function useTaskRecovery(
         }
 
         if (reason === 'online' && node.jobId === task.taskId) {
+          continue;
+        }
+
+        if (activeRecoveryControllersRef.current.has(task.taskId)) {
           continue;
         }
 
@@ -146,9 +157,16 @@ export function useTaskRecovery(
 
       for (const { task, node } of recoverableEntries) {
         recovered++;
-
-        void pollTaskFn(node, task.taskId).catch((error) => {
-          console.error('[TaskRecovery] Failed to restart polling:', error);
+        const controller = new AbortController();
+        activeRecoveryControllersRef.current.set(task.taskId, controller);
+        void resumeGenerationTask(node, task.taskId, pollTaskFn, {
+          signal: controller.signal,
+        }).catch((error) => {
+          console.error('[TaskRecovery] Failed to resume task:', error);
+        }).finally(() => {
+          if (activeRecoveryControllersRef.current.get(task.taskId) === controller) {
+            activeRecoveryControllersRef.current.delete(task.taskId);
+          }
         });
       }
 
@@ -164,6 +182,16 @@ export function useTaskRecovery(
       isRecoveringRef.current = false;
     }
   }, [activeCanvas, pollTaskFn]);
+
+  useEffect(() => {
+    if (enabled) return undefined;
+    abortRecoveryControllers(activeRecoveryControllersRef.current);
+    return undefined;
+  }, [enabled]);
+
+  useEffect(() => () => {
+    abortRecoveryControllers(activeRecoveryControllersRef.current);
+  }, []);
 
   /**
    * 监听页面可见性和网络变化，自动恢复任务
