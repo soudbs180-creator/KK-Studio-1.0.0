@@ -59,6 +59,7 @@
     "services/api/lib/generation-v3/worker",
     "services/api/lib/agent-run-read-store.js",
     "services/api/lib/agent-run-event-store.js",
+    "services/api/lib/agent-session-store.js",
     "services/api/routes/capability-graph.js",
     "services/api/routes/user/shared",
     "apps/web/src/services/generation/generationJobDiscovery.ts",

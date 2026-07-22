@@ -13,6 +13,7 @@ APPLY_BOOTSTRAP_SQL="${KK_APPLY_BOOTSTRAP_SQL:-false}"
 BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/ops/postgres/bootstrap-kk-vps.sql}"
 AI_ASSISTANT_SCOPE_MIGRATION_PATH="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_EVENT_MIGRATION:-infrastructure/database/migrations/020_agent_run_events.sql}"
+AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/database/migrations/021_agent_sessions.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -104,7 +105,7 @@ require_runtime_database_target() {
     exit 1
   fi
 
-  local runtime_identity migration_identity authority_probe missing_count unauthorized_count version_missing event_table_missing can_create_schema is_superuser
+  local runtime_identity migration_identity authority_probe missing_count unauthorized_count version_missing event_table_missing session_tables_missing can_create_schema is_superuser
   runtime_identity="$(psql "${RUNTIME_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT current_database() || '|' || coalesce(inet_server_addr()::text, 'local-socket') || '|' || coalesce(inet_server_port()::text, 'default')")"
   migration_identity="$(psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT current_database() || '|' || coalesce(inet_server_addr()::text, 'local-socket') || '|' || coalesce(inet_server_port()::text, 'default')")"
   if [[ -z "${runtime_identity}" || "${runtime_identity}" != "${migration_identity}" ]]; then
@@ -122,7 +123,8 @@ require_runtime_database_target() {
       ('agent_runs', true), ('agent_tool_calls', true), ('agent_memory', true),
       ('knowledge_documents', true), ('knowledge_chunks', true),
       ('canvas_runtime_snapshots', true), ('agent_skills', true),
-      ('agent_run_events', false)
+      ('agent_run_events', false), ('agent_sessions', false),
+      ('agent_context_snapshots', false)
     ), relations AS (
       SELECT target.name, target.required_before_migration, class.oid, class.relowner
       FROM targets AS target
@@ -138,11 +140,14 @@ require_runtime_database_target() {
       ),
       CASE WHEN to_regclass('public.agent_skill_versions') IS NULL THEN 1 ELSE 0 END,
       CASE WHEN to_regclass('public.agent_run_events') IS NULL THEN 1 ELSE 0 END,
+      count(*) FILTER (
+        WHERE name IN ('agent_sessions', 'agent_context_snapshots') AND oid IS NULL
+      ),
       has_schema_privilege(current_user, 'public', 'CREATE'),
       (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
     FROM relations
   ")"
-  IFS='|' read -r missing_count unauthorized_count version_missing event_table_missing can_create_schema is_superuser <<< "${authority_probe}"
+  IFS='|' read -r missing_count unauthorized_count version_missing event_table_missing session_tables_missing can_create_schema is_superuser <<< "${authority_probe}"
   if [[ "${unauthorized_count}" != "0" ]]; then
     echo "[deploy-kk-vps] Migration role does not own or inherit ownership for every existing AI assistant table." >&2
     exit 1
@@ -157,6 +162,10 @@ require_runtime_database_target() {
   fi
   if [[ "${event_table_missing}" != "0" && "${can_create_schema}" != "t" ]]; then
     echo "[deploy-kk-vps] Migration role cannot create agent_run_events in the public schema." >&2
+    exit 1
+  fi
+  if [[ "${session_tables_missing}" != "0" && "${can_create_schema}" != "t" ]]; then
+    echo "[deploy-kk-vps] Migration role cannot create Agent Session tables in the public schema." >&2
     exit 1
   fi
   if [[ "${APPLY_BOOTSTRAP_SQL}" == "true" && "${is_superuser}" != "t" ]]; then
@@ -188,7 +197,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016 and 020 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify schemas 016, 020 and 021 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -351,6 +360,10 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Agent Run event migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_EVENT_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${AGENT_SESSION_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] Agent Session migration not found at ${NEW_RELEASE_DIR}/${AGENT_SESSION_MIGRATION_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -367,6 +380,9 @@ apply_database_migrations() {
   echo "[deploy-kk-vps] Applying mandatory Agent Run event migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_EVENT_MIGRATION_PATH}"
 
+  echo "[deploy-kk-vps] Applying mandatory Agent Session migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_SESSION_MIGRATION_PATH}"
+
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %s TO %I',
@@ -374,9 +390,18 @@ SELECT format(
   :'runtime_role'
 )
 FROM (VALUES
-  ('agent_runs'), ('agent_run_events'), ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
+  ('agent_runs'), ('agent_run_events'), ('agent_sessions'), ('agent_context_snapshots'),
+  ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
   ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions')
 ) AS ai_tables(table_name)
+\gexec
+
+SELECT format(
+  'GRANT USAGE, SELECT ON SEQUENCE %s TO %I',
+  pg_get_serial_sequence('public.agent_context_snapshots', 'sequence'),
+  :'runtime_role'
+)
+WHERE pg_get_serial_sequence('public.agent_context_snapshots', 'sequence') IS NOT NULL
 \gexec
 SQL
 
@@ -427,6 +452,45 @@ BEGIN
       AND NOT event_trigger.tgisinternal
   ) <> 2 THEN
     RAISE EXCEPTION 'agent_run_events schema is missing or invalid';
+  END IF;
+  IF to_regclass('public.agent_sessions') IS NULL
+    OR to_regclass('public.agent_context_snapshots') IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM (VALUES
+        ('agent_sessions', 'id', 'text'),
+        ('agent_sessions', 'user_id', 'text'),
+        ('agent_sessions', 'collaboration_mode', 'text'),
+        ('agent_sessions', 'messages', 'jsonb'),
+        ('agent_sessions', 'summary', 'jsonb'),
+        ('agent_sessions', 'token_budget', 'jsonb'),
+        ('agent_sessions', 'last_heartbeat_at', 'timestamp with time zone'),
+        ('agent_context_snapshots', 'snapshot_id', 'text'),
+        ('agent_context_snapshots', 'session_id', 'text'),
+        ('agent_context_snapshots', 'sequence', 'bigint'),
+        ('agent_context_snapshots', 'snapshot_data', 'jsonb'),
+        ('agent_context_snapshots', 'captured_at', 'timestamp with time zone')
+      ) AS expected(table_name, column_name, data_type)
+      LEFT JOIN information_schema.columns AS actual
+        ON actual.table_schema = 'public'
+        AND actual.table_name = expected.table_name
+        AND actual.column_name = expected.column_name
+      WHERE actual.column_name IS NULL
+        OR actual.data_type <> expected.data_type
+        OR actual.is_nullable <> 'NO'
+    ) OR NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'agent_context_snapshots'
+        AND column_name = 'sequence'
+        AND is_identity = 'YES'
+    ) OR NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'public.agent_context_snapshots'::regclass
+        AND confrelid = 'public.agent_sessions'::regclass
+        AND contype = 'f'
+    ) THEN
+    RAISE EXCEPTION 'agent_sessions schema is missing or invalid';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns

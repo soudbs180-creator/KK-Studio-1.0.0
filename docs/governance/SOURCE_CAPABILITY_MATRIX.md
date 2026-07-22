@@ -56,8 +56,8 @@
 | 4.1 | IntentGate -> Planner -> ToolRegistry -> PermissionPolicy 链路 | 完全 | `apps/web/src/features/ai-takeover/` 核心链路在位。 | keep |
 | 4.2 | 多轮对话历史 | 不符合 | `apps/web/src/features/ai-takeover/core/llmBrain.ts:111-119` 只发 system + 单条 user；`localBrain.ts` 为纯本地规则脑（`:33-34` 是 `plan()` 入口与 `analyzeIntent` 调用），不构造 LLM 消息，同样无多轮历史。 | upgrade |
 | 4.3 | 上下文裁剪 | 不符合 | 无 TokenBudget 分配规则，无摘要/工具结果回填。 | upgrade |
-| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:173-199,344-408` 对认证 owner 保留 active Run，并按时间戳合并服务端权威投影；`agentRunHydration.ts:42-67` 使用共享 `AgentRunListDtoSchema` 校验 owner-scoped list，`AgentRuntime.ts:466-469,1045-1067` 保证先 hydration 再上传 pending 快照。migration 020 与 `agent-run-event-store.js` 已提供事务性 metadata-only 事件和 owner-scoped sequence 查询；远端独有计划仍是不可执行 projection（`AgentRuntime.ts:706`）。Session API、Web 事件消费与事件级恢复仍未实现。 | upgrade |
-| 4.5 | 跨设备续跑 | 部分 | 服务端 owner-scoped Run list/get、event query、typed client 与 Web projection hydration 已能让第二个浏览器发现 active Run；`AITakeoverContext.tsx:304-313` 订阅投影但不会执行远端计划。Session 查询、Web event replay、跨设备执行接管和真实 E2E 仍缺失。 | upgrade |
+| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:173-199,344-408` 对认证 owner 保留 active Run，并按时间戳合并服务端权威投影；`agentRunHydration.ts:42-67` 使用共享 `AgentRunListDtoSchema` 校验 owner-scoped list，`AgentRuntime.ts:466-469,1045-1067` 保证先 hydration 再上传 pending 快照。migrations 020/021 与对应 store 已提供 Run 事件、Session 和 Context Snapshot 数据面；远端独有计划仍是不可执行 projection（`AgentRuntime.ts:706`）。Web Session/event 消费、Run/Session 绑定与事件级恢复仍未实现。 | upgrade |
+| 4.5 | 跨设备续跑 | 部分 | 服务端 owner-scoped Run list/get、event query、Session list/get、Context Snapshot 与 typed client 已在位，Web Run projection hydration 已能让第二个浏览器发现 active Run；`AITakeoverContext.tsx:304-313` 订阅投影但不会执行远端计划。Web Session/event replay、跨设备执行接管和真实 E2E 仍缺失。 | upgrade |
 
 ## 5. PPT
 
@@ -137,6 +137,7 @@
 | 前端 DurableGenerationQueue 与同步投影 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:391-427,511-512` / `GenerationQueueSync.ts:60-75,151-205,228-240` |
 | 生成分发链 | `apps/web/src/core/generation/GenerationEngine.ts:15` / `TaskOrchestrator.ts:65-66` |
 | Agent Run 本地恢复、服务端同步、权威读取与事件查询 | `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts:173-199,344-408` / `agentRunHydration.ts:42-67` / `AgentRuntime.ts:466-469,1045-1067` / `services/api/lib/agent-run-read-store.js` / `services/api/lib/agent-run-event-store.js` / `services/api/routes/ai-assistant.js` / `infrastructure/database/migrations/020_agent_run_events.sql` |
+| Agent Session 与 Context Snapshot 权威数据面 | `packages/shared/src/contracts/dto/ai-assistant.ts` / `services/api/lib/agent-session-store.js` / `services/api/routes/ai-assistant.js` / `infrastructure/database/migrations/021_agent_sessions.sql` |
 | Planner 单轮输入 | `apps/web/src/features/ai-takeover/core/llmBrain.ts:111-119` |
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |

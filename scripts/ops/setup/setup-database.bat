@@ -15,6 +15,7 @@ if "%DATABASE_URL%"=="" (
 set "BOOTSTRAP_SQL=scripts\ops\postgres\bootstrap-kk-vps.sql"
 set "AI_SCOPE_MIGRATION=infrastructure\database\migrations\016_ai_assistant_user_scope.sql"
 set "AGENT_RUN_EVENT_MIGRATION=infrastructure\database\migrations\020_agent_run_events.sql"
+set "AGENT_SESSION_MIGRATION=infrastructure\database\migrations\021_agent_sessions.sql"
 if not exist "%BOOTSTRAP_SQL%" (
   echo Missing bootstrap SQL: %BOOTSTRAP_SQL%
   exit /b 1
@@ -27,32 +28,43 @@ if not exist "%AGENT_RUN_EVENT_MIGRATION%" (
   echo Missing Agent Run event migration: %AGENT_RUN_EVENT_MIGRATION%
   exit /b 1
 )
+if not exist "%AGENT_SESSION_MIGRATION%" (
+  echo Missing Agent Session migration: %AGENT_SESSION_MIGRATION%
+  exit /b 1
+)
 
-echo [1/4] Checking psql...
+echo [1/5] Checking psql...
 where psql >nul 2>&1
 if %errorlevel% neq 0 (
   echo psql was not found in PATH. Install PostgreSQL client tools on this machine or run the SQL on the VPS.
   exit /b 1
 )
 
-echo [2/4] Applying VPS PostgreSQL bootstrap...
+echo [2/5] Applying VPS PostgreSQL bootstrap...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%BOOTSTRAP_SQL%"
 if %errorlevel% neq 0 (
   echo Failed to apply bootstrap SQL.
   exit /b 1
 )
 
-echo [3/4] Applying AI assistant user scope migration...
+echo [3/5] Applying AI assistant user scope migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AI_SCOPE_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply AI assistant user scope migration.
   exit /b 1
 )
 
-echo [4/4] Applying Agent Run event migration...
+echo [4/5] Applying Agent Run event migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_RUN_EVENT_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Run event migration.
+  exit /b 1
+)
+
+echo [5/5] Applying Agent Session migration...
+psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_SESSION_MIGRATION%"
+if %errorlevel% neq 0 (
+  echo Failed to apply Agent Session migration.
   exit /b 1
 )
 

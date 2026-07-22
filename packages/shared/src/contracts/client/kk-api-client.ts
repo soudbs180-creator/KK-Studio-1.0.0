@@ -118,12 +118,17 @@ import type {
   RequestMeta,
 } from "../http/envelope.ts";
 import type {
+  AgentContextSnapshotDto,
+  AgentContextSnapshotInputDto,
   AgentKnowledgeChangeDto,
   AgentKnowledgeDocumentDto,
   AgentKnowledgeSearchQueryDto,
   AgentRunDto,
   AgentRunEventDto,
   AgentRunEventQueryDto,
+  AgentSessionDto,
+  AgentSessionListItemDto,
+  AgentSessionUpsertDto,
   AgentSkillDeleteDto,
   AgentSkillDto,
   AgentToolCallDto,
@@ -471,6 +476,31 @@ export interface KkApiClient {
     input: ClaimGenerationBatchJobRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  /** Reads bounded Session headers without returning every conversation body. */
+  listAgentSessions(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentSessionListItemDto[]>>>;
+  /** Reads one owner-scoped Session body. */
+  getAgentSession(
+    sessionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentSessionDto>>>;
+  /** Upserts a versioned Session; ownerId is derived from authentication. */
+  upsertAgentSession(
+    input: AgentSessionUpsertDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentSessionDto>>>;
+  /** Appends an idempotent metadata-only Context Snapshot. */
+  appendAgentContextSnapshot(
+    sessionId: string,
+    input: AgentContextSnapshotInputDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentContextSnapshotDto>>>;
+  /** Reads the latest Context Snapshot without granting execution authority. */
+  getLatestAgentContextSnapshot(
+    sessionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentContextSnapshotDto | null>>>;
   /** Reads the authenticated owner's recent authoritative Agent Runs. */
   listAgentRuns(
     options?: ApiClientRequestOptions,
@@ -1934,6 +1964,51 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         config,
         `api/v1/generation-jobs/${encodeURIComponent(jobId)}/claim`,
         { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    listAgentSessions(options) {
+      return requestJson<AssistantApiResultDto<AgentSessionListItemDto[]>>(
+        config,
+        "api/ai-assistant/sessions",
+        { method: "GET" },
+        options,
+      );
+    },
+
+    getAgentSession(sessionId, options) {
+      return requestJson<AssistantApiResultDto<AgentSessionDto>>(
+        config,
+        `api/ai-assistant/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    upsertAgentSession(input, options) {
+      return requestJson<AssistantApiResultDto<AgentSessionDto>>(
+        config,
+        "api/ai-assistant/sessions",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    appendAgentContextSnapshot(sessionId, input, options) {
+      return requestJson<AssistantApiResultDto<AgentContextSnapshotDto>>(
+        config,
+        `api/ai-assistant/sessions/${encodeURIComponent(sessionId)}/context-snapshots`,
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    getLatestAgentContextSnapshot(sessionId, options) {
+      return requestJson<AssistantApiResultDto<AgentContextSnapshotDto | null>>(
+        config,
+        `api/ai-assistant/sessions/${encodeURIComponent(sessionId)}/context-snapshots/latest`,
+        { method: "GET" },
         options,
       );
     },

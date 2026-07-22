@@ -15,6 +15,11 @@ const { TEMP_USER_ID_HEADER } = require('./compat/compatHelper');
 const { verifyJWT } = require('../lib/jwt');
 const agentRunReadStore = require('../lib/agent-run-read-store');
 const agentRunEventStore = require('../lib/agent-run-event-store');
+const agentSessionStore = require('../lib/agent-session-store');
+const {
+  AgentContextSnapshotInputDtoSchema,
+  AgentSessionUpsertDtoSchema,
+} = require('@kk/shared');
 
 /**
  * 验证请求头中的 JWT 令牌，杜绝非法调用和越权审计。
@@ -95,6 +100,76 @@ async function readAuthoritativeSkillState(pool, userId, skillName) {
     data: !authoritativeDeleted && row.id ? mapAgentSkillRow(row) : undefined,
   };
 }
+
+/** 按认证 owner 返回最近的 Session 轻量投影，不展开消息正文。 */
+router.get('/ai-assistant/sessions', verifyAuth, async (req, res) => {
+  try {
+    const sessions = await agentSessionStore.listAgentSessions(req.userId);
+    return res.json({ ok: true, data: sessions });
+  } catch (err) {
+    console.error('[AI assistant] Failed to list Sessions:', err);
+    return res.status(500).json({ error: 'Failed to list Agent Sessions' });
+  }
+});
+
+/** 以 Session id 与认证 owner 双重约束读取完整权威记录。 */
+router.get('/ai-assistant/sessions/:sessionId', verifyAuth, async (req, res) => {
+  try {
+    const session = await agentSessionStore.getAgentSession(req.userId, req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Agent session not found' });
+    return res.json({ ok: true, data: session });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read Session:', err);
+    return res.status(500).json({ error: 'Failed to read Agent Session' });
+  }
+});
+
+/** 校验严格共享契约后，以客户端 updatedAt 协调 Session 快照。 */
+router.post('/ai-assistant/sessions', verifyAuth, async (req, res) => {
+  const parsed = AgentSessionUpsertDtoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid Agent Session payload' });
+  try {
+    const outcome = await agentSessionStore.upsertAgentSession(req.userId, parsed.data);
+    if (!outcome) return res.status(409).json({ error: 'Agent session ownership conflict' });
+    return res.json({ ok: true, stale: outcome.stale, data: outcome.data });
+  } catch (err) {
+    console.error('[AI assistant] Failed to upsert Session:', err);
+    return res.status(500).json({ error: 'Failed to upsert Agent Session' });
+  }
+});
+
+/** 为 owned Session 追加幂等、无原始输入文本的上下文快照。 */
+router.post('/ai-assistant/sessions/:sessionId/context-snapshots', verifyAuth, async (req, res) => {
+  const parsed = AgentContextSnapshotInputDtoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid Agent Context Snapshot payload' });
+  try {
+    const outcome = await agentSessionStore.appendAgentContextSnapshot(
+      req.userId,
+      req.params.sessionId,
+      parsed.data,
+    );
+    if (!outcome) return res.status(409).json({ error: 'Context snapshot ownership conflict' });
+    return res.json({ ok: true, stale: outcome.stale, data: outcome.data });
+  } catch (err) {
+    console.error('[AI assistant] Failed to append Context Snapshot:', err);
+    return res.status(500).json({ error: 'Failed to append Agent Context Snapshot' });
+  }
+});
+
+/** 返回 owned Session 的最新上下文投影；尚无快照时 data 为 null。 */
+router.get('/ai-assistant/sessions/:sessionId/context-snapshots/latest', verifyAuth, async (req, res) => {
+  try {
+    const snapshot = await agentSessionStore.getLatestAgentContextSnapshot(
+      req.userId,
+      req.params.sessionId,
+    );
+    if (snapshot === undefined) return res.status(404).json({ error: 'Agent session not found' });
+    return res.json({ ok: true, data: snapshot });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read Context Snapshot:', err);
+    return res.status(500).json({ error: 'Failed to read Agent Context Snapshot' });
+  }
+});
 
 /**
  * GET /api/ai-assistant/runs

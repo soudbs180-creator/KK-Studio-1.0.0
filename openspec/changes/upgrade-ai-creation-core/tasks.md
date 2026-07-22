@@ -107,7 +107,8 @@
 - [x] Phase 3 前置可维护性拆分（会话状态）：会话持久化、活动消息双向同步、树投影、分支构造、导入解析与 smart merge 已迁入严格 session controller/data 模块；保持 storage key、导入导出格式和 Chat shell action 不变，热点 baseline 从 4501 行/22 `any` 降至 4040 行/21 `any`。
 - [ ] 实现 `AgentSessionDto`、`AgentContextSnapshotDto`、`AgentRunEventDto` 表结构与 API。
   - [x] `AgentRunEventDto` metadata-only 基础已落地：migration 020 以事务 trigger 为每个 accepted Run snapshot 追加 sequence，owner-scoped 查询与 typed client 已提供；不保存 user message、plan 或 tool payload。
-  - [ ] Agent Session、Context Snapshot 与绑定 Session 的语义事件 discriminated union 仍待实现。
+  - [x] `AgentSessionDto` 与 `AgentContextSnapshotDto` 权威数据面已落地：migration 021、strict schema、owner-scoped list/get/upsert、幂等 Snapshot append/latest 与 typed client 已提供；附件只接受 Asset 引用，Context 不保存输入原文或任意 payload。
+  - [ ] Web Session 投影、Run/Session 绑定与语义事件 discriminated union 仍待实现。
 - [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
 - [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。
 - [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
@@ -117,7 +118,8 @@
   - [x] 新增 owner-scoped Run list/get API、批量工具调用装配与 typed client。
   - [x] Web 使用共享 Zod schema 恢复 owner-scoped Run projection；认证 reload 保留 active Run，启动顺序固定为 hydration 后再上传 pending，本地较新快照与 owner 切换均 fail closed，远端独有计划不可在当前浏览器执行。
   - [x] Run event 持久日志/增量查询基础已落地；`GET /api/ai-assistant/runs/:runId/events` 最多返回 100 条 metadata-only 事件并使用 owner + sequence cursor 约束。
-  - [ ] Session API、Web 事件消费/事件级恢复、跨设备执行接管与真实浏览器 E2E 仍待完成。
+  - [x] Session list/get/upsert 与 Context Snapshot append/latest API 已落地；当前未接入 Web，不改变本地 Chat storage 的运行时角色。
+  - [ ] Web Session/event 消费、Run/Session 绑定、事件级恢复、跨设备执行接管与真实浏览器 E2E 仍待完成。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。

@@ -36,6 +36,57 @@ function mapAgentRunEventRow(row = {}) {
   });
 }
 
+function mapAgentSessionRow(row = {}) {
+  return compact({
+    sessionId: row.id,
+    ownerId: row.user_id,
+    collaborationMode: row.collaboration_mode,
+    messages: Array.isArray(row.messages) ? row.messages : [],
+    summary: row.summary,
+    toolResults: Array.isArray(row.tool_results) ? row.tool_results : [],
+    knowledgeRefs: Array.isArray(row.knowledge_refs) ? row.knowledge_refs : [],
+    tokenBudget: row.token_budget,
+    confirmations: Array.isArray(row.confirmations) ? row.confirmations : [],
+    checkpoints: Array.isArray(row.checkpoints) ? row.checkpoints : [],
+    lastHeartbeatAt: toIsoString(row.last_heartbeat_at),
+    createdAt: toIsoString(row.created_at),
+    updatedAt: toIsoString(row.updated_at),
+  });
+}
+
+function mapAgentSessionListRow(row = {}) {
+  return compact({
+    sessionId: row.id,
+    ownerId: row.user_id,
+    collaborationMode: row.collaboration_mode,
+    messageCount: Number(row.message_count || 0),
+    lastHeartbeatAt: toIsoString(row.last_heartbeat_at),
+    createdAt: toIsoString(row.created_at),
+    updatedAt: toIsoString(row.updated_at),
+  });
+}
+
+function mapAgentContextSnapshotRow(row = {}) {
+  const snapshot = row.snapshot_data && typeof row.snapshot_data === 'object'
+    ? row.snapshot_data
+    : {};
+  return compact({
+    snapshotId: row.snapshot_id,
+    sessionId: row.session_id,
+    sequence: Number(row.sequence),
+    activeSurface: snapshot.activeSurface,
+    canvasId: snapshot.canvasId,
+    canvasSummary: snapshot.canvasSummary,
+    selectedNodeIds: snapshot.selectedNodeIds,
+    viewport: snapshot.viewport,
+    recentEvents: snapshot.recentEvents,
+    inputBox: snapshot.inputBox,
+    availableTools: snapshot.availableTools,
+    capturedAt: toIsoString(row.captured_at),
+    createdAt: toIsoString(row.created_at),
+  });
+}
+
 function mapAgentToolCallRow(row = {}) {
   return compact({
     id: row.id,
@@ -90,6 +141,9 @@ function mapAgentSkillRow(row = {}) {
 module.exports = {
   mapAgentRunRow,
   mapAgentRunEventRow,
+  mapAgentSessionRow,
+  mapAgentSessionListRow,
+  mapAgentContextSnapshotRow,
   mapAgentToolCallRow,
   mapKnowledgeDocumentRow,
   mapAgentSkillRow,

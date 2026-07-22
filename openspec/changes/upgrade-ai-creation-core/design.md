@@ -129,26 +129,32 @@ interface AgentSessionDto {
   sessionId: string;
   ownerId: string;
   collaborationMode: 'direct' | 'assist' | 'takeover';
-  messages: AgentMessage[];         // 完整对话历史（用户/助手/系统）
-  summary: AgentSummary;            // 滚动摘要
-  toolResults: AgentToolResult[];     // 工具结果回填
-  knowledgeRefs: KnowledgeRef[];    // 知识引用
-  tokenBudget: TokenBudget;
-  confirmations: Confirmation[];      // 待确认/已确认授权
-  checkPoints: CheckPoint[];          // 检查点
+  messages: AgentSessionMessageDto[]; // 最多 200 条；附件只允许 Asset 引用
+  summary: AgentSessionSummaryDto;
+  toolResults: AgentSessionToolResultDto[];
+  knowledgeRefs: AgentSessionKnowledgeRefDto[];
+  tokenBudget: AgentTokenBudgetDto;
+  confirmations: Confirmation[];
+  checkpoints: CheckPoint[];
   lastHeartbeatAt: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface AgentContextSnapshotDto {
-  activeSurface: string;
+  snapshotId: string;
+  sessionId: string;
+  sequence: number;
+  activeSurface: AssistantWorkspaceSurface;
   canvasId?: string;
-  canvasSummary: CanvasSummary;
+  canvasSummary: { nodeCount: number; selectedNodeCount: number; generatedAssetCount: number };
   selectedNodeIds: string[];
   viewport: Viewport;
   recentEvents: CanvasEvent[];
-  inputBox?: InputBoxState;
-  availableTools: string[];         // 当前上下文可调用工具列表
+  inputBox?: { hasText: boolean; attachmentCount: number };
+  availableTools: string[];
+  capturedAt: string;
+  createdAt: string;
 }
 
 interface AgentRunEventDto {
@@ -163,6 +169,7 @@ interface AgentRunEventDto {
 
 **关键规则**：
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
+- migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；当前 Web 尚未接入，因此运行时仍不能宣称 Session 已切换到服务端权威。Context Snapshot 只保存计数、ID、视口、事件类型和工具名，不保存输入框原文、附件 bytes 或任意 payload。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
 - migration 020 先提供 metadata-only `run_snapshot` 事件基础；事件不得复制 user message、plan、tool input/output 或任意 `unknown` payload。Session 落地后，语义事件必须以新的 discriminated variant 和显式脱敏 payload schema 增量加入。
 - 当前 Web 仍以 Run 快照 hydration 为主；只有在 Web 消费 sequence cursor、拉取权威快照并完成跨设备 E2E 后，才能声明从服务端事件日志恢复而非本地 localStorage。
@@ -264,14 +271,19 @@ POST /api/v1/generation/jobs/:jobId/cancel
 ### 3.5 Agent Session / Run
 
 ```http
-POST /api/v1/agent/sessions
-GET /api/v1/agent/sessions/:sessionId
-POST /api/v1/agent/sessions/:sessionId/runs
-GET /api/v1/agent/sessions/:sessionId/runs/:runId
-POST /api/v1/agent/sessions/:sessionId/runs/:runId/confirm
-POST /api/v1/agent/sessions/:sessionId/runs/:runId/cancel
-POST /api/v1/agent/sessions/:sessionId/runs/:runId/recover
+GET  /api/ai-assistant/sessions
+POST /api/ai-assistant/sessions
+GET  /api/ai-assistant/sessions/:sessionId
+POST /api/ai-assistant/sessions/:sessionId/context-snapshots
+GET  /api/ai-assistant/sessions/:sessionId/context-snapshots/latest
+
+GET  /api/ai-assistant/runs
+POST /api/ai-assistant/runs
+GET  /api/ai-assistant/runs/:runId
+GET  /api/ai-assistant/runs/:runId/events
 ```
+
+Session/Context 与 Run/event 目前是两个 owner-scoped 数据面；Run 绑定 Session、confirm/cancel/recover 端点要在确认授权协议定型后再 additive 增加，禁止通过复用浏览器本地 Session ID 暗中授予执行权。
 
 ---
 

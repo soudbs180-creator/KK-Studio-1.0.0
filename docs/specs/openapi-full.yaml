@@ -2992,7 +2992,115 @@ paths:
                 $ref: '#/components/schemas/SuccessEnvelope'
 
   # ==================== AI Assistant ====================
+  /api/ai-assistant/sessions:
+    get:
+      tags: [AI Assistant]
+      summary: 列出当前用户的 Agent Session 轻量投影
+      operationId: listAgentSessions
+      responses:
+        '200':
+          description: 最近 50 个 Session，不展开消息正文
+          content:
+            application/json:
+              example:
+                ok: true
+                data:
+                  - sessionId: session-001
+                    collaborationMode: assist
+                    messageCount: 4
+                    updatedAt: '2026-07-22T04:00:00.000Z'
+    post:
+      tags: [AI Assistant]
+      summary: 保存 Agent Session 权威快照
+      description: "`ownerId` 由认证上下文提供；过期 `updatedAt` 返回当前 owner 的权威数据并标记 stale。"
+      operationId: upsertAgentSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              sessionId: session-001
+              collaborationMode: assist
+              messages: []
+              summary:
+                text: ''
+                coveredMessageCount: 0
+                updatedAt: '2026-07-22T04:00:00.000Z'
+              toolResults: []
+              knowledgeRefs: []
+              tokenBudget: { maxTokens: 10000, usedTokens: 0, reservedTokens: 500 }
+              confirmations: []
+              checkpoints: []
+              lastHeartbeatAt: '2026-07-22T04:00:00.000Z'
+              createdAt: '2026-07-22T04:00:00.000Z'
+              updatedAt: '2026-07-22T04:00:00.000Z'
+      responses:
+        '200': { description: 保存结果（可能 stale） }
+        '400': { description: 严格 Session 契约校验失败 }
+        '409': { description: Session ID 所有权冲突 }
+  /api/ai-assistant/sessions/{sessionId}:
+    get:
+      tags: [AI Assistant]
+      summary: 读取当前用户的完整 Agent Session
+      operationId: getAgentSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Agent Session 权威快照 }
+        '404': { description: Session 不存在或不属于当前用户 }
+  /api/ai-assistant/sessions/{sessionId}/context-snapshots:
+    post:
+      tags: [AI Assistant]
+      summary: 追加幂等 Agent Context Snapshot
+      description: 只接受画布计数、节点 ID、视口与工具名；不接受输入框原文、附件 bytes 或任意 payload。
+      operationId: appendAgentContextSnapshot
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              snapshotId: snapshot-001
+              activeSurface: canvas
+              canvasId: canvas-001
+              canvasSummary: { nodeCount: 4, selectedNodeCount: 1, generatedAssetCount: 2 }
+              selectedNodeIds: [node-001]
+              viewport: { x: 0, y: 0, width: 1280, height: 720, zoom: 1 }
+              recentEvents: []
+              inputBox: { hasText: true, attachmentCount: 0 }
+              availableTools: [canvas.inspect]
+              capturedAt: '2026-07-22T04:00:00.000Z'
+      responses:
+        '200': { description: 新增或已存在的同 ID Snapshot }
+        '400': { description: 严格 Context Snapshot 契约校验失败 }
+        '409': { description: Session 或 Snapshot ID 所有权冲突 }
+  /api/ai-assistant/sessions/{sessionId}/context-snapshots/latest:
+    get:
+      tags: [AI Assistant]
+      summary: 读取当前用户 Session 的最新 Context Snapshot
+      operationId: getLatestAgentContextSnapshot
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 最新 Snapshot；尚无快照时 data 为 null }
+        '404': { description: Session 不存在或不属于当前用户 }
   /api/ai-assistant/runs:
+    get:
+      tags: [AI Assistant]
+      summary: 列出当前用户最近的 Agent Run
+      operationId: listAgentRuns
+      responses:
+        '200': { description: 最近 50 个 owner-scoped Run }
     post:
       tags: [AI Assistant]
       summary: 保存 Agent 运行记录
@@ -3022,6 +3130,36 @@ paths:
                   id: run-001
                   status: running
                   updatedAt: '2026-07-21T04:00:00.000Z'
+  /api/ai-assistant/runs/{runId}:
+    get:
+      tags: [AI Assistant]
+      summary: 读取当前用户的一条 Agent Run
+      operationId: getAgentRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Agent Run 权威快照 }
+        '404': { description: Run 不存在或不属于当前用户 }
+  /api/ai-assistant/runs/{runId}/events:
+    get:
+      tags: [AI Assistant]
+      summary: 增量读取 metadata-only Agent Run 事件
+      operationId: listAgentRunEvents
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: afterSequence
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: 最多 100 条按 sequence 升序排列的 run_snapshot }
+        '400': { description: afterSequence 不是非负安全整数 }
+        '404': { description: Run 不存在或不属于当前用户 }
   /api/ai-assistant/tool-calls:
     post:
       tags: [AI Assistant]
