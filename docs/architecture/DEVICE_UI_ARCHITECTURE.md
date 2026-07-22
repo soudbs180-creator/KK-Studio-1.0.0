@@ -21,7 +21,7 @@ Status: reference
 推荐结构：
 
 ```text
-src/components/feature-name/
+apps/web/src/components/feature-name/
   FeatureRoot.tsx              # 共享逻辑入口
   feature-name/
     FeatureMobile.tsx          # 手机端布局
@@ -40,14 +40,14 @@ src/components/feature-name/
 
 `PromptBar` 已开始采用该结构：
 
-- `src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
   - 保留共享逻辑和状态管理
-- `src/components/layout/prompt-bar/PromptBarTopRowMobile.tsx`
-- `src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx`
-- `src/components/layout/prompt-bar/PromptBarTopRow.tsx`
-- `src/components/layout/prompt-bar/PromptBarFooterMobile.tsx`
-- `src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx`
-- `src/components/layout/prompt-bar/PromptBarFooter.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRowMobile.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRow.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarFooterMobile.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarFooter.tsx`
 
 这表示：
 

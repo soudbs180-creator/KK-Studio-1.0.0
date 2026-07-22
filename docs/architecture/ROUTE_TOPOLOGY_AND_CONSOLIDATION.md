@@ -1,75 +1,88 @@
 Status: reference
 
 <!-- AI_ROUTING_KEY: routing, dispatcher, consolidation, refactor, generate -->
-# services/api/routes 路由拓扑与合并方案（WS-3 只读分析）
+# services/api 路由拓扑与收敛边界
 
-> 本文档为**只读分析**，不改任何运行代码。依据 `services/api/index.js` 实际装配与各 router 体量。
-> 关联 Issue #6（WS-3）、母 Issue #3（完善 API 路由系统）。
+Last verified: 2026-07-22
 
-## 1. 实际挂载拓扑（来自 services/api/index.js）
+本文件记录当前 Express 路由装配事实及剩余兼容边界。当前源码、`services/api/index.js` 与 `services/api/routes/api.js` 优先于历史分析。
 
-按 `app.use` 注册顺序（顺序即优先级，先注册先匹配）：
+## 1. 当前装配拓扑
 
-| 顺序 | 挂载前缀 | Router | 体量 | 说明 |
-|---|---|---|---|---|
-| 1 | `/webhook` | webhook | 5KB | Stripe 等回调，独立，OK |
-| 2 | `/api` | **user-api-payload-router** | 10KB | 保存用户 API 配置；注释：必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据 |
-| 3 | `/api` | **user-wuyin-strict-router** | 25KB | Wuyin 专用严格路由 |
-| 4 | `/api` | **user-ai-router** | 12KB | 用户自带 Key 的新 AI Router；注释：只接管 `mode=chat`，其它模式 `next()` 回落旧逻辑 |
-| 5 | `/api` | **user (legacy)** | **98KB** | 巨石 god file，承载大量历史端点 |
-| 6 | `/api` | **credit-provider-router** | 12KB | 注释：必须挂在 legacy adminRouter 前，否则旧路由会吞掉 requestProfileId/routeStrategy |
-| 7 | `/api` | **admin (legacy)** | 25KB | 管理端 |
-| 8 | `/api` | provider-probe | 4KB | 供应商探测 |
-| 9 | `/api` | chat | 6KB | |
-| 10 | `/api` | generate-image | 0.6KB | |
-| 11 | `/api` | ocr | 4KB | |
-| 12 | `/api` | ai-assistant | 7KB | |
-| 13 | `/api` | config | 0.7KB | |
-| 14 | （无前缀，兜底） | **contract-compat** | **48KB** | 兼容层，挂在最后兜所有未命中 |
-| 15 | `/` | telemetry | 2KB | |
+`services/api/index.js` 只挂载四个顶层入口：
 
-## 2. 核心问题：脆弱的“顺序 + 回落”路由
-
-- **6 个 router 共用 `/api` 前缀**（第 2~13 行多数），**靠注册顺序 + `next()` 回落**到 98KB 的 legacy `user.js` / `admin.js` 才能正确工作。
-- `services/api/index.js` 自带注释印证脆弱性：
-  - “用户自带 Key 的新 AI Router 必须挂在 legacy userRouter 前；只接管 mode=chat，其它模式 next() 回落旧逻辑。”
-  - “credit-provider-router 必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。”
-- 后果：任何挂载顺序调整、或某 router 误吞请求，都会**静默改变计费/路由行为**；新人/AI 极难安全改动。
-- `contract-compat.js`(48KB) 作为无前缀兜底，进一步放大“谁处理了这个请求”的不确定性。
-
-## 3. 目标拓扑（收敛）
-
-所有“模型/供应商/生成/代理”请求收敛为两条标准入口，内部统一走 `services/api/lib/dispatcher`（已存在的 adapterRegistry + providerProfiles）：
-
-```
-POST /api/v1/generate          # 同步生成（chat/image 同步）
-POST /api/v1/generate/async    # 异步提交 -> 返回 jobId
-GET  /api/v1/generate/:jobId   # 异步轮询
-```
-
-- 鉴权/计费/限流作为中间件统一前置，不再分散在各 router。
-- 旧端点保留为 **薄适配层**：内部转调 dispatcher，并打 `@deprecated` 与调用计数埋点。
-
-## 4. 分阶段迁移（小步、影子并存、可回滚）
-
-| 阶段 | 内容 | 风险 | 回滚 |
+| 顺序 | 挂载前缀 | 当前 owner | 说明 |
 |---|---|---|---|
-| S0 | 加路由调用计数埋点（telemetry），摸清各 router 真实流量与未命中回落次数 | 极低（只读埋点） | 移除埋点 |
-| S1 | 新建 `/api/v1/generate*` 入口，内部走 dispatcher；与旧路径**影子并存**（不切流量） | 低 | 不挂载新路由 |
-| S2 | 前端/客户端按模型逐类切到新入口；旧入口转薄适配层 | 中（计费主链路） | 切回旧入口 |
-| S3 | `user.js`(98KB) 按域拆分：`user/auth.js`、`user/credits.js`、`user/assets.js`、`user/profile.js`、`user/api-config.js` | 中 | 分文件 PR，逐个回滚 |
-| S4 | 合并 `user-ai-router`/`user-api-payload-router`/`user-wuyin-strict-router`/`chat`/`generate-image` 的重叠职责到 dispatcher 入口；移除顺序依赖 | 高 | 指标无回退后再删旧 |
-| S5 | 评估 `contract-compat.js`(48KB) 兜底是否仍需要；能命名化的端点显式化 | 中 | 保留兜底 |
+| 1 | `/webhook` | `services/api/routes/webhook.js` | 支付与 Provider 回调。 |
+| 2 | `/api` | `services/api/routes/api.js` | 统一 API namespace，内部以确定顺序组合领域 router。 |
+| 3 | 无前缀 | `services/api/routes/contract-compat.js` | 已登记的薄兼容入口；只能在显式删除门禁后缩减。 |
+| 4 | `/` | `services/api/routes/telemetry.js` | 运行诊断与遥测。 |
 
-## 5. 验证门禁（每阶段）
-`npm run verify:changes`（含 architecture/governance/typecheck/test/governance:providers）+ 计费回归 + 灰度 + 审计回放。
+`services/api/routes/api.js` 当前按以下顺序组合：
 
-## 6. user.js(98KB) 拆分清单（建议域边界）
-- `auth`：登录/JWT/会话
-- `credits`：余额预扣/结算/退款（计费核心，最高敏感）
-- `api-config`：用户 API 配置保存（与 user-api-payload-router 职责重叠，应合并）
-- `assets`：静态资产/落盘
-- `profile`：用户资料
-- `model/generation`：迁移到 dispatcher 入口
+```text
+generate-v1
+→ generation-v3
+→ capability-graph
+→ user-api-payload-router
+→ user
+→ admin
+→ provider-probe
+→ ocr
+→ ai-assistant
+→ config
+```
 
-> 拆分时严禁改变计费事务边界与幂等键；每个子模块独立 PR + 契约测试。
+顺序仍是兼容契约的一部分，但不再由 `services/api/index.js` 分散注册。
+
+## 2. 用户路由职责
+
+`services/api/routes/user.js` 是无业务逻辑的组合入口：
+
+- `services/api/routes/user/auth.js`：认证、密码、JWT 与 Session。
+- `services/api/routes/user/profile.js`：用户资料、Key Manager、用户 Provider 路由和兼容代理。
+- `services/api/routes/user/wuyin.js`：Wuyin catalog、refresh 与 `/pricing-proxy` 的 HTTP owner。
+- `services/api/routes/user/shared/requestContext.js`：共享 owner 解析、请求元数据与响应 envelope，不承载领域业务。
+
+公开路径、DTO、状态码和响应 envelope 在拆分中保持不变。新增用户领域路由必须进入对应 owner，禁止重新把业务写回 `services/api/routes/user.js`。
+
+## 3. 生成控制面
+
+当前主链路分为兼容入口与 v3 权威控制面：
+
+```text
+POST /api/v1/generate
+POST /api/v1/generate/async
+  → services/api/routes/generate-v1.js
+  → generation-v3 Quote / Job / Billing bridge
+
+POST /api/v1/generation/quotes
+POST /api/v1/generation/jobs
+POST /api/v1/generation/jobs/:jobId/submit
+GET  /api/v1/generation/jobs/:jobId
+POST /api/v1/generation/jobs/:jobId/control
+  → services/api/routes/generation-v3.js
+  → services/api/lib/generation-v3/
+```
+
+图片 Durable Worker 只在服务端用户 scope flag 命中时接管 v3 submit；默认 `off` 保持旧同步提交。视频与音频仍未切入服务端 Worker，不得提前删除浏览器兼容轮询。
+
+## 4. 剩余偏差与删除门禁
+
+- `user-api-payload-router.js` 与规范化 Provider Connection 仍处于 dual-read 兼容期。
+- `contract-compat.js` 继续保留已登记操作，不允许恢复成无边界巨石 router。
+- 旧生成入口只能在客户端切流、flag 回滚验证和观测窗口完成后缩减。
+- Provider、Model、Capability 与 pricing 只能从 canonical catalog / 服务端投影读取，禁止在新 router 复制目录。
+
+## 5. 验证
+
+每次调整路由装配至少运行：
+
+```bash
+npm run architecture:check
+npm run governance:check
+npm run typecheck
+npm run test
+```
+
+涉及计费、Provider 或兼容入口时追加完整 `verify:changes`，并在 Handoff 记录 flag、回滚、观测和删除条件。

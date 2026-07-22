@@ -6,12 +6,15 @@ KK Studio data access is routed through the current `services/api/` backend and 
 
 Canonical paths:
 
-- Auth and browser sessions: `services/api/routes/user.js`
-- User profile/API settings: `services/api/routes/user.js` and `services/api/routes/user-api-payload-router.js`
+- Auth and browser sessions: `services/api/routes/user/auth.js`
+- User profile/API settings: `services/api/routes/user/profile.js` and `services/api/routes/user-api-payload-router.js`
+- Wuyin catalog/refresh/pricing proxy: `services/api/routes/user/wuyin.js`
+- Shared request owner/meta/envelope: `services/api/routes/user/shared/requestContext.js`
 - Billing balance, debit, recharge, and refund: `services/api/routes/credits.js` and related `services/api/routes`
 - Admin model pricing and provider route keys: `services/api/routes/admin.js`
 - Canvas persistence: current `services/api/` routes plus `packages/shared` contracts
-- System and user model proxy calls: `services/api/routes/user-wuyin-strict-router.js` and related model routes
+- User model proxy calls: `services/api/routes/user/profile.js`; Wuyin catalog HTTP ownership remains isolated in `services/api/routes/user/wuyin.js`
+- Quote/Job/Worker: `services/api/lib/generation-v3/` and `services/api/lib/generation-v3/worker/`
 - Payment settlement: `services/api/routes/webhook.js`
 
 Frontend access rules:

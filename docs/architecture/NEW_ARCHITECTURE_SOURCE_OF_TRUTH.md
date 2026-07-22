@@ -38,13 +38,16 @@ KK Studio 的无限画布针对 1000+ 节点卡片的场景进行了专门的轻
 
 ---
 
-## 2. API 生成智能路由决策 (ProviderRouteEngine)
+## 2. API 生成路由权威与浏览器投影
 
-* **实现类**：[ProviderRouteEngine.ts](../../apps/web/src/core/routing/ProviderRouteEngine.ts) 与 [routePolicies.ts](../../apps/web/src/core/routing/routePolicies.ts)
-* **路由行为**：
-  * **桌面端优先本地**：检测到桌面端设备且本地 runner 可达并拥有有效本地 API 密钥时，默认路由至 `local-runner`。
-  * **云端补位/海外代理**：本地失败或无 VPN 网络可达时，允许走云端加密用户 Key (`cloud-user-key`) 或走平台代理和积分积分模式 (`cloud-platform-key`)。
-  * **手机端云端优先**：手机端默认直接路由至云端，不支持强制本地化存储。
+* **服务端权威实现**：`services/api/lib/generation-v3/routeEngine.js` 冻结 Provider、Model、Channel、Adapter Version 与 Connection route；Quote、Job、Billing 和 Worker 都消费同一 route snapshot。
+* **浏览器兼容投影**：[ProviderRouteEngine.ts](../../apps/web/src/core/routing/ProviderRouteEngine.ts) 与 [routePolicies.ts](../../apps/web/src/core/routing/routePolicies.ts) 继续负责设备能力、用户偏好和 setup-required 的交互建议。
+* **边界规则**：浏览器路由只提供交互投影，不拥有最终 Provider、计费或 Job 决策；实际提交必须由服务端重新校验并使用冻结 route snapshot。
+* **当前兼容行为**：
+  * 桌面端可优先建议 `local-runner`，但未通过安全 gate 的 Local Runner 仍是 experimental。
+  * 云端用户 Key 与平台积分由服务端按互斥 Channel 执行，浏览器不能自行切换或扣费。
+  * 手机端默认建议云端能力，不把本地 Runtime 当作必需依赖。
+* **Worker 状态**：image Durable Worker 代码基础位于 `services/api/lib/generation-v3/worker/`，默认 flag 为 `off`；migration rehearsal、internal 灰度和恢复 E2E 通过前不得描述为线上权威执行路径。
 
 ---
 

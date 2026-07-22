@@ -148,7 +148,7 @@
 | Provider Connection 存储与验证 | `infrastructure/database/migrations/018_capability_graph_foundation.sql` / `services/api/lib/capability-graph/providerConnectionService.js` / `connectionVerifier.js` |
 | Agent capability tool | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` |
 | Server image Durable Worker | `infrastructure/database/migrations/019_generation_image_worker.sql` / `packages/shared/src/generation-worker/` / `services/api/lib/generation-v3/worker/` |
-| local-runner 独立构建未入 release 验证 | `local-runner/package.json` |
+| local-runner build/typecheck 已纳入 verify:changes，但安全 gate 未闭环 | `package.json` / `local-runner/package.json` / `local-runner/src/security/localToken.ts` |
 
 ---
 
