@@ -8,8 +8,13 @@ function resolveApiKey(input) {
   return input.auth?.apiKey || process.env.OPENAI_COMPATIBLE_API_KEY || '';
 }
 
+function resolveBaseUrl(input) {
+  return input.auth?.endpoint || process.env.OPENAI_COMPATIBLE_BASE_URL || '';
+}
+
 async function submit(input) {
   const apiKey = resolveApiKey(input);
+  const baseUrl = resolveBaseUrl(input);
   if (!apiKey) {
     const err = new Error('OpenAI-compatible provider API key is missing.');
     err.code = 'SETUP_REQUIRED';
@@ -17,17 +22,15 @@ async function submit(input) {
     throw err;
   }
 
-  // 旧适配器从环境变量读取 key；这里优先通过 env 注入，后续支持 keySlot
-  if (input.auth?.apiKey) {
-    process.env.OPENAI_COMPATIBLE_API_KEY = apiKey;
-  }
-
+  // Keep owner credentials request-scoped; the legacy adapter only falls back to env when absent.
   const result = await legacyAdapter.generateImage({
     requestId: input.requestId,
     modelId: input.modelId,
     prompt: input.prompt,
     size: input.size || '1024x1024',
     referenceImages: input.referenceImages || [],
+    apiKey,
+    baseUrl,
   });
 
   return {
