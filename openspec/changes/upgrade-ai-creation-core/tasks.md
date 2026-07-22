@@ -1,8 +1,8 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
+> Status: active / Phase 2a foundations landed / local control-plane gaps and external rollout gates pending
 > Last updated: 2026-07-22
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection and server image Worker code foundations completed; migration rehearsal, rollout and recovery E2E remain open.
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection and server image Worker code foundations landed; image-slice data-plane gating, Worker drain-safe rollback, cross-device Job discovery, migration rehearsal and rollout remain open.
 
 ---
 
@@ -59,10 +59,12 @@
 
 - [x] migration `018_capability_graph_foundation.sql`：新增 `provider_connections`、`capability_bindings` 与 asset lineage relation；additive，不保存明文 secret；迁移专项测试已覆盖结构、幂等与安全约束。
 - [x] Capability Graph DTO（Zod discriminated union）+ projection service + `GET /api/v1/capability-graph/snapshot`；Actor/Job/Run/Audit 从现有权威表投影，不建 EAV 节点表。
-- [x] Provider Connection CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）；新写入走 `provider_connections`，兼容读取仍保留删除门禁。
+- [x] Provider Connection 新表 CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）。
+- [ ] 建立旧 `ApiSettings`/profile 凭据栈到 `provider_connections` 的安全迁移/dual-read adapter，完成切流与观测窗口后再停止旧写入和读取；当前两套栈仍平行运行。
 - [x] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
 - [x] 首个纵向切片的代码基础：Google official image credentials / adapter、`FakeProviderAdapter` 测试路径与 server flag `capability_graph.image_provider_slice` 已落地。
-- [ ] 完成 `capability_graph.image_provider_slice` 的 internal → invited → full 灰度与关闭 flag 回退验证；在切流验收前不删除旧 connection 读取。
+- [ ] 将 `capability_graph.image_provider_slice` 接入实际 Quote/生成数据面；当前 flag 只保护 Capability Graph/Connection 管理 API，已知 `connectionId` 仍可在 off 时进入新路由。
+- [ ] 完成 `capability_graph.image_provider_slice` 的 off → internal → invited → full → off 集成测试、环境模板、匿名 rollout 指标与真实灰度；切流验收前不删除旧凭据栈。
 - [x] Asset lineage：生成 Asset 记录源资产、派生关系与参数；Quote 冻结字段扩展为 `connectionId/provider/model/capability/channel/requestProfile/priceVersion`。
 - [x] 在 `services/api/` 新增 image Worker 子系统：migration 019 租约表、`FOR UPDATE SKIP LOCKED` 领取、token 防陈旧写、心跳续约、提交、指数退避轮询、取消、单次调用超时、Job 总时限与租约失效恢复。
 - [x] 实现 Worker 与冻结图像 Provider Adapter 对接；`GENERATION_IMAGE_DURABLE_WORKER_ENABLED=off` 默认保持原同步路径，并支持 `internal → invited → full` user allowlist scope，命中用户的 `POST .../submit` 才入服务端队列。
@@ -72,11 +74,13 @@
 - [ ] 在受控 PostgreSQL 按 001→019 顺序演练 migration 019 的空库、存量库与重复执行，并验证 migration 018 数据原样保留。
   - 安全入口已就绪：`npm run rehearse:migration:019` 只接受专用 `KK_MIGRATION_*` 变量、名称含 `rehearsal` 且明确确认的空数据库；工具执行 bootstrap + 001→018、写入 018 sentinel、执行 019 两次并核对 sentinel/lease。当前机器无真实 PostgreSQL，故本 gate 保持未完成。
 - [ ] 完成 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` internal 灰度、关闭 flag 回退旧同步提交以及运行指标观测。
-  - [x] 控制面 characterization 已覆盖：`off`/未命中用户只走旧同步提交，命中 internal 的 image 才入队，非 image 回退同步；Worker loop 在 `off` 不启动。既有 `/v1/metrics` envelope 增加无 user/job/payload 的聚合 Worker outcome、延迟、submit/poll/cancel 与 durable/legacy 计数。真实 internal 放量和观测窗口仍未执行。
+  - [x] 新任务 admission characterization 已覆盖：`off`/未命中用户只走旧同步提交，命中 internal 的 image 才入队，非 image 回退同步。既有 `/v1/metrics` envelope 增加无 user/job/payload 的聚合 Worker outcome、延迟、submit/poll/cancel 与 durable/legacy 计数。
+  - [ ] 将新任务 admission 与存量 execution/drain 解耦；当前 `off` 同时停止 Worker loop 并跳过 durable cancel，可能冻结已入队 lease。补 internal → off 后存量完成/取消的非破坏性回滚测试。
   - [x] 计费/报价聚合观测已接入同一 metrics envelope：覆盖 quote expired、frozen route stale、重复 completion 拦截、reserve/charge/refund 成功与失败、charge no-op；不记录用户、Job、Quote、金额或错误文本。`chargeFromReservation` 只允许 `committed reserve` 单向结算并通过 `RETURNING` 识别重复写。真实账本观测窗口仍未执行。
 - [ ] 真实浏览器关闭/重新登录后通过 SSE 事件流恢复 Job 投影，并完成跨设备 E2E。
   - [x] 服务端 `/api/v1/generation/jobs/:jobId/events` 已提供 owner-scoped 全量 Job 投影：owner 校验命中后才打开 SSE，投影变化时推送共享 `GenerationJobEvent`，含 heartbeat、终态关闭与断连清理。浏览器消费、重连和跨设备 E2E 仍未完成。
   - [x] Web `useTaskRecovery` 已接入鉴权 fetch-stream consumer：共享 schema 校验投影、单会话一次 token refresh、非终态断流指数退避、owner 变化/卸载 abort，UUID 任务在 404 或网络失败时回退旧轮询。真实浏览器关闭/重新登录与跨设备 E2E 仍未执行。
+  - [ ] 新增 owner-scoped v3 pending Job list/discovery 与 Web hydration；当前恢复只扫描本机 localStorage 且要求画布已有对应节点，第二设备无法发现 Job ID。
 - [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
 - [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 
@@ -100,7 +104,8 @@
 - [ ] 实现 Token 预算分配规则并写入 OpenSpec 可测契约。
 - [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
 - [ ] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名。
-- [ ] 将 `AgentRunStore` 从 localStorage 升级为服务端权威源，reload 时不再置 failed。
+- [x] Agent Run 单向服务端同步基础：owner-scoped local projection、pending sync marker、启动/online 重试与陈旧服务端快照协调已落地。
+- [ ] 将 `AgentRunStore` 升级为服务端读取/事件恢复权威源，新增 Session/Run list/get API；reload 时不再把 active Run 置 failed。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。

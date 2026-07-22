@@ -35,7 +35,7 @@ Docs governance: 227 Markdown / 19 current (docs/governance/DOCUMENTATION_INDEX.
 | AI Takeover | `apps/web/src/features/ai-takeover/` | AI 接管体验入口。 |
 | AI Runtime | `apps/web/src/features/ai-assistant-runtime/` | ToolRegistry、CanvasRuntimeState、执行与知识同步。 |
 | Generation v3 | `services/api/lib/generation-v3/`、`services/api/routes/generation-v3.js` | Quote、Job、Billing、RouteEngine 与 Provider Adapter 当前控制面。 |
-| Capability Graph / Image Worker | `packages/shared/src/capability-graph/`、`packages/shared/src/generation-worker/`、`services/api/lib/capability-graph/`、`services/api/lib/generation-v3/worker/` | Capability Graph、Provider Connection 与 server image Worker 代码基础已落地；Worker flag 默认关闭，migration rehearsal、灰度和恢复 E2E 尚未完成。 |
+| Capability Graph / Image Worker | `packages/shared/src/capability-graph/`、`packages/shared/src/generation-worker/`、`services/api/lib/capability-graph/`、`services/api/lib/generation-v3/worker/` | Capability Graph、Provider Connection 与 server image Worker 代码基础已落地；image slice 数据面门禁、Worker 存量 drain/cancel、跨设备 Job discovery 仍有本地缺口，之后才进入 migration rehearsal、灰度和恢复 E2E。 |
 | Active OpenSpec | `openspec/changes/upgrade-ai-creation-core/` | 唯一活动升级计划；Capability Graph、Worker、Run 恢复、本地媒体与 IA 均在此跟踪。 |
 | Local Runner | `local-runner/` | 当前仅为 Browser/OpenCLI experimental runtime；typecheck/build 当前通过，但安全 gate 未通过，仍不是生产媒体运行时。 |
 
@@ -95,31 +95,34 @@ npm run local-runner:build
 4. 当前 Web 入口固定为 `apps/web/`，当前后端入口固定为 `services/api/`。
 5. 旧目录不存在或只能在 archive 文档中出现；不得在 active runtime 中恢复。
 6. Provider、Provider Connection、Model 与 Capability 必须是不同领域对象；UI、Agent 与 RouteEngine 只消费 canonical catalog 和服务端 Connection 投影。
-7. Browser 只持有交互和离线投影；VPS 是 Job/Run/Quote/Billing 权威源；Local Runner 只执行声明式、受权限约束的本地能力。
+7. 目标架构要求 Browser 只持有交互和离线投影，VPS 成为 Job/Run/Quote/Billing 权威源；当前 Job/Quote/Billing 已进入服务端控制面，Agent Run 只有单向快照 upsert，读取/事件恢复仍以浏览器 localStorage 为主。Local Runner 只执行声明式、受权限约束的本地能力。
 8. 现有 `direct | assist | takeover`、ToolRegistry、CanvasRuntimeState 与 AgentRunStore 是共享事实，不为新 IA 建立副本。
 9. `upgrade-ai-creation-core` 是唯一活动 change；禁止创建平行 Capability Graph、Provider registry、AI runtime 或 queue 计划。
 10. 每个 PR 的验收门禁见 `openspec/changes/upgrade-ai-creation-core/tasks.md` 文末"PR 验收模板"。
 
-## 5. 2026-07-22 - Phase 2 image Worker 基础完成，灰度与恢复 E2E 待验证
+## 5. 2026-07-22 - Phase 2 image Worker 基础完成，本地控制面与外部门禁待闭环
 
 ### Current facts
 
 - Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 227 份 Markdown、19 份 current、0 conflict。
 - Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
-- Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。
+- Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试；但 image slice flag 当前只保护管理 API，尚未门禁 Quote/生成数据面。
+- 新 Provider Connection 与旧 `ApiSettings`/profile 凭据栈仍是平行读写；当前没有把旧 payload 投影为新 Connection 的 dual-read adapter，不能把兼容迁移描述为已完成。
 - 服务端用户路由职责已收敛，共享请求上下文与热点文件可维护性递减门禁已建立。
 - `ChatSidebar` 的模型目录、assistant capability 默认选择、Key 优先级与订阅同步已迁入严格 model controller；会话持久化、活动消息同步、树投影、分支与导入算法已迁入严格 session controller/data 模块。热点 baseline 已从 4677 行/23 个显式 `any` 连续降至 4040 行/21 个，公开交互、storage key 和导入导出格式不变。
 - image Durable Worker 的 migration 019、租约领取、token/heartbeat、冻结路由提交、指数退避轮询、取消、超时、恢复和 Item 幂等代码已实现，并通过无浏览器参与、Worker 重建与过期租约的 characterization 测试；lease 丢失不再伪报终态或重试，迟到回调不能复活或降级终态 Item。
-- `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`；切流 helper 与 Worker loop characterization 已证明 `off`/未命中用户保留旧同步提交。既有 `/v1/metrics` 现提供不含业务标识或 payload 的 Worker 与计费聚合指标；owner-scoped Job SSE 已具备服务端投影和 Web 鉴权 fetch-stream 恢复代码，404/网络异常继续回退旧轮询。migration 019 尚未在受控 PostgreSQL 执行，实际 internal 放量、真实浏览器关闭/重新登录、跨设备恢复和生产观测窗口仍未完成，不得描述为已上线能力。
+- `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`；切流 helper 已证明 `off`/未命中用户的新提交保留旧同步路径。但同一 flag 也会停止 Worker loop 并跳过 durable cancel，关闭时可能冻结存量 lease，尚未形成安全 drain 语义。owner-scoped Job SSE 已具备服务端投影和 Web 鉴权 fetch-stream 恢复代码，但 Web 只从本机任务投影发现 Job，v3 缺 owner-scoped pending list，跨设备恢复目前不是单纯缺真实 E2E。migration 019、实际放量和生产观测均未完成，不得描述为已上线能力。
+- Agent Run 已有 owner-scoped local projection、服务端 upsert 重试和陈旧快照协调，但没有 Session/Run list/get/event API；reload 仍把 active Run 置 failed，VPS 尚不是 Run 恢复权威源。
 - Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标。
 - 当前 GitHub HEAD 的外部失败状态来自 Vercel 团队归属；仓库代码和 GitHub Actions 日志无法修复该外部配置。
 
 ### Next execution gate
 
-1. 在受控空 PostgreSQL 配置专用 `KK_MIGRATION_*` 变量并运行 `npm run rehearse:migration:019`，按序演练 bootstrap、001→018、带 sentinel 的存量状态和 019 重复执行，确认 migration 018 数据未变化。
-2. 在受控实例开启 `GENERATION_IMAGE_DURABLE_WORKER_ENABLED=internal`，通过既有 `/v1/metrics` 观察 Worker 延迟、lease_lost、submit/poll 比例和 durable/legacy 切流；随后关闭 flag，实证回退旧同步提交且不删除 lease/Capability Graph 数据。
-3. 补真实浏览器关闭、Worker 进程重启、租约失效、重新登录/SSE 投影和跨设备 E2E，并观察延迟、重复 submit、扣费与退款指标。
-4. 通过上述 gate 后再扩展视频/音频 Worker；Local Runner、真实媒体 runtime 与新版 IA 按后续阶段独立演进。
+1. 先把 `capability_graph.image_provider_slice` 接入 Quote/生成数据面，补齐 `off → internal → invited → full → off` 的本地集成测试、环境模板与匿名聚合指标。
+2. 将 Worker 新任务 admission 与存量 execution/drain 解耦；关闭 admission 后仍允许既有 lease 完成或取消，并用 characterization 锁定 internal → off 的非破坏性回滚。
+3. 增加 owner-scoped v3 pending Job discovery 与 Web hydration，使重新登录/第二设备能够发现 Job，再补真实浏览器关闭、SSE 和跨设备 E2E。
+4. 在受控 PostgreSQL 运行 `npm run rehearse:migration:019`，随后对 internal 用户放量并观察 Worker、计费、重复 submit 与回退指标。
+5. 上述 gate 通过后再扩展视频/音频 Worker；Phase 3 Agent Session/Run 权威源作为独立纵向切片推进，不与 Worker 回滚修复混入同一提交。
 
 ### Required PR evidence
 

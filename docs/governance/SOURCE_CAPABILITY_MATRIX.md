@@ -35,10 +35,10 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 2.1 | 浏览器侧持久化队列 | 完全 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365`，localStorage 持久化。 | upgrade |
-| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；同目录 `imageWorker.js`、`workerSubmissionRouter.js`、`workerLoop.js` 实现恢复、切流与关闭回退，`workerMetrics.js` 通过既有 `services/api/routes/telemetry.js` 输出无业务 payload 的聚合指标。flag 默认关闭且真实数据库/internal 灰度未验收。 | upgrade |
-| 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，Web `generationJobEventClient.ts`/`generationJobRecovery.ts` 已接入鉴权、重连、abort 和旧轮询回退。真实浏览器关闭/重新登录及跨设备 E2E 未完成，视频/音频仍由浏览器轮询。 | upgrade |
-| 2.4 | 双轨执行 | 不符合 | `DurableGenerationQueue.ts:365`（前端）与 `apps/web/src/core/generation/GenerationEngine.ts:15` 并行存在。 | upgrade |
+| 2.1 | 浏览器侧持久化队列 | 完全 | `DurableGenerationQueue.ts:391-427,511-512` 提供 owner-scoped localStorage；`GenerationQueueSync.ts:60-75,151-205,228-240` 提供 IndexedDB mirror、鉴权服务端投影与 claim 同步。未切流任务仍由浏览器执行，跨设备续跑未验收。 | upgrade |
+| 2.2 | 服务端 Durable Worker | 部分 | `services/api/lib/generation-v3/worker/workerStore.js` 与 migration 019 实现 Item lease、`SKIP LOCKED`、token、heartbeat、取消与结算；同目录 Worker 已覆盖恢复、切流、指标与关闭后新提交回退。但同一个 flag 也令 `workerLoop.js:24-30` 停止处理存量任务，`generation-v3.js:165-167` 在 off 时跳过 durable cancel，尚缺 admission-off 后 drain/cancel 的安全回滚语义；真实数据库/internal 灰度亦未验收。 | upgrade |
+| 2.3 | 关闭浏览器后续跑 | 部分 | server loop characterization 已覆盖无浏览器续跑、Worker 重建与过期租约恢复；`jobEventStream.js` 提供 owner-scoped SSE，Web `generationJobEventClient.ts`/`generationJobRecovery.ts` 已接入鉴权、重连、abort 和旧轮询回退。但恢复发现仍依赖本机 `taskPersistence.ts:194-230,348-353` 与当前画布节点，v3 API 无 owner-scoped pending Job 列表；真实重新登录/跨设备 E2E 尚不能成立，视频/音频仍由浏览器轮询。 | upgrade |
+| 2.4 | 执行权威未统一 | 不符合 | AI batch 生命周期先进入 `DurableGenerationQueue`，随后仍经 `useImageGeneration → generationService → TaskOrchestrator → GenerationEngine` 分发；部分 direct UI/legacy 路径绕过 Queue，server image Worker 又只在 flag 命中时接管。当前问题是执行生命周期权威未统一，而非两个完全独立 engine。 | upgrade |
 
 ## 3. 计费与对账
 
@@ -56,8 +56,8 @@
 | 4.1 | IntentGate -> Planner -> ToolRegistry -> PermissionPolicy 链路 | 完全 | `apps/web/src/features/ai-takeover/` 核心链路在位。 | keep |
 | 4.2 | 多轮对话历史 | 不符合 | `apps/web/src/features/ai-takeover/core/llmBrain.ts:111-119` 只发 system + 单条 user；`localBrain.ts` 为纯本地规则脑（`:33-34` 是 `plan()` 入口与 `analyzeIntent` 调用），不构造 LLM 消息，同样无多轮历史。 | upgrade |
 | 4.3 | 上下文裁剪 | 不符合 | 无 TokenBudget 分配规则，无摘要/工具结果回填。 | upgrade |
-| 4.4 | Agent Run 中断恢复 | 不符合 | `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts:142-156` reload 时把 running/waiting 一律置 failed；存储为 localStorage（`:43-52`，key 前缀 `:27`）。 | upgrade |
-| 4.5 | 跨设备续跑 | 不符合 | 依赖 localStorage（同上），无服务端 Session/Run 查询恢复。 | upgrade |
+| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:77-103,260-302` 已有 owner-scoped local projection、pending marker 与 authoritative merge；`AgentRuntime.ts:453-456,991-1052` 已实现启动/online 重试、服务端 upsert 和陈旧快照协调。但 `AgentRunStore.ts:142-156` reload 仍把 running/waiting 置 failed，服务端也没有 Run list/get/event 恢复 API。 | upgrade |
+| 4.5 | 跨设备续跑 | 不符合 | 当前只有浏览器到服务端的单 Run 快照写入与陈旧快照协调；服务端缺少 owner-scoped Session/Run 查询和事件日志，另一设备无法发现或重建 active Run。 | upgrade |
 
 ## 5. PPT
 
@@ -81,7 +81,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 7.1 | 编译期 Feature Flag | 完全 | `apps/web/src/config/featureFlags.ts:1-4`、`apps/web/src/app/kkaiFeatureFlags.ts:1-7` 均为硬编码常量。 | upgrade |
-| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供 image provider slice scope；`services/api/lib/generation-v3/worker/featureFlag.js` 提供默认 `off`、兼容 boolean 的 `internal → invited → full` Worker user scope。仍无统一管理员 Flag API、广播和 5 秒 Kill Switch 验证。 | upgrade |
+| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供 image provider slice scope，但当前只保护 snapshot/Connection 管理 API，`quoteEngine.js` 与 `generationConnectionResolver.js` 的实际数据面尚未门禁；Worker flag 提供默认 `off` 和 `internal → invited → full` user scope，但 admission 与存量 drain 未拆分。仍无统一管理员 Flag API、广播和 5 秒 Kill Switch 验证。 | upgrade |
 | 7.3 | 视觉 Flag 与能力 Flag 分离 | 不符合 | 当前视觉/能力开关均为同一常量（见 7.1）。 | upgrade |
 
 ## 8. 文档治理
@@ -99,7 +99,7 @@
 |---|---|---|---|---|
 | 9.1 | Canonical Provider catalog | 完全 | `packages/shared/src/generation/providerCatalog.ts` 与 Provider governance checks 维持前后端目录一致。 | keep |
 | 9.2 | Capability Graph snapshot API | 完全 | `packages/shared/src/capability-graph/` 定义契约；`services/api/lib/capability-graph/projection.js` 投影权威数据；`services/api/routes/capability-graph.js` 提供 snapshot API。 | keep |
-| 9.3 | Provider Connection 领域模型 | 部分 | migration `018_capability_graph_foundation.sql` 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立规范化写入、CRUD 和 verify；旧 profile payload 的兼容读取仍待切流后删除。 | upgrade |
+| 9.3 | Provider Connection 领域模型 | 部分 | migration 018 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立新表 CRUD 和 verify；但旧 `ApiSettings`/profile 凭据栈仍由 `userApiCloudRecordStorage.ts:514-625` 平行读写，当前不存在把旧 payload 投影到新 Connection 的 dual-read adapter，迁移、桥接与切流均未完成。 | upgrade |
 | 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 完全 | `providerConnectionService.js`、`connectionVerifier.js` 与 migration 018 使用 secret reference、URL/DNS/IP 检查、最小探测和诊断脱敏，不序列化明文 secret。 | keep |
 | 9.5 | Agent 查询可用能力 | 完全 | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` 注册只读 safe tool `capabilities.listAvailable`，并由 ToolRegistry 消费 snapshot。 | keep |
 
@@ -134,9 +134,9 @@
 | v3 计费 Saga | `services/api/lib/generation-v3/billingSaga.js:20,60,81`；`jobLifecycle.js:45,185,220` |
 | Item 幂等约束 | `infrastructure/database/migrations/017_quote_job_v3_and_ledger.sql:65` |
 | 旧同步 billingSaga | `services/api/lib/generation/generationController.js:95` |
-| 前端 DurableGenerationQueue | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:365` |
-| 前端 GenerationEngine | `apps/web/src/core/generation/GenerationEngine.ts:15` |
-| Agent Run reload 置 failed | `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts:142-156` |
+| 前端 DurableGenerationQueue 与同步投影 | `apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts:391-427,511-512` / `GenerationQueueSync.ts:60-75,151-205,228-240` |
+| 生成分发链 | `apps/web/src/core/generation/GenerationEngine.ts:15` / `TaskOrchestrator.ts:65-66` |
+| Agent Run 本地恢复与服务端同步 | `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts:77-156,260-302` / `AgentRuntime.ts:453-456,991-1052` |
 | Planner 单轮输入 | `apps/web/src/features/ai-takeover/core/llmBrain.ts:111-119` |
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |

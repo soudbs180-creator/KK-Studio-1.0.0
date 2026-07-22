@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 2a image Worker foundation landed / migration rehearsal, gray rollout and recovery E2E pending
+> Status: active / Phase 2a foundations landed / local control-plane gaps and external rollout gates pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-22
@@ -11,13 +11,13 @@
 
 KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地，Phase 0/1 已交付统一报价（Quote）、GenerationJobDto v3、统一 Provider Adapter 与冻结通道，但 AI 创作核心的关键闭环仍未完成：
 
-- image Durable Worker 的代码基础已进入服务端权威控制面，但 migration 019 尚待受控数据库演练、flag 仍默认关闭，不能描述为已灰度上线；视频/音频/批量任务关闭浏览器后仍无人继续推进。
-- 报价、路由、租约、计费与图像 Provider Adapter 已形成 server-gated 纵向切片；**尚未覆盖异步视频/音频、SSE/跨设备恢复与真实灰度观测**，浏览器侧队列仍承担未切流能力的执行权威。
+- image Durable Worker 的代码基础已进入服务端控制面，但关闭 admission flag 会同时停止存量 Worker loop/cancel；在完成 drain-safe 回滚、migration 019 受控演练和 internal 灰度前，不能描述为服务端权威或已上线。
+- 报价、路由、租约、计费与图像 Provider Adapter 已形成纵向切片基础，但 `capability_graph.image_provider_slice` 当前只保护管理 API，尚未门禁实际 Quote/生成数据面；v3 也缺少 owner-scoped pending Job discovery，跨设备恢复不能仅靠现有 SSE。
 - Agent 运行时仅有当前指令和画布上下文，没有跨轮对话历史、摘要和工具结果回填， reload 后 running Run 被直接标记为失败。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
-- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；用户 API 仍保留旧 profile payload 的兼容读取，需在完成切流和观测窗口后删除。
+- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；旧 `ApiSettings`/profile 凭据栈仍平行读写，当前没有 dual-read adapter，需先完成迁移/桥接、切流和观测窗口再删除旧栈。
 - `local-runner` 仍是 Browser/OpenCLI 原型：当前独立 typecheck/build 已通过并纳入 `verify:changes`，但固定 fallback token、token 日志、请求体无明确上限与显式 `any` 等安全债仍在，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。
@@ -53,7 +53,7 @@ BYOK、云端用户 Key、平台积分、用户网页会员必须是四条互斥
 以固定节点类型（`Actor | Provider | ProviderConnection | Model | Capability | Asset | Workflow | Step | Trigger | Runtime | Job | Run | ToolCall | Verification | Audit`）和版本化边构建用户可理解、Agent 可查询的能力图；`GET /api/v1/capability-graph/snapshot` 与只读 safe tool `capabilities.listAvailable` 对外暴露；UI 能直接解释每个能力的 Connection、Channel、隐私与成本。
 
 2.8 **Provider Connection 领域模型**
-`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测；迁移期 dual-read 旧 profile payload，新写入只走 `provider_connections`。
+`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测。目标迁移链要求先建立旧 profile 到 `provider_connections` 的安全桥接/dual-read，再切换新写入并经过观测窗口；这条迁移链当前尚未实现。
 
 2.9 **三 Runtime 架构**
 Browser/Vercel 只做交互与状态投影；VPS Express 是身份、Connection、能力图、Quote、Job、账务、Worker、Asset 元数据、Audit、feature flag 与恢复的控制面；Local Media/Automation Runtime 只执行已声明能力的本地媒体任务与 Browser Bridge，使用短期配对凭据、opaque asset handle 和受控根目录，不接收任意路径或 Shell。三端以版本化 DTO、幂等 id、签名事件和 capability manifest 通信；任何 runtime 重启后由 VPS Job/Run 状态恢复。
@@ -81,7 +81,7 @@ Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、
 - 文档治理：修复分类器、路径存在性检查、能力声明证据检查；归档历史占位文档。
 - 测试与验收：Fake Provider 全通道、Quote/计费/并发/对账、Worker 续跑、跨设备恢复、PPTX OpenXML 回归、Browser Bridge 安全。
 - 新增 Capability Graph：`CapabilityNodeDto` / `CapabilityEdgeDto` / `CapabilityGraphSnapshotDto v1`（Zod discriminated union）、migration `018_capability_graph_foundation.sql`（`provider_connections`、`capability_bindings`、Asset lineage relation）、projection service 与 snapshot API、Provider Connection CRUD/verify API、只读 safe tool `capabilities.listAvailable`。
-- 首个纵向切片（image provider slice）：Google official image adapter 为生产示例、`FakeProviderAdapter` 为自动化测试；链路为 计划 → Quote → 成本/通道确认 → v3 Job → RouteEngine → Adapter → Asset/Lineage → Worker thumbnail → Canvas node → Task Center → Verification/Audit；server flag `capability_graph.image_provider_slice` 按 internal → invited users → full rollout 放量。
+- 首个纵向切片（image provider slice）：Google official image adapter 为生产示例、`FakeProviderAdapter` 为自动化测试；链路为 计划 → Quote → 成本/通道确认 → v3 Job → RouteEngine → Adapter → Asset/Lineage → Worker thumbnail → Canvas node → Task Center → Verification/Audit；server flag `capability_graph.image_provider_slice` 必须门禁管理面和 Quote/生成数据面，并按 internal → invited users → full → off 完成非破坏性灰度与回滚。
 - Local Media Runtime 契约与安全加固：`LocalMediaJobDto`、`LocalAssetRefDto`、OPFS/IndexedDB、opaque handle；安全门禁（移除 fallback token 与 token 日志、token 文件 ACL/轮换、body/尺寸上限、Zod 校验、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额）；`local-runner:build` 与独立测试纳入 release 验证，通过前只标记 experimental。
 - AI Workspace 控制链：固定 `IntentGate → Planner → CapabilityGraph → ToolRegistry → PermissionPolicy → Quote/Confirmation → Executor → Verification → Audit/Memory`；权限级 `safe | confirm | dangerous | forbidden`；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - 新 IA 与统一 layout state：Connections/Capabilities 侧栏、单一 AI dock、底部 task/assets tray、command palette、minimap 重排。
@@ -125,7 +125,7 @@ Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、
 - 新创建任务（无论生图/视频/音频/PPT/网页自动化）统一使用 v3 Job 契约和 Quote 流程。
 - 前端旧代码中引用 v2 字段的内部调用可保留一个完整迭代，但新代码必须引用 v3。
 - 服务端 Feature Flag 默认关闭新 Worker 流程，按管理员/受邀测试/全量三阶段灰度开启。
-- Provider 配置迁移期 dual-read 旧 profile payload 与新 `provider_connections` 表；新写入只走新表；旧 payload 在两个稳定版本后停止读取。
+- Provider 配置先新增旧 profile 到新 `provider_connections` 的安全迁移/dual-read adapter，再切换新写入；旧 payload 只有在兼容测试、两个稳定版本与观测窗口通过后才停止读取。当前旧栈仍平行读写，不能提前视为迁移完成。
 - 既有 Quote/Job v3 API 保持兼容；Capability Graph 只新增只读 API 与 safe tool，不改变现有路由语义。
 
 ---
