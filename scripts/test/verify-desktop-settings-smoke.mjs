@@ -29,6 +29,24 @@ const SMOKE_AUTH_SESSION = {
   sessionExpiresAt: '2099-01-01T00:00:00.000Z',
   profile: SMOKE_PROFILE,
 };
+const SMOKE_TIMESTAMP = '2026-01-01T00:00:00.000Z';
+const SMOKE_CONNECTION_ID = '550e8400-e29b-41d4-a716-446655440001';
+const SMOKE_LEGACY_SLOT_ID = 'legacy-google-slot';
+const SMOKE_MIGRATION_CANDIDATE_TEST_ID = 'provider-migration-candidate-legacy-google-slot';
+const SMOKE_REENTERED_SECRET = 'test-only-reentered-provider-secret';
+const SMOKE_LEGACY_GOOGLE_SLOT = {
+  id: SMOKE_LEGACY_SLOT_ID,
+  key: 'test-only-legacy-key-never-migrate',
+  name: 'Legacy Google Studio',
+  provider: 'Google',
+  type: 'official',
+  format: 'gemini',
+  baseUrl: 'https://generativelanguage.googleapis.com',
+  supportedModels: [],
+  disabled: false,
+  status: 'valid',
+  createdAt: Date.parse(SMOKE_TIMESTAMP),
+};
 
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
@@ -63,75 +81,175 @@ async function fulfillSmokeJson(route, data) {
   });
 }
 
+function buildSmokeHealthData() {
+  return {
+    service: 'kk-studio-api',
+    status: 'ok',
+    selfHostedCoreReady: true,
+    config: {
+      hasPostgresConfig: true,
+      hasAuthKey: true,
+      hasUserApiEncryptionSecret: true,
+    },
+    repositories: {
+      adminConsole: 'postgres',
+      authData: 'postgres',
+      creditAccounts: 'postgres',
+      creditProviders: 'postgres',
+      workspaceLayout: 'postgres',
+    },
+    persistence: {
+      userApiKeys: true,
+      keyManager: true,
+      authData: true,
+      authSessions: true,
+      tempUsers: true,
+      credits: true,
+      creditProviders: true,
+      workspaceLayout: true,
+    },
+  };
+}
+
+function createSmokeConnection(request, status = 'unverified') {
+  return {
+    connectionId: SMOKE_CONNECTION_ID,
+    providerId: request.providerId,
+    displayName: request.displayName,
+    protocolProfile: request.protocolProfile,
+    endpoint: request.endpoint,
+    status,
+    hasSecret: true,
+    ...(status === 'available' ? { verifiedAt: SMOKE_TIMESTAMP } : {}),
+    createdAt: SMOKE_TIMESTAMP,
+    updatedAt: SMOKE_TIMESTAMP,
+  };
+}
+
+function createSmokeGraphSnapshot(connection) {
+  const providerNode = {
+    id: 'provider:google',
+    type: 'Provider',
+    status: 'available',
+    ownerScope: 'global',
+    source: 'canonical-provider-catalog',
+    version: '1',
+    updatedAt: SMOKE_TIMESTAMP,
+    providerId: 'google',
+    displayName: 'Google',
+  };
+  if (!connection || connection.status !== 'available') {
+    return { version: 'v1', generatedAt: SMOKE_TIMESTAMP, nodes: [providerNode], edges: [] };
+  }
+  const connectionNodeId = `provider-connection:${connection.connectionId}`;
+  return {
+    version: 'v1',
+    generatedAt: SMOKE_TIMESTAMP,
+    nodes: [providerNode, {
+      id: connectionNodeId,
+      type: 'ProviderConnection',
+      status: 'available',
+      ownerScope: 'user',
+      source: 'provider_connections',
+      version: '1',
+      updatedAt: SMOKE_TIMESTAMP,
+      connectionId: connection.connectionId,
+      providerId: connection.providerId,
+      displayName: connection.displayName,
+      hasSecret: true,
+    }],
+    edges: [{
+      from: connectionNodeId,
+      to: providerNode.id,
+      relation: 'connectsTo',
+      status: 'active',
+      source: 'provider_connections',
+      constraints: {},
+      permissions: 'safe',
+      version: '1',
+    }],
+  };
+}
+
+function createMigrationApiState() {
+  return { connection: null, createCalls: 0, verifyCalls: 0, lastCreateRequest: null };
+}
+
+async function handleProviderMigrationApiRoute(route, pathname, method, migrationApiState) {
+  if (pathname.endsWith('/api/v1/capability-graph/snapshot') && method === 'GET') {
+    await fulfillSmokeJson(route, createSmokeGraphSnapshot(migrationApiState.connection));
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/provider-connections') && method === 'GET') {
+    const connections = migrationApiState.connection ? [migrationApiState.connection] : [];
+    await fulfillSmokeJson(route, { version: 'v1', connections });
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/provider-connections') && method === 'POST') {
+    const request = route.request().postDataJSON();
+    migrationApiState.createCalls += 1;
+    migrationApiState.lastCreateRequest = {
+      providerId: request.providerId,
+      displayName: request.displayName,
+      protocolProfile: request.protocolProfile,
+      endpoint: request.endpoint,
+      secretMatchesReentry: request.secret === SMOKE_REENTERED_SECRET,
+      copiedLegacySecret: request.secret === SMOKE_LEGACY_GOOGLE_SLOT.key,
+    };
+    migrationApiState.connection = createSmokeConnection(request);
+    await fulfillSmokeJson(route, migrationApiState.connection);
+    return true;
+  }
+  if (pathname.endsWith(`/api/v1/provider-connections/${SMOKE_CONNECTION_ID}/verify`) && method === 'POST') {
+    migrationApiState.verifyCalls += 1;
+    migrationApiState.connection = createSmokeConnection(migrationApiState.connection, 'available');
+    await fulfillSmokeJson(route, migrationApiState.connection);
+    return true;
+  }
+  return false;
+}
+
+async function handleStandardSmokeApiRoute(route, pathname) {
+  if (pathname.endsWith('/api/v1/auth/session') || pathname.endsWith('/api/v1/auth/refresh')) {
+    await fulfillSmokeJson(route, SMOKE_AUTH_SESSION);
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/profile')) {
+    await fulfillSmokeJson(route, SMOKE_PROFILE);
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/profile/user-apis')) {
+    await fulfillSmokeJson(route, { entries: [] });
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
+    await fulfillSmokeJson(route, { version: 1, slots: [SMOKE_LEGACY_GOOGLE_SLOT], providers: [], entries: [] });
+    return true;
+  }
+  if (pathname.endsWith('/api/v1/model-catalog/active') || pathname.endsWith('/api/v1/model-catalog/active-credit-models')) {
+    await fulfillSmokeJson(route, { items: [] });
+    return true;
+  }
+  return false;
+}
+
 async function installSmokeApiRoutes(page) {
+  const migrationApiState = createMigrationApiState();
   await page.route('**/healthz**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json; charset=utf-8',
-      body: JSON.stringify({
-        success: true,
-        data: {
-          service: 'kk-studio-api',
-          status: 'ok',
-          selfHostedCoreReady: true,
-          config: {
-            hasPostgresConfig: true,
-            hasAuthKey: true,
-            hasUserApiEncryptionSecret: true,
-          },
-          repositories: {
-            adminConsole: 'postgres',
-            authData: 'postgres',
-            creditAccounts: 'postgres',
-            creditProviders: 'postgres',
-            workspaceLayout: 'postgres',
-          },
-          persistence: {
-            userApiKeys: true,
-            keyManager: true,
-            authData: true,
-            authSessions: true,
-            tempUsers: true,
-            credits: true,
-            creditProviders: true,
-            workspaceLayout: true,
-          },
-        },
-      }),
+      body: JSON.stringify({ success: true, data: buildSmokeHealthData() }),
     });
   });
-
   await page.route('**/api/v1/**', async (route) => {
-    const url = new URL(route.request().url());
-    const pathname = url.pathname.replace(/\/+$/, '');
-
-    if (pathname.endsWith('/api/v1/auth/session') || pathname.endsWith('/api/v1/auth/refresh')) {
-      await fulfillSmokeJson(route, SMOKE_AUTH_SESSION);
-      return;
-    }
-
-    if (pathname.endsWith('/api/v1/profile')) {
-      await fulfillSmokeJson(route, SMOKE_PROFILE);
-      return;
-    }
-
-    if (pathname.endsWith('/api/v1/profile/user-apis')) {
-      await fulfillSmokeJson(route, { entries: [] });
-      return;
-    }
-
-    if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
-      await fulfillSmokeJson(route, { version: 1, slots: [], providers: [], entries: [] });
-      return;
-    }
-
-    if (pathname.endsWith('/api/v1/model-catalog/active') || pathname.endsWith('/api/v1/model-catalog/active-credit-models')) {
-      await fulfillSmokeJson(route, { items: [] });
-      return;
-    }
-
+    const pathname = new URL(route.request().url()).pathname.replace(/\/+$/, '');
+    const method = route.request().method();
+    if (await handleProviderMigrationApiRoute(route, pathname, method, migrationApiState)) return;
+    if (await handleStandardSmokeApiRoute(route, pathname)) return;
     await route.fallback();
   });
+  return migrationApiState;
 }
 
 function readSource(relativePath) {
@@ -245,6 +363,47 @@ async function clickByTestId(page, testId) {
   await clickLocatorWithRetry(page, () => page.getByTestId(testId));
 }
 
+async function clickByControlAction(page, controlAction) {
+  await clickLocatorWithRetry(
+    page,
+    () => page.locator(`[data-settings-control-action="${controlAction}"]`),
+  );
+}
+
+function assertSmokeCondition(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function verifyProviderMigrationFlow(page, migrationApiState) {
+  const candidate = page.getByTestId(SMOKE_MIGRATION_CANDIDATE_TEST_ID);
+  const displayNameInput = page.getByTestId('provider-migration-display-name');
+  const secretInput = page.getByTestId('provider-migration-secret');
+  await assertVisible(candidate, 'Legacy Google migration candidate did not render.');
+  await assertVisible(
+    candidate.getByText(SMOKE_LEGACY_GOOGLE_SLOT.baseUrl, { exact: true }),
+    'Migration candidate did not expose its safe endpoint metadata.',
+  );
+  await clickByControlAction(page, `provider-migration-select-${SMOKE_LEGACY_SLOT_ID}`);
+  assertSmokeCondition(
+    await displayNameInput.inputValue() === SMOKE_LEGACY_GOOGLE_SLOT.name,
+    'Migration form did not preserve the legacy display name.',
+  );
+  assertSmokeCondition(!(await displayNameInput.isEditable()), 'Migration display name must be read-only.');
+  await secretInput.fill(SMOKE_REENTERED_SECRET);
+  await clickByControlAction(page, 'provider-migration-submit');
+  await assertVisible(
+    page.getByTestId(`provider-connection-${SMOKE_CONNECTION_ID}`),
+    'Verified Provider Connection did not render after migration.',
+  );
+  await candidate.waitFor({ state: 'detached', timeout: 15000 });
+  assertSmokeCondition(migrationApiState.createCalls === 1, 'Migration must create exactly one connection.');
+  assertSmokeCondition(migrationApiState.verifyCalls === 1, 'Migration must verify exactly one connection.');
+  assertSmokeCondition(migrationApiState.lastCreateRequest?.secretMatchesReentry, 'Migration did not submit the re-entered secret.');
+  assertSmokeCondition(!migrationApiState.lastCreateRequest?.copiedLegacySecret, 'Migration copied a legacy secret.');
+  assertSmokeCondition(await secretInput.inputValue() === '', 'Migration secret remained in the form after verification.');
+  assertSmokeCondition(await displayNameInput.inputValue() === 'Google official', 'Migration form did not reset after verification.');
+}
+
 async function assertHttpHtml(url) {
   const response = await fetch(url, { redirect: 'manual' });
   if (!response.ok) {
@@ -297,17 +456,23 @@ async function resolveFallbackRoutes(browserPreflight, targetUrl) {
   ]);
 }
 
-function verifyDesktopSourceContracts() {
-  const appSource = readSource('apps/web/src/App.tsx');
-  const appDesktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
-  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchPanel.tsx');
-  const settingsShellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
-  const settingsConsoleStyleSource = readSource('apps/web/src/styles/settings-console.css');
-  const settingsRoutesSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
-  const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
-  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
-  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+function readDesktopContractSources() {
+  return [
+    'apps/web/src/App.tsx',
+    'apps/web/src/app/AppDesktopChrome.tsx',
+    'apps/web/src/components/settings/SettingsWorkbenchPanel.tsx',
+    'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',
+    'apps/web/src/styles/settings-console.css',
+    'apps/web/src/components/settings/settingsRouteConfig.tsx',
+    'apps/web/src/components/settings/ApiSettingsView.tsx',
+    'apps/web/src/components/settings/apiWorkbenchSections.tsx',
+    'apps/web/src/components/settings/views/DashboardView.localized.tsx',
+    'apps/web/src/components/settings/views/CapabilitySourcesView.tsx',
+    'apps/web/src/components/settings/ProviderConnectionsPanel.tsx',
+  ].map(readSource);
+}
 
+function verifyDesktopSourceContracts() {
   const checks = [
     /data-testid="desktop-user-menu-trigger"/,
     /desktop-user-menu-settings/,
@@ -327,19 +492,10 @@ function verifyDesktopSourceContracts() {
     /data-testid="api-model-center-provider-pool"/,
     /data-testid="api-model-center-preset-directory"/,
     /data-testid="api-proxy-provider-add"/,
+    /<ProviderConnectionsPanel\s*\/>/,
+    /controlAction="provider-migration-submit"/,
   ];
-
-  const sources = [
-    appSource,
-    appDesktopChromeSource,
-    settingsPanelSource,
-    settingsShellSource,
-    settingsConsoleStyleSource,
-    settingsRoutesSource,
-    apiSettingsViewSource,
-    workbenchSectionsSource,
-    dashboardSource,
-  ];
+  const sources = readDesktopContractSources();
 
   for (const pattern of checks) {
     if (!sources.some((source) => pattern.test(source))) {
@@ -401,7 +557,7 @@ try {
   page = await browser.newPage({
     viewport: { width: 1600, height: 980 },
   });
-  await installSmokeApiRoutes(page);
+  const migrationApiState = await installSmokeApiRoutes(page);
 
   page.on('console', (msg) => {
     console.log(`[Browser Console] ${msg.type()}: ${msg.text()}`);
@@ -477,6 +633,7 @@ try {
   const providerPool = page.getByTestId('api-model-center-provider-pool');
   const presetDirectory = page.getByTestId('api-model-center-preset-directory');
 
+  await verifyProviderMigrationFlow(page, migrationApiState);
   await assertVisible(modelCenter, 'API model center did not render.');
   await assertVisible(providerPool, 'API provider card pool did not render.');
   await assertVisible(presetDirectory, 'API preset directory did not render.');

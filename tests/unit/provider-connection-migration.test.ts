@@ -130,6 +130,6 @@ test('Provider Connections UI exposes an explicit secret re-entry migration brid
   assert.match(source, /setSelectedMigration/);
   assert.match(source, /readOnly=\{Boolean\(props\.selectedMigration\)\}/);
   assert.match(source, /handleMigrationCancel/);
-  assert.match(source, /onSettled: async \(\) => \{ setSecret\(''\); setSelectedMigration\(null\); setDisplayName\(PHASE_ONE_PROVIDER_TEMPLATE\.title\);/);
+  assert.match(source, /finally \{[\s\S]*if \(resetForm\) \{[\s\S]*setSecret\(''\);[\s\S]*setSelectedMigration\(null\);[\s\S]*setDisplayName\(PHASE_ONE_PROVIDER_TEMPLATE\.title\);[\s\S]*await refreshGraph\(\);/);
   assert.doesNotMatch(source, /revealUserApiSecret/);
 });

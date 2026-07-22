@@ -10,6 +10,7 @@ import {
   SettingsBadge,
 } from '../SettingsScaffold';
 import ApiSettingsView from '../ApiSettingsView';
+import ProviderConnectionsPanel from '../ProviderConnectionsPanel';
 import { getKkApiServerHealth } from '../../../services/api/kkApiServerHealth';
 import { toolRegistryInstance, type BrowserBridgeStatusSnapshot } from '../../../features/ai-assistant-runtime';
 import { isApiManagementEditorRoute } from '../apiManagementRouteState';
@@ -133,6 +134,8 @@ export const CapabilitySourcesView: React.FC = () => {
           </div>
         </div>
       </SettingsSection>
+
+      <ProviderConnectionsPanel />
 
       <SettingsSection title={pick('密钥与通道配置 (原 API 设置)', 'Keys & Channels')}>
         <div className="border border-[var(--border-light)] rounded-xl overflow-hidden bg-[var(--bg-overlay)] p-2">

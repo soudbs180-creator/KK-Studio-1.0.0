@@ -17,7 +17,7 @@ KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地�
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 227 份 Markdown、19 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
-- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；Web 已能把旧设置中的 Google 名称/endpoint 安全投影为迁移候选，并要求用户显式重输 secret 后通过现有 create/verify API 建立新 Connection。旧 `ApiSettings`/profile 凭据栈仍平行读写，服务端权威 dual-read、全 Provider 切流和观测窗口尚未完成，不能删除旧栈。
+- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；`CapabilitySourcesView` 已实际挂载 Web 迁移面板，可把旧设置中的 Google 名称/endpoint 安全投影为迁移候选，并要求用户显式重输 secret 后通过现有 create/verify API 建立新 Connection。自动化浏览器已验证刷新去重与 secret 清理，但旧 `ApiSettings`/profile 凭据栈仍平行读写，服务端权威 dual-read、全 Provider 切流和观测窗口尚未完成，不能删除旧栈。
 - `local-runner` 仍是 Browser/OpenCLI 原型：当前独立 typecheck/build 已通过并纳入 `verify:changes`，但固定 fallback token、token 日志、请求体无明确上限与显式 `any` 等安全债仍在，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。

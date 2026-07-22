@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CapabilityGraphSnapshotDtoSchema,
   ProviderConnectionDtoSchema,
@@ -28,8 +27,6 @@ import {
   buildConnectionCapabilityRows,
   type ProviderConnectionCapabilityRow,
 } from './providerConnectionViewModel';
-
-const CAPABILITY_GRAPH_QUERY_KEY = ['capability-graph', 'snapshot'] as const;
 
 // Phase 1 仅支持单个开箱即用的 Provider 连接模板；后续通过 canonical catalog 驱动表单配置。
 const PHASE_ONE_PROVIDER_TEMPLATE = {
@@ -107,7 +104,10 @@ function ConnectionRow({
 }) {
   const { pick } = useLocale();
   return (
-    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-overlay)] p-3.5">
+    <div
+      className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-overlay)] p-3.5"
+      data-testid={`provider-connection-${row.connectionId}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs font-bold text-[var(--text-primary)]">{row.connectionName}</div>
@@ -159,15 +159,13 @@ function ConnectionList({
   );
 }
 
-function MigrationCandidateList({
-  busy,
-  candidates,
-  onSelect,
-}: {
+interface MigrationCandidateListProps {
   busy: boolean;
   candidates: ProviderConnectionMigrationCandidate[];
   onSelect: (candidate: ProviderConnectionMigrationCandidate) => void;
-}) {
+}
+
+function MigrationCandidateList({ busy, candidates, onSelect }: MigrationCandidateListProps) {
   const { pick } = useLocale();
   if (candidates.length === 0) return null;
   return (
@@ -175,13 +173,21 @@ function MigrationCandidateList({
       <p className="text-xs font-bold text-[var(--text-primary)]">{pick('可安全迁移的旧连接', 'Legacy connections ready to migrate')}</p>
       <p className="text-[10px] text-[var(--text-tertiary)]">{pick('仅复用名称与 endpoint；旧密钥不会复制，迁移时必须重新输入。', 'Only the name and endpoint are reused. Legacy secrets are never copied and must be re-entered.')}</p>
       {candidates.map((candidate) => (
-        <div key={candidate.legacyRouteId} className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          key={candidate.legacyRouteId}
+          className="flex flex-wrap items-center justify-between gap-2"
+          data-testid={`provider-migration-candidate-${candidate.legacyRouteId}`}
+        >
           <div className="min-w-0 text-xs text-[var(--text-secondary)]">
             <div>{candidate.displayName} · {candidate.providerId}</div>
             <div className="mt-0.5 break-all text-[10px] text-[var(--text-tertiary)]">{candidate.endpoint}</div>
             {candidate.requiresSecretReentry ? <SettingsBadge tone="amber">{pick('需重新输入密钥', 'Secret re-entry')}</SettingsBadge> : null}
           </div>
-          <SecondaryButton disabled={busy} onClick={() => onSelect(candidate)}>
+          <SecondaryButton
+            controlAction={`provider-migration-select-${candidate.legacyRouteId}`}
+            disabled={busy}
+            onClick={() => onSelect(candidate)}
+          >
             {pick('迁移此连接', 'Migrate connection')}
           </SecondaryButton>
         </div>
@@ -210,17 +216,17 @@ function ConnectionFormFields(props: ConnectionFormProps) {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
         <label className="text-xs text-[var(--text-secondary)]">
           <span className="mb-1.5 block">{pick('连接名称', 'Connection name')}</span>
-          <input className={SETTINGS_INPUT_CLASSNAME} value={props.displayName} maxLength={120} readOnly={Boolean(props.selectedMigration)} onChange={(event) => props.onDisplayNameChange(event.target.value)} />
+          <input data-testid="provider-migration-display-name" className={SETTINGS_INPUT_CLASSNAME} value={props.displayName} maxLength={120} readOnly={Boolean(props.selectedMigration)} onChange={(event) => props.onDisplayNameChange(event.target.value)} />
         </label>
         <label className="text-xs text-[var(--text-secondary)]">
           <span className="mb-1.5 block">{props.selectedMigration?.providerId || 'Google'} API key</span>
-          <input className={SETTINGS_INPUT_CLASSNAME} type="password" autoComplete="off" value={props.secret} onChange={(event) => props.onSecretChange(event.target.value)} />
+          <input data-testid="provider-migration-secret" className={SETTINGS_INPUT_CLASSNAME} type="password" autoComplete="off" value={props.secret} onChange={(event) => props.onSecretChange(event.target.value)} />
         </label>
-        <PrimaryButton loading={props.loading} disabled={props.busy || !props.displayName.trim() || !props.secret} onClick={props.onSubmit}>
+        <PrimaryButton controlAction="provider-migration-submit" loading={props.loading} disabled={props.busy || !props.displayName.trim() || !props.secret} onClick={props.onSubmit}>
           <Link2 size={14} /> {pick('创建并验证', 'Create & verify')}
         </PrimaryButton>
       </div>
-      {props.selectedMigration ? <div className="mt-2"><SecondaryButton disabled={props.busy} onClick={props.onCancel}>{pick('取消迁移', 'Cancel migration')}</SecondaryButton></div> : null}
+      {props.selectedMigration ? <div className="mt-2"><SecondaryButton controlAction="provider-migration-cancel" disabled={props.busy} onClick={props.onCancel}>{pick('取消迁移', 'Cancel migration')}</SecondaryButton></div> : null}
       {props.error ? <p role="alert" className="text-xs text-[var(--error)]">{props.error.message}</p> : null}
     </>
   );
@@ -241,45 +247,111 @@ function ConnectionFormCard(props: ConnectionFormProps) {
   );
 }
 
-function useConnectionMutations({
-  displayName,
-  secret,
-  selectedMigration,
-  setDisplayName,
-  setSecret,
-  setSelectedMigration,
-}: {
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function useCapabilityGraphState() {
+  const [data, setData] = useState<GraphAvailability | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isPending, setIsPending] = useState(true);
+  const requestRevision = useRef(0);
+  const refresh = useCallback(async () => {
+    const revision = ++requestRevision.current;
+    try {
+      const next = await loadCapabilityGraph();
+      if (revision === requestRevision.current) {
+        setData(next);
+        setError(null);
+      }
+    } catch (nextError) {
+      if (revision === requestRevision.current) setError(toError(nextError));
+    } finally {
+      if (revision === requestRevision.current) setIsPending(false);
+    }
+  }, []);
+  useEffect(() => {
+    void refresh();
+    return () => { requestRevision.current += 1; };
+  }, [refresh]);
+  return { data, error, isPending, refresh };
+}
+
+async function createAndVerifyConnection(
+  displayName: string,
+  secret: string,
+  selectedMigration: ProviderConnectionMigrationCandidate | null,
+): Promise<void> {
+  const created = unwrapConnection(await kkWebApiClient.createProviderConnection({
+    providerId: selectedMigration?.providerId || PHASE_ONE_PROVIDER_TEMPLATE.providerId,
+    displayName: displayName.trim(),
+    protocolProfile: selectedMigration?.protocolProfile || PHASE_ONE_PROVIDER_TEMPLATE.protocolProfile,
+    endpoint: selectedMigration?.endpoint,
+    secret,
+  }));
+  unwrapConnection(await kkWebApiClient.verifyProviderConnection(created.connectionId));
+}
+
+async function deleteConnection(connectionId: string): Promise<void> {
+  const response = await kkWebApiClient.deleteProviderConnection(connectionId);
+  if (!response.success) throw new Error(response.error.message);
+}
+
+interface ConnectionOperationsProps {
   displayName: string;
+  refreshGraph: () => Promise<void>;
   secret: string;
   selectedMigration: ProviderConnectionMigrationCandidate | null;
   setDisplayName: (value: string) => void;
   setSecret: (value: string) => void;
   setSelectedMigration: (value: ProviderConnectionMigrationCandidate | null) => void;
-}) {
-  const queryClient = useQueryClient();
-  const refreshGraph = () => queryClient.invalidateQueries({ queryKey: CAPABILITY_GRAPH_QUERY_KEY });
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const created = unwrapConnection(await kkWebApiClient.createProviderConnection({
-        providerId: selectedMigration?.providerId || PHASE_ONE_PROVIDER_TEMPLATE.providerId,
-        displayName: displayName.trim(),
-        protocolProfile: selectedMigration?.protocolProfile || PHASE_ONE_PROVIDER_TEMPLATE.protocolProfile,
-        endpoint: selectedMigration?.endpoint,
-        secret,
-      }));
-      return unwrapConnection(await kkWebApiClient.verifyProviderConnection(created.connectionId));
-    },
-    onSettled: async () => { setSecret(''); setSelectedMigration(null); setDisplayName(PHASE_ONE_PROVIDER_TEMPLATE.title); await refreshGraph(); },
+}
+
+function useConnectionOperations({
+  displayName,
+  refreshGraph,
+  secret,
+  selectedMigration,
+  setDisplayName,
+  setSecret,
+  setSelectedMigration,
+}: ConnectionOperationsProps) {
+  const [error, setError] = useState<Error | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<'create' | 'delete' | 'verify' | null>(null);
+  const runOperation = async (
+    operation: Exclude<typeof pendingOperation, null>,
+    action: () => Promise<void>,
+    resetForm = false,
+  ) => {
+    setPendingOperation(operation);
+    setError(null);
+    try {
+      await action();
+    } catch (nextError) {
+      setError(toError(nextError));
+    } finally {
+      if (resetForm) {
+        setSecret('');
+        setSelectedMigration(null);
+        setDisplayName(PHASE_ONE_PROVIDER_TEMPLATE.title);
+      }
+      await refreshGraph();
+      setPendingOperation(null);
+    }
+  };
+  const createConnection = () => runOperation(
+    'create',
+    () => createAndVerifyConnection(displayName, secret, selectedMigration),
+    true,
+  );
+  const verifyConnection = (connectionId: string) => runOperation('verify', async () => {
+    unwrapConnection(await kkWebApiClient.verifyProviderConnection(connectionId));
   });
-  const verifyMutation = useMutation({ mutationFn: async (connectionId: string) => unwrapConnection(await kkWebApiClient.verifyProviderConnection(connectionId)), onSettled: refreshGraph });
-  const deleteMutation = useMutation({
-    mutationFn: async (connectionId: string) => {
-      const response = await kkWebApiClient.deleteProviderConnection(connectionId);
-      if (!response.success) throw new Error(response.error.message);
-    },
-    onSettled: refreshGraph,
-  });
-  return { createMutation, deleteMutation, verifyMutation };
+  const removeConnection = (connectionId: string) => runOperation(
+    'delete',
+    () => deleteConnection(connectionId),
+  );
+  return { createConnection, deleteConnection: removeConnection, error, pendingOperation, verifyConnection };
 }
 
 /**
@@ -291,23 +363,24 @@ export const ProviderConnectionsPanel: React.FC = () => {
   const [secret, setSecret] = useState('');
   const [selectedMigration, setSelectedMigration] = useState<ProviderConnectionMigrationCandidate | null>(null);
   const legacyRoutes = useLegacyRouteMetadata();
-  const graphQuery = useQuery({ queryKey: CAPABILITY_GRAPH_QUERY_KEY, queryFn: loadCapabilityGraph, retry: false });
-  const { createMutation, deleteMutation, verifyMutation } = useConnectionMutations({
-    displayName, secret, selectedMigration, setDisplayName, setSecret, setSelectedMigration,
+  const graphState = useCapabilityGraphState();
+  const operations = useConnectionOperations({
+    displayName, refreshGraph: graphState.refresh, secret, selectedMigration,
+    setDisplayName, setSecret, setSelectedMigration,
   });
 
-  if (graphQuery.isPending || graphQuery.data?.enabled === false) return null;
-  const rows = graphQuery.data?.snapshot ? buildConnectionCapabilityRows(graphQuery.data.snapshot) : [];
+  if (graphState.isPending || graphState.data?.enabled === false) return null;
+  const rows = graphState.data?.snapshot ? buildConnectionCapabilityRows(graphState.data.snapshot) : [];
   const migrationCandidates = buildProviderConnectionMigrationCandidates(
     legacyRoutes,
-    graphQuery.data?.connections || [],
+    graphState.data?.connections || [],
     { providerIds: [PHASE_ONE_PROVIDER_TEMPLATE.providerId] },
   );
-  const busy = createMutation.isPending || verifyMutation.isPending || deleteMutation.isPending;
-  const operationError = createMutation.error || verifyMutation.error || deleteMutation.error || graphQuery.error;
+  const busy = operations.pendingOperation !== null;
+  const operationError = operations.error || graphState.error;
   const handleDelete = (connectionId: string) => {
     if (window.confirm(pick('删除此 Provider Connection？已有资产与账务记录不会被删除。', 'Delete this Provider Connection? Existing assets and billing records remain.'))) {
-      deleteMutation.mutate(connectionId);
+      void operations.deleteConnection(connectionId);
     }
   };
   const handleMigrationSelect = (candidate: ProviderConnectionMigrationCandidate) => {
@@ -323,9 +396,9 @@ export const ProviderConnectionsPanel: React.FC = () => {
 
   return (
     <SettingsSection title={pick('Provider 连接与能力', 'Provider Connections & Capabilities')}>
-      <ConnectionFormCard busy={busy} displayName={displayName} error={operationError} loading={createMutation.isPending} secret={secret} selectedMigration={selectedMigration} onCancel={handleMigrationCancel} onDisplayNameChange={setDisplayName} onSecretChange={setSecret} onSubmit={() => createMutation.mutate()} />
+      <ConnectionFormCard busy={busy} displayName={displayName} error={operationError} loading={operations.pendingOperation === 'create'} secret={secret} selectedMigration={selectedMigration} onCancel={handleMigrationCancel} onDisplayNameChange={setDisplayName} onSecretChange={setSecret} onSubmit={() => void operations.createConnection()} />
       <MigrationCandidateList candidates={migrationCandidates} busy={busy} onSelect={handleMigrationSelect} />
-      <ConnectionList rows={rows} busy={busy} onDelete={handleDelete} onVerify={(connectionId) => verifyMutation.mutate(connectionId)} />
+      <ConnectionList rows={rows} busy={busy} onDelete={handleDelete} onVerify={(connectionId) => void operations.verifyConnection(connectionId)} />
     </SettingsSection>
   );
 };

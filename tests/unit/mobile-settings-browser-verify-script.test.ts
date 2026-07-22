@@ -147,6 +147,14 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Show diagnostics\/i \}\)/);
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Hide diagnostics\/i \}\)/);
   assert.doesNotMatch(scriptSource, /api-workbench-diagnostics-toggle/);
+  assert.match(scriptSource, /\/api\/v1\/capability-graph\/snapshot/);
+  assert.match(scriptSource, /\/api\/v1\/provider-connections/);
+  assert.match(scriptSource, /provider-migration-candidate-legacy-google-slot/);
+  assert.match(scriptSource, /provider-migration-display-name/);
+  assert.match(scriptSource, /provider-migration-secret/);
+  assert.match(scriptSource, /provider-migration-submit/);
+  assert.match(scriptSource, /migrationApiState\.createCalls/);
+  assert.match(scriptSource, /migrationApiState\.verifyCalls/);
 
   assert.match(desktopChromeSource, /data-testid="desktop-user-menu-trigger"/);
   assert.match(desktopChromeSource, /testId="desktop-user-menu-settings"/);
