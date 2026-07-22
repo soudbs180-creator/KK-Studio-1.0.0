@@ -13,6 +13,7 @@ const {
 } = require('../lib/ai-assistant-dto');
 const { TEMP_USER_ID_HEADER } = require('./compat/compatHelper');
 const { verifyJWT } = require('../lib/jwt');
+const agentRunReadStore = require('../lib/agent-run-read-store');
 
 /**
  * 验证请求头中的 JWT 令牌，杜绝非法调用和越权审计。
@@ -84,6 +85,35 @@ async function readAuthoritativeSkillState(pool, userId, skillName) {
     data: !authoritativeDeleted && row.id ? mapAgentSkillRow(row) : undefined,
   };
 }
+
+/**
+ * GET /api/ai-assistant/runs
+ * 职责：按认证 owner 返回最近的 Agent Run 权威快照。
+ */
+router.get('/ai-assistant/runs', verifyAuth, async (req, res) => {
+  try {
+    const runs = await agentRunReadStore.listAgentRuns(req.userId);
+    res.json({ ok: true, data: runs });
+  } catch (err) {
+    console.error('[后端AI助手] 读取 Runs 失败:', err);
+    res.status(500).json({ error: '读取失败' });
+  }
+});
+
+/**
+ * GET /api/ai-assistant/runs/:runId
+ * 职责：以 run id 与认证 owner 双重约束读取单条权威记录。
+ */
+router.get('/ai-assistant/runs/:runId', verifyAuth, async (req, res) => {
+  try {
+    const run = await agentRunReadStore.getAgentRun(req.userId, req.params.runId);
+    if (!run) return res.status(404).json({ error: 'Agent run not found' });
+    return res.json({ ok: true, data: run });
+  } catch (err) {
+    console.error('[后端AI助手] 读取 Run 失败:', err);
+    return res.status(500).json({ error: '读取失败' });
+  }
+});
 
 /**
  * POST /api/ai-assistant/runs

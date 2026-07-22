@@ -95,7 +95,7 @@ npm run local-runner:build
 4. 当前 Web 入口固定为 `apps/web/`，当前后端入口固定为 `services/api/`。
 5. 旧目录不存在或只能在 archive 文档中出现；不得在 active runtime 中恢复。
 6. Provider、Provider Connection、Model 与 Capability 必须是不同领域对象；UI、Agent 与 RouteEngine 只消费 canonical catalog 和服务端 Connection 投影。
-7. 目标架构要求 Browser 只持有交互和离线投影，VPS 成为 Job/Run/Quote/Billing 权威源；当前 Job/Quote/Billing 已进入服务端控制面，Agent Run 只有单向快照 upsert，读取/事件恢复仍以浏览器 localStorage 为主。Local Runner 只执行声明式、受权限约束的本地能力。
+7. 目标架构要求 Browser 只持有交互和离线投影，VPS 成为 Job/Run/Quote/Billing 权威源；当前 Job/Quote/Billing 已进入服务端控制面，Agent Run 已有单向快照 upsert 与 owner-scoped list/get，但 Web 尚未消费读取面，事件恢复仍以浏览器 localStorage 为主。Local Runner 只执行声明式、受权限约束的本地能力。
 8. 现有 `direct | assist | takeover`、ToolRegistry、CanvasRuntimeState 与 AgentRunStore 是共享事实，不为新 IA 建立副本。
 9. `upgrade-ai-creation-core` 是唯一活动 change；禁止创建平行 Capability Graph、Provider registry、AI runtime 或 queue 计划。
 10. 每个 PR 的验收门禁见 `openspec/changes/upgrade-ai-creation-core/tasks.md` 文末"PR 验收模板"。
@@ -112,7 +112,7 @@ npm run local-runner:build
 - `ChatSidebar` 的模型目录、assistant capability 默认选择、Key 优先级与订阅同步已迁入严格 model controller；会话持久化、活动消息同步、树投影、分支与导入算法已迁入严格 session controller/data 模块。热点 baseline 已从 4677 行/23 个显式 `any` 连续降至 4040 行/21 个，公开交互、storage key 和导入导出格式不变。
 - image Durable Worker 的 migration 019、租约领取、token/heartbeat、冻结路由提交、指数退避轮询、取消、超时、恢复和 Item 幂等代码已实现，并通过无浏览器参与、Worker 重建与过期租约的 characterization 测试；lease 丢失不再伪报终态或重试，迟到回调不能复活或降级终态 Item。
 - `GENERATION_IMAGE_DURABLE_WORKER_ENABLED` 已支持 `off → internal → invited → full` 服务端用户范围且默认 `off`，只控制新任务 admission；默认关闭的 `GENERATION_IMAGE_WORKER_EXECUTION_ENABLED` 独立控制 migration-ready loop/cancel。characterization 已覆盖 admission `off` + execution `true` 时继续 drain，并以 `scope: off, running: true` 聚合指标显式观测；回滚不得在 lease 清空前关闭 execution。owner-scoped Job SSE、`GET /api/v1/generation/jobs` pending discovery、严格 typed client 与 Web hydration 已落地；Web 只自动观察 `submitted/running`，仅绑定已同步且 owner 匹配的 Prompt 节点，不创建新节点或覆盖本地任务元数据。migration 019、真实浏览器关闭/重新登录/跨设备 E2E、实际放量和生产观测均未完成，不得描述为已上线能力。
-- Agent Run 已有 owner-scoped local projection、服务端 upsert 重试和陈旧快照协调，但没有 Session/Run list/get/event API；reload 仍把 active Run 置 failed，VPS 尚不是 Run 恢复权威源。
+- Agent Run 已有 owner-scoped local projection、服务端 upsert 重试、陈旧快照协调，以及 owner-scoped Run list/get API；读取层一次批量装配工具调用并通过 typed client 暴露。Session/event API、Web hydration 和事件恢复尚未实现，reload 仍把 active Run 置 failed，VPS 尚不是 Run 恢复权威源。
 - Local Media Runtime、真实媒体 benchmark 与新版 IA 仍是计划目标。
 - 当前 GitHub HEAD 的外部失败状态来自 Vercel 团队归属；仓库代码和 GitHub Actions 日志无法修复该外部配置。
 

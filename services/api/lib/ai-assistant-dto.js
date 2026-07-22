@@ -11,14 +11,14 @@ function toIsoString(value) {
   return value == null ? undefined : String(value);
 }
 
-function mapAgentRunRow(row = {}) {
+function mapAgentRunRow(row = {}, toolCalls = []) {
   return compact({
     id: row.id,
     userMessage: row.user_message,
     intent: row.intent,
     plan: row.plan,
     status: row.status,
-    toolCalls: [],
+    toolCalls: Array.isArray(toolCalls) ? toolCalls : [],
     stepResults: Array.isArray(row.step_results) ? row.step_results : [],
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at),

@@ -112,6 +112,7 @@
 - [ ] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名。
 - [x] Agent Run 单向服务端同步基础：owner-scoped local projection、pending sync marker、启动/online 重试与陈旧服务端快照协调已落地。
 - [ ] 将 `AgentRunStore` 升级为服务端读取/事件恢复权威源，新增 Session/Run list/get API；reload 时不再把 active Run 置 failed。
+  - [x] 新增 owner-scoped Run list/get API、批量工具调用装配与 typed client；Session API、事件恢复、Web hydration 与 active Run reload 行为仍待完成。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。

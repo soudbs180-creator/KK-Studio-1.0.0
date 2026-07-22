@@ -469,6 +469,15 @@ export interface KkApiClient {
     input: ClaimGenerationBatchJobRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<GenerationBatchJobDto>>;
+  /** Reads the authenticated owner's recent authoritative Agent Runs. */
+  listAgentRuns(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto[]>>>;
+  /** Reads one authoritative Agent Run without exposing another owner's data. */
+  getAgentRun(
+    runId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto>>>;
   upsertAgentRun(
     input: AgentRunDto,
     options?: ApiClientRequestOptions,
@@ -1917,6 +1926,24 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         config,
         `api/v1/generation-jobs/${encodeURIComponent(jobId)}/claim`,
         { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    listAgentRuns(options) {
+      return requestJson<AssistantApiResultDto<AgentRunDto[]>>(
+        config,
+        "api/ai-assistant/runs",
+        { method: "GET" },
+        options,
+      );
+    },
+
+    getAgentRun(runId, options) {
+      return requestJson<AssistantApiResultDto<AgentRunDto>>(
+        config,
+        `api/ai-assistant/runs/${encodeURIComponent(runId)}`,
+        { method: "GET" },
         options,
       );
     },
