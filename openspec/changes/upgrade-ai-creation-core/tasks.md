@@ -1,6 +1,6 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan event foundation in progress
+> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan foundation complete, confirmation expiry next
 > Last updated: 2026-07-24
 > Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration 与 Google 安全迁移桥已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、服务端权威 dual-read 与全 Provider 切流仍未完成。
 

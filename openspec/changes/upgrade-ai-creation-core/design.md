@@ -1,6 +1,6 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan event foundation in progress
+> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan foundation complete, confirmation expiry next
 > Companion: proposal.md, tasks.md
 > Last verified: 2026-07-24
 
