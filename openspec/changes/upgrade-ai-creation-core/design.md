@@ -2,7 +2,7 @@
 
 > Status: active / Phase 2 external rollout gates pending / Phase 3 structured Planner context in progress
 > Companion: proposal.md, tasks.md
-> Last verified: 2026-07-22
+> Last verified: 2026-07-23
 
 ---
 
@@ -337,6 +337,7 @@ System rules (固定预算)
 - system/summary 可按 Unicode code point 截断到本类配额；消息、工具、画布、知识条目保持不可拆分。选择时按优先级后时间倒序准入，最终恢复时间正序；最近两个 user-led round 与 `confirmed=false` 的工具结果优先。
 - Planner 消费权威 Session 时使用同一分配器做第二次裁剪：扣除 Session 已声明的 output reserve 后最多使用 64,000 UTF-8 单位，并预留 1,024 单位给 JSON envelope；少于 2,048 单位、summary 覆盖越界或最终 envelope 超限均 fail closed。只保留未被 summary 覆盖的 user/assistant 消息，附件、owner、confirmation、checkpoint、content hash 与历史 system/tool message 均排除。
 - `llmBrain.ts` / `localBrain.ts` 已消费该 authority-free Session context；无 binding 时 LLM 保持原 system + current-user 两消息形状。Web 已生产并 owner-scoped hydrate latest metadata-only Context Snapshot，Planner 仅在 exact Session、surface、canvas、summary freshness 和时钟偏差门禁通过后按画布硬预算消费。多轮选区指代由 `agentPlannerReferencePolicy.ts` 再与当前画布节点求交并冻结目标：通用 continuation、多候选单数指代、缺失目标、历史 Job ID 或 Planner 目标替换均 fail closed；只有当前消息明确提供的 paused Job `jobId` 可进入 resume。语义事件 replay、真实 LLM 多轮验证与跨设备执行接管仍是后续任务。
+- `AgentRuntime` 还会通过 ToolRegistry 的 safe tool `capabilities.listAvailable` 并发读取 captured-owner capability snapshot；1.5 秒超时、owner 变化、schema 失败或 transport 失败都只移除 capability context，不阻断原有 Planner/Run 路径。Planner 仅接收最多 100 条 active Connection -> Model -> Capability route 的 allowlisted `connectionId/providerId/modelId/capabilityId/mediaType/channel/requestProfile/permission`，不接收 displayName、secret 或任意 constraints payload。该摘要只有 `discovery_only` 权限；显式 generation model hint 必须匹配相同媒体 capability，否则在安全评估前移除并由服务端 RouteEngine 决定最终路由。
 
 ### 5.2 Run 恢复
 
@@ -444,7 +445,7 @@ POST /api/v1/provider-connections/:id/verify
 DELETE /api/v1/provider-connections/:id
 ```
 
-- 新增只读 safe tool `capabilities.listAvailable`，Agent 经 ToolRegistry 查询能力图摘要。
+- 只读 safe tool `capabilities.listAvailable` 已接入 Agent Planner；查询使用 captured owner 与 AbortSignal，输出再次经共享 snapshot schema 和 bounded allowlist 投影，且不授予执行或最终路由选择权限。
 - 现有 Quote / Job API 保持兼容，不改变语义。
 
 ---

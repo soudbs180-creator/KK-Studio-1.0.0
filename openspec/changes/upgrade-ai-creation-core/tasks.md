@@ -1,7 +1,7 @@
 # Tasks: upgrade-ai-creation-core
 
 > Status: active / Phase 2 external rollout gates pending / Phase 3 structured Planner context in progress
-> Last updated: 2026-07-22
+> Last updated: 2026-07-23
 > Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration 与 Google 安全迁移桥已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、服务端权威 dual-read 与全 Provider 切流仍未完成。
 
 ---
@@ -120,17 +120,17 @@
   - [x] Web Context Snapshot 生产、owner-scoped latest 投影与 Planner 消费基础已落地：只持久化计数、ID、视口、事件类型、输入存在性和工具名；必须匹配 exact Session、surface、canvas、summary freshness 与时钟偏差后才进入独立画布预算。
   - [x] 多轮选区指代回归已落地：`AgentRuntime` 只将当前画布仍存在的唯一选区 ID 投影给 Local/LLM Planner；普通“继续”、模糊“刚才那个”、多候选单数指代和 Planner 目标偷换均 fail closed，恢复 Job 仍要求当前消息显式提供具体 `jobId`。
   - [ ] 语义事件 discriminated union、真实 LLM 多轮验证与跨设备执行接管仍待实现。
-- [ ] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
+- [x] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
   - [x] `AgentRuntime` 已把校验后的 Session context 传入 Local/LLM Planner；LLM 将历史上下文置于最新指令之前并用 system policy 降权，LocalBrain 只报告恢复计数，不回显或执行历史指令。无 binding、预算不足、owner 变化或 detail 缺失时保持原有两消息/未绑定路径。
   - [x] `AgentRuntime` 在规划前以 1.5 秒上限读取 bound Session 的 latest Snapshot，并异步追加当前 metadata-only capture；网络失败不清空 Session 或阻止 Run。Planner 只接收晚于 rolling summary、不超过 5 分钟未来偏差且与当前 surface/canvas 一致的预算化画布摘要。
   - [x] 完成多轮指代语义回归：历史选区只在 exact owner/Session/surface/canvas/freshness 门禁后的 Snapshot 中作为候选，并再次与当前画布节点求交；歧义、缺失、通用 continuation、历史 Job ID 和目标替换均不产生动作，历史 confirmation 继续排除。
 - [x] 实现 Token 预算分配规则并写入 OpenSpec 可测契约：5% headroom、系统规则上限、`20:30:20:15:10` 类别权重、UTF-8 byte upper bound、每条 4 单位结构开销、类别硬配额和 deterministic trimming 均有专项测试；该值不是 Provider 计费 token。
-- [ ] 实现工具结果回填、上下文裁剪、多轮指代支持。
+- [x] 实现工具结果回填、上下文裁剪、多轮指代支持。
   - [x] 上下文裁剪基础已实现：最近两个 user-led round 与未确认工具结果优先，条目不可拆分，准入后恢复时间正序。
   - [x] 权威 Session 的已裁剪工具结果与知识引用已接入 Planner；confirmation/checkpoint 与附件 payload 保持排除。
   - [x] 权威 Context Snapshot 的画布摘要、选择 ID、视口、受限事件类型、输入存在性与工具名已按 `canvasSnapshot` 类别硬预算进入 Planner；原文、名称、附件内容和事件摘要不被生产或消费。
   - [x] 完成多轮选区指代回归与确定性 Planner 出口门禁；不把该能力描述为 semantic event replay。
-- [ ] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名。
+- [x] Agent 通过 ToolRegistry 查询 capability snapshot（`capabilities.listAvailable`），Planner 输入包含能力图摘要，禁止猜模型名：查询绑定 captured owner 与 1.5 秒 AbortSignal，只投影最多 100 条 active Connection -> Model -> Capability 路由并白名单化 channel/requestProfile；图片、视频、音频 action 的显式 model hint 必须匹配同媒体 capability，否则移除并交由服务端 RouteEngine 选择最终路由。
 - [x] Agent Run 单向服务端同步基础：owner-scoped local projection、pending sync marker、启动/online 重试与陈旧服务端快照协调已落地。
 - [ ] 将 `AgentRunStore` 升级为服务端读取/事件恢复权威源，新增 Session/Run list/get API；reload 时不再把 active Run 置 failed。
   - [x] 新增 owner-scoped Run list/get API、批量工具调用装配与 typed client。

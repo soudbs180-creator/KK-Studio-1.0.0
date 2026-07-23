@@ -32,8 +32,8 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "Status: reference",
-    "contentHash": "00ebd329a1c39688bfb4685eb1c2a748",
-    "updatedAt": "2026-07-22T14:13:17.734Z"
+    "contentHash": "bd36e0396906b66ca589d73b59542132",
+    "updatedAt": "2026-07-23T15:33:50.150Z"
   },
   {
     "id": "doc_readme_md",
@@ -76,9 +76,9 @@
     "source": "doc",
     "path": "docs/ai-assistant/site-capability-matrix.md",
     "title": "KK Studio AI 全站能力覆盖矩阵",
-    "summary": "Last verified: 2026-07-22",
-    "contentHash": "37be6e1c3c46290fe34f75d5168b2d48",
-    "updatedAt": "2026-07-21T16:59:21.142Z"
+    "summary": "Last verified: 2026-07-23",
+    "contentHash": "c7796223c8f62ab6fb5516890052e361",
+    "updatedAt": "2026-07-23T15:53:40.866Z"
   },
   {
     "id": "doc_skills_md",

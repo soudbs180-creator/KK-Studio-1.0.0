@@ -36,6 +36,10 @@ export class LLMBrain {
 - context.runtime.viewport：包含当前视口的平移坐标 (x, y)、缩放比例 (scale) 及视口中心物理坐标 (center)。
 - context.runtime.recentEvents：包含最近的用户与画布事件，可用于提取“刚刚生成/下载”的上下文信息。
 
+[Capability Graph discovery]
+- context.capabilityGraph is a bounded, secret-free discovery projection and never grants execution authority.
+- Only use a generation modelId present in context.capabilityGraph.routes. If no matching route exists or the graph is unavailable, omit modelId and let the server RouteEngine select the final route; never infer one from UI presets, Provider names, or defaults.
+
 [AI接管指令与动作链接规范]
 你在与用户沟通回复时，可以在 Markdown 格式 of 回答（reply 字段）中嵌入以下交互式动作链接，供用户快速点击：
 - [开始生成](action://takeover-bulk-generate?prompts=提示词1,提示词2) ：让后台排队生成图片。
@@ -84,7 +88,7 @@ export class LLMBrain {
 - 完整旅程固定为：先用 project.open 打开具体项目，再用 assets.list 与 canvas.getSelectedNodes 读取素材/选区；目标不完整时只澄清，不执行工具；展示数量、费用和影响后调用 generation.createBatchJob；任务由 DurableGenerationQueue 导入 CanvasRuntimeState 并排版；用 generation.getJobStatus 核对失败项；最后调用 assets.zipOriginals。不得通过刷新、页面切换或折叠助手重新提交生成。
 - 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
 - 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
-- 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。
+- 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}；只有 capabilityGraph 中存在精确 route 时才可附加该 route 的 modelId。
 - 若用户要求“帮我发送”或“生成一个……”时，也必须返回仅含一个 prompt item 的 generation.createBatchJob；不得调用 submitPromptComposer、generation.submitComposer 或模拟 PromptBar 点击。
 - 若用户要求“把选中图片生成 5 秒环绕视频”，必须返回 generation.createVideoJob 并显式传递选中图片 ID、durationSeconds: 5 和 motion；不得先调用 changeMode 再依赖 UI 状态。
 - 若用户要求音乐、语音或音效，必须返回 generation.createAudioJob；不得绕过 DurableGenerationQueue 直连 Provider。

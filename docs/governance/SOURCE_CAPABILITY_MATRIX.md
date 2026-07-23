@@ -3,7 +3,7 @@
 > Status: current
 > Owner: KK Studio AI Core Team
 > Verifies: `openspec/changes/upgrade-ai-creation-core/proposal.md`
-> Last verified: 2026-07-22
+> Last verified: 2026-07-23
 
 本矩阵记录 KK Studio v1.6.0 的**当前事实**（非规划目标）。每项能力声明必须附带源码证据；证据缺失或矛盾的条目不得作为当前事实引用。
 
@@ -101,7 +101,7 @@
 | 9.2 | Capability Graph snapshot API | 完全 | `packages/shared/src/capability-graph/` 定义契约；`services/api/lib/capability-graph/projection.js` 投影权威数据；`services/api/routes/capability-graph.js` 提供 snapshot API。 | keep |
 | 9.3 | Provider Connection 领域模型 | 部分 | migration 018 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立新表 CRUD 和 verify；`CapabilitySourcesView.tsx` 已实际挂载 `ProviderConnectionsPanel.tsx`，由 `providerConnectionMigration.ts` 把旧 Google 设置的非敏感名称/endpoint 投影为迁移候选，要求显式重输 secret 后调用现有 create/verify，并与新 Connection 去重。桌面 Chromium smoke 已验证该 UI 闭环；旧 `ApiSettings`/profile 仍由 `userApiCloudRecordStorage.ts:514-625` 平行读写，服务端权威 dual-read、真实 Provider 验收、全 Provider 切流和观测窗口未完成。 | upgrade |
 | 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 完全 | `providerConnectionService.js`、`connectionVerifier.js` 与 migration 018 使用 secret reference、URL/DNS/IP 检查、最小探测和诊断脱敏，不序列化明文 secret。 | keep |
-| 9.5 | Agent 查询可用能力 | 完全 | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` 注册只读 safe tool `capabilities.listAvailable`，并由 ToolRegistry 消费 snapshot。 | keep |
+| 9.5 | Agent 查询可用能力 | 完全 | `capabilityTools.ts` 注册只读 safe tool `capabilities.listAvailable`；`agentPlannerCapabilityContext.ts` 通过 ToolRegistry 以 captured owner/1.5 秒上限读取 snapshot，只投影 bounded active Connection -> Model -> Capability 路由。`AgentRuntime.ts` 将同一摘要交给 Local/LLM Planner，并按 image/video/audio capability 移除无图证据的 generation model hint；最终路由仍由服务端 RouteEngine 决定。 | keep |
 
 ## 10. 本地媒体与 Runtime
 
@@ -147,6 +147,7 @@
 | Planner authority-free Session context | `apps/web/src/features/ai-takeover/core/agentPlannerContext.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/agentPlannerSessionContext.ts` / `apps/web/src/features/ai-takeover/core/{llmBrain,localBrain}.ts` / `tests/unit/agent-planner-session-context.test.ts` |
 | Context Snapshot metadata producer、owner-scoped projection 与 Planner consumption | `apps/web/src/features/ai-takeover/core/agentContextSnapshot.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/agentContextSnapshotProjection.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-context-snapshot-projection.test.ts` |
 | Planner 多轮选区指代与 authority fail-closed 门禁 | `apps/web/src/features/ai-takeover/core/agentPlannerReferencePolicy.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-planner-session-context.test.ts` |
+| Planner Capability Graph 发现与 model hint 门禁 | `apps/web/src/features/ai-takeover/core/agentPlannerCapabilityContext.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-planner-capability-context.test.ts` |
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |

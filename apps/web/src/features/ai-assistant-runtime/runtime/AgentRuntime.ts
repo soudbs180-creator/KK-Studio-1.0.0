@@ -13,6 +13,11 @@ import {
   applyAgentPlannerReferenceContext,
   enforceAgentPlannerReferencePolicy,
 } from '../../ai-takeover/core/agentPlannerReferencePolicy.ts';
+import {
+  applyAgentPlannerCapabilityContext,
+  enforceAgentPlannerCapabilityPolicy,
+  resolveAgentPlannerCapabilityContext,
+} from '../../ai-takeover/core/agentPlannerCapabilityContext.ts';
 import { agentPermissionPolicy } from './AgentPermissionPolicy.ts';
 import {
   agentRunStore,
@@ -535,11 +540,14 @@ export class AgentRuntime {
     sessionId?: string,
   ): Promise<PlannedAgentRunRecord> {
     const planningOwnerId = getRuntimeOwnerId();
+    const capabilityContextPromise = resolveAgentPlannerCapabilityContext(planningOwnerId);
     await hydratePlannerContextSnapshot(sessionId, planningOwnerId);
+    const capabilityContext = await capabilityContextPromise;
     const sessionContext = resolveAgentPlannerSessionContext(sessionId, agentSessionProjectionStore, context);
     const validatedSessionId = sessionContext?.sessionId;
     appendCurrentContextSnapshot(validatedSessionId, planningOwnerId, context);
-    const plannerContext = applyAgentPlannerReferenceContext(text, context, sessionContext);
+    const referenceContext = applyAgentPlannerReferenceContext(text, context, sessionContext);
+    const plannerContext = applyAgentPlannerCapabilityContext(referenceContext, capabilityContext);
     const localPlan = await localBrain.plan(text, plannerContext, sessionContext);
     if (getRuntimeOwnerId() !== planningOwnerId) {
       throw new Error('Agent planning stopped because the authenticated owner changed.');
@@ -560,6 +568,7 @@ export class AgentRuntime {
       throw new Error('Agent planning stopped because the authenticated owner changed.');
     }
     plan = enforceAgentPlannerReferencePolicy(text, plan, context, sessionContext);
+    plan = enforceAgentPlannerCapabilityPolicy(plan, capabilityContext);
 
     let isBlocked = false;
     let blockReason = '';

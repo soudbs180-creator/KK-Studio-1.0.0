@@ -1,6 +1,6 @@
 # KK Studio AI 全站能力覆盖矩阵
 
-Last verified: 2026-07-22
+Last verified: 2026-07-23
 
 Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`、`apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts`、CanvasContext 与本页列出的业务入口。
 
@@ -36,7 +36,7 @@ Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.
 | Account | 查看登录存在性和 Key 配置状态 | Auth runtime、KeyManager | `account.getSummary` | safe | 只返回 owner ID、登录布尔值和 masked 状态；不返回 Key/Token。 |
 | Billing | 查看可展示余额 | BillingContext | `billing.getSummary` | safe | 只读；单位固定为 credits。 |
 | Browser | 状态、公开 URL 检查、外部生成/草稿 | Browser Bridge | `browser.*` | safe / confirm / dangerous | 保留已硬化的公开 URL、owner 和确认边界。 |
-| Capabilities | 查看当前用户可用的 Provider、Connection、Model、Capability、Channel 与 Runtime | 当前尚无统一领域入口 | 计划新增 `capabilities.listAvailable` | safe | **未实现**；必须先完成服务端 Capability Graph snapshot 与脱敏 Provider Connection 投影，不得从模型名或 UI preset 猜测。 |
+| Capabilities | 查看当前用户可用的 Provider、Connection、Model、Capability、Channel 与 Runtime | 服务端 Capability Graph snapshot + bounded Planner projection | `capabilities.listAvailable` | safe | **已实现只读发现**；Planner 查询绑定 owner/超时并只消费 active 脱敏 route，显式 generation model hint 必须匹配相同媒体 capability。最终 Connection/Channel 仍由服务端 RouteEngine/Quote 冻结。 |
 
 ## UI 动作映射
 
@@ -71,7 +71,7 @@ Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.
 | 9. 验证失败项 | `generation.getJobStatus` | completed / failed / running / queued 精确计数。 |
 | 10. 导出原图 | `assets.zipOriginals` | ZIP manifest、成功项与失败项；部分失败不得伪装全成功。 |
 
-Capability Graph 图像纵向切片完成后，在步骤 3 与步骤 4 之间增加固定步骤：读取脱敏 capability snapshot、冻结 `connectionId/provider/model/capability/channel/requestProfile`，并把它写入 Quote route snapshot。执行期间不得切换 Connection 或 Channel。
+当前在步骤 3 与步骤 4 之间先通过 ToolRegistry 读取脱敏 capability snapshot，Planner 只消费 bounded discovery route 并校验显式 model hint；`connectionId/provider/model/capability/channel/requestProfile` 的最终冻结仍由服务端 Quote route snapshot 负责。执行期间不得由浏览器改选 Connection 或 Channel。
 
 ## 明确禁止的自治入口
 
