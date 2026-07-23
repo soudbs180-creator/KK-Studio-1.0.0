@@ -204,3 +204,80 @@ test('local route resolution checks the uncached new source before legacy cache'
   assert.equal(secondRoute?.apiKey, 'second-secret');
   assert.equal(callCount, 2);
 });
+
+test('dual-read records aggregate rollout outcomes without retaining request identity', async () => {
+  const adapterModule = await import('../../services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js');
+  const metricsModule = await import('../../services/api/lib/capability-graph/providerConnectionDualReadMetrics.js');
+  const { resolveProviderConnectionLegacyRoute } = adapterModule.default || adapterModule;
+  const { createProviderConnectionDualReadMetrics } = metricsModule.default || metricsModule;
+  const metrics = createProviderConnectionDualReadMetrics({ now: () => 1_000 });
+  const enabledEnv = { PROVIDER_CONNECTION_LEGACY_DUAL_READ_ENABLED: 'true' };
+  const connectionId = '550e8400-e29b-41d4-a716-446655440006';
+
+  await resolveProviderConnectionLegacyRoute('owner-private', connectionId, {
+    env: enabledEnv,
+    metrics,
+    pool: createPool({ candidates: [googleCandidate(connectionId)], secretRef: 'encrypted-private' }).pool,
+    decrypt: () => 'secret-private',
+  });
+  await resolveProviderConnectionLegacyRoute('owner-private', 'google-1017-1', {
+    env: enabledEnv,
+    metrics,
+    pool: createPool({ candidates: [] }).pool,
+  });
+  await resolveProviderConnectionLegacyRoute('owner-private', 'google-1017-1', {
+    env: enabledEnv,
+    metrics,
+    pool: createPool({ queryError: new Error('private database detail') }).pool,
+  });
+  await resolveProviderConnectionLegacyRoute('owner-private', 'legacy-private-route', {
+    env: enabledEnv,
+    metrics,
+  });
+  await assert.rejects(resolveProviderConnectionLegacyRoute('owner-private', connectionId, {
+    env: enabledEnv,
+    metrics,
+    pool: createPool({ candidates: [googleCandidate(connectionId)], secretRef: 'invalid-private' }).pool,
+    decrypt: () => { throw new Error('private decrypt detail'); },
+  }));
+
+  const snapshot = metrics.getSnapshot();
+  assert.deepEqual(snapshot.outcomes, {
+    selected: 1,
+    fallbackNoMatch: 1,
+    fallbackStorageUnavailable: 1,
+    fallbackUnsupportedRoute: 1,
+    blockedSecretUnavailable: 1,
+  });
+  assert.equal(snapshot.lastEventAt, new Date(1_000).toISOString());
+  assert.doesNotMatch(
+    JSON.stringify(snapshot),
+    /owner-private|legacy-private-route|encrypted-private|secret-private|private database detail|private decrypt detail/,
+  );
+});
+
+test('existing telemetry envelope exposes the aggregate dual-read snapshot', async () => {
+  const metricsModule = await import('../../services/api/lib/capability-graph/providerConnectionDualReadMetrics.js');
+  const { providerConnectionDualReadMetrics } = metricsModule.default || metricsModule;
+  providerConnectionDualReadMetrics.reset();
+  providerConnectionDualReadMetrics.recordOutcome('fallbackNoMatch');
+
+  const telemetryModule = await import('../../services/api/routes/telemetry.js');
+  const router = telemetryModule.default || telemetryModule;
+  const metricsLayer = router.stack.find((layer: { route?: { path?: string } }) => layer.route?.path === '/v1/metrics');
+  let payload: {
+    success: boolean;
+    data: { providerConnectionDualRead: { enabled: boolean; outcomes: { fallbackNoMatch: number } } };
+  } | undefined;
+
+  metricsLayer.route.stack[0].handle({}, {
+    json(value: typeof payload) {
+      payload = value;
+      return value;
+    },
+  });
+
+  assert.equal(payload?.success, true);
+  assert.equal(payload?.data.providerConnectionDualRead.enabled, false);
+  assert.equal(payload?.data.providerConnectionDualRead.outcomes.fallbackNoMatch, 1);
+});

@@ -11,6 +11,8 @@ const metricsCollector = require('../lib/dispatcher/metricsCollector');
 const dispatcher = require('../lib/dispatcher/index');
 const { imageWorkerMetrics } = require('../lib/generation-v3/worker/workerMetrics');
 const { generationV3Metrics } = require('../lib/generation-v3/generationMetrics');
+const { providerConnectionDualReadMetrics } = require('../lib/capability-graph/providerConnectionDualReadMetrics');
+const { isProviderConnectionLegacyDualReadEnabled } = require('../lib/capability-graph/providerConnectionLegacyRouteAdapter');
 
 const router = express.Router();
 
@@ -68,6 +70,10 @@ router.get('/v1/metrics', (req, res) => {
       circuitBreaker: breakerStatus,
       generationV3: generationV3Metrics.getSnapshot(),
       imageDurableWorker: imageWorkerMetrics.getSnapshot(),
+      providerConnectionDualRead: {
+        enabled: isProviderConnectionLegacyDualReadEnabled(),
+        ...providerConnectionDualReadMetrics.getSnapshot(),
+      },
     },
   });
 });

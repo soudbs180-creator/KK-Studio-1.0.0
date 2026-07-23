@@ -1,5 +1,6 @@
 const cryptoUtil = require('../../utils/crypto');
 const { withUserScopedClient } = require('./providerConnectionStore');
+const { providerConnectionDualReadMetrics } = require('./providerConnectionDualReadMetrics');
 
 const GOOGLE_LEGACY_ROUTE_ID = 'google-1017-1';
 const CONNECTION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -52,7 +53,7 @@ function selectCandidate(candidates, routeId) {
 
 async function readSelectedConnection(userId, routeId, pool) {
   try {
-    return await withUserScopedClient(userId, async (client) => {
+    const record = await withUserScopedClient(userId, async (client) => {
       const candidateResult = await client.query(
         `SELECT pc.connection_id AS "connectionId", pc.provider_id AS "providerId",
                 pc.display_name AS "displayName", pc.protocol_profile AS "protocolProfile",
@@ -82,8 +83,11 @@ async function readSelectedConnection(userId, routeId, pool) {
       );
       return secretResult.rows[0] ? { ...selected, secretRef: secretResult.rows[0].secretRef } : null;
     }, pool);
+    return record
+      ? { outcome: 'selected', record }
+      : { outcome: 'fallbackNoMatch', record: null };
   } catch {
-    return null;
+    return { outcome: 'fallbackStorageUnavailable', record: null };
   }
 }
 
@@ -118,14 +122,29 @@ function projectLegacyRoute(record, apiKey) {
 async function resolveProviderConnectionLegacyRoute(userId, routeId, overrides = {}) {
   const env = overrides.env || process.env;
   if (!isProviderConnectionLegacyDualReadEnabled(env) || !userId || !routeId) return null;
+  const metrics = overrides.metrics || providerConnectionDualReadMetrics;
   const normalizedRouteId = normalizeLegacyRouteId(routeId);
   const supportsNewLookup = normalizedRouteId === GOOGLE_LEGACY_ROUTE_ID
     || CONNECTION_ID_PATTERN.test(normalizedRouteId);
-  if (!supportsNewLookup) return null;
-  const record = await readSelectedConnection(userId, normalizedRouteId, overrides.pool);
-  if (!record) return null;
-  const apiKey = decryptSelectedSecret(record, overrides.decrypt || cryptoUtil.decrypt);
-  return projectLegacyRoute(record, apiKey);
+  if (!supportsNewLookup) {
+    metrics.recordOutcome('fallbackUnsupportedRoute');
+    return null;
+  }
+  const selection = await readSelectedConnection(userId, normalizedRouteId, overrides.pool);
+  if (!selection.record) {
+    metrics.recordOutcome(selection.outcome);
+    return null;
+  }
+  let apiKey;
+  try {
+    apiKey = decryptSelectedSecret(selection.record, overrides.decrypt || cryptoUtil.decrypt);
+  } catch (error) {
+    metrics.recordOutcome('blockedSecretUnavailable');
+    throw error;
+  }
+  const route = projectLegacyRoute(selection.record, apiKey);
+  metrics.recordOutcome('selected');
+  return route;
 }
 
 module.exports = {
