@@ -82,7 +82,8 @@ Boundary: this runtime store is a browser projection/cache. It must not be treat
 - **Web API client**: `packages/api-client`
 - **Authenticated server routes**: `services/api/routes/ai-assistant.js`
 - **User-scope migration**: `infrastructure/database/migrations/016_ai_assistant_user_scope.sql`
-- **Run event migrations and read store**: `infrastructure/database/migrations/020_agent_run_events.sql`, `infrastructure/database/migrations/023_agent_run_semantic_events.sql`, `services/api/lib/agent-run-event-store.js`
+- **Run event migrations and read store**: `infrastructure/database/migrations/020_agent_run_events.sql`, `infrastructure/database/migrations/023_agent_run_semantic_events.sql`, `infrastructure/database/migrations/024_agent_run_replan_events.sql`, `services/api/lib/agent-run-event-store.js`
+- **Bounded replan event boundary**: migration 024 derives `replanCount` only from an accepted structural plan replacement, enforces 0–3 in PostgreSQL, and emits fixed `plan_replaced / accepted_plan_change` metadata. Clients cannot choose the count; Web treats the event as read-only invalidation and never as execution authority.
 - **Web Run projection recovery**: `apps/web/src/features/ai-assistant-runtime/runtime/agentRunHydration.ts`, `apps/web/src/features/ai-assistant-runtime/runtime/agentRunEventRecovery.ts`
 - **Session/context migration and store**: `infrastructure/database/migrations/021_agent_sessions.sql`, `services/api/lib/agent-session-store.js`
 - **Web Session read-only projection**: `apps/web/src/features/ai-assistant-runtime/runtime/agentSessionProjection.ts`

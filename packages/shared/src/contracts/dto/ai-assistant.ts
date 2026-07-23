@@ -113,7 +113,7 @@ export interface AgentRunDto {
   confirmationGrantedAt?: string;
   totalSteps?: number;
   completedStepIds?: string[];
-  replanCount?: number;
+  replanCount?: 0 | 1 | 2 | 3;
 }
 
 export interface AgentRunSnapshotEventDto {
@@ -135,7 +135,24 @@ export interface AgentRunStepOutcomeEventDto {
   step: Omit<AgentStepResultDto, "message">;
 }
 
-export type AgentRunEventDto = AgentRunSnapshotEventDto | AgentRunStepOutcomeEventDto;
+export interface AgentRunReplanEventDto {
+  runId: string;
+  sequence: number;
+  type: "replan";
+  status: AgentRunStatus;
+  runUpdatedAt: string;
+  createdAt: string;
+  replan: {
+    count: 1 | 2 | 3;
+    reasonCode: "plan_replaced";
+    triggerCode: "accepted_plan_change";
+  };
+}
+
+export type AgentRunEventDto =
+  | AgentRunSnapshotEventDto
+  | AgentRunStepOutcomeEventDto
+  | AgentRunReplanEventDto;
 
 export interface AgentRunEventQueryDto {
   afterSequence?: number;
@@ -200,6 +217,19 @@ export const AgentToolCallDtoSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
+const AgentRunReplanCountSchema = z.union([
+  z.literal(0),
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+]);
+
+const AgentRunReplanEventCountSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+]);
+
 export const AgentRunDtoSchema = z.object({
   id: z.string().min(1).max(200),
   sessionId: z.string().min(1).max(200).optional(),
@@ -215,7 +245,7 @@ export const AgentRunDtoSchema = z.object({
   confirmationGrantedAt: z.iso.datetime().optional(),
   totalSteps: z.number().int().nonnegative().optional(),
   completedStepIds: z.array(z.string()).optional(),
-  replanCount: z.number().int().nonnegative().optional(),
+  replanCount: AgentRunReplanCountSchema.optional(),
 });
 
 /** Validates the bounded server collection before it enters Web runtime state. */
@@ -238,10 +268,20 @@ const AgentRunStepOutcomeEventDtoSchema = AgentRunEventBaseDtoSchema.extend({
   step: AgentStepResultDtoSchema.omit({ message: true }).strict(),
 }).strict();
 
+const AgentRunReplanEventDtoSchema = AgentRunEventBaseDtoSchema.extend({
+  type: z.literal("replan"),
+  replan: z.object({
+    count: AgentRunReplanEventCountSchema,
+    reasonCode: z.literal("plan_replaced"),
+    triggerCode: z.literal("accepted_plan_change"),
+  }).strict(),
+}).strict();
+
 /** Keeps semantic event transport metadata-only through explicit, strict variants. */
 export const AgentRunEventDtoSchema = z.discriminatedUnion("type", [
   AgentRunSnapshotEventDtoSchema,
   AgentRunStepOutcomeEventDtoSchema,
+  AgentRunReplanEventDtoSchema,
 ]);
 
 /** Bounds one incremental replay page independently from the Run snapshot list. */

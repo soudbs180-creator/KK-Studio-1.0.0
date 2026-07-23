@@ -1,7 +1,7 @@
 <!-- AI_ROUTING_KEY: state, validation, verification, milestone, handoff -->
 # Project State and Validation — KK Studio v1.6.0
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 ## 0. 当前验证基线
 
@@ -104,6 +104,8 @@ npm run local-runner:build
 
 ### Current facts
 
+> 2026-07-24 校准：下文若仍以“replan event 未实现”概括 Phase 3，现应读作“可执行 replan/replay 未实现”。metadata-only `replan` 事件底座已由 migration 024 完成：只从 accepted plan replacement 推导 1–3 次计数与固定 reason/trigger code，Web 仅作 detail invalidation，完整执行与接管仍未完成。
+
 - Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 227 份 Markdown、19 份 current、0 conflict。
 - Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
 - Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。image slice 现同时保护管理面和实际数据面：Connection-backed Quote、同步 submit 与 durable enqueue 均在 resolver/credential/Provider/lease 副作用前按 server scope fail closed；无 `connectionId` 的 legacy 路径不变，已入队 Worker 在 flag 关闭后继续使用冻结路由 drain。
@@ -119,11 +121,15 @@ npm run local-runner:build
 
 ### Next execution gate
 
+> Phase 3 current delta（2026-07-24）：migration 024 已把 accepted Run 的 plan replacement 推导为 strict metadata-only `replan` event，数据库权威累计 1–3 次并记录固定 `plan_replaced / accepted_plan_change` code；客户端 `replanCount` 不参与计算，第四次替换不写入。Web 仍只把 `run_snapshot | step_outcome | replan` 混合页作为权威详情失效信号。完整 semantic replay、真实 replan 执行/调度、confirmation expiry、真实 LLM 多轮和跨设备执行接管仍未完成；该增量不授予远端 projection 执行权。
+
 1. 在受控 PostgreSQL 与真实浏览器中验证 owner-scoped pending Job discovery、SSE 和 Web hydration：关闭页面后续跑、重新登录、第二设备发现已同步 Prompt 节点并恢复投影；无法安全关联时必须保持本地 fallback 且不得创建重复节点。
 2. 在受控 PostgreSQL 运行 `npm run rehearse:migration:019`；先开启 Worker execution，再完成 image-slice 与 Worker admission 的真实 internal → invited → full → off 放量，观察准入、Worker、计费、重复 submit 与回退指标；回滚时保持 execution 直到 lease drain。
 3. 上述 gate 通过后再扩展视频/音频 Worker；Phase 3 下一纵向切片应在既有 metadata-only `step_outcome` 上单独设计完整 semantic replay/replan event，并保留已完成的多轮选区指代 authority 门禁；不得把 event metadata、本地 binding 或历史 Snapshot 扩张为远端执行授权或 ChatSidebar 全量切流。
 
 ### Required PR evidence
+
+Phase 3 下一独立纵切应基于 migration 024 设计 confirmation expiry 或真实 replan executor 接线；不得把 metadata event、历史 plan、Session binding 或 Snapshot 直接升级为执行授权。migration 024 与既有 019/022/023 一样仍需受控 PostgreSQL 的空库、存量库、重复执行与 deploy probe 演练。
 
 每个 PR 必须记录 scope、OpenSpec task、migration、兼容、flag、回滚、安全、性能、测试、剩余风险和删除条件。阶段收口运行 `verify:changes` 与 `verify:large-canvas-10k`；Local Runner 进入发布前必须独立 build/typecheck 与安全测试全绿。
 

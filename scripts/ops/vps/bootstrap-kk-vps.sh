@@ -20,6 +20,7 @@ AGENT_RUN_EVENT_MIGRATION="${KK_AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastr
 AGENT_SESSION_MIGRATION="${KK_AGENT_SESSION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/021_agent_sessions.sql}"
 AGENT_RUN_SESSION_BINDING_MIGRATION="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
+AGENT_RUN_REPLAN_EVENT_MIGRATION="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -110,6 +111,10 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required Agent Run semantic event migration not found at ${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}." >&2
     exit 1
   fi
+  if [[ ! -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" ]]; then
+    echo "[bootstrap-kk-vps] Required Agent Run replan event migration not found at ${AGENT_RUN_REPLAN_EVENT_MIGRATION}." >&2
+    exit 1
+  fi
 
   REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
   AI_ASSISTANT_SCOPE_MIGRATION="$(realpath "${AI_ASSISTANT_SCOPE_MIGRATION}")"
@@ -117,6 +122,7 @@ setup_postgres() {
   AGENT_SESSION_MIGRATION="$(realpath "${AGENT_SESSION_MIGRATION}")"
   AGENT_RUN_SESSION_BINDING_MIGRATION="$(realpath "${AGENT_RUN_SESSION_BINDING_MIGRATION}")"
   AGENT_RUN_SEMANTIC_EVENT_MIGRATION="$(realpath "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}")"
+  AGENT_RUN_REPLAN_EVENT_MIGRATION="$(realpath "${AGENT_RUN_REPLAN_EVENT_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -140,6 +146,10 @@ setup_postgres() {
   case "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Agent Run semantic event migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+  case "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] Agent Run replan event migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
 
   for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
@@ -189,7 +199,8 @@ SQL
     -f "${AGENT_RUN_EVENT_MIGRATION}" \
     -f "${AGENT_SESSION_MIGRATION}" \
     -f "${AGENT_RUN_SESSION_BINDING_MIGRATION}" \
-    -f "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}"
+    -f "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}" \
+    -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}"
 }
 
 install_runtime_templates() {

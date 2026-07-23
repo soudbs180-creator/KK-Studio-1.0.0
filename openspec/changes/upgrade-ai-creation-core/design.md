@@ -1,8 +1,8 @@
 # Design: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 metadata-only semantic events in progress
+> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan event foundation in progress
 > Companion: proposal.md, tasks.md
-> Last verified: 2026-07-23
+> Last verified: 2026-07-24
 
 ---
 
@@ -170,6 +170,14 @@ type AgentRunEventDto =
   | (AgentRunEventBaseDto & {
       type: 'step_outcome';
       step: Omit<AgentStepResultDto, 'message'>;
+    })
+  | (AgentRunEventBaseDto & {
+      type: 'replan';
+      replan: {
+        count: 1 | 2 | 3;
+        reasonCode: 'plan_replaced';
+        triggerCode: 'accepted_plan_change';
+      };
     });
 ```
 
@@ -177,8 +185,8 @@ type AgentRunEventDto =
 - Session 是服务端权威源；浏览器本地缓存仅为投影。
 - migration 021 与 `/api/ai-assistant/sessions*` 已建立 owner-scoped Session/Context 数据面；migration 022 为 Run 增加可选 `sessionId`，通过 `(session_id, user_id)` 复合外键保证同 owner，首次绑定后 API 不允许改绑或解除。Web 已接入严格的 Session list/detail 只读投影，并提供纯函数写入资格映射：调用者必须显式给出 canonical Asset、结构化摘要、TokenBudget、owner 和创建时间，任何未解析附件、URL 附件、临时 Session 或跨 owner base 都拒绝；映射会保留权威 tool/knowledge/confirmation/checkpoint 状态。canonical Asset 协调器复用现有 owner-scoped `/api/v1/assets` typed API，以 `chat_<sha256>` 内容寻址复用/创建 7 MiB 内 data URL；document 必须有显式敏感性批准，响应必须通过 Asset Zod schema 且 owner 在异步期间不变。Chat 压缩现会把 canonical rolling summary 作为 `agentSummary` 独立持久化，原分界消息仅保留 UI/旧格式兼容；压缩完成时按源 Session ID 原子提交，切换会话和重复回调不会污染其他 Session 或重复边界。Provider-independent `TokenBudget` 分配器也已产生可通过 strict Session mapper 的预算证据。写协调器已把权威 detail/404 新建判断、expected-subject Asset 解析、预算计划、strict mapper、Session upsert 与服务端响应 hydration 串成单一 fail-closed 边界；stale upsert 只接受服务端权威数据，不用本地候选覆盖。ChatSidebar 现在只在创建协作模式 Run 前按需调用该边界：本地 Session 必须具有显式 `createdAt` 和结构化摘要，已有权威 detail 还必须精确匹配 createdAt 且不旧于本地投影；否则先写入并 hydrate，只有成功结果才传入 Run binding。提升尝试最多等待 3 秒，任一失败继续创建未绑定 Run。`AgentRuntime` 对 binding 再次要求 exact owner-scoped detail，并构造不含附件、owner、confirmation、checkpoint 或 content hash 的 authority-free Planner context；校验或预算失败时同时丢弃上下文与 Run binding。Web 现另行从 `SanitizedProjectContext` 生成 metadata-only Snapshot：只保留计数、ID、视口、受限事件类型、输入存在性和工具名，不保存 prompt、画布/图片名称、事件摘要、附件 bytes 或任意 payload。规划前 latest GET 受 1.5 秒上限约束，当前 capture 异步 append；只有 exact Session、surface、canvas、晚于 rolling summary 且不超过 5 分钟未来偏差的 Snapshot 才进入独立 `canvasSnapshot` 预算。网络失败保留已有 Session context 与 Run 创建。该增量接线不代表 Chat 已整体切换到服务端权威，也不授予历史 Snapshot 执行权。
 - Planner 输入由系统规则 + 滚动摘要 + 最近消息 + 工具结果 + 画布快照 + 知识引用组成，按 `TokenBudget` 裁剪。
-- migration 020 先提供 metadata-only `run_snapshot` 事件基础；migration 023 再以 strict discriminated `step_outcome` variant 投影新增或语义变化的 step verification outcome。该 variant 只使用关系型白名单列，不复制 `message`、user message、plan、tool input/output 或任意 `unknown` payload；单次 Run 写入最多追加 100 条 step event，并与 snapshot/sequence 更新保持同一事务。
-- 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），`run_snapshot` 与 `step_outcome` 都仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，本地新 Run 已可在权威 Session write/hydrate 成功后首次携带 `sessionId`；但该机制仍不是可执行语义 replay，也不向远端计划授予执行权，完整 step history/replan event、真实 LLM 多轮验证与跨设备 E2E 完成前不能宣称服务端已接管完整 Run 恢复。
+- migration 020 先提供 metadata-only `run_snapshot` 事件基础；migration 023 再以 strict discriminated `step_outcome` variant 投影新增或语义变化的 step verification outcome。该 variant 只使用关系型白名单列，不复制 `message`、user message、plan、tool input/output 或任意 `unknown` payload；单次 Run 写入最多追加 100 条 step event，并与 snapshot/sequence 更新保持同一事务。migration 024 增加 strict `replan` variant：只有服务端接受的既有 Run plan 发生结构变化才由数据库递增 1–3 次计数并追加固定 `plan_replaced / accepted_plan_change` 元数据；不信任客户端计数，也不复制 plan、prompt、自由文本原因或任意 payload，第四次替换不写入。
+- 当前 Web 在首次 Run 列表 hydration 后消费 owner-qualified sequence cursor：只轮询最近 20 个 active + synced Run（最多 4 并发），`run_snapshot`、`step_outcome` 与 `replan` 都仅作为详情失效信号；事件页、Run ID、单调 sequence、owner 和详情更新时间全部校验通过，且权威快照成功合并后才推进游标。migration 022 的 binding-only 更新同样推进 event sequence，本地新 Run 已可在权威 Session write/hydrate 成功后首次携带 `sessionId`；但该机制仍不是可执行语义 replay，也不向远端计划授予执行权，完整 step history、真实 replan 执行/调度、confirmation expiry、真实 LLM 多轮验证与跨设备 E2E 完成前不能宣称服务端已接管完整 Run 恢复。
 
 ### 2.4 PPT 契约
 
@@ -352,7 +360,7 @@ System rules (固定预算)
 - cursor 按 owner + Run 持久化；owner 变化、跨 Run/乱序事件、陈旧详情、网络失败或本地较新 pending snapshot 均不得推进 cursor。
 - 服务端独有 Run 始终是 `server_projection`，当前浏览器只能展示或请求服务端控制，不能执行未在本地验证和确认的 plan。
 - 恢复后不重新执行已完成步骤；未执行步骤重新进入 Worker 队列。
-- 最多允许三次**受控重规划**：每次重规划必须在服务端事件日志中记录原因和触发条件。
+- 最多允许三次**受控重规划**：migration 024 已对 accepted plan replacement 建立服务端计数上限和结构化原因/触发条件事件；Planner 失败驱动的真实重规划循环、恢复调度与 confirmation 失效仍需后续独立实现。
 
 ---
 

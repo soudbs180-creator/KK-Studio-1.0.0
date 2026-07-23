@@ -81,7 +81,7 @@ test('database entrypoints apply semantic events after Run Session binding', () 
     assert.ok(semanticIndex > bindingIndex, 'semantic event migration must follow Run Session binding');
   }
   const bootstrap = readSource('scripts/ops/postgres/bootstrap-kk-vps.sql');
-  assert.match(bootstrap, /event_type IN \('run_snapshot', 'step_outcome'\)/);
+  assert.match(bootstrap, /event_type IN \('run_snapshot', 'step_outcome', 'replan'\)/);
   assert.match(bootstrap, /jsonb_array_elements/);
 });
 

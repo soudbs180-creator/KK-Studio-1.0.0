@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {
   AgentRunDto,
+  AgentRunReplanEventDto,
   AgentRunSnapshotEventDto,
   AgentRunStepOutcomeEventDto,
 } from '@kk/shared';
@@ -75,6 +76,20 @@ const makeStepOutcomeEvent = (sequence: number): AgentRunStepOutcomeEventDto => 
   },
 });
 
+const makeReplanEvent = (sequence: number): AgentRunReplanEventDto => ({
+  runId: 'event-run-1',
+  sequence,
+  type: 'replan',
+  status: 'running',
+  runUpdatedAt: '2026-07-22T00:02:00.000Z',
+  createdAt: '2026-07-22T00:02:01.000Z',
+  replan: {
+    count: 1,
+    reasonCode: 'plan_replaced',
+    triggerCode: 'accepted_plan_change',
+  },
+});
+
 const ok = <Payload>(payload: Payload) => Promise.resolve({
   success: true as const,
   data: { ok: true as const, data: payload },
@@ -130,7 +145,7 @@ test('advances an owner-qualified cursor only after a valid authoritative Run me
   assert.equal(hasLocalAgentRunExecutionAuthority(store.getRun('event-run-1')), false);
 });
 
-test('treats mixed snapshot and step outcome events as read-only invalidation signals', async () => {
+test('treats mixed snapshot, step outcome, and replan events as read-only invalidation signals', async () => {
   const ownerId = 'event-owner-semantic';
   const storage = createStorage();
   const store = new AgentRunStore(storage, () => ownerId);
@@ -138,13 +153,14 @@ test('treats mixed snapshot and step outcome events as read-only invalidation si
   store.hydrateAuthoritativeRuns(ownerId, [makeRun()]);
   let detailRequests = 0;
   const client: AgentRunEventRecoveryClient = {
-    listAgentRunEvents: async () => ok([makeEvent(), makeStepOutcomeEvent(2)]),
+    listAgentRunEvents: async () => ok([makeEvent(), makeStepOutcomeEvent(2), makeReplanEvent(3)]),
     getAgentRun: async () => {
       detailRequests += 1;
       return ok(makeRun({
         status: 'completed',
         updatedAt: '2026-07-22T00:02:00.000Z',
         stepResults: [makeStepOutcomeEvent(2).step],
+        replanCount: 1,
       }));
     },
   };
@@ -159,8 +175,9 @@ test('treats mixed snapshot and step outcome events as read-only invalidation si
 
   assert.equal(result.outcome, 'refreshed');
   assert.equal(detailRequests, 1);
-  assert.equal(cursors.getSequence(ownerId, 'event-run-1'), 2);
+  assert.equal(cursors.getSequence(ownerId, 'event-run-1'), 3);
   assert.equal(store.getRun('event-run-1')?.stepResults?.[0]?.stepId, 'step-1');
+  assert.equal(store.getRun('event-run-1')?.replanCount, 1);
   assert.equal(hasLocalAgentRunExecutionAuthority(store.getRun('event-run-1')), false);
 });
 

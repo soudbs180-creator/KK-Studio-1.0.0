@@ -16,6 +16,7 @@ AGENT_RUN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_EVENT_MIGRATION:-infrastructure/d
 AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/database/migrations/021_agent_sessions.sql}"
 AGENT_RUN_SESSION_BINDING_MIGRATION_PATH="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
+AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -199,7 +200,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022 and 023 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022, 023 and 024 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -374,6 +375,10 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Agent Run semantic event migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] Agent Run replan event migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -398,6 +403,9 @@ apply_database_migrations() {
 
   echo "[deploy-kk-vps] Applying mandatory Agent Run semantic event migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH}"
+
+  echo "[deploy-kk-vps] Applying mandatory Agent Run replan event migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH}"
 
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
@@ -437,6 +445,22 @@ BEGIN
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'agent_runs'
+      AND column_name = 'replan_count'
+      AND data_type = 'integer'
+      AND is_nullable = 'NO'
+      AND coalesce(column_default, '') LIKE '0%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_runs_replan_count_check'
+      AND conrelid = 'public.agent_runs'::regclass
+      AND convalidated
+  ) THEN
+    RAISE EXCEPTION 'agent_runs.replan_count is missing or does not enforce the three-replan limit';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'agent_runs'
       AND column_name = 'event_sequence'
       AND data_type = 'integer'
       AND is_nullable = 'NO'
@@ -465,7 +489,10 @@ BEGIN
       ('outcome', 'text'),
       ('verification_rule', 'text'),
       ('retryable', 'boolean'),
-      ('verified_at', 'timestamp with time zone')
+      ('verified_at', 'timestamp with time zone'),
+      ('replan_count', 'integer'),
+      ('reason_code', 'text'),
+      ('trigger_code', 'text')
     ) AS expected(column_name, data_type)
     LEFT JOIN information_schema.columns AS actual
       ON actual.table_schema = 'public'
@@ -481,6 +508,7 @@ BEGIN
       AND convalidated
       AND position('run_snapshot' IN pg_get_constraintdef(oid)) > 0
       AND position('step_outcome' IN pg_get_constraintdef(oid)) > 0
+      AND position('replan' IN pg_get_constraintdef(oid)) > 0
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'agent_run_events_event_shape_check'

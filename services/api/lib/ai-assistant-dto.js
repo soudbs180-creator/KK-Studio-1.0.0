@@ -21,6 +21,7 @@ function mapAgentRunRow(row = {}, toolCalls = []) {
     status: row.status,
     toolCalls: Array.isArray(toolCalls) ? toolCalls : [],
     stepResults: Array.isArray(row.step_results) ? row.step_results : [],
+    replanCount: Number.isInteger(row.replan_count) ? row.replan_count : undefined,
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at),
   });
@@ -35,6 +36,16 @@ function mapAgentRunEventRow(row = {}) {
     runUpdatedAt: toIsoString(row.run_updated_at),
     createdAt: toIsoString(row.created_at),
   });
+  if (row.event_type === 'replan') {
+    return {
+      ...event,
+      replan: {
+        count: Number(row.replan_count),
+        reasonCode: row.reason_code,
+        triggerCode: row.trigger_code,
+      },
+    };
+  }
   if (row.event_type !== 'step_outcome') return event;
   return {
     ...event,

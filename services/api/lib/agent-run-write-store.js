@@ -28,6 +28,10 @@ const RUN_UPSERT_SQL = `
       OR current_run.session_id IS NULL
       OR current_run.session_id = EXCLUDED.session_id
     )
+    AND (
+      current_run.plan = EXCLUDED.plan
+      OR current_run.replan_count < 3
+    )
   RETURNING *`;
 
 const runParams = (ownerId, input, sessionId) => [

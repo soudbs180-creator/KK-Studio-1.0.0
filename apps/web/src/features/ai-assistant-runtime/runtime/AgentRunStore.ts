@@ -19,7 +19,7 @@ export interface AgentRunRecord {
   confirmationGrantedAt?: string;
   totalSteps?: number;
   completedStepIds?: string[];
-  replanCount?: number;
+  replanCount?: 0 | 1 | 2 | 3;
   backendSyncState?: 'pending' | 'synced';
   executionAuthority?: 'local_validated' | 'server_projection';
 }
