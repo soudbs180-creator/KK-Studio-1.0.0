@@ -2965,3 +2965,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：confirmation 专项 10/10；正式 preload 下 confirmation、ToolRegistry 与 control-plane 聚焦测试全部通过。完整 unit 2119 pass / 0 fail / 2 skipped，integration 14/14、contract 15/15、e2e 11/11。architecture 32/32、governance 11/11；root/architecture/local-runner TypeScript、服务端 101 文件语法与 564 个测试文件语义检查通过。Shared/UI/API Client/Web/local-runner 构建通过，Shared bundle 103.3 KiB，Web 转换 2505 modules。OpenSpec scaffold、knowledge/documentation index 重建、encoding、mojibake、canvas benchmark 3/3、Prompt drag、移动/桌面设置、AI takeover、startup banner 五组 Chromium smoke 与 `git diff --check` 通过。完整 unit 首轮 4 个失败来自 bundled Node 未加入 `PATH` 和 `DOCUMENTATION_INDEX.md` 尚未重建；补齐正式运行环境与索引后全绿，未修改产品代码规避测试。
 - **未运行验证及原因**：本机没有系统 `npm`/`npx`，仓库也未安装 Swagger CLI，因此未字面执行 `npm run verify:changes`、`npm audit` 或 OpenAPI swagger-cli validation；其余可用子项均使用 bundled Node 24 与仓库本地 CLI 逐项执行。未连接受控 PostgreSQL、真实 Agent Session API、真实 cost-bearing Quote、真实 Provider/LLM，也未执行真实账号跨设备接管、migration 019/022/023/024 演练或 Worker internal → invited → full 灰度。本切片不修改画布渲染、几何或大数据路径，未重复 `verify:large-canvas-10k`。
 - **风险与下一步**：中低风险。bound Run confirmation 新增一次 owner-qualified Session read/upsert，网络或并发失败会明确拒绝执行，可能要求用户重新确认，但不会降级为历史投影授权。当前 Quote/cost 绑定只在 plan 已提供字段时生效，不能描述为真实计费闭环；下一独立切片应把 Planner 失败接入真实 bounded replan executor，cost-bearing 生成链另行把服务端 Quote、确认卡与账本金额闭环。Phase 2 继续并行完成 migration 019、真实浏览器续跑、重新登录/第二设备发现、灰度与生产观测。按用户要求直接在当前 `main` 固化，不创建分支或推送远端。
+
+## 198. 2026-07-24 - 合并保留并发 WorkBuddy 工作日志
+
+- **修改范围**：在继续 Phase 3 bounded replan 前恢复多 Agent 同步基线。保留当前 Three.js 设计意图记录，并把 Git 中被并发替换的 Miora 能力分析记录无损合并回同一日期工作日志；不修改运行时代码、公开 API、DTO、数据库、OpenSpec 状态或用户行为。
+- **修改文件**：`.workbuddy/memory/2026-07-24.md`、`docs/development/session-handoff.md`。
+- **当前设计决策**：采用只追加、不覆盖的保守合并；Miora 与 Three.js 都属于 reference 协作记录，不提升为当前架构或需求事实源，仍服从 active OpenSpec、项目状态与源码优先级。
+- **已运行验证**：待本条追加后运行 documentation governance、current facts、Agent docs、encoding、mojibake 与 `git diff --check`；通过后使用 `agents:commit` 独立固化，避免后续 replan 代码提交夹带并发日志。
+- **未运行验证及原因**：本提交只合并 Markdown 工作日志，不修改 TypeScript、JavaScript、构建、迁移或画布路径，因此不重复 typecheck、build、完整 test 或 `verify:large-canvas-10k`。
+- **风险与下一步**：低风险；两段记录都保留，原内容仍可由 Git 追溯。下一独立切片按既定事实源实现真实 bounded replan executor，并继续要求服务端接受 plan replacement 后才授予本地执行权。
