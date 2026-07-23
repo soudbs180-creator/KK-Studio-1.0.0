@@ -108,7 +108,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 10.1 | 浏览器缩略图 Worker 与批量并发控制 | 需验证 | 界面/代码审计称已存在，但源码坐标未核定；object URL 生命周期分散在各 store/组件。 | verify |
-| 10.2 | Local Runtime（local-runner）生产可用 | 不符合 | 根 `verify:changes` 已包含 `local-runner:typecheck/build`，2026-07-22 当前两项均通过；但 `local-runner/src/security/localToken.ts:18-31` 仍输出 token、接受固定 fallback，`server.ts:28` 无请求体上限，且多处显式 `any`，安全门禁未通过。 | upgrade |
+| 10.2 | Local Runtime（local-runner）生产可用 | 部分 | 根 `verify:changes` 已包含 `local-runner:typecheck/build/test`。`localToken.ts` 使用 256-bit 本地凭据、常量时间比较且不再输出 token；`originGuard.ts` 精确解析 loopback Origin/Host，`server.ts` 只绑定 `127.0.0.1`，`app.ts` 限制 JSON body 为 256 KiB。Windows ACL、显式轮换/配对协议、Zod command envelope、路径 containment、symlink、MIME sniff、解码超时、资源限额与现存显式 `any` 尚未清零，因此仍仅为 experimental。 | upgrade |
 | 10.3 | 资产 OPFS/IndexedDB 持久化 | 部分 | 本地资产仍主要依赖内存对象（审计）；无 `LocalMediaJobDto` / `LocalAssetRefDto`（全仓零匹配）。 | upgrade |
 | 10.4 | 真实媒体性能基线 | 不符合 | 仅有节点级 smoke：`scripts/test/verify-large-canvas-10k-smoke.mjs`（10K 通过但伴随 `localStorage QuotaExceeded` 与 100ms+ long task）；无 1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 与恢复时间基线。 | verify |
 

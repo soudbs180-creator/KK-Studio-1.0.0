@@ -5,8 +5,8 @@ export class OpencliClient {
   private localUrl = 'http://localhost:9099';
 
   private getLocalToken(): string {
-    // 优先从 localStorage 读取临时的 local-runner-token，如果没有则默认为空
-    return localStorage.getItem('kk_local_runner_token') || 'local_handshake_token_default';
+    // 缺少配对凭据时保持为空，由 Local Runner 明确拒绝，禁止共享默认值回退。
+    return localStorage.getItem('kk_local_runner_token')?.trim() || '';
   }
 
   public async execute(command: {

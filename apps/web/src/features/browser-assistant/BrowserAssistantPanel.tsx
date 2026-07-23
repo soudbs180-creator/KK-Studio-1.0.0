@@ -116,12 +116,12 @@ export const BrowserAssistantPanel: React.FC = () => {
             type="password"
             value={localToken}
             onChange={(e) => handleUpdateToken(e.target.value)}
-            placeholder="输入启动时生成的握手凭证..."
+            placeholder="输入 Local Runner 安全凭据文件中的配对凭证..."
             className="flex-1 px-3 py-1.5 text-[11px] text-slate-200 placeholder-slate-600 rounded-lg border border-white/10 bg-slate-950 focus:border-indigo-500 focus:outline-none transition-all"
           />
         </div>
         <p className="text-[9px] leading-relaxed text-slate-500">
-          为了确保您的安全，当且仅当 Token 匹配时，前端的控制指令才会通过 Local Runner 的 CORS 过滤机制。
+          Local Runner 不会在启动日志中输出凭证；仅从本地安全凭据文件完成手动配对。
         </p>
       </div>
 

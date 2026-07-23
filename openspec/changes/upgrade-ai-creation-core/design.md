@@ -526,6 +526,8 @@ interface LocalAssetRefDto {
 - `local-runner:build` 与独立测试必须进入 `verify:changes` 或 release manifest；通过前只能标记为 experimental。
 - 首个纵向切片继续使用现有 Browser Worker 生成图像 thumbnail；未加固的 `local-runner` 不进入生产链。
 
+当前首段安全切片已移除共享 fallback credential 与启动日志中的 token，使用 256-bit 本地凭据和常量时间比较，收紧 exact loopback Origin/Host、IPv4 loopback 监听与 256 KiB JSON 上限，并把独立测试接入 `verify:changes`。Windows ACL、显式轮换/配对协议、Zod command envelope、路径 containment、symlink、MIME、解码超时和资源限额仍未完成，因此 Local Runner 继续保持 experimental。
+
 ---
 
 ## 13. AI Workspace 控制链
