@@ -3,6 +3,7 @@ const path = require('path');
 const cryptoUtil = require('../../utils/crypto');
 const { getPool } = require('../db');
 const { READONLY_SECRET_PLACEHOLDER } = require('../userApiSecret');
+const providerConnectionLegacyRouteAdapter = require('../capability-graph/providerConnectionLegacyRouteAdapter');
 
 const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../../../.kk-local/local-user-apis.json');
 
@@ -359,7 +360,12 @@ async function readLocalStorage(userId = null) {
   return cache.readPromise;
 }
 
-async function resolveLocalUserRoute(userId, routeId) {
+async function resolveLocalUserRoute(userId, routeId, dependencies = {}) {
+  const resolveProviderConnectionRoute = dependencies.resolveProviderConnectionLegacyRoute
+    || providerConnectionLegacyRouteAdapter.resolveProviderConnectionLegacyRoute;
+  const providerConnectionRoute = await resolveProviderConnectionRoute(userId, routeId);
+  if (providerConnectionRoute) return providerConnectionRoute;
+
   // 🚀 优先命中短 TTL 缓存，避免每次请求都做全量 DB 查询 + 解密 + 索引构建
   const cachedRoute = getCachedRoute(userId, routeId);
   if (cachedRoute !== undefined) {

@@ -81,7 +81,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 7.1 | 编译期 Feature Flag | 完全 | `apps/web/src/config/featureFlags.ts:1-4`、`apps/web/src/app/kkaiFeatureFlags.ts:1-7` 均为硬编码常量。 | upgrade |
-| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供纯 server scope；`services/api/lib/generation-v3/imageProviderSliceAdmission.js` 在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前统一 fail closed，并输出无业务标识的 allowed/blocked 计数。Worker 已把 admission scope 与默认关闭的 migration-ready execution flag 分离，支持停止新 durable 提交并继续 drain；统一管理员 Flag API、广播和 5 秒 Kill Switch 仍未实现。 | upgrade |
+| 7.2 | 运行时能力 Flag | 部分 | `services/api/lib/capability-graph/featureFlag.js` 提供纯 server scope；`imageProviderSliceAdmission.js` 在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前统一 fail closed。`providerConnectionLegacyRouteAdapter.js` 又以默认关闭的 server flag 门禁 generation/dispatcher dual-read。Worker 已把 admission scope 与默认关闭的 migration-ready execution flag 分离，支持停止新 durable 提交并继续 drain；统一管理员 Flag API、广播和 5 秒 Kill Switch 仍未实现。 | upgrade |
 | 7.3 | 视觉 Flag 与能力 Flag 分离 | 不符合 | 当前视觉/能力开关均为同一常量（见 7.1）。 | upgrade |
 
 ## 8. 文档治理
@@ -99,7 +99,7 @@
 |---|---|---|---|---|
 | 9.1 | Canonical Provider catalog | 完全 | `packages/shared/src/generation/providerCatalog.ts` 与 Provider governance checks 维持前后端目录一致。 | keep |
 | 9.2 | Capability Graph snapshot API | 完全 | `packages/shared/src/capability-graph/` 定义契约；`services/api/lib/capability-graph/projection.js` 投影权威数据；`services/api/routes/capability-graph.js` 提供 snapshot API。 | keep |
-| 9.3 | Provider Connection 领域模型 | 部分 | migration 018 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立新表 CRUD 和 verify；`CapabilitySourcesView.tsx` 已实际挂载 `ProviderConnectionsPanel.tsx`，由 `providerConnectionMigration.ts` 把旧 Google 设置的非敏感名称/endpoint 投影为迁移候选，要求显式重输 secret 后调用现有 create/verify，并与新 Connection 去重。桌面 Chromium smoke 已验证该 UI 闭环；旧 `ApiSettings`/profile 仍由 `userApiCloudRecordStorage.ts:514-625` 平行读写，服务端权威 dual-read、真实 Provider 验收、全 Provider 切流和观测窗口未完成。 | upgrade |
+| 9.3 | Provider Connection 领域模型 | 部分 | migration 018 与 `providerConnectionStore.js` / `providerConnectionService.js` 已建立新表 CRUD 和 verify；Web 安全迁移桥要求显式重输 secret。`providerConnectionLegacyRouteAdapter.js` 现为 generation/dispatcher 提供默认关闭、owner-scoped 的新表优先读取：仅 exact Connection ID 或唯一 Google alias 可命中，歧义/基础设施失败保留 legacy，选中新 secret 后解密失败 fail closed；`localUserRouteStore.js` 在旧缓存前调用该 adapter，避免 revoke 后继续使用缓存的新 secret。旧 profile 写入和 `profile.js` 内部解析仍未全切；真实 Provider/PostgreSQL 验收、全 Provider 映射、新写入切流、两个稳定版本和观测窗口未完成。 | upgrade |
 | 9.4 | Connection secret 治理（secret_ref/verify/SSRF 检查） | 完全 | `providerConnectionService.js`、`connectionVerifier.js` 与 migration 018 使用 secret reference、URL/DNS/IP 检查、最小探测和诊断脱敏，不序列化明文 secret。 | keep |
 | 9.5 | Agent 查询可用能力 | 完全 | `capabilityTools.ts` 注册只读 safe tool `capabilities.listAvailable`；`agentPlannerCapabilityContext.ts` 通过 ToolRegistry 以 captured owner/1.5 秒上限读取 snapshot，只投影 bounded active Connection -> Model -> Capability 路由。`AgentRuntime.ts` 将同一摘要交给 Local/LLM Planner，并按 image/video/audio capability 移除无图证据的 generation model hint；最终路由仍由服务端 RouteEngine 决定。 | keep |
 
@@ -158,6 +158,7 @@
 | Capability Graph 契约与投影 | `packages/shared/src/capability-graph/` / `services/api/lib/capability-graph/projection.js` / `services/api/routes/capability-graph.js` |
 | Provider Connection 存储与验证 | `infrastructure/database/migrations/018_capability_graph_foundation.sql` / `services/api/lib/capability-graph/providerConnectionService.js` / `connectionVerifier.js` |
 | Provider Connection 安全迁移桥 | `apps/web/src/services/provider-connections/providerConnectionMigration.ts` / `apps/web/src/components/settings/{ProviderConnectionsPanel.tsx,views/CapabilitySourcesView.tsx}` / `scripts/test/verify-desktop-settings-smoke.mjs` |
+| Provider Connection generation/dispatcher dual-read 首段 | `services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js` / `services/api/lib/dispatcher/localUserRouteStore.js` / `tests/unit/provider-connection-dual-read.test.ts` |
 | Agent capability tool | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` |
 | Server image Durable Worker | `infrastructure/database/migrations/019_generation_image_worker.sql` / `packages/shared/src/generation-worker/` / `services/api/lib/generation-v3/worker/` |
 | Generation v3 pending Job discovery | `services/api/lib/generation-v3/jobStore.js` / `services/api/routes/generation-v3.js` / `packages/shared/src/contracts/client/kk-api-client.ts` / `apps/web/src/services/generation/generationJobDiscovery.ts` / `apps/web/src/hooks/useTaskRecovery.ts` |

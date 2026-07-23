@@ -132,6 +132,22 @@
       "removalCondition": "Delete or rename when Browser Assistant transport is a stable first-party runtime module and no longer needs bridge-pattern compatibility registration."
     },
     {
+      "path": "services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js",
+      "role": "compatibility-layer",
+      "owner": "server-provider-connections",
+      "reviewBy": "2026-09-30",
+      "currentPurpose": "Lets generation and dispatcher reads prefer an owner-scoped available Provider Connection while legacy profile credentials remain readable during migration.",
+      "upstreamCanonicalSource": "services/api/lib/capability-graph/providerConnectionStore.js",
+      "downstreamDependents": [
+        "services/api/lib/dispatcher/localUserRouteStore.js"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/provider-connection-dual-read.test.ts"
+      ],
+      "removalCondition": "Delete after profile routes and every supported Provider use canonical Connections, new writes have cut over, compatibility tests pass, and legacy reads have remained unused through two stable versions plus the required observation window."
+    },
+    {
       "path": "services/api/routes/compat",
       "role": "compatibility-layer",
       "owner": "server-platform",

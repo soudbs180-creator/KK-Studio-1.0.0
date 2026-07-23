@@ -2,7 +2,7 @@
 
 > Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan executor complete, semantic replay and cross-device execution pending
 > Last updated: 2026-07-24
-> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration 与 Google 安全迁移桥已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、服务端权威 dual-read 与全 Provider 切流仍未完成。
+> Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration、Google 安全迁移桥与 generation/dispatcher dual-read 首段已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、profile 全覆盖与全 Provider 切流仍未完成。
 
 ---
 
@@ -60,11 +60,11 @@
 - [x] migration `018_capability_graph_foundation.sql`：新增 `provider_connections`、`capability_bindings` 与 asset lineage relation；additive，不保存明文 secret；迁移专项测试已覆盖结构、幂等与安全约束。
 - [x] Capability Graph DTO（Zod discriminated union）+ projection service + `GET /api/v1/capability-graph/snapshot`；Actor/Job/Run/Audit 从现有权威表投影，不建 EAV 节点表。
 - [x] Provider Connection 新表 CRUD + verify API（协议 profile、URL 规范化、DNS/IP/SSRF 检查、最小探测、诊断脱敏）。
-- [ ] 建立旧 `ApiSettings`/profile 凭据栈到 `provider_connections` 的安全迁移/dual-read adapter，完成切流与观测窗口后再停止旧写入和读取；当前两套栈仍平行运行。
+- [ ] 建立旧 `ApiSettings`/profile 凭据栈到 `provider_connections` 的安全迁移/dual-read adapter，完成切流与观测窗口后再停止旧写入和读取；generation/dispatcher 读取首段已接入，两套栈仍平行写入且 profile 路由尚未全覆盖。
   - [x] Web Provider Connections 面板已由 `CapabilitySourcesView` 实际挂载，并把旧设置中的 Google 名称/endpoint 投影为安全迁移候选；旧 secret 不读取、不复制、不传输，用户必须显式重输并复用现有 create/verify API。桌面 Chromium smoke 已覆盖候选 → 重输 → create → verify → 刷新去重与表单清理；真实 Google/受控 PostgreSQL 验收仍由外部 gate 跟踪。
   - [x] 旧 `user_provider_credentials` repository 已收口为认证 owner 的单用户读写：hosted 列表/reveal/connectivity/pricing/兼容代理读取不再以零 owner 回退本地文件，数据库替换写入只处理当前 owner；公开路径、DTO、状态码、envelope 与旧数据结构不变。
   - [x] Google 与 OpenAI-compatible image adapter 均按单次调用传递 Connection credential；OpenAI-compatible adapter 不再把 owner key 写入全局 `process.env`，并发隔离测试覆盖不同 key/endpoint，环境变量仅作为无 Connection 时的兼容 fallback。Provider Connection 映射与 dual-read 完成前不把此项描述为已切流。
-  - [ ] 服务端 owner-scoped dual-read、全 Provider 映射、新写入切流、兼容测试、两个稳定版本与观测窗口仍待完成；上述门禁通过前保留旧读取和写入。
+  - [ ] 服务端 generation/dispatcher owner-scoped dual-read 首段已由默认关闭的 `PROVIDER_CONNECTION_LEGACY_DUAL_READ_ENABLED` 接入：仅选择 available、未 revoked 且有 active binding 的当前 owner Connection；exact Connection ID 或唯一 Google canonical alias 命中新来源，歧义/无匹配/查询基础设施不可用时保留旧读取，选中后的 secret 解密失败则 fail closed，新 route 不进入旧 10 秒缓存。`profile.js` 全覆盖、全 Provider 映射、新写入切流、真实 PostgreSQL 兼容测试、两个稳定版本与观测窗口仍待完成；上述门禁通过前保留旧读取和写入。
 - [x] 只读 safe tool `capabilities.listAvailable` 接入 ToolRegistry。
 - [x] 首个纵向切片的代码基础：Google official image credentials / adapter、`FakeProviderAdapter` 测试路径与 server flag `capability_graph.image_provider_slice` 已落地。
 - [x] 将 `capability_graph.image_provider_slice` 接入实际 Quote/生成数据面：Connection-backed Quote、同步 submit 与 durable enqueue 均在 resolver/credential/Provider/lease 副作用前 fail closed；无 `connectionId` 的 legacy 路径不变，已入队 Worker 不重读 live flag。
