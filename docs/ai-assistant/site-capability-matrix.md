@@ -1,6 +1,6 @@
 # KK Studio AI 全站能力覆盖矩阵
 
-Last verified: 2026-07-23
+Last verified: 2026-07-24
 
 Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`、`apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts`、CanvasContext 与本页列出的业务入口。
 
@@ -48,7 +48,7 @@ Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.
 | Prompt Composer | 提交生成 | `generation.createBatchJob` | Provider 副作用必须进入 Queue；`generation.submitComposer` 只允许直接用户点击兼容路径。 |
 | Prompt Composer | 展开、模型菜单、模式菜单、高级选项、局部开关 | manual UI | `PROMPT_COMPOSER_ACTIONS` 保持 `toolName: undefined`。需要持久化默认值时由 `preferences.*` 表达业务意图。 |
 | Chat Shell | 会话菜单、折叠、附件菜单、历史面板、复制 | manual UI | `CHAT_SHELL_ACTIONS` 不进入自治 ToolRegistry。 |
-| Agent Dock | 确认/取消 Run | AgentRuntime 控制动作 | 确认是用户授权来源，不是普通工具。 |
+| Agent Dock | 确认/取消 Run | AgentRuntime 控制动作 | 确认是用户授权来源，不是普通工具；grant 绑定 owner、plan、tool/step、target 与显式 expiry，bound Run 还要求 exact authoritative Session metadata proof。 |
 | Agent Dock | Queue 暂停/恢复/重试/取消 | `generation.*Job` | 使用同一 DurableGenerationQueue。 |
 | Agent Dock | 折叠、资源面板、上下文压缩、定位输出、归档显示 | manual UI | 不创建第二套任务状态。 |
 | Settings | 打开模块 | `navigation.openSettings` | 只负责页面导航。 |

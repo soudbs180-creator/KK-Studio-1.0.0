@@ -55,11 +55,18 @@ import type {
 } from './AssistantExecutionContext.ts';
 import {
   captureAssistantAuthorizationScope,
+  createAssistantConfirmationExpiresAt,
+  createAssistantPlanHash,
   createAssistantStepAuthorization,
+  createAssistantTargetSnapshotHash,
   createRunStepIdempotencyKey,
   isAssistantConfirmationGrantFresh,
   sameAssistantStepAuthorizations,
 } from './AssistantExecutionContext.ts';
+import {
+  doesAgentSessionAuthorizeConfirmation,
+  persistAgentSessionConfirmationGrant,
+} from './agentConfirmationGrant.ts';
 
 const localBrain = new LocalAssistantBrain();
 const llmBrain = new LLMBrain();
@@ -245,6 +252,30 @@ const createPlanStepAuthorizations = (
   context: { ...context, runId, planId: plan.id, stepId: step.stepId },
   authorizationScope,
 }));
+
+interface AssistantPlanQuoteBinding {
+  valid: boolean;
+  quoteId?: string;
+  maxCostCredits?: number;
+}
+
+const resolveAssistantPlanQuoteBinding = (plan: AssistantPlan): AssistantPlanQuoteBinding => {
+  const confirmation = plan.confirmation;
+  const quoteDeclared = confirmation?.quoteId !== undefined;
+  const costDeclared = confirmation?.maxCostCredits !== undefined;
+  if (!quoteDeclared && !costDeclared) return { valid: true };
+  const quoteId = typeof confirmation?.quoteId === 'string' ? confirmation.quoteId.trim() : '';
+  const maxCostCredits = confirmation?.maxCostCredits;
+  if (!quoteId || !Number.isInteger(maxCostCredits) || Number(maxCostCredits) < 0) return { valid: false };
+  return { valid: true, quoteId, maxCostCredits };
+};
+
+const sameAssistantPlanQuoteBinding = (
+  grant: AssistantConfirmationGrant,
+  binding: AssistantPlanQuoteBinding,
+): boolean => binding.valid
+  && grant.quoteId === binding.quoteId
+  && grant.maxCostCredits === binding.maxCostCredits;
 
 const validatePlanStepInputs = (runId: string, steps: AgentPlanStep[]): void => {
   for (const step of steps) {
@@ -650,17 +681,49 @@ export class AgentRuntime {
     validateStepGraph(steps);
     validatePlanStepInputs(runId, steps);
     const scope = authorizationScope || captureAssistantAuthorizationScope(context);
+    const quoteBinding = resolveAssistantPlanQuoteBinding(confirmedPlanSnapshot);
+    if (!quoteBinding.valid) throw new TypeError('Confirmation quoteId and maxCostCredits must be supplied together.');
+    const grantedAt = new Date().toISOString();
     return {
       runId,
       planId: confirmedPlanSnapshot.id,
+      planHash: createAssistantPlanHash(confirmedPlanSnapshot),
+      targetSnapshotHash: createAssistantTargetSnapshotHash(scope),
       ownerId: scope.ownerId,
       confirmed: true,
       toolNames: Array.from(new Set(steps.map((step) => step.action.type))),
       authorizationScope: scope,
       authorizedSteps: createPlanStepAuthorizations(runId, confirmedPlanSnapshot, steps, context, scope),
-      grantedAt: new Date().toISOString(),
+      quoteId: quoteBinding.quoteId,
+      maxCostCredits: quoteBinding.maxCostCredits,
+      grantedAt,
+      expiresAt: createAssistantConfirmationExpiresAt(grantedAt),
       source: 'user',
     };
+  }
+
+  async persistConfirmationGrant(
+    runId: string,
+    grant: AssistantConfirmationGrant,
+  ): Promise<AssistantConfirmationGrant> {
+    const ownerId = getRuntimeOwnerId();
+    const record = agentRunStore.getRunForOwner(ownerId, runId);
+    if (!record || !hasLocalAgentRunExecutionAuthority(record) || grant.runId !== runId) {
+      throw new Error(`Cannot persist confirmation for a non-executable Agent Run: ${runId}`);
+    }
+    if (!record.sessionId) {
+      if (grant.sessionConfirmation) throw new Error('Unbound Agent Runs cannot reuse Session confirmation proof.');
+      return grant;
+    }
+    const result = await persistAgentSessionConfirmationGrant({
+      sessionId: record.sessionId,
+      ownerId,
+      grant,
+    });
+    if (!result.ok) {
+      throw new Error(`Agent confirmation could not become authoritative: ${result.reason}`);
+    }
+    return result.grant;
   }
 
   executePendingRun(runId: string, executorContext: AssistantExecutionContext): Promise<void> {
@@ -785,12 +848,23 @@ export class AgentRuntime {
     validatePlanStepInputs(runId, steps);
     const explicitGrant = executorContext.confirmationGrant;
     const expectedAuthorizations = createPlanStepAuthorizations(runId, plan, steps, executorContext);
+    const expectedQuoteBinding = resolveAssistantPlanQuoteBinding(plan);
+    const sessionConfirmationGranted = record.sessionId
+      ? doesAgentSessionAuthorizeConfirmation(
+          agentSessionProjectionStore.getSession(record.sessionId),
+          explicitGrant,
+        )
+      : explicitGrant?.sessionConfirmation === undefined;
     const confirmationGranted = explicitGrant?.confirmed === true
       && explicitGrant.runId === runId
       && explicitGrant.source === 'user'
       && explicitGrant.ownerId === executionOwnerId
       && explicitGrant.planId === plan.id
+      && explicitGrant.planHash === createAssistantPlanHash(plan)
+      && explicitGrant.targetSnapshotHash === createAssistantTargetSnapshotHash(explicitGrant.authorizationScope)
+      && sameAssistantPlanQuoteBinding(explicitGrant, expectedQuoteBinding)
       && isAssistantConfirmationGrantFresh(explicitGrant)
+      && sessionConfirmationGranted
       && sameAssistantStepAuthorizations(explicitGrant.authorizedSteps, expectedAuthorizations);
     const confirmedAuthorizationScope = confirmationGranted ? explicitGrant!.authorizationScope : undefined;
     const confirmationRequired = plan.requiresConfirmation === true || record.status === 'waiting_confirmation';

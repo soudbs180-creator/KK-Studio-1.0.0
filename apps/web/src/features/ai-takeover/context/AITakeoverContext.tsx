@@ -416,12 +416,13 @@ export function AITakeoverProvider({
         throw new Error('Cannot execute a confirmed plan without the authorization scope shown to the user.');
       }
       ctx.planId = confirmedPlanSnapshot.id;
-      ctx.confirmationGrant = agentRuntimeInstance.createConfirmationGrant(
+      const confirmationGrant = agentRuntimeInstance.createConfirmationGrant(
         runId,
         confirmedPlanSnapshot,
         ctx,
         confirmedAuthorizationScope,
       );
+      ctx.confirmationGrant = await agentRuntimeInstance.persistConfirmationGrant(runId, confirmationGrant);
     }
     ctx.executeTool = (toolName: string, input: unknown, extra: Partial<AssistantExecutionContext> = {}) => (
       toolRegistryInstance.execute(toolName, input, { ...ctx, ...extra })

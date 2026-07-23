@@ -20,15 +20,27 @@ export interface AssistantConfirmedStepAuthorization {
   inputFingerprint: string;
 }
 
+export interface AssistantSessionConfirmationProof {
+  sessionId: string;
+  confirmationIds: readonly string[];
+  sessionUpdatedAt: string;
+}
+
 export interface AssistantConfirmationGrant {
   runId: string;
   planId: string;
+  planHash: string;
+  targetSnapshotHash: string;
   ownerId: string;
   confirmed: true;
   toolNames: readonly string[];
   authorizedSteps: readonly AssistantConfirmedStepAuthorization[];
   authorizationScope: AssistantAuthorizationScopeSnapshot;
+  quoteId?: string;
+  maxCostCredits?: number;
   grantedAt: string;
+  expiresAt: string;
+  sessionConfirmation?: AssistantSessionConfirmationProof;
   source: 'user';
 }
 
@@ -257,6 +269,7 @@ export function createRunStepIdempotencyKey(runId: string, stepId: string): stri
 
 const ASSISTANT_CONFIRMATION_MAX_AGE_MS = 15 * 60 * 1000;
 const ASSISTANT_CONFIRMATION_FUTURE_TOLERANCE_MS = 30 * 1000;
+const ASSISTANT_CONFIRMATION_DEFAULT_TTL_MS = 5 * 60 * 1000;
 
 const stableAuthorizationValue = (value: unknown, seen = new Set<object>()): unknown => {
   if (value === null || ['string', 'boolean'].includes(typeof value)) return value;
@@ -283,6 +296,23 @@ const fingerprintStableAuthorizationValue = (value: unknown): string => {
   const reversed = Array.from(serialized).reverse().join('');
   return `${stableAuthorizationHash(serialized)}:${stableAuthorizationHash(reversed)}:${serialized.length}`;
 };
+
+/** Binds a confirmation to the exact immutable plan preview shown to the user. */
+export function createAssistantPlanHash(plan: unknown): string {
+  return `plan_v1:${fingerprintStableAuthorizationValue(plan)}`;
+}
+
+/** Binds a confirmation to the owner, canvas, selection, model, and mutable configuration snapshot. */
+export function createAssistantTargetSnapshotHash(scope: AssistantAuthorizationScopeSnapshot): string {
+  return `target_v1:${fingerprintStableAuthorizationValue(scope)}`;
+}
+
+/** Creates the short explicit expiry used by user-action and Agent Run confirmations. */
+export function createAssistantConfirmationExpiresAt(grantedAt: string): string {
+  const grantedAtMs = Date.parse(grantedAt);
+  if (!Number.isFinite(grantedAtMs)) throw new TypeError('Confirmation grantedAt must be a valid ISO timestamp.');
+  return new Date(grantedAtMs + ASSISTANT_CONFIRMATION_DEFAULT_TTL_MS).toISOString();
+}
 
 const callContextGetter = <Value>(getter: unknown, fallback: Value): Value => {
   if (typeof getter !== 'function') return fallback;
@@ -351,13 +381,30 @@ export function createAssistantStepAuthorization(args: {
   };
 }
 
+const hasValidAssistantConfirmationQuoteBinding = (grant: AssistantConfirmationGrant): boolean => {
+  const hasQuoteId = typeof grant.quoteId === 'string';
+  const hasMaxCost = typeof grant.maxCostCredits === 'number';
+  if (!hasQuoteId && !hasMaxCost) return true;
+  return hasQuoteId
+    && grant.quoteId!.trim().length > 0
+    && hasMaxCost
+    && Number.isInteger(grant.maxCostCredits)
+    && grant.maxCostCredits! >= 0;
+};
+
 export function isAssistantConfirmationGrantFresh(
   grant: AssistantConfirmationGrant | undefined,
   now = Date.now(),
 ): boolean {
-  if (!grant?.confirmed || typeof grant.grantedAt !== 'string') return false;
+  if (!grant?.confirmed || typeof grant.grantedAt !== 'string' || typeof grant.expiresAt !== 'string') return false;
+  if (!hasValidAssistantConfirmationQuoteBinding(grant)) return false;
   const grantedAt = Date.parse(grant.grantedAt);
+  const expiresAt = Date.parse(grant.expiresAt);
   return Number.isFinite(grantedAt)
+    && Number.isFinite(expiresAt)
+    && expiresAt > grantedAt
+    && expiresAt <= grantedAt + ASSISTANT_CONFIRMATION_MAX_AGE_MS
+    && now < expiresAt
     && grantedAt <= now + ASSISTANT_CONFIRMATION_FUTURE_TOLERANCE_MS
     && grantedAt >= now - ASSISTANT_CONFIRMATION_MAX_AGE_MS;
 }
@@ -407,11 +454,14 @@ export function createUserActionConfirmation(
     trigger: 'user-action' as const,
   };
   const authorizationScope = captureAssistantAuthorizationScope(baseContext);
+  const grantedAt = new Date().toISOString();
   return {
     ...baseContext,
     confirmationGrant: {
       runId,
       planId,
+      planHash: createAssistantPlanHash({ toolName, input }),
+      targetSnapshotHash: createAssistantTargetSnapshotHash(authorizationScope),
       ownerId: authorizationScope.ownerId,
       confirmed: true,
       toolNames: [toolName],
@@ -424,7 +474,8 @@ export function createUserActionConfirmation(
         context: baseContext,
         authorizationScope,
       })],
-      grantedAt: new Date().toISOString(),
+      grantedAt,
+      expiresAt: createAssistantConfirmationExpiresAt(grantedAt),
       source: 'user',
     },
   };

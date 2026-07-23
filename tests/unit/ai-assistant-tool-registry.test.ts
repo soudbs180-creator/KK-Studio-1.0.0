@@ -7,7 +7,10 @@ import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant
 import { emitAuthSessionChange } from '../../apps/web/src/services/auth/authSessionEvents.ts';
 import {
   captureAssistantAuthorizationScope,
+  createAssistantConfirmationExpiresAt,
+  createAssistantPlanHash,
   createAssistantStepAuthorization,
+  createAssistantTargetSnapshotHash,
 } from '../../apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts';
 
 const userGrant = (
@@ -32,11 +35,14 @@ const userGrant = (
     trigger: 'assist-confirmed' as const,
   };
   const authorizationScope = captureAssistantAuthorizationScope(baseContext);
+  const grantedAt = new Date().toISOString();
   return {
     ...baseContext,
     confirmationGrant: {
       runId,
       planId,
+      planHash: createAssistantPlanHash({ planId, toolName, input }),
+      targetSnapshotHash: createAssistantTargetSnapshotHash(authorizationScope),
       ownerId: authorizationScope.ownerId,
       confirmed: true as const,
       toolNames: [toolName],
@@ -50,7 +56,8 @@ const userGrant = (
         authorizationScope,
       })],
       source: 'user' as const,
-      grantedAt: new Date().toISOString(),
+      grantedAt,
+      expiresAt: createAssistantConfirmationExpiresAt(grantedAt),
     },
   };
 };

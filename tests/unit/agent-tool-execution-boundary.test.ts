@@ -10,7 +10,10 @@ import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant
 import { AgentAuditLog } from '../../apps/web/src/features/ai-assistant-runtime/runtime/AgentAuditLog.ts';
 import {
   captureAssistantAuthorizationScope,
+  createAssistantConfirmationExpiresAt,
+  createAssistantPlanHash,
   createAssistantStepAuthorization,
+  createAssistantTargetSnapshotHash,
 } from '../../apps/web/src/features/ai-assistant-runtime/runtime/AssistantExecutionContext.ts';
 
 const confirmationContext = (runId: string, toolNames: string[], input: unknown = {}) => {
@@ -26,11 +29,14 @@ const confirmationContext = (runId: string, toolNames: string[], input: unknown 
     selectedModel: { id: 'model-test' },
   };
   const authorizationScope = captureAssistantAuthorizationScope(baseContext);
+  const grantedAt = new Date().toISOString();
   return {
     ...baseContext,
     confirmationGrant: {
       runId,
       planId,
+      planHash: createAssistantPlanHash({ planId, toolNames, input }),
+      targetSnapshotHash: createAssistantTargetSnapshotHash(authorizationScope),
       ownerId: authorizationScope.ownerId,
       confirmed: true as const,
       toolNames,
@@ -44,7 +50,8 @@ const confirmationContext = (runId: string, toolNames: string[], input: unknown 
         authorizationScope,
       })),
       source: 'user' as const,
-      grantedAt: new Date().toISOString(),
+      grantedAt,
+      expiresAt: createAssistantConfirmationExpiresAt(grantedAt),
     },
   activeCanvas: { id: 'canvas-test' },
   notify: { success() {}, error() {}, warning() {}, info() {} },

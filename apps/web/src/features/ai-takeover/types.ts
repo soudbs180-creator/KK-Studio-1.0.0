@@ -206,6 +206,8 @@ export interface AssistantPlan {
     summary: string;
     confirmText: string;
     cancelText: string;
+    quoteId?: string;
+    maxCostCredits?: number;
   };
 }
 

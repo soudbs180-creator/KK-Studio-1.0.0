@@ -54,9 +54,9 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 4.1 | IntentGate -> Planner -> ToolRegistry -> PermissionPolicy 链路 | 完全 | `apps/web/src/features/ai-takeover/` 核心链路在位。 | keep |
-| 4.2 | 多轮对话历史 | 部分 | `agentPlannerSessionContext.ts` 只从 exact owner-scoped Session detail 构造历史投影；`agentPlannerContext.ts` 排除已被 summary 覆盖的消息、历史 system/tool message 和执行授权字段，再把 bounded summary、最近 user/assistant 消息、工具结果、知识引用及通过 freshness/surface/canvas 门禁的 metadata-only Snapshot 交给 Planner。`agentPlannerReferencePolicy.ts` 只解析仍存在于当前画布的唯一历史选区，普通“继续”、模糊/多候选指代、历史 Job ID 和目标偷换均 fail closed。Run event 已有 strict metadata-only `step_outcome | replan`，但完整 semantic replay、真实 replan 执行/调度、confirmation expiry 与真实 LLM 多轮验证仍缺失。 | upgrade |
+| 4.2 | 多轮对话历史 | 部分 | `agentPlannerSessionContext.ts` 只从 exact owner-scoped Session detail 构造历史投影；`agentPlannerContext.ts` 排除已被 summary 覆盖的消息、历史 system/tool message 和执行授权字段，再把 bounded summary、最近 user/assistant 消息、工具结果、知识引用及通过 freshness/surface/canvas 门禁的 metadata-only Snapshot 交给 Planner。`agentPlannerReferencePolicy.ts` 只解析仍存在于当前画布的唯一历史选区，普通“继续”、模糊/多候选指代、历史 Job ID 和目标偷换均 fail closed。Run event 已有 strict metadata-only `step_outcome | replan`，confirmation grant 也已有显式 expiry 与 bound Session proof；但完整 semantic replay、真实 replan 执行/调度与真实 LLM 多轮验证仍缺失。 | upgrade |
 | 4.3 | 上下文裁剪 | 部分 | `agentContextBudget.ts` 统一 exact quota、5% headroom、UTF-8 byte upper bound 与 deterministic selection，`chatAgentContextBudget.ts` 复用该策略生产写入证据；Planner 对权威 detail 再次扣除 output reserve、以 64,000 上限和 1,024 envelope reserve 裁剪，附件、owner、confirmation、checkpoint、content hash 不进入模型。`agentContextSnapshot.ts` 只生产计数、ID、视口、受限事件类型、输入存在性和工具名，`agentPlannerContext.ts` 再按独立 `canvasSnapshot` 硬预算裁剪；选区指代还会与当前画布节点求交。 | upgrade |
-| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:173-199,344-377` 对认证 owner 保留 active Run，并按时间戳合并服务端权威投影；`agentRunHydration.ts:42-67` 校验 owner-scoped list，`agentRunEventRecovery.ts:150-274` 只对最近 20 个 active + synced Run 做 bounded cursor invalidation，并在详情成功合并后推进 owner-qualified sequence。migration 023 投影关系型 step verification metadata；migration 024 又从 accepted plan replacement 推导 1–3 次 `replanCount` 与固定 reason/trigger code，第四次替换沿 stale 协调路径返回权威 Run。owner-scoped query 返回 strict `run_snapshot | step_outcome | replan`，Web mixed page 仍只触发权威 detail 重读。Session binding、Context Snapshot 与 authority-free Planner 门禁保持不变，远端独有计划仍不可执行；完整语义 replay、真实 replan executor、confirmation expiry 和真实跨设备 E2E 仍未实现。 | upgrade |
+| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:173-199,344-377` 对认证 owner 保留 active Run，并按时间戳合并服务端权威投影；`agentRunHydration.ts:42-67` 校验 owner-scoped list，`agentRunEventRecovery.ts:150-274` 只对最近 20 个 active + synced Run 做 bounded cursor invalidation，并在详情成功合并后推进 owner-qualified sequence。migration 023 投影关系型 step verification metadata；migration 024 又从 accepted plan replacement 推导 1–3 次 `replanCount` 与固定 reason/trigger code，第四次替换沿 stale 协调路径返回权威 Run。`agentConfirmationGrant.ts` 为 bound Run 建立 owner-stable Session read/upsert：grant 绑定 plan、tool/step、target、expiry 与可用时的 quote/cost，只有 exact authoritative metadata response 才产生执行 proof；未绑定兼容 grant 同样会过期。owner-scoped event 仍只触发权威 detail 重读，历史 Snapshot、远端 projection 和 Session record 本身均无执行权。完整语义 replay、真实 replan executor、真实 Quote 来源和真实跨设备 E2E 仍未实现。 | upgrade |
 | 4.5 | 跨设备续跑 | 部分 | 服务端 owner-scoped Run list/get、event query、Session list/get、Context Snapshot、可选 Run/Session owner binding 与 typed client 已在位，Web Run projection hydration + event cursor 已能发现并刷新第二个浏览器中的 active Run，Session list/detail 也在 startup、认证恢复与 online 时按 owner 严格刷新；bound Session 规划时还会 owner-stable 读取 latest Context Snapshot，并只消费与当前 surface/canvas、summary 时间兼容的元数据。owner 变化、跨 Run/乱序事件、陈旧详情、本地较新 pending snapshot 和 Snapshot transport failure 均 fail closed。本地新 Run 已能绑定并消费受限历史，但 `AITakeoverContext.tsx` 仍不会执行远端计划。跨设备执行接管、binding/Snapshot 浏览器实测和真实 E2E 仍缺失。 | upgrade |
 
 ## 5. PPT
@@ -88,8 +88,8 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 227 份 Markdown（不含生成索引本身）。 | keep |
-| 8.2 | current 分类正确 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:17`：19 份 current，达成 15–25 目标。 | keep |
+| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 229 份 Markdown（不含生成索引本身）。 | keep |
+| 8.2 | current 分类正确 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:17`：20 份 current，达成 15–25 目标。 | keep |
 | 8.3 | 版本事实源一致 | 部分 | `config/release-manifest.json` 是唯一版本源；但部分文档仍引用旧版本。 | archive |
 | 8.4 | OpenSpec 单一 active | 完全 | `DOCUMENTATION_INDEX.md` 中仅 `upgrade-ai-creation-core` 的文档标为 current；`canvas-card-system-v2`、`expand-ai-site-capabilities`、`harden-ai-control-plane`、`modernize-ai-first-workspace-ui`、`unify-ai-collaboration-modes` 均已归类 history。 | keep |
 
@@ -151,7 +151,7 @@
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |
-| 文档 227 / 19 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
+| 文档 229 / 20 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
 | Browser Bridge 白名单/脱敏 | `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts:108-147,149-190` / `browserActionCatalog.ts` |
 | Canonical Provider catalog | `packages/shared/src/generation/providerCatalog.ts` |
 | Capability Graph 契约与投影 | `packages/shared/src/capability-graph/` / `services/api/lib/capability-graph/projection.js` / `services/api/routes/capability-graph.js` |
