@@ -1,7 +1,9 @@
 // 简体中文：云端大模型接管规划器 (LLM Brain)
 import type { AssistantPlan, SanitizedProjectContext } from '../types';
 import {
+  buildAgentPlannerReplanInstruction,
   buildAgentPlannerLlmMessages,
+  type AgentPlannerReplanEvidence,
   type AgentPlannerSessionContext,
 } from './agentPlannerContext.ts';
 type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
@@ -12,6 +14,21 @@ const chatWithLlm: LlmChat = async (...args) => {
 };
 
 export class LLMBrain {
+  /** Requests a new plan from bounded structural evidence without promoting tool error text. */
+  async replan(
+    evidence: AgentPlannerReplanEvidence,
+    context: SanitizedProjectContext,
+    modelId?: string,
+    sessionContext?: AgentPlannerSessionContext,
+  ): Promise<AssistantPlan> {
+    return this.plan(
+      buildAgentPlannerReplanInstruction(evidence),
+      context,
+      modelId,
+      sessionContext,
+    );
+  }
+
   /**
    * 负责接收脱敏的 SanitizedProjectContext 及用户输入，生成符合 JSON Plan 的 AssistantPlan。
    * 此模块在云端连接可用时工作。在无 Key 状态时应当平滑回退到 LocalBrain。

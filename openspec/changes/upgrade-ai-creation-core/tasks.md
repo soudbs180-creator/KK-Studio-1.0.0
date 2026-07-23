@@ -1,6 +1,6 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation complete, real replan executor next
+> Status: active / Phase 2 external rollout gates pending / Phase 3 bounded replan executor complete, semantic replay and cross-device execution pending
 > Last updated: 2026-07-24
 > Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration 与 Google 安全迁移桥已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、服务端权威 dual-read 与全 Provider 切流仍未完成。
 
@@ -122,7 +122,8 @@
   - [x] metadata-only `step_outcome` discriminated variant 已落地：migration 023 在 accepted Run 写事务中，从 `stepResults` 只投影白名单 verification metadata，单次最多 100 条；不保存 message、plan、tool input/output 或任意 payload。owner-scoped event query 与 Web mixed-page recovery 仍只把它作为权威 Run detail invalidation。
   - [x] bounded metadata-only `replan` discriminated variant 已落地：migration 024 只在服务端接受的既有 Run plan 发生结构变化时递增 `replanCount`，最多三次，并记录固定结构化 `plan_replaced / accepted_plan_change` 原因与触发条件；客户端计数不参与推导，第四次替换沿既有 stale 协调路径返回权威 Run。事件不保存 plan、prompt、自由文本原因或 tool payload。
   - [x] confirmation expiry foundation 已落地：grant 绑定 owner、plan hash、tool/step、target snapshot 与显式 5 分钟有效期（最大 15 分钟）；bound Run 必须通过 owner-stable Session read/upsert 取得 exact authoritative metadata proof，event、历史 Snapshot 和远端 projection 不获得执行权。plan 提供 Quote 时还会绑定 `quoteId/maxCostCredits`，但真实 cost-bearing Quote 来源与确认卡/账本一致性仍待切流。
-  - [ ] 完整 semantic replay、真实 replan 执行/调度、真实 LLM 多轮验证与跨设备执行接管仍待实现。
+  - [x] 真实 bounded replan executor 已落地：只接受显式 `retryable_failure + retryable=true` 或具有可信成功回滚证据的 `rolled_back_failure`；owner/Session/画布/选区/model/config scope 变化、取消、权限/校验/setup/unknown failure、未取消 Job、远端 projection 或无权威服务端接受证据均 fail closed。每次 replacement 先建立 exact authoritative baseline，再以服务端 `replanCount`（最多 3）提交结构替换；POST 回包丢失时仅允许 owner-qualified GET 且 exact plan/count/status 全匹配后恢复。已完成 step 不重放，相同失败 action 复用旧 step ID，新 action 使用新 ID；旧 confirmation 清空，需要确认的新 plan 回到 `waiting_confirmation` 并重新展示。
+  - [ ] 完整 semantic replay、真实 Provider/LLM 多轮质量验证与跨设备执行接管仍待实现。
 - [x] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
   - [x] `AgentRuntime` 已把校验后的 Session context 传入 Local/LLM Planner；LLM 将历史上下文置于最新指令之前并用 system policy 降权，LocalBrain 只报告恢复计数，不回显或执行历史指令。无 binding、预算不足、owner 变化或 detail 缺失时保持原有两消息/未绑定路径。
   - [x] `AgentRuntime` 在规划前以 1.5 秒上限读取 bound Session 的 latest Snapshot，并异步追加当前 metadata-only capture；网络失败不清空 Session 或阻止 Run。Planner 只接收晚于 rolling summary、不超过 5 分钟未来偏差且与当前 surface/canvas 一致的预算化画布摘要。
@@ -149,10 +150,12 @@
   - [x] Chat Session 写协调器与 Run binding 已完成本地增量激活：可复用 exact createdAt 且不旧于本地投影的权威 detail，本地较新时先重写并 hydrate；失败、超时、旧会话、临时会话和不安全附件均 fail closed 为未绑定 Run。
   - [x] Run planning 现在只消费对应 binding 的 exact owner-scoped Session detail；DTO 在 Planner 前再次按 UTF-8 上界裁剪并移除执行授权字段，校验失败时连同 Run binding 一起 fail closed。
   - [x] bound Session 的 latest Context Snapshot 现由独立 owner-scoped Web projection hydrate；owner/Session/schema、sequence、surface/canvas、summary 时间或未来时钟任一不满足即排除，Snapshot 网络失败不改变 Session context 或 Run 创建。
-  - [ ] 完整语义 replay、真实 replan 执行、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation、`step_outcome`、`replan` 和本地首次 binding 不等同于可执行 Run replay。
+  - [x] 本地可执行 Run 已接入服务端接受优先的 bounded replan coordinator；metadata cursor、历史 plan、Session/Snapshot 与远端 projection 仍不授予执行权。专项回归覆盖 exact POST 接受、丢回包后的 owner-qualified GET、第四次/陈旧拒绝、scope/cancel/recovery debt、completed-step 去重、failed-step ID 复用与 confirmation 失效。
+  - [ ] 完整语义 replay、崩溃后续接管、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation、`step_outcome`、`replan` 和本地首次 binding 不等同于可执行 Run replay。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
-  - [x] 服务端已从 accepted plan replacement 推导 `replanCount`、以数据库约束锁定 0–3，并为每次替换追加 metadata-only replan event；尚未把 Planner 失败接入真实重规划循环。
-  - [x] 确认过期与 Session proof 已实现；owner、plan、tool/step、target、expiry 和可用时的 quote/cost 任一不匹配均 fail closed，owner 在 GET/upsert 异步边界切换时不提交写入。真实 Quote 来源、semantic replay、replan executor 与跨设备接管仍未完成。
+  - [x] 服务端已从 accepted plan replacement 推导 `replanCount`、以数据库约束锁定 0–3，并为每次替换追加 metadata-only replan event；Web bounded replan coordinator 只消费该权威计数与 exact accepted plan。
+  - [x] 确认过期与 Session proof 已实现；owner、plan、tool/step、target、expiry 和可用时的 quote/cost 任一不匹配均 fail closed，owner 在 GET/upsert 异步边界切换时不提交写入。真实 Quote 来源、semantic replay 与跨设备接管仍未完成。
+  - [x] Planner 失败已接入 bounded replan 执行循环：新计划重新经过 fresh sanitized context、Capability/Reference policy、PermissionPolicy、输入/图校验与 confirmation 评估；服务端未证明接受前不启动新工具，服务端计数达到 3、scope 变化、恢复债务或远端 projection 时终止。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。
 

@@ -5,7 +5,7 @@ import type {
   AssistantPlan,
   SanitizedProjectContext,
 } from '../../ai-takeover/types.ts';
-import type { AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
+import type { AgentFailureClass, AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
 import { LocalAssistantBrain } from '../../ai-takeover/core/localBrain.ts';
 import { LLMBrain } from '../../ai-takeover/core/llmBrain.ts';
 import { buildAgentContextSnapshotInput } from '../../ai-takeover/core/agentContextSnapshot.ts';
@@ -45,7 +45,6 @@ import {
 } from './agentContextSnapshotProjection.ts';
 import {
   durableGenerationQueue,
-  type DurableGenerationQueue,
 } from '../queue/DurableGenerationQueue.ts';
 import type {
   AssistantAuthorizationScopeSnapshot,
@@ -67,11 +66,27 @@ import {
   doesAgentSessionAuthorizeConfirmation,
   persistAgentSessionConfirmationGrant,
 } from './agentConfirmationGrant.ts';
+import {
+  coordinateAgentReplan,
+  type CoordinateAgentReplanResult,
+} from './agentReplanCoordinator.ts';
+import {
+  MAX_AGENT_REPLANS,
+  type AgentReplanRecoveryEvidence,
+} from './agentReplanPolicy.ts';
+import { createAgentReplan } from './agentReplanPlanner.ts';
+import {
+  createAgentStepPayload as actionPayloadWithIdempotency,
+  freezeAgentPlanExecutionTargets as freezePlanExecutionTargets,
+  normalizeAgentPlanSteps as normalizePlanSteps,
+  validateAgentPlanStepInputs as validatePlanStepInputs,
+  validateAgentStepGraph as validateStepGraph,
+  type AgentPlanningQueue,
+} from './agentPlanCompiler.ts';
 
 const localBrain = new LocalAssistantBrain();
 const llmBrain = new LLMBrain();
 const MAX_AGENT_STEPS = 20;
-const MAX_AUTO_REPLANS = 3;
 const MAX_READ_ONLY_CONCURRENCY = 4;
 const SNAPSHOT_HYDRATION_TIMEOUT_MS = 1_500;
 const READ_ONLY_TOOLS = new Set([
@@ -80,8 +95,6 @@ const READ_ONLY_TOOLS = new Set([
   'generation.getJobStatus',
   'browser.getStatus',
 ]);
-
-type GenerationPlanningQueue = Pick<DurableGenerationQueue, 'getJob' | 'getJobs'>;
 
 let contextSnapshotSequence = 0;
 
@@ -116,127 +129,6 @@ function appendCurrentContextSnapshot(
   if (!input) return;
   void appendAgentContextSnapshotProjection(sessionId, input, { ownerId });
 }
-
-const retryableFailedPromptIds = (job: ReturnType<GenerationPlanningQueue['getJob']>): string[] => (
-  (job?.prompts || [])
-    .filter((prompt) => prompt.status === 'failed' && prompt.retryable !== false)
-    .map((prompt) => prompt.id)
-    .sort()
-);
-
-const freezeRetryActionTarget = (
-  action: AssistantAction,
-  queue: GenerationPlanningQueue,
-): AssistantAction => {
-  if (action.type !== 'generation.retryJob') return action;
-  const payload = (action.payload || {}) as Record<string, unknown>;
-  const explicitJobId = String(payload.jobId || '').trim();
-  const job = explicitJobId
-    ? queue.getJob(explicitJobId)
-    : queue.getJobs()
-        .filter((candidate) => candidate.status !== 'cancelled' && retryableFailedPromptIds(candidate).length > 0)
-        .sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id))[0];
-  if (!job) {
-    throw new Error(explicitJobId
-      ? `Generation retry target not found: ${explicitJobId}.`
-      : 'Generation retry target not found: no retryable failed durable job.');
-  }
-  const expectedRetryablePromptIds = retryableFailedPromptIds(job);
-  if (expectedRetryablePromptIds.length === 0) {
-    throw new Error(`Generation job ${job.id} has no retryable failed items.`);
-  }
-  const { target: _dynamicTarget, ...frozenPayload } = payload;
-  return {
-    ...action,
-    payload: {
-      ...frozenPayload,
-      jobId: job.id,
-      expectedUpdatedAt: job.updatedAt,
-      expectedRetryablePromptIds,
-    },
-  };
-};
-
-const freezePlanExecutionTargets = (
-  plan: AssistantPlan,
-  queue: GenerationPlanningQueue,
-): AssistantPlan => ({
-  ...plan,
-  actions: (plan.actions || []).map((action) => freezeRetryActionTarget(action, queue)),
-  steps: (plan.steps || []).map((step) => ({
-    ...step,
-    action: freezeRetryActionTarget(step.action, queue),
-  })),
-});
-
-const isKnowledgeWrite = (action: AssistantAction) => action.type === 'knowledge.recordChange';
-
-const verificationRuleForAction = (action: AssistantAction): AgentPlanStep['verification']['rule'] => {
-  if (action.type.startsWith('generation.') || action.type === 'startGeneration' || action.type === 'startBatchGeneration') {
-    return 'queue_job';
-  }
-  if (action.type.startsWith('canvas.') || action.type === 'locateCard') return 'canvas_state';
-  if (action.type === 'assets.zipOriginals' || action.type === 'zipOutputs') return 'asset_manifest';
-  return 'tool';
-};
-
-const normalizePlanSteps = (plan: AssistantPlan): AgentPlanStep[] => {
-  const sourceSteps = Array.isArray(plan.steps) && plan.steps.length > 0
-    ? plan.steps.map((step, index) => ({
-        ...step,
-        stepId: step.stepId || `${plan.id}:step:${index + 1}`,
-        dependsOn: Array.isArray(step.dependsOn) ? [...step.dependsOn] : [],
-        idempotencyKey: step.idempotencyKey || `${plan.id}:step:${index + 1}`,
-        verification: step.verification || {
-          required: true,
-          rule: verificationRuleForAction(step.action),
-        },
-      }))
-    : [...(plan.actions || [])]
-        .sort((left, right) => Number(isKnowledgeWrite(left)) - Number(isKnowledgeWrite(right)))
-        .map((action, index, actions) => ({
-          stepId: `${plan.id}:step:${index + 1}`,
-          action,
-          dependsOn: index === 0 ? [] : [`${plan.id}:step:${index}`],
-          idempotencyKey: `${plan.id}:${action.type}:${index + 1}`,
-          verification: {
-            required: true,
-            rule: verificationRuleForAction(action),
-          },
-        }));
-
-  const nonKnowledgeStepIds = sourceSteps
-    .filter((step) => !isKnowledgeWrite(step.action))
-    .map((step) => step.stepId);
-  return sourceSteps.map((step) => isKnowledgeWrite(step.action)
-    ? { ...step, dependsOn: Array.from(new Set([...step.dependsOn, ...nonKnowledgeStepIds])) }
-    : step);
-};
-
-const validateStepGraph = (steps: AgentPlanStep[]) => {
-  if (steps.length > MAX_AGENT_STEPS) {
-    throw new Error(`Agent plan exceeds the ${MAX_AGENT_STEPS}-step execution limit.`);
-  }
-  const ids = new Set<string>();
-  for (const step of steps) {
-    if (ids.has(step.stepId)) throw new Error(`Duplicate agent stepId: ${step.stepId}`);
-    ids.add(step.stepId);
-  }
-  for (const step of steps) {
-    for (const dependency of step.dependsOn) {
-      if (!ids.has(dependency)) throw new Error(`Unknown dependency ${dependency} for step ${step.stepId}`);
-      if (dependency === step.stepId) throw new Error(`Step ${step.stepId} cannot depend on itself.`);
-    }
-  }
-};
-
-const actionPayloadWithIdempotency = (step: AgentPlanStep, runId?: string) => {
-  const payload: Record<string, unknown> = { ...(step.action.payload || {}) };
-  payload.idempotencyKey = runId
-    ? createRunStepIdempotencyKey(runId, step.stepId)
-    : step.idempotencyKey;
-  return payload;
-};
 
 const createPlanStepAuthorizations = (
   runId: string,
@@ -276,14 +168,6 @@ const sameAssistantPlanQuoteBinding = (
 ): boolean => binding.valid
   && grant.quoteId === binding.quoteId
   && grant.maxCostCredits === binding.maxCostCredits;
-
-const validatePlanStepInputs = (runId: string, steps: AgentPlanStep[]): void => {
-  for (const step of steps) {
-    const tool = toolRegistryInstance.getTool(step.action.type);
-    if (!tool) throw new TypeError(`Unknown Agent tool in plan: ${step.action.type}`);
-    tool.inputValidator.parse(actionPayloadWithIdempotency(step, runId));
-  }
-};
 
 export interface AgentPlanStepVerificationResult extends AgentStepResultDto {}
 
@@ -542,13 +426,13 @@ export class AgentRuntime {
   private readonly runStartedStepIds = new Map<string, Set<string>>();
   private readonly runSyncChains = new Map<string, Promise<void>>();
   private readonly pendingRunSyncs = new Map<string, AgentRunRecord>();
-  private readonly planningGenerationQueue: GenerationPlanningQueue;
+  private readonly planningGenerationQueue: AgentPlanningQueue;
   private activeRunSyncOwnerId = agentRunStore.getOwnerScopeId();
   private hydratedRunSyncOwnerId = '';
   private runHydration?: { ownerId: string; promise: Promise<AgentRunHydrationResult> };
   private sessionHydration?: { ownerId: string; promise: Promise<AgentSessionHydrationResult> };
 
-  constructor(planningGenerationQueue: GenerationPlanningQueue = durableGenerationQueue) {
+  constructor(planningGenerationQueue: AgentPlanningQueue = durableGenerationQueue) {
     this.planningGenerationQueue = planningGenerationQueue;
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
@@ -631,7 +515,7 @@ export class AgentRuntime {
     if (!isBlocked) {
       plan.actions = safeActions;
       plan.version = 2;
-      plan.maxReplans = MAX_AUTO_REPLANS;
+      plan.maxReplans = MAX_AGENT_REPLANS;
       plan.steps = normalizePlanSteps(plan);
       try {
         validateStepGraph(plan.steps);
@@ -724,6 +608,48 @@ export class AgentRuntime {
       throw new Error(`Agent confirmation could not become authoritative: ${result.reason}`);
     }
     return result.grant;
+  }
+
+  private coordinateFailureReplan(
+    runId: string,
+    ownerId: string,
+    failure: AgentStepResultDto,
+    failureClass: AgentFailureClass | undefined,
+    recovery: AgentReplanRecoveryEvidence,
+    initialScope: AssistantAuthorizationScopeSnapshot,
+    executorContext: AssistantExecutionContext,
+  ): Promise<CoordinateAgentReplanResult> {
+    return coordinateAgentReplan({
+      ownerId,
+      runId,
+      failure,
+      failureClass,
+      recovery,
+      initialScope,
+      captureCurrentScope: () => captureAssistantAuthorizationScope(executorContext),
+      getCurrentOwnerId: getRuntimeOwnerId,
+      store: agentRunStore,
+      transport: {
+        upsertAgentRun: (input, options) => kkWebApiClient.upsertAgentRun(input, options),
+        getAgentRun: (requestedRunId, options) => kkWebApiClient.getAgentRun(requestedRunId, options),
+      },
+      createReplacementPlan: async (nextReplanCount) => {
+        const latestRecord = agentRunStore.getRunForOwner(ownerId, runId);
+        const freshContext = executorContext.getSanitizedProjectContext?.();
+        if (!latestRecord || !freshContext) {
+          throw new Error('Fresh sanitized project context is required for bounded replanning.');
+        }
+        return createAgentReplan({
+          record: latestRecord,
+          failure,
+          freshContext,
+          ownerId,
+          nextReplanCount,
+          collaborationMode: executorContext.collaborationMode,
+          planningQueue: this.planningGenerationQueue,
+        });
+      },
+    });
   }
 
   executePendingRun(runId: string, executorContext: AssistantExecutionContext): Promise<void> {
@@ -879,12 +805,10 @@ export class AgentRuntime {
       throw new Error(`Explicit user confirmation is required for agent run: ${runId}`);
     }
     const executionStartedAt = Date.now();
-    const authorizedSelection = confirmedAuthorizationScope
-      ? [...confirmedAuthorizationScope.selectedNodeIds]
-      : [...(executorContext.getSelectedNodeIds?.() || executorContext.selectedNodeIds || [])];
-    const authorizedCanvasId = confirmedAuthorizationScope
-      ? confirmedAuthorizationScope.canvasId
-      : String(executorContext.getActiveCanvas?.()?.id || executorContext.activeCanvas?.id || '');
+    const executionAuthorizationScope = confirmedAuthorizationScope
+      || captureAssistantAuthorizationScope(executorContext);
+    const authorizedSelection = [...executionAuthorizationScope.selectedNodeIds];
+    const authorizedCanvasId = executionAuthorizationScope.canvasId;
     const completed = new Set(record.completedStepIds || []);
     const stepResults = [...(record.stepResults || [])];
     const pending = new Map(steps.filter((step) => !completed.has(step.stepId)).map((step) => [step.stepId, step]));
@@ -1032,11 +956,15 @@ export class AgentRuntime {
           : 'completed',
         toolCalls,
         stepResults,
-        completedStepIds: steps.map((step) => step.stepId),
+        completedStepIds: Array.from(new Set([
+          ...(record.completedStepIds || []),
+          ...steps.map((step) => step.stepId),
+        ])),
       });
       void writeHandoff(updated, executionOwnerId);
     } catch (error: unknown) {
       const verificationResult = error instanceof AgentStepVerificationError ? error.result : undefined;
+      let replanFailure = verificationResult;
       const ownerChanged = getRuntimeOwnerId() !== executionOwnerId;
       const cancelled = abortController.signal.aborted
         || ownerChanged
@@ -1058,12 +986,50 @@ export class AgentRuntime {
           );
           if (resultIndex >= 0) stepResults[resultIndex] = rolledBackResult;
           else stepResults.push(rolledBackResult);
+          if (replanFailure?.stepId === recoveredStepId) replanFailure = rolledBackResult;
           completed.delete(recoveredStepId);
         }
       }
       const toolCalls: AgentToolCallLog[] = toolRegistryInstance.getLogs(executionOwnerId).filter((log) => (
         log.runId === runId && new Date(log.startedAt).getTime() >= executionStartedAt
       ));
+      updateOwnedRun({
+        toolCalls,
+        stepResults: [...stepResults],
+        completedStepIds: [...completed],
+      });
+      const failureClass = replanFailure
+        ? [...toolCalls].reverse().find((log) => log.stepId === replanFailure?.stepId)?.failureClass
+        : undefined;
+      const replanResult = !cancelled && replanFailure
+        ? await this.coordinateFailureReplan(
+            runId,
+            executionOwnerId,
+            replanFailure,
+            failureClass,
+            recovery,
+            executionAuthorizationScope,
+            executorContext,
+          )
+        : undefined;
+      if (replanResult?.outcome === 'accepted') {
+        const replacementPlan = replanResult.record.plan as AssistantPlan;
+        if (replacementPlan.requiresConfirmation) {
+          executorContext.requestReplanConfirmation?.({
+            runId,
+            plan: replacementPlan,
+            authorizationScope: captureAssistantAuthorizationScope(executorContext),
+          });
+          return;
+        }
+        this.runRecoveryTargets.set(runId, new Map());
+        this.runStartedStepIds.set(runId, new Set(replanResult.record.completedStepIds || []));
+        await this.executePendingRunInternal(runId, {
+          ...executorContext,
+          confirmationGrant: undefined,
+        });
+        return;
+      }
       const safeExecutionError = redactToolText(error instanceof Error ? error.message : String(error));
       const updated = updateOwnedRun({
         status: cancelled ? 'cancelled' : 'failed',
@@ -1080,7 +1046,9 @@ export class AgentRuntime {
             ? `Execution failed; generation job(s) still require manual cancellation: ${recovery.failedJobIds.join(', ')}`
             : recovery.recoveredStepIds.length > 0
               ? `Execution failed and recoverable side effects were cancelled: ${safeExecutionError}`
-              : `Execution failed: ${safeExecutionError}`,
+              : replanResult?.outcome === 'blocked'
+                ? `Execution failed; automatic replanning stopped (${replanResult.reason}): ${safeExecutionError}`
+                : `Execution failed: ${safeExecutionError}`,
       });
       void writeHandoff(updated, executionOwnerId);
       throw error;

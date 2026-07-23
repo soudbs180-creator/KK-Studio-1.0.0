@@ -42,6 +42,20 @@ const clonePlan = (plan: unknown): unknown => (
   plan === undefined ? undefined : JSON.parse(JSON.stringify(plan))
 );
 
+const canonicalJsonValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, canonicalJsonValue(child)]),
+  );
+};
+
+const sameJsonValue = (left: unknown, right: unknown): boolean => (
+  JSON.stringify(canonicalJsonValue(left)) === JSON.stringify(canonicalJsonValue(right))
+);
+
 const planRequiresConfirmation = (plan: unknown): boolean => (
   isRecord(plan) && plan.requiresConfirmation === true
 );
@@ -336,6 +350,51 @@ export class AgentRunStore {
       stepResults: [...(snapshot.stepResults || [])],
       completedStepIds: snapshot.completedStepIds ? [...snapshot.completedStepIds] : current.completedStepIds,
       backendSyncState: 'synced',
+    };
+    this.runs[index] = authoritative;
+    this.saveRuns();
+    return cloneRunRecord(authoritative);
+  }
+
+  /** Applies only the exact server-accepted replacement while retaining local execution evidence. */
+  applyAuthoritativeReplan(
+    snapshot: AgentRunDto,
+    expectedLocalUpdatedAt: string,
+    expectedPlan: unknown,
+    nextStep?: string,
+  ): AgentRunRecord | undefined {
+    this.ensureOwnerScope();
+    const index = this.runs.findIndex((candidate) => candidate.id === snapshot.id);
+    if (index < 0) return undefined;
+    const current = this.runs[index];
+    const authoritativeTime = Date.parse(snapshot.updatedAt);
+    const currentTime = Date.parse(current.updatedAt);
+    const countAccepted = [1, 2, 3].includes(snapshot.replanCount || 0);
+    const statusAccepted = ['waiting_confirmation', 'waiting_execution'].includes(snapshot.status);
+    if (current.updatedAt !== expectedLocalUpdatedAt
+      || !hasLocalAgentRunExecutionAuthority(current)
+      || snapshot.userMessage !== current.userMessage
+      || snapshot.intent !== current.intent
+      || snapshot.sessionId !== current.sessionId
+      || !sameJsonValue(snapshot.plan, expectedPlan)
+      || !countAccepted
+      || !statusAccepted
+      || !Number.isFinite(authoritativeTime)
+      || (Number.isFinite(currentTime) && authoritativeTime < currentTime)) {
+      return undefined;
+    }
+    const authoritative: AgentRunRecord = {
+      ...current,
+      ...snapshot,
+      plan: clonePlan(snapshot.plan),
+      toolCalls: mergeToolCalls(current.toolCalls || [], snapshot.toolCalls || []),
+      stepResults: snapshot.stepResults?.map((result) => ({ ...result })) || [],
+      completedStepIds: current.completedStepIds ? [...current.completedStepIds] : [],
+      totalSteps: getPlanStepCount(snapshot.plan),
+      confirmationGrantedAt: undefined,
+      nextStep,
+      backendSyncState: 'synced',
+      executionAuthority: 'local_validated',
     };
     this.runs[index] = authoritative;
     this.saveRuns();

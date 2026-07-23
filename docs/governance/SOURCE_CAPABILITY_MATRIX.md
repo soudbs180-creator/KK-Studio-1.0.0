@@ -3,7 +3,7 @@
 > Status: current
 > Owner: KK Studio AI Core Team
 > Verifies: `openspec/changes/upgrade-ai-creation-core/proposal.md`
-> Last verified: 2026-07-23
+> Last verified: 2026-07-24
 
 本矩阵记录 KK Studio v1.6.0 的**当前事实**（非规划目标）。每项能力声明必须附带源码证据；证据缺失或矛盾的条目不得作为当前事实引用。
 
@@ -54,9 +54,9 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 4.1 | IntentGate -> Planner -> ToolRegistry -> PermissionPolicy 链路 | 完全 | `apps/web/src/features/ai-takeover/` 核心链路在位。 | keep |
-| 4.2 | 多轮对话历史 | 部分 | `agentPlannerSessionContext.ts` 只从 exact owner-scoped Session detail 构造历史投影；`agentPlannerContext.ts` 排除已被 summary 覆盖的消息、历史 system/tool message 和执行授权字段，再把 bounded summary、最近 user/assistant 消息、工具结果、知识引用及通过 freshness/surface/canvas 门禁的 metadata-only Snapshot 交给 Planner。`agentPlannerReferencePolicy.ts` 只解析仍存在于当前画布的唯一历史选区，普通“继续”、模糊/多候选指代、历史 Job ID 和目标偷换均 fail closed。Run event 已有 strict metadata-only `step_outcome | replan`，confirmation grant 也已有显式 expiry 与 bound Session proof；但完整 semantic replay、真实 replan 执行/调度与真实 LLM 多轮验证仍缺失。 | upgrade |
+| 4.2 | 多轮对话历史 | 部分 | `agentPlannerSessionContext.ts` 只从 exact owner-scoped Session detail 构造历史投影；`agentPlannerContext.ts` 排除已被 summary 覆盖的消息、历史 system/tool message 和执行授权字段，再把 bounded summary、最近 user/assistant 消息、工具结果、知识引用及通过 freshness/surface/canvas 门禁的 metadata-only Snapshot 交给 Planner。`agentPlannerReferencePolicy.ts` 只解析仍存在于当前画布的唯一历史选区，普通“继续”、模糊/多候选指代、历史 Job ID 和目标偷换均 fail closed。`llmBrain.ts` 现可消费不含自由错误文本的结构化 replan evidence；`agentReplanPolicy.ts` / `agentReplanCoordinator.ts` 只让 retryable 或已验证回滚失败进入 fresh-context replacement，并在服务端 exact 接受前保持无执行权。完整 semantic replay、真实 Provider/LLM 多轮质量验收与跨设备接管仍缺失。 | upgrade |
 | 4.3 | 上下文裁剪 | 部分 | `agentContextBudget.ts` 统一 exact quota、5% headroom、UTF-8 byte upper bound 与 deterministic selection，`chatAgentContextBudget.ts` 复用该策略生产写入证据；Planner 对权威 detail 再次扣除 output reserve、以 64,000 上限和 1,024 envelope reserve 裁剪，附件、owner、confirmation、checkpoint、content hash 不进入模型。`agentContextSnapshot.ts` 只生产计数、ID、视口、受限事件类型、输入存在性和工具名，`agentPlannerContext.ts` 再按独立 `canvasSnapshot` 硬预算裁剪；选区指代还会与当前画布节点求交。 | upgrade |
-| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts:173-199,344-377` 对认证 owner 保留 active Run，并按时间戳合并服务端权威投影；`agentRunHydration.ts:42-67` 校验 owner-scoped list，`agentRunEventRecovery.ts:150-274` 只对最近 20 个 active + synced Run 做 bounded cursor invalidation，并在详情成功合并后推进 owner-qualified sequence。migration 023 投影关系型 step verification metadata；migration 024 又从 accepted plan replacement 推导 1–3 次 `replanCount` 与固定 reason/trigger code，第四次替换沿 stale 协调路径返回权威 Run。`agentConfirmationGrant.ts` 为 bound Run 建立 owner-stable Session read/upsert：grant 绑定 plan、tool/step、target、expiry 与可用时的 quote/cost，只有 exact authoritative metadata response 才产生执行 proof；未绑定兼容 grant 同样会过期。owner-scoped event 仍只触发权威 detail 重读，历史 Snapshot、远端 projection 和 Session record 本身均无执行权。完整语义 replay、真实 replan executor、真实 Quote 来源和真实跨设备 E2E 仍未实现。 | upgrade |
+| 4.4 | Agent Run 中断恢复 | 部分 | `AgentRunStore.ts` 对认证 owner 保留 active Run、按时间戳合并服务端投影，并用 `applyAuthoritativeReplan` 只应用 exact accepted replacement；`agentRunHydration.ts` 与 `agentRunEventRecovery.ts` 继续把远端 Run/event 保持为只读投影。migration 024 从 accepted plan replacement 推导 1–3 次 `replanCount` 并拒绝第四次结构替换。`agentReplanCoordinator.ts` 先同步/读取 exact baseline，再以 owner-qualified POST 提交 replacement；回包丢失时仅 exact GET 可恢复，scope/cancel/recovery debt/unsafe failure/remote projection 均终止。`agentReplanPolicy.ts` 去除已完成 action、为相同失败 action 复用旧 step ID，并给新 action 分配新 ID；旧 confirmation 清空，需要确认的新 plan 回到 `waiting_confirmation`。`agentConfirmationGrant.ts` 仍要求 owner-stable Session proof。完整语义 replay、崩溃/跨设备执行接管、真实 Quote 来源与真实浏览器 E2E 仍未实现。 | upgrade |
 | 4.5 | 跨设备续跑 | 部分 | 服务端 owner-scoped Run list/get、event query、Session list/get、Context Snapshot、可选 Run/Session owner binding 与 typed client 已在位，Web Run projection hydration + event cursor 已能发现并刷新第二个浏览器中的 active Run，Session list/detail 也在 startup、认证恢复与 online 时按 owner 严格刷新；bound Session 规划时还会 owner-stable 读取 latest Context Snapshot，并只消费与当前 surface/canvas、summary 时间兼容的元数据。owner 变化、跨 Run/乱序事件、陈旧详情、本地较新 pending snapshot 和 Snapshot transport failure 均 fail closed。本地新 Run 已能绑定并消费受限历史，但 `AITakeoverContext.tsx` 仍不会执行远端计划。跨设备执行接管、binding/Snapshot 浏览器实测和真实 E2E 仍缺失。 | upgrade |
 
 ## 5. PPT
@@ -148,6 +148,7 @@
 | Context Snapshot metadata producer、owner-scoped projection 与 Planner consumption | `apps/web/src/features/ai-takeover/core/agentContextSnapshot.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/agentContextSnapshotProjection.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-context-snapshot-projection.test.ts` |
 | Planner 多轮选区指代与 authority fail-closed 门禁 | `apps/web/src/features/ai-takeover/core/agentPlannerReferencePolicy.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-planner-session-context.test.ts` |
 | Planner Capability Graph 发现与 model hint 门禁 | `apps/web/src/features/ai-takeover/core/agentPlannerCapabilityContext.ts` / `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts` / `tests/unit/agent-planner-capability-context.test.ts` |
+| Bounded replan policy、Plan 编译、服务端 CAS 与 fresh confirmation | `apps/web/src/features/ai-assistant-runtime/runtime/agentPlanCompiler.ts` / `agentReplanPolicy.ts` / `agentReplanPlanner.ts` / `agentReplanCoordinator.ts` / `AgentRunStore.ts` / `AgentRuntime.ts` / `apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx` / `tests/unit/agent-bounded-replan.test.ts` |
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |

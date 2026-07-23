@@ -1,5 +1,10 @@
 import type { AssistantCollaborationMode, AssistantWorkspaceSurface } from '@kk/shared';
-import type { AssetContextSummary, CanvasRuntimeState } from '../../ai-takeover/types.ts';
+import type {
+  AssetContextSummary,
+  AssistantPlan,
+  CanvasRuntimeState,
+  SanitizedProjectContext,
+} from '../../ai-takeover/types.ts';
 import type { Canvas } from '../../../types/index.ts';
 import type { BrowserBridgeClient, BrowserBridgeStatusSnapshot } from '../browser/browserBridge.ts';
 import type { DurableGenerationQueue } from '../queue/DurableGenerationQueue.ts';
@@ -52,6 +57,12 @@ export interface AssistantAuthorizationScopeSnapshot {
   selectedNodeIds: readonly string[];
   selectedModelId: string;
   mutableConfigurationFingerprint: string;
+}
+
+export interface AssistantReplanConfirmationRequest {
+  runId: string;
+  plan: AssistantPlan;
+  authorizationScope: AssistantAuthorizationScopeSnapshot;
 }
 
 export interface AssistantStepVerificationBaseline {
@@ -183,6 +194,7 @@ export interface AssistantExecutionContext {
   signal?: AbortSignal;
   confirmationGrant?: AssistantConfirmationGrant;
   verificationBaseline?: AssistantStepVerificationBaseline;
+  projectId?: string;
 
   activeCanvas?: Canvas;
   selectedNodeIds: string[];
@@ -192,6 +204,12 @@ export interface AssistantExecutionContext {
   getActiveCanvas: () => Canvas | undefined;
   getSelectedNodeIds: () => string[];
   getCanvasRuntimeState: () => CanvasRuntimeState | undefined;
+  getCurrentPage?: () => AssistantWorkspaceSurface;
+  getProjectId?: () => string;
+  getSelectedModel?: () => { id?: string; [key: string]: unknown } | undefined;
+  getMutableConfigurationSnapshot?: () => Record<string, unknown>;
+  getSanitizedProjectContext?: () => SanitizedProjectContext;
+  requestReplanConfirmation?: (request: AssistantReplanConfirmationRequest) => void;
 
   generationQueue: DurableGenerationQueue;
   runStore: AgentRunStore;
@@ -329,22 +347,26 @@ export function captureAssistantAuthorizationScope(
   const activeCanvas = callContextGetter(context.getActiveCanvas, context.activeCanvas);
   const runtimeState = callContextGetter(context.getCanvasRuntimeState, context.canvasRuntimeState);
   const selectedNodeIds = callContextGetter(context.getSelectedNodeIds, context.selectedNodeIds || []);
+  const currentPage = callContextGetter(context.getCurrentPage, context.currentPage);
+  const projectId = callContextGetter(context.getProjectId, context.projectId || context.workspaceId || '');
+  const selectedModel = callContextGetter(context.getSelectedModel, context.selectedModel);
+  const mutableConfiguration = callContextGetter(context.getMutableConfigurationSnapshot, {
+    config: context.config ?? null,
+    ecommerceState: context.ecommerceState ?? null,
+    browserAssistantSnapshot: context.browserAssistantSnapshot ?? null,
+    browserBridgeSnapshot: context.browserBridgeSnapshot ?? null,
+  });
   const normalizedSelection = Array.isArray(selectedNodeIds)
     ? Array.from(new Set(selectedNodeIds.map((id) => String(id).trim()).filter(Boolean))).sort()
     : [];
   return {
     ownerId: String(getRuntimeOwnerId() || 'local_user').trim() || 'local_user',
-    workspaceSurface: String(context.currentPage || 'unknown'),
-    projectId: String(context.projectId || context.workspaceId || ''),
+    workspaceSurface: String(currentPage || 'unknown'),
+    projectId: String(projectId || ''),
     canvasId: String(activeCanvas?.id || runtimeState?.canvas?.id || context.canvasId || ''),
     selectedNodeIds: normalizedSelection,
-    selectedModelId: String(context.selectedModel?.id || context.modelId || ''),
-    mutableConfigurationFingerprint: fingerprintStableAuthorizationValue({
-      config: context.config ?? null,
-      ecommerceState: context.ecommerceState ?? null,
-      browserAssistantSnapshot: context.browserAssistantSnapshot ?? null,
-      browserBridgeSnapshot: context.browserBridgeSnapshot ?? null,
-    }),
+    selectedModelId: String(selectedModel?.id || context.modelId || ''),
+    mutableConfigurationFingerprint: fingerprintStableAuthorizationValue(mutableConfiguration),
   };
 }
 

@@ -280,6 +280,7 @@ export function AITakeoverProvider({
     restoredPendingRun && hasLocalAgentRunExecutionAuthority(restoredPendingRun)
       ? captureAssistantAuthorizationScope({
           currentPage,
+          projectId: siteCapabilities?.project.getSnapshot().activeProjectId || '',
           activeCanvas,
           selectedNodeIds: selectedNodeIds || [],
           canvasRuntimeState,
@@ -320,6 +321,29 @@ export function AITakeoverProvider({
       unsubscribeAuth();
     };
   }, []);
+
+  const getFreshSanitizedProjectContext = useCallback((): SanitizedProjectContext => (
+    buildSanitizedProjectContext({
+      currentPage: currentPageRef.current,
+      aiTakeoverEnabled: collaborationModeRef.current === 'takeover',
+      agentEnabled: collaborationModeRef.current !== 'direct',
+      collaborationMode: collaborationModeRef.current,
+      activeCanvas: activeCanvasRef.current,
+      selectedNodeIds: selectedNodeIdsRef.current,
+      apiKeyStatus: apiKeyStatusRef.current,
+      providerCount: 1,
+      selectedModel: selectedModelRef.current?.id,
+      balanceKnown: true,
+      canEstimateCost: true,
+      assetsSummary: useAssetStore.getState().getAssetsSummary(),
+      projectSnapshot: siteCapabilitiesRef.current?.project.getSnapshot(),
+      errors: [],
+      config: configRef.current,
+      ecommerceState: ecommerceStateRef.current,
+      canvasTransform: canvasTransformRef.current,
+      canvasRef: canvasHostRef.current,
+    })
+  ), []);
 
 
 
@@ -375,6 +399,26 @@ export function AITakeoverProvider({
       getActiveCanvas: () => activeCanvasRef.current,
       getSelectedNodeIds: () => selectedNodeIdsRef.current,
       getCanvasRuntimeState: () => canvasRuntimeStateRef.current,
+      getCurrentPage: () => currentPageRef.current,
+      getProjectId: () => siteCapabilitiesRef.current?.project.getSnapshot().activeProjectId || '',
+      getSelectedModel: () => selectedModelRef.current,
+      getMutableConfigurationSnapshot: () => ({
+        config: configRef.current ?? null,
+        ecommerceState: ecommerceStateRef.current ?? null,
+        browserAssistantSnapshot: null,
+        browserBridgeSnapshot: null,
+      }),
+      getSanitizedProjectContext: getFreshSanitizedProjectContext,
+      requestReplanConfirmation: ({
+        runId: replannedRunId,
+        plan: replacementPlan,
+        authorizationScope,
+      }) => {
+        setCurrentRunId(replannedRunId);
+        setCurrentRun(agentRunStore.getRun(replannedRunId) ?? null);
+        setPendingPlan(replacementPlan);
+        setPendingAuthorizationScope(authorizationScope);
+      },
       generationQueue: durableGenerationQueue,
       runStore: agentRunStore,
       siteCapabilities,
@@ -434,7 +478,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, siteCapabilities, currentPage, collaborationMode]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, siteCapabilities, currentPage, collaborationMode, getFreshSanitizedProjectContext]);
 
 
   // 发送消息
@@ -455,27 +499,7 @@ export function AITakeoverProvider({
     setCurrentRun(null);
 
     // 智能脱敏上下文构建
-    const assetsSummary = useAssetStore.getState().getAssetsSummary();
-    const projectContext = buildSanitizedProjectContext({
-      currentPage,
-      aiTakeoverEnabled: collaborationMode === 'takeover',
-      agentEnabled: collaborationMode !== 'direct',
-      collaborationMode,
-      activeCanvas,
-      selectedNodeIds: selectedNodeIds || [],
-      apiKeyStatus,
-      providerCount: 1,
-      selectedModel: selectedModel?.id,
-      balanceKnown: true,
-      canEstimateCost: true,
-      assetsSummary,
-      projectSnapshot: siteCapabilities?.project.getSnapshot(),
-      errors: [],
-      config,
-      ecommerceState,
-      canvasTransform,
-      canvasRef
-    });
+    const projectContext = getFreshSanitizedProjectContext();
 
     try {
       // 模拟大脑思考用时，提升拟人化感官
@@ -506,6 +530,7 @@ export function AITakeoverProvider({
         });
         setPendingAuthorizationScope(captureAssistantAuthorizationScope({
           currentPage,
+          projectId: siteCapabilities?.project.getSnapshot().activeProjectId || '',
           activeCanvas,
           selectedNodeIds: selectedNodeIds || [],
           canvasRuntimeState,
@@ -518,6 +543,7 @@ export function AITakeoverProvider({
       } else if (plan.requiresConfirmation) {
         setPendingAuthorizationScope(captureAssistantAuthorizationScope({
           currentPage,
+          projectId: siteCapabilities?.project.getSnapshot().activeProjectId || '',
           activeCanvas,
           selectedNodeIds: selectedNodeIds || [],
           canvasRuntimeState,
@@ -535,7 +561,7 @@ export function AITakeoverProvider({
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, canvasRuntimeState, collaborationMode, currentPage, siteCapabilities]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef, canvasRuntimeState, collaborationMode, currentPage, siteCapabilities, getFreshSanitizedProjectContext]);
 
 
   // 用户点击“确认执行”
@@ -604,6 +630,14 @@ export function AITakeoverProvider({
   const selectedNodeIdsRef = useRef(selectedNodeIds || []);
   const canvasRuntimeStateRef = useRef(canvasRuntimeState);
   const selectedModelRef = useRef(selectedModel);
+  const currentPageRef = useRef(currentPage);
+  const collaborationModeRef = useRef(collaborationMode);
+  const apiKeyStatusRef = useRef(apiKeyStatus);
+  const configRef = useRef(config);
+  const ecommerceStateRef = useRef(ecommerceState);
+  const canvasTransformRef = useRef(canvasTransform);
+  const canvasHostRef = useRef(canvasRef);
+  const siteCapabilitiesRef = useRef(siteCapabilities);
   const addPromptNodeRef = useRef(addPromptNode);
   const updatePromptNodeRef = useRef(updatePromptNode);
   const deletePromptNodeRef = useRef(deletePromptNode);
@@ -621,6 +655,14 @@ export function AITakeoverProvider({
     selectedNodeIdsRef.current = selectedNodeIds || [];
     canvasRuntimeStateRef.current = canvasRuntimeState;
     selectedModelRef.current = selectedModel;
+    currentPageRef.current = currentPage;
+    collaborationModeRef.current = collaborationMode;
+    apiKeyStatusRef.current = apiKeyStatus;
+    configRef.current = config;
+    ecommerceStateRef.current = ecommerceState;
+    canvasTransformRef.current = canvasTransform;
+    canvasHostRef.current = canvasRef;
+    siteCapabilitiesRef.current = siteCapabilities;
     addPromptNodeRef.current = addPromptNode;
     updatePromptNodeRef.current = updatePromptNode;
     deletePromptNodeRef.current = deletePromptNode;
