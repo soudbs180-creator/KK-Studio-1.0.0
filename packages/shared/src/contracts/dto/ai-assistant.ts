@@ -116,7 +116,7 @@ export interface AgentRunDto {
   replanCount?: number;
 }
 
-export interface AgentRunEventDto {
+export interface AgentRunSnapshotEventDto {
   runId: string;
   sequence: number;
   type: "run_snapshot";
@@ -124,6 +124,18 @@ export interface AgentRunEventDto {
   runUpdatedAt: string;
   createdAt: string;
 }
+
+export interface AgentRunStepOutcomeEventDto {
+  runId: string;
+  sequence: number;
+  type: "step_outcome";
+  status: AgentRunStatus;
+  runUpdatedAt: string;
+  createdAt: string;
+  step: Omit<AgentStepResultDto, "message">;
+}
+
+export type AgentRunEventDto = AgentRunSnapshotEventDto | AgentRunStepOutcomeEventDto;
 
 export interface AgentRunEventQueryDto {
   afterSequence?: number;
@@ -209,15 +221,28 @@ export const AgentRunDtoSchema = z.object({
 /** Validates the bounded server collection before it enters Web runtime state. */
 export const AgentRunListDtoSchema = z.array(AgentRunDtoSchema).max(50);
 
-/** Keeps the event log metadata-only so prompts, plans, and tool payloads cannot leak through replay. */
-export const AgentRunEventDtoSchema = z.object({
+const AgentRunEventBaseDtoSchema = z.object({
   runId: z.string().min(1).max(200),
   sequence: z.number().int().positive(),
-  type: z.literal("run_snapshot"),
   status: AgentRunStatusSchema,
   runUpdatedAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
 }).strict();
+
+const AgentRunSnapshotEventDtoSchema = AgentRunEventBaseDtoSchema.extend({
+  type: z.literal("run_snapshot"),
+}).strict();
+
+const AgentRunStepOutcomeEventDtoSchema = AgentRunEventBaseDtoSchema.extend({
+  type: z.literal("step_outcome"),
+  step: AgentStepResultDtoSchema.omit({ message: true }).strict(),
+}).strict();
+
+/** Keeps semantic event transport metadata-only through explicit, strict variants. */
+export const AgentRunEventDtoSchema = z.discriminatedUnion("type", [
+  AgentRunSnapshotEventDtoSchema,
+  AgentRunStepOutcomeEventDtoSchema,
+]);
 
 /** Bounds one incremental replay page independently from the Run snapshot list. */
 export const AgentRunEventListDtoSchema = z.array(AgentRunEventDtoSchema).max(100);

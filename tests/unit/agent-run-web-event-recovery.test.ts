@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { AgentRunDto, AgentRunEventDto } from '@kk/shared';
+import type {
+  AgentRunDto,
+  AgentRunSnapshotEventDto,
+  AgentRunStepOutcomeEventDto,
+} from '@kk/shared';
 import {
   AgentRunStore,
   agentRunStore,
@@ -42,7 +46,9 @@ const makeRun = (overrides: Partial<AgentRunDto> = {}): AgentRunDto => ({
   ...overrides,
 });
 
-const makeEvent = (overrides: Partial<AgentRunEventDto> = {}): AgentRunEventDto => ({
+const makeEvent = (
+  overrides: Partial<AgentRunSnapshotEventDto> = {},
+): AgentRunSnapshotEventDto => ({
   runId: 'event-run-1',
   sequence: 1,
   type: 'run_snapshot',
@@ -50,6 +56,23 @@ const makeEvent = (overrides: Partial<AgentRunEventDto> = {}): AgentRunEventDto 
   runUpdatedAt: '2026-07-22T00:02:00.000Z',
   createdAt: '2026-07-22T00:02:01.000Z',
   ...overrides,
+});
+
+const makeStepOutcomeEvent = (sequence: number): AgentRunStepOutcomeEventDto => ({
+  runId: 'event-run-1',
+  sequence,
+  type: 'step_outcome',
+  status: 'running',
+  runUpdatedAt: '2026-07-22T00:02:00.000Z',
+  createdAt: '2026-07-22T00:02:01.000Z',
+  step: {
+    stepId: 'step-1',
+    toolName: 'canvas.arrangeNodes',
+    outcome: 'success',
+    verificationRule: 'canvas_state',
+    retryable: false,
+    verifiedAt: '2026-07-22T00:02:00.000Z',
+  },
 });
 
 const ok = <Payload>(payload: Payload) => Promise.resolve({
@@ -104,6 +127,40 @@ test('advances an owner-qualified cursor only after a valid authoritative Run me
   assert.equal(cursors.getSequence(ownerId, 'event-run-1'), 2);
   assert.equal(new AgentRunEventCursorStore(storage).getSequence(ownerId, 'event-run-1'), 2);
   assert.equal(store.getRun('event-run-1')?.status, 'completed');
+  assert.equal(hasLocalAgentRunExecutionAuthority(store.getRun('event-run-1')), false);
+});
+
+test('treats mixed snapshot and step outcome events as read-only invalidation signals', async () => {
+  const ownerId = 'event-owner-semantic';
+  const storage = createStorage();
+  const store = new AgentRunStore(storage, () => ownerId);
+  const cursors = new AgentRunEventCursorStore(storage);
+  store.hydrateAuthoritativeRuns(ownerId, [makeRun()]);
+  let detailRequests = 0;
+  const client: AgentRunEventRecoveryClient = {
+    listAgentRunEvents: async () => ok([makeEvent(), makeStepOutcomeEvent(2)]),
+    getAgentRun: async () => {
+      detailRequests += 1;
+      return ok(makeRun({
+        status: 'completed',
+        updatedAt: '2026-07-22T00:02:00.000Z',
+        stepResults: [makeStepOutcomeEvent(2).step],
+      }));
+    },
+  };
+
+  const result = await refreshAgentRunEventProjection({
+    ownerId,
+    store,
+    cursorStore: cursors,
+    client,
+    getOwnerId: () => ownerId,
+  });
+
+  assert.equal(result.outcome, 'refreshed');
+  assert.equal(detailRequests, 1);
+  assert.equal(cursors.getSequence(ownerId, 'event-run-1'), 2);
+  assert.equal(store.getRun('event-run-1')?.stepResults?.[0]?.stepId, 'step-1');
   assert.equal(hasLocalAgentRunExecutionAuthority(store.getRun('event-run-1')), false);
 });
 

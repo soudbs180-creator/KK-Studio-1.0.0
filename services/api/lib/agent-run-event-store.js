@@ -20,7 +20,13 @@ async function listAgentRunEvents(
        event.event_type,
        event.status,
        event.run_updated_at,
-       event.created_at
+       event.created_at,
+       event.step_id,
+       event.tool_name,
+       event.outcome,
+       event.verification_rule,
+       event.retryable,
+       event.verified_at
      FROM (
        SELECT id
          FROM public.agent_runs
@@ -28,7 +34,9 @@ async function listAgentRunEvents(
         LIMIT 1
      ) AS owned_run
      LEFT JOIN LATERAL (
-       SELECT run_id, sequence, event_type, status, run_updated_at, created_at
+       SELECT
+         run_id, sequence, event_type, status, run_updated_at, created_at,
+         step_id, tool_name, outcome, verification_rule, retryable, verified_at
         FROM public.agent_run_events AS event
         WHERE event.run_id = owned_run.id
           AND event.sequence > $3

@@ -15,6 +15,7 @@ AI_ASSISTANT_SCOPE_MIGRATION_PATH="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-infrastruc
 AGENT_RUN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_EVENT_MIGRATION:-infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/database/migrations/021_agent_sessions.sql}"
 AGENT_RUN_SESSION_BINDING_MIGRATION_PATH="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-infrastructure/database/migrations/022_agent_run_session_binding.sql}"
+AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -198,7 +199,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016, 020, 021 and 022 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022 and 023 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -369,6 +370,10 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Agent Run Session binding migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_SESSION_BINDING_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] Agent Run semantic event migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -390,6 +395,9 @@ apply_database_migrations() {
 
   echo "[deploy-kk-vps] Applying mandatory Agent Run Session binding migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SESSION_BINDING_MIGRATION_PATH}"
+
+  echo "[deploy-kk-vps] Applying mandatory Agent Run semantic event migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH}"
 
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
@@ -449,7 +457,36 @@ BEGIN
     WHERE actual.column_name IS NULL
       OR actual.data_type <> expected.data_type
       OR actual.is_nullable <> 'NO'
-  ) OR (
+  ) OR EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('step_id', 'text'),
+      ('tool_name', 'text'),
+      ('outcome', 'text'),
+      ('verification_rule', 'text'),
+      ('retryable', 'boolean'),
+      ('verified_at', 'timestamp with time zone')
+    ) AS expected(column_name, data_type)
+    LEFT JOIN information_schema.columns AS actual
+      ON actual.table_schema = 'public'
+      AND actual.table_name = 'agent_run_events'
+      AND actual.column_name = expected.column_name
+    WHERE actual.column_name IS NULL
+      OR actual.data_type <> expected.data_type
+      OR actual.is_nullable <> 'YES'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_run_events_event_type_check'
+      AND conrelid = 'public.agent_run_events'::regclass
+      AND convalidated
+      AND position('run_snapshot' IN pg_get_constraintdef(oid)) > 0
+      AND position('step_outcome' IN pg_get_constraintdef(oid)) > 0
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'agent_run_events_event_shape_check'
+      AND conrelid = 'public.agent_run_events'::regclass
+      AND convalidated
+  ) OR to_regprocedure('public.project_agent_run_step_outcomes(jsonb,jsonb)') IS NULL OR (
     SELECT count(*) FROM pg_trigger AS event_trigger
     JOIN pg_class AS class ON class.oid = event_trigger.tgrelid
     WHERE class.oid = 'public.agent_runs'::regclass
@@ -458,7 +495,9 @@ BEGIN
         'append_agent_run_snapshot_event'
       )
       AND NOT event_trigger.tgisinternal
-  ) <> 2 THEN
+  ) <> 2
+    OR to_regprocedure('public.prepare_agent_run_event_sequence()') IS NULL
+    OR to_regprocedure('public.append_agent_run_snapshot_event()') IS NULL THEN
     RAISE EXCEPTION 'agent_run_events schema is missing or invalid';
   END IF;
   IF to_regclass('public.agent_sessions') IS NULL

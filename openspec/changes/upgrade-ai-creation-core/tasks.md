@@ -1,6 +1,6 @@
 # Tasks: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 structured Planner context in progress
+> Status: active / Phase 2 external rollout gates pending / Phase 3 metadata-only semantic events in progress
 > Last updated: 2026-07-23
 > Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration 与 Google 安全迁移桥已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、服务端权威 dual-read 与全 Provider 切流仍未完成。
 
@@ -119,7 +119,8 @@
   - [x] Planner 结构化 Session 输入基础已落地：只有 exact owner-scoped detail 才生成二次预算裁剪的 authority-free context；附件、owner、confirmation、checkpoint、content hash 与已被 summary 覆盖的消息不会进入 Planner。
   - [x] Web Context Snapshot 生产、owner-scoped latest 投影与 Planner 消费基础已落地：只持久化计数、ID、视口、事件类型、输入存在性和工具名；必须匹配 exact Session、surface、canvas、summary freshness 与时钟偏差后才进入独立画布预算。
   - [x] 多轮选区指代回归已落地：`AgentRuntime` 只将当前画布仍存在的唯一选区 ID 投影给 Local/LLM Planner；普通“继续”、模糊“刚才那个”、多候选单数指代和 Planner 目标偷换均 fail closed，恢复 Job 仍要求当前消息显式提供具体 `jobId`。
-  - [ ] 语义事件 discriminated union、真实 LLM 多轮验证与跨设备执行接管仍待实现。
+  - [x] metadata-only `step_outcome` discriminated variant 已落地：migration 023 在 accepted Run 写事务中，从 `stepResults` 只投影白名单 verification metadata，单次最多 100 条；不保存 message、plan、tool input/output 或任意 payload。owner-scoped event query 与 Web mixed-page recovery 仍只把它作为权威 Run detail invalidation。
+  - [ ] 完整 semantic replay、replan event、真实 LLM 多轮验证与跨设备执行接管仍待实现。
 - [x] 改造 `llmBrain.ts` / `localBrain.ts` Planner 输入：使用结构化 Session Context（系统规则+摘要+消息+工具结果+画布快照+知识引用）。
   - [x] `AgentRuntime` 已把校验后的 Session context 传入 Local/LLM Planner；LLM 将历史上下文置于最新指令之前并用 system policy 降权，LocalBrain 只报告恢复计数，不回显或执行历史指令。无 binding、预算不足、owner 变化或 detail 缺失时保持原有两消息/未绑定路径。
   - [x] `AgentRuntime` 在规划前以 1.5 秒上限读取 bound Session 的 latest Snapshot，并异步追加当前 metadata-only capture；网络失败不清空 Session 或阻止 Run。Planner 只接收晚于 rolling summary、不超过 5 分钟未来偏差且与当前 surface/canvas 一致的预算化画布摘要。
@@ -136,6 +137,7 @@
   - [x] 新增 owner-scoped Run list/get API、批量工具调用装配与 typed client。
   - [x] Web 使用共享 Zod schema 恢复 owner-scoped Run projection；认证 reload 保留 active Run，启动顺序固定为 hydration 后再上传 pending，本地较新快照与 owner 切换均 fail closed，远端独有计划不可在当前浏览器执行。
   - [x] Run event 持久日志/增量查询基础已落地；`GET /api/ai-assistant/runs/:runId/events` 最多返回 100 条 metadata-only 事件并使用 owner + sequence cursor 约束。
+  - [x] Run event 查询已 additive 支持 strict `step_outcome`：服务端只返回 step ID、tool name、outcome、verification rule、retryable 与 verified time；snapshot 与 step event 共用单调 sequence，Web 混合事件页仍无本地执行权。
   - [x] Web 已消费 owner-qualified Run event cursor：首次列表 hydration 后以及后续 online/认证恢复请求只查询最近 20 个 active + synced Run，最多 4 并发；事件仅触发详情读取和严格校验，权威快照成功合并后才推进游标，远端投影不获得执行权。
   - [x] Session list/get/upsert 与 Context Snapshot append/latest API 已落地；Web 在 startup/认证恢复/online 时读取 owner-scoped Session list，并可按需校验 detail，但不改变本地 Chat storage 的运行时角色。
   - [x] Run 写入已支持可选 owner-enforced Session binding；服务端拒绝跨 owner、改绑和解除绑定，Web 只在本地 Chat 通过 createdAt/summary/Asset/budget/owner 门禁且权威 detail hydrate 后使用 additive 参数。
@@ -145,7 +147,7 @@
   - [x] Chat Session 写协调器与 Run binding 已完成本地增量激活：可复用 exact createdAt 且不旧于本地投影的权威 detail，本地较新时先重写并 hydrate；失败、超时、旧会话、临时会话和不安全附件均 fail closed 为未绑定 Run。
   - [x] Run planning 现在只消费对应 binding 的 exact owner-scoped Session detail；DTO 在 Planner 前再次按 UTF-8 上界裁剪并移除执行授权字段，校验失败时连同 Run binding 一起 fail closed。
   - [x] bound Session 的 latest Context Snapshot 现由独立 owner-scoped Web projection hydrate；owner/Session/schema、sequence、surface/canvas、summary 时间或未来时钟任一不满足即排除，Snapshot 网络失败不改变 Session context 或 Run 创建。
-  - [ ] 语义事件 replay、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation 和本地首次 binding 不等同于可执行 Run replay。
+  - [ ] 完整语义 replay、replan event、跨设备执行接管与真实浏览器 E2E 仍待完成；metadata cursor invalidation、`step_outcome` 和本地首次 binding 不等同于可执行 Run replay。
 - [ ] 实现 Run 恢复、最多三次受控重规划、确认过期处理；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
 - [ ] 验证 owner/画布切换、崩溃恢复、跨设备查询。
 - [ ] 运行 Phase 3 相关测试 + `verify:changes`。

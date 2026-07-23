@@ -27,7 +27,7 @@ function mapAgentRunRow(row = {}, toolCalls = []) {
 }
 
 function mapAgentRunEventRow(row = {}) {
-  return compact({
+  const event = compact({
     runId: row.run_id,
     sequence: Number(row.sequence),
     type: row.event_type,
@@ -35,6 +35,18 @@ function mapAgentRunEventRow(row = {}) {
     runUpdatedAt: toIsoString(row.run_updated_at),
     createdAt: toIsoString(row.created_at),
   });
+  if (row.event_type !== 'step_outcome') return event;
+  return {
+    ...event,
+    step: {
+      stepId: row.step_id,
+      toolName: row.tool_name,
+      outcome: row.outcome,
+      verificationRule: row.verification_rule,
+      retryable: row.retryable,
+      verifiedAt: toIsoString(row.verified_at),
+    },
+  };
 }
 
 function mapAgentSessionRow(row = {}) {
