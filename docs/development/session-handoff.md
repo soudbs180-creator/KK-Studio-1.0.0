@@ -3087,3 +3087,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：TDD 首轮确认 provider-runtime 模块缺失；实现后 Local Runner 12/12 独立测试、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 通过。测试覆盖默认关闭、SSRF URL、路由本地认证、固定 endpoint/Bearer、strict projection、畸形响应、超时、chunked 超限 cancel 与供应链 pin。
 - **未运行验证及原因**：本机无 Go、系统 `npm`/`npx` 和真实 CLIProxyAPI binary，未运行上游 Go 测试、真实 sidecar 或 Provider/OAuth；本切片使用 bundled Node 24 与本地 fake HTTP server 验证协议。
 - **风险与下一步**：低风险且默认关闭。当前只是 discovery foundation，不具备登录或模型调用能力；下一切片建立 secret-free OAuth session 状态/断开契约，仍不调用上游 Management API，真实 login start 必须等待自定义 OS keychain/encrypted TokenStore 与 Provider 合规门禁。
+
+## 209. 2026-07-25 - 建立 CLIProxyAPI OAuth 本地状态与断开契约
+
+- **修改范围**：完成 CLIProxyAPI 融合 Slice C 的安全契约层；新增固定 Provider OAuth 状态 DTO、受 Local Runner token 保护的状态查询，以及必须显式用户确认的断开路由。未实现 login start，不调用上游 Management API。
+- **修改文件**：`local-runner/src/provider-runtime/{oauthContracts,oauthController}.ts`、`local-runner/src/routes/{providerRuntime,providerRuntimeOAuth}.ts`、`local-runner/tests/provider-runtime.test.ts` 与两份治理事实文档。并发 Miora Phase 3.5 的 OpenSpec 修改已单独保护，未并入本提交。
+- **当前设计决策**：只接受 `codex/claude/antigravity/xai/kimi` 与七种固定状态；响应严格拒绝额外字段，不允许 token、email、account 或自由 payload 穿过。断开必须同时具备 Local Runner token、strict Zod body 和 `x-user-approved-gesture: true`。默认 `PendingSecureOAuthController` 在 runtime 关闭时只返回 `disabled`，开启时只返回 `not_installed`，从不读取、删除或保存 credential；controller/Zod 错误均映射为固定文案。
+- **已运行验证**：TDD 首轮确认 OAuth controller 与路由注入不存在；实现后 Local Runner 14/14 独立测试、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 通过。测试覆盖 secret-free 状态、未确认/非法/确认断开和默认 fail-closed controller。
+- **未运行验证及原因**：本机无 Go、系统 `npm`/`npx`、OS keychain adapter 和真实 CLIProxyAPI binary；因此未运行上游 Go 测试、真实 OAuth、token refresh/revoke 或 Provider ToS 验收。本切片不伪造这些外部证据。
+- **风险与下一步**：低风险且默认无 credential 副作用。真实登录仍被安全门禁阻断；下一阶段必须先实现独立 Go companion、自定义 `coreauth.Store` 对接 OS keychain/AES-GCM、本地进程生命周期与 Provider 官方 client/ToS 审批，然后才能把 controller 替换为真实实现。

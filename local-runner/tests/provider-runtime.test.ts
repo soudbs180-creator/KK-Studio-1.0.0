@@ -14,6 +14,11 @@ import {
   ProviderRuntimeClient,
   ProviderRuntimeError,
 } from '../src/provider-runtime/client';
+import {
+  PendingSecureOAuthController,
+  ProviderOAuthError,
+  type ProviderOAuthController,
+} from '../src/provider-runtime/oauthController';
 import { createProviderRuntimeRouter } from '../src/routes/providerRuntime';
 
 interface TestServer {
@@ -105,6 +110,101 @@ test('provider runtime routes require local authentication before sidecar access
     reachable: true,
   });
   assert.equal(healthRequests, 1);
+});
+
+test('OAuth session routes are secret-free and require confirmation to disconnect', async (context) => {
+  let disconnectRequests = 0;
+  const oauthController: ProviderOAuthController = {
+    listStatuses: async () => [
+      { provider: 'codex', status: 'connected' },
+      { provider: 'claude', status: 'login_required' },
+    ],
+    disconnect: async (provider) => {
+      disconnectRequests += 1;
+      return { provider, status: 'login_required' };
+    },
+  };
+  const app = express();
+  app.use(express.json());
+  app.use(createProviderRuntimeRouter({
+    client: {
+      enabled: true,
+      getHealth: async () => ({ status: 'ok' }),
+      listModels: async () => [],
+    },
+    oauthController,
+    validateLocalToken: (authorization) => authorization === 'Bearer local-route-token',
+  }));
+  const server = await listen(createServer(app));
+  context.after(server.close);
+
+  const statusResponse = await fetch(`${server.baseUrl}/oauth/status`, {
+    headers: { Authorization: 'Bearer local-route-token' },
+  });
+  assert.equal(statusResponse.status, 200);
+  const statusBody = await statusResponse.json();
+  assert.deepEqual(statusBody, {
+    runtime: 'cliproxyapi',
+    sessions: [
+      { provider: 'codex', status: 'connected' },
+      { provider: 'claude', status: 'login_required' },
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(statusBody), /token|secret|email|account/i);
+
+  const unconfirmedResponse = await fetch(`${server.baseUrl}/oauth/disconnect`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer local-route-token',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ provider: 'codex' }),
+  });
+  assert.equal(unconfirmedResponse.status, 403);
+  assert.equal(disconnectRequests, 0);
+
+  const invalidResponse = await fetch(`${server.baseUrl}/oauth/disconnect`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer local-route-token',
+      'Content-Type': 'application/json',
+      'X-User-Approved-Gesture': 'true',
+    },
+    body: JSON.stringify({ provider: 'unknown-provider' }),
+  });
+  assert.equal(invalidResponse.status, 400);
+  assert.equal(disconnectRequests, 0);
+
+  const disconnectResponse = await fetch(`${server.baseUrl}/oauth/disconnect`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer local-route-token',
+      'Content-Type': 'application/json',
+      'X-User-Approved-Gesture': 'true',
+    },
+    body: JSON.stringify({ provider: 'codex' }),
+  });
+  assert.equal(disconnectResponse.status, 200);
+  assert.deepEqual(await disconnectResponse.json(), {
+    runtime: 'cliproxyapi',
+    session: { provider: 'codex', status: 'login_required' },
+  });
+  assert.equal(disconnectRequests, 1);
+});
+
+test('pending secure OAuth controller never claims a connection or deletes credentials', async () => {
+  const disabledController = new PendingSecureOAuthController(false);
+  const disabledStatuses = await disabledController.listStatuses();
+  assert.ok(disabledStatuses.every((session) => session.status === 'disabled'));
+
+  const pendingController = new PendingSecureOAuthController(true);
+  const pendingStatuses = await pendingController.listStatuses();
+  assert.ok(pendingStatuses.every((session) => session.status === 'not_installed'));
+  await assert.rejects(
+    pendingController.disconnect('codex'),
+    (error: unknown) => error instanceof ProviderOAuthError
+      && error.code === 'SECURE_OAUTH_COMPANION_REQUIRED',
+  );
 });
 
 test('provider runtime only reads bounded health and model projections', async (context) => {

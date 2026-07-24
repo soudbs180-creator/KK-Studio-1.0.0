@@ -8,7 +8,12 @@ import type {
   ProviderRuntimeHealth,
   ProviderRuntimeModel,
 } from '../provider-runtime/contracts';
+import {
+  PendingSecureOAuthController,
+  type ProviderOAuthController,
+} from '../provider-runtime/oauthController';
 import { localToken } from '../security/localToken';
+import { createProviderRuntimeOAuthRouter } from './providerRuntimeOAuth';
 
 interface ProviderRuntimeReader {
   readonly enabled: boolean;
@@ -18,10 +23,12 @@ interface ProviderRuntimeReader {
 
 export interface ProviderRuntimeRouterOptions {
   client?: ProviderRuntimeReader;
+  oauthController?: ProviderOAuthController;
   validateLocalToken?: (authorization: string) => boolean;
 }
 
 const defaultClient = new ProviderRuntimeClient(parseProviderRuntimeConfig());
+const defaultOAuthController = new PendingSecureOAuthController(defaultClient.enabled);
 
 function statusForRuntimeError(error: ProviderRuntimeError): number {
   if (error.code === 'PROVIDER_RUNTIME_INVALID_RESPONSE') {
@@ -106,12 +113,14 @@ export function createProviderRuntimeRouter(
 ): Router {
   const router = Router();
   const client = options.client ?? defaultClient;
+  const oauthController = options.oauthController ?? defaultOAuthController;
   const validateLocalToken = options.validateLocalToken
     ?? ((authorization: string) => localToken.validate(authorization));
 
   router.use(createLocalAuthHandler(validateLocalToken));
   router.get('/health', createHealthHandler(client));
   router.get('/models', createModelsHandler(client));
+  router.use('/oauth', createProviderRuntimeOAuthRouter(oauthController));
 
   return router;
 }
