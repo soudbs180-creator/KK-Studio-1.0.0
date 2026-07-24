@@ -181,6 +181,7 @@
 - [ ] Local Runtime 安全加固：移除 fallback token 与 token 日志、token 文件 ACL/轮换、body/尺寸上限、Zod 校验、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额。
   - [x] 首段安全边界：移除共享 fallback credential 与启动 token 输出；使用 256-bit 本地凭据和常量时间比较；精确校验 loopback Origin/Host，仅绑定 `127.0.0.1`，并限制 JSON body 为 256 KiB。
   - [x] OpenCLI command envelope 使用 strict Zod schema 限制动作、目标长度与 payload 形态；本地审计递归清除 credential、Prompt 和 URL query/hash，并将文件权限收紧为 owner-only。
+  - CLIProxyAPI 只读发现底座已固定上游版本并接入默认关闭、IPv4/IPv6 loopback-only 的 `/healthz` 与 `/v1/models`；Management API、OAuth 与推理执行仍未接入。
   - [ ] Windows ACL、显式轮换/配对协议、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额仍待完成。
 - [x] `local-runner:build` 与独立测试纳入 `verify:changes`；Local Runner 在其余安全门禁通过前继续标记 experimental。
 - [ ] 建立 ACP Gateway，隔离 Grok 输出 patch/artifact。

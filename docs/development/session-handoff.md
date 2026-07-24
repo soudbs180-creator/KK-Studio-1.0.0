@@ -3078,3 +3078,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：TDD 红测先确认缺少 command contract 与可注入审计路径；实现后 Local Runner 独立测试 6/6、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 均通过。
 - **未运行验证及原因**：本机无系统 `npm`/`npx`，使用 bundled Node 24 直接执行等价底层入口；本切片不调用真实 Provider、OAuth、浏览器或 PostgreSQL。
 - **风险与下一步**：低风险且仅限本地 experimental runtime。Windows ACL、显式轮换/配对、路径 containment、symlink、MIME、解码超时和资源限额仍未完成；下一独立切片只建立默认关闭、loopback-only 的 CLIProxyAPI sidecar health/model 窄协议，不暴露 Management API 或 token。
+
+## 208. 2026-07-25 - 建立 CLIProxyAPI 本地只读发现通道
+
+- **修改范围**：完成 CLIProxyAPI 融合 Slice B；只增加本地 sidecar 配置、health/model client 与受 Local Runner token 保护的只读路由，不接入 OAuth、推理或进程启动。
+- **修改文件**：`config/third-party/cliproxyapi.json`、`local-runner/src/provider-runtime/{config,contracts,client}.ts`、`local-runner/src/routes/providerRuntime.ts`、`local-runner/src/app.ts`、`local-runner/tests/provider-runtime.test.ts`、OpenSpec 与治理事实文档。
+- **当前设计决策**：固定上游 `v7.2.97` / `42f36b94e0805a9897c3aa3be46a2b124be0057e` / MIT；默认关闭，只接受字面 IPv4/IPv6 loopback HTTP origin，不接受 hostname、credential、path、query/hash；client 只能访问 `/healthz` 与 `/v1/models`，禁重定向，3 秒默认超时和 1 MiB 流式响应上限。API key 仅在本地进程内用于模型目录，不写日志、不回传；Management API 明确关闭。
+- **已运行验证**：TDD 首轮确认 provider-runtime 模块缺失；实现后 Local Runner 12/12 独立测试、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 通过。测试覆盖默认关闭、SSRF URL、路由本地认证、固定 endpoint/Bearer、strict projection、畸形响应、超时、chunked 超限 cancel 与供应链 pin。
+- **未运行验证及原因**：本机无 Go、系统 `npm`/`npx` 和真实 CLIProxyAPI binary，未运行上游 Go 测试、真实 sidecar 或 Provider/OAuth；本切片使用 bundled Node 24 与本地 fake HTTP server 验证协议。
+- **风险与下一步**：低风险且默认关闭。当前只是 discovery foundation，不具备登录或模型调用能力；下一切片建立 secret-free OAuth session 状态/断开契约，仍不调用上游 Management API，真实 login start 必须等待自定义 OS keychain/encrypted TokenStore 与 Provider 合规门禁。

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "CLIProxyAPI",
+  "repository": "https://github.com/router-for-me/CLIProxyAPI",
+  "tag": "v7.2.97",
+  "commit": "42f36b94e0805a9897c3aa3be46a2b124be0057e",
+  "license": "MIT",
+  "integrationMode": "local-sidecar",
+  "defaultEnabled": false,
+  "managementApiEnabled": false,
+  "allowedRuntimeEndpoints": [
+    "/healthz",
+    "/v1/models"
+  ]
+}

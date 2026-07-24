@@ -3,7 +3,7 @@
 > Status: current
 > Owner: KK Studio AI Core Team
 > Verifies: `openspec/changes/upgrade-ai-creation-core/proposal.md`
-> Last verified: 2026-07-24
+> Last verified: 2026-07-25
 
 本矩阵记录 KK Studio v1.6.0 的**当前事实**（非规划目标）。每项能力声明必须附带源码证据；证据缺失或矛盾的条目不得作为当前事实引用。
 
@@ -108,7 +108,7 @@
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
 | 10.1 | 浏览器缩略图 Worker 与批量并发控制 | 需验证 | 界面/代码审计称已存在，但源码坐标未核定；object URL 生命周期分散在各 store/组件。 | verify |
-| 10.2 | Local Runtime（local-runner）生产可用 | 部分 | 根 `verify:changes` 已包含 `local-runner:typecheck/build/test`。`localToken.ts` 使用 256-bit 本地凭据、常量时间比较且不再输出 token；`originGuard.ts` 精确解析 loopback Origin/Host，`server.ts` 只绑定 `127.0.0.1`，`app.ts` 限制 JSON body 为 256 KiB。`contracts/opencli.ts` 以 strict Zod schema 限制动作、目标和 payload；`localAuditLogService.ts` 递归清除 credential、Prompt、URL query/hash 与 Bearer 文本，并使用 owner-only 文件权限。Windows ACL、显式轮换/配对协议、路径 containment、symlink、MIME sniff、解码超时和资源限额尚未完成，因此仍仅为 experimental。 | upgrade |
+| 10.2 | Local Runtime（local-runner）生产可用 | 部分 | 根 `verify:changes` 已包含 `local-runner:typecheck/build/test`。`localToken.ts` 使用 256-bit 本地凭据、常量时间比较且不再输出 token；`originGuard.ts` 精确解析 loopback Origin/Host，`server.ts` 只绑定 `127.0.0.1`，`app.ts` 限制 JSON body 为 256 KiB。`contracts/opencli.ts` 以 strict Zod schema 限制动作、目标和 payload；`localAuditLogService.ts` 递归清除 credential、Prompt、URL query/hash 与 Bearer 文本，并使用 owner-only 文件权限。`provider-runtime/` 已建立默认关闭、literal-loopback-only 的 CLIProxyAPI `/healthz` 与 `/v1/models` 只读 client，禁重定向、限制超时/响应体并只投影 secret-free 模型元数据；`config/third-party/cliproxyapi.json` 固定上游版本且禁用 Management API。OAuth、推理与进程生命周期尚未接入，Windows ACL、显式轮换/配对协议、路径 containment、symlink、MIME sniff、解码超时和资源限额也未完成，因此仍仅为 experimental。 | upgrade |
 | 10.3 | 资产 OPFS/IndexedDB 持久化 | 部分 | 本地资产仍主要依赖内存对象（审计）；无 `LocalMediaJobDto` / `LocalAssetRefDto`（全仓零匹配）。 | upgrade |
 | 10.4 | 真实媒体性能基线 | 不符合 | 仅有节点级 smoke：`scripts/test/verify-large-canvas-10k-smoke.mjs`（10K 通过但伴随 `localStorage QuotaExceeded` 与 100ms+ long task）；无 1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 与恢复时间基线。 | verify |
 
@@ -162,7 +162,7 @@
 | Agent capability tool | `apps/web/src/features/ai-assistant-runtime/tools/capabilityTools.ts` |
 | Server image Durable Worker | `infrastructure/database/migrations/019_generation_image_worker.sql` / `packages/shared/src/generation-worker/` / `services/api/lib/generation-v3/worker/` |
 | Generation v3 pending Job discovery | `services/api/lib/generation-v3/jobStore.js` / `services/api/routes/generation-v3.js` / `packages/shared/src/contracts/client/kk-api-client.ts` / `apps/web/src/services/generation/generationJobDiscovery.ts` / `apps/web/src/hooks/useTaskRecovery.ts` |
-| local-runner build/typecheck 已纳入 verify:changes，但安全 gate 未闭环 | `package.json` / `local-runner/package.json` / `local-runner/tests/` / `local-runner/src/security/{localToken,originGuard,commandAllowlist}.ts` / `local-runner/src/contracts/opencli.ts` / `local-runner/src/services/localAuditLogService.ts` |
+| local-runner build/typecheck 已纳入 verify:changes，但安全 gate 未闭环 | `package.json` / `local-runner/package.json` / `local-runner/tests/` / `local-runner/src/security/{localToken,originGuard,commandAllowlist}.ts` / `local-runner/src/contracts/opencli.ts` / `local-runner/src/services/localAuditLogService.ts` / `local-runner/src/provider-runtime/` / `config/third-party/cliproxyapi.json` |
 
 ---
 

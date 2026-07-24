@@ -3,6 +3,7 @@ import express, { ErrorRequestHandler, Express } from 'express';
 import browserRouter from './routes/browser';
 import healthRouter from './routes/health';
 import opencliRouter from './routes/opencli';
+import providerRuntimeRouter from './routes/providerRuntime';
 import { isAllowedLocalOrigin, originGuard } from './security/originGuard';
 
 export const LOCAL_RUNNER_JSON_LIMIT_BYTES = 256 * 1024;
@@ -45,7 +46,7 @@ export function createLocalRunnerApp(): Express {
   app.use('/api/health', healthRouter);
   app.use('/api/browser', browserRouter);
   app.use('/api/opencli', opencliRouter);
+  app.use('/api/provider-runtime', providerRuntimeRouter);
   app.use(handleRequestError);
   return app;
 }
-
