@@ -40,7 +40,12 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
           <Stack.Screen name="index" />
+          <Stack.Screen name="brand-vi" options={{ title: '品牌 VI 专家模式' }} />
+          <Stack.Screen name="skills" options={{ title: '技能中心' }} />
+          <Stack.Screen name="canvas" options={{ title: '画布同步视图' }} />
+          <Stack.Screen name="settings" options={{ title: '设置与节点' }} />
         </Stack>
+
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

@@ -55,28 +55,39 @@ export const TOKENS = {
     background: "var(--kk-color-bg-canvas)",
     surface: "var(--kk-color-bg-surface)",
     surfaceSolid: "var(--kk-color-bg-surface-solid)",
+    surfaceGlass: "rgba(15, 23, 42, 0.75)",
+    surfaceGlassBorder: "rgba(255, 255, 255, 0.1)",
     textPrimary: "var(--kk-color-text-primary)",
     textSecondary: "var(--kk-color-text-secondary)",
     textTertiary: "var(--kk-color-text-tertiary)",
     borderSubtle: "var(--kk-color-border-subtle)",
     brandPrimary: "var(--kk-color-brand-primary)",
     brandCoral: "var(--kk-color-brand-coral)",
+    accentIndigo: "#6366F1",
+    accentEmerald: "#10B981",
+    accentAmber: "#F59E0B",
+    glowAccent: "rgba(99, 102, 241, 0.3)",
   },
   radius: {
     sm: "var(--kk-radius-sm)",
     md: "var(--kk-radius-md)",
     lg: "var(--kk-radius-lg)",
     xl: "var(--kk-radius-xl)",
+    full: "9999px",
   },
   shadows: {
     surface: "var(--kk-shadow-surface)",
     floating: "var(--kk-shadow-floating)",
     primaryAction: "var(--kk-shadow-primary-action)",
+    cardSelected: "0 0 0 2px #6366F1, 0 10px 25px -5px rgba(99, 102, 241, 0.4)",
+    glow: "0 0 20px rgba(99, 102, 241, 0.35)",
   },
   typography: {
-    fontFamily: "Inter, sans-serif",
+    fontFamily: "Inter, Roboto, sans-serif",
+    displayFontFamily: "Outfit, Inter, sans-serif",
   },
   uiSystem: UI_SYSTEM_TOKENS,
 };
 
 export type ThemeTokens = typeof TOKENS;
+

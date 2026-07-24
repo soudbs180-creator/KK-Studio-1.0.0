@@ -1,7 +1,9 @@
 /* 中文注释：建立核心变量桥梁，用于统一原生 KK UI 适配层与现有系统旧样式变量的渲染 */
 :root {
   --kk-color-brand-primary: #6366f1;
+  --kk-color-brand-glow: rgba(99, 102, 241, 0.22);
   --kk-color-brand-coral: #ff6b5a;
+  --kk-color-brand-coral-glow: rgba(255, 107, 90, 0.28);
   --kk-color-bg-canvas: #ffffff;
   --kk-color-bg-surface: #ffffff;
   --kk-color-bg-surface-solid: #ffffff;
@@ -30,8 +32,8 @@
   --kk-touch-target-min: 44px;
   --kk-control-height-desktop: 40px;
   --kk-control-height-mobile: 48px;
-  --kk-ui-glass-opacity: 0.68;
-  --kk-ui-glass-blur: 20px;
+  --kk-ui-glass-opacity: 0.76;
+  --kk-ui-glass-blur: 24px;
   --kk-ui-motion-scale: 1;
   --kk-motion-fast: calc(120ms * var(--kk-ui-motion-scale));
   --kk-motion-standard: calc(180ms * var(--kk-ui-motion-scale));
@@ -39,8 +41,10 @@
   --kk-motion-ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
   --kk-glass-surface-bg: rgb(255 255 255 / var(--kk-ui-glass-opacity));
   --kk-glass-surface-border: rgb(17 24 39 / 0.12);
-  --kk-shadow-surface: none;
-  --kk-shadow-floating: 0 24px 64px rgba(15, 23, 42, 0.20);
+  --kk-glass-border-light: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  --kk-shadow-surface: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --kk-shadow-floating: 0 32px 80px -12px rgba(15, 23, 42, 0.22);
+  --kk-shadow-pulse-glow: 0 0 24px var(--kk-color-brand-glow);
   --mobile-header-scrim-bg: linear-gradient(to bottom, #ffffff 0%, rgb(255 255 255 / 0.96) 18%, rgb(255 255 255 / 0.88) 36%, rgb(255 255 255 / 0.68) 54%, rgb(255 255 255 / 0.42) 72%, rgb(255 255 255 / 0.16) 88%, rgb(255 255 255 / 0) 100%);
   --kk-z-canvas: 1;
   --kk-z-chrome: 100;

@@ -90,7 +90,16 @@
 - [x] 验证已完成 Item 不再领取；过期租约若已有 `providerTaskId` 只 poll、不重复 submit，执行仍使用冻结 route snapshot。
 - [ ] 真实媒体 benchmark 基线作为 2a 验收门禁：1K 混合代理输入响应 p95 ≤100ms、三轮导入/删除后内存增长 ≤10%、object URL 回落到活动资产数。
 
-### 2b — 视频/音频 Worker（第 2–3 周）
+### 2c — Miora 创意工作室能力整合（P0–P2 业务能力线）
+
+- [ ] **G1 品牌 VI 专家模式（P0）**：建立 `apps/web/src/features/brand-vi/` 品牌视觉识别 6 步工作流组件（Logo 概念 → 调性色板 → VI 规范 → 矢量图形 → 批量营销物料），并与生成队列解发对接。
+- [ ] **G2 跨会话品牌记忆（P0）**：在 `packages/shared/src/domain/modules/brandMemory.ts` 补充 `BrandProfile` 契约；结合数据库 `brand_profiles` 表与 `projectContextBuilder.ts` 实现品牌档案检索与 LLM Prompt 自动注入。
+- [ ] **G3 节点级图像后处理工具链（P0）**：为画布图像节点提供浮动后处理工具栏 `ImagePostProcessingToolbar`（支持去背/抠图、选区重绘、扩图 Outpainting、高清放大 Upscale、SVG 矢量化与 Mockup 嵌套）。
+- [ ] **G4 3D 生成与渲染卡片（P1）**：接入混元 3D / TokenHub API 路由，支持在画布一键提交 2D/文本转 3D 渲染卡片。
+- [ ] **G5/G6 设计编译器与质量案例库（P1）**：实现设计意图结构化编译与高分设计 Prompt 评级案例库沉淀。
+- [ ] **G8 滚动官网生成器（P2）**：支持从品牌 VI 自动编译响应式 Landing Page 并导出全套原图与代码离线 ZIP 包。
+
+---
 
 - [ ] 将视频/音频异步链路从浏览器轮询迁移到 Worker 轮询。
 - [ ] 实现 Worker 对 Wuyin 等异步后端的 submit/status/cancel 封装。

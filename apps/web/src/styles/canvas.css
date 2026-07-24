@@ -86,6 +86,38 @@ body.dark-mode .zoom-slider {
   transition: background-color 0.2s ease;
 }
 
+/* 高级感画布网格点阵与微环境散色 */
+.kk-canvas-dot-grid {
+  background-image: radial-gradient(rgba(99, 102, 241, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.dark .kk-canvas-dot-grid,
+body.dark-mode .kk-canvas-dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* 高级感卡片物理沉浸浮雕 */
+.kk-card-shell-premium {
+  border-radius: var(--kk-radius-lg, 16px);
+  background: var(--kk-glass-surface-bg, rgba(255, 255, 255, 0.82));
+  backdrop-filter: var(--kk-glass-blur, blur(24px));
+  box-shadow: var(--kk-shadow-floating), var(--kk-glass-border-light);
+  transition: transform var(--kk-motion-standard, 180ms) cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow var(--kk-motion-standard, 180ms) ease,
+              border-color var(--kk-motion-standard, 180ms) ease;
+}
+
+.kk-card-shell-premium:hover {
+  box-shadow: 0 40px 96px -16px rgba(15, 23, 42, 0.28), 0 0 20px var(--kk-color-brand-glow);
+}
+
+.kk-card-shell-premium.is-selected {
+  border-color: var(--kk-color-brand-primary, #6366f1);
+  box-shadow: 0 0 0 2px var(--kk-color-brand-primary), var(--kk-shadow-pulse-glow);
+}
+
+
 .zoom-slider:hover::-moz-range-thumb {
   background: var(--zoom-slider-thumb-hover);
 }

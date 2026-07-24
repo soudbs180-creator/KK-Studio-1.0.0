@@ -1,5 +1,22 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap");
+
+:root {
+  --kk-mobile-bg: #0F172A;
+  --kk-mobile-surface: rgba(30, 41, 59, 0.75);
+  --kk-mobile-border: rgba(255, 255, 255, 0.1);
+  --kk-mobile-brand-indigo: #6366F1;
+  --kk-mobile-touch-min: 44px;
+}
 
 body {
-  font-family: "Inter", sans-serif !important;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  background-color: var(--kk-mobile-bg);
+  color: #F8FAFC;
+  -webkit-tap-highlight-color: transparent;
 }
+
+button, a, [role="button"] {
+  min-height: var(--kk-mobile-touch-min);
+  touch-action: manipulation;
+}
+

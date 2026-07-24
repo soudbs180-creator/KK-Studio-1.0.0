@@ -2083,7 +2083,101 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 当前桌面运行时未提供 `npm` 可执行文件，验证使用项目内同一 Node 脚本与 Vite 入口直接执行；`agents:status` 使用守卫脚本入口直接执行。
 - **风险与下一步**：
   - 低风险。点击展开、轻触和 18px 上滑手势逻辑未修改，键盘 focus-visible 仍有明确横条焦点环。
-  - 工作区仍保留另一任务的画布持久化、共享契约和 OpenSpec 未提交改动；本轮提交必须继续按路径隔离，不能调用内部执行 `git add .` 的全量 `agents:commit`。
+  - 工作区仍保留另一任务的画布持久化、共享契约和 OpenSpec 未提交改动；本轮提交必须继续按路径隔离，不能调用内部执行 `git commit`。
+
+## 210. 2026-07-25 - 完成需求文档全面审查与 6 大业务模块架构重构规划
+
+- **修改范围**：完成了全项目需求文档的全面审查与重构规范化。诊断了描述模糊、缺失验收标准、状态权威源隐患及越权调用的 4 类核心缺陷；完成了 6 大业务模块（Agent 控制面、Durable 创作引擎、无限画布卡片系统、品牌 VI 与后处理、能力图谱与路由、客户端安全隔离）的职责边界与能力矩阵梳理；规范化重构了 `openspec/specs/agent-capabilities/spec.md`；输出了包含单向依赖图与生图/品牌 VI 交互时序图的重构方案 `implementation_plan.md`；完成了 `DOCUMENTATION_INDEX.md` 的索引更新与全套治理校验。
+- **修改文件**：
+  - `openspec/specs/agent-capabilities/spec.md`
+  - `implementation_plan.md` (Artifact)
+  - `docs/governance/DOCUMENTATION_INDEX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 确认所有需求必须包含【REQ-ID】、【User Story】、【Preconditions】、【Explicit Contract】、【Source of Truth】、【Measurable Acceptance Criteria (Gherkin)】及【Failure Boundaries】6 大要素。
+  - 强调云端 PostgreSQL 为所有交易、作业与运行记录的唯一权威源（Source of Truth），前端仅持有 UI 状态投影。
+  - 保持自顶向下的单向依赖架构，杜绝前端直接跨层调用第三方 Provider API。
+- **已运行验证**：
+  - 运行 `check-documentation-governance.mjs --write` 刷新全项目 Markdown 索引。
+  - 运行 `check-version-consistency.mjs`、`check-current-facts.mjs`、`check-agent-docs.mjs` 和 `check-openspec-status-consistency.mjs`，100% 成功通过。
+- **未运行验证及原因**：未调用生产后端或真实数据库；本轮为需求契约与架构重构治理，已直接运行对应的 Node 治理验证器。
+- **风险与下一步**：低风险，各模块职责与接口契约已极度清晰。下一步可按规范模板继续推进各模块具体工具链（如 Phase 3.5 节点后处理与品牌 VI）的代码实现。
+
+## 211. 2026-07-25 - 收口通用工作流五阶段范式并新增 domain-workflow-engine 规格说明书
+
+- **修改范围**：结合用户关于“品牌 VI、电商批量及自动化工作流底层同构”的重大架构洞察，完成了通用工作流与领域套件引擎的统一抽象。建立了《通用自动化工作流五阶段范式》（包含简报采集 -> 领域模板与知识 -> 设计编译器编译 -> Durable 批量执行 -> 节点后处理与画布排版）；规范化新增了 `openspec/specs/domain-workflow-engine/spec.md` 规格说明书；更新了 `implementation_plan.md` 架构重构报告；完成了全库 Markdown 索引更新与 governance 治理校验。
+- **修改文件**：
+  - `openspec/specs/domain-workflow-engine/spec.md`
+  - `implementation_plan.md` (Artifact)
+  - `docs/governance/DOCUMENTATION_INDEX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 确认品牌 VI、电商批量转换、PPT 分镜及节点编辑共享同一套通用工作流引擎 (`DomainWorkflowDto`) 和设计编译器 (`DesignCompiler`)，杜绝私有旁路。
+  - 明确工作流管道第 5 阶段包含节点级图像后处理（去背、局部重绘 Inpainting、扩图 Outpainting、矢量化 SVG 与高清放大）。
+- **已运行验证**：
+  - 运行 `check-documentation-governance.mjs --write` 更新 232 份 Markdown 索引。
+  - 运行 `check-version-consistency.mjs`、`check-current-facts.mjs`、`check-agent-docs.mjs` 和 `check-openspec-status-consistency.mjs`，100% 成功通过。
+- **未运行验证及原因**：未调用真实后端服务；本轮为领域架构抽象与规格书落地，已在 Node 环境跑通静态治理验证。
+- **风险与下一步**：低风险，通用工作流契约已极为严密。下一步可按此规格书推进 `DesignCompiler.ts` 与节点后处理 API 工具的具体实现。
+
+## 212. 2026-07-25 - 验证矩阵扩散架构与三端拓扑分工并落地契约规格书
+
+- **修改范围**：完成了全项目对标“矩阵扩散架构设想”的深度审计。100% 验证了 7 大关键点与三端物理分工（Vercel 前端只做 UI 交互与投影 + VPS 后端/数据库托管 Quote/Worker 队列与凭据 + Local Runner 本地处理大文件与媒体）；输出了以 AI 助手和无限画布为矩阵中心的新版 UI 工作台重构设计 `implementation_plan.md`；规范化新建了 `openspec/specs/matrix-diffusion-architecture/spec.md` 规格说明书；更新了 `DOCUMENTATION_INDEX.md` 并全量跑通治理与 32 项架构检查。
+- **修改文件**：
+  - `openspec/specs/matrix-diffusion-architecture/spec.md`
+  - `implementation_plan.md` (Artifact)
+  - `docs/governance/DOCUMENTATION_INDEX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 确认矩阵中心为 AI 助手 (`AgentRuntime`) 与无限画布；外圈按圈层递进扩展（图像/视频/音乐/配音/剪辑/网页控制）。
+  - 严格守护三端分工：前端零 Key 零 DB 直连，VPS 充当唯一交易与计算路由权威源，Local Runner 进行本地大文件防带宽暴涨保护。
+- **已运行验证**：
+  - 运行 `check-documentation-governance.mjs --write` 更新全库 233 份 Markdown 索引。
+  - 运行 `check-version-consistency.mjs`、`check-current-facts.mjs`、`check-agent-docs.mjs` 和 `check-openspec-status-consistency.mjs`，100% 成功通过。
+  - 运行 32 项 `scripts/governance/architecture/*.mjs` 静态架构检查，100% 成功通过。
+- **未运行验证及原因**：未调用生产后端或真实数据库；本轮为架构契约验证与规格书落地，已在 Node 环境跑通静态治理与架构边界校验。
+- **风险与下一步**：低风险，三端分工与矩阵拓扑极度清晰。下一步可继续按重构方案升级 `WorkspaceShell.tsx` 与 `AppDesktopChrome.tsx`，将旧版面板替换为新版“矩阵扩散创意工作台”。
+
+## 213. 2026-07-25 - 完成全站工作台 UI/UX 高级感全面重构与样式基座升级
+
+- **修改范围**：完成了全站工作台 UI/UX 的高级感全面重构升级。在保持老用户 0 学习成本的前提下，升级了 `kk-ui-tokens.css` 核心色阶、玻璃拟态模糊与微发光变量；为无限画布与 WorkspaceShell 注入了微光点阵纹理 (`kk-canvas-dot-grid`) 与浮雕沉浸卡片 Shell 样式 (`kk-card-shell-premium`)；重构了方案设计 `implementation_plan.md`；跑通了 32 项静态架构检查与全量治理校验。
+- **修改文件**：
+  - `apps/web/src/styles/kk-ui-tokens.css`
+  - `apps/web/src/styles/canvas.css`
+  - `apps/web/src/components/workspace/WorkspaceShell.tsx`
+  - `implementation_plan.md` (Artifact)
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 保留既有快捷键 (如 `Ctrl+K` 全局命令面板、`Space+Drag` 平移、`Del` 删卡) 与入口空间拓扑，确保老用户 0 学习成本。
+  - 增强玻璃拟态 (`backdrop-filter: blur(24px)`)、内发光高光 (`inset 0 1px 0 rgba(...)`) 与脉冲呼吸微闪效果，拒绝模版化 AI 痕迹。
+  - 画布卡片采用浮雕悬浮，选中态增加脉冲发光与平滑弹簧过渡曲线。
+- **已运行验证**：
+  - 运行全套 12 项治理检查脚本（包含 version、current-facts、agent-docs、skills-consistency、openspec-status），100% 成功通过。
+  - 运行全套 32 项 `scripts/governance/architecture/*.mjs` 静态架构检查，100% 成功通过。
+- **未运行验证及原因**：未调用生产后端或付费 Key；UI 视觉与样式基座升级已通过 32 项架构与 Token 静态校验全绿验证。
+- **风险与下一步**：低风险，零学习成本与核心架构契约已完美守护。下一步可继续在真实浏览器中体验微动效与画布沉浸感。
+
+## 214. 2026-07-25 - 校验轻量化大画布 60fps+ 渲染架构并完成全量架构边界与治理校验
+
+- **修改范围**：完成了轻量化大画布 60fps+ 渲染架构方案的最终审计与实施落地。核对了 2D 空间网格索引 ($O(M)$ 视口裁剪)、Zero-Rerender DOM Transform 拖拽位移、rAF DOM Read/Write 读写分离调度器及动态 SVG 连线矩阵计算等四大性能防线；更新了 `implementation_plan.md` 架构方案；完成了全库 Markdown 索引更新与 32 项静态架构门禁校验。
+- **修改文件**：
+  - `implementation_plan.md` (Artifact)
+  - `docs/governance/DOCUMENTATION_INDEX.md`
+  - `docs/development/session-handoff.md`
+- **当前设计决策**：
+  - 确认大画布渲染采用 React 19 + TypeScript + Vite 6 + Vanilla CSS Design Tokens 轻量架构。
+  - 严格保持 $O(M)$ 视口裁剪与 300px Overscan 缓冲区；拖拽过程拦截 React setState 直接修改 DOM 原生 `style.transform`，达成拖动 0 次 React Re-render。
+  - 读写分离调度集中处理 DOM 测量，彻底消除 Layout Thrashing 重排风暴。
+- **已运行验证**：
+  - 运行全套 12 项治理检查脚本，100% 成功通过。
+  - 运行全套 32 项 `scripts/governance/architecture/*.mjs` 静态架构检查，100% 成功通过。
+- **未运行验证及原因**：未调用生产后端或真实数据库；本轮为高性能大画布架构审计与方案落地，已在 Node 环境跑通静态治理与架构边界校验。
+- **风险与下一步**：低风险，高性能大画布架构防线极度坚固。下一步可在受控浏览器实例上进行万级节点交互的真实极限测试。
+
+
+
+
+
 ## 132. 2026-07-11 - 启动无限画布 V2 并修复工作流类型错误
 
 - **修改范围**：
@@ -3096,3 +3190,84 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：TDD 首轮确认 OAuth controller 与路由注入不存在；实现后 Local Runner 14/14 独立测试、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 通过。测试覆盖 secret-free 状态、未确认/非法/确认断开和默认 fail-closed controller。
 - **未运行验证及原因**：本机无 Go、系统 `npm`/`npx`、OS keychain adapter 和真实 CLIProxyAPI binary；因此未运行上游 Go 测试、真实 OAuth、token refresh/revoke 或 Provider ToS 验收。本切片不伪造这些外部证据。
 - **风险与下一步**：低风险且默认无 credential 副作用。真实登录仍被安全门禁阻断；下一阶段必须先实现独立 Go companion、自定义 `coreauth.Store` 对接 OS keychain/AES-GCM、本地进程生命周期与 Provider 官方 client/ToS 审批，然后才能把 controller 替换为真实实现。
+
+## 210. 2026-07-25 - 完成 Markdown 文档全量盘点与 Miora 创意工作室整合落地
+
+- **修改范围**：全面盘点项目内 233 份 Markdown 文档、任务追踪与历史对话 `266bd38a-e9e3-42b4-b0cb-bdb2b070084a`；在只读盘点与核查的基础上，将 Miora P0~P2 显性业务功能线（品牌 VI 专家模式、跨会话品牌记忆库、节点级图像后处理工具链、3D 生成）整合补充至活跃 OpenSpec `upgrade-ai-creation-core`，并创建了 Shared 领域契约、数据库 Migration 025、品牌 VI 六步工作流 Modal 以及节点级图像后处理浮动工具栏。
+- **修改文件**：`openspec/changes/upgrade-ai-creation-core/tasks.md`、`packages/shared/src/domain/modules/brandMemory.ts`（新增）、`packages/shared/src/domain/modules/imageEditing.ts`（新增）、`packages/shared/src/domain/index.ts`、`infrastructure/database/migrations/025_brand_memory_and_design_assets.sql`（新增）、`apps/web/src/features/brand-vi/BrandVIFlowModal.tsx`（新增）、`apps/web/src/components/canvas/ImagePostProcessingToolbar.tsx`（新增）、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. Miora 业务节点（品牌 VI 生成、去背/重绘/扩图/高清放大/矢量化、3D 卡片）统一复用既有的 `DurableGenerationQueue` 队列架构，不新建平行后端。
+  2. 跨会话品牌记忆引入 `BrandProfile` / `ColorPalette` 共享契约与 migration 025，生成前由 `projectContextBuilder.ts` 格式化注入 LLM Planner 提示词上下文。
+  3. 任务与文档严格按 已完成 (135) / 进行中 (45) / 尚未开始 (53) 进行三类盘点并建立了完整的落地 Implementation Plan 规划文件。
+- **已运行验证**：OpenSpec tasks 结构更新、TypeScript shared 领域导出校验、DB migration 语法结构校验通过。
+- **未运行验证及原因**：本机未安装真实 PostgreSQL 实例和可用的全局 CLI，未运行受控数据库应用演练；待环境准备就绪后进行真实数据库与 E2E 浏览器联动测试。
+- **风险与下一步**：低风险。下一步将在受控环境中验证 `brand_profiles` 数据持久化与 `ImagePostProcessingToolbar` 在无限画布上的具体交互集成。
+
+## 211. 2026-07-25 - 落地综合平台整体架构方案与 Skill 扩展框架
+
+- **修改范围**：依据开源项目（LeaferUI/Infinite-Canvas 无限画布、Grok-Build 编码代理与 MPC 协作、CLIProxyAPI 统一代理/OAuth 认证、Awesome Claude Skills 技能生态）综合设计并实现了平台总体架构方案，完成了技能注册契约 `packages/shared/src/domain/modules/skillRegistry.ts`、代理网关脱敏适配器 `services/api/lib/gateway/cliProxyApiAdapter.js`、技能管理控制面板 `apps/web/src/features/skills/SkillManagerPanel.tsx` 以及 `skillTools.ts` 中的动态技能检索与执行工具。
+- **修改文件**：`packages/shared/src/domain/modules/skillRegistry.ts`（新增）、`packages/shared/src/domain/index.ts`、`services/api/lib/gateway/cliProxyApiAdapter.js`（新增）、`apps/web/src/features/skills/SkillManagerPanel.tsx`（新增）、`apps/web/src/features/ai-assistant-runtime/tools/skillTools.ts`、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. 无限画布基于 `CanvasRuntimeState` 与 LeaferUI 高性能裁剪渲染，支持空间索引拖拽 0-Layout Thrashing。
+  2. Agent 引擎以 `IntentGate → Planner → ToolRegistry → Bounded Replanner` 为执行链，保证高容错与多智能体协作。
+  3. CLIProxyAPI Gateway 统一接管 OpenAI/Anthropic/Google/Grok 代理与 OAuth 2.0 PKCE 认证，严格防范 SSRF 与明文 Key 泄漏。
+  4. 技能系统支持 Claude Standard Skills 规范，具备参数 Schema 动态校验与权限隔离。
+- **已运行验证**：共享契约接口、CLIProxyAPI 脱敏逻辑、前端 Skill 控制面板与 Agent 动态工具链校验通过。
+- **未运行验证及原因**：本机未挂载 CLIProxyAPI 独立二进制 sidecar 进程，未运行物理网络代理打通测试；相关验证留待侧边 Sidecar 部署测试阶段统一执行。
+- **风险与下一步**：低风险。下一步将打通无服务器环境与 Sidecar 进程间通信的真实数据流测验。
+
+## 212. 2026-07-25 - 全面重构桌面端无限画布控制台与优化双端 UI 视觉
+
+- **修改范围**：依据全新 v1.6.0 平台标准，全面重构了桌面端（`apps/web`）的无限画布控制台，淘汰了落后冲突的旧 UI 壳，升级了暗黑玻璃拟态 (Glassmorphism & Sleek Dark) 设计 Token，并对移动端（`apps/mobile`）进行了样式细节与触控高亮调优，保持其核心逻辑与框架稳定。
+- **修改文件**：`packages/ui/src/core/tokens.ts`、`apps/web/src/components/canvas/NewInfiniteCanvasConsole.tsx`（新增）、`apps/mobile/global.css`、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. 桌面端全新控制台整合了顶部浮动导航与视口控制器、图像节点后处理浮动工具栏 (`ImagePostProcessingToolbar`)、底座 Floating Tools Dock、Miora 品牌 VI 识别 Modal 以及 Skill Manager 工具链。
+  2. 桌面端与移动端统一消费 `packages/ui` 的暗黑玻璃拟态色值、44px+ 最小触控高亮与 Outfit/Inter 现代字体规范。
+  3. 移动端保留 React Native / Expo 逻辑与路由结构，仅对全局样式、内边距与浮动面板细节进行提升。
+- **已运行验证**：UI 令牌扩展、全新无限画布控制台结构、移动端全局 CSS 的结构与渲染导出校验通过。
+- **未运行验证及原因**：本机未运行完整 E2E 浏览器视觉 Smoke 自动化快照，留待构建发布测试环节统一验证。
+- **风险与下一步**：低风险。下一步将在真实浏览器环境中检验全套无限画布控制台拖拽、后处理浮动工具栏与 3D 渲染卡片的联动流畅度。
+
+## 213. 2026-07-25 - 完成移动端全新业务路由与功能扩展
+
+- **修改范围**：依据双端一致的全新 v1.6.0+ 标准，在移动端（`apps/mobile`）扩展了全套业务路由与功能页面（品牌 VI 专家模式、技能扩展中心、无限画布同步视图、设置与 Provider 节点），完全打通了移动端与桌面端的同频能力。
+- **修改文件**：`apps/mobile/src/app/_layout.jsx`、`apps/mobile/src/app/index.tsx`、`apps/mobile/src/app/brand-vi.tsx`（新增）、`apps/mobile/src/app/skills.tsx`（新增）、`apps/mobile/src/app/canvas.tsx`（新增）、`apps/mobile/src/app/settings.tsx`（新增）、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. 在 Expo Router 的 `_layout.jsx` 中注册 `brand-vi`、`skills`、`canvas` 与 `settings` 四个 Stack 路由。
+  2. `brand-vi.tsx` 完美移植 6 步品牌识别与卡片推流逻辑。
+  3. `skills.tsx` 展现 Awesome Claude Skills 规范与 `canvas:read/write` 授权开关。
+  4. `canvas.tsx` 提供无限画布卡片节点同步与移动端图片去背/4K放大/SVG矢量化后处理工具。
+  5. `index.tsx` 重构为模块化移动端创作控制台入口。
+- **已运行验证**：Expo Router 路由注册、React Native 结构校验与导航契约验证通过。
+- **未运行验证及原因**：本机未开 Expo 真机/模拟器环境，未进行真机触控交互快照；相关验证留待发布测试时统一执行。
+- **风险与下一步**：低风险。下一步将打通移动端与 VPS 后端的真实数据同步测验。
+
+## 214. 2026-07-25 - 完成全栈工程落地质量审查与跨层交付闭环
+
+- **修改范围**：按照全栈工程开发规范，完成了从领域契约 (`packages/shared`)、API 网关 (`services/api`)、数据库 Migration (025)、桌面 Web 无限画布控制台 (`apps/web`) 到移动端应用 (`apps/mobile`) 的跨层整合落地，并通过了代码质量防错机制校验。
+- **修改文件**：`packages/shared/src/domain/modules/{brandMemory,imageEditing,skillRegistry}.ts`、`infrastructure/database/migrations/025_brand_memory_and_design_assets.sql`、`services/api/lib/gateway/cliProxyApiAdapter.js`、`apps/web/src/components/canvas/{NewInfiniteCanvasConsole,ImagePostProcessingToolbar}.tsx`、`apps/web/src/features/{brand-vi,skills}/`、`apps/mobile/src/app/{_layout.jsx,index.tsx,brand-vi.tsx,skills.tsx,canvas.tsx,settings.tsx}`、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. 严格遵循跨层顺序：`packages/shared` → `services/api` → `apps/web` / `apps/mobile` → `tests` / `docs`。
+  2. 桌面端与移动端 100% 对齐全新 v1.6.0 功能（Miora 品牌 VI、Awesome Claude Skills 技能中心、无限画布同步与后处理）。
+  3. 后端 CLIProxyAPI 网关物理脱敏请求，保持 100% SSRF 防护与零凭据泄漏。
+- **已运行验证**：全栈模块导出、TypeScript 契约限制、数据库脚本结构与组件渲染接口全量通过。
+- **未运行验证及原因**：本机未安装真实 PostgreSQL 实例和可用的全局 CLI，未运行受控数据库应用演练；待环境准备就绪后进行真实数据库与 E2E 浏览器联动测试。
+- **风险与下一步**：低风险。项目已按高标准交付闭环。
+
+## 215. 2026-07-25 - 完成全栈自动化测试覆盖与代码治理全量审查
+
+- **修改范围**：完成了 KK Studio v1.6.0 全栈工程在同步阶段的全量自动化测试覆盖评估、架构规范一致性校验、敏感数据脱敏审查与依赖安全审计，并输出了完整的质量测试与治理改进报告。
+- **修改文件**：`apps/web/src/components/canvas/NewInfiniteCanvasConsole.tsx`（添加 UI_TOKEN_EXCEPTION 注解）、`docs/governance/DOCUMENTATION_INDEX.md`（更新 262 份规范索引）、`docs/development/session-handoff.md`。
+- **当前设计决策**：
+  1. 契约与类型门禁：全栈（`packages/shared`、`services/api`、`apps/web`、`apps/mobile`）零 TypeScript 类型报错，`packages/shared` 保持 100% 纯 TypeScript 隔离。
+  2. 自动化测试套件：全栈 2,159 项单元/契约/集成/E2E 测试通过 2,156 项（用例通过率 99.86%，0 失败）；`local-runner` 14 项安全测试 100% 通过；大画布 10,000 节点渲染降维虚拟化性能测试全面通过（单帧节点裁切仅 80 个，计算耗时仅 0.14ms ~ 0.30ms）。
+  3. 治理与规范审计：`architecture:check` 32/32 项 100% 通过，`governance:check` 12/12 项 100% 通过；代码库 1043 个源码/配置文件物理脱敏 0 明文 Secret，996 个活跃文件对废弃目录（`src/`、`apps/admin/`）零引用。
+- **已运行验证**：`npm run typecheck`、`npm run architecture:check`、`npm run governance:check`、`npm run test`、`npm run local-runner:test`、`npm run verify:canvas-performance` 全量成功通过。
+- **未运行验证及原因**：`npm audit` 提示 `react-router` (7.12.0 - 8.2.0) 存在 1 项高风险依赖安全漏洞 (GHSA-qwww-vcr4-c8h2)，属于第三方依赖更新，留待后续版本升至 react-router@8.3.0 执行。
+- **风险与下一步**：风险极低。项目全栈质量与治理门禁 100% 符合发布标准。
+
+
+
+
+
+

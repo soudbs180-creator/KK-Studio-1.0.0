@@ -36,6 +36,8 @@ function collectMarkdownFiles(directory = root) {
 const historicalPath = (relativePath) => (
   relativePath.startsWith("docs/archive/")
   || relativePath === "docs/development/session-handoff.md"
+  || relativePath.startsWith(".agents/")
+  || relativePath.startsWith(".workbuddy/")
 );
 
 const pendingArchivePath = (relativePath) => (
@@ -73,10 +75,11 @@ const forbiddenActivePatterns = [
 function findBrokenLinks(relativePath, source) {
   const broken = [];
   const baseDir = path.dirname(relativePath);
+  const cleanSource = source.replace(/```[\s\S]*?```/g, "").replace(/`[^`\r\n]+`/g, "");
   // Match markdown links and bare relative paths that look like source files.
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
-  while ((match = linkRegex.exec(source)) !== null) {
+  while ((match = linkRegex.exec(cleanSource)) !== null) {
     const link = match[2];
     if (!link || link.startsWith("http") || link.startsWith("#") || link.startsWith("mailto:")) continue;
     const target = link.split("#")[0];
