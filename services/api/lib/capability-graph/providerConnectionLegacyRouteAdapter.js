@@ -10,6 +10,46 @@ const ENDPOINT_TYPE_BY_PROTOCOL = {
   'google-official': 'google_gemini_generate_content',
   'openai-compatible': 'auto',
 };
+const FORMAT_BY_PROTOCOL = {
+  'claude-native': 'claude',
+  'gemini-native': 'gemini',
+  'google-official': 'gemini',
+  'openai-compatible': 'auto',
+};
+
+/** Canonical provider legacy route prefix → provider_id 映射。
+ *  来自 @kk/shared CANONICAL_PROVIDER_CATALOG 的 16 个提供商。
+ *  用户自定义 Key Manager entry（UUID 格式）走 exact match，不在此映射中。 */
+const CANONICAL_PROVIDER_PREFIX_TO_ID = new Map([
+  ['google-1017-1', 'google'],
+  ['openai', 'openai'],
+  ['anthropic', 'anthropic'],
+  ['deepseek', 'deepseek'],
+  ['volcengine', 'volcengine'],
+  ['aliyun', 'aliyun'],
+  ['tencent', 'tencent'],
+  ['siliconflow', 'siliconflow'],
+  ['openrouter', 'openrouter'],
+  ['apimart', 'apimart'],
+  ['gpt-best', 'gpt-best'],
+  ['wuyin', 'wuyinkeji'],
+  ['12ai', '12ai'],
+  ['flow2api', 'flow2api'],
+  ['custom', 'custom'],
+  ['systemproxy', 'systemproxy'],
+]);
+
+/** 反向映射：provider_id → 主要 legacy route 前缀（用于 projectLegacyRoute） */
+const PROVIDER_ID_TO_LEGACY_PREFIX = new Map();
+for (const [prefix, providerId] of CANONICAL_PROVIDER_PREFIX_TO_ID) {
+  // 保留第一个（主前缀），跳过 google-1017-1 全量别名和 UUID/系统级 provider
+  const NO_LEGACY_PREFIX = new Set(['custom', 'systemproxy']);
+  if (!PROVIDER_ID_TO_LEGACY_PREFIX.has(providerId) && !prefix.includes('-1017-') && !NO_LEGACY_PREFIX.has(providerId)) {
+    PROVIDER_ID_TO_LEGACY_PREFIX.set(providerId, prefix);
+  }
+}
+// google 的特殊别名
+PROVIDER_ID_TO_LEGACY_PREFIX.set('google', 'google-1017-1');
 
 function isProviderConnectionLegacyDualReadEnabled(env = process.env) {
   return String(env.PROVIDER_CONNECTION_LEGACY_DUAL_READ_ENABLED || '').trim().toLowerCase() === 'true';
@@ -41,14 +81,68 @@ function groupCandidateRows(rows) {
   return Array.from(candidates.values());
 }
 
+function resolveProviderIdFromLegacyRoute(normalizedRouteId) {
+  if (!normalizedRouteId) return null;
+  // 精确 UUID 匹配不需要 provider 映射（由 exact match 处理）
+  if (CONNECTION_ID_PATTERN.test(normalizedRouteId)) return null;
+  // 全量字符串匹配（如 google-1017-1）
+  if (CANONICAL_PROVIDER_PREFIX_TO_ID.has(normalizedRouteId)) {
+    return CANONICAL_PROVIDER_PREFIX_TO_ID.get(normalizedRouteId);
+  }
+  // 前缀匹配（如 openai-xxx, deepseek-xxx）— 要求前缀后是边界（'-' 或结束）
+  for (const [prefix, providerId] of CANONICAL_PROVIDER_PREFIX_TO_ID) {
+    if (prefix.includes('-1017-')) continue; // 跳过 google 特殊别名，它在全量匹配中已处理
+    if (normalizedRouteId.startsWith(prefix)) {
+      const suffix = normalizedRouteId.slice(prefix.length);
+      if (suffix === '' || suffix.startsWith('-')) return providerId;
+    }
+  }
+  return null;
+}
+
+function supportsNewLookup(normalizedRouteId) {
+  if (!normalizedRouteId) return false;
+  if (CONNECTION_ID_PATTERN.test(normalizedRouteId)) return true;
+  if (CANONICAL_PROVIDER_PREFIX_TO_ID.has(normalizedRouteId)) return true;
+  for (const prefix of CANONICAL_PROVIDER_PREFIX_TO_ID.keys()) {
+    if (prefix.includes('-1017-')) continue;
+    if (normalizedRouteId.startsWith(prefix)) {
+      const suffix = normalizedRouteId.slice(prefix.length);
+      if (suffix === '' || suffix.startsWith('-')) return true;
+    }
+  }
+  return false;
+}
+
 function selectCandidate(candidates, routeId) {
   const normalizedRouteId = normalizeLegacyRouteId(routeId);
   if (!normalizedRouteId) return null;
+
+  // 1. 精确 UUID 匹配
   const exact = candidates.find(({ connectionId }) => String(connectionId).toLowerCase() === normalizedRouteId);
   if (exact) return exact;
-  if (normalizedRouteId !== GOOGLE_LEGACY_ROUTE_ID) return null;
-  const googleCandidates = candidates.filter(({ providerId }) => providerId === 'google');
-  return googleCandidates.length === 1 ? googleCandidates[0] : null;
+
+  // 2. Provider 级别匹配：查找该 provider 的所有 connection
+  const providerId = resolveProviderIdFromLegacyRoute(normalizedRouteId);
+  if (!providerId) return null;
+
+  const providerCandidates = candidates.filter(({ providerId: pid }) => pid === providerId);
+  if (providerCandidates.length === 0) return null;
+
+  // 3. 单一 connection → 直接返回
+  if (providerCandidates.length === 1) return providerCandidates[0];
+
+  // 4. 多个 connection → 选 verified_at 最新的，记录歧义 warning
+  const sorted = providerCandidates
+    .map((c) => ({ ...c, _verifiedAt: c.verifiedAt ? new Date(c.verifiedAt).getTime() : 0 }))
+    .sort((a, b) => b._verifiedAt - a._verifiedAt);
+
+  console.warn('[providerConnectionLegacyRouteAdapter] Multiple connections for provider', {
+    providerId, routeId: normalizedRouteId, count: sorted.length,
+    selected: sorted[0].connectionId,
+  });
+
+  return sorted[0];
 }
 
 async function readSelectedConnection(userId, routeId, pool) {
@@ -57,8 +151,8 @@ async function readSelectedConnection(userId, routeId, pool) {
       const candidateResult = await client.query(
         `SELECT pc.connection_id AS "connectionId", pc.provider_id AS "providerId",
                 pc.display_name AS "displayName", pc.protocol_profile AS "protocolProfile",
-                pc.endpoint_url AS endpoint, cb.model_id AS "modelId",
-                cb.request_profile AS "requestProfile"
+                pc.endpoint_url AS endpoint, pc.verified_at AS "verifiedAt",
+                cb.model_id AS "modelId", cb.request_profile AS "requestProfile"
          FROM public.provider_connections pc
          JOIN public.capability_bindings cb
            ON cb.user_id = pc.user_id AND cb.connection_id = pc.connection_id
@@ -103,14 +197,15 @@ function decryptSelectedSecret(record, decrypt) {
 }
 
 function projectLegacyRoute(record, apiKey) {
+  const legacyPrefix = PROVIDER_ID_TO_LEGACY_PREFIX.get(record.providerId);
   return {
     id: record.connectionId,
-    legacyIds: record.providerId === 'google' ? [GOOGLE_LEGACY_ROUTE_ID] : [],
+    legacyIds: legacyPrefix ? [legacyPrefix] : [],
     name: record.displayName,
     baseUrl: record.endpoint || '',
     apiKey,
     models: record.models,
-    format: record.protocolProfile === 'google-official' ? 'gemini' : 'auto',
+    format: FORMAT_BY_PROTOCOL[record.protocolProfile] || 'auto',
     endpointType: ENDPOINT_TYPE_BY_PROTOCOL[record.protocolProfile] || 'auto',
     requestProfileId: record.requestProfiles.length === 1
       ? record.requestProfiles[0]
@@ -124,9 +219,7 @@ async function resolveProviderConnectionLegacyRoute(userId, routeId, overrides =
   if (!isProviderConnectionLegacyDualReadEnabled(env) || !userId || !routeId) return null;
   const metrics = overrides.metrics || providerConnectionDualReadMetrics;
   const normalizedRouteId = normalizeLegacyRouteId(routeId);
-  const supportsNewLookup = normalizedRouteId === GOOGLE_LEGACY_ROUTE_ID
-    || CONNECTION_ID_PATTERN.test(normalizedRouteId);
-  if (!supportsNewLookup) {
+  if (!supportsNewLookup(normalizedRouteId)) {
     metrics.recordOutcome('fallbackUnsupportedRoute');
     return null;
   }
@@ -150,4 +243,14 @@ async function resolveProviderConnectionLegacyRoute(userId, routeId, overrides =
 module.exports = {
   isProviderConnectionLegacyDualReadEnabled,
   resolveProviderConnectionLegacyRoute,
+  // 导出以便单元测试
+  CANONICAL_PROVIDER_PREFIX_TO_ID,
+  PROVIDER_ID_TO_LEGACY_PREFIX,
+  resolveProviderIdFromLegacyRoute,
+  selectCandidate,
+  supportsNewLookup,
+  projectLegacyRoute,
+  normalizeLegacyRouteId,
+  groupCandidateRows,
+  decryptSelectedSecret,
 };

@@ -127,25 +127,28 @@ test('the unique Google canonical alias prefers the new Connection', async () =>
   assert.equal(route?.apiKey, 'new-google-secret');
 });
 
-test('ambiguous Google aliases do not select randomly and preserve legacy fallback', async () => {
+test('multiple Google connections select the latest verified candidate deterministically', async () => {
   const module = await import('../../services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js');
   const { resolveProviderConnectionLegacyRoute } = module.default || module;
-  const { pool, calls } = createPool({
+  const newerConnId = '550e8400-e29b-41d4-a716-446655440003';
+  const olderConnId = '550e8400-e29b-41d4-a716-446655440004';
+  const { pool } = createPool({
     candidates: [
-      googleCandidate('550e8400-e29b-41d4-a716-446655440003'),
-      googleCandidate('550e8400-e29b-41d4-a716-446655440004'),
+      { ...googleCandidate(newerConnId), verifiedAt: '2026-07-01T00:00:00Z' },
+      { ...googleCandidate(olderConnId), verifiedAt: '2026-01-01T00:00:00Z' },
     ],
-    secretRef: 'must-not-be-read',
+    secretRef: 'encrypted-envelope',
   });
 
   const route = await resolveProviderConnectionLegacyRoute('owner-1', 'google-1017-1', {
     env: { PROVIDER_CONNECTION_LEGACY_DUAL_READ_ENABLED: 'true' },
     pool,
-    decrypt: () => 'must-not-decrypt',
+    decrypt: () => 'selected-key',
   });
 
-  assert.equal(route, null);
-  assert.equal(calls.some(({ text }) => text.includes('pc.secret_ref AS "secretRef"')), false);
+  assert.ok(route);
+  assert.equal(route.id, newerConnId, 'Should pick the latest verified connection');
+  assert.equal(route.apiKey, 'selected-key');
 });
 
 test('no new match and query infrastructure failure both preserve legacy fallback', async () => {

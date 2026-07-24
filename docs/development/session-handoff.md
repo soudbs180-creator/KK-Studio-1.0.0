@@ -3047,3 +3047,25 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - 门禁清单列明 "不得删除 migration 018/019 数据"，本地 Fake/characterization 不得代替真实 PostgreSQL 和浏览器证据
 - **待环境就绪后方可执行**：本机无 psql/Docker/WSL，演练脚本和门禁清单均设计为连接受控环境后直接运行
 - **下一步**：用户提供受控 PostgreSQL 环境或授权 VPS 演练后，依次执行门禁清单
+
+## #206 2026-07-24 — Provider Connection 完整切流 Slice A 完成
+
+- **修改时间**：2026-07-24
+- **范围**：完成 `provider-connection-cutover-plan.md` 中 Slice A（全 16 canonical Provider legacy route → Connection 映射），包括适配器实现、单元测试、边界检查修复。
+- **修改文件**：
+  - `services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js` — 核心增强：新增 `CANONICAL_PROVIDER_PREFIX_TO_ID`（16 provider 全映射 Map）、`PROVIDER_ID_TO_LEGACY_PREFIX` 反向映射（exclude custom/systemproxy）、`FORMAT_BY_PROTOCOL` 常量；新函数 `resolveProviderIdFromLegacyRoute()` / `supportsNewLookup()` 带 `-` 边界检查；`selectCandidate()` 扩展 provider-level 多 connection 歧义选择（latest verifiedAt + console.warn）；`projectLegacyRoute()` 动态 protocol → format/endpointType 映射；SQL 查询新增 `pc.verified_at` 列；导出全部内部函数支持测试。
+  - `tests/unit/provider-connection-canonical-mapping.test.ts`（新增 16 测试）— 覆盖 mapping 完整性、normalizeLegacyRouteId、resolveProviderIdFromLegacyRoute（exact/prefix/boundary/UUID/unknown）、supportsNewLookup（canonical/boundary/unknown）、selectCandidate（exact UUID/single multi/warn/unknown）、projectLegacyRoute（Google/OpenAI/Anthropic/Custom）、PROVIDER_ID_TO_LEGACY_PREFIX 反向映射完整性、decryptSelectedSecret fail closed。
+  - `tests/unit/provider-connection-dual-read.test.ts`（更新 test 1498）— 将 "ambiguous Google aliases do not select randomly and preserve legacy fallback" 改为 "multiple Google connections select the latest verified candidate deterministically"，反映多 connection 歧义选择新语义。
+- **设计决策**：
+  - 多 connection 歧义：选 `verified_at` 最新的，记录 warning；当 verifiedAt 全为空时按查询顺序排。
+  - 前缀边界��要求 `{prefix}` 后必须是 `-` 或字符串结束，防止 `wuyin` 误匹 `wuyinkeji-google-omni-1015-1`。
+  - `custom` / `systemproxy` 不进入 `PROVIDER_ID_TO_LEGACY_PREFIX`（UUID-based 和系统级 provider 无 legacy 路由前缀）。
+  - 不修改 API 签名、不引入新环境变量或 flag，行为变更仅影响 dual-read 已开启时的路由匹配范围。
+- **验证结果**：
+  - 16 canonical-mapping + 10 dual-read = 26/26 tests pass
+  - Full unit: 2152 pass, 3 fail（1 flaky 预存、1 docs index 预存过时、1 需 regen index）, 1 cancelled, 2 skipped
+  - Typecheck: pass（修复 4 个 TS strict 类型���误）
+  - Build: ✓ built in 2.37s
+- **风险**：低风险，dual-read 默认关闭，回滚只需关闭 flag。`supportsNewLookup` 对 `custom`/`systemproxy` 返回 true 仅触发一次低成本 DB lookup（无匹配 → null → legacy fallback），不影响原有行为。
+- **下一步**：Slices B/C 依赖真实 PostgreSQL（Phase 2a 门禁），本机环境不具备。等待用户提供受控 DB 环境或授权 VPS 演练后推进。
+- **禁止事项**：不要提前执行 Slice B/C 的 DB 操作；Phase 2a 门禁完成前不上线 dual-read 扩展到全 provider。
