@@ -1,6 +1,6 @@
 # Change Proposal: upgrade-ai-creation-core
 
-> Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation complete, real replan executor next
+> Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation and bounded replan executor complete, semantic replay and cross-device execution pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
 > Last verified: 2026-07-24
@@ -13,11 +13,11 @@ KK Studio v1.6.0 已完成"AI 优先工作台"四大战略变更的代码落地�
 
 - image Durable Worker 的代码基础已进入服务端控制面，新任务 admission 与存量 execution/drain 已使用两个默认关闭的 server flag 解耦；关闭 admission 并保持 execution 开启时，既有 lease 仍可完成或取消。在完成 migration 019 受控演练和 internal 灰度前，仍不能描述为服务端权威或已上线。
 - 报价、路由、租约、计费与图像 Provider Adapter 已形成纵向切片基础；`capability_graph.image_provider_slice` 已在 Connection-backed Quote、同步 submit 与 durable enqueue 的副作用前门禁，关闭后不阻断已入队 Worker drain。v3 已新增 owner-scoped pending Job discovery，Web 可把可恢复 Job 绑定到已同步的 Prompt 节点；真实 PostgreSQL、浏览器关闭/重新登录与跨设备 E2E 仍未完成。
-- Agent 运行时已具备 owner-scoped Session/Context、Run snapshot/event 投影、结构化历史裁剪、多轮选区指代与 bounded `step_outcome | replan` 元数据；认证 reload 不再把 active Run 误置为失败。confirmation expiry foundation 已把 user grant 绑定到 owner、plan、tool、target 与显式有效期，bound Run 还要求 exact authoritative Session proof；plan 已支持可选 Quote/cost binding，但真实 cost-bearing Quote 来源和确认卡/账本一致性尚未切流。完整 semantic replay、真实 replan executor、真实 LLM 多轮验证与跨设备执行接管仍未完成。
+- Agent 运行时已具备 owner-scoped Session/Context、Run snapshot/event 投影、结构化历史裁剪、多轮选区指代与 bounded `step_outcome | replan` 元数据；认证 reload 不再把 active Run 误置为失败。confirmation expiry foundation 已把 user grant 绑定到 owner、plan、tool、target 与显式有效期，bound Run 还要求 exact authoritative Session proof；plan 已支持可选 Quote/cost binding，但真实 cost-bearing Quote 来源和确认卡/账本一致性尚未切流。完整 semantic replay、Planner 失败驱动的真实重规划调度循环、真实 LLM 多轮验证与跨设备执行接管仍未完成（bounded replan executor 的元数据与单次重放已落地，但失败调度循环仍需后续独立实现）。
 - PPT 生成走 `handleSlides()` 旁路，把整页压成 AI 图片，与已有的可编辑 OpenXML 导出脱节。
 - 文档治理当前为 229 份 Markdown、20 份 current（达成 15–25 目标）；Capability Graph 基础已与能力矩阵、项目状态和本 OpenSpec 对齐。
 - "能力来源"页面只是 Provider preset 列表；用户无法理解 `Connection → Provider → Model → Capability → Channel` 关系，"无可用模型"不能直接说明缺少哪种 Connection 或 Capability。
-- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；`CapabilitySourcesView` 已实际挂载 Web 迁移面板，可把旧设置中的 Google 名称/endpoint 安全投影为迁移候选，并要求用户显式重输 secret 后通过现有 create/verify API 建立新 Connection。自动化浏览器已验证刷新去重与 secret 清理，但旧 `ApiSettings`/profile 凭据栈仍平行读写，服务端权威 dual-read、全 Provider 切流和观测窗口尚未完成，不能删除旧栈。
+- Provider Connection 规范化存储、verify 与凭据脱敏已经落地；`CapabilitySourcesView` 已实际挂载 Web 迁移面板，可把旧设置中的 Google 名称/endpoint 安全投影为迁移候选，并要求用户显式重输 secret 后通过现有 create/verify API 建立新 Connection。自动化浏览器已验证刷新去重与 secret 清理，但旧 `ApiSettings`/profile 凭据栈仍平行读写；服务端 dual-read 已以默认关闭 flag 接入并覆盖 generation/dispatcher 与 profile execution，全 Provider 映射、新写入切流和观测窗口尚未完成，不能删除旧栈。
 - `local-runner` 仍是 Browser/OpenCLI 原型：当前独立 typecheck/build 已通过并纳入 `verify:changes`，但固定 fallback token、token 日志、请求体无明确上限与显式 `any` 等安全债仍在，不得进入生产链。
 - AI dock、Task Center 浮层与 minimap 相互覆盖画布区域，AI toggle 在 DOM 中同时存在 open/close 两个可见控制；缺少统一 layout state 与新信息架构（IA）。
 - 真实媒体负载缺少基线：10K smoke 通过（11,103 节点、DOM 峰值约 1,305、连线误差约 0.097px）但伴随 `localStorage QuotaExceeded` 与多次 100ms+ long task；1K/10K 真实图片/视频/音频代理的解码并发、内存平台期、输入延迟、object URL 数量与恢复时间均未测量。
@@ -53,7 +53,7 @@ BYOK、云端用户 Key、平台积分、用户网页会员必须是四条互斥
 以固定节点类型（`Actor | Provider | ProviderConnection | Model | Capability | Asset | Workflow | Step | Trigger | Runtime | Job | Run | ToolCall | Verification | Audit`）和版本化边构建用户可理解、Agent 可查询的能力图；`GET /api/v1/capability-graph/snapshot` 与只读 safe tool `capabilities.listAvailable` 对外暴露；UI 能直接解释每个能力的 Connection、Channel、隐私与成本。
 
 2.8 **Provider Connection 领域模型**
-`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测。目标迁移链要求先建立旧 profile 到 `provider_connections` 的安全桥接/dual-read，再切换新写入并经过观测窗口；当前只完成 Web 端 Google 安全元数据投影和显式 secret 重输，服务端权威 dual-read、全 Provider 切流与观测窗口仍未实现。
+`Provider` 是全局身份（canonical catalog 管理），`ProviderConnection` 是用户拥有的凭据与 endpoint；secret 只存加密 `secret_ref`，API 永不回显；Connection verify 带协议 profile、URL 规范化、DNS/IP/SSRF 检查与最小探测。目标迁移链要求先建立旧 profile 到 `provider_connections` 的安全桥接/dual-read，再切换新写入并经过观测窗口；当前 Web 端 Google 安全元数据投影和显式 secret 重输已落地；服务端 dual-read 已以默认关闭 flag 接入并覆盖 generation/dispatcher 与 profile execution（exact Connection ID 或唯一 Google canonical alias 命中，歧义/无匹配回退 legacy，secret 解密失败 fail closed），全 Provider 映射、新写入切流与观测窗口仍未实现。
 
 2.9 **三 Runtime 架构**
 Browser/Vercel 只做交互与状态投影；VPS Express 是身份、Connection、能力图、Quote、Job、账务、Worker、Asset 元数据、Audit、feature flag 与恢复的控制面；Local Media/Automation Runtime 只执行已声明能力的本地媒体任务与 Browser Bridge，使用短期配对凭据、opaque asset handle 和受控根目录，不接收任意路径或 Shell。三端以版本化 DTO、幂等 id、签名事件和 capability manifest 通信；任何 runtime 重启后由 VPS Job/Run 状态恢复。
