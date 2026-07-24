@@ -136,14 +136,16 @@
       "role": "compatibility-layer",
       "owner": "server-provider-connections",
       "reviewBy": "2026-09-30",
-      "currentPurpose": "Lets generation and dispatcher reads prefer an owner-scoped available Provider Connection while legacy profile credentials remain readable during migration.",
+      "currentPurpose": "Lets generation, dispatcher, and profile-owned execution reads prefer an owner-scoped available Provider Connection while legacy profile credentials remain readable during migration.",
       "upstreamCanonicalSource": "services/api/lib/capability-graph/providerConnectionStore.js",
       "downstreamDependents": [
-        "services/api/lib/dispatcher/localUserRouteStore.js"
+        "services/api/lib/dispatcher/localUserRouteStore.js",
+        "services/api/routes/user/shared/profileRouteResolver.js"
       ],
       "riskLevel": "high",
       "regressionTests": [
-        "tests/unit/provider-connection-dual-read.test.ts"
+        "tests/unit/provider-connection-dual-read.test.ts",
+        "tests/unit/provider-connection-profile-dual-read.test.ts"
       ],
       "removalCondition": "Delete after profile routes and every supported Provider use canonical Connections, new writes have cut over, compatibility tests pass, and legacy reads have remained unused through two stable versions plus the required observation window."
     },

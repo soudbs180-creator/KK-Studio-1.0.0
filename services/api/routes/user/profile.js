@@ -43,6 +43,7 @@ const {
   resolveProfileUserId,
   verifyRequestJwt,
 } = require('./shared/requestContext');
+const { resolveProfileUserRoute } = require('./shared/profileRouteResolver');
 
 const router = express.Router();
 function extractWuyinEndpointPath(url) {
@@ -211,11 +212,10 @@ function requireProfileAuth(req, res, next) {
   return next();
 }
 
-const localUserRouteStore = require('../../lib/dispatcher/localUserRouteStore');
 const {
   readOwnerProfileState,
   writeOwnerProfileState,
-} = localUserRouteStore;
+} = require('../../lib/dispatcher/localUserRouteStore');
 
 function localProxyErrorEnvelope(req, code, message) {
   return {
@@ -438,13 +438,6 @@ function localRecordMatchesRoute(record, routeTarget, rawRouteId) {
     || name === routeTarget;
 }
 
-async function resolveLocalUserRoute(userId, routeId) {
-  if (userId && typeof userId === 'object') {
-    return localUserRouteStore.resolveRouteFromProfileState(userId, routeId);
-  }
-  return localUserRouteStore.resolveLocalUserRoute(userId, routeId);
-}
-
 function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
   const token = String(apiKey || '').trim();
   if (!token) return targetUrl;
@@ -489,14 +482,14 @@ function findFirstWuyinVideoRoute(profileState) {
   return null;
 }
 
-async function handleWuyinGenericProxy(req, res, userId) {
+async function handleWuyinGenericProxy(req, res, profileState) {
   const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
   const routeId = String(req.headers['x-key-slot-id'] || '').trim();
   if (!targetUrl) {
     return null;
   }
 
-  const route = await resolveLocalUserRoute(userId, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
@@ -672,7 +665,7 @@ function buildWuyinLocalTaskId(route, routeId, result, catalogItem) {
 // 简体中文注释：处理速创 API 的图片模型提交，由统一的 wuyinModelExecutor 处理参数清洗和路由执行
 async function handleWuyinImageMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = await resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -732,7 +725,7 @@ async function handleWuyinImageMode(req, res, profileState) {
 // 简体中文注释：处理速创 API 的视频模型提交，利用通用执行器自动分流和适配参数
 async function handleWuyinVideoMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = await resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -769,7 +762,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
 
 async function handleWuyinAudioMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = await resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -825,7 +818,7 @@ function extractWuyinChatContent(payload) {
 
 async function handleWuyinChatMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = await resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -865,7 +858,7 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   }
 
   let route = parsed.routeId
-    ? await resolveLocalUserRoute(profileState, parsed.routeId)
+    ? await resolveProfileUserRoute(req.profileUserId, profileState, parsed.routeId)
     : findFirstWuyinVideoRoute(profileState);
   if (!route && /^(image|video|audio)_[a-z0-9_.-]+$/i.test(String(parsed.routeId || ''))) {
     route = findFirstWuyinVideoRoute(profileState);
@@ -1372,12 +1365,12 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
     let is12AI = false;
     const routeId = String(req.body && req.body.routeId || '').trim();
     if (routeId) {
-      route = await resolveLocalUserRoute(profileState, routeId);
+      route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
     } else if (mode === 'task_status') {
       const localTaskId = String(req.body && (req.body.localTaskId || req.body.taskId) || '').trim();
       const parsed = decodeLocalProxyTaskId(localTaskId);
       if (parsed.routeId) {
-        route = await resolveLocalUserRoute(profileState, parsed.routeId);
+        route = await resolveProfileUserRoute(req.profileUserId, profileState, parsed.routeId);
       }
     }
 
@@ -1549,7 +1542,7 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
       format: req.body && req.body.format || 'openai'
     };
   } else {
-    route = await resolveLocalUserRoute(profileState, routeId);
+    route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
   }
 
   if (!route) {
@@ -1718,7 +1711,7 @@ router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth,
   const routeId = req.params.routeId;
   const profileState = await readOwnerProfileState(req.profileUserId);
 
-  const route = await resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
   if (!route) {
     return res.status(404).json({
       success: false,
