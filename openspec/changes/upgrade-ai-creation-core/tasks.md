@@ -180,7 +180,8 @@
 - [ ] 实现 Browser Bridge 断连 setup_required 处理与 SSRF 防护；Browser Bridge 与未来 Local Media Runtime 共用受控 runtime manifest。
 - [ ] Local Runtime 安全加固：移除 fallback token 与 token 日志、token 文件 ACL/轮换、body/尺寸上限、Zod 校验、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额。
   - [x] 首段安全边界：移除共享 fallback credential 与启动 token 输出；使用 256-bit 本地凭据和常量时间比较；精确校验 loopback Origin/Host，仅绑定 `127.0.0.1`，并限制 JSON body 为 256 KiB。
-  - [ ] Windows ACL、显式轮换/配对协议、Zod command envelope、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额仍待完成。
+  - [x] OpenCLI command envelope 使用 strict Zod schema 限制动作、目标长度与 payload 形态；本地审计递归清除 credential、Prompt 和 URL query/hash，并将文件权限收紧为 owner-only。
+  - [ ] Windows ACL、显式轮换/配对协议、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额仍待完成。
 - [x] `local-runner:build` 与独立测试纳入 `verify:changes`；Local Runner 在其余安全门禁通过前继续标记 experimental。
 - [ ] 建立 ACP Gateway，隔离 Grok 输出 patch/artifact。
 - [ ] 管理员审批流程：Grok 输出必须经审批后执行 typecheck/build/test，禁止访问计费/生成/数据库/发布。

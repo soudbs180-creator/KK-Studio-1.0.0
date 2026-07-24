@@ -1,13 +1,19 @@
+import type { OpencliCommand } from '../contracts/opencli';
 import { localAuditLogService } from './localAuditLogService';
+
+export interface OpencliExecutionResult {
+  status: 'success';
+  summary: string;
+  data: Record<string, unknown>;
+}
+
+interface OpencliExecutionCommand extends OpencliCommand {
+  logId: string;
+}
 
 // 简体中文：本地 OpenCLI 核心执行器 (OpenCLI Service)
 export class OpencliService {
-  public async executeCommand(command: {
-    kind: string;
-    target: string;
-    payload?: Record<string, any>;
-    logId: string;
-  }): Promise<any> {
+  public async executeCommand(command: OpencliExecutionCommand): Promise<OpencliExecutionResult> {
     const { kind, target, payload, logId } = command;
 
     // 针对每个动作进行针对性渲染回传（支持高保真返回以及 CDP 交互防错机制）
@@ -46,9 +52,11 @@ export class OpencliService {
           screenshotUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
         }
       };
-    } catch (e: any) {
-      localAuditLogService.log(logId, kind, 'medium', target, 'failed', { error: e.message });
-      throw e;
+    } catch (error: unknown) {
+      localAuditLogService.log(logId, kind, 'medium', target, 'failed', {
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      });
+      throw error;
     }
   }
 }

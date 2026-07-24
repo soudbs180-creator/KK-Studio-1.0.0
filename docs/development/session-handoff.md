@@ -3069,3 +3069,12 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **风险**：低风险，dual-read 默认关闭，回滚只需关闭 flag。`supportsNewLookup` 对 `custom`/`systemproxy` 返回 true 仅触发一次低成本 DB lookup（无匹配 → null → legacy fallback），不影响原有行为。
 - **下一步**：Slices B/C 依赖真实 PostgreSQL（Phase 2a 门禁），本机环境不具备。等待用户提供受控 DB 环境或授权 VPS 演练后推进。
 - **禁止事项**：不要提前执行 Slice B/C 的 DB 操作；Phase 2a 门禁完成前不上线 dual-read 扩展到全 provider。
+
+## 207. 2026-07-25 - 收紧 Local Runner 命令契约与本地隐私审计
+
+- **修改范围**：完成 CLIProxyAPI 融合前置安全 Slice A；不接入 Provider、不启动 OAuth、不改 Web/API/数据库公开契约。
+- **修改文件**：`local-runner/src/contracts/opencli.ts`、`local-runner/src/routes/opencli.ts`、`local-runner/src/security/{commandAllowlist,permissionPolicy}.ts`、`local-runner/src/services/{localAuditLogService,opencliService}.ts`、`local-runner/tests/command-security.test.ts`、OpenSpec 与两份治理事实文档。
+- **当前设计决策**：OpenCLI 入口使用 strict Zod envelope 和 2048 字符目标上限，只接受声明式动作；不再用 shell 字符正则误判普通 Prompt。审计只落本地受限元数据，递归清除 credential、Prompt、URL query/hash 和 Bearer 文本；路由不回显内部异常。CLIProxyAPI sidecar 与 OAuth 状态尚未接入，不描述为当前能力。
+- **已运行验证**：TDD 红测先确认缺少 command contract 与可注入审计路径；实现后 Local Runner 独立测试 6/6、完整 typecheck/build、architecture 32/32、governance 12/12 与 `git diff --check` 均通过。
+- **未运行验证及原因**：本机无系统 `npm`/`npx`，使用 bundled Node 24 直接执行等价底层入口；本切片不调用真实 Provider、OAuth、浏览器或 PostgreSQL。
+- **风险与下一步**：低风险且仅限本地 experimental runtime。Windows ACL、显式轮换/配对、路径 containment、symlink、MIME、解码超时和资源限额仍未完成；下一独立切片只建立默认关闭、loopback-only 的 CLIProxyAPI sidecar health/model 窄协议，不暴露 Management API 或 token。
