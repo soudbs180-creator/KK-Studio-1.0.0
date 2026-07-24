@@ -3028,3 +3028,22 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - **已运行验证**：单独 `governance:openspec` 通过；完整 `governance:check` 12 项全绿（含新增 openspec 检查）；`governance:current`、`architecture:check`（Settings Modernization 等通过）均通过。负向测试：临时把 proposal.md 改为“real replan executor next”后检查以 exit 1 输出 diff 并提示漂移，还原后恢复通过。`git diff --check` 干净。
 - **未运行验证及原因**：本切片为 docs + governance 脚本，不修改运行时代码、画布或大数据路径，未重复 unit/integration/e2e/build 全链（#203 已串行重跑全绿）；本机无真实 PostgreSQL/浏览器，未执行 Phase 2a 外部门禁。
 - **风险与下一步**：零运行时风险，仅文档与治理脚本。下一步进入第 3 步 Phase 2a 外部门禁（受控 PostgreSQL + 真实浏览器），本机环境受限，需受控数据库与浏览器证据，不得用本地 Fake/characterization 代替。按用户要求直接在当前 `main` 固化，不创建分支或推送远端。
+
+## #205 Phase 2a 外部门禁准备 — 演练脚本与门禁清单
+
+- **修改时间**：2026-07-24
+- **范围**：准备 Phase 2a 演练基础设施，不触及产品代码
+- **新增文件**：
+  - `scripts/ops/postgres/rehearse-migration-001-019.sh` — migration 001→019 演练脚本，支持三种模式（fresh/repeat/populated），含自动结构验证与 JSON 报告输出
+  - `docs/governance/phase-2a-gating-checklist.md` — Phase 2a 外部门禁检查清单，覆盖 6 大验证域：migration 演练、灰度放量（off→internal→invited→full→off）、业务指标（submit/poll/cancel/退款/重复结算）、真实浏览器（关闭/重登/第二设备 SSE/Job 投影恢复）、1K 媒体 benchmark、回滚协议
+- **修改文件**：
+  - `package.json` — 新增 `db:rehearse-migrations` / `db:rehearse-migrations:repeat` / `db:rehearse-migrations:populated` npm 快捷入口
+  - `docs/governance/DOCUMENTATION_INDEX.md` — governance:docs --write 自动刷新（含新文件的索引条目）
+- **设计决策**：
+  - 演练脚本设计为纯 shell + psql，零外部依赖，环境变量注入连接串（`KK_MIGRATION_DATABASE_URL`）
+  - 脚本内置数据库名安全检查（拒绝 production/prod/live/master 命名的库）
+  - 关键 migration（017/018/019）失败立即中止，防止级联破坏
+  - 门禁清单明确 admission flag 与 execution flag 分离：当前 `CAPABILITY_GRAPH_IMAGE_PROVIDER_SLICE` 仅控制 admission（`assertImageProviderSliceAdmission`），回滚先关 admission、execution 保持至 lease drain
+  - 门禁清单列明 "不得删除 migration 018/019 数据"，本地 Fake/characterization 不得代替真实 PostgreSQL 和浏览器证据
+- **待环境就绪后方可执行**：本机无 psql/Docker/WSL，演练脚本和门禁清单均设计为连接受控环境后直接运行
+- **下一步**：用户提供受控 PostgreSQL 环境或授权 VPS 演练后，依次执行门禁清单
