@@ -3354,3 +3354,15 @@ npm run build                # Passed (Vite production bundle compiled successfu
 ### 风险与下一步
 - 风险低。`rechargeSubmissionService.test.ts` 使用 node:test 而非 vitest，为既有问题
 - 下一步：`agents:commit` 固化
+
+---
+
+## 217. 2026-07-25 - 清理冗余 pnpm-lock.yaml 双锁文件冲突
+
+### 修改范围
+删除 `pnpm-lock.yaml`，解决双锁文件并存导致的包管理器歧义。
+
+### 设计决策
+- 项目实际使用 npm（`package.json` 脚本全部调用 `npm run`/`npx`，`package-lock.json` 活跃维护）
+- `pnpm-lock.yaml` 最近更新 7/22，为历史遗留，非当前工作流产物
+- AGENTS.md 锁文件检测规则在双文件并存时产生歧义，清理后明确为 npm
