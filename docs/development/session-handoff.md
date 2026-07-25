@@ -752,7 +752,7 @@ npm run build                # Passed (Vite production bundle compiled successfu
   - `npm run governance:version`
   - `npm run verify:changes`
   - `npm run package:portable`
-  - `node scripts/release/publish-portable-release.mjs --base-url https://github.com/soudbs180/kk-studio/releases/download/v1.5.9`
+  - `node scripts/release/publish-portable-release.mjs --base-url https://github.com/soudbs180-creator/nano-banana-KK-/releases/download/v1.5.9`
 - **未运行验证及原因**：无。
 - **风险与下一步**：推送到远端以更新 master 分支，版本发布一致性已完全验证。
 
@@ -3366,3 +3366,33 @@ npm run build                # Passed (Vite production bundle compiled successfu
 - 项目实际使用 npm（`package.json` 脚本全部调用 `npm run`/`npx`，`package-lock.json` 活跃维护）
 - `pnpm-lock.yaml` 最近更新 7/22，为历史遗留，非当前工作流产物
 - AGENTS.md 锁文件检测规则在双文件并存时产生歧义，清理后明确为 npm
+
+﻿---
+
+## 218. 2026-07-25 - 三端版本一致性修复：manifest URL、BOM、Git 标签
+
+### 修改范围
+- 修复  + "elease/publish/stable/manifest.json" + @ BOM 字符导致 JSON 解析失败
+- 修复 manifest  + "downloadUrl" + @ 从旧 GitHub 用户名  + "soudbs180/kk-studio" + @ 更正为  + "soudbs180-creator/nano-banana-KK-" + @
+- 修复 manifest  + "commitSha" + @ 从  + "pending" + @ 更新为实际 HEAD  + "1ec0d006" + @
+- 修复  + "docs/development/session-handoff.md" + @ 中旧 GitHub URL 引用
+
+### 设计决策
+- 三端版本校验：本地所有包 v1.6.1 一致；GitHub HEAD  + "1ec0d006" + @ 与本地同步
+- 远端缺少 v1.6.1 Git 标签（仅有中文标签  + "生成api" + @），需创建推送
+- Vercel 部署通过 GitHub Actions ( + "cloud-auto-deploy.yml" + @) 管理，本地无 token 无法直连验证
+- GitHub 仓库为私有，API 返回 404，Git 操作正常
+
+### 已运行验证
+-  + "governance:version" + @ — Version metadata is aligned to 1.6.1
+- Git 远端同步检查 — HEAD 一致
+- 版本目标全量扫描 — 8 个包 + manifest + appInfo.ts 全部 1.6.1
+
+### 未运行验证及原因
+-  + "erify:changes" + @ — 本次仅修改 meta 文件，未涉及源码，跳过全量验证
+- Vercel 部署状态 — 无 Vercel Token，无法直接查询
+
+### 风险与下一步
+- 需创建并推送 v1.6.1 Git 标签到远端
+- 需确认 Vercel 部署版本与 v1.6.1 一致（建议通过 GitHub Actions 日志或 Vercel Dashboard 确认）
+- 风险低：仅修复 manifest 元数据，不影响运行时

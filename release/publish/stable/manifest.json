@@ -2,7 +2,7 @@
   "appName": "KK Studio",
   "version": "1.6.1",
   "displayVersion": "v1.6.1",
-  "buildTime": "2026-07-25T00:00:00.000Z",
+  "buildTime": "2026-07-25T12:53:12.413Z",
   "releaseDate": "2026-07-25",
   "releaseNotes": [
     "react-router 安全升级至 v8.3.0 (修复 GHSA-qwww-vcr4-c8h2)",
@@ -11,10 +11,10 @@
     "架构决策记录 (ADR) 体系建立"
   ],
   "channel": "stable",
-  "commitSha": "pending",
-  "commitShortSha": "pending",
+  "commitSha": "1ec0d0068a688fbfe8e64d640dae2bae7764fc9b",
+  "commitShortSha": "1ec0d006",
   "packageFile": "KK-Studio-Portable-1.6.1.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.6.1/KK-Studio-Portable-1.6.1.zip",
+  "downloadUrl": "https://github.com/soudbs180-creator/nano-banana-KK-/releases/download/v1.6.1/KK-Studio-Portable-1.6.1.zip",
   "sha256": "35b4e1e74956f7d9672ebce6127f2945ff9f2048f47349a7c1baabc634cae593",
   "size": 71492552
 }
