@@ -9,7 +9,7 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, useLocation, useNavigate } from 'react-router';
 
 import { useLocale } from '../../context/LocaleContext';
 import { useTheme } from '../../context/ThemeContext';

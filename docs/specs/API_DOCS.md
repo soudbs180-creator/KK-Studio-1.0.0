@@ -2,7 +2,7 @@ Status: reference
 
 # GPT-Best API 适配文档
 
-Current project baseline: KK Studio v1.6.0.
+Current project baseline: KK Studio v1.6.1.
 
 ## 概述
 

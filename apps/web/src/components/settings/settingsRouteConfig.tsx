@@ -1,6 +1,6 @@
 import React from 'react';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
-import { Navigate, Route, type RouteObject, useNavigate } from 'react-router-dom';
+import { Navigate, Route, type RouteObject, useNavigate } from 'react-router';
 
 import type { Supplier } from '../../services/billing/supplierService';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';

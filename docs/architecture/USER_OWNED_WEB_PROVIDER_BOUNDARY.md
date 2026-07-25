@@ -1,9 +1,9 @@
 Status: reference
 
-# User-Owned Web Provider Safety Boundary (v1.6.0)
+# User-Owned Web Provider Safety Boundary (v1.6.1)
 
 Last Updated: 2026-06-26
-Project Version: 1.6.0
+Project Version: 1.6.1
 
 ## 1. 物理隔离边界与用户自带密钥 (Boundary & Own Credentials)
 网页会员能力（例如 ChatGPT Plus、小红书会员等）在系统中被定义为 `User-Owned Web Provider`（或个人网页 Provider）。

@@ -2,7 +2,7 @@ Status: reference
 
 # API Stable Baseline
 
-Current project baseline: KK Studio v1.6.0.
+Current project baseline: KK Studio v1.6.1.
 
 This file records the API documents that are the source of truth for this project.
 

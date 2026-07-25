@@ -1,9 +1,9 @@
 Status: reference
 
-# Slides Workflow Integration in Canvas (v1.6.0)
+# Slides Workflow Integration in Canvas (v1.6.1)
 
 Last Updated: 2026-06-26
-Project Version: 1.6.0
+Project Version: 1.6.1
 
 ## 1. 画布一体化工作流 (Unified Canvas Workflow)
 为了避免形成功能孤岛，KK Studio 废除了独立的 PPT / Slides 原型页面，将所有的幻灯片管理完全吸收至大画布（Canvas）的核心逻辑中：

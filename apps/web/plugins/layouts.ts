@@ -138,7 +138,7 @@ export function layoutWrapperPlugin(userOpts: HierarchicalLayoutOptions = {}): P
 
     if (routeParams.length > 0) {
       imports.push(
-        `import { useParams${hasSpreadParams ? ', useLocation' : ''} } from 'react-router-dom';`
+        `import { useParams${hasSpreadParams ? ', useLocation' : ''} } from 'react-router';`
       );
     }
 

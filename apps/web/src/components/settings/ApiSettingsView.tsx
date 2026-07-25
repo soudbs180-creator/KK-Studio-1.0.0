@@ -16,7 +16,7 @@ import {
   X,
   Filter,
 } from 'lucide-react';
-import { MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams } from 'react-router';
 import type { CapabilityRole, Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
 import type { ChannelConfig } from '../../services/api/channelConfig';

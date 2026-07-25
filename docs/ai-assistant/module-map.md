@@ -2,7 +2,7 @@ Status: reference
 
 # 模块地图 (Module Map)
 
-本文件整理了 KK Studio v1.6.0 的核心模块，供 AI 助手理解代码依赖和调用边界。
+本文件整理了 KK Studio v1.6.1 的核心模块，供 AI 助手理解代码依赖和调用边界。
 
 ---
 

@@ -1,9 +1,9 @@
 Status: reference
 
-# KK Studio Architecture Source of Truth (v1.6.0)
+# KK Studio Architecture Source of Truth (v1.6.1)
 
 Last Updated: 2026-07-13
-Project Version: 1.6.0
+Project Version: 1.6.1
 
 本文档定义了 KK Studio 目前最新的真实物理架构事实与技术规格，供 AI 助手、代码审查与 CI 脚本做强一致校验。任何后续开发必须以此文档记录的实际实现为准。
 

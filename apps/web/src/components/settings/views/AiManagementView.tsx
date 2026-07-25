@@ -15,7 +15,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { KK_LAYER } from '@kk/ui';
 import type { CapabilityRole, CapabilityRouteAssignment } from '../../../types';
 import {

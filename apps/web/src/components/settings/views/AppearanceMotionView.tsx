@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CircleGauge, Eye, Gauge, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';

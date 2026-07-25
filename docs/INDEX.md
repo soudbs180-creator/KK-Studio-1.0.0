@@ -2,7 +2,7 @@ Status: reference
 
 # KK Studio 文档文件速查索引 (docs/INDEX.md)
 
-以下为当前 **v1.6.0** 架构下，所有有效核心文档的文件路径及其定位的速查表。
+以下为当前 **v1.6.1** 架构下，所有有效核心文档的文件路径及其定位的速查表。
 
 | 核心文件路径 | 职责定位 | 关联的模块修改 |
 |---|---|---|
@@ -45,4 +45,4 @@ Status: reference
 | **审计与优化报告 (Reports)** | | |
 | [reports/root-notes/PERFORMANCE_OPTIMIZATION.md](reports/root-notes/PERFORMANCE_OPTIMIZATION.md) | 桌面端/画布的性能优化策略 | 画布渲染性能调优 |
 | **归档历史 (Archive)** | | |
-| [archive/](archive/README.md) | 已过时或与 v1.6.0 冲突的历史文档目录 | 🚫 **修改当前代码时严禁使用** |
+| [archive/](archive/README.md) | 已过时或与 v1.6.1 冲突的历史文档目录 | 🚫 **修改当前代码时严禁使用** |

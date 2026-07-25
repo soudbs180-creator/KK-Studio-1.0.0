@@ -3,10 +3,10 @@
     "id": "doc_ai_assistant_roadmap_md",
     "source": "doc",
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
-    "title": "AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.0",
+    "title": "AI Assistant Roadmap - Historical Sprint Record - KK Studio v1.6.1",
     "summary": "Status: historical",
-    "contentHash": "01867e641ff692f88655cf44eaa1274a",
-    "updatedAt": "2026-07-21T19:46:31.725Z"
+    "contentHash": "6806a9eef950248f01b56104ad590bba",
+    "updatedAt": "2026-07-25T10:56:29.654Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -104,7 +104,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "Status: reference",
-    "contentHash": "d1b3fc628c24bfdc0da3091914a1bb98",
-    "updatedAt": "2026-07-20T20:45:33.267Z"
+    "contentHash": "89079db399cac7b20ebea44ed7a49b51",
+    "updatedAt": "2026-07-25T10:56:30.276Z"
   }
 ]

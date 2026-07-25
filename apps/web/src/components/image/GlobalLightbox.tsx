@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2, Heart } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
-import { useNavigate, useInRouterContext } from 'react-router-dom';
+import { useNavigate, useInRouterContext } from 'react-router';
 import { resolveRedrawRouteAndModel } from '../../services/api/capabilityRouteAssignments';
 
 // 简体中文：获取是否已经配置了图片生成的逻辑，根据能力路由配置是否有有效链路来判断

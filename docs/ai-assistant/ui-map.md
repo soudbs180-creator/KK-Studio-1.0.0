@@ -2,7 +2,7 @@ Status: reference
 
 # UI 映射表 (UI Map)
 
-本文件维护 KK Studio v1.6.0 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
+本文件维护 KK Studio v1.6.1 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。
 
 ---
 
@@ -43,7 +43,7 @@ AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、�
 - AI 接管使用同一个 AgentRuntime、ToolRegistry、时间线和持久队列；低风险动作可按策略执行，高风险、批量、成本或外部副作用动作继续确认。
 - 切换模式不得添加阻断画布的遮罩，也不得清空 `AgentRunStore` 或 `DurableGenerationQueue`。
 
-Current AI selector source of truth for KK Studio v1.6.0.
+Current AI selector source of truth for KK Studio v1.6.1.
 
 ## 3. Canvas Group Controls - 2026-06-05
 

@@ -1,8 +1,8 @@
 Status: reference
 
-# Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.0
+# Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.1
 
-本文件是 KK Studio v1.6.0 规范下 AI 助手的可执行技能手册 (Skills) 索引。
+本文件是 KK Studio v1.6.1 规范下 AI 助手的可执行技能手册 (Skills) 索引。
 具体的技能细节与运行 Runbook 已被目录化拆分到 [skills/](skills/README.md) 专属子目录中，保证文档职责的清晰隔离。
 
 ---

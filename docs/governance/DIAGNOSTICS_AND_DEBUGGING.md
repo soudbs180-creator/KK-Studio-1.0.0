@@ -1,6 +1,6 @@
 Status: reference
 
-# AI 快速排障与调试规约 (Diagnostics & Debugging Guide) - KK Studio v1.6.0
+# AI 快速排障与调试规约 (Diagnostics & Debugging Guide) - KK Studio v1.6.1
 
 本指南专为研发人员与 AI 编程 Agent 设计。当系统发生运行期崩溃、静态检查阻断、编译报错或一致性验证熔断时，AI 可通过本规约快速定位错误根源，极速恢复项目健康运行。
 

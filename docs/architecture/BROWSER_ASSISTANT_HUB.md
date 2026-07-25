@@ -1,9 +1,9 @@
 Status: reference
 
-# Browser Assistant Hub Specification (v1.6.0)
+# Browser Assistant Hub Specification (v1.6.1)
 
 Last Updated: 2026-06-26
-Project Version: 1.6.0
+Project Version: 1.6.1
 
 ## 1. 简介 (Introduction)
 Browser Assistant Hub 是 KK Studio 中为本地优先而设计的桌面端浏览器助手核心。在保障用户 Cookie/Session 隐私、无额度池化及桌面端安全隔离的前提下，通过 `Local OpenCLI Bridge` 桥接用户本地浏览器已登录的会员及 API 能力，支持多网站适配器（Site Adapters）的扩展，并通过 `BrowserActionRouter` 统一调度。

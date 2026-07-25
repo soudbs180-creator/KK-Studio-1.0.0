@@ -8,7 +8,7 @@
 - Runtime snapshot types: `packages/shared/src/types/agent.ts`
 - Canvas context integration: `apps/web/src/context/CanvasContext.tsx`
 
-当前构建器写入 `projectVersion: '1.6.0'`；版本更新时必须与 `config/release-manifest.json` 同步。
+当前构建器写入 `projectVersion: '1.6.1'`；版本更新时必须与 `config/release-manifest.json` 同步。
 
 ## 1. 运行态状态定义
 

@@ -2,7 +2,7 @@ Status: reference
 
 # KK Studio 当前部署与本地运行
 
-本目录只描述 KK Studio v1.6.0 当前的 `apps/web/` + `services/api/` + VPS
+本目录只描述 KK Studio v1.6.1 当前的 `apps/web/` + `services/api/` + VPS
 PostgreSQL 运行链路。版本事实来自 `config/release-manifest.json`，数据库
 结构变更来自 `infrastructure/database/migrations/`；浏览器和文档都不得直接连接 Provider、数据库
 或支付系统。

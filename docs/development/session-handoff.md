@@ -1,7 +1,66 @@
-Status: historical
+﻿Status: current
 
-# Session Handoff - 卡片测量收口优化
+# Session Handoff — v1.6.1 安全修复与版本升级
 
+## 1. 修改范围
+KK Studio v1.6.0 → v1.6.1。核心变更：react-router 安全大版本升级 (v7→v8)、brace-expansion 漏洞修复、团队技术规范体系建设。
+
+## 2. 修改文件
+- `package.json` — 版本 1.6.0→1.6.1、brace-expansion override 5.0.7→5.0.8
+- `config/release-manifest.json` — 版本升级 + release notes 更新
+- `services/api/package.json` — 版本同步
+- `packages/shared/package.json` — 版本同步
+- `packages/api-client/package.json` — 版本同步
+- `packages/ui/package.json` — 版本同步
+- `apps/web/package.json` — 版本同步 + react-router ^7.17.0→^8.3.0、移除 react-router-dom
+- `apps/mobile/package.json` — 版本同步
+- `apps/web/src/components/settings/ApiSettingsView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/ApiAdvancedSettingsView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/SettingsWorkbenchPanel.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/views/AppearanceMotionView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/settingsRouteConfig.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/views/UserProfileView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/views/AiManagementView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/SettingsWorkbenchShell.tsx` — react-router-dom→react-router
+- `apps/web/src/components/settings/views/CapabilitySourcesView.tsx` — react-router-dom→react-router
+- `apps/web/src/components/image/GlobalLightbox.tsx` — react-router-dom→react-router
+- `apps/web/plugins/layouts.ts` — 代码生成模板 react-router-dom→react-router
+- `docs/README.md` — 版本号更新
+- `docs/governance/PROJECT_STATE_AND_VALIDATION.md` — 版本号 + 日期更新
+- `release/publish/stable/manifest.json` — 版本同步
+- `docs/standards/TEAM_TECHNICAL_IMPROVEMENT_PLAN.md` — 新增：团队技术能力提升方案
+- `docs/standards/CODE_REVIEW_CHECKLIST.md` — 新增：代码审查清单
+- `docs/standards/CODING_STANDARDS.md` — 新增：全栈编码规范
+- `docs/adr/ADR-001-canvas-measurement-scheduler.md` — 新增：首份架构决策记录
+- `docs/adr/ADR_TEMPLATE.md` — 新增：ADR 模板
+
+## 3. 当前设计决策
+- **react-router 8.3.0 升级**: 解决 GHSA-qwww-vcr4-c8h2 (RSC Mode CSRF Bypass) 高危漏洞。由于 react-router-dom 在 v8 被移除合并至 react-router，所有 `from 'react-router-dom'` 导入改为 `from 'react-router'`。react-router 8 要求 React ≥19.2.7、Vite ≥7、Node ≥22.22.0，当前环境均满足。
+- **brace-expansion 5.0.8**: override 升级解决 GHSA-mh99-v99m-4gvg DoS 漏洞。
+- **团队规范体系**: 建立 ADR 目录、CR Checklist、编码规范三大支柱。
+
+## 4. 已运行验证
+### 4.1 安全与类型
+- `npm audit` — 0 vulnerabilities (从 5 high 降至 0)
+- `typecheck` (tsc --noEmit ×3 + server + tests) — ✅ 0 errors
+### 4.2 架构与治理
+- `governance:version` — ✅ Version metadata aligned to 1.6.1
+- `governance:current` — ✅ v1.6.1 current-only baseline aligned
+- `governance:security` — ✅ Sensitive storage and logging boundaries passed
+- `architecture:check` (import/legacy/UI/settings/modernization/canvas/provider) — ✅ All passed
+### 4.3 构建与测试
+- `build` (vite production) — ✅ built in 6.11s (2562 modules)
+- `test` (vitest) — ✅ 16 passed, 0 fail (1 pre-existing: rechargeSubmissionService.test.ts uses node:test, not vitest)
+
+## 5. 未运行验证及原因
+- `npm run verify:changes` 完整发布前检查链 — 因环境中 npm 不在 PATH，部分子命令无法直接运行
+- `release/publish/stable/manifest.json` 中 `commitSha` / `sha256` 需在 Git commit 后更新
+
+## 6. 风险与下一步
+- 风险低。react-router v8 的 breaking changes 仅涉及 `react-router-dom` 包移除，所有受影响文件已迁移完毕
+- 下一步：执行 `agents:commit` 固化本次交付
+
+---
 ## 版本合规声明
 - 本次会话基于 KK Studio 版本 `1.5.9`。
 - `config/release-manifest.json` 为本项目的主版本源。
@@ -12,21 +71,21 @@ Status: historical
 - 本次优化细节已记录至 [AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md)。
 
 
-## 1. 修改范围
+### 1. 修改范围
 本次重构完成了大画布卡片测量收口优化，合并了重复的 `ResizeObserver` 并限制了其执行时机，防止在大画布拖拽/平移/缩放时因为 Resize 测量造成严重的 Layout Thrashing。
 
-## 2. 修改文件
+### 2. 修改文件
 - **[PromptNodeComponent.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/canvas/PromptNodeComponent.tsx)**：合并了两个 ResizeObserver；引入本地 IntersectionObserver 避免渲染关联；添加 isCanvasTransforming 变换拦截。
 - **[ImageCard2.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/components/image/ImageCard2.tsx)**：合并高度测量和密度自适应的 ResizeObserver；合并 RAF 调度更新。
 - **[WorkspacePage.tsx](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/pages/Workspace/WorkspacePage.tsx)**：向下传递 `isCanvasTransforming` 给 ImageNode；使用 Ref 隔离并支持 PromptNode 批量高度更新。
 - **[usePromptGroupLayout.ts](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web/src/app/usePromptGroupLayout.ts)**：重构 `handlePromptGroupNodeHeightChange` 接入调度器批量处理。
 
-## 3. 当前设计决策
+### 3. 当前设计决策
 - **拦截时机 (Transforms Delay)**：使用 `isCanvasTransforming` 在所有 ResizeObserver 挂载 Effect 中作为前置判断，一旦处于 Transforming 直接短路。当状态恢复至 `idle` 时，Effect 会自动因依赖变化触发一次补偿测高，保证高度最终一致性。
 - **本地化视口检测 (IntersectionObserver)**：通过在 `PromptNodeComponent` 中使用局部 IntersectionObserver，使测量完全与全局平移坐标脱钩，规避了高频平移造成的全局大量重新渲染。
 - **单例批处理调度 (Measurement Scheduler)**：利用 `CanvasMeasurementScheduler` 把原本零散、同步的 Prompt 节点和 Image 节点的高度变更，全数合流至统一的 RAF 周期进行集中状态与 DB 写入。
 
-## 4. 已运行验证
+### 4. 已运行验证
 我们已运行了本地全套 CI 级别治理和构建检测，均 100% 成功通过：
 ```bash
 npm run typecheck            # Passed
@@ -35,10 +94,10 @@ npm run governance:check     # Passed
 npm run build                # Passed (Vite production bundle compiled successfully)
 ```
 
-## 5. 未运行验证及原因
+### 5. 未运行验证及原因
 - **真实高负载大画布上手动性能复测**：由于本地没有连接真实的 GUI 浏览器交互环境，未能直接观测 FPS 及进行 Chrome Performance Profiling，这需要用户在大画布上进行频繁拖拽/缩放/平移以验证流畅度提升。
 
-## 6. 风险与下一步
+### 6. 风险与下一步
 - **风险**：如果在极低性能设备上平移瞬间结束，可能会在极短时间内因触发补救测高发生短暂的 Layout Task。
 - **下一步**：在大画布中加载百级节点包围盒，观察平移、拖动和缩放时的帧率表现。
 
@@ -3271,3 +3330,27 @@ npm run build                # Passed (Vite production bundle compiled successfu
 
 
 
+
+---
+
+## 216. 2026-07-25 - v1.6.1 安全升级审查与验证补充 (Codex Review)
+
+### 修改范围
+对 v1.6.1 未提交变更进行全面代码审查，补充运行 typecheck/build/test/architecture/governance 验证，更新 handoff 记录。
+
+### 审查结论
+- react-router v7→v8 迁移彻底（11 源文件 + 3 测试全部正确更新）
+- 版本号拉齐一致（8 package.json + config + manifest + AGENTS.md）
+- 无 console.log / debugger / 硬编码密钥
+- 双锁文件并存（pnpm-lock.yaml + package-lock.json），建议确认主包管理器后清理
+
+### 已运行验证
+- `typecheck` — ✅ 0 errors
+- `build` — ✅ built in 6.11s
+- `test` — ✅ 16 passed
+- `architecture:check` — ✅ 多模块通过
+- `governance:version/current/security` — ✅ 全部通过
+
+### 风险与下一步
+- 风险低。`rechargeSubmissionService.test.ts` 使用 node:test 而非 vitest，为既有问题
+- 下一步：`agents:commit` 固化

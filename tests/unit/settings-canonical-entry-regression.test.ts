@@ -52,7 +52,7 @@ test('settings workbench self-hosts a MemoryRouter because the app root does not
   const mainSource = readSource('apps/web/src/main.tsx');
 
   assert.doesNotMatch(mainSource, /<BrowserRouter/);
-  assert.match(localizedShellSource, /import.*MemoryRouter.*from 'react-router-dom';/);
+  assert.match(localizedShellSource, /import.*MemoryRouter.*from 'react-router';/);
   assert.match(localizedShellSource, /<MemoryRouter initialEntries=\{\[initialEntry\]\} key=\{initialEntry\}>/);
 });
 

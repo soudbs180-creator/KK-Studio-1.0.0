@@ -1,9 +1,9 @@
-Status: historical
+Status: current
 
-# KK Studio Progress Report - v1.6.0
+# KK Studio Progress Report - v1.6.1
 
-Current version source is `config/release-manifest.json` (`v1.6.0`).
-Last reviewed: 2026-07-20.
+Current version source is `config/release-manifest.json` (`v1.6.1`).
+Last reviewed: 2026-07-25.
 
 - `config/release-manifest.json` 是版本真相。
 - `apps/web/src/config/appInfo.ts` 作为运行时只读导出。

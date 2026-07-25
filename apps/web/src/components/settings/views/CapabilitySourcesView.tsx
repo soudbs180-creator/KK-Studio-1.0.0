@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { KeyRound, Server, ShieldCheck, Globe, Cpu } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,

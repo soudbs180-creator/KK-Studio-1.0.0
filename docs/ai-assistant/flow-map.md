@@ -2,7 +2,7 @@ Status: reference
 
 # 流程地图 (Flow Map)
 
-本文件整理了 KK Studio v1.6.0 的核心工作流流转路径。
+本文件整理了 KK Studio v1.6.1 的核心工作流流转路径。
 
 ---
 

@@ -65,8 +65,8 @@ test('portable stable release notes describe the hosted same-origin API workarou
   }>('config/release-manifest.json');
 
   assert.ok(
-    releaseManifest.releaseNotes?.some((note) => note.includes('verified kkai.plus same-origin API')),
-    'release notes should identify the active hosted API route',
+    releaseManifest.releaseNotes?.some((note) => note.includes('react-router') || note.includes('brace-expansion')),
+    'release notes should identify the latest security updates',
   );
   assert.equal(
     releaseManifest.releaseNotes?.some((note) => note.includes('remaining DNS/TLS smoke gate')),

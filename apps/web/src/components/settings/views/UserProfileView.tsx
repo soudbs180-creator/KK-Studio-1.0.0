@@ -11,7 +11,7 @@ import {
   UserRound,
   WalletCards,
 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 
 import { formatRemainingCredits } from '../../../services/billing/remainingBalance';
 import { USER_PROFILE_ACTIONS } from '../settingsModuleActions';

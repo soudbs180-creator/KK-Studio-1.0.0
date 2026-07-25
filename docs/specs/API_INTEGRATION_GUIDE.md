@@ -1,4 +1,4 @@
-# KK Studio API Integration Guide - v1.6.0
+# KK Studio API Integration Guide - v1.6.1
 
 Status: reference integration boundary. This guide replaces the old hosted
 database, default-admin-password and browser-to-Provider examples.

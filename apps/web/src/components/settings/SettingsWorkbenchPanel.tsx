@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 
 import type { Supplier } from '../../services/billing/supplierService';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
