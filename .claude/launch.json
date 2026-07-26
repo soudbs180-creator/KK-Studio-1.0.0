@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kk-web",
+      "runtimeExecutable": "C:\\Program Files\\Adobe\\Adobe Creative Cloud Experience\\libs\\node.exe",
+      "runtimeArgs": [
+        "node_modules/vite/bin/vite.js",
+        "--configLoader",
+        "native",
+        "--config",
+        "apps/web/vite.config.ts"
+      ],
+      "port": 3000
+    }
+  ]
+}

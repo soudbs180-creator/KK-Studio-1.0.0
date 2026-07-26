@@ -88,8 +88,8 @@
 
 | # | 能力 | 符合度 | 当前证据 | 后续动作 |
 |---|---|---|---|---|
-| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 229 份 Markdown（不含生成索引本身）。 | keep |
-| 8.2 | current 分类正确 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:17`：20 份 current，达成 15–25 目标。 | keep |
+| 8.1 | 文档总量 | 完全 | `docs/governance/DOCUMENTATION_INDEX.md:6`：仓库共 269 份 Markdown（不含生成索引本身）。 | keep |
+| 8.2 | current 分类正确 | 不符合 | `docs/governance/DOCUMENTATION_INDEX.md:17`：29 份 current，已超出 15–25 目标区间。 | archive |
 | 8.3 | 版本事实源一致 | 部分 | `config/release-manifest.json` 是唯一版本源；但部分文档仍引用旧版本。 | archive |
 | 8.4 | OpenSpec 单一 active | 完全 | `DOCUMENTATION_INDEX.md` 中仅 `upgrade-ai-creation-core` 的文档标为 current；`canvas-card-system-v2`、`expand-ai-site-capabilities`、`harden-ai-control-plane`、`modernize-ai-first-workspace-ui`、`unify-ai-collaboration-modes` 均已归类 history。 | keep |
 
@@ -152,7 +152,7 @@
 | handleSlides 位图旁路 | `apps/web/src/core/orchestration/TaskOrchestrator.ts:96-147` |
 | 可编辑 PPTX 导出 | `apps/web/src/app/usePptRuntime.ts:613-816` |
 | 硬编码 Feature Flag | `apps/web/src/config/featureFlags.ts:1-4` / `apps/web/src/app/kkaiFeatureFlags.ts:1-7` |
-| 文档 229 / 20 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
+| 文档 269 / 29 current | `docs/governance/DOCUMENTATION_INDEX.md:6,17` |
 | Browser Bridge 白名单/脱敏 | `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts:108-147,149-190` / `browserActionCatalog.ts` |
 | Canonical Provider catalog | `packages/shared/src/generation/providerCatalog.ts` |
 | Capability Graph 契约与投影 | `packages/shared/src/capability-graph/` / `services/api/lib/capability-graph/projection.js` / `services/api/routes/capability-graph.js` |

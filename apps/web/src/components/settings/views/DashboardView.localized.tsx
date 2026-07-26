@@ -4,12 +4,14 @@ import {
   ArrowRight,
   CircleGauge,
   Cloud,
+  Coins,
   Cpu,
   Globe,
   HardDrive,
   KeyRound,
   Laptop,
   ScrollText,
+  Sparkles,
 } from 'lucide-react';
 
 import { useBilling } from '../../../context/BillingContext';
@@ -570,6 +572,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     { id: 'fast', label: pick('快速', 'Fast'), description: pick('优先操作响应', 'Prioritize responsiveness') },
     { id: 'balanced', label: pick('正常', 'Normal'), description: pick('性能与质感均衡', 'Balanced performance') },
     { id: 'visual', label: pick('性能', 'Performance'), description: pick('完整特效与画质', 'Full effects and quality') },
+  ];
+  // 取值域必须与 GenerationModeView 及 ProviderRouteEngine 一致（auto/local/cloud/platform）。
+  const routeOptions: Array<{ id: QuickGenerationRoute; label: string; description: string; icon: React.ReactNode }> = [
+    { id: 'auto', label: pick('自动', 'Auto'), description: pick('按可用性自动选择', 'Pick automatically by availability'), icon: <Sparkles size={15} /> },
+    { id: 'local', label: pick('本地优先', 'Local first'), description: pick('优先使用本地运行时', 'Prefer the local runtime'), icon: <Laptop size={15} /> },
+    { id: 'cloud', label: pick('服务器优先', 'Server first'), description: pick('优先使用自有服务器', 'Prefer your own server'), icon: <Cloud size={15} /> },
+    { id: 'platform', label: pick('平台积分', 'Platform'), description: pick('使用平台积分模型', 'Use the platform credit model'), icon: <Coins size={15} /> },
   ];
   const selectRoutePreference = (route: QuickGenerationRoute) => {
     setQuickGenerationRoute(route);
@@ -1657,15 +1666,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="dashboard-preference-control">
               <div className="dashboard-preference-control__label">
                 <span>{pick('默认执行位置', 'Default execution')}</span>
-                <strong>{routePreference === 'local' ? pick('本地优先', 'Local first') : pick('服务器优先', 'Server first')}</strong>
+                <strong>{routeOptions.find((option) => option.id === routePreference)?.label}</strong>
               </div>
-              <div className="dashboard-segment" role="radiogroup" aria-label={pick('默认执行位置', 'Default execution')}>
-                <button type="button" role="radio" aria-checked={routePreference === 'local'} data-state={routePreference === 'local' ? 'selected' : 'idle'} onClick={() => selectRoutePreference('local')}>
-                  <Laptop size={15} />{pick('本地优先', 'Local first')}
-                </button>
-                <button type="button" role="radio" aria-checked={routePreference === 'cloud'} data-state={routePreference === 'cloud' ? 'selected' : 'idle'} onClick={() => selectRoutePreference('cloud')}>
-                  <Cloud size={15} />{pick('服务器优先', 'Server first')}
-                </button>
+              {/* 四个选项必须与生成模式页一致：只给「本地/服务器」两个按钮时，
+                  用户在生成模式页选的「自动」或「平台」会在这里被改写掉。 */}
+              <div className="dashboard-segment dashboard-segment--four" role="radiogroup" aria-label={pick('默认执行位置', 'Default execution')}>
+                {routeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={routePreference === option.id}
+                    data-state={routePreference === option.id ? 'selected' : 'idle'}
+                    onClick={() => selectRoutePreference(option.id)}
+                    title={option.description}
+                  >
+                    {option.icon}{option.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="dashboard-preference-control">

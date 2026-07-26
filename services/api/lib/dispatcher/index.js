@@ -438,10 +438,11 @@ class BackendDispatcher {
         throw error;
       }
 
-      currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
+      // Saga 步骤一：扣款与任务单置为 pending_deducted 在 credits.deductCredits 的
+      // 同一事务内提交。进程若在请求 Provider 期间崩溃，对账守护会按 pending_deducted
+      // 扫描到该任务并自动退款（此前状态从未写入，守护扫描的是空集）。
+      currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey, { billingJobId: requestId });
       creditsDeducted = true;
-
-      // 🚀 移除中间状态更新，减少一次 DB 往返
 
       let requestSuccess = false;
       let finalContent = '';
@@ -584,10 +585,19 @@ class BackendDispatcher {
         });
       }
 
-      await pool.query(
-        'UPDATE public.billing_jobs SET status = $1, updated_at = NOW() WHERE id = $2',
-        ['completed', requestId]
+      // 结算仅允许从 pending_deducted 推进；rowCount 为 0 说明对账守护已在超时
+      // 窗口后退款（极端慢请求），此时服务已交付但积分被退，需要告警人工复核。
+      const settleRes = await pool.query(
+        "UPDATE public.billing_jobs SET status = 'completed', updated_at = NOW() WHERE id = $1 AND status = 'pending_deducted'",
+        [requestId]
       );
+      if (settleRes.rowCount === 0) {
+        console.error('[P0 ALERT] 计费任务结算冲突：任务已被对账守护提前退款，但请求最终成功', {
+          jobId: requestId,
+          userId,
+          cost: requiredCredits,
+        });
+      }
 
       metricsCollector.recordRequest({
         modelId: usedChannelInfo?.model_id || baseModelId,
@@ -639,7 +649,15 @@ class BackendDispatcher {
 
       let refundFailed = false;
       try {
-        currentCredits = await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
+        // Saga 补偿：退款与任务单置为 refunded 同事务提交，并以 pending_deducted
+        // 状态做原子抢占；返回 null 表示对账守护已并发退款，跳过防止双重退款。
+        const refundResult = await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits, { billingJobId: requestId });
+        if (refundResult === null) {
+          console.warn(`[BackendDispatcher] 任务 ${requestId} 已由对账守护并发退款，跳过重复补偿`);
+          currentCredits = await credits.getUserCredits(userId);
+        } else {
+          currentCredits = refundResult;
+        }
       } catch (refundErr) {
         refundFailed = true;
         console.error('[P0 ALERT] 积分退款失败，需人工介入', {
@@ -665,11 +683,7 @@ class BackendDispatcher {
         throw error;
       }
 
-      await pool.query(
-        'UPDATE public.billing_jobs SET status = $1, updated_at = NOW() WHERE id = $2',
-        ['refunded', requestId]
-      );
-
+      // 任务单状态已在 refundCredits 事务内原子置为 refunded，无需二次更新。
       const error = new Error(`AI 请求处理失败，已安全回滚并退还 ${requiredCredits} 积分。`);
       error.statusCode = err.statusCode || 500;
       error.code = err.code || 'AI_CHAT_FAILED';

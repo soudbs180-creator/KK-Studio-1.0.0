@@ -3,7 +3,13 @@
  * Integrated OAuth 2.0 PKCE authentication management & Multi-Provider proxy routing for KK Studio (services/api).
  */
 
-const { logger } = require('../../logger');
+// 中文注释：services/api 无独立 logger 模块，统一使用 console（与 dispatcher 等模块一致）。
+// 原 `require('../../logger')` 指向不存在的文件，模块一经加载即崩溃，此处改为 console 适配。
+const logger = {
+  info: (...args) => console.log(...args),
+  warn: (...args) => console.warn(...args),
+  error: (...args) => console.error(...args)
+};
 
 // 支持的 Canonical Providers
 const SUPPORTED_PROVIDERS = [

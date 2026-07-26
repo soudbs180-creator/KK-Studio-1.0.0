@@ -3,6 +3,8 @@
 
 import React from 'react';
 import type { ImagePostProcessingAction } from '@kk/shared';
+import { KK_LAYER } from '@kk/ui';
+import { LayerPortal } from '../layout/LayerPortal';
 
 export interface ImagePostProcessingToolbarProps {
   selectedNodeId: string;
@@ -17,8 +19,12 @@ export const ImagePostProcessingToolbar: React.FC<ImagePostProcessingToolbarProp
 }) => {
   if (!isVisible || !selectedNodeId) return null;
 
+  // 特权浮层契约：节点级工具栏 Portal 到 document.body 并改用 fixed 定位，
+  // 避免被画布节点的 transform / overflow-hidden 囚禁；层级取 KK_LAYER.toolbar
+  // 而非裸 Tailwind z 值，保证与全局层级体系一致。
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 backdrop-blur-md rounded-xl shadow-xl text-xs text-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+    <LayerPortal zIndex={KK_LAYER.toolbar}>
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 backdrop-blur-md rounded-xl shadow-xl text-xs text-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
       <button
         onClick={() => onExecuteAction('remove_background')}
         className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors flex items-center gap-1"
@@ -59,5 +65,6 @@ export const ImagePostProcessingToolbar: React.FC<ImagePostProcessingToolbarProp
         <span>📐</span> 矢量化 SVG
       </button>
     </div>
+    </LayerPortal>
   );
 };

@@ -8,9 +8,10 @@ import {
   getEffectiveValue,
   isPlaceholder,
   resolveRepoRoot,
-} from "./lib/env-contract.mjs";
+} from "../lib/env-contract.mjs";
 
-const repoRoot = resolveRepoRoot(import.meta.url);
+// 本文件位于 scripts/release/，resolveRepoRoot 假定调用方在 scripts/ 下一层，需再上一级才是仓库根目录。
+const repoRoot = path.resolve(resolveRepoRoot(import.meta.url), "..");
 const rootPath = repoRoot;
 
 const hostedFrontendRequired = [

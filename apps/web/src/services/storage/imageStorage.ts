@@ -13,6 +13,7 @@
 
 import { fileSystemService } from './fileSystemService.ts';
 import { getStorageMode } from './storagePreference.ts';
+import { buildImageCacheInvalidationKeys, rehydrateWith, type ImageCacheKeyOptions } from './imageCacheKeys.ts';
 
 const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/=\r\n]+$/;
 
@@ -96,6 +97,18 @@ class ImageMemoryCache {
             URL.revokeObjectURL(url);
         }
         this.cache.delete(id);
+    }
+
+    /**
+     * 逐出但不 revoke —— 与 delete 是两种语义。
+     *
+     * 同一个 key 对应的 blob URL 字符串会被灯箱、PromptBar 引用缩略图、画布节点、
+     * 收藏与导出等多路消费者同时持有。“失效缓存以便重新读取”时若 revoke，
+     * 仍在渲染该 URL 的其它组件会立刻黑图。因此失效路径只从 Map 摘除，
+     * 让旧 URL 随其最后一个持有者自然消亡。
+     */
+    evict(id: string): boolean {
+        return this.cache.delete(id);
     }
 
     // 检查是否存在
@@ -845,6 +858,35 @@ export function clearMemoryCache(): void {
     console.log('[ImageStorage] Memory cache cleared');
 }
 
+export interface InvalidateImageCacheOptions extends ImageCacheKeyOptions {
+    /**
+     * 默认 false。内存缓存里的 blob URL 跨消费者共享，revoke 会让仍在渲染它的
+     * 其它卡片黑图；只有确定要销毁该图时才传 true。
+     */
+    revokeObjectUrls?: boolean;
+}
+
+/**
+ * 按 id 失效内存缓存（含派生档位）。同步执行，调用方可以「先失效、后读取」
+ * 而不必担心竞态。返回实际被逐出的键，便于测试与诊断。
+ */
+export function invalidateImageCache(id: string, options: InvalidateImageCacheOptions = {}): string[] {
+    const keys = buildImageCacheInvalidationKeys([id], options);
+    const evicted: string[] = [];
+
+    for (const key of keys) {
+        if (!memoryCache.has(key)) continue;
+        if (options.revokeObjectUrls) {
+            memoryCache.delete(key);
+        } else {
+            memoryCache.evict(key);
+        }
+        evicted.push(key);
+    }
+
+    return evicted;
+}
+
 /**
  * 获取内存缓存统计信息
  */
@@ -943,7 +985,7 @@ function compressImage(dataUrl: string, maxDimension: number): Promise<string> {
 // 🚀 图片质量分级功能
 // ============================================
 
-import { ImageQuality, generateAllQualities, getQualityStorageId } from '../image/imageQuality.ts';
+import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, generateAllQualities, getQualityStorageId } from '../image/imageQuality.ts';
 
 /**
  * 🚀 保存图片（支持质量分级）
@@ -980,6 +1022,46 @@ export async function saveImageWithQualities(id: string, originalUrl: string): P
  * @param quality 质量级别
  * @returns 图片数据或null
  */
+// 正在补建的档位键，防止同一图片在多卡片并发 miss 时重复压缩。
+const qualityBackfillInFlight = new Set<string>();
+
+/**
+ * 档位缺失时的惰性补建：把回落读到的原图压缩成缺失档位并写回，
+ * 使下一次读取直接命中小图，而不是反复整张原图解码。
+ *
+ * 存量图片（本次修复前生成的）缺少 THUMBNAIL 档位，只靠写路径补齐无法覆盖，
+ * 因此在读路径做一次性补建。补建在空闲帧执行，不阻塞当前返回。
+ */
+function scheduleQualityBackfill(id: string, quality: ImageQuality, originalData: string): void {
+    if (quality === ImageQuality.ORIGINAL) return;
+    // 仅图片可压缩；视频/非 data URL 源跳过。
+    if (!originalData.startsWith('data:image/')) return;
+
+    const backfillKey = getQualityStorageId(id, quality);
+    if (qualityBackfillInFlight.has(backfillKey)) return;
+    qualityBackfillInFlight.add(backfillKey);
+
+    const run = async () => {
+        try {
+            const compressed = await compressImageToQuality(originalData, QUALITY_CONFIGS[quality]);
+            if (compressed) {
+                await saveImage(backfillKey, compressed);
+                console.debug(`[ImageQuality] Backfilled ${quality} tier for ${id}`);
+            }
+        } catch (error) {
+            console.debug(`[ImageQuality] Backfill of ${quality} for ${id} skipped:`, error);
+        } finally {
+            qualityBackfillInFlight.delete(backfillKey);
+        }
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => { void run(); }, { timeout: 3000 });
+    } else {
+        setTimeout(() => { void run(); }, 0);
+    }
+}
+
 export async function getImageByQuality(
     id: string,
     quality: ImageQuality = ImageQuality.ORIGINAL
@@ -990,10 +1072,33 @@ export async function getImageByQuality(
     // 如果指定质量不存在，fallback到原图
     if (!image && quality !== ImageQuality.ORIGINAL) {
         console.debug(`[ImageQuality] Quality ${quality} not found for ${id}, using original`);
-        return getImage(id);
+        const original = await getImage(id);
+        if (original) {
+            scheduleQualityBackfill(id, quality, original);
+        }
+        return original;
     }
 
     return image;
+}
+
+/**
+ * 强制再水合：绕过内存缓存快路径，重新从 IDB / 本地磁盘 / OPFS 读取并重建 URL。
+ *
+ * `getImage` 在内存命中时直接短路返回且不做有效性检查（见其实现），因此一个已经
+ * 失效的 blob URL 会被无限次返回 —— 单纯重试读取无法自愈，必须先失效再读。
+ * 顺序契约由 rehydrateWith 保证，可在单元测试中独立验证。
+ */
+export async function rehydrateImage(
+    id: string,
+    quality: ImageQuality = ImageQuality.ORIGINAL
+): Promise<string | null> {
+    return rehydrateWith(id, quality, {
+        invalidate: (targetId) => invalidateImageCache(targetId),
+        readStrictOriginal: (targetId) => getStrictOriginalImage(targetId),
+        read: (targetId) => getImage(targetId),
+        readByQuality: (targetId, targetQuality) => getImageByQuality(targetId, targetQuality),
+    });
 }
 
 /**

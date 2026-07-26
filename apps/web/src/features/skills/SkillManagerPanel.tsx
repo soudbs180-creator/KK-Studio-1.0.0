@@ -3,6 +3,8 @@
 
 import React, { useState } from 'react';
 import type { AgentSkillManifest, SkillCategory, SkillPermission } from '@kk/shared';
+import { KK_LAYER } from '@kk/ui';
+import { LayerPortal } from '../../components/layout/LayerPortal';
 
 export interface SkillManagerPanelProps {
   isOpen: boolean;
@@ -41,8 +43,11 @@ export const SkillManagerPanel: React.FC<SkillManagerPanelProps> = ({
     return matchCategory && matchQuery;
   });
 
+  // 特权浮层契约：面板必须 Portal 到 document.body，脱离画布视口的 transform
+  // 层叠上下文，否则 fixed inset-0 遮罩会塌缩到父容器尺寸。
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <LayerPortal zIndex={KK_LAYER.modal}>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[650px] text-slate-100">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
@@ -161,5 +166,6 @@ export const SkillManagerPanel: React.FC<SkillManagerPanelProps> = ({
         </div>
       </div>
     </div>
+    </LayerPortal>
   );
 };

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { toolRegistryInstance, AgentToolRegistry } from '../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts';
 import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { emitAuthSessionChange } from '../../apps/web/src/services/auth/authSessionEvents.ts';
+import { waitFor } from '../support/waitFor.js';
 import {
   captureAssistantAuthorizationScope,
   createAssistantConfirmationExpiresAt,
@@ -973,7 +974,12 @@ test('ToolRegistry: generation.retryJob retries failed durable queue prompts', a
       'tool-registry-retry-job'
     );
 
-    await new Promise(resolve => originalSetTimeout(resolve, 120));
+    // 等到队列真的把 1 次执行 + 3 次重试跑完为止，而不是赌固定 120ms 够用。
+    // 固定等待在 CPU 繁忙时会不够，导致本用例间歇性失败。
+    await waitFor(
+      () => durableGenerationQueue.getJob(createdJob.id)?.prompts[0]?.status === 'failed',
+      { description: 'prompt-1 耗尽重试进入 failed', timer: originalSetTimeout }
+    );
 
     const failedJob = durableGenerationQueue.getJob(createdJob.id);
     assert.equal(failedJob?.prompts[0]?.status, 'failed');
@@ -996,7 +1002,10 @@ test('ToolRegistry: generation.retryJob retries failed durable queue prompts', a
     assert.equal(result.retryingCount, 1);
     assert.equal(result.failedCount, 0);
 
-    await new Promise(resolve => originalSetTimeout(resolve, 50));
+    await waitFor(
+      () => durableGenerationQueue.getJob(createdJob.id)?.prompts[0]?.status === 'completed',
+      { description: 'prompt-1 重试后完成', timer: originalSetTimeout }
+    );
 
     const recoveredJob = durableGenerationQueue.getJob(createdJob.id);
     assert.equal(recoveredJob?.prompts[0]?.status, 'completed');

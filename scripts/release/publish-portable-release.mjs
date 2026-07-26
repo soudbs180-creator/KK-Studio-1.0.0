@@ -4,6 +4,8 @@ import path from "node:path";
 
 import JSZip from "jszip";
 
+import { assertVersionConsistency } from "../lib/version-gate.mjs";
+
 const rootDir = process.cwd();
 const releaseManifestPath = path.join(rootDir, "config", "release-manifest.json");
 const portableBundleDir = path.join(rootDir, "release", "KK-Studio-Portable");
@@ -116,6 +118,10 @@ async function main() {
     printUsage();
     return;
   }
+
+  // 发布门禁：portable 发布不经 GitHub Actions，必须自行校验版本真理源一致性，
+  // 否则子包 package.json 的版本漂移会被直接打进对外分发的 zip 与 manifest。
+  assertVersionConsistency({ context: "publish:portable", rootDir });
 
   ensureExists(releaseManifestPath, "config/release-manifest.json was not found.");
   ensureExists(portableBundleDir, "release/KK-Studio-Portable was not found. Run npm run package:portable first.");

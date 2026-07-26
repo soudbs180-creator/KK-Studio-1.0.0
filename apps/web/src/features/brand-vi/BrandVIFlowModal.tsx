@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import type { BrandProfile, ColorPalette, TypographyRule, BrandGuideline } from '@kk/shared';
+import { KK_LAYER } from '@kk/ui';
+import { LayerPortal } from '../../components/layout/LayerPortal';
 
 export interface BrandVIFlowModalProps {
   isOpen: boolean;
@@ -85,8 +87,11 @@ export const BrandVIFlowModal: React.FC<BrandVIFlowModalProps> = ({
     onClose();
   };
 
+  // 特权浮层契约：Modal 必须 Portal 到 document.body。画布视口带 transform，
+  // 内联渲染会让 fixed inset-0 以视口容器为包含块，遮罩塌缩且被 overflow 裁剪。
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <LayerPortal zIndex={KK_LAYER.modal}>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-100">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
@@ -281,5 +286,6 @@ export const BrandVIFlowModal: React.FC<BrandVIFlowModalProps> = ({
         </div>
       </div>
     </div>
+    </LayerPortal>
   );
 };

@@ -1,10 +1,10 @@
 // User profile, Key Manager, and user-owned Provider route APIs.
 
 const express = require('express');
-const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || 'admin@example.com';
-
+const INITIAL_ADMIN_EMAIL = String(process.env.ADMIN_INITIAL_EMAIL || '').trim().toLowerCase(); // 安全：禁止硬编码默认值，抢注默认邮箱即可自助提权；未配置则不提权
 const { getPool } = require('../../lib/db');
 const { signJWT } = require('../../lib/jwt');
+const { rejectUnsafeOutboundUrl } = require('./shared/outboundUrlGuard');
 const {
   buildWuyinVideoDetailUrl,
   buildWuyinVideoRequestBody,
@@ -57,7 +57,6 @@ function extractWuyinEndpointPath(url) {
   }
 }
 
-
 function buildProfileFromUserRow(user) {
   const email = String(user.email || '').trim();
   const timestamp = user.updated_at || user.created_at || new Date().toISOString();
@@ -104,7 +103,7 @@ async function loadProfileForUserId(userId) {
 
   if (result.rows.length > 0) {
     const user = result.rows[0];
-    if (user.email === INITIAL_ADMIN_EMAIL && Number(user.admin_level || 0) !== 1) {
+    if (INITIAL_ADMIN_EMAIL && String(user.email || '').trim().toLowerCase() === INITIAL_ADMIN_EMAIL && Number(user.admin_level || 0) !== 1) {
       user.admin_level = 1;
       await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
     }
@@ -144,7 +143,7 @@ router.get('/user/me', async (req, res) => {
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
   const user = result.rows[0];
   let adminLevel = Number(user.admin_level || 0);
-  if (user.email === INITIAL_ADMIN_EMAIL && adminLevel !== 1) {
+  if (INITIAL_ADMIN_EMAIL && String(user.email || '').trim().toLowerCase() === INITIAL_ADMIN_EMAIL && adminLevel !== 1) {
     adminLevel = 1;
     await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
   }
@@ -190,7 +189,6 @@ router.get('/v1/profile', async (req, res) => {
 
   return res.json(okEnvelope(profile, req));
 });
-
 
 function requireProfileAuth(req, res, next) {
   const authState = resolveProfileUserId(req);
@@ -488,6 +486,9 @@ async function handleWuyinGenericProxy(req, res, profileState) {
   if (!targetUrl) {
     return null;
   }
+
+  const unsafeTarget = rejectUnsafeOutboundUrl(targetUrl); // SSRF 守卫：见 shared/outboundUrlGuard.js
+  if (unsafeTarget) return sendLocalProxyError(res, req, 400, 'PROXY_TARGET_REJECTED', unsafeTarget);
 
   const route = await resolveProfileUserRoute(req.profileUserId, profileState, routeId);
   if (!route) {
@@ -1527,7 +1528,6 @@ router.post('/v1/profile/user-apis', async (req, res) => {
   });
 });
 
-
 // 6. 检测个人通道连通性与自动获取模型列表
 router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth, async (req, res) => {
   const routeId = req.params.routeId;
@@ -1780,6 +1780,5 @@ router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth,
     meta: buildMeta(req)
   });
 });
-
 
 module.exports = router;

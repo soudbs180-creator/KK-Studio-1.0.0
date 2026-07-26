@@ -17,7 +17,7 @@ API client: packages/api-client/
 UI package: packages/ui/
 Database migrations: infrastructure/database/migrations/
 Active OpenSpec: openspec/changes/upgrade-ai-creation-core/ (single active change)
-Docs governance: 229 Markdown / 20 current (docs/governance/DOCUMENTATION_INDEX.md)
+Docs governance: 269 Markdown / 29 current (docs/governance/DOCUMENTATION_INDEX.md)
 ```
 
 本文件只记录当前状态、验证入口和清理边界。历史事实、旧计划、旧版本和旧部署路径应归档到 `docs/archive/`，不得重新影响当前主链路。
@@ -106,7 +106,7 @@ npm run local-runner:build
 
 > 2026-07-24 当前事实：metadata-only `replan` 事件、confirmation expiry foundation 与本地可执行 Run 的 bounded replan executor 均已完成。replacement 必须由服务端 exact 接受并使用数据库 `replanCount`（最多 3）；真实 Quote 来源、semantic replay、真实 Provider/LLM 质量验收与跨设备执行接管仍未完成。
 
-- Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 229 份 Markdown、20 份 current、0 conflict。
+- Phase 0 的 PostgreSQL 016 演练与文档治理已完成；当前治理索引为 269 份 Markdown、29 份 current、0 conflict。该数字由 `npm run governance:docs` 生成，新增或归档文档后必须以脚本输出为准重写，不得手工推算。
 - Phase 1 的 Quote、Job v3、Item ledger、Provider Adapter 和同步/异步桥接已经完成。
 - Capability Graph DTO、migration 018、snapshot projection/API、规范化 Provider Connection CRUD/verify、只读 Agent tool、asset lineage 与 image slice flag 已实现并有专项测试。image slice 现同时保护管理面和实际数据面：Connection-backed Quote、同步 submit 与 durable enqueue 均在 resolver/credential/Provider/lease 副作用前按 server scope fail closed；无 `connectionId` 的 legacy 路径不变，已入队 Worker 在 flag 关闭后继续使用冻结路由 drain。
 - Agent Planner 已经通过 ToolRegistry 的 `capabilities.listAvailable` 消费服务端 snapshot：请求绑定 captured owner 与 1.5 秒 AbortSignal，只投影最多 100 条 active Connection -> Model -> Capability route，displayName、secret 与任意 constraints payload 不进入上下文。图片/视频/音频 action 的显式 model hint 必须匹配同媒体 capability；无图证据时移除 hint 并保留服务端 RouteEngine 的最终选择权，该摘要不授予执行权限。

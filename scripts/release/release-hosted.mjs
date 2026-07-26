@@ -2,8 +2,12 @@ import { spawnSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { assertVersionConsistency } from "../lib/version-gate.mjs";
+
 const scriptPath = fileURLToPath(import.meta.url);
-const repoRoot = path.resolve(path.dirname(scriptPath), "..");
+// 本文件位于 scripts/release/，需上溯两级才是仓库根目录；此前只上溯一级，
+// 所有部署步骤实际运行在 scripts/ 下（与 diagnose-hosted-release.mjs 同类修复）。
+const repoRoot = path.resolve(path.dirname(scriptPath), "..", "..");
 const vpsDeployCommand = process.env.KK_VPS_DEPLOY_COMMAND;
 const vpsPreviewDeployCommand = process.env.KK_VPS_PREVIEW_DEPLOY_COMMAND;
 
@@ -95,6 +99,10 @@ function main() {
 
   console.log("[release:hosted] Starting hosted release workflow");
   console.log(`[release:hosted] repo: ${repoRoot}`);
+
+  // 发布门禁：该路径可绕过 GitHub Actions 直连生产，版本一致性必须在此校验。
+  // 刻意不受 --skip-check 控制——该标志只用于跳过环境探测，不得跳过版本真理源。
+  assertVersionConsistency({ context: "release:hosted", rootDir: repoRoot });
 
   if (!skipCheck) {
     runStep("Hosted preflight check", "npm run release:hosted:check");

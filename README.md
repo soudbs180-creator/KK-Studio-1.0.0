@@ -239,15 +239,20 @@ psql "$DATABASE_URL" -f infrastructure/database/migrations/002_token_schema.sql
 所有迁移脚本均为幂等设计，可重复执行而不会破坏已有数据。
 
 ### 7.4 构建共享包
-在本地开发启动前，必须构建协议契约包与 API 客户端：
-```bash
-npm run build -w packages/api-client
-```
-若修改了 `packages/shared` 或 `packages/ui`，也需要同步构建对应的 workspace：
+在本地开发启动前，必须按以下顺序构建三个共享包，缺一不可：
 ```bash
 npm run build -w packages/shared
 npm run build -w packages/ui
+npm run build -w packages/api-client
 ```
+顺序不可调换：
+- `packages/shared` **必须构建**。其 `require` 导出指向 `dist/index.cjs`，而 `services/api`
+  是 CommonJS、通过 `require('@kk/shared')` 加载它；未构建时服务端会在启动阶段直接失败。
+- `packages/ui` 的 `build` 实为类型检查（tsconfig 设了 `noEmit`），其 `exports` 直接指向
+  `src/index.ts` 由 Vite 消费源码，因此不产出 `dist/`；这一步用于拦截类型错误，仍建议执行。
+- `packages/api-client` 依赖 `@kk/shared`，必须排在其后构建。
+
+> 该顺序与 [docs/setup/GUIDE.md](docs/setup/GUIDE.md) 保持一致；若两处出现分歧，以 GUIDE 为准。
 
 ### 7.5 启动开发服务
 ```bash

@@ -7,7 +7,20 @@ export const GENERATION_ROUTE_STORAGE_KEY = 'kk_studio_preferred_generation_mode
 export const CANVAS_PERFORMANCE_STORAGE_KEY = 'kk_studio_canvas_perf_mode';
 export const SETTINGS_QUICK_PREFERENCES_EVENT = 'kk-settings-quick-preferences-change';
 
-export type QuickGenerationRoute = 'local' | 'cloud';
+/**
+ * 生成路由偏好。必须与两处消费方保持同一取值域：
+ * - 写入与选择：components/settings/views/GenerationModeView.tsx
+ * - 实际路由判定：core/routing/ProviderRouteEngine.ts
+ * 两者都按 auto/local/cloud/platform 四值工作。此处若窄化为两值，
+ * 总览页读到 auto/platform 会退化成 local，用户一旦在总览页改动就会
+ * 把「自动」「平台」静默改写成「本地」。
+ */
+export type QuickGenerationRoute = 'auto' | 'local' | 'cloud' | 'platform';
+
+const QUICK_GENERATION_ROUTES: readonly QuickGenerationRoute[] = ['auto', 'local', 'cloud', 'platform'];
+
+export const isQuickGenerationRoute = (value: unknown): value is QuickGenerationRoute =>
+  typeof value === 'string' && (QUICK_GENERATION_ROUTES as readonly string[]).includes(value);
 
 type AppearancePreset = AppearanceMotionPreferences & {
   canvasMode: 'auto' | 'quality' | 'smooth';
@@ -46,8 +59,10 @@ const dispatchPreferenceChange = () => {
 };
 
 export const readQuickGenerationRoute = (): QuickGenerationRoute => {
-  if (typeof window === 'undefined') return 'local';
-  return window.localStorage.getItem(GENERATION_ROUTE_STORAGE_KEY) === 'cloud' ? 'cloud' : 'local';
+  if (typeof window === 'undefined') return 'auto';
+  const stored = window.localStorage.getItem(GENERATION_ROUTE_STORAGE_KEY);
+  // 与 ProviderRouteEngine 的回退一致：无效值一律视为 auto，而不是 local。
+  return isQuickGenerationRoute(stored) ? stored : 'auto';
 };
 
 export const setQuickGenerationRoute = (route: QuickGenerationRoute) => {

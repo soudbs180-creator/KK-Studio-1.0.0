@@ -14,8 +14,8 @@
     "path": "docs/ai-assistant/canvas-runtime-state.md",
     "title": "画布运行态协议 (Canvas Runtime State)",
     "summary": "画布运行态是 AI 助手精准感知当前工作区的桥梁。生成辅助建议或发起 Agent 规划时，助手会将当前页面、视口、框选对象及近期事件的脱敏摘要组装为状态；执行期间 ToolRegistry 还会在每一步重新读取运行态，从而避免模型或工具依赖过期快照。",
-    "contentHash": "be0fd1d2e58cf2d5258c60ff60c692c5",
-    "updatedAt": "2026-07-20T20:45:33.281Z"
+    "contentHash": "1e5954171324389ccedc6704e563f6d8",
+    "updatedAt": "2026-07-26T10:29:50.525Z"
   },
   {
     "id": "doc_flow_map_md",
@@ -23,8 +23,8 @@
     "path": "docs/ai-assistant/flow-map.md",
     "title": "流程地图 (Flow Map)",
     "summary": "Status: reference",
-    "contentHash": "31fcf127d65ed3614458f62b1ec86fc0",
-    "updatedAt": "2026-07-20T20:45:33.267Z"
+    "contentHash": "c6b072210e51d6e79d20884af8ef9c75",
+    "updatedAt": "2026-07-25T12:38:12.409Z"
   },
   {
     "id": "doc_module_map_md",
@@ -32,35 +32,35 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "Status: reference",
-    "contentHash": "fcd25a6ccbb8f9670112e3fba5771912",
-    "updatedAt": "2026-07-23T19:48:43.981Z"
+    "contentHash": "4e6ee581ed7c8ecbb4c1eb1fd6a4dfbd",
+    "updatedAt": "2026-07-26T10:29:52.721Z"
   },
   {
     "id": "doc_readme_md",
     "source": "doc",
     "path": "docs/ai-assistant/README.md",
-    "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.6.0",
+    "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.6.1",
     "summary": "Status: reference",
-    "contentHash": "927dea51f13f93bfc38a894ca82c5ffb",
-    "updatedAt": "2026-07-20T20:45:33.269Z"
+    "contentHash": "1002d1f210ad1eeae51bbaaf554058b5",
+    "updatedAt": "2026-07-25T12:38:11.494Z"
   },
   {
     "id": "doc_runbooks_md",
     "source": "doc",
     "path": "docs/ai-assistant/RUNBOOKS.md",
-    "title": "AI Assistant Runbooks — KK Studio v1.6.0",
+    "title": "AI Assistant Runbooks — KK Studio v1.6.1",
     "summary": "Last updated: 2026-07-19",
-    "contentHash": "94d98977524230338a24c1964f385dd4",
-    "updatedAt": "2026-07-21T19:46:31.725Z"
+    "contentHash": "4de3470e96aeb8ce65405d25bb7237ee",
+    "updatedAt": "2026-07-25T12:38:11.796Z"
   },
   {
     "id": "doc_safety_policy_md",
     "source": "doc",
     "path": "docs/ai-assistant/safety-policy.md",
     "title": "安全策略规约 (Safety Policy)",
-    "summary": "在 KK Studio v1.6.0 中，为了保障用户财产、隐私与 API 安全，AI 助手在处理任何计划前都必须严格遵守以下物理性隔离与门禁策略。",
-    "contentHash": "b335a59fa8439371f015a48c66fc0f43",
-    "updatedAt": "2026-07-20T20:45:33.283Z"
+    "summary": "在 KK Studio v1.6.1 中，为了保障用户财产、隐私与 API 安全，AI 助手在处理任何计划前都必须严格遵守以下物理性隔离与门禁策略。",
+    "contentHash": "bcafee5efc394dd0231ba43b728766be",
+    "updatedAt": "2026-07-25T12:38:13.383Z"
   },
   {
     "id": "doc_session_memory_md",
@@ -77,26 +77,26 @@
     "path": "docs/ai-assistant/site-capability-matrix.md",
     "title": "KK Studio AI 全站能力覆盖矩阵",
     "summary": "Last verified: 2026-07-24",
-    "contentHash": "7f2ed6c60e085609a63abe618d603988",
-    "updatedAt": "2026-07-23T17:49:53.958Z"
+    "contentHash": "4bc30f811be4b6122837788bcc8bb7d4",
+    "updatedAt": "2026-07-26T10:29:52.068Z"
   },
   {
     "id": "doc_skills_md",
     "source": "doc",
     "path": "docs/ai-assistant/skills.md",
-    "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.0",
+    "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.6.1",
     "summary": "Status: reference",
-    "contentHash": "5e3184cc947229bdc2eb645c284980d6",
-    "updatedAt": "2026-07-21T19:46:31.726Z"
+    "contentHash": "726d8bacefbfd161395e8af684e34036",
+    "updatedAt": "2026-07-25T12:38:13.083Z"
   },
   {
     "id": "doc_tool_registry_md",
     "source": "doc",
     "path": "docs/ai-assistant/tool-registry.md",
     "title": "工具注册表说明 (Tool Registry)",
-    "summary": "在 KK Studio v1.6.0 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
-    "contentHash": "e29e5d4f5b1d4253a394707c40c400e7",
-    "updatedAt": "2026-07-20T20:45:33.283Z"
+    "summary": "在 KK Studio v1.6.1 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
+    "contentHash": "103914e59c7c77190e7860390be0416f",
+    "updatedAt": "2026-07-26T10:29:51.386Z"
   },
   {
     "id": "doc_ui_map_md",

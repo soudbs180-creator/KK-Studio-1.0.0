@@ -6,7 +6,7 @@ import { LayerPortal } from '../layout/LayerPortal';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
-import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
+import { getImage, getStrictOriginalImage, invalidateImageCache } from '../../services/storage/imageStorage';
 import { resolveImageCost } from '../../services/billing/costService';
 import { fileSystemService } from '../../services/storage/fileSystemService';
 import { notify } from '../../services/system/notificationService';
@@ -999,7 +999,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     const handleRetryLoad = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        cancelImageLoad(imageStorageKey);
+
+        // 失效内存缓存是「真正重新读取」的前提：getImage 在内存命中时会直接短路
+        // 返回缓存值且不做有效性检查，不失效就只会拿回同一个坏 URL。
+        // 只逐出、不 revoke —— 该 blob URL 可能仍被灯箱等其它消费者持有。
+        invalidateImageCache(imageStorageKey);
+
+        // 不调用 cancelImageLoad：它会把该 key 上所有在途请求以 null 兑现
+        // （load 对同 key 做 Promise 链式合并），从而把其它等待方推进失败阶梯。
         if (qualityDebounceRef.current) {
             clearTimeout(qualityDebounceRef.current);
             qualityDebounceRef.current = null;
@@ -1007,7 +1014,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         qualityLoadingRef.current = false;
         loadedRef.current = false;
         failedSourcesRef.current.clear();
-        setImgError(false);
+        // 自动重试阶梯只在成功时归零，三次耗尽后手动重试会被 autoRetryRef < 3 守卫
+        // 直接挡掉，必须在此复位，否则「重试」按钮点了也只生效一次。
+        autoRetryRef.current = 0;
+        // 刻意不清除 imgError：清掉会让错误容器与重试按钮在点击瞬间卸载，重试期间毫无反馈。
+        // 成功时 <img onLoad> 会清除它，失败时 handleMediaLoadError 会重新置位，两端都会收敛。
         setIsLoading(true);
         setDisplaySrc(undefined);
         setRetryTick(prev => prev + 1);
@@ -1953,6 +1964,23 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                                         : '图片加载失败'}
                                                         </span>
                                                     )}
+                                                    {/* 重试控件必须渲染在上面这个三元之外：重试会把 isLoading 置 true，
+                                                        若放在 else 分支里，按钮会在点击瞬间卸载且再也回不来。
+                                                        拖拽抑制必须用 onMouseDown/onTouchStart —— 卡片是在这两个事件上
+                                                        起拖的，拦 onPointerDown 是空操作。 */}
+                                                    {imgError && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleRetryLoad}
+                                                            onMouseDown={stopMediaPointerPropagation}
+                                                            onTouchStart={(e) => e.stopPropagation()}
+                                                            disabled={isLoading}
+                                                            className="kk-image-card-retry mt-2 px-2 py-1 text-[11px] font-medium rounded"
+                                                            title="重新从本地存储读取该媒体"
+                                                        >
+                                                            {isLoading ? '重试中…' : '重试加载'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             );
                                         })()
@@ -1976,11 +2004,29 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 isExpired ? 'kk-image-card-state--expired' : 'kk-image-card-state--error'
                                             )}
                                         >
-                                            <span 
-                                                className="text-xs font-semibold tracking-wide"
-                                            >
-                                                {errorText}
-                                            </span>
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span
+                                                    className="text-xs font-semibold tracking-wide"
+                                                >
+                                                    {errorText}
+                                                </span>
+                                                {/* 该覆盖层是 absolute inset-0，会盖住上面的内联错误态，
+                                                    因此失效媒体的重试入口必须在这里也提供一份。
+                                                    仅限「已失效」：生成失败/超时应走生成级重试，重读本地存储无意义。 */}
+                                                {isExpired && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRetryLoad}
+                                                        onMouseDown={stopMediaPointerPropagation}
+                                                        onTouchStart={(e) => e.stopPropagation()}
+                                                        disabled={isLoading}
+                                                        className="kk-image-card-retry px-2 py-1 text-[11px] font-medium rounded"
+                                                        title="重新从本地存储读取该媒体"
+                                                    >
+                                                        {isLoading ? '重试中…' : '重试加载'}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })()}

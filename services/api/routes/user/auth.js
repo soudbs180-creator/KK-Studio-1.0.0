@@ -1,7 +1,16 @@
 // Authentication and session lifecycle routes.
 
 const express = require('express');
-const INITIAL_ADMIN_EMAIL = process.env.ADMIN_INITIAL_EMAIL || '977483863@qq.com';
+// 该常量此前身兼两职：既做「本地单机档案的默认邮箱」，又做「按邮箱自动册封管理员」的判据。
+// 后者带默认值是严重漏洞：注册接口不校验邮箱所有权，任何人抢注该邮箱即可自助提权。
+// 现拆成两个：本地默认邮箱保留兜底；管理员引导判据未显式配置时为空，一律不提权（fail closed）。
+const LOCAL_DEFAULT_EMAIL = process.env.ADMIN_INITIAL_EMAIL || '977483863@qq.com';
+const INITIAL_ADMIN_EMAIL = String(process.env.ADMIN_INITIAL_EMAIL || '').trim().toLowerCase();
+
+// 仅当显式配置了 ADMIN_INITIAL_EMAIL 且邮箱完全匹配时才允许引导册封。
+function shouldBootstrapAdmin(email) {
+  return Boolean(INITIAL_ADMIN_EMAIL) && String(email || '').trim().toLowerCase() === INITIAL_ADMIN_EMAIL;
+}
 
 const crypto = require('crypto');
 const { getPool } = require('../../lib/db');
@@ -52,7 +61,7 @@ function buildProfileFromUserRow(user) {
   };
 }
 
-function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL)) {
+function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'local-user@example.com' : LOCAL_DEFAULT_EMAIL)) {
   const now = new Date().toISOString();
   return {
     id: userId || 'local-user',
@@ -69,7 +78,7 @@ function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'l
 
 async function loadProfileForUserId(userId) {
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
-    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : LOCAL_DEFAULT_EMAIL;
     return buildLocalProfile(userId, defaultEmail);
   }
 
@@ -81,9 +90,10 @@ async function loadProfileForUserId(userId) {
 
   if (result.rows.length > 0) {
     const user = result.rows[0];
-    if (user.email === INITIAL_ADMIN_EMAIL && Number(user.admin_level || 0) !== 1) {
+    if (shouldBootstrapAdmin(user.email) && Number(user.admin_level || 0) !== 1) {
       user.admin_level = 1;
       await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
+      console.warn('[SECURITY] 已按 ADMIN_INITIAL_EMAIL 引导册封初始管理员', { userId: user.id });
     }
     return buildProfileFromUserRow(user);
   }
@@ -221,7 +231,7 @@ router.post('/v1/auth/login', async (req, res) => {
     }
 
     const userId = 'mock-user-id';
-    const defaultEmail = isTest ? 'local-user@example.com' : INITIAL_ADMIN_EMAIL;
+    const defaultEmail = isTest ? 'local-user@example.com' : LOCAL_DEFAULT_EMAIL;
     const loginEmail = String(email).trim() || defaultEmail;
     const session = buildAuthSession({
       id: userId,
@@ -277,9 +287,10 @@ router.post('/v1/auth/login', async (req, res) => {
     }
 
     let adminLevel = Number(user.admin_level || 0);
-    if (user.email === INITIAL_ADMIN_EMAIL && adminLevel !== 1) {
+    if (shouldBootstrapAdmin(user.email) && adminLevel !== 1) {
       adminLevel = 1;
       await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
+      console.warn('[SECURITY] 已按 ADMIN_INITIAL_EMAIL 引导册封初始管理员', { userId: user.id });
     }
 
     const session = buildAuthSession({

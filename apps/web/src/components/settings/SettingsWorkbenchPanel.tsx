@@ -37,7 +37,6 @@ const SettingsPageHistorySync: React.FC<{ enabled: boolean }> = ({ enabled }) =>
   }, [currentRouterPath]);
 
   useEffect(() => {
-    console.log(`[HistorySync] enabled=${enabled}, currentRouterPath=${currentRouterPath}, windowPath=${typeof window !== 'undefined' ? window.location.pathname : 'undefined'}`);
     if (!enabled || typeof window === 'undefined') {
       return;
     }
@@ -101,7 +100,6 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   isChatOpen = false,
   chatSidebarWidth = 420,
 }) => {
-  console.log('[SettingsWorkbenchPanel] render, presentation:', presentation);
   // 简体中文：核心判定，桌面端绝不因为右侧 AI 侧边栏挤压而误判为移动端（将断点由 isCompactResponsiveWidth 换为 isPhoneResponsiveWidth）
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false

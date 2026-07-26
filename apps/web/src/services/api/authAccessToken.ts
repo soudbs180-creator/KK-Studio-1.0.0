@@ -8,6 +8,16 @@ import {
   refreshHostedSessionFromServer,
   restoreHostedSessionFromServer,
 } from "../auth/kkApiSessionBootstrap.ts";
+import { getLatestRuntimeAuthState } from "../auth/runtimeAuthState.ts";
+
+/**
+ * 临时（访客）会话按设计就没有托管 JWT —— `POST /api/v1/auth/temp-users` 只返回身份信息、
+ * 不签发 token。因此托管会话刷新失败对访客是正常结果，不能据此判定「会话失效」并清空运行时状态，
+ * 否则访客登录成功后会在约 1 秒内被踢回落地页。
+ */
+function isGuestRuntimeSession(): boolean {
+  return Boolean(getLatestRuntimeAuthState().isTempUser);
+}
 
 const accessTokenStorageKey = "kk.api.access_token";
 const refreshTokenStorageKey = "kk.api.refresh_token";
@@ -248,7 +258,10 @@ export async function refreshPreferredKkApiAccessToken(): Promise<string | undef
     .then((response) => {
       if (!response.success) {
         if (isHostedSessionAuthFailureCode(response.error?.code)) {
-          clearHostedSessionRuntime();
+          // 访客没有托管会话可刷新，鉴权失败是预期结果，不得清空其运行时状态。
+          if (!isGuestRuntimeSession()) {
+            clearHostedSessionRuntime();
+          }
           return undefined;
         }
 
@@ -288,7 +301,10 @@ export function startKkApiAccessTokenSessionSync(): () => void {
   const handleUnauthorized = () => {
     // 简体中文注释：监听自 api-client 抛出的 401 事件，通知 web 侧清理缓存并重置 hosted session 状态
     clearStoredKkApiAuthTokens();
-    clearHostedSessionRuntime();
+    // 访客本就无托管 token，某个需要鉴权的接口回 401 属正常，不应连带把访客登出。
+    if (!isGuestRuntimeSession()) {
+      clearHostedSessionRuntime();
+    }
   };
   window.addEventListener("kk-api-unauthorized", handleUnauthorized);
 

@@ -35,5 +35,19 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(source, /HardDrive/);
   assert.match(source, /ScrollText/);
   assert.doesNotMatch(source, /\bWallet,/);
-  assert.doesNotMatch(source, /\bCoins,/);
+  // Coins 曾是未使用的遗留 import。现在它是「平台积分」路由选项的图标，
+  // 因此判据从「不得出现」改为「若 import 就必须真的被使用」——
+  // 原本要防的是死 import，而不是这个标识符本身。
+  assertImportIsUsedIfPresent(source, 'Coins');
 });
+
+function assertImportIsUsedIfPresent(source: string, identifier: string): void {
+  const importedInList = new RegExp(`^\\s*${identifier},\\s*$`, 'm').test(source);
+  if (!importedInList) return;
+
+  const occurrences = source.match(new RegExp(`\\b${identifier}\\b`, 'g')) || [];
+  assert.ok(
+    occurrences.length >= 2,
+    `${identifier} 已被 import 但未在文件中使用，属于死 import`
+  );
+}

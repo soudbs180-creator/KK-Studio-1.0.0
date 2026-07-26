@@ -49,12 +49,12 @@ Status: reference
 管理绘图生成任务，处理 API 通信、积分逻辑和异常重试。
 
 - **React 状态钩子**: [useImageGeneration.ts](../../apps/web/src/hooks/useImageGeneration.ts)
-- **大模型通信服务**: [LLMService.ts](../../apps/web/src/services/llm/LLMService.ts)
+- **大模型通信服务**: [generateService.ts](../../apps/web/src/features/generation/generateService.ts)（旧 `LLMService` 已并入，`apps/web/src/services/llm/index.ts` 保留兼容导出）
 - **任务持久化与恢复**:
   - 内存/存储序列化: [taskPersistence.ts](../../apps/web/src/services/persistence/taskPersistence.ts)
   - 自动任务断线重连恢复: [useTaskRecovery.ts](../../apps/web/src/hooks/useTaskRecovery.ts)
 - **持久化批量任务队列**: [DurableGenerationQueue.ts](../../apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts)
-- **后端生成路由**: `services/api/routes/generate-image.js`
+- **后端生成路由**: `services/api/routes/generate-v1.js`（v1 兼容）与 `services/api/routes/generation-v3.js`（当前 v3 任务链路）
 - **Provider Connection 兼容读取边界**: `services/api/lib/capability-graph/providerConnectionLegacyRouteAdapter.js` 在默认关闭的 server flag 后，以 owner + available/active/revoked 门禁为 generation/dispatcher 提供新来源优先读取；`services/api/lib/dispatcher/localUserRouteStore.js` 保留旧凭据 fallback。歧义不会随机选择，已选中新 secret 后解密失败不会降级到旧 secret；profile 全覆盖、写切流与观测窗口仍未完成。
 
 ---

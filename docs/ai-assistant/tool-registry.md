@@ -4,8 +4,8 @@
 
 ## Source evidence
 
-- Tool registry: `apps/web/src/features/ai-assistant-runtime/toolRegistry.ts`
-- Tool types: `packages/shared/src/types/agent.ts`
+- Tool registry: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
+- Tool types: `packages/shared/src/contracts/dto/ai-assistant.ts`
 
 ## 1. 安全等级权限矩阵
 

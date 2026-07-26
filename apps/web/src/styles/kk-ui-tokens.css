@@ -2513,6 +2513,24 @@
   box-shadow: var(--kk-image-card-state-expired-shadow);
 }
 
+/* 媒体加载失败态的重试按钮：复用状态层既有令牌，不引入新色值 */
+.kk-image-card-retry {
+  border: 1px solid var(--kk-image-card-state-border);
+  background: var(--kk-image-card-state-bg);
+  color: var(--kk-image-card-state-text);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.kk-image-card-retry:hover {
+  opacity: 0.8;
+}
+
+.kk-image-card-retry:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .kk-image-card-state--generating {
   border-color: var(--kk-image-card-generating-border);
   background: var(--kk-image-card-generating-bg);

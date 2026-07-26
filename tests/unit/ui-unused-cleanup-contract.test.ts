@@ -63,5 +63,12 @@ test('legacy DashboardView does not retain unused icon imports', () => {
   assert.doesNotMatch(source, /\bShieldCheck,/);
   assert.doesNotMatch(source, /\bWallet,/);
   assert.doesNotMatch(localizedSource, /\bWallet,/);
-  assert.doesNotMatch(localizedSource, /\bCoins,/);
+
+  // Coins 现在是「平台积分」路由选项的图标，不再是死 import。
+  // 本用例要防的是未使用的 import，因此改为按实际使用情况判定。
+  const coinsImported = /^\s*Coins,\s*$/m.test(localizedSource);
+  if (coinsImported) {
+    const occurrences = localizedSource.match(/\bCoins\b/g) || [];
+    assert.ok(occurrences.length >= 2, 'Coins 已 import 但未使用，属于死 import');
+  }
 });

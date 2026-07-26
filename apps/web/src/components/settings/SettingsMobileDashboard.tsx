@@ -7,6 +7,7 @@ import {
   Cloud,
   Coins,
   Laptop,
+  Sparkles,
   Route,
   ShieldCheck,
   UserRound,
@@ -125,9 +126,13 @@ const SettingsMobileDashboard: React.FC<{
     ? '...'
     : `${formatRemainingCredits(balance, locale)} ${pick('积分', 'credits')}`;
 
+  // 四值必须与 GenerationModeView 及 ProviderRouteEngine 一致；
+  // 只列两项会让用户在此处一点就把「自动」「平台」改写成「本地」。
   const routeOptions: Array<{ id: QuickGenerationRoute; label: string; icon: typeof Laptop }> = [
+    { id: 'auto', label: pick('自动', 'Auto'), icon: Sparkles },
     { id: 'local', label: pick('本地优先', 'Local first'), icon: Laptop },
     { id: 'cloud', label: pick('服务器优先', 'Server first'), icon: Cloud },
+    { id: 'platform', label: pick('平台积分', 'Platform'), icon: Coins },
   ];
   const performanceOptions: Array<{ id: WebPerformanceMode; label: string }> = [
     { id: 'fast', label: pick('快速', 'Fast') },
@@ -235,7 +240,7 @@ const SettingsMobileDashboard: React.FC<{
           <div className="settings-mobile-quick-control">
             <div className="settings-mobile-quick-control__label">
               <span>{pick('默认执行位置', 'Default execution')}</span>
-              <strong>{routePreference === 'local' ? pick('本地优先', 'Local first') : pick('服务器优先', 'Server first')}</strong>
+              <strong>{routeOptions.find((option) => option.id === routePreference)?.label}</strong>
             </div>
             <div className="settings-mobile-segment" role="radiogroup" aria-label={pick('默认执行位置', 'Default execution')}>
               {routeOptions.map((option) => {

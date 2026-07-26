@@ -4,15 +4,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const ROOT_DIR = process.cwd();
 const PROJECT_INDEX_PATH = path.join(ROOT_DIR, 'docs', 'ai-assistant', 'generated', 'project-index.json');
 
+// 用 process.execPath 而非字面量 'node'：不依赖 node 是否在 PATH 上，
+// 并保证子进程与测试运行在同一 Node 版本。
+function runGovernanceScript(relativePath: string, options: Parameters<typeof execFileSync>[2] = {}) {
+  return execFileSync(process.execPath, [relativePath], options);
+}
+
 test('知识库索引：通过 build-knowledge-index.mjs 脚本构建 project-index.json 并做格式与内容契约校验', () => {
   // 1. 物理运行索引构建脚本
   try {
-    execSync('node scripts/governance/ai-assistant/build-knowledge-index.mjs', { stdio: 'pipe' });
+    runGovernanceScript('scripts/governance/ai-assistant/build-knowledge-index.mjs', { stdio: 'pipe' });
   } catch (err: any) {
     assert.fail(`脚本 build-knowledge-index.mjs 执行失败: ${err.message}`);
   }
@@ -59,7 +65,7 @@ test('知识库索引：通过 build-knowledge-index.mjs 脚本构建 project-in
 
 test('一致性校验：物理运行 check-skills-consistency.mjs 脚本且必须通过校验', () => {
   try {
-    const stdout = execSync('node scripts/governance/ai-assistant/check-skills-consistency.mjs', { encoding: 'utf-8' });
+    const stdout = runGovernanceScript('scripts/governance/ai-assistant/check-skills-consistency.mjs', { encoding: 'utf-8' }) as unknown as string;
     assert.match(stdout, /校验成功/);
     assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.getStatus/);
     assert.match(stdout, /运行时注册的工具: \[[^\]]*browser\.extractProduct/);

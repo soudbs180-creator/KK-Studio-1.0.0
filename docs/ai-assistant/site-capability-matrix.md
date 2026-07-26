@@ -6,7 +6,8 @@ Source of truth: `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.
 
 ## Source evidence
 
-- Capability matrix source: `apps/web/src/features/ai-takeover/core/browserActionCatalog.ts`
+- Capability matrix source: `apps/web/src/features/browser-assistant/siteCapabilityMatrix.ts`
+- Browser local action catalog: `apps/web/src/features/ai-assistant-runtime/browser/browserActionCatalog.ts`
 - Browser bridge: `apps/web/src/features/ai-assistant-runtime/browser/browserBridge.ts`
 - Canonical Provider catalog: `packages/shared/src/generation/providerCatalog.ts`
 

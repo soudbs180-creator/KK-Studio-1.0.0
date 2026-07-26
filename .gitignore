@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+# 项目主包管理器为 npm（见 session-handoff #217），禁止 pnpm 锁文件进入版本库造成双锁歧义
+pnpm-lock.yaml
 .pnpm-store/
 .pnp/
 .pnp.js

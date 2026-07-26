@@ -313,6 +313,7 @@ import {
 // import { syncService } from '../../services/system/syncService'; // [FIX] Dynamic Import
 import { saveOriginalImage, normalizePersistableMediaSource } from '../../services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from '../../services/image/imageLoader';
+import type { ImageQuality } from '../../services/image/imageQuality';
 import { calculateImageHash } from '../../utils/imageUtils';
 import { useImageGeneration } from '../../hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
@@ -4185,28 +4186,27 @@ export const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
-    let queuedKeys: string[] = [];
+    // 平移/缩放都会重跑本 effect，清理时只撤销本次预取的档位；按 imageKey 全量取消会误杀卡片自身的可见档位加载。
+    let queued: Array<[string, ImageQuality]> = [];
     const timer = window.setTimeout(() => {
-      queuedKeys = Array.from(imageLoadSchedulingById.entries())
+      queued = Array.from(imageLoadSchedulingById.entries())
         .filter(([, scheduling]) => scheduling.loadBand === 1)
         .sort((left, right) => right[1].loadPriority - left[1].loadPriority)
         .slice(0, 8)
-        .map(([imageId, scheduling]) => {
+        .map(([imageId, scheduling]): [string, ImageQuality] | null => {
           const imageNode = imageNodesById.get(imageId);
           const imageKey = imageNode?.storageId || imageNode?.id;
           if (!imageKey) return null;
 
           void loadImage(imageKey, scheduling.prefetchQuality, scheduling.loadPriority);
-          return imageKey;
+          return [imageKey, scheduling.prefetchQuality];
         })
-        .filter((imageKey): imageKey is string => Boolean(imageKey));
+        .filter((entry): entry is [string, ImageQuality] => Boolean(entry));
     }, 180);
 
     return () => {
       window.clearTimeout(timer);
-      queuedKeys.forEach((imageKey) => {
-        cancelImageLoad(imageKey);
-      });
+      queued.forEach(([imageKey, quality]) => cancelImageLoad(imageKey, quality));
     };
   }, [
     activeCanvas,
@@ -5335,7 +5335,7 @@ const isRectIntersecting = (
   // Keep this after all hooks so the hook order stays stable across renders.
   if (!isReady) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: '#000000' }} role="status" aria-live="polite" aria-label="正在载入画布">
         <Loader2 className="animate-spin text-indigo-500" size={32} />
       </div>
     );

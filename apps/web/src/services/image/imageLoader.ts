@@ -73,14 +73,26 @@ class ImageLoaderQueue {
 
     /**
      * 取消请求（用于离开视口的图片）
+     *
+     * quality 省略时取消该图片的全部在途请求（离开视口场景）；传入 quality 时
+     * 只取消该档位。视口预取与卡片自身加载常常并存于不同档位，若不区分档位，
+     * 预取清理会连带把卡片正在等待的 Promise 以 null 兑现（load() 对同 key 请求
+     * 做了 Promise 链式合并），卡片随即落入失败重试阶梯，表现为“已有 ID 却长时间白屏”。
      */
-    cancel(imageId: string): void {
-        const item = this.queue.find(q => q.imageId === imageId);
-        if (item) {
+    cancel(imageId: string, quality?: ImageQuality): void {
+        const matches = (item: QueueItem) =>
+            item.imageId === imageId && (quality === undefined || item.quality === quality);
+
+        const targets = this.queue.filter(matches);
+        if (targets.length === 0) {
+            return;
+        }
+
+        targets.forEach(item => {
             item.cancelled = true;
             item.resolve(null);
-            this.queue = this.queue.filter(q => q.imageId !== imageId);
-        }
+        });
+        this.queue = this.queue.filter(item => !matches(item));
     }
 
     /**
@@ -171,8 +183,8 @@ export function loadImage(imageId: string, quality?: ImageQuality, priority?: nu
     return imageLoader.load(imageId, quality, priority);
 }
 
-export function cancelImageLoad(imageId: string): void {
-    imageLoader.cancel(imageId);
+export function cancelImageLoad(imageId: string, quality?: ImageQuality): void {
+    imageLoader.cancel(imageId, quality);
 }
 
 export function prioritizeImage(imageId: string): void {

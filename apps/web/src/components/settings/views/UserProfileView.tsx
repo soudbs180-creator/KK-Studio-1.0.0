@@ -14,6 +14,7 @@ import {
 import { useLocation, useNavigate } from 'react-router';
 
 import { formatRemainingCredits } from '../../../services/billing/remainingBalance';
+import { resolveAvatarUrl } from '../../../utils/presetAvatars';
 import { USER_PROFILE_ACTIONS } from '../settingsModuleActions';
 import { SettingsViewShell } from '../SettingsScaffold';
 import { useAccountCenterController } from '../controllers/useAccountCenterController';
@@ -100,7 +101,9 @@ const OverviewView: React.FC<{ controller: ReturnType<typeof useAccountCenterCon
           <div className="console-card-heading"><div><h3>账户资料</h3><p>用于 API 调用、账单和技术支持的身份信息。</p></div></div>
           <div className="console-profile-identity">
             <div className="console-avatar">
-              {controller.avatarUrl ? <img src={controller.avatarUrl} alt="头像" /> : controller.nickname.slice(0, 1).toUpperCase()}
+              {/* 头像可能是 `preset:xxx` 标识符而非 URL，必须经 resolveAvatarUrl 解析成真实资源，
+                  否则浏览器会把它当作非法协议直接破图（其余 7 处渲染点均已正确解析）。 */}
+              {resolveAvatarUrl(controller.avatarUrl) ? <img src={resolveAvatarUrl(controller.avatarUrl)} alt="头像" /> : controller.nickname.slice(0, 1).toUpperCase()}
             </div>
             <div><strong>{controller.nickname}</strong><span><Mail size={13} />{controller.displayEmail}</span></div>
           </div>
@@ -201,7 +204,7 @@ const EditView: React.FC<{ controller: ReturnType<typeof useAccountCenterControl
   return (
     <section className="console-card console-profile-editor">
       <div className="console-card-heading"><div><h3>资料编辑</h3><p>更新昵称和头像地址，登录会话可用时同步至 KK API。</p></div></div>
-      <div className="console-profile-edit-preview"><div className="console-avatar">{controller.avatarUrl ? <img src={controller.avatarUrl} alt="头像预览" /> : controller.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{controller.displayName || '未命名用户'}</strong><span>{controller.displayEmail}</span></div></div>
+      <div className="console-profile-edit-preview"><div className="console-avatar">{resolveAvatarUrl(controller.avatarUrl) ? <img src={resolveAvatarUrl(controller.avatarUrl)} alt="头像预览" /> : controller.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{controller.displayName || '未命名用户'}</strong><span>{controller.displayEmail}</span></div></div>
       <label className="console-field"><span>昵称</span><input value={controller.displayName} onChange={(event) => controller.setDisplayName(event.target.value)} maxLength={40} /></label>
       <label className="console-field"><span>头像 URL</span><input value={controller.avatarUrl} onChange={(event) => controller.setAvatarUrl(event.target.value)} placeholder="https://..." /></label>
       <div className="console-card-actions"><button type="button" className="console-primary-button" disabled={controller.busyAction === 'profile'} onClick={() => void submit()}>{controller.busyAction === 'profile' ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}保存资料</button></div>

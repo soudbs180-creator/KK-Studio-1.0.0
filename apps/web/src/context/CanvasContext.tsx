@@ -9,7 +9,8 @@ import { calculateImageHash } from '../utils/imageUtils';
 import { notificationService, notify } from '../services/system/notificationService';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import { logError, logInfo } from '../services/system/systemLogService';
-import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
+import { ImageQuality } from '../services/image/imageQuality';
+import { persistImageQualityTiers } from '../services/image/qualityTierPersistence';
 import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
 import { canvasToWorkflow } from '../workflow/adapters/canvasToWorkflow';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
@@ -1506,46 +1507,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             }
                         }
 
-                        // [Optimization] Generate thumbnails in a Web Worker to avoid blocking the main thread.
-                        try {
-                            const { generateThumbnailWithPreset } = await import('../workers/thumbnailService');
-                            const { blob } = await generateThumbnailWithPreset(previewSource, 'MICRO');
-
-                            // Convert the worker output to base64 before storing it in IndexedDB.
-                            const reader = new FileReader();
-                            const microData = await new Promise<string>((resolve, reject) => {
-                                reader.onload = () => resolve(reader.result as string);
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-
-                            const microId = getQualityStorageId(storageId, ImageQuality.MICRO);
-                            await saveImage(microId, microData);
-                            console.log(`[CanvasContext] Saved MICRO thumbnail (Worker) for ${storageId}`);
-
-                            if (selectedStorageMode === 'local' && currentHandle) {
-                                await fileSystemService.saveThumbnailToHandle(currentHandle, storageId, blob);
-                            }
-
-                            // Mirror the preview slot to the original asset to avoid blank preview reads.
-                            const previewId = getQualityStorageId(storageId, ImageQuality.PREVIEW);
-                            await saveImage(previewId, previewSource);
-                        } catch (workerError) {
-                            // Fall back to main-thread compression if the worker fails.
-                            console.warn(`[CanvasContext] Worker failed, falling back to main thread:`, workerError);
-                            const microData = await compressImageToQuality(previewSource, QUALITY_CONFIGS[ImageQuality.MICRO]);
-                            const microId = getQualityStorageId(storageId, ImageQuality.MICRO);
-                            await saveImage(microId, microData);
-                            console.log(`[CanvasContext] Saved MICRO thumbnail (main thread) for ${storageId}`);
-
-                            if (selectedStorageMode === 'local' && currentHandle) {
-                                const microBlob = base64ToBlob(microData);
-                                await fileSystemService.saveThumbnailToHandle(currentHandle, storageId, microBlob);
-                            }
-
-                            const previewId = getQualityStorageId(storageId, ImageQuality.PREVIEW);
-                            await saveImage(previewId, previewSource);
-                        }
+                        // 派生档位（MICRO/THUMBNAIL/PREVIEW）的生成与落盘收口在
+                        // persistImageQualityTiers 中，Worker 优先、主线程回退。
+                        await persistImageQualityTiers({
+                            storageId,
+                            previewSource,
+                            localFolderHandle: selectedStorageMode === 'local' ? currentHandle : null,
+                            base64ToBlob,
+                        });
                     }
                 } catch (e) {
                     console.error(`[CanvasContext] Failed to save ${node.id}`, e);

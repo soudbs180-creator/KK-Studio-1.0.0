@@ -941,7 +941,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             e.preventDefault();
         }
 
-        if (e.key === 'Escape' || e.key === 'Home') {
+        // 复位视图只绑 Home。Escape 在本应用里有 13 处监听（灯箱、图片预览、
+        // PPT 编辑弹窗、分组菜单、绘制overlay 等）都用它表示「关闭当前浮层」，
+        // 画布若同时把它当复位，用户关掉一个弹窗就会连带把视图跳走。
+        if (e.key === 'Home') {
             // 如果有onResetView prop,使用它(定位最新),否则使用resetView(重置到中心)
             if (callbackRef.current.onResetView) {
                 callbackRef.current.onResetView();

@@ -4,8 +4,9 @@
 
 ## Source evidence
 
-- CanvasRuntimeState builder: `apps/web/src/features/ai-assistant-runtime/runtime/CanvasRuntimeStateBuilder.ts`
-- Runtime snapshot types: `packages/shared/src/types/agent.ts`
+- CanvasRuntimeState builder: `apps/web/src/features/ai-takeover/core/canvasRuntimeStateBuilder.ts`
+- Runtime context assembly: `apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts`
+- Runtime snapshot types: `packages/shared/src/contracts/dto/ai-assistant.ts`
 - Canvas context integration: `apps/web/src/context/CanvasContext.tsx`
 
 当前构建器写入 `projectVersion: '1.6.1'`；版本更新时必须与 `config/release-manifest.json` 同步。

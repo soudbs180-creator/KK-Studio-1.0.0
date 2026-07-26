@@ -64,7 +64,7 @@ function assertPositiveCreditAmount(amount, context) {
   return normalizedAmount;
 }
 
-async function deductCredits(userId, amount, operationKey) {
+async function deductCredits(userId, amount, operationKey, options = {}) {
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -82,6 +82,15 @@ async function deductCredits(userId, amount, operationKey) {
     const remaining = Number.parseInt(updateRes.rows[0].credits, 10);
     await writeCreditLog(client, userId, -amount, 'ai_deduct', operationKey, remaining, userId);
 
+    // Saga 步骤一：扣款与任务单状态必须同事务提交，否则进程崩溃会留下
+    // “积分已扣但任务单停留在 draft”的孤儿账单，对账守护将无法发现它。
+    if (options.billingJobId) {
+      await client.query(
+        "UPDATE public.billing_jobs SET status = 'pending_deducted', updated_at = NOW() WHERE id = $1",
+        [options.billingJobId]
+      );
+    }
+
     await client.query('COMMIT');
     return remaining;
   } catch (err) {
@@ -92,11 +101,24 @@ async function deductCredits(userId, amount, operationKey) {
   }
 }
 
-async function refundCredits(userId, amount, operationKey, originalBalance) {
+async function refundCredits(userId, amount, operationKey, originalBalance, options = {}) {
   const pool = getPool();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Saga 补偿：带 billingJobId 时先原子抢占任务单（仅 pending_deducted 可退），
+    // 抢占失败说明请求线程与对账守护（或多实例）已并发结算，跳过以防双重退款。
+    if (options.billingJobId) {
+      const claimRes = await client.query(
+        "UPDATE public.billing_jobs SET status = 'refunded', updated_at = NOW() WHERE id = $1 AND status = 'pending_deducted' RETURNING id",
+        [options.billingJobId]
+      );
+      if (claimRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+    }
 
     const updateRes = await client.query(
       'UPDATE public.users SET credits = credits + $1, updated_at = NOW() WHERE id = $2 RETURNING credits',
