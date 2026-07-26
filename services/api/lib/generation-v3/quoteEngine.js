@@ -61,6 +61,9 @@ async function computeCost({ mediaType, model, channel, count, client }) {
 async function resolveQuoteRoute(userId, request, options) {
   const resolveConnection = options.resolveQuoteConnectionRoute || resolveQuoteConnectionRoute;
   const connectionRoute = await resolveConnection(userId, request, options.connectionDependencies);
+  // 报价阶段保留既有语义（legacy 路径允许客户端声明 preferredChannel）。
+  // 免积分通道的真正准入校验放在执行阶段，见 jobLifecycle 的 assertFreeChannelHasOwnCredential ——
+  // 报价不产生成本，真正的白嫖发生在提交执行时。
   const channel = connectionRoute?.channel || request.preferredChannel || 'platform-credits';
   const route = selectRoute({
     mediaType: request.mediaType,

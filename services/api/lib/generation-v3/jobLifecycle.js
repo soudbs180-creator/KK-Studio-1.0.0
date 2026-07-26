@@ -35,7 +35,36 @@ async function resolveFrozenProviderRoute(userId, quote, options = {}) {
   }
   const resolveAuth = options.resolveExecutionConnectionAuth || resolveExecutionConnectionAuth;
   const auth = await resolveAuth(userId, snapshot, options.connectionDependencies);
+  assertFreeChannelHasOwnCredential(quote.channel, auth);
   return { route, auth };
+}
+
+// 免积分通道：平台不收积分，前提是「用户自带凭据」。
+const FREE_CHANNELS = new Set(['byok', 'cloud-key', 'web-membership']);
+
+/**
+ * 免积分通道必须真的解析出用户自己的凭据才允许执行。
+ *
+ * resolveExecutionConnectionAuth 在没有 connectionId 时返回 undefined，
+ * 随后各 adapter 会回落到平台自有的 *_API_KEY（如 googleImageAdapter 的
+ * `input.auth?.apiKey || process.env.GEMINI_API_KEY`）。若不拦截，客户端只要在报价时
+ * 声明 preferredChannel='byok' 且不带 connectionId，就能既不扣积分、又用平台 Key 完成生成，
+ * 且不产生任何 ledger 记录，事后无法追账。
+ *
+ * 这里刻意拦在执行阶段而不是报价阶段：报价不产生成本，legacy 路径仍可正常报价；
+ * 真正的白嫖发生在提交执行时。platform-credits 同样没有 connectionId 但走积分扣减，
+ * 依赖平台 Key 属预期行为，因此不在拦截范围内。
+ */
+function assertFreeChannelHasOwnCredential(channel, auth) {
+  if (!FREE_CHANNELS.has(channel)) return;
+  if (auth && auth.apiKey) return;
+
+  const error = new Error(
+    'This channel requires your own Provider credential. Configure a Provider Connection and request a new quote.'
+  );
+  error.code = 'CONNECTION_CREDENTIAL_REQUIRED';
+  error.statusCode = 409;
+  throw error;
 }
 
 /**

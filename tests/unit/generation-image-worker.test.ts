@@ -250,12 +250,15 @@ test('production resolver builds Connection execution after the live admission f
         getQuote: async () => ({ channel: 'byok', mediaType: 'image', model: 'model-1', routeSnapshot: { adapterVersion: '1.0.0', connectionId: 'connection-1' } }),
         routeOptions: {
           selectRoute: () => ({ adapter, adapterVersion: '1.0.0' }),
-          resolveExecutionConnectionAuth: async () => ({ mode: 'connection-auth' }),
+          // 真实的 resolveExecutionConnectionAuth 返回 { apiKey, connectionId, endpoint }。
+          // 免积分通道的执行守卫要求解析出的凭据含 apiKey（缺失即会回落平台 Key），
+          // 故此桩需带上 apiKey 才能反映真实契约。
+          resolveExecutionConnectionAuth: async () => ({ mode: 'connection-auth', apiKey: 'connection-secret' }),
         },
       });
     });
     assert.equal(execution?.adapter, adapter);
-    assert.deepEqual(execution?.auth, { mode: 'connection-auth' });
+    assert.deepEqual(execution?.auth, { mode: 'connection-auth', apiKey: 'connection-secret' });
     assert.equal(execution?.input.prompt, 'drain');
   } finally {
     quoteEngine.getQuote = originalGetQuote;

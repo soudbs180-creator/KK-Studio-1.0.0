@@ -799,3 +799,60 @@ CLIProxyAPI sidecar）与云厂商 metadata 端点；上游响应体经错误消
 - `tsc --noEmit` 0 error；`check-tests-types.mjs` 573 个测试文件通过
 - `check-server.mjs` 106 文件通过；架构检查 33/33；`vite build` 通过
 - 本地 API 带修复重启，`/healthz` 返回 `healthy`，访客端点仍 201
+
+---
+
+## 228. 2026-07-27 - 修复剩余两个 critical：零扣费白嫖与自更新 fail-open
+
+**1. 【critical】免积分通道零扣费白嫖平台 Provider**
+客户端在报价时声明 `preferredChannel='byok'` 且不带 `connectionId`，即可跳过积分计价与
+余额校验；执行时 `resolveExecutionConnectionAuth` 因无 connectionId 返回 `undefined`，
+各 adapter 随即回落到平台自有 `*_API_KEY`（如 `googleImageAdapter` 的
+`input.auth?.apiKey || process.env.GEMINI_API_KEY`）完成生成 ——
+**既不扣费又用平台 Key，且不留任何 ledger 记录，事后无法追账**。
+
+**修复位置的两次调整（过程值得记录）**
+- 第一次改在**报价阶段**（忽略客户端 preferredChannel，一律回落 platform-credits），
+  被两个既有测试打红并证明该方案有两处错误：
+  ① `setup-required` 并不跳过计费（它会被直接拒绝），却被一并屏蔽；
+  ② `off leaves a non-Connection quote on the legacy path` 表明 legacy 报价路径
+  允许客户端声明通道，报价阶段拦截会破坏既有契约。
+- 改为拦在**执行阶段**：`jobLifecycle` 新增 `assertFreeChannelHasOwnCredential`，
+  在 `resolveExecutionConnectionAuth` 解析之后、返回执行上下文之前校验。
+  理由：报价不产生成本，真正的白嫖发生在提交执行时；这样 legacy 报价与
+  `setup-required` 语义均不变，两个既有测试恢复通过。
+- `platform-credits` **刻意不纳入**校验 —— 它同样没有 connectionId，
+  但走积分扣减，依赖平台 Key 属预期行为；误纳入会打断付费主链路。
+
+**2. 【critical】便携版自更新 fail-open → 远程代码执行**
+`scripts/release/portable-self-update.ps1` 的完整性校验条件是
+「清单里有 sha256 才校验」，攻击者删掉该字段即可跳过整个分支；
+随后压缩包被解包覆盖到 `$ReleaseRoot`（含 `runtime\node.exe` 与启动脚本），
+用户下次启动即以自身权限执行投放的可执行文件。
+- 修复：sha256 改为**强制**，缺失或非 64 位十六进制一律中止安装。
+  已核实 `publish-portable-release.mjs` 始终生成 sha256，故不影响任何正常发布。
+- 同时补上更新源限制：`manifestUrl` 必须是绝对 https；
+  `downloadUrl` 必须是 https **且与清单同源**（原先 `Resolve-AbsoluteUrl` 对绝对 URL
+  直接透传，被篡改的清单可把载荷指向任意主机）。
+- PowerShell 语法经 `[Parser]::ParseFile` 校验通过。
+
+**3. 修改既有测试的说明**
+`tests/unit/generation-image-worker.test.ts` 的 `resolveExecutionConnectionAuth` 桩原返回
+`{ mode: 'connection-auth' }`（无 apiKey），与真实实现返回的
+`{ apiKey, connectionId, endpoint }` 不符。守卫要求凭据含 `apiKey`
+（缺失正是回落平台 Key 的条件），故补齐桩与对应 `deepEqual` 断言。
+**未放宽守卫**：改成只判 `auth` 存在会留下「auth 存在但 apiKey 为空」的缺口。
+该用例考察的是准入标志行为，补 apiKey 不影响其目的。
+
+**新增测试**
+`tests/unit/billing-channel-and-update-integrity.test.ts`（6 项）：
+守卫位于执行阶段且在 auth 解析之后、三个免积分通道全覆盖、
+`platform-credits` 明确排除在外、报价阶段保留 legacy 语义、
+sha256 强制校验、更新源 https 与同源限制、发布器仍生成 sha256（守卫前提）。
+
+**已运行验证**
+- 全量单元测试 2201 项：2199 通过 / **0 失败** / 2 跳过
+- `check-tests-types.mjs` 574 个测试文件通过；`check-server.mjs` 106 文件通过
+- 架构检查 33/33；`vite build` 通过；PowerShell 语法校验通过
+
+**至此 #223 列出的三个 critical 全部关闭**（SSRF 于 #227，本条关闭其余两个）。
