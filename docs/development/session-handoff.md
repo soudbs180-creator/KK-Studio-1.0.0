@@ -856,3 +856,45 @@ sha256 强制校验、更新源 https 与同源限制、发布器仍生成 sha25
 - 架构检查 33/33；`vite build` 通过；PowerShell 语法校验通过
 
 **至此 #223 列出的三个 critical 全部关闭**（SSRF 于 #227，本条关闭其余两个）。
+
+---
+
+## 229. 2026-07-27 - 修复移动端根布局失效与 react-query 死配置
+
+**1. 生效的根布局是空壳，应用丢失全部全局 Provider**
+`apps/mobile/src/app/` 下同时存在 `_layout.tsx`（8 行 `<Slot />` 空壳）与
+`_layout.jsx`（52 行真实布局）。Expo/Metro 默认 sourceExts 把 ts/tsx 排在 js/jsx 之前，
+**实际生效的是空壳**。因此应用真实运行时丢失了：
+`QueryClientProvider`（所有 react-query 调用会抛错）、`useAuth` 初始化、
+`GestureHandlerRootView`（手势失效）、启动屏控制，
+以及 brand-vi / skills / canvas / settings 四条路由的标题注册。
+之所以一直没被发现，是因为当前 5 个页面碰巧都没用到 react-query 或 useAuth。
+
+**修复方式：不删文件**
+删除 `_layout.jsx` 的命令此前被权限策略拦截。改为把真实布局**收敛进生效的 `.tsx`**，
+效果等价且无需删除：`.tsx` 本就优先生效，写入真实内容后 `.jsx` 自然失效。
+`_layout.jsx` 可择机移除，留存不影响行为。
+（`index.jsx` 返回 null 而 `index.tsx` 是真实首页，同理 `.tsx` 已胜出，无需改动。）
+
+**2. react-query 死配置**
+原 `cacheTime: 1000 * 60 * 30` 是 v4 的选项名。已核实本仓
+`@tanstack/query-core` 为 **5.101.4**，其类型定义中**只有 `gcTime`、`cacheTime` 完全不存在** ——
+该行配置被静默忽略，缓存回收时间实际回落到默认值而非配置的 30 分钟。已改为 `gcTime`。
+
+**新增测试**
+`tests/unit/mobile-root-layout-contract.test.ts`（5 项）：断言生效的根布局提供四类全局能力、
+使用 `Stack` 且注册全部五条路由、不得退化为 `<Slot />` 空壳、
+使用 v5 的 `gcTime` 且带版本前提断言（若降级到 v4 会提示需改回）、
+以及「真实内容不得只存在于不生效的重名文件中」。
+编写过程中该测试抓出我自己的一处问题：断言 `\bcacheTime\b` 会匹配到注释里的说明文字，
+已改为只匹配属性写法 `^\s*cacheTime\s*:`。
+
+**未能验证的部分**
+本机未安装 `apps/mobile` 依赖（无 `expo`、`react-native`），该工程无法做类型检查或真机运行。
+此前审计也指出 apps/mobile 未接入根 typecheck 链，属既有的门禁缺口。
+本次改动是对既有可用 `.jsx` 的等价移植 + 一处选项改名，风险低，但**未经真机验证**。
+
+**已运行验证**
+- 全量单元测试 2206 项：2204 通过 / **0 失败** / 2 跳过
+- `check-tests-types.mjs` 575 个测试文件通过；`tsc --noEmit` 0 error
+- 架构检查 33/33；`check-server.mjs` 106 文件；编码与版本一致性通过
