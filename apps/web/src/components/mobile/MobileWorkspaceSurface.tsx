@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
@@ -29,6 +29,7 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
 );
 
 import { useCanvas } from '../../context/CanvasContext';
+import { useOverlayFocusLifecycle } from '../../hooks/useOverlayFocusLifecycle';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocale } from '../../context/LocaleContext';
 // 简体中文：导入全局通知服务以在移动端提供操作反馈
@@ -138,6 +139,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   } = useCanvas();
   const { toggleTheme, isDarkMode } = useTheme();
   const { toggleLanguage, isChinese, pick } = useLocale();
+  const moreSheetRef = useRef<HTMLDivElement>(null);
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
   const [showProjectList, setShowProjectList] = useState(false);
   const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
@@ -155,6 +157,12 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
     setShowProjectList(false);
     onScreenChange('home');
   };
+
+  useOverlayFocusLifecycle({
+    isOpen: showMoreSheet,
+    onClose: closeMoreSheet,
+    containerRef: moreSheetRef,
+  });
 
   const runFromMoreSheet = (action: () => void) => {
     closeMoreSheet();
@@ -228,6 +236,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
 
           {/* 更多操作底部滑出式抽屉面板，强行指定为极具质感的暗色磨砂玻璃背景 rgba(20, 20, 22, 0.90) */}
           <div
+            ref={moreSheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={pick('更多操作', 'More Actions')}
+            tabIndex={-1}
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
               background: 'var(--mobile-clay-shell-bg)',

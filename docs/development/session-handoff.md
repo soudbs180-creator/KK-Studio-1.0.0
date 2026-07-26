@@ -956,3 +956,63 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
    而 `wuyinDocumentedAdapter` 对进行中任务返回 `pending`，item 被写成 `submitted` 后
    再无人推进 —— Job 永久停在 running，ledger 既不 charge 也不 refund，
    用户积分被扣但结果永不落卡。复核指出这是**平台积分用户做视频的默认路径**，非边缘场景。
+
+---
+
+## 231. 2026-07-27 - fix(ui): 修复首批 P1 UI 系统缺陷
+
+**修改范围**
+依据全局 UI 质量审计，完成首批已确认的 P1 修复；不重新设计页面、不增加功能、不改变业务逻辑。
+本批覆盖 AI 模式选中态、768px 任务中心定位、数据同步动作尺寸、浏览器助手圆角，以及搜索、
+设置与移动端更多面板的 dialog 语义和焦点生命周期。
+
+**修改文件**
+- `apps/web/src/styles/tokens.css` — 把仍在使用的 `--primary`、`--primary-light`、
+  `--radius-control-lg` 兼容名映射到当前语义 Token，避免未定义变量令选中态和圆角失效。
+- `apps/web/src/styles/kk-ui-tokens.css` — 任务中心移动定位规则由 `max-width: 767px`
+  改为含 768px，与 `PHONE_MAX_WIDTH = 768` 的运行时判断一致。
+- `apps/web/src/components/settings/views/StorageSettingsView.localized.tsx` — 10 个紧凑动作
+  共用 `STORAGE_COMPACT_ACTION_CLASS`，统一 44px 触控高度、语义圆角、字号 Token 与状态样式。
+- `apps/web/src/hooks/useOverlayFocusLifecycle.ts`（新增）— 收口初始聚焦、Tab 循环、
+  Escape 关闭与触发器回焦。
+- `apps/web/src/components/layout/SearchPalette.tsx`、`components/settings/SettingsWorkbenchPanel.tsx`、
+  `components/mobile/MobileWorkspaceSurface.tsx` — 接入共享焦点生命周期并补齐
+  `role="dialog"` / `aria-modal` / 可访问名称。
+- `tests/unit/ui-p1-regression-contract.test.ts`（新增）— 为上述四类回归增加静态契约守卫。
+
+**当前设计决策**
+1. 旧组件仍引用的变量先在现有 Token 层做兼容映射，不在各页面添加颜色、圆角或偏移补丁；
+   后续 P2 再逐步把调用方迁移到正式语义名。
+2. 768px 修复只统一同一手机判定的 CSS 边界，不扩大或重定义产品断点。
+3. 数据同步按钮统一使用项目既有 `--ui-control-height-touch`（44px）与
+   `--radius-control-md`，不引入新尺寸。
+4. 三个顶层浮层共用一个焦点实现，避免各页面复制 Escape 与回焦逻辑；页面型设置不启用该 Hook。
+
+**已运行验证**
+- TDD 红测：新增契约首次运行 0/4 通过，分别复现缺失 Token、768px 断点、控制尺寸与焦点问题；
+  实现后 4/4 通过。
+- 相关 UI system contracts：76/76 通过。
+- 全量 unit：2211 通过 / 0 失败 / 2 跳过（2213 项）。
+- TypeScript 等价完整链：Web `tsc --noEmit`、architecture tsconfig、server syntax（106 文件）、
+  tests semantic check（576 文件）全部通过。
+- `architecture:check` 33 项、`governance:check` 12 项、编码与 mojibake 检查全部通过。
+- 生产构建通过：Vite 8.1.4，2565 modules，约 1.41s。
+- 真实浏览器：
+  - 768×900：任务中心 `data-mobile=true`、右边距 12px、`transform:none`；
+  - 1440×900：AI「直接」选中态为实色背景/白字；数据同步 9 个带稳定 action 的按钮均为
+    44px 高、12px 圆角；浏览器助手 feature card / notice / row 均为 16px 圆角；
+  - 搜索与设置浮层打开后焦点进入 dialog，Escape 后分别回到 command search 与「配置模型」；
+  - 390×844：移动更多面板打开后焦点进入首个动作，Escape 后回到「打开功能菜单」。
+
+**未运行验证及原因**
+- 未运行完整 `npm run verify:changes`：本机没有系统 `npm`；使用 bundled Node 逐项完成了本批
+  直接相关的 typecheck、architecture、governance、build、unit、encoding 与真实浏览器验证。
+- `verify:mobile-settings-smoke` 单独运行 120 秒无输出并超时；其遗留的本地 Vite 进程已清理。
+  同一移动设置与浮层焦点路径已在真实浏览器 390px 视口手动验证。
+- 未重复 integration / contract / E2E / local-runner 全链；本批不改 API、领域契约或服务端逻辑。
+
+**风险与下一步**
+- 风险低。三个兼容 Token 是过渡层，不是新设计语言；后续应按审计报告的 P2 顺序迁移旧调用方，
+  再删除兼容别名。
+- 新焦点 Hook 当前只接入三个本批顶层浮层；其它已有独立 modal 仍应逐模块审计，避免一次性扩大改动面。
+- 下一批建议继续处理页面容器宽度、重复卡片 padding、图标库混用和硬编码颜色等 P2 系统性问题。

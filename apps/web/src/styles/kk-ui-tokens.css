@@ -1109,7 +1109,7 @@
 
 /* Persistent task visibility on narrow screens. The tray sits above the
    composer/tab bar and never blocks the canvas with a full-screen mask. */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .kk-task-center-host[data-mobile='true'] {
     top: auto;
     right: var(--kk-space-3);

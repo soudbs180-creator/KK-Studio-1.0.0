@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 
 import type { Supplier } from '../../services/billing/supplierService';
+import { useOverlayFocusLifecycle } from '../../hooks/useOverlayFocusLifecycle';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 import {
   getCurrentSettingsViewId,
@@ -100,6 +101,7 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   isChatOpen = false,
   chatSidebarWidth = 420,
 }) => {
+  const overlayRef = useRef<HTMLDivElement>(null);
   // 简体中文：核心判定，桌面端绝不因为右侧 AI 侧边栏挤压而误判为移动端（将断点由 isCompactResponsiveWidth 换为 isPhoneResponsiveWidth）
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
@@ -113,6 +115,12 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
       ? `/settings/capability-sources`
       : buildSettingsPath(safeInitialView)
   );
+
+  useOverlayFocusLifecycle({
+    isOpen: isOpen && presentation === 'overlay',
+    onClose,
+    containerRef: overlayRef,
+  });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
@@ -158,7 +166,12 @@ export const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     </div>
   ) : (
     <div
+      ref={overlayRef}
       className="settings-panel settings-shell-backdrop settings-console-host"
+      role="dialog"
+      aria-modal="true"
+      aria-label="设置"
+      tabIndex={-1}
       style={{
         left: '0px',
         top: '0px',

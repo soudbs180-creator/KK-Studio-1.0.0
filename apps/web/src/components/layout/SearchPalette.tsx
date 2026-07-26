@@ -3,6 +3,7 @@ import { type PromptNode, type CanvasGroup} from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import { generateTagColor } from '../../utils/colorUtils';
+import { useOverlayFocusLifecycle } from '../../hooks/useOverlayFocusLifecycle';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface SearchPaletteProps {
@@ -41,7 +42,15 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
     const lastClickedIndexRef = useRef<number>(-1); // Record the last clicked index for Shift-range selection
+
+    useOverlayFocusLifecycle({
+        isOpen,
+        onClose,
+        containerRef: panelRef,
+        initialFocusRef: inputRef,
+    });
 
     // Normalize query
     const lowerQuery = query.toLowerCase();
@@ -75,14 +84,13 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
     const results = [...groupResults, ...nodeResults].slice(0, 50);
 
-    // Auto-focus input when opened
+    // Reset transient search state whenever the dialog opens.
     useEffect(() => {
         if (isOpen) {
             setQuery('');
             setSelectedIndex(0);
             setMultiSelectedIds(new Set());
             setIsMultiSelectMode(false);
-            setTimeout(() => inputRef.current?.focus(), 50);
         }
     }, [isOpen]);
 
@@ -121,10 +129,6 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             handleSelect(results[selectedIndex]);
                         }
                     }
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    onClose();
                     break;
                 case 'm':
                     if (e.ctrlKey || e.metaKey) {
@@ -191,7 +195,12 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
             <div className="kk-search-palette-scrim absolute inset-0" onClick={onClose} />
 
             <div
+                ref={panelRef}
                 data-search-panel={isMobile ? 'mobile-bottom-sheet' : 'desktop-command-surface'}
+                role="dialog"
+                aria-modal="true"
+                aria-label="搜索历史内容"
+                tabIndex={-1}
                 className={`kk-search-palette-panel relative w-full overflow-hidden animate-slideDown flex flex-col ${isMobile ? 'clay-mobile-search-sheet mobile-sheet-viewport' : 'max-w-2xl max-h-[60vh]'}`}
                 style={{
                     borderRadius: isMobile ? 'var(--search-palette-mobile-radius)' : 'var(--search-palette-desktop-radius)',
@@ -246,6 +255,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
                     <button
                         onClick={onClose}
+                        aria-label="关闭搜索"
                         className="p-1 hover:bg-[var(--toolbar-hover)] rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
                     >
                         <X size={18} />

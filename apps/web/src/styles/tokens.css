@@ -66,6 +66,9 @@
   --accent-coral-glow: rgba(255, 107, 90, 0.45);
   --accent-coral-ring: rgba(255, 107, 90, 0.12);
   --accent-color: var(--accent-blue);
+  /* Legacy component aliases resolve through the current semantic state tokens. */
+  --primary: var(--accent-color);
+  --primary-light: var(--toolbar-active);
 
   /* ===== 状态语义色 ===== */
   --state-success-bg: rgba(16, 185, 129, 0.1);
@@ -232,6 +235,7 @@
   --radius-control-md: var(--ui-radius-control);
   --radius-surface-md: var(--ui-radius-card);
   --radius-surface-lg: var(--ui-radius-panel);
+  --radius-control-lg: var(--radius-surface-md);
 
   /* ===== Premium UI density scale ===== */
   --ui-control-height-compact: 32px;
