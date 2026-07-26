@@ -51,4 +51,51 @@ function hasUnsafeBaseUrl(route) {
   return rejectUnsafeOutboundUrl(raw) !== null;
 }
 
-module.exports = { rejectUnsafeOutboundUrl, hasUnsafeBaseUrl };
+const MAX_REDIRECTS = 5;
+
+/**
+ * 带逐跳守卫的出站 fetch。
+ *
+ * Node 全局 fetch 的 redirect 默认是 'follow'（最多 20 跳），只在发起前校验一次地址
+ * 等于没有防护：攻击者把目标指向自己控制的公网主机，由其返回
+ * `302 Location: http://169.254.169.254/...`，请求就会被自动跟到内网，
+ * 而响应体仍会被原样回吐。
+ *
+ * 因此改为 redirect:'manual'，每一跳的 Location 都重新过同一道守卫后才继续，
+ * 并限制跳数。相对「一律拒绝 3xx」，保留跳转可避免打断确实会做重定向的合法 Provider。
+ *
+ * @param {string} url 初始目标（调用方应已校验过，本函数会再校验一次）
+ * @param {RequestInit} init
+ * @returns {Promise<Response>}
+ */
+async function safeOutboundFetch(url, init = {}) {
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    const rejection = rejectUnsafeOutboundUrl(currentUrl);
+    if (rejection) {
+      const error = new Error(rejection);
+      error.code = 'PROXY_TARGET_REJECTED';
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const response = await fetch(currentUrl, { ...init, redirect: 'manual' });
+    if (response.status < 300 || response.status > 399) {
+      return response;
+    }
+
+    const location = response.headers.get('location');
+    if (!location) return response;
+
+    // Location 可能是相对路径，按当前地址解析成绝对地址后再送回守卫。
+    currentUrl = new URL(location, currentUrl).toString();
+  }
+
+  const error = new Error('Too many redirects while proxying the upstream request.');
+  error.code = 'PROXY_TOO_MANY_REDIRECTS';
+  error.statusCode = 502;
+  throw error;
+}
+
+module.exports = { rejectUnsafeOutboundUrl, hasUnsafeBaseUrl, safeOutboundFetch };

@@ -11,10 +11,51 @@ const { URL } = require('url');
  * @param {string} hostname 域名或 IP 字符串
  * @returns {boolean} 是否为私有 Host
  */
+/**
+ * 把 IPv6 字面量归一到可判定的形式。
+ *
+ * 调用方传入的通常是 `new URL(x).hostname`，对 IPv6 该值**带方括号**，
+ * 因此 `host === '::1'`、`startsWith('fe80:')` 这类判定全部匹配不上。
+ * 另外 WHATWG URL 会把 IPv4-mapped 写法归一为十六进制
+ * （`[::ffff:127.0.0.1]` → `[::ffff:7f00:1]`），必须还原成点分 IPv4 后
+ * 复用 IPv4 判定，否则 `http://[::ffff:127.0.0.1]:5432/` 这类地址可直达回环。
+ */
+function normalizeHostForPrivacyCheck(rawHost) {
+  let host = String(rawHost || '').trim().toLowerCase();
+  if (host.startsWith('[') && host.endsWith(']')) {
+    host = host.slice(1, -1);
+  }
+
+  // IPv4-mapped / IPv4-compatible：既接受点分（::ffff:127.0.0.1）
+  // 也接受 WHATWG 归一后的十六进制两段（::ffff:7f00:1）。
+  const mapped = host.match(/^::(?:ffff:)?([0-9a-f.:]+)$/);
+  if (mapped) {
+    const tail = mapped[1];
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(tail)) return tail;
+    const hextets = tail.split(':');
+    if (hextets.length === 2 && hextets.every((h) => /^[0-9a-f]{1,4}$/.test(h))) {
+      const high = parseInt(hextets[0], 16);
+      const low = parseInt(hextets[1], 16);
+      if (Number.isFinite(high) && Number.isFinite(low)) {
+        return `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+      }
+    }
+  }
+
+  return host;
+}
+
 function isPrivateHost(hostname) {
-  const host = String(hostname || '').trim().toLowerCase();
+  const host = normalizeHostForPrivacyCheck(hostname);
   if (!host) return true;
   if (host === 'localhost' || host === 'localhost.localdomain') return true;
+
+  // IPv6 回环、未指定地址、链路本地(fe80::/10)、唯一本地(fc00::/7)。
+  // 去括号后判定，覆盖 ::1 / :: / 展开写法。
+  if (host === '::1' || host === '0:0:0:0:0:0:0:1') return true;
+  if (host === '::' || host === '0:0:0:0:0:0:0:0') return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
+  if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
 
   // 127.0.0.1/8 (回环地址)
   // 10.0.0.0/8 (私有 A 类)
@@ -32,10 +73,6 @@ function isPrivateHost(hostname) {
     const secondOctet = parseInt(match172[1], 10);
     if (secondOctet >= 16 && secondOctet <= 31) return true;
   }
-
-  // IPv6 本地/私有检查
-  if (host === '::1' || host === '0:0:0:0:0:0:0:1' || host === '[::1]') return true;
-  if (host.startsWith('fe80:') || host.startsWith('fc00:') || host.startsWith('fd00:')) return true;
 
   return false;
 }
@@ -73,6 +110,39 @@ async function readResponseBodyWithLimit(response, limitBytes) {
   }
 }
 
+const MAX_SAFE_REDIRECTS = 5;
+
+/**
+ * 手动跟随重定向，并对每一跳重新执行私有主机判定。
+ * 仅在跳转目标同样通过判定时才继续，且限制跳数。
+ * @param {string} url
+ * @param {object} fetchOptions
+ * @returns {Promise<Response>}
+ */
+async function fetchFollowingSafeRedirects(url, fetchOptions) {
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= MAX_SAFE_REDIRECTS; hop += 1) {
+    if (isPrivateHost(new URL(currentUrl).hostname)) {
+      const err = new Error('SSRF Blocked: Private host access rejected.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const response = await fetch(currentUrl, { ...fetchOptions, redirect: 'manual' });
+    if (response.status < 300 || response.status > 399) return response;
+
+    const location = response.headers.get('location');
+    if (!location) return response;
+
+    currentUrl = new URL(location, currentUrl).toString();
+  }
+
+  const err = new Error('SSRF Blocked: too many redirects.');
+  err.statusCode = 502;
+  throw err;
+}
+
 /**
  * 生产级 fetchWithRetries
  * @param {string} url 目标请求 URL
@@ -106,8 +176,11 @@ async function fetchWithRetries(url, options = {}) {
       delete fetchOptions.limitBytes;
       delete fetchOptions.stream;
 
-      // 使用 Node.js 内置全局 fetch
-      const response = await fetch(url, fetchOptions);
+      // 安全：redirect 必须显式设为 manual。默认的 'follow' 会让上面第 121 行的
+      // isPrivateHost 只对首跳生效 —— 攻击者把目标指向自己控制的公网主机，
+      // 由其返回 302 到 169.254.169.254 或 127.0.0.1，请求就会被自动跟进内网。
+      // 这里对每一跳的 Location 重新过同一道判定后才继续。
+      const response = await fetchFollowingSafeRedirects(url, fetchOptions);
       clearTimeout(timeoutId);
 
       // 如果响应非 OK，读取错误信息并抛出，若可以重试则由 catch 处理

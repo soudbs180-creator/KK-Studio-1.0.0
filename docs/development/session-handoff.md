@@ -898,3 +898,61 @@ sha256 强制校验、更新源 https 与同源限制、发布器仍生成 sha25
 - 全量单元测试 2206 项：2204 通过 / **0 失败** / 2 跳过
 - `check-tests-types.mjs` 575 个测试文件通过；`tsc --noEmit` 0 error
 - 架构检查 33/33；`check-server.mjs` 106 文件；编码与版本一致性通过
+
+---
+
+## 230. 2026-07-27 - 独立复核推翻 #227 的 SSRF 修复，补齐两处绕过
+
+**背景**
+新一轮排查工作流中，专门复审本会话改动的 agent **推翻了 #227 的 SSRF 修复**，
+并起真实 HTTP 服务实测复现。两处绕过均已确认成立并修复。
+
+**绕过一：守卫只校验首跳，302 可完全绕过**
+Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
+攻击者把 `X-Proxy-Target-Url` 指向自己控制的**合法公网主机**（顺利通过守卫），
+由其返回 `302 Location: http://169.254.169.254/...`，请求即被自动跟进内网，
+响应体仍原样回吐 —— 新增的守卫对这条路径零作用。
+- 实测对照：默认 `fetch('http://127.0.0.1:8792/redir')` 返回 `redirected=true`
+  且拿到内网服务的完整响应体，攻击链真实存在。
+- 修复：新增 `safeOutboundFetch`（outboundUrlGuard.js）与
+  `fetchFollowingSafeRedirects`（fetchClient.js），改为 `redirect: 'manual'`，
+  **每一跳的 Location 都重新过同一道守卫**后才继续，跳数上限 5。
+  保留跳转而非一律拒绝 3xx，避免打断确实会重定向的合法 Provider。
+- 复核特别指出：只改 profile.js 会漏掉 `lib/fetchClient.js` 这条
+  **BYOK chat 出站的唯一通道**（userAiRouteHandler 经此出站），已一并覆盖。
+
+**绕过二：isPrivateHost 的 IPv6 判定全线失效**
+守卫传入的是 `new URL(x).hostname`，对 IPv6 该值**带方括号**，
+而原判定是 `host === '::1'`、`startsWith('fe80:')` 等，除恰好单列的 `'[::1]'` 外全部匹配不上。
+更关键的是 IPv4-mapped：`[::ffff:127.0.0.1]` 被 WHATWG 归一为 `[::ffff:7f00:1]`，
+不被拦截；实测 `fetch('http://[::ffff:127.0.0.1]:8791/secret')` 成功读到本地服务响应。
+- 修复：新增 `normalizeHostForPrivacyCheck` —— 去方括号，并把 IPv4-mapped
+  （点分与 WHATWG 归一后的十六进制两段两种写法）还原成点分 IPv4 后复用 IPv4 判定；
+  IPv6 回环/未指定/链路本地(fe80::/10)/唯一本地(fc00::/7) 改用去括号后的正则判定。
+- 实测 18 个向量全部符合预期，公网 IPv6（如 `[2606:4700:4700::1111]`）不被误伤。
+
+**测试抓出的第三处遗漏**
+新增的「代理必须使用带守卫的 fetch」断言直接打红 —— `profile.js` 里还有
+**5 处裸 `fetch`**（12AI / wuyin 的图像与视频模式），它们用的是同样用户可控的
+`route.baseUrl`。已全部改为 `safeOutboundFetch`，现文件内无残留裸 fetch 出站。
+
+**已运行验证**
+- 全量单元测试 2209 项：2207 通过 / **0 失败** / 2 跳过
+- SSRF 专项 11/11；`check-server.mjs` 106 文件；架构 33/33；敏感边界通过
+- 攻击链实测：守卫路径在重定向跳转处拦截，对照组默认 fetch 确实读到内网响应体
+
+**本轮排查仍有 2 个未修 critical（需较大改造，未擅动）**
+1. **submitJob 在 BEGIN…COMMIT 之间同步跑完整个 Provider 生成**
+   （jobLifecycle.js，Provider 调用位于事务内），单张图最长 450 秒，
+   而 `count` 上限为 100 → 最坏单事务约 12.5 小时。pg 连接池默认 max=10，
+   10 个并发生成即耗尽连接池，全站请求在 `pool.connect()` 排队；
+   事务同时持有 job/item 行锁且处于 idle-in-transaction。
+   托管 PG 普遍配置 `idle_in_transaction_session_timeout`，超时掐断会导致
+   COMMIT 失败整笔回滚，而积分已在前一个事务扣掉、Provider 也已真实出图计费。
+   注意：`routes/generate-v1.js` 直接调用 `generationV3.submitJob`，
+   不经过 `submitJobWithWorkerRollout`，因此开启 durable worker 开关对这条默认路径无效。
+2. **video/audio 的 v3 Job 永远没有轮询者**
+   worker 的 CLAIM_SQL 硬性要求 `task_type='image'`，非 image 一律回落 legacy submitJob；
+   而 `wuyinDocumentedAdapter` 对进行中任务返回 `pending`，item 被写成 `submitted` 后
+   再无人推进 —— Job 永久停在 running，ledger 既不 charge 也不 refund，
+   用户积分被扣但结果永不落卡。复核指出这是**平台积分用户做视频的默认路径**，非边缘场景。

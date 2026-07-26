@@ -4,7 +4,7 @@ const express = require('express');
 const INITIAL_ADMIN_EMAIL = String(process.env.ADMIN_INITIAL_EMAIL || '').trim().toLowerCase(); // 安全：禁止硬编码默认值，抢注默认邮箱即可自助提权；未配置则不提权
 const { getPool } = require('../../lib/db');
 const { signJWT } = require('../../lib/jwt');
-const { rejectUnsafeOutboundUrl } = require('./shared/outboundUrlGuard');
+const { rejectUnsafeOutboundUrl, safeOutboundFetch } = require('./shared/outboundUrlGuard');
 const {
   buildWuyinVideoDetailUrl,
   buildWuyinVideoRequestBody,
@@ -526,7 +526,7 @@ async function handleWuyinGenericProxy(req, res, profileState) {
           : JSON.stringify(req.body || {});
     }
 
-    const upstream = await fetch(isWuyin ? appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) : targetUrl, init);
+    const upstream = await safeOutboundFetch(isWuyin ? appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) : targetUrl, init);
     const responseText = await upstream.text().catch(() => '');
     const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
     const safeText = apiKey ? responseText.replaceAll(apiKey, '[REDACTED]') : responseText;
@@ -1077,7 +1077,7 @@ async function handleTwelveAIImageMode(req, res, route, profileState) {
         }
       };
 
-      const upstream = await fetch(url, {
+      const upstream = await safeOutboundFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1149,7 +1149,7 @@ async function handleTwelveAIImageMode(req, res, route, profileState) {
         };
       }
 
-      const upstream = await fetch(url, {
+      const upstream = await safeOutboundFetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -1214,7 +1214,7 @@ async function handleTwelveAIVideoMode(req, res, route, profileState) {
     const url = `${baseUrl.replace(/\/+$/, '')}/v1/videos`;
     const payload = buildTwelveAIVideoPayload(req.body || {}, modelId, prompt, aspectRatio, duration, size);
 
-    const upstream = await fetch(url, {
+    const upstream = await safeOutboundFetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -1277,7 +1277,7 @@ async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
       url = `${baseUrl.replace(/\/+$/, '')}/v1/task/${providerTaskId}`;
     }
 
-    const upstream = await fetch(url, {
+    const upstream = await safeOutboundFetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -1654,7 +1654,7 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(targetUrl, {
+    const response = await safeOutboundFetch(targetUrl, {
       method: 'GET',
       headers,
       signal: controller.signal

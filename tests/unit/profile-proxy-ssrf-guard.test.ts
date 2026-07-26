@@ -120,3 +120,57 @@ test('both outbound paths share one guard implementation', () => {
   assert.match(resolver, /require\('\.\/outboundUrlGuard'\)/, 'baseUrl 路径应引用共享守卫');
   assert.match(profile, /require\('\.\/shared\/outboundUrlGuard'\)/, 'header 路径应引用共享守卫');
 });
+
+// ---------------------------------------------------------------------------
+// 以下两组守护来自独立复核：首版守卫只校验首跳，可被 302 完全绕过；
+// 且 isPrivateHost 对 IPv6 判定全线失效（hostname 带方括号、IPv4-mapped 被归一为十六进制）。
+// 两者都经真实 HTTP 服务实测复现，故补齐断言防止回退。
+// ---------------------------------------------------------------------------
+
+const { isPrivateHost } = require('../../services/api/lib/fetchClient.js');
+
+test('isPrivateHost handles bracketed IPv6 and IPv4-mapped forms', () => {
+  // new URL().hostname 对 IPv6 带方括号；WHATWG 还会把 IPv4-mapped 归一为十六进制。
+  const viaUrl = (host: string) => isPrivateHost(new URL('http://' + host + '/').hostname);
+
+  for (const host of ['[::1]', '[::]', '[fe80::1]', '[fd00::1]', '[fc00::1]',
+                      '[::ffff:127.0.0.1]', '[::ffff:169.254.169.254]', '[0:0:0:0:0:0:0:1]']) {
+    assert.equal(viaUrl(host), true, `${host} 必须被判定为私有地址`);
+  }
+  // 合法公网地址不得被误伤
+  for (const host of ['api.openai.com', '8.8.8.8', '[2606:4700:4700::1111]', '172.32.0.1']) {
+    assert.equal(viaUrl(host), false, `${host} 不应被误判为私有地址`);
+  }
+});
+
+test('outbound fetch re-checks every redirect hop instead of only the first', () => {
+  const guard = readFileSync(
+    path.join(ROOT_DIR, 'services', 'api', 'routes', 'user', 'shared', 'outboundUrlGuard.js'),
+    'utf8'
+  );
+  const client = readFileSync(
+    path.join(ROOT_DIR, 'services', 'api', 'lib', 'fetchClient.js'),
+    'utf8'
+  );
+
+  // Node 全局 fetch 默认 redirect:'follow'，只校验首跳等于没有防护。
+  for (const [label, source] of [['outboundUrlGuard', guard], ['fetchClient', client]] as const) {
+    assert.match(source, /redirect: 'manual'/, `${label} 必须禁用自动跟随重定向`);
+    assert.match(source, /new URL\(location, currentUrl\)/, `${label} 必须对每一跳的 Location 复检`);
+  }
+  assert.match(guard, /safeOutboundFetch/);
+  assert.match(client, /fetchFollowingSafeRedirects/);
+});
+
+test('the BYOK proxy uses the redirect-safe fetch, not the bare global fetch', () => {
+  const profile = readFileSync(
+    path.join(ROOT_DIR, 'services', 'api', 'routes', 'user', 'profile.js'),
+    'utf8'
+  );
+  assert.match(profile, /await safeOutboundFetch\(/, '代理出站必须走带逐跳守卫的 fetch');
+  assert.doesNotMatch(
+    profile,
+    /const upstream = await fetch\(/,
+    '不得直接使用全局 fetch 发起代理请求（会自动跟随重定向进内网）'
+  );
+});
