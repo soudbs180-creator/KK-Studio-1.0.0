@@ -22,6 +22,7 @@ AGENT_RUN_SESSION_BINDING_MIGRATION="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-$
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
 AGENT_RUN_REPLAN_EVENT_MIGRATION="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 OAUTH_IDENTITY_MIGRATION="${KK_OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
+PAYMENT_RECHARGE_MIGRATION="${KK_PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -120,6 +121,10 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required OAuth identity migration not found at ${OAUTH_IDENTITY_MIGRATION}." >&2
     exit 1
   fi
+  if [[ ! -f "${PAYMENT_RECHARGE_MIGRATION}" ]]; then
+    echo "[bootstrap-kk-vps] Required payment recharge migration not found at ${PAYMENT_RECHARGE_MIGRATION}." >&2
+    exit 1
+  fi
 
   REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
   AI_ASSISTANT_SCOPE_MIGRATION="$(realpath "${AI_ASSISTANT_SCOPE_MIGRATION}")"
@@ -129,6 +134,7 @@ setup_postgres() {
   AGENT_RUN_SEMANTIC_EVENT_MIGRATION="$(realpath "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}")"
   AGENT_RUN_REPLAN_EVENT_MIGRATION="$(realpath "${AGENT_RUN_REPLAN_EVENT_MIGRATION}")"
   OAUTH_IDENTITY_MIGRATION="$(realpath "${OAUTH_IDENTITY_MIGRATION}")"
+  PAYMENT_RECHARGE_MIGRATION="$(realpath "${PAYMENT_RECHARGE_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -160,6 +166,10 @@ setup_postgres() {
   case "${OAUTH_IDENTITY_MIGRATION}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] OAuth identity migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+  case "${PAYMENT_RECHARGE_MIGRATION}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] Payment recharge migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
 
   for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
@@ -211,7 +221,8 @@ SQL
     -f "${AGENT_RUN_SESSION_BINDING_MIGRATION}" \
     -f "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}" \
     -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" \
-    -f "${OAUTH_IDENTITY_MIGRATION}"
+    -f "${OAUTH_IDENTITY_MIGRATION}" \
+    -f "${PAYMENT_RECHARGE_MIGRATION}"
 }
 
 install_runtime_templates() {

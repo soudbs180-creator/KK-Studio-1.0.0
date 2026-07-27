@@ -6,6 +6,10 @@
 const express = require('express');
 const { getPool } = require('../lib/db');
 const credits = require('../lib/credits');
+const {
+  assertStripeSessionMatchesOrder,
+  isStripeSessionPaid,
+} = require('../lib/billing/stripeSettlement');
 
 const router = express.Router();
 
@@ -28,7 +32,8 @@ function resolveWebhookRawBody(req) {
  * 2. 结合 stripe_session_id 查询数据库 orders 中事先插入的可信订单；
  * 3. 校验并确保幂等。如果订单仍处于 'pending'，将其更新为 'completed' 并安全增加用户积分。
  */
-async function handleStripePaymentSettlement(sessionId) {
+async function handleStripePaymentSettlement(session) {
+  const sessionId = session.id;
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -36,7 +41,7 @@ async function handleStripePaymentSettlement(sessionId) {
 
     // 查询数据库中记录的可信 pending 订单信息，并使用行锁防止并发状态覆盖
     const orderRes = await client.query(
-      "SELECT user_id, credits, status FROM public.orders WHERE stripe_session_id = $1 FOR UPDATE",
+      "SELECT user_id, credits, amount_cents, currency, status FROM public.orders WHERE stripe_session_id = $1 FOR UPDATE",
       [sessionId]
     );
 
@@ -47,11 +52,12 @@ async function handleStripePaymentSettlement(sessionId) {
     }
 
     const order = orderRes.rows[0];
+    assertStripeSessionMatchesOrder(session, order);
 
     // 幂等处理：若订单状态已经为 completed，说明已被其他事件或轮询并发处理过，跳过交易
     if (order.status !== 'pending') {
       await client.query('ROLLBACK');
-      console.log(`[payment-webhook] Stripe session ${sessionId} 订单已是完成状态 (${order.status})，跳过重复结算。`);
+      console.info(`[payment-webhook] Stripe session ${sessionId} 订单已是完成状态 (${order.status})，跳过重复结算。`);
       return true;
     }
 
@@ -70,7 +76,7 @@ async function handleStripePaymentSettlement(sessionId) {
     const balanceAfter = await credits.addCredits(client, order.user_id, parsedCredits, 'stripe_webhook', sessionId);
 
     await client.query('COMMIT');
-    console.log(`[payment-webhook] Stripe 支付结算成功。用户 ${order.user_id} 获得 ${parsedCredits} 积分，当前最新余额: ${balanceAfter}`);
+    console.info(`[payment-webhook] Stripe 支付结算成功。用户 ${order.user_id} 获得 ${parsedCredits} 积分，当前最新余额: ${balanceAfter}`);
     return true;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -85,7 +91,7 @@ async function handleStripePaymentSettlement(sessionId) {
  * Stripe Webhook 入口路由：POST /webhook/stripe
  */
 router.post('/stripe', async (req, res) => {
-  console.log('[payment-webhook] 收到 Stripe Webhook 通知');
+  console.info('[payment-webhook] 收到 Stripe Webhook 通知');
 
   const sig = req.headers['stripe-signature'];
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -113,15 +119,29 @@ router.post('/stripe', async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 仅对支付完成事件进行处理
-  if (event.type === 'checkout.session.completed') {
+  const settlementEvents = new Set([
+    'checkout.session.completed',
+    'checkout.session.async_payment_succeeded',
+  ]);
+  if (settlementEvents.has(event.type)) {
     const session = event.data.object;
     const stripeSessionId = session.id;
 
-    console.log('[payment-webhook] 正在处理 Stripe checkout.session.completed 事件:', { stripeSessionId });
+    if (!isStripeSessionPaid(session)) {
+      console.info('[payment-webhook] Stripe Checkout 尚未确认付款，等待后续成功事件:', {
+        stripeSessionId,
+        paymentStatus: session.payment_status,
+      });
+      return res.json({ received: true, settled: false });
+    }
+
+    console.info('[payment-webhook] 正在处理 Stripe 支付成功事件:', {
+      eventType: event.type,
+      stripeSessionId,
+    });
 
     // 执行防篡改结算
-    const settlementSuccess = await handleStripePaymentSettlement(stripeSessionId);
+    const settlementSuccess = await handleStripePaymentSettlement(session);
 
     if (settlementSuccess) {
       return res.json({ received: true });

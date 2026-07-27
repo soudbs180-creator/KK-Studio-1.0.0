@@ -13,7 +13,7 @@ Status: reference
 | GET | `/healthz` | 公开 | 主服务 readiness/配置摘要；返回原始健康对象，异常可为 500。 |
 | GET | `/v1/health` | 公开 | Dispatcher 数据库与本地存储健康检查；原始健康对象。 |
 | GET | `/v1/metrics` | 公开 | Dispatcher 路由指标和熔断器状态；非标准 `success/data`。 |
-| POST | `/webhook/stripe` | 签名 | Stripe `checkout.session.completed` 幂等结算；要求 `Stripe-Signature`。 |
+| POST | `/webhook/stripe` | 签名 | 处理 Stripe `checkout.session.completed` 与 `checkout.session.async_payment_succeeded`；仅在已支付且金额、币种与服务端订单一致时幂等结算，要求 `Stripe-Signature`。 |
 | GET | `/uploads/*` | 公开 | 上传资源静态读取；文件/流响应，不计入 123 个方法端点。 |
 
 ## 认证与会话
@@ -162,13 +162,13 @@ OAuth `redirectTo` 只接受服务端允许列表中的 Web Origin；state 在 P
 | POST | `/api/v1/billing/credits/debit` | 用户 | 使用业务引用和幂等键扣减积分。 |
 | POST | `/api/v1/billing/credits/refunds` | 用户 | 对原扣减交易退款。 |
 | GET | `/api/billing/plans` | 公开 | 旧式 Stripe 套餐列表。 |
-| POST | `/api/billing/create-checkout` | 用户 | 创建 Stripe Checkout。 |
-| GET | `/api/v1/billing/payment-channels` | 用户 | 获取可用充值渠道配置。 |
+| POST | `/api/billing/create-checkout` | 用户 | 创建 Stripe Checkout；金额、币种和回跳地址均由服务端配置决定。 |
+| GET | `/api/v1/billing/payment-channels` | 用户 | 获取充值渠道配置；支付宝/微信二维码来自服务端环境变量，未配置时渠道不可用。 |
 | GET | `/api/v1/billing/exchange-rates` | 用户 | 获取积分兑换率。 |
 | POST | `/api/v1/billing/recharge-submissions` | 用户 | 创建充值申请。 |
 | POST | `/api/v1/billing/submit-recharge` | 用户 | 兼容的一步式充值提交。 |
-| POST | `/api/v1/billing/recharge-submissions/:submissionId/proof` | 用户 | 提交充值证明。 |
-| POST | `/api/v1/billing/recharge-submissions/:submissionId/mark-paid` | 用户 | 标记用户侧已付款。 |
+| POST | `/api/v1/billing/recharge-submissions/:submissionId/proof` | 用户 | 校验并保存支付渠道、金额和转账尾号，随后进入待审核状态。 |
+| POST | `/api/v1/billing/recharge-submissions/:submissionId/mark-paid` | 用户 | 兼容入口；仅允许已存在有效支付证明的申请进入待审核状态。 |
 
 ## 标准 Admin 契约
 
@@ -186,7 +186,7 @@ OAuth `redirectTo` 只接受服务端允许列表中的 Web Origin；state 在 P
 | PUT | `/api/v1/admin/billing/exchange-rates` | 管理员 | Upsert 兑换率。 |
 | GET | `/api/v1/admin/billing/recharge-submissions` | 管理员 | 列出充值申请。 |
 | GET | `/api/v1/admin/billing/recharge-submissions/:submissionId` | 管理员 | 获取充值申请详情。 |
-| POST | `/api/v1/admin/billing/recharge-submissions/:submissionId/review` | 管理员 | 审核充值申请并执行相应积分变更。 |
+| POST | `/api/v1/admin/billing/recharge-submissions/:submissionId/review` | 管理员 | 在数据库事务中审核充值申请并原子写入积分与账本；重复通过不会重复入账。 |
 
 ## 旧 `/api/admin/*` 管理接口
 

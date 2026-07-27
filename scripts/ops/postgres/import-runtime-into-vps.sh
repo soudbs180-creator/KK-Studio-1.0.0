@@ -20,6 +20,7 @@ AGENT_RUN_SESSION_BINDING_MIGRATION="${AGENT_RUN_SESSION_BINDING_MIGRATION:-${RE
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
 AGENT_RUN_REPLAN_EVENT_MIGRATION="${AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 OAUTH_IDENTITY_MIGRATION="${OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
+PAYMENT_RECHARGE_MIGRATION="${PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -73,6 +74,11 @@ if [[ ! -f "${OAUTH_IDENTITY_MIGRATION}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${PAYMENT_RECHARGE_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing payment recharge migration: ${PAYMENT_RECHARGE_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -106,6 +112,9 @@ psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_REPLAN_EVENT_MI
 
 echo "[import-runtime-into-vps] Applying mandatory OAuth identity migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${OAUTH_IDENTITY_MIGRATION}"
+
+echo "[import-runtime-into-vps] Applying mandatory payment recharge integrity migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${PAYMENT_RECHARGE_MIGRATION}"
 
 echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only; canonical bootstrap and migrations own the target schema"
 

@@ -73,7 +73,7 @@ test('manual recharge UI exposes reserved dynamic channels and admin paid-order 
   assert.match(rechargeModalSource, /我已支付/);
   assert.match(rechargeModalSource, /人工充值较慢/);
   assert.match(rechargeModalSource, /支付成功但积分未到账/);
-  assert.match(rechargeModalSource, /markRechargeSubmissionPaid/);
+  assert.match(rechargeModalSource, /submitRechargeProof/);
 
   assert.doesNotMatch(floatingPanelSource, /useAdminRole/);
   assert.match(floatingPanelSource, /enabled = false/);

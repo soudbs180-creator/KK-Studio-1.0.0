@@ -38,8 +38,8 @@ import {
   createRechargeBill,
   getRechargeSubmissionErrorMessage,
   listRechargePaymentChannels,
-  markRechargeSubmissionPaid,
   normalizeRechargeBillSnapshot,
+  submitRechargeProof,
   type RechargeBillSnapshot,
   type RechargePaymentChannelConfig,
 } from '../../services/billing/rechargeSubmissionService';
@@ -58,7 +58,7 @@ const FALLBACK_CHANNELS: RechargePaymentChannelConfig[] = [
     channel: 'alipay',
     label: '支付宝静态码',
     instructionText: '人工充值较慢，请等待 1-5 分钟。',
-    isActive: true,
+    isActive: false,
     qrImageDataUrl: null,
     qrImagePath: null,
   },
@@ -66,7 +66,7 @@ const FALLBACK_CHANNELS: RechargePaymentChannelConfig[] = [
     channel: 'wechat',
     label: '微信静态码',
     instructionText: '人工充值较慢，请等待 1-5 分钟。',
-    isActive: true,
+    isActive: false,
     qrImageDataUrl: null,
     qrImagePath: null,
   },
@@ -239,6 +239,7 @@ const RechargeModal: React.FC = () => {
       || FALLBACK_CHANNELS[0],
     [activeProvider, paymentChannels],
   );
+  const activeQrSource = activeChannelConfig.qrImageDataUrl || activeChannelConfig.qrImagePath || '';
 
   useEffect(() => {
     if (!showRechargeModal) {
@@ -318,6 +319,13 @@ const RechargeModal: React.FC = () => {
       return;
     }
 
+    if (!activeChannelConfig.isActive || !activeQrSource) {
+      const text = '当前支付通道尚未配置收款码，请联系管理员。';
+      setMessage(text);
+      notify.warning('通道未配置', text);
+      return;
+    }
+
     setCreating(true);
     setMessage('');
     try {
@@ -370,8 +378,15 @@ const RechargeModal: React.FC = () => {
         throw new Error('请填写转账流水后四位。');
       }
 
-      const paidResponse = await markRechargeSubmissionPaid(
-        billSnapshot.submissionId,
+      const paidResponse = await submitRechargeProof(
+        {
+          submissionId: billSnapshot.submissionId,
+          amount: billSnapshot.amount,
+          currencyCode: billSnapshot.currencyCode,
+          paymentChannel: billSnapshot.paymentChannel,
+          transferReferenceLast4: normalizedReference,
+          note: billSnapshot.note,
+        },
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
       if (!paidResponse.success) {
@@ -805,9 +820,9 @@ const RechargeModal: React.FC = () => {
                         className="h-28 w-28 shrink-0 flex items-center justify-center rounded-xl bg-white p-1.5 shadow-md border"
                         style={{ borderColor: 'var(--frost-card-framework-border)' }}
                       >
-                        {activeChannelConfig.qrImageDataUrl ? (
+                        {activeQrSource ? (
                           <img
-                            src={activeChannelConfig.qrImageDataUrl}
+                            src={activeQrSource}
                             alt={`${providerTitle}收款码`}
                             className="h-full w-full object-contain"
                           />

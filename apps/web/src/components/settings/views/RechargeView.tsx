@@ -25,8 +25,8 @@ import {
   createRechargeBill,
   getRechargeSubmissionErrorMessage,
   listRechargePaymentChannels,
-  markRechargeSubmissionPaid,
   normalizeRechargeBillSnapshot,
+  submitRechargeProof,
   type RechargeBillSnapshot,
   type RechargePaymentChannelConfig,
 } from '../../../services/billing/rechargeSubmissionService';
@@ -43,8 +43,8 @@ const INITIAL_RATE_MAP: Record<SupportedRechargeCurrency, CreditExchangeRate> = 
 };
 
 const FALLBACK_CHANNELS: RechargePaymentChannelConfig[] = [
-  { channel: 'alipay', label: '支付宝静态码', instructionText: '付款后提交流水后四位。', isActive: true, qrImageDataUrl: null, qrImagePath: null },
-  { channel: 'wechat', label: '微信静态码', instructionText: '付款后提交流水后四位。', isActive: true, qrImageDataUrl: null, qrImagePath: null },
+  { channel: 'alipay', label: '支付宝静态码', instructionText: '付款后提交流水后四位。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
+  { channel: 'wechat', label: '微信静态码', instructionText: '付款后提交流水后四位。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
 ];
 
 const CHANNELS: Array<{ id: RechargeChannel; label: string; helper: string; icon: React.ComponentType<{ size?: number }> }> = [
@@ -116,6 +116,7 @@ const RechargeView: React.FC = () => {
       || FALLBACK_CHANNELS[0],
     [paymentChannels, selectedProvider],
   );
+  const qrSource = selectedChannel.qrImageDataUrl || selectedChannel.qrImagePath || '';
   const isExpired = Boolean(bill?.expiresAt && secondsLeft <= 0 && bill.status !== 'credited');
 
   const clampAmount = (value: number) => Math.max(minAmount, Math.min(maxAmount, Number.isFinite(value) ? value : minAmount));
@@ -129,6 +130,12 @@ const RechargeView: React.FC = () => {
       const text = channel === 'international' ? '国际支付通道暂未配置。' : '人工充值请联系管理员。';
       setMessage(text);
       notify.info('通道说明', text);
+      return;
+    }
+    if (!selectedChannel.isActive || !qrSource) {
+      const text = '当前支付通道尚未配置收款码，请联系管理员。';
+      setMessage(text);
+      notify.warning('通道未配置', text);
       return;
     }
     setCreating(true);
@@ -169,8 +176,15 @@ const RechargeView: React.FC = () => {
     }
     setMarkingPaid(true);
     try {
-      const response = await markRechargeSubmissionPaid(
-        bill.submissionId,
+      const response = await submitRechargeProof(
+        {
+          submissionId: bill.submissionId,
+          amount: bill.amount,
+          currencyCode: bill.currencyCode,
+          paymentChannel: bill.paymentChannel,
+          transferReferenceLast4: normalizedReference,
+          note: bill.note,
+        },
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
       if (!response.success) throw new Error(getRechargeSubmissionErrorMessage(response, '提交支付凭证失败。'));
@@ -188,8 +202,6 @@ const RechargeView: React.FC = () => {
 
   const displayedAmount = bill?.payableAmount ?? bill?.amount ?? amount;
   const displayedCredits = bill?.creditAmount ?? bill?.estimatedCredits ?? previewCredits;
-  const qrSource = selectedChannel.qrImageDataUrl || selectedChannel.qrImagePath || '';
-
   return (
     <SettingsViewShell className="console-recharge-page">
       <header className="console-page-header">

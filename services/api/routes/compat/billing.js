@@ -12,6 +12,7 @@ const { getPool } = require('../../lib/db');
 const { signJWT, verifyJWT } = require('../../lib/jwt');
 const credits = require('../../lib/credits');
 const dispatcher = require('../../lib/dispatcher');
+const rechargeSubmissions = require('../../lib/billing/rechargeSubmissions');
 
 const router = express.Router();
 
@@ -51,8 +52,8 @@ function defaultStore() {
     profiles: {},
     paymentOrders: {},
     exchangeRates: [
-      { currencyCode: 'CNY', creditsPerUnit: 100, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },
-      { currencyCode: 'USD', creditsPerUnit: 700, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },
+      { currencyCode: 'CNY', creditsPerUnit: 5, minAmount: 5, maxAmount: 500, isActive: true, updatedAt: nowIso() },
+      { currencyCode: 'USD', creditsPerUnit: 30, minAmount: 1, maxAmount: 100, isActive: true, updatedAt: nowIso() },
     ],
     adminPasswordHash: '',
   };
@@ -197,32 +198,25 @@ function toLegacyAuthResponse(session, message) {
 
 function defaultBillingPlans() {
   return [
-    { id: 'price_basic_100', name: 'Basic Credits', amount: '9.90', credits: 100 },
-    { id: 'price_premium_500', name: 'Premium Credits', amount: '39.90', credits: 500 },
-    { id: 'price_enterprise_1500', name: 'Enterprise Credits', amount: '99.90', credits: 1500 },
+    { id: 'price_basic_100', name: 'Basic Credits', amount: '9.90', credits: 100, currency: 'USD' },
+    { id: 'price_premium_500', name: 'Premium Credits', amount: '39.90', credits: 500, currency: 'USD' },
+    { id: 'price_enterprise_1500', name: 'Enterprise Credits', amount: '99.90', credits: 1500, currency: 'USD' },
   ];
 }
 
 async function listLegacyBillingPlans() {
-  if (isDbEnabled()) {
-    try {
-      const pool = getPool();
-      const result = await pool.query(
-        'SELECT id, name, amount_cents, credits FROM public.plans ORDER BY amount_cents ASC, id ASC',
-      );
-      if (result.rows.length > 0) {
-        return result.rows.map((row) => ({
-          id: String(row.id),
-          name: String(row.name || row.id),
-          amount: (Number(row.amount_cents || 0) / 100).toFixed(2),
-          credits: Number(row.credits || 0),
-        }));
-      }
-    } catch (error) {
-      console.warn('[contract-compat] Failed to load DB billing plans, using local fallback:', error.message);
-    }
-  }
-  return defaultBillingPlans();
+  if (!isDbEnabled()) return defaultBillingPlans();
+  const pool = getPool();
+  const result = await pool.query(
+    'SELECT id, name, amount_cents, credits, currency FROM public.plans ORDER BY amount_cents ASC, id ASC',
+  );
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name || row.id),
+    amount: (Number(row.amount_cents || 0) / 100).toFixed(2),
+    credits: Number(row.credits || 0),
+    currency: String(row.currency || 'USD').toUpperCase(),
+  }));
 }
 
 async function findUserByIdentity(identity) {
@@ -260,11 +254,38 @@ function mapCreditLog(row) {
   };
 }
 
-function buildRechargeSubmission(userId, input, overrides = {}) {
+function buildRechargeSubmission(userId, input, overrides = {}, exchangeRates = defaultStore().exchangeRates) {
   const amount = Number(input.amount || 0);
-  const currencyCode = String(input.currencyCode || 'CNY').toUpperCase() === 'USD' ? 'USD' : 'CNY';
-  const creditsPerUnit = currencyCode === 'USD' ? 700 : 100;
-  const creditAmount = Math.max(0, Math.round(amount * creditsPerUnit));
+  const currencyCode = String(input.currencyCode || '').trim().toUpperCase();
+  const manualProvider = String(input.manualProvider || '').trim().toLowerCase();
+  const exchangeRate = exchangeRates.find((item) => item.currencyCode === currencyCode && item.isActive !== false);
+  if (input.paymentChannel !== 'manual' || !['alipay', 'wechat'].includes(manualProvider)) {
+    throw Object.assign(new Error('Only configured manual alipay or wechat recharges are supported.'), {
+      code: 'INVALID_RECHARGE_CHANNEL',
+      statusCode: 400,
+    });
+  }
+  if (!exchangeRate || !Number.isFinite(amount) || amount <= 0) {
+    throw Object.assign(new Error('A positive amount and active currency exchange rate are required.'), {
+      code: 'INVALID_RECHARGE_PAYLOAD',
+      statusCode: 400,
+    });
+  }
+  if ((exchangeRate.minAmount !== null && amount < Number(exchangeRate.minAmount))
+    || (exchangeRate.maxAmount !== null && amount > Number(exchangeRate.maxAmount))) {
+    throw Object.assign(new Error('Recharge amount is outside the configured limits.'), {
+      code: 'INVALID_RECHARGE_AMOUNT',
+      statusCode: 400,
+    });
+  }
+  const creditsPerUnit = Number(exchangeRate.creditsPerUnit);
+  const creditAmount = Math.round(amount * creditsPerUnit);
+  if (!Number.isSafeInteger(creditAmount) || creditAmount <= 0) {
+    throw Object.assign(new Error('The configured exchange rate produced an invalid credit amount.'), {
+      code: 'INVALID_RECHARGE_CREDITS',
+      statusCode: 400,
+    });
+  }
   const timestamp = nowIso();
   return {
     submissionId: overrides.submissionId || `rch_${crypto.randomUUID()}`,
@@ -279,7 +300,7 @@ function buildRechargeSubmission(userId, input, overrides = {}) {
     creditsPerUnit,
     currencyCode,
     paymentChannel: input.paymentChannel || 'manual',
-    manualProvider: input.manualProvider || null,
+    manualProvider,
     transferReferenceLast4: input.transferReferenceLast4 || null,
     note: input.note || '',
     status: overrides.status || 'created',
@@ -289,6 +310,58 @@ function buildRechargeSubmission(userId, input, overrides = {}) {
     submittedAt: overrides.submittedAt || null,
     reviewedAt: overrides.reviewedAt || null,
     reviewActorUserId: overrides.reviewActorUserId || null,
+  };
+}
+
+function sendRechargeRouteError(res, req, error) {
+  return sendError(
+    res,
+    req,
+    error.statusCode || 500,
+    error.code || 'RECHARGE_OPERATION_FAILED',
+    error.message || 'Recharge operation failed.',
+  );
+}
+
+function getPublicAppOrigin(req) {
+  const configured = process.env.PUBLIC_APP_URL || process.env.KK_PUBLIC_APP_URL || process.env.WEB_PUBLIC_URL || '';
+  const fallback = `${req.protocol}://${req.get('host')}`;
+  const url = new URL(configured || fallback);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('PUBLIC_APP_URL must use http or https.');
+  }
+  if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+    throw new Error('PUBLIC_APP_URL must use https in production.');
+  }
+  return url.origin;
+}
+
+function readPaymentQrPath(envName) {
+  const value = String(process.env[envName] || '').trim();
+  if (!value) return null;
+  if (value.startsWith('/') && !value.startsWith('//')) return value;
+  try {
+    const url = new URL(value);
+    const localHttp = process.env.NODE_ENV !== 'production'
+      && url.protocol === 'http:'
+      && ['127.0.0.1', 'localhost'].includes(url.hostname);
+    return url.protocol === 'https:' || localHttp ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildPaymentChannel(channel, envName, label) {
+  const qrImagePath = readPaymentQrPath(envName);
+  return {
+    channel,
+    label,
+    isActive: Boolean(qrImagePath),
+    qrImagePath,
+    qrImageDataUrl: null,
+    instructionText: qrImagePath
+      ? 'Complete the transfer, then submit the last four characters of the reference.'
+      : 'This payment channel is not configured.',
   };
 }
 
@@ -466,12 +539,21 @@ router.post('/api/v1/billing/credits/refunds', requireUser, async (req, res) => 
 
 
 router.get('/api/billing/plans', async (_req, res) => {
-  return res.json({ plans: await listLegacyBillingPlans() });
+  try {
+    return res.json({ plans: await listLegacyBillingPlans() });
+  } catch {
+    return res.status(503).json({ error: 'Billing plans are temporarily unavailable.' });
+  }
 });
 
 router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
   const planId = String(req.body?.planId || '').trim();
-  const plans = await listLegacyBillingPlans();
+  let plans;
+  try {
+    plans = await listLegacyBillingPlans();
+  } catch {
+    return res.status(503).json({ error: 'Billing plans are temporarily unavailable.' });
+  }
   const plan = plans.find((item) => item.id === planId);
   if (!plan) {
     return res.status(400).json({ error: 'Invalid billing plan.' });
@@ -479,27 +561,33 @@ router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
 
   const amountCents = Math.round(Number(plan.amount) * 100);
   const localSessionId = `local_checkout_${crypto.randomUUID()}`;
-  const successUrl = String(req.body?.successUrl || '').trim();
-  const cancelUrl = String(req.body?.cancelUrl || '').trim();
-  const origin = `${req.protocol}://${req.get('host')}`;
+  const origin = getPublicAppOrigin(req);
 
-  if (isDbEnabled() && process.env.STRIPE_SECRET_KEY) {
+  if (isDbEnabled() && !process.env.STRIPE_SECRET_KEY) {
+    return res.status(503).json({
+      error: 'Stripe checkout is not configured.',
+      code: 'STRIPE_NOT_CONFIGURED',
+    });
+  }
+
+  if (isDbEnabled()) {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    let session = null;
     try {
-      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-      const session = await stripe.checkout.sessions.create({
+      session = await stripe.checkout.sessions.create({
         mode: 'payment',
         line_items: [
           {
             price_data: {
-              currency: String(req.body?.currency || 'usd').toLowerCase(),
+              currency: plan.currency.toLowerCase(),
               product_data: { name: plan.name },
               unit_amount: amountCents,
             },
             quantity: 1,
           },
         ],
-        success_url: successUrl || `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl || `${origin}/billing/cancel`,
+        success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/billing/cancel`,
         metadata: {
           userId: req.userId,
           planId,
@@ -508,12 +596,23 @@ router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
       });
       const pool = getPool();
       await pool.query(
-        'INSERT INTO public.orders (id, user_id, stripe_session_id, plan_id, amount_cents, credits, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) ON CONFLICT (stripe_session_id) DO NOTHING',
-        [`order_${crypto.randomUUID()}`, req.userId, session.id, planId, amountCents, plan.credits, 'pending'],
+        'INSERT INTO public.orders (id, user_id, stripe_session_id, plan_id, amount_cents, credits, currency, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())',
+        [`order_${crypto.randomUUID()}`, req.userId, session.id, planId, amountCents, plan.credits, plan.currency, 'pending'],
       );
       return res.json({ url: session.url, stripeSessionId: session.id });
     } catch (error) {
-      return res.status(502).json({ error: error.message, code: 'CHECKOUT_CREATE_FAILED' });
+      if (session?.id) {
+        try {
+          await stripe.checkout.sessions.expire(session.id);
+        } catch (expireError) {
+          console.error('[contract-compat] Failed to expire an unpersisted Stripe session:', expireError.message);
+        }
+      }
+      console.error('[contract-compat] Failed to create a durable Stripe checkout:', error.message);
+      return res.status(502).json({
+        error: 'Unable to create a durable checkout session.',
+        code: 'CHECKOUT_CREATE_FAILED',
+      });
     }
   }
 
@@ -523,9 +622,9 @@ router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
     merchantOrderNo: localSessionId,
     status: 'pending',
     amount: plan.amount,
-    currency: String(req.body?.currency || 'USD').toUpperCase(),
+    currency: plan.currency,
     creditAmount: plan.credits,
-    paymentUrl: successUrl || `/billing?checkout=manual&planId=${encodeURIComponent(planId)}`,
+    paymentUrl: `/billing?checkout=manual&planId=${encodeURIComponent(planId)}`,
     providerCode: 'manual',
     userId: req.userId,
     settlementApplied: false,
@@ -543,53 +642,144 @@ router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
 router.get('/api/v1/billing/payment-channels', requireUser, async (req, res) => {
   return res.json(okEnvelope({
     items: [
-      { channel: 'manual', label: 'Manual', isActive: true, instructionText: 'Submit transfer proof for manual review.' },
+      buildPaymentChannel('alipay', 'KK_RECHARGE_ALIPAY_QR_URL', '支付宝静态码'),
+      buildPaymentChannel('wechat', 'KK_RECHARGE_WECHAT_QR_URL', '微信静态码'),
     ],
   }, req));
 });
 
 router.get('/api/v1/billing/exchange-rates', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const items = await rechargeSubmissions.listExchangeRates(getPool());
+      return res.json(okEnvelope({ items }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
   return res.json(okEnvelope({ items: store.exchangeRates || [] }, req));
 });
 
 
 router.post('/api/v1/billing/recharge-submissions', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const submission = await rechargeSubmissions.createRechargeSubmission(
+        getPool(),
+        req.userId,
+        req.body || {},
+      );
+      return res.status(201).json(okEnvelope({ submission }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
   const profileStore = ensureProfileStore(store, req.userId);
-  const submission = buildRechargeSubmission(req.userId, req.body || {});
+  let submission;
+  try {
+    submission = buildRechargeSubmission(req.userId, req.body || {}, {}, store.exchangeRates || []);
+  } catch (error) {
+    return sendRechargeRouteError(res, req, error);
+  }
   profileStore.rechargeSubmissions[submission.submissionId] = submission;
   await writeStore(store);
   return res.status(201).json(okEnvelope({ submission }, req));
 });
 
 router.post('/api/v1/billing/submit-recharge', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const submission = await rechargeSubmissions.createRechargeSubmission(
+        getPool(),
+        req.userId,
+        req.body || {},
+        { initialProof: req.body?.transferReferenceLast4 },
+      );
+      return res.status(201).json(okEnvelope({ submission }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
   const profileStore = ensureProfileStore(store, req.userId);
-  const submission = buildRechargeSubmission(req.userId, req.body || {}, { status: 'pending', submittedAt: nowIso(), paymentMarkedAt: nowIso() });
+  let submission;
+  try {
+    const reference = String(req.body?.transferReferenceLast4 || '').trim().toUpperCase();
+    if (!/^[0-9A-Z]{4}$/.test(reference)) {
+      throw Object.assign(new Error('transferReferenceLast4 must contain exactly four letters or digits.'), {
+        code: 'INVALID_TRANSFER_REFERENCE',
+        statusCode: 400,
+      });
+    }
+    submission = buildRechargeSubmission(req.userId, { ...req.body, transferReferenceLast4: reference }, {
+      status: 'paying',
+      submittedAt: nowIso(),
+      paymentMarkedAt: nowIso(),
+    }, store.exchangeRates || []);
+  } catch (error) {
+    return sendRechargeRouteError(res, req, error);
+  }
   profileStore.rechargeSubmissions[submission.submissionId] = submission;
   await writeStore(store);
   return res.status(201).json(okEnvelope({ submission }, req));
 });
 
 router.post('/api/v1/billing/recharge-submissions/:submissionId/proof', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const submission = await rechargeSubmissions.submitRechargeProof(
+        getPool(),
+        req.userId,
+        req.params.submissionId,
+        req.body || {},
+      );
+      return res.json(okEnvelope({ submission }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
   const profileStore = ensureProfileStore(store, req.userId);
   const submission = profileStore.rechargeSubmissions?.[req.params.submissionId];
   if (!submission) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
-  submission.transferReferenceLast4 = req.body?.transferReferenceLast4 || submission.transferReferenceLast4 || null;
+  const reference = String(req.body?.transferReferenceLast4 || '').trim().toUpperCase();
+  if (!/^[0-9A-Z]{4}$/.test(reference)) {
+    return sendError(res, req, 400, 'INVALID_TRANSFER_REFERENCE', 'transferReferenceLast4 must contain exactly four letters or digits.');
+  }
+  if (!['created', 'pending', 'paying'].includes(submission.status) || new Date(submission.expiresAt).getTime() <= Date.now()) {
+    return sendError(res, req, 409, 'RECHARGE_SUBMISSION_NOT_PAYABLE', 'Recharge submission can no longer accept payment proof.');
+  }
+  submission.transferReferenceLast4 = reference;
   submission.note = req.body?.note || submission.note || '';
-  submission.status = 'pending';
+  submission.status = 'paying';
+  submission.paymentMarkedAt = submission.paymentMarkedAt || nowIso();
   submission.submittedAt = nowIso();
   await writeStore(store);
   return res.json(okEnvelope({ submission }, req));
 });
 
 router.post('/api/v1/billing/recharge-submissions/:submissionId/mark-paid', requireUser, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const submission = await rechargeSubmissions.markRechargeSubmissionPaid(
+        getPool(),
+        req.userId,
+        req.params.submissionId,
+      );
+      return res.json(okEnvelope({ submission }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
   const profileStore = ensureProfileStore(store, req.userId);
   const submission = profileStore.rechargeSubmissions?.[req.params.submissionId];
   if (!submission) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
+  if (!submission.transferReferenceLast4) {
+    return sendError(res, req, 409, 'RECHARGE_PROOF_REQUIRED', 'Submit transfer proof before marking the recharge as paid.');
+  }
   submission.status = 'paying';
   submission.paymentMarkedAt = nowIso();
   await writeStore(store);

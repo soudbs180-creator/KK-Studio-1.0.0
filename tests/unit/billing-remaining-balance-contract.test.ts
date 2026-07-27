@@ -95,13 +95,13 @@ test('manual recharge paid success path refreshes canonical billing balance and 
   assert.match(rechargeModalSource, /const \{[\s\S]*?showRechargeModal[\s\S]*?refreshBilling[\s\S]*?\} = useBilling\(\);/);
   assert.match(
     rechargeModalSource,
-    /const paidResponse = await markRechargeSubmissionPaid\([\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(\{ submission: paidResponse\.data\.submission \},[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,
+    /const paidResponse = await submitRechargeProof\([\s\S]*?transferReferenceLast4: normalizedReference[\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(\{ submission: paidResponse\.data\.submission \},[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,
   );
   const handleMarkPaidIndex = rechargeModalSource.indexOf('const handleMarkPaid = async () => {');
   const handleCreateOrderIndex = rechargeModalSource.indexOf('const baseAmount =', handleMarkPaidIndex);
   const handleMarkPaidSource = rechargeModalSource.slice(handleMarkPaidIndex, handleCreateOrderIndex);
   assert.ok(handleMarkPaidIndex >= 0);
-  assert.doesNotMatch(handleMarkPaidSource, /submitRechargeProof\(/);
+  assert.doesNotMatch(handleMarkPaidSource, /markRechargeSubmissionPaid\(/);
   assert.doesNotMatch(
     rechargeModalSource,
     /paymentOrderStatus === 'paid'/,

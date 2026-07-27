@@ -12,6 +12,7 @@ const { getPool } = require('../../lib/db');
 const { signJWT, verifyJWT } = require('../../lib/jwt');
 const credits = require('../../lib/credits');
 const dispatcher = require('../../lib/dispatcher');
+const rechargeSubmissions = require('../../lib/billing/rechargeSubmissions');
 
 const router = express.Router();
 
@@ -50,8 +51,8 @@ function defaultStore() {
     version: 1,
     profiles: {},
     exchangeRates: [
-      { currencyCode: 'CNY', creditsPerUnit: 100, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },
-      { currencyCode: 'USD', creditsPerUnit: 700, minAmount: 1, maxAmount: null, isActive: true, updatedAt: nowIso() },
+      { currencyCode: 'CNY', creditsPerUnit: 5, minAmount: 5, maxAmount: 500, isActive: true, updatedAt: nowIso() },
+      { currencyCode: 'USD', creditsPerUnit: 30, minAmount: 1, maxAmount: 100, isActive: true, updatedAt: nowIso() },
     ],
     adminPasswordHash: '',
   };
@@ -454,6 +455,73 @@ async function listAllLocalRechargeSubmissions() {
   return items;
 }
 
+function sendRechargeRouteError(res, req, error) {
+  return sendError(
+    res,
+    req,
+    error.statusCode || 500,
+    error.code || 'RECHARGE_OPERATION_FAILED',
+    error.message || 'Recharge operation failed.',
+  );
+}
+
+function findLocalRechargeSubmission(store, submissionId) {
+  for (const [userId, profileStore] of Object.entries(store.profiles || {})) {
+    const submission = profileStore.rechargeSubmissions?.[submissionId];
+    if (submission) return { userId, profileStore, submission };
+  }
+  return null;
+}
+
+function buildLocalRechargeResponse(found, balanceAfter, creditedAmount) {
+  return {
+    identity: found.userId,
+    subjectId: found.userId,
+    balanceAfter,
+    creditedAmount,
+    subjectEmail: found.profileStore.profile?.email,
+  };
+}
+
+function creditLocalRecharge(found, adminUserId) {
+  if (found.submission.status === 'credited') {
+    const balanceAfter = Number(found.profileStore.creditBalance || 0);
+    return buildLocalRechargeResponse(found, balanceAfter, 0);
+  }
+  if (found.submission.status !== 'paying' || !found.submission.transferReferenceLast4) {
+    throw Object.assign(new Error('Only a paid submission with transfer proof can be credited.'), {
+      code: 'RECHARGE_PROOF_REQUIRED',
+      statusCode: 409,
+    });
+  }
+  const creditAmount = Number(found.submission.creditAmount || 0);
+  if (!Number.isSafeInteger(creditAmount) || creditAmount <= 0) {
+    throw Object.assign(new Error('Recharge credit amount must be a positive integer.'), {
+      code: 'INVALID_RECHARGE_CREDITS',
+      statusCode: 409,
+    });
+  }
+  const balanceAfter = Number(found.profileStore.creditBalance || 0) + creditAmount;
+  found.profileStore.creditBalance = balanceAfter;
+  if (!Array.isArray(found.profileStore.creditTransactions)) {
+    found.profileStore.creditTransactions = [];
+  }
+  found.profileStore.creditTransactions.unshift({
+    id: `ledger_${crypto.randomUUID()}`,
+    userId: found.userId,
+    transactionType: 'recharge',
+    amount: creditAmount,
+    balanceAfter,
+    description: 'manual_recharge',
+    status: 'completed',
+    businessRefId: found.submission.submissionId,
+    createdAt: nowIso(),
+    completedAt: nowIso(),
+    actorId: adminUserId,
+  });
+  return buildLocalRechargeResponse(found, balanceAfter, creditAmount);
+}
+
 function authStartPayload(req, provider, mode) {
   const query = new URLSearchParams(req.query || {});
   const redirectTo = query.get('redirectTo') || '/';
@@ -785,12 +853,34 @@ router.get('/api/v1/admin/billing/accounts/:identity', requireAdmin, async (req,
 
 
 router.put('/api/v1/admin/billing/exchange-rates', requireAdmin, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const rate = await rechargeSubmissions.upsertExchangeRate(getPool(), req.body || {});
+      return res.json(okEnvelope(rate, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const store = await readStore();
+  const currencyCode = String(req.body?.currencyCode || '').trim().toUpperCase();
+  const creditsPerUnit = Number(req.body?.creditsPerUnit);
+  const rawMinAmount = req.body?.minAmount;
+  const rawMaxAmount = req.body?.maxAmount;
+  const minAmount = rawMinAmount === null || typeof rawMinAmount === 'undefined' ? null : Number(rawMinAmount);
+  const maxAmount = rawMaxAmount === null || typeof rawMaxAmount === 'undefined' ? null : Number(rawMaxAmount);
+  if (!['CNY', 'USD'].includes(currencyCode) || !Number.isFinite(creditsPerUnit) || creditsPerUnit <= 0) {
+    return sendError(res, req, 400, 'INVALID_EXCHANGE_RATE', 'A supported currency and positive creditsPerUnit are required.');
+  }
+  if ((minAmount !== null && (!Number.isFinite(minAmount) || minAmount <= 0))
+    || (maxAmount !== null && (!Number.isFinite(maxAmount) || maxAmount <= 0))
+    || (minAmount !== null && maxAmount !== null && maxAmount < minAmount)) {
+    return sendError(res, req, 400, 'INVALID_EXCHANGE_RATE_LIMIT', 'Exchange-rate amount limits are invalid.');
+  }
   const next = {
-    currencyCode: String(req.body?.currencyCode || 'CNY').toUpperCase() === 'USD' ? 'USD' : 'CNY',
-    creditsPerUnit: Number(req.body?.creditsPerUnit || 0),
-    minAmount: req.body?.minAmount ?? null,
-    maxAmount: req.body?.maxAmount ?? null,
+    currencyCode,
+    creditsPerUnit,
+    minAmount,
+    maxAmount,
     isActive: req.body?.isActive !== false,
     updatedAt: nowIso(),
   };
@@ -802,10 +892,29 @@ router.put('/api/v1/admin/billing/exchange-rates', requireAdmin, async (req, res
 
 
 router.get('/api/v1/admin/billing/recharge-submissions', requireAdmin, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const items = await rechargeSubmissions.listRechargeSubmissions(getPool());
+      return res.json(okEnvelope({ items }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   return res.json(okEnvelope({ items: await listAllLocalRechargeSubmissions() }, req));
 });
 
 router.get('/api/v1/admin/billing/recharge-submissions/:submissionId', requireAdmin, async (req, res) => {
+  if (isDbEnabled()) {
+    try {
+      const submission = await rechargeSubmissions.getRechargeSubmission(
+        getPool(),
+        req.params.submissionId,
+      );
+      return res.json(okEnvelope({ submission }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
+    }
+  }
   const items = await listAllLocalRechargeSubmissions();
   const submission = items.find((item) => item.submissionId === req.params.submissionId);
   if (!submission) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
@@ -813,20 +922,60 @@ router.get('/api/v1/admin/billing/recharge-submissions/:submissionId', requireAd
 });
 
 router.post('/api/v1/admin/billing/recharge-submissions/:submissionId/review', requireAdmin, async (req, res) => {
-  const store = await readStore();
-  let found = null;
-  for (const profileStore of Object.values(store.profiles || {})) {
-    if (profileStore.rechargeSubmissions?.[req.params.submissionId]) {
-      found = profileStore.rechargeSubmissions[req.params.submissionId];
-      break;
+  if (isDbEnabled()) {
+    try {
+      const result = await rechargeSubmissions.reviewRechargeSubmission(
+        getPool(),
+        req.userId,
+        req.params.submissionId,
+        req.body || {},
+      );
+      const recharge = req.body?.decision === 'credit'
+        ? {
+            identity: result.submission.userId,
+            subjectId: result.submission.userId,
+            balanceAfter: result.balanceAfter,
+            creditedAmount: result.credited ? result.submission.creditAmount : 0,
+          }
+        : null;
+      return res.json(okEnvelope({
+        submission: result.submission,
+        recharge,
+        creditAmount: result.submission.creditAmount,
+      }, req));
+    } catch (error) {
+      return sendRechargeRouteError(res, req, error);
     }
   }
+  const store = await readStore();
+  const found = findLocalRechargeSubmission(store, req.params.submissionId);
   if (!found) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
-  found.status = req.body?.decision === 'reject' ? 'rejected' : 'credited';
-  found.reviewedAt = nowIso();
-  found.reviewActorUserId = req.userId;
+  const decision = String(req.body?.decision || '');
+  if (!['credit', 'reject'].includes(decision)) {
+    return sendError(res, req, 400, 'INVALID_RECHARGE_REVIEW', 'decision must be credit or reject.');
+  }
+  let recharge = null;
+  try {
+    if (decision === 'credit') {
+      recharge = creditLocalRecharge(found, req.userId);
+      found.submission.status = 'credited';
+    } else {
+      if (found.submission.status === 'credited') {
+        return sendError(res, req, 409, 'RECHARGE_ALREADY_CREDITED', 'A credited recharge cannot be rejected.');
+      }
+      found.submission.status = 'rejected';
+    }
+  } catch (error) {
+    return sendRechargeRouteError(res, req, error);
+  }
+  found.submission.reviewedAt = nowIso();
+  found.submission.reviewActorUserId = req.userId;
   await writeStore(store);
-  return res.json(okEnvelope({ submission: toAdminRechargeSubmission(found), recharge: null, creditAmount: Number(found.creditAmount || 0) }, req));
+  return res.json(okEnvelope({
+    submission: toAdminRechargeSubmission(found.submission),
+    recharge,
+    creditAmount: Number(found.submission.creditAmount || 0),
+  }, req));
 });
 
 

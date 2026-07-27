@@ -1119,3 +1119,66 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 风险低。登录磨砂卡片建议后续在未登录浏览器会话中再做一次不同背景亮度下的视觉抽查。
 - 工作区同时出现另一条支付/充值任务的未提交文件；本次提交必须使用文件白名单隔离，
   不得由 `agents:commit` 的 `git add .` 夹带。
+
+---
+
+## 234. 2026-07-27 - fix(payment): 修复充值入账与 Stripe 结算一致性
+
+**修改范围**
+- 修复人工充值审核只改状态、不增加积分的账务缺陷；充值申请、支付证明、审核入账和汇率配置在
+  PostgreSQL 模式下统一使用数据库，审核通过以单事务完成状态锁定、积分增加和账本写入。
+- 修复前端只校验转账尾号却未提交证明的问题；支付宝/微信渠道只在服务端配置有效二维码后启用，
+  不再用前端占位渠道伪装为可支付。
+- 收紧 Stripe Checkout 与 Webhook：金额、币种、回跳地址均由服务端决定；仅结算已支付且与订单
+  金额、币种一致的事件，并覆盖异步支付成功事件。
+- 新增 migration 027、部署接线、环境变量示例、接口文档和回归测试。
+
+**修改文件**
+- 数据与账务：`infrastructure/database/migrations/027_payment_recharge_integrity.sql`、
+  `services/api/lib/billing/rechargeSubmissions.js`、`services/api/lib/billing/stripeSettlement.js`。
+- API：`services/api/routes/compat/billing.js`、`services/api/routes/compat/admin.js`、
+  `services/api/routes/webhook.js`。
+- Web：`apps/web/src/components/modals/RechargeModal.tsx`、
+  `apps/web/src/components/settings/views/RechargeView.tsx`。
+- 运维与文档：`scripts/ops/postgres/import-runtime-into-vps.sh`、
+  `scripts/ops/vps/bootstrap-kk-vps.sh`、`scripts/ops/vps/deploy-kk-vps.sh`、
+  `scripts/ops/vps/kk-api.env.example`、`services/api/.env.local.example`、
+  `docs/api/runtime-endpoints.md`。
+- 测试：新增 `tests/unit/payment-recharge-integrity.test.ts`，并更新
+  `tests/unit/billing-remaining-balance-contract.test.ts`、
+  `tests/unit/kkai-billing-ui-surface.test.ts`。
+
+**当前设计决策**
+1. PostgreSQL 启用时充值和汇率读取 fail closed，不回退本地 JSON；本地 JSON 仅保留给明确的无数据库
+   开发模式，并同样校验支付证明且在审核通过时只入账一次。
+2. 人工充值创建时冻结汇率与积分快照；审核通过对申请行加锁，并在同一事务调用
+   `credits.addCredits`、写账本和更新 `credited` 状态。重复通过为幂等操作，已入账申请不可再驳回。
+3. 旧 `mark-paid` 路由保留兼容，但没有已保存的有效支付证明时拒绝推进；新前端只调用 proof 路由。
+4. Stripe 计划的金额和币种、公开回跳 Origin 都来自服务端配置；生产数据库读取失败或 Stripe 未配置
+   时返回 503，不生成伪 Checkout。Stripe Session 创建后若本地订单写入失败，会尝试过期该 Session。
+5. Webhook 同时处理 `checkout.session.completed` 与 `checkout.session.async_payment_succeeded`，
+   未支付事件只确认接收；支付状态、金额和币种全部匹配服务端订单后才进入既有幂等积分结算。
+
+**已运行验证**
+- TDD：支付完整性测试首次 3/3 失败；补充部署与 Stripe fail-closed/补偿断言后也先确认红测，
+  实现完成后专项及相关计费测试 31/31 通过，最终支付完整性文件 5/5 通过。
+- integration 14/14、contract 15/15、E2E 11/11 通过。
+- 全量 unit 2227 项：2224 通过、1 项失败、2 跳过；唯一失败为既有
+  `minimap-10k-virtualization-contract` 的 2ms 墙钟阈值偶发得到 2.07ms，立即隔离重跑 2/2 通过。
+- Web/architecture TypeScript、server syntax（116 文件）、tests semantic（578 文件）全部通过。
+- `architecture:check`、`governance:check` 等价完整脚本、encoding/mojibake、
+  `git diff --check` 全部通过。
+- 生产构建通过：Vite 8.1.4，2566 modules。
+
+**未运行验证及原因**
+- 未直接运行聚合命令 `npm run verify:changes`：本机没有系统 `npm`；已使用 bundled Node 24
+  逐项执行本次直接相关的 typecheck、server/test semantic、architecture、governance、build、
+  unit、integration、contract、E2E 和编码检查。
+- 本机无 `psql`、PostgreSQL 与 Bash，未实际应用 migration 027，也未执行 shell `bash -n`。
+- 未持有真实 Stripe、支付宝或微信支付配置，未执行生产 Checkout/Webhook 和扫码转账 smoke test。
+
+**风险与下一步**
+- 上线前必须先应用 migration 027，再配置 `PUBLIC_APP_URL`、Stripe 密钥/Webhook Secret，以及
+  `KK_RECHARGE_ALIPAY_QR_URL` / `KK_RECHARGE_WECHAT_QR_URL`；未配置二维码的渠道会按设计保持不可用。
+- 在受控环境依次验证：人工充值创建→提交证明→管理员通过→余额与账本只增加一次；Stripe 同步成功、
+  异步成功、未支付、金额/币种不匹配与重复 Webhook；随后核对部署脚本的表、列和约束检查结果。
