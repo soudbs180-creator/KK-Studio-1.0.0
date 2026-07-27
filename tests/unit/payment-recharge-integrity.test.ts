@@ -15,8 +15,8 @@ test('manual recharge persists proof and settles credits through the authoritati
   assert.match(billingSource, /rechargeSubmissions\.createRechargeSubmission/);
   assert.match(billingSource, /rechargeSubmissions\.submitRechargeProof/);
   assert.match(adminSource, /rechargeSubmissions\.reviewRechargeSubmission/);
-  assert.match(modalSource, /submitRechargeProof\([\s\S]*transferReferenceLast4: normalizedReference/);
-  assert.match(viewSource, /submitRechargeProof\([\s\S]*transferReferenceLast4: normalizedReference/);
+  assert.match(modalSource, /submitRechargeProof\([\s\S]*providerTransactionId: normalizedTransactionId/);
+  assert.match(viewSource, /submitRechargeProof\([\s\S]*providerTransactionId: normalizedTransactionId/);
   assert.doesNotMatch(modalSource, /markRechargeSubmissionPaid/);
   assert.doesNotMatch(viewSource, /markRechargeSubmissionPaid/);
 });
@@ -75,6 +75,7 @@ test('manual recharge review applies credits once across repeated approvals', as
     currency_code: 'CNY',
     payment_channel: 'manual',
     manual_provider: 'alipay',
+    provider_transaction_id: 'ALIPAY-TEST-A123',
     transfer_reference_last4: 'A123',
     note: '',
     status: 'paying',

@@ -41,12 +41,31 @@ function normalizeProvider(input) {
   return manualProvider;
 }
 
-function normalizeReference(value) {
-  const reference = String(value || '').trim().toUpperCase();
-  if (!/^[0-9A-Z]{4}$/.test(reference)) {
-    throw createRechargeError(400, 'INVALID_TRANSFER_REFERENCE', 'transferReferenceLast4 must contain exactly four letters or digits.');
+function normalizeProviderTransactionId(value) {
+  const providerTransactionId = String(value || '').trim().toUpperCase();
+  if (!/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(providerTransactionId)) {
+    throw createRechargeError(
+      400,
+      'INVALID_PROVIDER_TRANSACTION_ID',
+      'providerTransactionId must contain 8-64 letters, digits, or hyphens.',
+    );
   }
-  return reference;
+  return providerTransactionId;
+}
+
+function buildTransferReference(providerTransactionId) {
+  return providerTransactionId.replace(/-/g, '').slice(-4);
+}
+
+function translateProviderTransactionConflict(error) {
+  if (error?.code === '23505' && error?.constraint === 'recharge_submissions_provider_transaction_unique_idx') {
+    throw createRechargeError(
+      409,
+      'RECHARGE_TRANSACTION_ALREADY_USED',
+      'This provider transaction has already been submitted.',
+    );
+  }
+  throw error;
 }
 
 function normalizeNote(value) {
@@ -92,6 +111,7 @@ function mapRechargeRow(row) {
     currencyCode: String(row.currency_code),
     paymentChannel: String(row.payment_channel),
     manualProvider: row.manual_provider || null,
+    providerTransactionId: row.provider_transaction_id || null,
     transferReferenceLast4: row.transfer_reference_last4 || null,
     note: row.note || '',
     status: String(row.status),
@@ -137,11 +157,16 @@ function buildSubmissionValues(userId, input, rate, options) {
   if (!Number.isSafeInteger(creditAmount) || creditAmount <= 0) {
     throw createRechargeError(400, 'INVALID_RECHARGE_CREDITS', 'The configured exchange rate produced an invalid credit amount.');
   }
-  const initialProof = options.initialProof ? normalizeReference(options.initialProof) : null;
+  const providerTransactionId = options.initialProof
+    ? normalizeProviderTransactionId(options.initialProof)
+    : null;
+  const transferReference = providerTransactionId
+    ? buildTransferReference(providerTransactionId)
+    : null;
   return [
     `rch_${crypto.randomUUID()}`, userId, amount, creditAmount, rate.creditsPerUnit,
-    rate.currencyCode, normalizeProvider(input), normalizeNote(input.note), initialProof,
-    initialProof ? 'paying' : 'created',
+    rate.currencyCode, normalizeProvider(input), normalizeNote(input.note),
+    providerTransactionId, transferReference, providerTransactionId ? 'paying' : 'created',
   ];
 }
 
@@ -152,41 +177,54 @@ async function createRechargeSubmission(pool, userId, input, options = {}) {
   const currencyCode = normalizeCurrency(input.currencyCode);
   const rate = await getActiveExchangeRate(pool, currencyCode);
   const values = buildSubmissionValues(userId, input, rate, options);
-  const result = await pool.query(
-    `INSERT INTO public.recharge_submissions (
-       submission_id, user_id, amount, base_amount, service_fee, payable_amount,
-       base_credits, bonus_credits, credit_amount, credits_per_unit, currency_code,
-       payment_channel, manual_provider, note, transfer_reference_last4, status,
-       expires_at, payment_marked_at, submitted_at, created_at
-     ) VALUES (
-       $1, $2, $3, $3, 0, $3, $4, 0, $4, $5, $6,
-       'manual', $7, $8, $9, $10, NOW() + INTERVAL '24 hours',
-       CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END,
-       CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END, NOW()
-     ) RETURNING *`,
-    values,
-  );
-  return mapRechargeRow(result.rows[0]);
+  try {
+    const result = await pool.query(
+      `INSERT INTO public.recharge_submissions (
+         submission_id, user_id, amount, base_amount, service_fee, payable_amount,
+         base_credits, bonus_credits, credit_amount, credits_per_unit, currency_code,
+         payment_channel, manual_provider, note, provider_transaction_id,
+         transfer_reference_last4, status,
+         expires_at, payment_marked_at, submitted_at, created_at
+       ) VALUES (
+         $1, $2, $3, $3, 0, $3, $4, 0, $4, $5, $6,
+         'manual', $7, $8, $9, $10, $11, NOW() + INTERVAL '24 hours',
+         CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END,
+         CASE WHEN $9::text IS NULL THEN NULL ELSE NOW() END, NOW()
+       ) RETURNING *`,
+      values,
+    );
+    return mapRechargeRow(result.rows[0]);
+  } catch (error) {
+    translateProviderTransactionConflict(error);
+  }
 }
 
 /**
  * 提交转账凭证。所有权、状态和有效期在一条原子 UPDATE 中校验。
  */
 async function submitRechargeProof(pool, userId, submissionId, input) {
-  const reference = normalizeReference(input.transferReferenceLast4);
+  const providerTransactionId = normalizeProviderTransactionId(input.providerTransactionId);
+  const reference = buildTransferReference(providerTransactionId);
   const note = normalizeNote(input.note);
-  const result = await pool.query(
-    `UPDATE public.recharge_submissions
-        SET transfer_reference_last4 = $3,
-            note = CASE WHEN $4 = '' THEN note ELSE $4 END,
-            status = 'paying',
-            payment_marked_at = COALESCE(payment_marked_at, NOW()), submitted_at = NOW()
-      WHERE submission_id = $1 AND user_id = $2
-        AND status IN ('created', 'pending', 'paying')
-        AND (expires_at IS NULL OR expires_at > NOW())
-      RETURNING *`,
-    [submissionId, userId, reference, note],
-  );
+  let result;
+  try {
+    result = await pool.query(
+      `UPDATE public.recharge_submissions
+          SET provider_transaction_id = $3,
+              transfer_reference_last4 = $4,
+              note = CASE WHEN $5 = '' THEN note ELSE $5 END,
+              status = 'paying',
+              payment_marked_at = NOW(), submitted_at = NOW()
+        WHERE submission_id = $1 AND user_id = $2
+          AND status IN ('created', 'pending')
+          AND provider_transaction_id IS NULL
+          AND (expires_at IS NULL OR expires_at > NOW())
+        RETURNING *`,
+      [submissionId, userId, providerTransactionId, reference, note],
+    );
+  } catch (error) {
+    translateProviderTransactionConflict(error);
+  }
   if (result.rows[0]) return mapRechargeRow(result.rows[0]);
   await assertMutableSubmission(pool, userId, submissionId);
   throw createRechargeError(409, 'RECHARGE_SUBMISSION_NOT_PAYABLE', 'Recharge submission can no longer accept payment proof.');
@@ -213,7 +251,7 @@ async function markRechargeSubmissionPaid(pool, userId, submissionId) {
     `UPDATE public.recharge_submissions
         SET status = 'paying', payment_marked_at = COALESCE(payment_marked_at, NOW())
       WHERE submission_id = $1 AND user_id = $2
-        AND transfer_reference_last4 IS NOT NULL
+        AND provider_transaction_id IS NOT NULL
         AND status IN ('pending', 'paying')
         AND (expires_at IS NULL OR expires_at > NOW())
       RETURNING *`,
@@ -291,7 +329,7 @@ async function creditLockedSubmission(client, row, adminUserId, note) {
     const balance = await client.query('SELECT credits FROM public.users WHERE id = $1', [row.user_id]);
     return { submission: mapRechargeRow(row), balanceAfter: Number(balance.rows[0]?.credits || 0), credited: false };
   }
-  if (row.status !== 'paying' || !row.transfer_reference_last4) {
+  if (row.status !== 'paying' || !row.provider_transaction_id) {
     throw createRechargeError(409, 'RECHARGE_PROOF_REQUIRED', 'Only a paid submission with transfer proof can be credited.');
   }
   const balanceAfter = await credits.addCredits(

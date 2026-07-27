@@ -287,6 +287,7 @@ function buildRechargeSubmission(userId, input, overrides = {}, exchangeRates = 
     });
   }
   const timestamp = nowIso();
+  const providerTransactionId = input.providerTransactionId || null;
   return {
     submissionId: overrides.submissionId || `rch_${crypto.randomUUID()}`,
     userId,
@@ -301,7 +302,10 @@ function buildRechargeSubmission(userId, input, overrides = {}, exchangeRates = 
     currencyCode,
     paymentChannel: input.paymentChannel || 'manual',
     manualProvider,
-    transferReferenceLast4: input.transferReferenceLast4 || null,
+    providerTransactionId,
+    transferReferenceLast4: providerTransactionId
+      ? providerTransactionId.replace(/-/g, '').slice(-4)
+      : null,
     note: input.note || '',
     status: overrides.status || 'created',
     createdAt: overrides.createdAt || timestamp,
@@ -311,6 +315,35 @@ function buildRechargeSubmission(userId, input, overrides = {}, exchangeRates = 
     reviewedAt: overrides.reviewedAt || null,
     reviewActorUserId: overrides.reviewActorUserId || null,
   };
+}
+
+function normalizeProviderTransactionId(value) {
+  const providerTransactionId = String(value || '').trim().toUpperCase();
+  if (!/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(providerTransactionId)) {
+    throw Object.assign(new Error('providerTransactionId must contain 8-64 letters, digits, or hyphens.'), {
+      code: 'INVALID_PROVIDER_TRANSACTION_ID',
+      statusCode: 400,
+    });
+  }
+  return providerTransactionId;
+}
+
+function isProviderTransactionUsed(store, manualProvider, providerTransactionId) {
+  return Object.values(store.profiles || {}).some((profileStore) => Object.values(
+    profileStore?.rechargeSubmissions || {},
+  ).some((submission) => (
+    submission.manualProvider === manualProvider
+    && submission.providerTransactionId === providerTransactionId
+  )));
+}
+
+function assertUnusedProviderTransaction(store, manualProvider, providerTransactionId) {
+  if (isProviderTransactionUsed(store, manualProvider, providerTransactionId)) {
+    throw Object.assign(new Error('This provider transaction has already been submitted.'), {
+      code: 'RECHARGE_TRANSACTION_ALREADY_USED',
+      statusCode: 409,
+    });
+  }
 }
 
 function sendRechargeRouteError(res, req, error) {
@@ -596,7 +629,7 @@ router.post('/api/billing/create-checkout', requireUser, async (req, res) => {
       });
       const pool = getPool();
       await pool.query(
-        'INSERT INTO public.orders (id, user_id, stripe_session_id, plan_id, amount_cents, credits, currency, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())',
+        'INSERT INTO public.orders (id, user_id, stripe_session_id, plan_id, amount_cents, credits, currency, currency_verified, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, NOW(), NOW())',
         [`order_${crypto.randomUUID()}`, req.userId, session.id, planId, amountCents, plan.credits, plan.currency, 'pending'],
       );
       return res.json({ url: session.url, stripeSessionId: session.id });
@@ -695,7 +728,7 @@ router.post('/api/v1/billing/submit-recharge', requireUser, async (req, res) => 
         getPool(),
         req.userId,
         req.body || {},
-        { initialProof: req.body?.transferReferenceLast4 },
+        { initialProof: req.body?.providerTransactionId },
       );
       return res.status(201).json(okEnvelope({ submission }, req));
     } catch (error) {
@@ -706,14 +739,10 @@ router.post('/api/v1/billing/submit-recharge', requireUser, async (req, res) => 
   const profileStore = ensureProfileStore(store, req.userId);
   let submission;
   try {
-    const reference = String(req.body?.transferReferenceLast4 || '').trim().toUpperCase();
-    if (!/^[0-9A-Z]{4}$/.test(reference)) {
-      throw Object.assign(new Error('transferReferenceLast4 must contain exactly four letters or digits.'), {
-        code: 'INVALID_TRANSFER_REFERENCE',
-        statusCode: 400,
-      });
-    }
-    submission = buildRechargeSubmission(req.userId, { ...req.body, transferReferenceLast4: reference }, {
+    const providerTransactionId = normalizeProviderTransactionId(req.body?.providerTransactionId);
+    const manualProvider = String(req.body?.manualProvider || '').trim().toLowerCase();
+    assertUnusedProviderTransaction(store, manualProvider, providerTransactionId);
+    submission = buildRechargeSubmission(req.userId, { ...req.body, providerTransactionId }, {
       status: 'paying',
       submittedAt: nowIso(),
       paymentMarkedAt: nowIso(),
@@ -744,14 +773,20 @@ router.post('/api/v1/billing/recharge-submissions/:submissionId/proof', requireU
   const profileStore = ensureProfileStore(store, req.userId);
   const submission = profileStore.rechargeSubmissions?.[req.params.submissionId];
   if (!submission) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
-  const reference = String(req.body?.transferReferenceLast4 || '').trim().toUpperCase();
-  if (!/^[0-9A-Z]{4}$/.test(reference)) {
-    return sendError(res, req, 400, 'INVALID_TRANSFER_REFERENCE', 'transferReferenceLast4 must contain exactly four letters or digits.');
+  let providerTransactionId;
+  try {
+    providerTransactionId = normalizeProviderTransactionId(req.body?.providerTransactionId);
+    assertUnusedProviderTransaction(store, submission.manualProvider, providerTransactionId);
+  } catch (error) {
+    return sendRechargeRouteError(res, req, error);
   }
-  if (!['created', 'pending', 'paying'].includes(submission.status) || new Date(submission.expiresAt).getTime() <= Date.now()) {
+  if (!['created', 'pending'].includes(submission.status)
+    || submission.providerTransactionId
+    || new Date(submission.expiresAt).getTime() <= Date.now()) {
     return sendError(res, req, 409, 'RECHARGE_SUBMISSION_NOT_PAYABLE', 'Recharge submission can no longer accept payment proof.');
   }
-  submission.transferReferenceLast4 = reference;
+  submission.providerTransactionId = providerTransactionId;
+  submission.transferReferenceLast4 = providerTransactionId.replace(/-/g, '').slice(-4);
   submission.note = req.body?.note || submission.note || '';
   submission.status = 'paying';
   submission.paymentMarkedAt = submission.paymentMarkedAt || nowIso();
@@ -777,7 +812,7 @@ router.post('/api/v1/billing/recharge-submissions/:submissionId/mark-paid', requ
   const profileStore = ensureProfileStore(store, req.userId);
   const submission = profileStore.rechargeSubmissions?.[req.params.submissionId];
   if (!submission) return sendError(res, req, 404, 'RECHARGE_SUBMISSION_NOT_FOUND', 'Recharge submission was not found.');
-  if (!submission.transferReferenceLast4) {
+  if (!submission.providerTransactionId) {
     return sendError(res, req, 409, 'RECHARGE_PROOF_REQUIRED', 'Submit transfer proof before marking the recharge as paid.');
   }
   submission.status = 'paying';

@@ -11,6 +11,11 @@ WEB_ENV_FILE="${KK_WEB_ENV_FILE:-$ENV_DIR/kk-web.env}"
 API_ENV_FILE="${KK_API_ENV_FILE:-$ENV_DIR/kk-api.env}"
 APPLY_BOOTSTRAP_SQL="${KK_APPLY_BOOTSTRAP_SQL:-false}"
 BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/ops/postgres/bootstrap-kk-vps.sql}"
+STRICT_BILLING_SCHEMA_MIGRATION_PATH="${KK_STRICT_BILLING_SCHEMA_MIGRATION:-infrastructure/database/migrations/003_strict_agents_schema.sql}"
+CREDIT_DEFAULT_MIGRATION_PATH="${KK_CREDIT_DEFAULT_MIGRATION:-infrastructure/database/migrations/005_remove_default_credits.sql}"
+ADMIN_CREDITS_MIGRATION_PATH="${KK_ADMIN_CREDITS_MIGRATION:-infrastructure/database/migrations/006_admin_credits_contract.sql}"
+ADMIN_LEVEL_CONSTRAINT_MIGRATION_PATH="${KK_ADMIN_LEVEL_CONSTRAINT_MIGRATION:-infrastructure/database/migrations/009_admin_level_check_constraint.sql}"
+ORDERS_CONSTRAINT_MIGRATION_PATH="${KK_ORDERS_CONSTRAINT_MIGRATION:-infrastructure/database/migrations/010_orders_positive_credits_constraint.sql}"
 AI_ASSISTANT_SCOPE_MIGRATION_PATH="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_EVENT_MIGRATION:-infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/database/migrations/021_agent_sessions.sql}"
@@ -19,6 +24,8 @@ AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION
 AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 OAUTH_IDENTITY_MIGRATION_PATH="${KK_OAUTH_IDENTITY_MIGRATION:-infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION_PATH="${KK_PAYMENT_RECHARGE_MIGRATION:-infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
+PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH="${KK_PAYMENT_RECHARGE_HARDENING_MIGRATION:-infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
+LEGACY_PAYMENT_IMPORT_SCRIPT_PATH="scripts/ops/postgres/import-legacy-payment-state.mjs"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -202,7 +209,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022, 023, 024, 026 and 027 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify billing prerequisites and schemas 016, 020, 021, 022, 023, 024, 026, 027 and 028 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -357,6 +364,17 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Bootstrap SQL not found at ${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}" >&2
     exit 1
   fi
+  for prerequisite_path in \
+    "${STRICT_BILLING_SCHEMA_MIGRATION_PATH}" \
+    "${CREDIT_DEFAULT_MIGRATION_PATH}" \
+    "${ADMIN_CREDITS_MIGRATION_PATH}" \
+    "${ADMIN_LEVEL_CONSTRAINT_MIGRATION_PATH}" \
+    "${ORDERS_CONSTRAINT_MIGRATION_PATH}"; do
+    if [[ ! -f "${NEW_RELEASE_DIR}/${prerequisite_path}" ]]; then
+      echo "[deploy-kk-vps] Billing prerequisite migration not found at ${NEW_RELEASE_DIR}/${prerequisite_path}" >&2
+      exit 1
+    fi
+  done
   if [[ ! -f "${NEW_RELEASE_DIR}/${AI_ASSISTANT_SCOPE_MIGRATION_PATH}" ]]; then
     echo "[deploy-kk-vps] AI assistant scope migration not found at ${NEW_RELEASE_DIR}/${AI_ASSISTANT_SCOPE_MIGRATION_PATH}" >&2
     exit 1
@@ -389,6 +407,14 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Payment recharge migration not found at ${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] Payment recharge hardening migration not found at ${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH}" >&2
+    exit 1
+  fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${LEGACY_PAYMENT_IMPORT_SCRIPT_PATH}" ]]; then
+    echo "[deploy-kk-vps] Legacy payment import script not found at ${NEW_RELEASE_DIR}/${LEGACY_PAYMENT_IMPORT_SCRIPT_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -397,6 +423,17 @@ apply_database_migrations() {
     SCHEMA_MIGRATION_ATTEMPTED=true
     psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${BOOTSTRAP_SQL_PATH}"
   fi
+
+  echo "[deploy-kk-vps] Applying strict billing prerequisite migrations..."
+  SCHEMA_MIGRATION_ATTEMPTED=true
+  for prerequisite_path in \
+    "${STRICT_BILLING_SCHEMA_MIGRATION_PATH}" \
+    "${CREDIT_DEFAULT_MIGRATION_PATH}" \
+    "${ADMIN_CREDITS_MIGRATION_PATH}" \
+    "${ADMIN_LEVEL_CONSTRAINT_MIGRATION_PATH}" \
+    "${ORDERS_CONSTRAINT_MIGRATION_PATH}"; do
+    psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${prerequisite_path}"
+  done
 
   echo "[deploy-kk-vps] Applying mandatory AI assistant user-scope migration..."
   SCHEMA_MIGRATION_ATTEMPTED=true
@@ -423,6 +460,9 @@ apply_database_migrations() {
   echo "[deploy-kk-vps] Applying mandatory payment recharge integrity migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_MIGRATION_PATH}"
 
+  echo "[deploy-kk-vps] Applying mandatory payment recharge hardening migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH}"
+
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %s TO %I',
@@ -434,7 +474,7 @@ FROM (VALUES
   ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
   ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions'),
   ('auth_identities'), ('oauth_transactions'), ('credit_exchange_rates'),
-  ('recharge_submissions'), ('plans'), ('orders')
+  ('recharge_submissions'), ('legacy_payment_imports'), ('plans'), ('orders')
 ) AS ai_tables(table_name)
 \gexec
 
@@ -672,6 +712,7 @@ BEGIN
   END IF;
   IF to_regclass('public.credit_exchange_rates') IS NULL
     OR to_regclass('public.recharge_submissions') IS NULL
+    OR to_regclass('public.legacy_payment_imports') IS NULL
     OR NOT EXISTS (
       SELECT 1 FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'plans' AND column_name = 'currency'
@@ -679,6 +720,15 @@ BEGIN
     OR NOT EXISTS (
       SELECT 1 FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'currency'
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'currency_verified'
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'recharge_submissions'
+        AND column_name = 'provider_transaction_id'
     )
     OR NOT EXISTS (
       SELECT 1 FROM pg_constraint
@@ -697,6 +747,23 @@ BEGIN
       WHERE conname = 'chk_recharge_submission_manual_channel'
         AND conrelid = 'public.recharge_submissions'::regclass
         AND convalidated
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'chk_recharge_submission_provider_transaction'
+        AND conrelid = 'public.recharge_submissions'::regclass
+        AND convalidated
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_index
+      WHERE indexrelid = 'public.recharge_submissions_provider_transaction_unique_idx'::regclass
+        AND indisunique
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_trigger
+      WHERE tgname = 'recharge_submissions_immutable_proof_trigger'
+        AND tgrelid = 'public.recharge_submissions'::regclass
+        AND NOT tgisinternal
     ) THEN
     RAISE EXCEPTION 'Payment recharge integrity schema is missing or invalid';
   END IF;
@@ -713,6 +780,28 @@ BEGIN
 END $$;
 SQL
   SCHEMA_CUTOVER_APPLIED=true
+}
+
+import_legacy_payment_state() {
+  local configured_store="${KK_LEGACY_PAYMENT_STORE_PATH:-${CURRENT_DIR}/services/api/.kk-local/contract-compat.json}"
+  if [[ ! -f "${configured_store}" ]]; then
+    echo "[deploy-kk-vps] No legacy contract-compat payment store found; skipping one-time import."
+    return
+  fi
+
+  local resolved_store
+  resolved_store="$(realpath "${configured_store}")"
+  case "${resolved_store}" in
+    "${APP_ROOT}"/*|"${ENV_DIR}"/*) ;;
+    *)
+      echo "[deploy-kk-vps] Legacy payment store must stay inside ${APP_ROOT} or ${ENV_DIR}." >&2
+      exit 1
+      ;;
+  esac
+
+  echo "[deploy-kk-vps] Importing legacy JSON recharge state before release cutover..."
+  sudo -u "${APP_USER}" env LEGACY_PAYMENT_STORE_PATH="${resolved_store}" bash -lc \
+    "set -a; source '${API_ENV_FILE}'; set +a; cd '${NEW_RELEASE_DIR}'; node '${LEGACY_PAYMENT_IMPORT_SCRIPT_PATH}'"
 }
 
 atomic_switch_symlinks() {
@@ -873,6 +962,7 @@ harden_env_permissions
 verify_database_migration_inputs
 stop_api_services_for_schema_cutover
 apply_database_migrations
+import_legacy_payment_state
 
 # 进入临界区，进行原子替换与重载
 atomic_switch_symlinks

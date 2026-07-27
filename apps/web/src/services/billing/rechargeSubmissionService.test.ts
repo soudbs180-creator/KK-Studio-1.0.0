@@ -8,6 +8,7 @@ import {
   getRechargeSubmissionErrorMessage,
   getRechargeSubmissionStatusLabel,
   normalizeRechargeBillSnapshot,
+  sanitizeProviderTransactionId,
   sanitizeTransferReferenceLast4,
 } from './rechargeSubmissionService.ts';
 
@@ -17,20 +18,26 @@ test('sanitizeTransferReferenceLast4 keeps the latest four alphanumeric characte
   assert.equal(sanitizeTransferReferenceLast4('12'), '12');
 });
 
-test('buildRechargeSubmissionRequest normalizes amount, note, and reference tail', () => {
+test('sanitizeProviderTransactionId normalizes a complete provider transaction identifier', () => {
+  assert.equal(sanitizeProviderTransactionId(' ali-8x9z-20260728 '), 'ALI-8X9Z-20260728');
+  assert.equal(sanitizeProviderTransactionId('invalid_value'), 'INVALIDVALUE');
+});
+
+test('buildRechargeSubmissionRequest normalizes amount, note, and transaction identifier', () => {
   assert.deepEqual(
     buildRechargeSubmissionRequest({
       amount: 20,
       currencyCode: 'CNY',
       paymentChannel: 'alipay',
-      transferReferenceLast4: ' 8x-9z ',
+      providerTransactionId: ' ali-8x9z-20260728 ',
       note: '  user uploaded transfer proof  ',
     }),
     {
       amount: 20,
       currencyCode: 'CNY',
       paymentChannel: 'alipay',
-      transferReferenceLast4: '8X9Z',
+      providerTransactionId: 'ALI-8X9Z-20260728',
+      transferReferenceLast4: '0728',
       note: 'user uploaded transfer proof',
     },
   );
@@ -73,7 +80,7 @@ test('buildRechargeBillRequest supports manual recharge provider selection', () 
   );
 });
 
-test('buildRechargeProofSubmissionRequest preserves bill references and requires a transfer tail', () => {
+test('buildRechargeProofSubmissionRequest preserves bill references and requires a complete transaction identifier', () => {
   assert.deepEqual(
     buildRechargeProofSubmissionRequest({
       submissionId: 'sub_123',
@@ -81,7 +88,7 @@ test('buildRechargeProofSubmissionRequest preserves bill references and requires
       amount: 50,
       currencyCode: 'USD',
       paymentChannel: 'paypal',
-      transferReferenceLast4: ' aa11 ',
+      providerTransactionId: ' paypal-aa11-20260415 ',
       note: '  paid from business card  ',
     }),
     {
@@ -90,7 +97,8 @@ test('buildRechargeProofSubmissionRequest preserves bill references and requires
       amount: 50,
       currencyCode: 'USD',
       paymentChannel: 'paypal',
-      transferReferenceLast4: 'AA11',
+      providerTransactionId: 'PAYPAL-AA11-20260415',
+      transferReferenceLast4: '0415',
       note: 'paid from business card',
     },
   );
@@ -102,21 +110,21 @@ test('buildRechargeProofSubmissionRequest preserves bill references and requires
       amount: 50,
       currencyCode: 'USD',
       paymentChannel: 'paypal',
-      transferReferenceLast4: 'A1',
+      providerTransactionId: 'A1',
     }),
-    /\u8bf7\u586b\u5199\u8f6c\u8d26\u6d41\u6c34\u540e\u56db\u4f4d/,
+    /8-64/,
   );
 });
 
-test('buildRechargeSubmissionRequest rejects invalid transfer tails and amounts', () => {
+test('buildRechargeSubmissionRequest rejects invalid transaction identifiers and amounts', () => {
   assert.throws(
     () => buildRechargeSubmissionRequest({
       amount: 20,
       currencyCode: 'CNY',
       paymentChannel: 'wechat',
-      transferReferenceLast4: '12',
+      providerTransactionId: '12',
     }),
-    /\u8bf7\u586b\u5199\u8f6c\u8d26\u6d41\u6c34\u540e\u56db\u4f4d/,
+    /8-64/,
   );
 
   assert.throws(
@@ -125,7 +133,7 @@ test('buildRechargeSubmissionRequest rejects invalid transfer tails and amounts'
         amount: 0,
         currencyCode: 'USD',
         paymentChannel: 'paypal',
-        transferReferenceLast4: 'ABCD',
+        providerTransactionId: 'PAYPAL-20260728',
       }),
     /\u5145\u503c\u91d1\u989d\u65e0\u6548/,
   );
@@ -163,6 +171,7 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
           bonusCredits: 2,
           creditAmount: 882,
           estimatedCredits: 880,
+          providerTransactionId: 'ALIPAY-8X9Z-20260427',
           transferReferenceLast4: '8X9Z',
           status: 'proof_submitted',
           expiresAt: '2026-04-27T08:05:00.000Z',
@@ -194,6 +203,7 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
       bonusCredits: 2,
       creditAmount: 882,
       estimatedCredits: 880,
+      providerTransactionId: 'ALIPAY-8X9Z-20260427',
       transferReferenceLast4: '8X9Z',
       note: undefined,
       status: 'proof_submitted',
@@ -216,6 +226,7 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
           amount: 20,
           currencyCode: 'USD',
           paymentChannel: 'paypal',
+          providerTransactionId: 'LEGACY-12345678',
           transferReferenceLast4: 'ABCD',
           status: 'pending',
           submittedAt: '2026-04-15T01:02:03.000Z',
@@ -235,6 +246,7 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
       currencyCode: 'USD',
       paymentChannel: 'paypal',
       estimatedCredits: 100,
+      providerTransactionId: 'LEGACY-12345678',
       transferReferenceLast4: 'ABCD',
       note: undefined,
       status: 'pending',

@@ -18,6 +18,17 @@ function isStripeSessionPaid(session) {
 }
 
 /**
+ * 仅从已通过 Stripe 签名校验的 Checkout Session 读取标准三字母币种。
+ */
+function readStripeSessionCurrency(session) {
+  const currency = String(session?.currency || '').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw createSettlementError(`Stripe currency is invalid for order ${session?.id || 'unknown'}.`);
+  }
+  return currency;
+}
+
+/**
  * 校验签名事件中的金额和币种与创建 Checkout 时保存的订单完全一致。
  */
 function assertStripeSessionMatchesOrder(session, order) {
@@ -37,4 +48,5 @@ function assertStripeSessionMatchesOrder(session, order) {
 module.exports = {
   assertStripeSessionMatchesOrder,
   isStripeSessionPaid,
+  readStripeSessionCurrency,
 };

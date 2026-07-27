@@ -27,7 +27,7 @@ export interface RechargeSubmissionDraft {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargeSubmissionChannel;
-  transferReferenceLast4: string;
+  providerTransactionId: string;
   note?: string;
 }
 
@@ -84,6 +84,7 @@ export interface RechargeBillSnapshotSeed {
   bonusCredits?: number;
   creditAmount?: number;
   estimatedCredits?: number;
+  providerTransactionId?: string;
   transferReferenceLast4?: string;
   note?: string;
   status?: string;
@@ -107,6 +108,7 @@ export interface RechargeBillSnapshot {
   bonusCredits?: number;
   creditAmount?: number;
   estimatedCredits?: number;
+  providerTransactionId?: string;
   transferReferenceLast4?: string;
   note?: string;
   status: string;
@@ -131,6 +133,7 @@ export interface RechargeBillRecord {
   bonusCredits?: number | null;
   creditAmount?: number | null;
   estimatedCredits?: number | null;
+  providerTransactionId?: string | null;
   transferReferenceLast4?: string | null;
   note?: string | null;
   status?: string | null;
@@ -381,6 +384,23 @@ export function sanitizeTransferReferenceLast4(value: string): string {
     .slice(-4);
 }
 
+export function sanitizeProviderTransactionId(value: string): string {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^0-9A-Z-]/g, '')
+    .slice(0, 64);
+}
+
+function normalizeProviderTransactionId(value: string): string {
+  const sanitized = sanitizeProviderTransactionId(value);
+  if (!/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(sanitized)) {
+    throw new Error('\u8bf7\u586b\u5199 8-64 \u4f4d\u5b8c\u6574\u8f6c\u8d26\u6d41\u6c34\u53f7\uff08\u5b57\u6bcd\u3001\u6570\u5b57\u6216\u8fde\u5b57\u7b26\uff09\u3002');
+  }
+
+  return sanitized;
+}
+
 function normalizeTransferReferenceLast4(value: string): string {
   const sanitized = sanitizeTransferReferenceLast4(value);
   if (sanitized.length !== 4) {
@@ -404,13 +424,15 @@ export function buildRechargeBillRequest(input: RechargeBillDraft): RechargeBill
 export function buildRechargeProofSubmissionRequest(
   input: RechargeProofSubmissionDraft,
 ): RechargeProofSubmissionRequest {
+  const providerTransactionId = normalizeProviderTransactionId(input.providerTransactionId);
   return {
     submissionId: pickFirstString(input.submissionId),
     billNumber: pickFirstString(input.billNumber),
     amount: normalizeSubmissionAmount(input.amount),
     currencyCode: input.currencyCode,
     paymentChannel: input.paymentChannel,
-    transferReferenceLast4: normalizeTransferReferenceLast4(input.transferReferenceLast4),
+    providerTransactionId,
+    transferReferenceLast4: normalizeTransferReferenceLast4(providerTransactionId.replace(/-/g, '').slice(-4)),
     note: normalizeRechargeNote(input.note),
   };
 }
@@ -422,6 +444,7 @@ export function buildRechargeSubmissionRequest(input: RechargeSubmissionDraft): 
     amount: normalizedProof.amount,
     currencyCode: normalizedProof.currencyCode,
     paymentChannel: normalizedProof.paymentChannel,
+    providerTransactionId: normalizedProof.providerTransactionId,
     transferReferenceLast4: normalizedProof.transferReferenceLast4,
     note: normalizedProof.note,
   };
@@ -503,6 +526,7 @@ export function normalizeRechargeBillSnapshot(
   const bonusCredits = pickEstimatedCredits(source['bonusCredits'], seed.bonusCredits);
   const creditAmount = pickEstimatedCredits(source['creditAmount'], seed.creditAmount ?? seed.estimatedCredits);
   const estimatedCredits = pickEstimatedCredits(source['estimatedCredits'], seed.estimatedCredits);
+  const providerTransactionId = pickFirstString(source['providerTransactionId'], seed.providerTransactionId);
   const transferReferenceLast4 = pickFirstString(source['transferReferenceLast4'], seed.transferReferenceLast4);
   const note = pickFirstString(source['note'], seed.note);
   const status = pickFirstString(source['status'], seed.status) || 'draft';
@@ -520,6 +544,7 @@ export function normalizeRechargeBillSnapshot(
     currencyCode,
     paymentChannel,
     estimatedCredits,
+    providerTransactionId,
     transferReferenceLast4,
     note,
     status,
@@ -614,6 +639,7 @@ export async function createRechargeBill(
           bonusCredits: response.data.submission.bonusCredits ?? 0,
           creditAmount: response.data.submission.creditAmount,
           estimatedCredits: response.data.submission.creditAmount,
+          providerTransactionId: response.data.submission.providerTransactionId ?? null,
           transferReferenceLast4: response.data.submission.transferReferenceLast4 ?? null,
           note: response.data.submission.note,
           status: response.data.submission.status,
@@ -687,6 +713,7 @@ export async function submitRechargeProof(
     return rechargeApiClient.submitRechargeProof(
       submissionId,
       {
+        providerTransactionId: request.providerTransactionId,
         transferReferenceLast4: request.transferReferenceLast4,
         note: request.note,
       },
@@ -699,6 +726,7 @@ export async function submitRechargeProof(
       amount: request.amount,
       currencyCode: request.currencyCode,
       paymentChannel: request.paymentChannel,
+      providerTransactionId: request.providerTransactionId,
       transferReferenceLast4: request.transferReferenceLast4,
       note: request.note,
     },
@@ -745,4 +773,3 @@ export async function submitRechargeRequest(
     options?.requestId ? { requestId: options.requestId } : undefined,
   );
 }
-

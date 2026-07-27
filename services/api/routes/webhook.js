@@ -9,6 +9,7 @@ const credits = require('../lib/credits');
 const {
   assertStripeSessionMatchesOrder,
   isStripeSessionPaid,
+  readStripeSessionCurrency,
 } = require('../lib/billing/stripeSettlement');
 
 const router = express.Router();
@@ -41,7 +42,7 @@ async function handleStripePaymentSettlement(session) {
 
     // 查询数据库中记录的可信 pending 订单信息，并使用行锁防止并发状态覆盖
     const orderRes = await client.query(
-      "SELECT user_id, credits, amount_cents, currency, status FROM public.orders WHERE stripe_session_id = $1 FOR UPDATE",
+      "SELECT user_id, credits, amount_cents, currency, currency_verified, status FROM public.orders WHERE stripe_session_id = $1 FOR UPDATE",
       [sessionId]
     );
 
@@ -52,6 +53,14 @@ async function handleStripePaymentSettlement(session) {
     }
 
     const order = orderRes.rows[0];
+    if (order.currency_verified === false) {
+      order.currency = readStripeSessionCurrency(session);
+      await client.query(
+        "UPDATE public.orders SET currency = $2, currency_verified = TRUE, updated_at = NOW() WHERE stripe_session_id = $1",
+        [sessionId, order.currency],
+      );
+      order.currency_verified = true;
+    }
     assertStripeSessionMatchesOrder(session, order);
 
     // 幂等处理：若订单状态已经为 completed，说明已被其他事件或轮询并发处理过，跳过交易

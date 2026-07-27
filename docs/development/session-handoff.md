@@ -1241,3 +1241,74 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   继续同源时 callback 使用 `https://kkai.plus/api/v1/auth/<provider>/callback`；
   直连 API 域时先创建 `api.kkai.plus` DNS，并在 Web 构建注入
   `VITE_KK_API_BASE_URL=https://api.kkai.plus`。start 与 callback 必须落在同一 Cookie 域。
+
+---
+
+## 236. 2026-07-28 - fix(payment): 加固支付凭证、防重放与部署迁移
+
+**修改范围**
+- 复核 #234 的人工充值、Stripe 结算和 VPS 部署链路，修复五类问题：新 VPS 缺少支付前置表、
+  旧本地 JSON 充值状态未迁移、四位流水尾号可跨申请重放、支付凭证可在 `paying` 状态覆盖，
+  以及 migration 027 为历史 Stripe 订单静默补成 USD。
+- 人工充值改为提交 8–64 位完整 Provider 交易号；服务端派生四位展示尾号，以
+  `manual_provider + provider_transaction_id` 做唯一约束，并在数据库触发器和应用状态机两层
+  禁止凭证提交后改写。
+- 新增一次性旧支付状态导入器；部署在数据库迁移完成、切换 release symlink 之前导入旧 JSON。
+  历史已审批/已入账申请降级为待人工复核，避免在不知道旧余额是否已生效时自动重复加分。
+- Stripe 新订单显式标记币种已核验；历史订单只允许在签名 Webhook 内用 Checkout Session
+  的真实币种补齐，再执行金额和币种一致性校验。
+
+**修改文件**
+- 数据库：`infrastructure/database/migrations/028_payment_recharge_hardening.sql`、
+  `infrastructure/database/migrations/009_admin_level_check_constraint.sql`。
+- 运维：`scripts/ops/postgres/import-legacy-payment-state.mjs`、
+  `scripts/ops/postgres/import-runtime-into-vps.sh`、
+  `scripts/ops/vps/bootstrap-kk-vps.sh`、`scripts/ops/vps/deploy-kk-vps.sh`。
+- 共享契约与 Web：`packages/shared/src/contracts/dto/billing.ts`、
+  `apps/web/src/services/billing/rechargeSubmissionService.ts`、
+  `apps/web/src/components/modals/RechargeModal.tsx`、
+  `apps/web/src/components/settings/views/RechargeView.tsx`。
+- API：`services/api/lib/billing/rechargeSubmissions.js`、
+  `services/api/lib/billing/stripeSettlement.js`、
+  `services/api/routes/compat/billing.js`、`services/api/routes/compat/admin.js`、
+  `services/api/routes/webhook.js`。
+- 测试：新增 `tests/unit/payment-recharge-hardening.test.ts`，更新支付完整性、余额刷新和
+  `rechargeSubmissionService` 测试。
+
+**当前设计决策**
+1. 完整交易号是核销与防重放事实，四位尾号只用于展示；客户端传入的尾号不作为可信依据。
+2. 凭证只能从 `created` / `pending` 首次提交；数据库 trigger 阻止已保存的
+   `provider_transaction_id` 被清空或替换，唯一索引把重复交易号转换为明确的 409 错误。
+3. migration 028 为只有旧四位尾号的记录生成 `LEGACY-<hash>` 兼容标识；没有任何证明的旧
+   `paying` / `approved` 记录退回 `pending`。旧 JSON 中的 `credited` / `approved` 不直接重放
+   余额写入，而是进入 `paying` 并追加余额核对说明，以避免重复入账。
+4. VPS bootstrap/deploy/import 先补跑 003、005、006、009、010，再执行后续迁移；因此把 009
+   改为幂等约束创建。runtime 数据导入场景在导入旧数据后执行 028，以便先回填再收紧约束。
+5. `orders.currency_verified` 对历史行初始为 false、对新行默认及显式写入为 true；只有已通过
+   Stripe 签名验证的事件能为 false 的旧行补齐币种，新订单仍严格匹配创建时保存的币种。
+
+**已运行验证**
+- TDD 红测：新增支付加固测试首次 0/4 通过；实现后支付专项 11/11、前端充值服务 10/10、
+  余额刷新契约 5/5 通过。
+- 全量 unit 2234 项：2232 通过 / 0 失败 / 2 跳过。
+- integration 14/14、contract 15/15、E2E 11/11、Local Runner 14/14 通过。
+- Web 与 architecture TypeScript、server syntax（116 文件）、tests semantic（579 文件）
+  全部通过。
+- `architecture:check`、`governance:check` 等价完整脚本、encoding/mojibake、
+  `git diff --check` 全部通过。
+- 生产构建通过：共享包、UI、API Client 与 Vite 8.1.4 Web 构建，2566 modules。
+
+**未运行验证及原因**
+- 未直接运行聚合命令 `npm run verify:changes`：本机没有系统 `npm`；bundled `pnpm` 会因
+  环境拒绝自动执行 `esbuild@0.28.1` 安装脚本而中止。已使用 bundled Node 24 逐项执行上述
+  typecheck、architecture、governance、build、全量测试和编码检查。
+- 本机无 PostgreSQL、`psql`、Bash 和真实支付凭据，未实际应用 migration 028、执行
+  `bash -n`，也未进行真实 Stripe Checkout/Webhook、支付宝或微信扫码核销。
+
+**风险与下一步**
+- 部署必须使用本次更新后的脚本，让 003–010、027、028 按顺序落库后再启动新 API。
+- 部署日志若显示导入了历史 JSON，管理员需复核带
+  `Legacy import: previous approval requires balance reconciliation` 的申请及用户现有余额，
+  确认后再核销；不得机械批量通过。
+- 在受控 PostgreSQL 上至少演练 fresh、repeat、含旧 027 数据和旧 JSON 四种场景，并对真实
+  Stripe 同步/异步成功、币种不匹配、重复 Webhook、人工充值重复交易号与重复审核做 smoke。

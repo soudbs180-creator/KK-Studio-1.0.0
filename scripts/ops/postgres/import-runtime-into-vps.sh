@@ -13,6 +13,11 @@ fi
 TARGET_DATABASE_URL="${TARGET_DATABASE_URL:-}"
 EXPORT_ROOT="${EXPORT_ROOT:-${REPO_ROOT}/.tmp-postgres-migration}"
 BOOTSTRAP_SQL="${BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/ops/postgres/bootstrap-kk-vps.sql}"
+STRICT_BILLING_SCHEMA_MIGRATION="${STRICT_BILLING_SCHEMA_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/003_strict_agents_schema.sql}"
+CREDIT_DEFAULT_MIGRATION="${CREDIT_DEFAULT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/005_remove_default_credits.sql}"
+ADMIN_CREDITS_MIGRATION="${ADMIN_CREDITS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/006_admin_credits_contract.sql}"
+ADMIN_LEVEL_CONSTRAINT_MIGRATION="${ADMIN_LEVEL_CONSTRAINT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/009_admin_level_check_constraint.sql}"
+ORDERS_CONSTRAINT_MIGRATION="${ORDERS_CONSTRAINT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/010_orders_positive_credits_constraint.sql}"
 AI_ASSISTANT_SCOPE_MIGRATION="${AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION="${AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION="${AGENT_SESSION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/021_agent_sessions.sql}"
@@ -21,6 +26,7 @@ AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${REPO
 AGENT_RUN_REPLAN_EVENT_MIGRATION="${AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 OAUTH_IDENTITY_MIGRATION="${OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION="${PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
+PAYMENT_RECHARGE_HARDENING_MIGRATION="${PAYMENT_RECHARGE_HARDENING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -38,6 +44,18 @@ if [[ ! -f "${BOOTSTRAP_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing bootstrap SQL: ${BOOTSTRAP_SQL}" >&2
   exit 1
 fi
+
+for prerequisite_migration in \
+  "${STRICT_BILLING_SCHEMA_MIGRATION}" \
+  "${CREDIT_DEFAULT_MIGRATION}" \
+  "${ADMIN_CREDITS_MIGRATION}" \
+  "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}" \
+  "${ORDERS_CONSTRAINT_MIGRATION}"; do
+  if [[ ! -f "${prerequisite_migration}" ]]; then
+    echo "[import-runtime-into-vps] Missing billing prerequisite migration: ${prerequisite_migration}" >&2
+    exit 1
+  fi
+done
 
 if [[ ! -f "${AI_ASSISTANT_SCOPE_MIGRATION}" ]]; then
   echo "[import-runtime-into-vps] Missing AI assistant scope migration: ${AI_ASSISTANT_SCOPE_MIGRATION}" >&2
@@ -79,6 +97,11 @@ if [[ ! -f "${PAYMENT_RECHARGE_MIGRATION}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing payment recharge hardening migration: ${PAYMENT_RECHARGE_HARDENING_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -91,6 +114,16 @@ fi
 
 echo "[import-runtime-into-vps] Applying bootstrap schema"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${BOOTSTRAP_SQL}"
+
+echo "[import-runtime-into-vps] Applying strict billing prerequisite migrations"
+for prerequisite_migration in \
+  "${STRICT_BILLING_SCHEMA_MIGRATION}" \
+  "${CREDIT_DEFAULT_MIGRATION}" \
+  "${ADMIN_CREDITS_MIGRATION}" \
+  "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}" \
+  "${ORDERS_CONSTRAINT_MIGRATION}"; do
+  psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${prerequisite_migration}"
+done
 
 echo "[import-runtime-into-vps] Applying mandatory AI assistant user-scope migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AI_ASSISTANT_SCOPE_MIGRATION}"
@@ -120,5 +153,8 @@ echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only;
 
 echo "[import-runtime-into-vps] Importing exported runtime data"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${RUNTIME_SQL}"
+
+echo "[import-runtime-into-vps] Applying mandatory payment recharge hardening migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}"
 
 echo "[import-runtime-into-vps] Import complete."

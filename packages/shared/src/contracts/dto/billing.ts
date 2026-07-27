@@ -204,7 +204,8 @@ export interface CreateRechargeSubmissionRequestDto {
 }
 
 export interface SubmitRechargeProofRequestDto {
-  transferReferenceLast4: string;
+  providerTransactionId: string;
+  transferReferenceLast4?: string;
   note?: string;
 }
 
@@ -212,7 +213,8 @@ export interface SubmitRechargeRequestDto {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargePaymentChannelDto;
-  transferReferenceLast4: string;
+  providerTransactionId: string;
+  transferReferenceLast4?: string;
   note?: string;
 }
 
@@ -230,6 +232,7 @@ export interface RechargeSubmissionDto {
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargePaymentChannelDto;
   manualProvider?: ManualRechargeProviderDto | null;
+  providerTransactionId?: string | null;
   transferReferenceLast4?: string | null;
   note?: string;
   status: RechargeSubmissionStatusDto;

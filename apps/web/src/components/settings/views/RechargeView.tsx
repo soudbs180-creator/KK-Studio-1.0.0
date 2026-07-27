@@ -43,8 +43,8 @@ const INITIAL_RATE_MAP: Record<SupportedRechargeCurrency, CreditExchangeRate> = 
 };
 
 const FALLBACK_CHANNELS: RechargePaymentChannelConfig[] = [
-  { channel: 'alipay', label: '支付宝静态码', instructionText: '付款后提交流水后四位。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
-  { channel: 'wechat', label: '微信静态码', instructionText: '付款后提交流水后四位。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
+  { channel: 'alipay', label: '支付宝静态码', instructionText: '付款后提交完整转账流水号。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
+  { channel: 'wechat', label: '微信静态码', instructionText: '付款后提交完整转账流水号。', isActive: false, qrImageDataUrl: null, qrImagePath: null },
 ];
 
 const CHANNELS: Array<{ id: RechargeChannel; label: string; helper: string; icon: React.ComponentType<{ size?: number }> }> = [
@@ -77,7 +77,7 @@ const RechargeView: React.FC = () => {
   const [amount, setAmount] = useState(20);
   const [channel, setChannel] = useState<RechargeChannel>('alipay');
   const [bill, setBill] = useState<RechargeBillSnapshot | null>(null);
-  const [referenceLast4, setReferenceLast4] = useState('');
+  const [providerTransactionId, setProviderTransactionId] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [creating, setCreating] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
@@ -169,9 +169,9 @@ const RechargeView: React.FC = () => {
 
   const markPaid = async () => {
     if (!bill?.submissionId || isExpired) return;
-    const normalizedReference = referenceLast4.trim().toUpperCase();
-    if (!/^[0-9A-Z]{4}$/.test(normalizedReference)) {
-      setMessage('请填写转账流水后四位。');
+    const normalizedTransactionId = providerTransactionId.trim().toUpperCase();
+    if (!/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(normalizedTransactionId)) {
+      setMessage('请填写 8-64 位完整转账流水号。');
       return;
     }
     setMarkingPaid(true);
@@ -182,13 +182,16 @@ const RechargeView: React.FC = () => {
           amount: bill.amount,
           currencyCode: bill.currencyCode,
           paymentChannel: bill.paymentChannel,
-          transferReferenceLast4: normalizedReference,
+          providerTransactionId: normalizedTransactionId,
           note: bill.note,
         },
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
       if (!response.success) throw new Error(getRechargeSubmissionErrorMessage(response, '提交支付凭证失败。'));
-      setBill(normalizeRechargeBillSnapshot({ submission: response.data.submission }, { ...bill, transferReferenceLast4: normalizedReference }));
+      setBill(normalizeRechargeBillSnapshot(
+        { submission: response.data.submission },
+        { ...bill, providerTransactionId: normalizedTransactionId },
+      ));
       setMessage('支付凭证已提交，到账后余额会自动刷新。');
       await refreshBilling({ includeTransactions: true });
     } catch (error) {
@@ -247,10 +250,10 @@ const RechargeView: React.FC = () => {
               <div className="console-card-heading"><div><h3>订单支付</h3><p>订单号 {bill.submissionId}</p></div><span className="console-status" data-tone={isExpired ? 'danger' : 'pending'}>{isExpired ? '已过期' : formatCountdown(secondsLeft)}</span></div>
               <div className="console-order-summary"><div><span>实付金额</span><strong>{formatMoney(displayedAmount, bill.currencyCode || currency)}</strong></div><div><span>到账积分</span><strong>{displayedCredits}</strong></div></div>
               <div className="console-qr-area">{qrSource ? <img src={qrSource} alt={`${selectedProvider} 收款二维码`} /> : <><QrCode size={44} /><span>支付二维码暂未配置</span></>}</div>
-              <p className="console-payment-instruction">{selectedChannel.instructionText || '完成付款后提交流水后四位。'}</p>
-              <label className="console-field"><span>转账流水后四位</span><input value={referenceLast4} maxLength={4} onChange={(event) => setReferenceLast4(event.target.value.replace(/[^0-9a-z]/gi, '').toUpperCase())} placeholder="例如 A123" /></label>
+              <p className="console-payment-instruction">{selectedChannel.instructionText || '完成付款后提交完整转账流水号。'}</p>
+              <label className="console-field"><span>完整转账流水号</span><input value={providerTransactionId} maxLength={64} onChange={(event) => setProviderTransactionId(event.target.value.replace(/[^0-9a-z-]/gi, '').toUpperCase())} placeholder="请输入支付平台显示的完整流水号" /></label>
               {message ? <div className="console-notice"><Clock3 size={15} /><span>{message}</span></div> : null}
-              <div className="console-button-row"><button type="button" className="console-secondary-button" onClick={() => { setBill(null); setReferenceLast4(''); setMessage(''); }}>重新选择</button><button type="button" className="console-primary-button" disabled={markingPaid || isExpired} onClick={() => void markPaid()}>{markingPaid ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}<span>{markingPaid ? '正在提交' : '我已支付'}</span></button></div>
+              <div className="console-button-row"><button type="button" className="console-secondary-button" onClick={() => { setBill(null); setProviderTransactionId(''); setMessage(''); }}>重新选择</button><button type="button" className="console-primary-button" disabled={markingPaid || isExpired} onClick={() => void markPaid()}>{markingPaid ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}<span>{markingPaid ? '正在提交' : '我已支付'}</span></button></div>
             </>
           )}
         </section>

@@ -422,7 +422,10 @@ function buildRechargeSubmission(userId, input, overrides = {}) {
     currencyCode,
     paymentChannel: input.paymentChannel || 'manual',
     manualProvider: input.manualProvider || null,
-    transferReferenceLast4: input.transferReferenceLast4 || null,
+    providerTransactionId: input.providerTransactionId || null,
+    transferReferenceLast4: input.providerTransactionId
+      ? String(input.providerTransactionId).replace(/-/g, '').slice(-4)
+      : null,
     note: input.note || '',
     status: overrides.status || 'created',
     createdAt: overrides.createdAt || timestamp,
@@ -488,7 +491,7 @@ function creditLocalRecharge(found, adminUserId) {
     const balanceAfter = Number(found.profileStore.creditBalance || 0);
     return buildLocalRechargeResponse(found, balanceAfter, 0);
   }
-  if (found.submission.status !== 'paying' || !found.submission.transferReferenceLast4) {
+  if (found.submission.status !== 'paying' || !found.submission.providerTransactionId) {
     throw Object.assign(new Error('Only a paid submission with transfer proof can be credited.'), {
       code: 'RECHARGE_PROOF_REQUIRED',
       statusCode: 409,

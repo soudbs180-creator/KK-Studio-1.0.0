@@ -124,7 +124,7 @@ const RechargeModal: React.FC = () => {
   const [amount, setAmount] = useState(20);
   const [rechargeType, setRechargeType] = useState<SupportedThemeType>('alipay');
   const [billSnapshot, setBillSnapshot] = useState<RechargeBillSnapshot | null>(null);
-  const [transferReferenceLast4, setTransferReferenceLast4] = useState('');
+  const [providerTransactionId, setProviderTransactionId] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [creating, setCreating] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
@@ -281,7 +281,7 @@ const RechargeModal: React.FC = () => {
       setAmount(20);
       setRechargeType('alipay');
       setBillSnapshot(null);
-      setTransferReferenceLast4('');
+      setProviderTransactionId('');
       setMessage('');
       setCreating(false);
       setMarkingPaid(false);
@@ -373,9 +373,9 @@ const RechargeModal: React.FC = () => {
 
     setMarkingPaid(true);
     try {
-      const normalizedReference = transferReferenceLast4.trim().toUpperCase();
-      if (!/^[0-9A-Z]{4}$/.test(normalizedReference)) {
-        throw new Error('请填写转账流水后四位。');
+      const normalizedTransactionId = providerTransactionId.trim().toUpperCase();
+      if (!/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(normalizedTransactionId)) {
+        throw new Error('请填写 8-64 位完整转账流水号。');
       }
 
       const paidResponse = await submitRechargeProof(
@@ -384,7 +384,7 @@ const RechargeModal: React.FC = () => {
           amount: billSnapshot.amount,
           currencyCode: billSnapshot.currencyCode,
           paymentChannel: billSnapshot.paymentChannel,
-          transferReferenceLast4: normalizedReference,
+          providerTransactionId: normalizedTransactionId,
           note: billSnapshot.note,
         },
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
@@ -395,7 +395,7 @@ const RechargeModal: React.FC = () => {
 
       const nextBill = normalizeRechargeBillSnapshot({ submission: paidResponse.data.submission }, {
         ...billSnapshot,
-        transferReferenceLast4: normalizedReference,
+        providerTransactionId: normalizedTransactionId,
       });
       setBillSnapshot(nextBill);
       setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
@@ -863,19 +863,20 @@ const RechargeModal: React.FC = () => {
 
                       <label className="block">
                         <span className="text-[10px] text-[var(--text-secondary)] font-medium flex items-center gap-1 mb-1 px-0.5">
-                          <span>流水号后 4 位:</span>
-                          {transferReferenceLast4.trim().length === 4 && (
+                          <span>完整转账流水号:</span>
+                          {/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(providerTransactionId.trim()) && (
                             <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
                           )}
                         </span>
                         <input
-                          value={transferReferenceLast4}
+                          value={providerTransactionId}
+                          maxLength={64}
                           onChange={(event) =>
-                            setTransferReferenceLast4(
-                              event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(-4),
+                            setProviderTransactionId(
+                              event.target.value.toUpperCase().replace(/[^0-9A-Z-]/g, '').slice(0, 64),
                             )
                           }
-                          placeholder="请输入转账流水后 4 位字符进行校验"
+                          placeholder="请输入支付平台显示的完整流水号"
                           className="w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none transition focus:border-amber-500/30"
                           style={modalInputStyle}
                         />
@@ -907,7 +908,11 @@ const RechargeModal: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleMarkPaid}
-                        disabled={markingPaid || isExpired || transferReferenceLast4.trim().length !== 4}
+                        disabled={
+                          markingPaid
+                          || isExpired
+                          || !/^[0-9A-Z](?:[0-9A-Z-]{6,62})[0-9A-Z]$/.test(providerTransactionId.trim())
+                        }
                         className="flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60 relative overflow-hidden text-white"
                         style={{
                           background: `linear-gradient(135deg, ${activeTheme.color} 0%, color-mix(in srgb, ${activeTheme.color} 80%, black) 100%)`,

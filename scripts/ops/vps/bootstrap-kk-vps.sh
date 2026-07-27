@@ -15,6 +15,11 @@ POSTGRES_USER="${KK_PG_USER:-kkstudio}"
 POSTGRES_PASSWORD="${KK_PG_PASSWORD:-}"
 POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
 REPO_BOOTSTRAP_SQL="${KK_BOOTSTRAP_SQL:-${REPO_ROOT}/scripts/ops/postgres/bootstrap-kk-vps.sql}"
+STRICT_BILLING_SCHEMA_MIGRATION="${KK_STRICT_BILLING_SCHEMA_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/003_strict_agents_schema.sql}"
+CREDIT_DEFAULT_MIGRATION="${KK_CREDIT_DEFAULT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/005_remove_default_credits.sql}"
+ADMIN_CREDITS_MIGRATION="${KK_ADMIN_CREDITS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/006_admin_credits_contract.sql}"
+ADMIN_LEVEL_CONSTRAINT_MIGRATION="${KK_ADMIN_LEVEL_CONSTRAINT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/009_admin_level_check_constraint.sql}"
+ORDERS_CONSTRAINT_MIGRATION="${KK_ORDERS_CONSTRAINT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/010_orders_positive_credits_constraint.sql}"
 AI_ASSISTANT_SCOPE_MIGRATION="${KK_AI_ASSISTANT_SCOPE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/016_ai_assistant_user_scope.sql}"
 AGENT_RUN_EVENT_MIGRATION="${KK_AGENT_RUN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/020_agent_run_events.sql}"
 AGENT_SESSION_MIGRATION="${KK_AGENT_SESSION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/021_agent_sessions.sql}"
@@ -23,6 +28,7 @@ AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${R
 AGENT_RUN_REPLAN_EVENT_MIGRATION="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
 OAUTH_IDENTITY_MIGRATION="${KK_OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION="${KK_PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
+PAYMENT_RECHARGE_HARDENING_MIGRATION="${KK_PAYMENT_RECHARGE_HARDENING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -93,6 +99,17 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required bootstrap SQL not found at ${REPO_BOOTSTRAP_SQL}." >&2
     exit 1
   fi
+  for prerequisite_migration in \
+    "${STRICT_BILLING_SCHEMA_MIGRATION}" \
+    "${CREDIT_DEFAULT_MIGRATION}" \
+    "${ADMIN_CREDITS_MIGRATION}" \
+    "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}" \
+    "${ORDERS_CONSTRAINT_MIGRATION}"; do
+    if [[ ! -f "${prerequisite_migration}" ]]; then
+      echo "[bootstrap-kk-vps] Required billing prerequisite migration not found at ${prerequisite_migration}." >&2
+      exit 1
+    fi
+  done
   if [[ ! -f "${AI_ASSISTANT_SCOPE_MIGRATION}" ]]; then
     echo "[bootstrap-kk-vps] Required AI assistant migration not found at ${AI_ASSISTANT_SCOPE_MIGRATION}." >&2
     exit 1
@@ -125,8 +142,17 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required payment recharge migration not found at ${PAYMENT_RECHARGE_MIGRATION}." >&2
     exit 1
   fi
+  if [[ ! -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" ]]; then
+    echo "[bootstrap-kk-vps] Required payment recharge hardening migration not found at ${PAYMENT_RECHARGE_HARDENING_MIGRATION}." >&2
+    exit 1
+  fi
 
   REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
+  STRICT_BILLING_SCHEMA_MIGRATION="$(realpath "${STRICT_BILLING_SCHEMA_MIGRATION}")"
+  CREDIT_DEFAULT_MIGRATION="$(realpath "${CREDIT_DEFAULT_MIGRATION}")"
+  ADMIN_CREDITS_MIGRATION="$(realpath "${ADMIN_CREDITS_MIGRATION}")"
+  ADMIN_LEVEL_CONSTRAINT_MIGRATION="$(realpath "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}")"
+  ORDERS_CONSTRAINT_MIGRATION="$(realpath "${ORDERS_CONSTRAINT_MIGRATION}")"
   AI_ASSISTANT_SCOPE_MIGRATION="$(realpath "${AI_ASSISTANT_SCOPE_MIGRATION}")"
   AGENT_RUN_EVENT_MIGRATION="$(realpath "${AGENT_RUN_EVENT_MIGRATION}")"
   AGENT_SESSION_MIGRATION="$(realpath "${AGENT_SESSION_MIGRATION}")"
@@ -135,10 +161,22 @@ setup_postgres() {
   AGENT_RUN_REPLAN_EVENT_MIGRATION="$(realpath "${AGENT_RUN_REPLAN_EVENT_MIGRATION}")"
   OAUTH_IDENTITY_MIGRATION="$(realpath "${OAUTH_IDENTITY_MIGRATION}")"
   PAYMENT_RECHARGE_MIGRATION="$(realpath "${PAYMENT_RECHARGE_MIGRATION}")"
+  PAYMENT_RECHARGE_HARDENING_MIGRATION="$(realpath "${PAYMENT_RECHARGE_HARDENING_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
+  for prerequisite_migration in \
+    "${STRICT_BILLING_SCHEMA_MIGRATION}" \
+    "${CREDIT_DEFAULT_MIGRATION}" \
+    "${ADMIN_CREDITS_MIGRATION}" \
+    "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}" \
+    "${ORDERS_CONSTRAINT_MIGRATION}"; do
+    case "${prerequisite_migration}" in
+      "${REPO_ROOT}"/*) ;;
+      *) echo "[bootstrap-kk-vps] Billing prerequisite migrations must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+    esac
+  done
   case "${AI_ASSISTANT_SCOPE_MIGRATION}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] AI assistant migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -170,6 +208,10 @@ setup_postgres() {
   case "${PAYMENT_RECHARGE_MIGRATION}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Payment recharge migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+  esac
+  case "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" in
+    "${REPO_ROOT}"/*) ;;
+    *) echo "[bootstrap-kk-vps] Payment recharge hardening migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
 
   for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
@@ -215,6 +257,11 @@ SQL
     -d "${POSTGRES_DB}" \
     -c "SET ROLE \"${POSTGRES_USER}\"" \
     -f "${REPO_BOOTSTRAP_SQL}" \
+    -f "${STRICT_BILLING_SCHEMA_MIGRATION}" \
+    -f "${CREDIT_DEFAULT_MIGRATION}" \
+    -f "${ADMIN_CREDITS_MIGRATION}" \
+    -f "${ADMIN_LEVEL_CONSTRAINT_MIGRATION}" \
+    -f "${ORDERS_CONSTRAINT_MIGRATION}" \
     -f "${AI_ASSISTANT_SCOPE_MIGRATION}" \
     -f "${AGENT_RUN_EVENT_MIGRATION}" \
     -f "${AGENT_SESSION_MIGRATION}" \
@@ -222,7 +269,8 @@ SQL
     -f "${AGENT_RUN_SEMANTIC_EVENT_MIGRATION}" \
     -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" \
     -f "${OAUTH_IDENTITY_MIGRATION}" \
-    -f "${PAYMENT_RECHARGE_MIGRATION}"
+    -f "${PAYMENT_RECHARGE_MIGRATION}" \
+    -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}"
 }
 
 install_runtime_templates() {
