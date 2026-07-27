@@ -37,9 +37,21 @@ test('empty canvas welcome stays above workspace chrome without being hidden by 
   );
   assert.match(
     canvasCssSource,
-    /\.empty-canvas-welcome-panel\s*\{[\s\S]*width:\s*min\(100%,\s*600px\);[\s\S]*max-height:\s*min\(100%,\s*460px\);/,
+    /\.empty-canvas-welcome-panel\s*\{[\s\S]*width:\s*min\(100%,\s*600px\);[\s\S]*height:\s*min\(100%,\s*460px\);/,
   );
   assert.match(welcomeSource, /aria-labelledby="empty-canvas-title"/);
+});
+
+test('empty canvas welcome can be dismissed and keeps workflow templates visibly labelled', () => {
+  const welcomeSource = readSource('apps/web/src/landing/EmptyCanvasWelcome.tsx');
+
+  assert.match(welcomeSource, /const \[isDismissed, setIsDismissed\] = React\.useState\(false\);/);
+  assert.match(welcomeSource, /if \(isDismissed\) return null;/);
+  assert.match(welcomeSource, /aria-label=\{t\(\{ zh: '关闭介绍页', en: 'Close introduction' \}\)\}/);
+  assert.match(welcomeSource, /onClick=\{\(\) => setIsDismissed\(true\)\}/);
+  assert.match(welcomeSource, /欢迎使用 KK Studio 画布/);
+  assert.match(welcomeSource, /aria-labelledby="empty-canvas-workflow-title"/);
+  assert.match(welcomeSource, /WORKFLOW_TEMPLATES\.map/);
 });
 
 test('empty canvas API settings entry is a semantic command', () => {

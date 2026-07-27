@@ -243,8 +243,11 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
     fallbackPosition: CanvasPoint | undefined | null
   ) => {
     if (!nodeId) return fallbackPosition ?? null;
+    // 工作流附加卡每帧提交拖拽位置；优先读取当前状态，避免虚线连接器落后于节流快照。
+    const workflowPosition = workflowUtilityNodesById.get(nodeId)?.position;
+    if (workflowPosition) return workflowPosition;
     return connectorRenderSnapshot.positionByNodeId[nodeId] ?? fallbackPosition ?? null;
-  }, [connectorRenderSnapshot]);
+  }, [connectorRenderSnapshot, workflowUtilityNodesById]);
 
   return {
     connectorRenderSnapshot,

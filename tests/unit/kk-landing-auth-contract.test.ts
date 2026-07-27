@@ -68,13 +68,20 @@ test('landing page keeps KK Studio brand on current-only landing classes', () =>
   }
 });
 
-test("login card uses neutral KK reference styling instead of the rejected blue treatment", () => {
+test("login card uses an opaque frosted KK surface instead of the rejected transparent blue treatment", () => {
   const authCssSource = readSource(LOGIN_SCREEN_CSS_PATH);
   const referenceCssSource = readSource(LANDING_REFERENCE_PATH);
   const combinedAuthCss = `${authCssSource}\n${referenceCssSource}`;
 
   assert.match(combinedAuthCss, /--kk-landing-ink:\s*#0c1018;/);
-  assert.match(combinedAuthCss, /\.auth-page--landing \.auth-modal-content \.auth-panel\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.45\)/);
+  assert.match(
+    combinedAuthCss,
+    /\.auth-page--landing \.auth-modal-content \.auth-panel\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)[\s\S]*backdrop-filter:\s*blur\(32px\)\s*saturate\(1\.45\)/,
+  );
+  assert.doesNotMatch(
+    combinedAuthCss,
+    /\.auth-page--landing \.auth-modal-content \.auth-panel\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.45\)/,
+  );
   assert.match(combinedAuthCss, /\.auth-page--landing \.auth-btn-main\s*\{[\s\S]*background:\s*#0c1018 !important;/);
   assert.match(combinedAuthCss, /\.auth-social-row\s*\{[\s\S]*display:\s*flex/);
   assert.doesNotMatch(combinedAuthCss, /linear-gradient\(135deg,\s*#1e40af,\s*#0f1d3a\)/);

@@ -1071,3 +1071,51 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 微信网站应用登录需要开放平台资质与审核，不能用微信公众号 AppID 替代。
 - 部署后分别用新账号登录、已有密码账号绑定、拒绝授权、过期/重复 state 和跨浏览器 callback
   做真实 smoke test，并确认浏览器允许 API 域的会话 Cookie。
+
+---
+
+## 233. 2026-07-27 - fix(ui): 修复登录磨砂、欢迎工作流与虚线跟随
+
+**修改范围**
+- 将登录弹窗卡片从过度透明的白色玻璃改为高不透明度磨砂表面，保留背景模糊但提升正文可读性。
+- 为「欢迎使用 KK Studio 画布」介绍页增加可访问的关闭按钮，并让工作流模板区获得稳定高度、
+  明确标题和内部滚动，避免模板列表被压缩到不可见。
+- 工作流附加卡拖拽时，虚线连接器优先读取当前卡片位置，不再落后于节流后的通用画布快照。
+
+**修改文件**
+- `apps/web/src/components/auth/LoginScreen.css`
+- `apps/web/src/landing/EmptyCanvasWelcome.tsx`
+- `apps/web/src/styles/canvas.css`
+- `apps/web/src/app/useConnectorRenderer.ts`
+- `tests/unit/kk-landing-auth-contract.test.ts`
+- `tests/unit/workflow-actions-unused-cleanup-contract.test.ts`
+- `tests/unit/canvas-connector-throttling-contract.test.ts`
+
+**当前设计决策**
+1. 登录卡片采用 `rgba(255, 255, 255, 0.88)` 与 `blur(32px)`，选择可读性更稳定的磨砂效果，
+   不改动登录布局和品牌色。
+2. 介绍页关闭状态只属于当前组件生命周期；不写入用户设置或本地存储，避免改变首次引导策略。
+3. 只让工作流附加卡绕过节流位置快照；图片、提示词等普通画布卡仍沿用现有节流策略，
+   将连接器重绘成本限制在本次问题范围内。
+
+**已运行验证**
+- TDD 红测首次 3 项失败，分别复现透明度、无法关闭/工作流不可见和虚线跟随延迟；实现后目标契约
+  12/12 通过。
+- 全量 unit：2227 项，2225 通过 / 0 失败 / 2 跳过。
+- Web `tsc --noEmit`、architecture tsconfig、server syntax（116 文件）和 tests semantic
+  （578 文件）全部通过。
+- `architecture:check`、`governance:check` 的等价完整脚本全绿，`git diff --check` 通过。
+- 生产构建通过：Vite 8.1.4，2566 modules。
+- 真实浏览器验证：介绍页三条工作流模板全部可见，关闭按钮可访问且点击后面板消失。
+
+**未运行验证及原因**
+- 未直接运行聚合命令 `npm run verify:changes`：本机没有系统 `npm`，bundled `pnpm`
+  又因当前环境拒绝自动执行 `esbuild@0.28.1` 构建脚本而无法启动；已使用 bundled Node
+  逐项完成本次所需的 unit、typecheck、architecture、governance、server syntax 与生产构建。
+- 未重复 integration / contract / E2E / local-runner 全链；本次只修改 Web 样式、欢迎态交互和
+  连接器渲染取值，不改变 API、共享 DTO、数据库或服务端业务逻辑。
+
+**风险与下一步**
+- 风险低。登录磨砂卡片建议后续在未登录浏览器会话中再做一次不同背景亮度下的视觉抽查。
+- 工作区同时出现另一条支付/充值任务的未提交文件；本次提交必须使用文件白名单隔离，
+  不得由 `agents:commit` 的 `git add .` 夹带。

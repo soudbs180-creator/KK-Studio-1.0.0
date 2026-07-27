@@ -84,4 +84,13 @@ describe('canvas connector throttling contract', () => {
       /const targetPosition = resolveConnectorRenderPosition\(targetNode\.id, targetNode\.position\);/
     )
   })
+
+  test('workflow connector geometry follows the latest workflow card position before a throttled snapshot catches up', () => {
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
+
+    assert.match(
+      hookSource,
+      /const workflowPosition = workflowUtilityNodesById\.get\(nodeId\)\?\.position;[\s\S]*if \(workflowPosition\) return workflowPosition;[\s\S]*connectorRenderSnapshot\.positionByNodeId\[nodeId\]/,
+    )
+  })
 })

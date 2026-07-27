@@ -308,6 +308,7 @@ body.dark-mode .kk-canvas-dot-grid {
 
 .empty-canvas-welcome-panel {
   width: min(100%, 600px);
+  height: min(100%, 460px);
   max-height: min(100%, 460px);
   border-color: var(--frost-card-framework-border);
   background: var(--frost-card-framework-bg);
@@ -320,7 +321,8 @@ body.dark-mode .kk-canvas-dot-grid {
 
 .empty-canvas-welcome-panel > header,
 .empty-canvas-workflow-row,
-.empty-canvas-welcome-settings {
+.empty-canvas-welcome-settings,
+.empty-canvas-welcome-close {
   border-color: var(--frost-card-sub-border);
 }
 
@@ -334,6 +336,7 @@ body.dark-mode .kk-canvas-dot-grid {
 }
 
 .empty-canvas-welcome-settings,
+.empty-canvas-welcome-close,
 .empty-canvas-workflow-row {
   background: var(--toolbar-bg);
   color: var(--text-primary);
@@ -344,9 +347,14 @@ body.dark-mode .kk-canvas-dot-grid {
 }
 
 .empty-canvas-welcome-settings:hover,
+.empty-canvas-welcome-close:hover,
 .empty-canvas-workflow-row:hover {
   border-color: var(--border-focus);
   background: var(--toolbar-hover);
+}
+
+.empty-canvas-workflow-list {
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 960px) {
