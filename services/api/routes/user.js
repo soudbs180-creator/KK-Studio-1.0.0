@@ -3,12 +3,14 @@
 
 const express = require('express');
 const authRouter = require('./user/auth');
+const oauthRouter = require('./user/oauth');
 const profileRouter = require('./user/profile');
 const wuyinRouter = require('./user/wuyin');
 
 const router = express.Router();
 
 router.use(authRouter);
+router.use(oauthRouter);
 router.use(profileRouter);
 router.use(wuyinRouter);
 

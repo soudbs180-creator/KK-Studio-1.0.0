@@ -226,6 +226,8 @@ export function updateRuntimeAuthStateFromProfile(profile: ProfileDto): RuntimeA
   const currentMetadata = currentState.user?.user_metadata || {};
   const currentAppMetadata = currentState.user?.app_metadata || {};
   const providers = normalizeProviders([
+    profile.authProvider,
+    ...(profile.providers || []),
     currentMetadata.auth_provider,
     currentMetadata.provider,
     ...(Array.isArray(currentMetadata.providers) ? currentMetadata.providers : []),
@@ -243,7 +245,7 @@ export function updateRuntimeAuthStateFromProfile(profile: ProfileDto): RuntimeA
       fullName: profile.nickname || String(currentMetadata.full_name || currentMetadata.display_name || DEFAULT_LOCAL_NAME),
       displayName: profile.nickname || String(currentMetadata.display_name || currentMetadata.full_name || DEFAULT_LOCAL_NAME),
       avatarUrl: profile.avatarUrl || String(currentMetadata.avatar_url || ""),
-      authProvider: providers[0] || "password",
+      authProvider: profile.authProvider || providers[0] || "password",
       providers: providers.length > 0 ? providers : ["password"],
     }),
   });
@@ -299,4 +301,3 @@ export function subscribeRuntimeAuthState(
     window.removeEventListener(RUNTIME_AUTH_CHANGE_EVENT, handler as EventListener);
   };
 }
-

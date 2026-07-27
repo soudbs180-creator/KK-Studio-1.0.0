@@ -48,11 +48,17 @@ function buildProfileFromUserRow(user) {
   const email = String(user.email || '').trim();
   const timestamp = user.updated_at || user.created_at || new Date().toISOString();
   const adminLevel = Number(user.admin_level || 0);
+  const providers = Array.from(new Set([
+    ...(user.has_password ? ['password'] : []),
+    ...(Array.isArray(user.providers) ? user.providers : []),
+  ].map((provider) => String(provider || '').trim().toLowerCase()).filter(Boolean)));
   return {
     id: user.id,
     email,
-    nickname: email.split('@')[0] || 'KK User',
-    avatarUrl: '',
+    nickname: String(user.display_name || '').trim() || email.split('@')[0] || 'KK User',
+    avatarUrl: String(user.avatar_url || '').trim(),
+    authProvider: providers[0] || 'password',
+    providers: providers.length > 0 ? providers : ['password'],
     adminLevel,
     role: adminLevel > 0 ? 'admin' : 'user',
     status: 'active',
@@ -68,6 +74,8 @@ function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'l
     email,
     nickname: email.split('@')[0] || 'Local User',
     avatarUrl: '',
+    authProvider: 'local',
+    providers: ['local'],
     adminLevel: 1,
     role: 'admin',
     status: 'active',
@@ -84,7 +92,18 @@ async function loadProfileForUserId(userId) {
 
   const pool = getPool();
   const result = await pool.query(
-    'SELECT id, email, created_at, updated_at, COALESCE(admin_level, 0) AS admin_level FROM public.users WHERE id = $1',
+    `SELECT users.id, users.email, users.display_name, users.avatar_url,
+            users.created_at, users.updated_at,
+            (users.password_hash IS NOT NULL) AS has_password,
+            COALESCE(users.admin_level, 0) AS admin_level,
+            ARRAY(
+              SELECT identity.provider
+                FROM public.auth_identities identity
+               WHERE identity.user_id = users.id
+               ORDER BY identity.created_at ASC
+            ) AS providers
+       FROM public.users
+      WHERE users.id = $1`,
     [userId]
   );
 
@@ -238,6 +257,8 @@ router.post('/v1/auth/login', async (req, res) => {
       email: loginEmail,
       nickname: loginEmail.split('@')[0] || 'Mock User',
       avatarUrl: '',
+      authProvider: 'password',
+      providers: ['password'],
       adminLevel: 1,
       role: 'admin',
       status: 'active',
@@ -298,6 +319,8 @@ router.post('/v1/auth/login', async (req, res) => {
       email: user.email,
       nickname: user.email.split('@')[0],
       avatarUrl: '',
+      authProvider: 'password',
+      providers: ['password'],
       adminLevel: adminLevel,
       role: adminLevel > 0 ? 'admin' : 'user',
       status: 'active',

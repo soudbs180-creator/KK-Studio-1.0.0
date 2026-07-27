@@ -17,6 +17,7 @@ AGENT_SESSION_MIGRATION_PATH="${KK_AGENT_SESSION_MIGRATION:-infrastructure/datab
 AGENT_RUN_SESSION_BINDING_MIGRATION_PATH="${KK_AGENT_RUN_SESSION_BINDING_MIGRATION:-infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
 AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-infrastructure/database/migrations/024_agent_run_replan_events.sql}"
+OAUTH_IDENTITY_MIGRATION_PATH="${KK_OAUTH_IDENTITY_MIGRATION:-infrastructure/database/migrations/026_oauth_identities.sql}"
 SYSTEMD_SERVICES=("kk-api")
 
 # 准备版本发布所需的目录
@@ -200,7 +201,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022, 023 and 024 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify schemas 016, 020, 021, 022, 023, 024 and 026 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -379,6 +380,10 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Agent Run replan event migration not found at ${NEW_RELEASE_DIR}/${AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH}" >&2
     exit 1
   fi
+  if [[ ! -f "${NEW_RELEASE_DIR}/${OAUTH_IDENTITY_MIGRATION_PATH}" ]]; then
+    echo "[deploy-kk-vps] OAuth identity migration not found at ${NEW_RELEASE_DIR}/${OAUTH_IDENTITY_MIGRATION_PATH}" >&2
+    exit 1
+  fi
 }
 
 apply_database_migrations() {
@@ -407,6 +412,9 @@ apply_database_migrations() {
   echo "[deploy-kk-vps] Applying mandatory Agent Run replan event migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH}"
 
+  echo "[deploy-kk-vps] Applying mandatory OAuth identity migration..."
+  psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${OAUTH_IDENTITY_MIGRATION_PATH}"
+
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %s TO %I',
@@ -416,7 +424,8 @@ SELECT format(
 FROM (VALUES
   ('agent_runs'), ('agent_run_events'), ('agent_sessions'), ('agent_context_snapshots'),
   ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
-  ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions')
+  ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions'),
+  ('auth_identities'), ('oauth_transactions')
 ) AS ai_tables(table_name)
 \gexec
 
@@ -640,6 +649,17 @@ BEGIN
   END IF;
   IF to_regclass('public.agent_skill_versions') IS NULL THEN
     RAISE EXCEPTION 'agent_skill_versions is missing';
+  END IF;
+  IF to_regclass('public.auth_identities') IS NULL
+    OR to_regclass('public.oauth_transactions') IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'users'
+        AND column_name = 'password_hash'
+        AND is_nullable = 'YES'
+    ) THEN
+    RAISE EXCEPTION 'OAuth identity schema is missing or users.password_hash is still required';
   END IF;
   IF NOT EXISTS (
     SELECT 1

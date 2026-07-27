@@ -19,6 +19,7 @@ set "AGENT_SESSION_MIGRATION=infrastructure\database\migrations\021_agent_sessio
 set "AGENT_RUN_SESSION_BINDING_MIGRATION=infrastructure\database\migrations\022_agent_run_session_binding.sql"
 set "AGENT_RUN_SEMANTIC_EVENT_MIGRATION=infrastructure\database\migrations\023_agent_run_semantic_events.sql"
 set "AGENT_RUN_REPLAN_EVENT_MIGRATION=infrastructure\database\migrations\024_agent_run_replan_events.sql"
+set "OAUTH_IDENTITY_MIGRATION=infrastructure\database\migrations\026_oauth_identities.sql"
 if not exist "%BOOTSTRAP_SQL%" (
   echo Missing bootstrap SQL: %BOOTSTRAP_SQL%
   exit /b 1
@@ -47,60 +48,71 @@ if not exist "%AGENT_RUN_REPLAN_EVENT_MIGRATION%" (
   echo Missing Agent Run replan event migration: %AGENT_RUN_REPLAN_EVENT_MIGRATION%
   exit /b 1
 )
+if not exist "%OAUTH_IDENTITY_MIGRATION%" (
+  echo Missing OAuth identity migration: %OAUTH_IDENTITY_MIGRATION%
+  exit /b 1
+)
 
-echo [1/8] Checking psql...
+echo [1/9] Checking psql...
 where psql >nul 2>&1
 if %errorlevel% neq 0 (
   echo psql was not found in PATH. Install PostgreSQL client tools on this machine or run the SQL on the VPS.
   exit /b 1
 )
 
-echo [2/8] Applying VPS PostgreSQL bootstrap...
+echo [2/9] Applying VPS PostgreSQL bootstrap...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%BOOTSTRAP_SQL%"
 if %errorlevel% neq 0 (
   echo Failed to apply bootstrap SQL.
   exit /b 1
 )
 
-echo [3/8] Applying AI assistant user scope migration...
+echo [3/9] Applying AI assistant user scope migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AI_SCOPE_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply AI assistant user scope migration.
   exit /b 1
 )
 
-echo [4/8] Applying Agent Run event migration...
+echo [4/9] Applying Agent Run event migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_RUN_EVENT_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Run event migration.
   exit /b 1
 )
 
-echo [5/8] Applying Agent Session migration...
+echo [5/9] Applying Agent Session migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_SESSION_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Session migration.
   exit /b 1
 )
 
-echo [6/8] Applying Agent Run Session binding migration...
+echo [6/9] Applying Agent Run Session binding migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_RUN_SESSION_BINDING_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Run Session binding migration.
   exit /b 1
 )
 
-echo [7/8] Applying Agent Run semantic event migration...
+echo [7/9] Applying Agent Run semantic event migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_RUN_SEMANTIC_EVENT_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Run semantic event migration.
   exit /b 1
 )
 
-echo [8/8] Applying Agent Run replan event migration...
+echo [8/9] Applying Agent Run replan event migration...
 psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%AGENT_RUN_REPLAN_EVENT_MIGRATION%"
 if %errorlevel% neq 0 (
   echo Failed to apply Agent Run replan event migration.
+  exit /b 1
+)
+
+echo [9/9] Applying OAuth identity migration...
+psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%OAUTH_IDENTITY_MIGRATION%"
+if %errorlevel% neq 0 (
+  echo Failed to apply OAuth identity migration.
   exit /b 1
 )
 

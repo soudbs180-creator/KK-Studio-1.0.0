@@ -19,6 +19,7 @@ AGENT_SESSION_MIGRATION="${AGENT_SESSION_MIGRATION:-${REPO_ROOT}/infrastructure/
 AGENT_RUN_SESSION_BINDING_MIGRATION="${AGENT_RUN_SESSION_BINDING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/022_agent_run_session_binding.sql}"
 AGENT_RUN_SEMANTIC_EVENT_MIGRATION="${AGENT_RUN_SEMANTIC_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/023_agent_run_semantic_events.sql}"
 AGENT_RUN_REPLAN_EVENT_MIGRATION="${AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/024_agent_run_replan_events.sql}"
+OAUTH_IDENTITY_MIGRATION="${OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -67,6 +68,11 @@ if [[ ! -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${OAUTH_IDENTITY_MIGRATION}" ]]; then
+  echo "[import-runtime-into-vps] Missing OAuth identity migration: ${OAUTH_IDENTITY_MIGRATION}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -97,6 +103,9 @@ psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_SEMANTIC_EVENT_
 
 echo "[import-runtime-into-vps] Applying mandatory Agent Run replan event migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}"
+
+echo "[import-runtime-into-vps] Applying mandatory OAuth identity migration"
+psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${OAUTH_IDENTITY_MIGRATION}"
 
 echo "[import-runtime-into-vps] Runtime schema snapshot retained for audit only; canonical bootstrap and migrations own the target schema"
 

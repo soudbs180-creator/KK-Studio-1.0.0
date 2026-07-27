@@ -50,12 +50,10 @@ const hostedApiRequired = [
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
-  "GOOGLE_STATE_SIGNING_SECRET",
   "GOOGLE_ALLOWED_REDIRECT_ORIGINS",
   "WECHAT_OPEN_APP_ID",
   "WECHAT_OPEN_APP_SECRET",
   "WECHAT_OPEN_REDIRECT_URI",
-  "WECHAT_STATE_SIGNING_SECRET",
   "WECHAT_ALLOWED_REDIRECT_ORIGINS",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
@@ -77,6 +75,7 @@ const hostedApiPasswordResetPublicOriginEnv = [
 
 const hostedApiRequiredMigrations = [
   "infrastructure/database/migrations/013_password_reset_tokens.sql",
+  "infrastructure/database/migrations/026_oauth_identities.sql",
 ];
 
 const DISABLED_ENV_FLAG_VALUES = new Set(["0", "false", "no", "off"]);
@@ -395,7 +394,7 @@ function pushRequiredMigrationChecks(blockers, remoteChecks) {
       return;
     }
 
-    remoteChecks.push(`Confirm VPS PostgreSQL has applied ${migrationPath} before deploying the hosted password reset confirmation flow.`);
+    remoteChecks.push(`Confirm VPS PostgreSQL has applied ${migrationPath} before deploying the hosted authentication flow.`);
   });
 }
 

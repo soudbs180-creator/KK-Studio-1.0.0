@@ -29,7 +29,7 @@ test('createAppRootMode routes workspace paths to the workspace shell and /setti
   assert.equal(createAppRootMode({ pathname: '/settings/api-management' }), 'settings');
 });
 
-test('kkai app root bypasses login and callback routes and mounts a local runtime auth provider', () => {
+test('kkai app root bypasses the auth gate for OAuth callbacks and mounts a local runtime auth provider', () => {
   const mainSource = readSource('apps/web/src/main.tsx');
   const appSource = readSource('apps/web/src/App.tsx');
   const authContextSource = readSource('apps/web/src/context/AuthContext.tsx');
@@ -37,9 +37,10 @@ test('kkai app root bypasses login and callback routes and mounts a local runtim
 
   assert.match(mainSource, /<AuthProvider>[\s\S]*<App \/>[\s\S]*<\/AuthProvider>/);
   assert.doesNotMatch(appSource, /<LoginScreen \/>/);
-  assert.doesNotMatch(appSource, /<AuthCallback \/>/);
+  assert.match(appSource, /const AuthCallback = lazyWithRetry\(\(\) => import\('\.\/pages\/AuthCallback'\)\);/);
+  assert.match(appSource, /isAuthCallback \? \([\s\S]*<AuthCallback \/>/);
   assert.doesNotMatch(appSource, /if \(!user\)/);
-  assert.doesNotMatch(appSource, /window\.location\.pathname === '\/auth\/callback'/);
+  assert.match(appSource, /const isAuthCallback = window\.location\.pathname === '\/auth\/callback';/);
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
   const switchSource = readSource('apps/web/src/app/AppRootContentSwitch.tsx');
   assert.match(appSource, /import AppRootContentSwitch from '\.\/app\/AppRootContentSwitch';/);

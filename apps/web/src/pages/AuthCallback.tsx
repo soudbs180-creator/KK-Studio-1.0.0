@@ -88,6 +88,7 @@ export default function AuthCallback() {
       const hashParams = parseHashParams();
       const bindProvider = resolveBindCallbackProvider(searchParams);
       const bindFlow = Boolean(bindProvider);
+      const callbackProvider = String(searchParams.get('provider') || '').trim().toLowerCase();
 
       try {
         if (searchParams.get('wechat_bind') === 'success') {
@@ -121,6 +122,12 @@ export default function AuthCallback() {
 
         const restoredHostedSession = await restoreHostedSessionFromServer();
         if (restoredHostedSession) {
+          if (callbackProvider === 'google' || callbackProvider === 'wechat') {
+            updateRuntimeUserMetadata({
+              authProvider: callbackProvider,
+              addProvider: callbackProvider,
+            });
+          }
           finishWithRedirect(
             'success',
             bindFlow ? resolveBindSuccessMessage(bindProvider) : 'Authentication callback completed and the VPS session was restored.',
@@ -135,6 +142,17 @@ export default function AuthCallback() {
             bindFlow
               ? resolveBindFailureMessage(bindProvider)
               : '认证回调已收到，但当前 KK API 需要由服务器端完成授权码交换。',
+            3200,
+          );
+          return;
+        }
+
+        if (searchParams.get('auth') === 'success') {
+          finishWithRedirect(
+            'error',
+            bindFlow
+              ? resolveBindFailureMessage(bindProvider)
+              : '登录已完成，但无法恢复服务器会话，请确认浏览器允许站点 Cookie 后重试。',
             3200,
           );
           return;

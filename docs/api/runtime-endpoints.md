@@ -38,10 +38,15 @@ Status: reference
 | POST | `/api/auth/signout` | 公开 | Web 登录退出兼容响应。 |
 | POST | `/api/v1/auth/signout` | 公开 | 标准信封退出别名。 |
 | POST | `/api/v1/auth/temp-users` | 公开 | 创建本地/兼容临时用户会话。 |
-| GET | `/api/v1/auth/google/start` | 公开 | 返回 Google 登录授权启动信息。 |
-| GET | `/api/v1/auth/google/bind/start` | 公开 | 返回 Google 账号绑定启动信息。 |
-| GET | `/api/v1/auth/wechat/start` | 公开 | 返回微信登录授权启动信息。 |
-| GET | `/api/v1/auth/wechat/bind/start` | 公开 | 返回微信账号绑定启动信息。 |
+| GET | `/api/v1/auth/google/start` | 公开 | 创建一次性 state，返回 Google Authorization Code 登录地址。 |
+| GET | `/api/v1/auth/google/bind/start` | 用户 | 为当前用户创建 Google 账号绑定事务。 |
+| GET | `/api/v1/auth/google/callback` | Provider 回调 | 服务端换码、创建或绑定身份、设置 HttpOnly 会话并跳回 Web。 |
+| GET | `/api/v1/auth/wechat/start` | 公开 | 创建一次性 state，返回微信网站应用扫码登录地址。 |
+| GET | `/api/v1/auth/wechat/bind/start` | 用户 | 为当前用户创建微信账号绑定事务。 |
+| GET | `/api/v1/auth/wechat/callback` | Provider 回调 | 服务端换码、创建或绑定身份、设置 HttpOnly 会话并跳回 Web。 |
+
+OAuth `redirectTo` 只接受服务端允许列表中的 Web Origin；state 在 PostgreSQL
+中仅保存 SHA-256 摘要且只能消费一次。Provider access token 不写入数据库，也不返回前端。
 
 ## Profile、用户 API 路由与密钥管理
 
@@ -218,4 +223,3 @@ Status: reference
 - 未匹配路由：HTTP 404，`{ "error": "Endpoint not found or legacy route disabled." }`。
 - 未处理异常：HTTP 500，`{ "error": "Internal server error." }`。
 - 标准兼容契约使用 `success/error/meta`；旧式路由的错误结构以各表说明和源码为准。
-

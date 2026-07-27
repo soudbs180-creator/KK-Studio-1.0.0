@@ -103,6 +103,26 @@ The VPS backend must provide:
 
 Optional provider/runtime secrets should stay in the VPS runtime env, never in frontend env files.
 
+## Google / WeChat OAuth
+
+OAuth 登录由 VPS 服务端完成授权码交换，前端只接收 HttpOnly Session Cookie。发布前：
+
+1. 应用 `infrastructure/database/migrations/026_oauth_identities.sql`。
+2. Google Cloud 创建 Web application OAuth Client，并把
+   `https://<API 域名>/api/v1/auth/google/callback` 配为 Authorized redirect URI。
+3. 微信开放平台创建网站应用并通过审核，把
+   `https://<API 域名>/api/v1/auth/wechat/callback` 配为授权回调域。
+4. 在 VPS `kk-api.env` 配置 `GOOGLE_OAUTH_CLIENT_ID`、
+   `GOOGLE_OAUTH_CLIENT_SECRET`、`GOOGLE_OAUTH_REDIRECT_URI`、
+   `GOOGLE_ALLOWED_REDIRECT_ORIGINS`、`WECHAT_OPEN_APP_ID`、
+   `WECHAT_OPEN_APP_SECRET`、`WECHAT_OPEN_REDIRECT_URI` 和
+   `WECHAT_ALLOWED_REDIRECT_ORIGINS`。
+5. `*_ALLOWED_REDIRECT_ORIGINS` 只填写可信 Web Origin；不要加入路径、通配符或第三方域名。
+
+`OAUTH_STATE_TTL_SECONDS` 可选，服务端会把有效期限制在 120–900 秒。OAuth state
+仅以 SHA-256 摘要写入数据库，成功或失败回调都只能消费一次；Google/微信 access token
+不会持久化。
+
 ## Password Reset Production Readiness
 
 Password reset is part of the hosted auth release surface. Before enabling it:

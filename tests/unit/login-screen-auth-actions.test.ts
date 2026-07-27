@@ -30,6 +30,9 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
   assert.doesNotMatch(source, /import \{ startGoogleSignIn \} from '\.\.\/\.\.\/services\/auth\/googleAuth\.ts';/);
   assert.doesNotMatch(source, /import \{ startWechatLogin \} from '\.\.\/\.\.\/services\/auth\/wechatAuth\.ts';/);
   assert.match(source, /const handleGoogleLogin = async \(\) => \{/);
+  assert.match(source, /const handleWechatLogin = async \(\) => \{/);
+  assert.match(source, /const authStart = await startWechatLogin\(\);/);
+  assert.match(source, /onClick=\{handleWechatLogin\}/);
   assert.match(source, /const handleTempUserEntry = async \(\) => \{/);
   assert.match(source, /await loginAsTempUser\(\);/);
   assert.match(source, /Continue with Google/);

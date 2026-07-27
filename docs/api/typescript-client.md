@@ -86,6 +86,10 @@ const client = createKkApiClient({
 | `syncUserRoutePricing` | `POST /api/v1/profile/user-routes/:routeId/pricing-sync` |
 | `createTempUser` | `POST /api/v1/auth/temp-users` |
 
+四个 OAuth start 方法只负责取得 Provider 授权地址。Google/微信回调直接进入 VPS
+`/api/v1/auth/{provider}/callback`，由服务端换码并设置 HttpOnly Cookie；客户端随后在
+`/auth/callback` 调用 `getSession` 恢复运行时用户，不接触 Provider access token。
+
 ### Admin 与权限（5）
 
 | 方法 | HTTP 端点 |

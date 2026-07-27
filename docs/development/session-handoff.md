@@ -1016,3 +1016,58 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   再删除兼容别名。
 - 新焦点 Hook 当前只接入三个本批顶层浮层；其它已有独立 modal 仍应逐模块审计，避免一次性扩大改动面。
 - 下一批建议继续处理页面容器宽度、重复卡片 padding、图标库混用和硬编码颜色等 P2 系统性问题。
+
+---
+
+## 232. 2026-07-27 - feat(auth): 接入 Google 与微信 OAuth 登录和绑定
+
+**修改范围**
+- 参考 JustAuth 的 Provider 抽象，但不把 Java/Maven 运行时引入当前 Node/Express 主链。
+- 新增 Google Authorization Code 与微信开放平台网站应用扫码登录；登录和已有账号绑定共用
+  服务端 OAuth 事务、身份解析和 HttpOnly Session。
+- 前端接通现有 Google 按钮、微信二维码弹窗与 `/auth/callback`，回调页绕过登录门禁并恢复 VPS 会话。
+
+**修改文件**
+- 服务端：`services/api/lib/oauth/*`、`services/api/routes/user/oauth.js`、
+  `services/api/routes/user.js`、`services/api/routes/user/auth.js`。
+- 数据与契约：`infrastructure/database/migrations/026_oauth_identities.sql`、
+  `packages/shared/src/contracts/dto/auth.ts`。
+- Web：`apps/web/src/App.tsx`、`components/auth/LoginScreen.tsx`、
+  `pages/AuthCallback.tsx`、`services/auth/runtimeAuthState.ts`。
+- 运维与文档：VPS bootstrap/deploy/import/setup 脚本、三份 API env 模板、
+  hosted release 诊断、API 端点/客户端参考与发布 runbook。
+- 测试：新增 `tests/unit/oauth-server-flow.test.ts`，并更新 App/LoginScreen 契约测试。
+
+**当前设计决策**
+1. Provider client secret 和授权码只进入 VPS；Provider access/refresh token 不写库、不返回前端。
+2. OAuth state 使用 32 字节随机值，数据库只保存 SHA-256 摘要；回调原子消费且不可重放。
+   同时使用短期 HttpOnly state Cookie 绑定发起浏览器，阻断 login CSRF。
+3. `redirectTo` 必须命中 Provider 专属服务端 Origin 允许列表，禁止开放重定向。
+4. Google 已验证邮箱若与现有密码账号重复，不自动合并；必须先登录原账号再显式绑定。
+   微信以 OpenID 为应用内身份，并在存在 UnionID 时进行跨应用去重。
+5. 社交账号允许 `users.email/password_hash` 为空；外部昵称、邮箱、头像 URL 和 subject
+   在写库前做长度、格式与协议校验。
+
+**已运行验证**
+- OAuth 专项：7/7；真实 Express fake-provider 路径覆盖 start → state Cookie →
+  服务端换码 → 创建身份 → Session Cookie → Web 回跳。
+- 全量 unit：2220 项，2218 通过 / 0 失败 / 2 跳过。
+- integration：14/14；contract：15/15；E2E：11/11。
+- 完整 TypeScript 链、server syntax（114 文件）、tests semantic（577 文件）通过。
+- `architecture:check` 全绿；`governance:check` 12 项全绿；encoding/mojibake、spec structure、
+  `git diff --check` 通过。
+- 生产构建通过：Vite 8.1.4，2566 modules。
+
+**未运行验证及原因**
+- 本机无系统 `npm`，未直接执行聚合命令 `npm run verify:changes`；使用 bundled Node 24
+  逐项执行了本次所需的 architecture、governance、typecheck、build、unit、integration、
+  contract、E2E、encoding 与 spec structure。
+- 未连接真实 PostgreSQL，也未持有 Google Cloud / 微信开放平台账号与密钥，因此未执行真实
+  Provider 授权、数据库迁移或生产部署。上线仍需按 runbook 创建应用、登记精确 callback URL、
+  写入 VPS secret env 并应用 migration 026。
+
+**风险与下一步**
+- 代码主链和部署入口已完成；未配置 Provider env 或无数据库时 start 路由 fail closed 返回 503。
+- 微信网站应用登录需要开放平台资质与审核，不能用微信公众号 AppID 替代。
+- 部署后分别用新账号登录、已有密码账号绑定、拒绝授权、过期/重复 state 和跨浏览器 callback
+  做真实 smoke test，并确认浏览器允许 API 域的会话 Cookie。

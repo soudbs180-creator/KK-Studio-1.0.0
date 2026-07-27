@@ -45,6 +45,8 @@ export interface ProfileDto {
   email: string;
   nickname?: string;
   avatarUrl?: string;
+  authProvider?: string;
+  providers?: string[];
   adminLevel?: number;
   role: "user" | "admin";
   status: "active" | "suspended";

@@ -371,6 +371,25 @@ const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleWechatLogin = async () => {
+    if (loading || tempLoading || googleLoading || wechatLoading) return;
+    setWechatModalOpen(true);
+    setWechatLoading(true);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+    try {
+      const { startWechatLogin } = await import('../../services/auth/wechatAuth.ts');
+      const authStart = await startWechatLogin();
+      setWechatAuthorizationUrl(authStart.authorizationUrl);
+      setWechatExpiresAt(authStart.expiresAt);
+    } catch (authError) {
+      setWechatError(resolveAuthErrorMessage(authError, 'login'));
+    } finally {
+      setWechatLoading(false);
+    }
+  };
+
   const handleAdminEntry = () => {
     setError(null);
     setMessage(null);
@@ -408,8 +427,6 @@ const LoginScreen: React.FC = () => {
 
 
   // 为了满足单元测试的正则检查：<div className={`auth-page auth-page--${resolvedTheme}`}>
-  // const { startGoogleSignIn } = await import('../../services/auth/googleAuth.ts');
-  // const { startWechatLogin } = await import('../../services/auth/wechatAuth.ts');
   // Admin sign-in
   // minLength={8}
   // Continue with Google
@@ -632,7 +649,7 @@ const LoginScreen: React.FC = () => {
                       <button
                         type="button"
                         className="auth-social-btn"
-                        onClick={() => setWechatModalOpen(true)}
+                        onClick={handleWechatLogin}
                         disabled={loading || tempLoading || googleLoading || wechatLoading}
                       >
                         <QrCode size={15} />
