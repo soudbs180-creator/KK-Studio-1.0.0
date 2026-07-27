@@ -16,6 +16,7 @@ const {
   exchangeGoogleCode,
   exchangeWechatCode,
 } = require('../../services/api/lib/oauth/oauthProviders.js');
+const { signJWT } = require('../../services/api/lib/jwt.js');
 const { createOAuthRouter } = require('../../services/api/routes/user/oauth.js');
 
 function jsonResponse(payload: Record<string, unknown>, ok = true) {
@@ -248,6 +249,76 @@ test('real Express OAuth route completes server-side Google callback and writes 
   assert.match(callbackLocation, /auth=success/);
   assert.match(createdUserId, /^oauth-/);
   assert.equal(providerRequestCount, 2);
+});
+
+test('OAuth bind callback rejects a browser that no longer has the initiating KK account session', async (t) => {
+  let oauthTransaction: Record<string, unknown> | null = null;
+  let providerRequestCount = 0;
+  const pool = {
+    query: async (text: string, values: unknown[]) => {
+      if (text.includes('INSERT INTO public.oauth_transactions')) {
+        oauthTransaction = {
+          provider: values[1],
+          mode: values[2],
+          redirect_to: values[3],
+          user_id: values[4],
+          expires_at: values[5],
+        };
+      }
+      if (text.includes('UPDATE public.oauth_transactions')) {
+        return { rows: oauthTransaction ? [oauthTransaction] : [] };
+      }
+      return { rows: [] };
+    },
+  };
+  const env = {
+    DATABASE_URL: 'postgres://test',
+    GOOGLE_OAUTH_CLIENT_ID: 'google-client',
+    GOOGLE_OAUTH_CLIENT_SECRET: 'server-secret',
+    GOOGLE_OAUTH_REDIRECT_URI: 'https://api.example.com/api/v1/auth/google/callback',
+    GOOGLE_ALLOWED_REDIRECT_ORIGINS: 'https://app.example.com',
+    PUBLIC_APP_URL: 'https://app.example.com',
+  };
+  const express = require('express');
+  const app = express();
+  app.use('/api', createOAuthRouter({
+    env: () => env,
+    getPool: () => pool,
+    fetchImpl: () => async () => {
+      providerRequestCount += 1;
+      return jsonResponse({ access_token: 'provider-access-token' });
+    },
+  }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const address = server.address() as AddressInfo;
+  const ownerToken = signJWT({ userId: 'owner-1' });
+
+  const startResponse = await nativeFetch(
+    `http://127.0.0.1:${address.port}/api/v1/auth/google/bind/start`
+      + '?redirectTo=https%3A%2F%2Fapp.example.com%2Fauth%2Fcallback',
+    { headers: { authorization: `Bearer ${ownerToken}` } },
+  );
+  const payload = await startResponse.json() as {
+    data?: { state?: string };
+  };
+  const stateCookie = startResponse.headers.get('set-cookie') || '';
+
+  const callbackResponse = await nativeFetch(
+    `http://127.0.0.1:${address.port}/api/v1/auth/google/callback`
+      + `?code=authorization-code&state=${encodeURIComponent(payload.data?.state || '')}`,
+    {
+      headers: { cookie: stateCookie.split(';')[0] || '' },
+      redirect: 'manual',
+    },
+  );
+  const callbackLocation = callbackResponse.headers.get('location') || '';
+
+  assert.equal(callbackResponse.status, 302);
+  assert.match(callbackLocation, /error=OAUTH_BIND_SESSION_MISMATCH/);
+  assert.match(callbackLocation, /mode=google-bind/);
+  assert.equal(providerRequestCount, 0);
 });
 
 test('OAuth migration allows social-only users and stores only hashed state', () => {

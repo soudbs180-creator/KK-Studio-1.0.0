@@ -1182,3 +1182,62 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   `KK_RECHARGE_ALIPAY_QR_URL` / `KK_RECHARGE_WECHAT_QR_URL`；未配置二维码的渠道会按设计保持不可用。
 - 在受控环境依次验证：人工充值创建→提交证明→管理员通过→余额与账本只增加一次；Stripe 同步成功、
   异步成功、未支付、金额/币种不匹配与重复 Webhook；随后核对部署脚本的表、列和约束检查结果。
+
+---
+
+## 235. 2026-07-27 - fix(auth): 校验 OAuth 绑定回调会话一致性
+
+**修改范围**
+- 继续复核 #232 的 Google / 微信 OAuth 实现，并与 JustAuth 当前 Google、微信开放平台实现逐项
+  对照 authorization code、`state`、`openid` / `unionid`、token 与 userinfo 请求。
+- 修复第三方账号绑定回调未再次确认当前 KK 会话的问题：绑定开始后若用户退出或切换账号，
+  回调现在会一次性消费事务并以 `OAUTH_BIND_SESSION_MISMATCH` 失败，不再交换 Provider 授权码，
+  也不会把第三方身份绑定到最初账号。
+- 只收紧 `bind` 模式；普通 Google / 微信登录流程和公开 API 路径不变。
+
+**修改文件**
+- `services/api/routes/user/oauth.js`
+- `tests/unit/oauth-server-flow.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. `state` 证明回调属于原始浏览器事务，但不能代替“回调时仍是同一 KK 用户”的验证；绑定模式必须
+   同时满足 HttpOnly state Cookie、数据库一次性事务和当前 Session 用户三者一致。
+2. 会话一致性检查位于 state 原子消费之后、Provider code exchange 之前；失败事务不可重放，
+   且不会把授权码发送给 Google / 微信 token 端点。
+3. Node/Express 主链不引入 Java/Maven 版 JustAuth；继续复用其 Provider 协议与安全原则，
+   保持项目现有工具链和最小依赖面。
+
+**生产核验**
+- `https://kkai.plus` 返回 200，VPS `/healthz` 显示 PostgreSQL 与核心持久化已就绪。
+- 线上 Google / 微信 start 路由均返回旧版 503：
+  `GOOGLE_AUTH_UNAVAILABLE` / `WECHAT_AUTH_UNAVAILABLE`，说明 #232 后端和 Provider env 尚未上线。
+- 当前线上 Web 产物未注入 `api.kkai.plus`，实际通过 `vercel.json` 同源 rewrite 访问 VPS；
+  公共 DNS 对 `api.kkai.plus` 的 A / AAAA / CNAME 查询均无记录。
+- Google Cloud 页面仍停在账号登录入口；本机没有 Vercel、VPS、Cloudflare 或 Provider 凭据，
+  未执行任何生产写操作，也未输出 Secret。
+
+**已运行验证**
+- OAuth 专项 17/17 通过；新增测试验证绑定发起会话丢失后回调 302 返回
+  `OAUTH_BIND_SESSION_MISMATCH`，Provider 请求次数保持 0。
+- 全量 unit 2228 项：2226 通过 / 0 失败 / 2 跳过。
+- integration 14/14、contract 15/15、E2E 11/11 通过。
+- Web 与 architecture TypeScript、server syntax（116 文件）、tests semantic（578 文件）全部通过。
+- 敏感边界、Cookie/云端登录自动化边界、encoding/mojibake 检查通过。
+- 生产构建通过：Vite 8.1.4，2566 modules。
+
+**未运行验证及原因**
+- 未直接运行 `npm run verify:changes`：本机没有系统 `npm`；bundled `pnpm` 因拒绝自动执行
+  `esbuild@0.28.1` 安装脚本而中止。已使用 bundled Node 24 运行上述等价检查。
+- 无 Google Cloud / 微信开放平台登录、Provider 密钥、Vercel/Cloudflare/VPS 权限，未创建应用、
+  写入生产 env、应用 migration 026 或部署 #232/#235。
+- 未连接真实 Provider 与 PostgreSQL 执行授权、绑定、跨浏览器、过期及重复 state smoke；
+  当前证据为真实生产只读探测与本地 fake-provider/Express 回归测试。
+
+**风险与下一步**
+- 本地代码与构建已通过；生产登录仍不可用，剩余工作是外部账号登录、精确 callback 登记、
+  migration 026、Provider env 和后端部署，不可把本次本地提交描述为已上线。
+- 当前线上采用 `kkai.plus` 同源 VPS rewrite；上线前应在两种方案中固定一种：
+  继续同源时 callback 使用 `https://kkai.plus/api/v1/auth/<provider>/callback`；
+  直连 API 域时先创建 `api.kkai.plus` DNS，并在 Web 构建注入
+  `VITE_KK_API_BASE_URL=https://api.kkai.plus`。start 与 callback 必须落在同一 Cookie 域。

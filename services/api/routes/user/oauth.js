@@ -124,6 +124,21 @@ async function consumeCallbackTransaction(req, res, provider, dependencies) {
   return transaction;
 }
 
+function assertBindSessionOwner(req, transaction) {
+  if (transaction.mode !== 'bind') {
+    return;
+  }
+
+  const currentUserId = verifyRequestJwt(req);
+  if (!currentUserId || currentUserId !== transaction.user_id) {
+    throw new OAuthFlowError(
+      'OAUTH_BIND_SESSION_MISMATCH',
+      '当前登录账号已变化，请重新登录后发起绑定。',
+      401,
+    );
+  }
+}
+
 function redirectCallbackFailure(res, transaction, provider, error) {
   const oauthError = asOAuthFlowError(error);
   return res.redirect(302, buildCallbackRedirect(transaction, provider, {
@@ -140,6 +155,7 @@ function createCallbackHandler(provider, dependencies) {
       ensureHostedOAuthRuntime(env);
       transaction = await consumeCallbackTransaction(req, res, provider, dependencies);
       if (!transaction) return undefined;
+      assertBindSessionOwner(req, transaction);
 
       if (readQueryValue(req.query.error)) {
         return redirectCallbackFailure(res, transaction, provider, new OAuthFlowError(
