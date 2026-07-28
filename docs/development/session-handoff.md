@@ -1351,3 +1351,36 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 风险低，变更仅影响未被前序 API rewrite 命中的前端路径。
 - 推送后必须确认最新生产 deployment 为 READY，并实测 `/auth/callback` 返回应用 HTML；
   随后重新完成一次 Google 登录，验证回调页面消费会话并返回工作区。
+
+---
+
+## 238. 2026-07-28 - fix(build): 修正 brace-expansion 锁文件完整性摘要
+
+**修改范围**
+- #237 推送后，Vercel 已正确接受生产部署且不再返回 `BLOCKED`，但依赖安装以
+  `EINTEGRITY` 失败。
+- 对照 npm Registry 的 `brace-expansion@5.0.8` 发布元数据与实际 tarball，修正
+  `package-lock.json` 中错误的 SHA-512 完整性摘要；不关闭 npm 完整性校验。
+
+**修改文件**
+- `package-lock.json`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Registry 元数据、实际下载 tarball 和 Vercel 错误日志返回同一个新摘要，采用该权威值。
+2. 保持 `package.json` 中 `brace-expansion: 5.0.8` override 不变，不回退安全修复版本。
+3. 这是锁文件元数据修复，不重新解析或升级其它依赖。
+
+**已运行验证**
+- Vercel 首次生产构建真实复现两次 tarball retry 后的 `EINTEGRITY`。
+- 使用 Node 24 下载官方 tarball（10242 bytes）并独立计算 SHA-512，结果与 npm Registry
+  `dist.integrity` 和修正后的 lockfile 完全一致。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 本机没有系统 `npm`，无法本地执行 `npm ci`；Vercel 的全新构建环境作为最终安装验证。
+
+**风险与下一步**
+- 风险低，只修正一个已固定版本的完整性摘要。
+- 推送后等待生产部署到 READY，再验证版本清单、OAuth callback 深链、API 代理和完整
+  Google 登录回调。
