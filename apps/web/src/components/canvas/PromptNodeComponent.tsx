@@ -27,6 +27,7 @@ import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementSchedu
 import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
 import CanvasCardShell from './CanvasCardShell.tsx';
 import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
+import { createPromptCardViewModel } from '../../canvas/v3/adapters.ts';
 
 const EcommerceCanvasWorkbenchCard = React.lazy(() => import('../ecommerce/EcommerceCanvasWorkbenchCard'));
 
@@ -675,6 +676,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const baseCardWidth = getPromptNodeBaseCardWidth(node);
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
     const cardWidth = getPromptNodeCardWidth(node, isMobile, viewportWidth);
+    const canvasV3ViewModel = createPromptCardViewModel(node);
     const originX = renderOrigin?.x ?? 0;
     const originY = renderOrigin?.y ?? 0;
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
@@ -697,8 +699,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const [frameworkRemarkDraft, setFrameworkRemarkDraft] = useState(() => resolveFrameworkRemarkLabel(node));
     const frameworkRemarkSkipCommitRef = useRef(false);
     const ecommerceFrameworkCardClassName = isEcommerceFrameworkCard
-        ? 'px-4 pb-4 pt-3 flex flex-col flex-1'
-        : 'p-3 flex flex-col flex-1';
+        ? 'kk-canvas-v3-prompt-body px-4 pb-4 pt-3 flex flex-col'
+        : 'kk-canvas-v3-prompt-body p-3 flex flex-col';
     const resolvedTimerStart = resolveGenerationTimerStart(node);
     const timerStartRef = useRef<number>(resolvedTimerStart ?? Date.now());
 
@@ -1619,7 +1621,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             <div
                 ref={cardRef}
                 data-canvas-surface="prompt"
-                className="relative flex flex-col rounded-2xl border border-[var(--frost-card-main-border)] transition-all"
+                data-card-v3-kind={canvasV3ViewModel.kind}
+                data-card-v3-status={canvasV3ViewModel.status}
+                data-selected={isSelected || undefined}
+                className="kk-canvas-v3-adapted-card relative flex flex-col rounded-2xl border border-[var(--frost-card-main-border)] transition-all"
                 style={{
                     width: isChatMode ? '100%' : cardWidth,
                     maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
@@ -1635,7 +1640,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 {/* 🚀 [NEW] Connection Point - Bottom Center */}
                 {onConnectStart && !isChatMode && (
                     <div
-                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-[rgba(255,77,139,0.22)] rounded-full z-50 cursor-crosshair transition-colors"
+                            className="kk-canvas-v3-port kk-canvas-v3-port--output absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-[rgba(255,77,139,0.22)] rounded-full z-50 cursor-crosshair transition-colors"
                         onMouseDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
@@ -1653,7 +1658,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     />
                 )}
                 {/* Header (Status & Actions) */}
-                <div className="flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', ...secondaryTextRenderStyle }}>
+                <div className="kk-canvas-v3-prompt-header flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', ...secondaryTextRenderStyle }}>
                     {/* Left: Status Icon and Text */}
                     <div className="flex flex-1 items-center gap-2 min-w-0">
                         {isEcommerceFrameworkCard ? (
@@ -1912,7 +1917,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Prompt Text Area - 画布主卡禁用文本选择，避免拖拽时误选中文案 */}
                     <div
-                        className={`relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] group/content ${isChatMode ? 'select-text cursor-text' : 'select-none'}`}
+                        className={`kk-canvas-v3-prompt-copy relative text-[var(--text-primary)] text-[13px] leading-5 font-normal tracking-wide overflow-y-auto max-h-[144px] custom-scrollbar pr-1 group/content ${isChatMode ? 'select-text cursor-text' : 'select-none'}`}
                         style={primaryTextRenderStyle}
                         onWheel={(e) => e.stopPropagation()}
                         onClick={(e) => {
@@ -2435,9 +2440,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         </div>
                     )}
 
-                    {/* Spacer */}
-                    <div className="h-3 mt-3" />
-
                     {/* Loading Placeholders - 2x2 Grid Layout with Shimmer */}
                     {/* 🚀 Generating Overlay - Simple & Focused */}
                     {node.isGenerating && !showError && (() => {
@@ -2726,7 +2728,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     })()}
                     {/* Telemetry Footer */}
                     <div
-                        className="flex items-center justify-between px-3.5 py-1.5 w-full text-[10px] rounded-b-2xl"
+                        className="kk-canvas-v3-prompt-footer flex items-center justify-between px-3.5 py-1.5 w-full text-[10px] rounded-b-2xl"
                         style={{
                             background: 'rgba(24, 24, 27, 0.25)',
                             borderTop: '1px solid rgba(255, 255, 255, 0.05)',

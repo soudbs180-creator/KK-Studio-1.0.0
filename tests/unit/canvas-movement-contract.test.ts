@@ -141,9 +141,9 @@ test('moving selected prompt nodes moves their child images without forcing chil
 
   assert.deepEqual(result.promptNodes.find((node) => node.id === 'prompt-1')?.position, { x: 15, y: 10 });
   assert.equal(result.promptNodes.find((node) => node.id === 'prompt-1')?.userMoved, true);
-  assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-listed')?.position, { x: -141, y: 429 });
+  assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-listed')?.position, { x: -141, y: 382 });
   assert.equal(result.imageNodes.find((node) => node.id === 'image-listed')?.userMoved, false);
-  assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-parent')?.position, { x: 171, y: 429 });
+  assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-parent')?.position, { x: 171, y: 382 });
   assert.equal(result.imageNodes.find((node) => node.id === 'image-parent')?.userMoved, true);
   assert.deepEqual(result.promptNodes.find((node) => node.id === 'prompt-other')?.position, { x: 100, y: 200 });
   assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-other')?.position, { x: 110, y: 210 });

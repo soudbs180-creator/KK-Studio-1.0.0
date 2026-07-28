@@ -57,7 +57,7 @@ export const CanvasCardShell = React.forwardRef<HTMLDivElement, CanvasCardShellP
         top: position.y - height,
       };
   const surfaceClassName = surface
-    ? `overflow-hidden border bg-zinc-950 text-zinc-100 ${selected ? 'border-sky-400 shadow-lg' : 'border-white/10'}`
+    ? `kk-canvas-card-shell-surface overflow-hidden border ${selected ? 'is-selected' : ''}`
     : '';
 
   return (
@@ -77,9 +77,9 @@ export const CanvasCardShell = React.forwardRef<HTMLDivElement, CanvasCardShellP
         width,
         minHeight: height,
         zIndex,
-        borderRadius: surface ? 8 : undefined,
+        borderRadius: surface ? 14 : undefined,
         opacity: isGhost ? 0.72 : 1,
-        transition: 'var(--canvas-card-transition, left 220ms ease, top 220ms ease, transform 220ms ease, opacity 180ms ease, border-color 180ms ease)',
+        transition: 'var(--canvas-card-transition, left 160ms var(--kk-motion-ease-standard), top 160ms var(--kk-motion-ease-standard), transform 160ms var(--kk-motion-ease-standard), opacity 125ms var(--kk-motion-ease-standard), border-color 125ms var(--kk-motion-ease-standard))',
         ...style,
       }}
     >

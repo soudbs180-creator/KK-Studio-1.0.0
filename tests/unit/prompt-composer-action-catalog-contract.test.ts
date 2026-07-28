@@ -32,6 +32,8 @@ test('Prompt composer controls expose one stable action catalog', () => {
     'openProviderModels',
     'closeProviderModels',
     'toggleMode',
+    'openWorkflowBrowser',
+    'toggleComposerTools',
     'selectMobileMode',
     'toggleAdvancedOptions',
     'toggleGrounding',

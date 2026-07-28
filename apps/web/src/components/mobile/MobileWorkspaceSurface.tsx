@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
+import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Languages, PackageOpen, Trash2 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
@@ -30,7 +30,6 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
 
 import { useCanvas } from '../../context/CanvasContext';
 import { useOverlayFocusLifecycle } from '../../hooks/useOverlayFocusLifecycle';
-import { useTheme } from '../../context/ThemeContext';
 import { useLocale } from '../../context/LocaleContext';
 // 简体中文：导入全局通知服务以在移动端提供操作反馈
 import { notify } from '../../services/system/notificationService';
@@ -87,7 +86,7 @@ export interface MobileWorkspaceSurfaceProps {
 }
 
 const moreSheetActionClass =
-  'kk-mobile-more-action rounded-[14px] border p-3.5 text-left text-[var(--text-primary)] active:scale-[0.985]';
+  'kk-mobile-more-action rounded-[14px] border p-3.5 text-left text-[var(--text-primary)]';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -136,7 +135,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
     deleteCanvas,
     cleanupInvalidCards
   } = useCanvas();
-  const { toggleTheme, isDarkMode } = useTheme();
   const { toggleLanguage, isChinese, pick } = useLocale();
   const moreSheetRef = useRef<HTMLDivElement>(null);
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
@@ -250,30 +248,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               </div>
             </div>
 
-            <div className="kk-mobile-more-sheet__shortcuts mb-3 grid w-full grid-cols-[20fr_20fr_20fr_40fr] gap-2">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                data-active-theme={isDarkMode ? 'dark' : 'light'}
-                className="kk-mobile-more-shortcut kk-mobile-more-shortcut--theme relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center active:scale-[0.97] cursor-pointer"
-              >
-                <div className="relative shrink-0 text-[var(--text-secondary)]">
-                  {isDarkMode ? <Moon size={18} strokeWidth={2} /> : <Sun size={18} strokeWidth={2} />}
-                </div>
-                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '主题' : 'Theme'}
-                  </div>
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '偏好' : 'Pref'}
-                  </div>
-                </div>
-              </button>
-
+            <div className="kk-mobile-more-sheet__shortcuts mb-3 grid w-full grid-cols-[22fr_22fr_56fr] gap-2">
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center active:scale-[0.975] cursor-pointer"
+                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center cursor-pointer"
               >
                 <div className="relative text-[var(--text-secondary)] shrink-0">
                   <Languages size={18} strokeWidth={2} />
@@ -292,7 +271,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 type="button"
                 onClick={() => runFromMoreSheet(onOpenFavorites)}
                 data-testid="mobile-more-menu-favorites"
-                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center text-[var(--text-secondary)] active:scale-[0.975] cursor-pointer"
+                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center text-[var(--text-secondary)] cursor-pointer"
               >
                 <div className="relative text-[var(--accent-coral)] shrink-0">
                   <Heart size={18} strokeWidth={2} />
@@ -310,7 +289,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[8px] border px-2.5 text-left active:scale-[0.985]"
+                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[8px] border px-2.5 text-left"
               >
                 <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
                 <div className="min-w-0 flex-1 text-left">
@@ -376,7 +355,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                                   );
                                 }
                               }}
-                              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-red-400 active:scale-95 transition-colors cursor-pointer"
+                              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-red-400 transition-colors cursor-pointer"
                               aria-label={pick('删除项目', 'Delete Project')}
                             >
                               <Trash2 size={15} />
@@ -424,7 +403,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     }
                     closeMoreSheet();
                   }}
-                  className="kk-mobile-more-project-action mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] border border-dashed px-3 py-3 text-sm font-medium text-[var(--text-secondary)] active:scale-[0.99] cursor-pointer"
+                  className="kk-mobile-more-project-action mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] border border-dashed px-3 py-3 text-sm font-medium text-[var(--text-secondary)] cursor-pointer"
                 >
                   <Broom size={16} />
                   {pick('清理错误卡片', 'Clean Invalid Cards')}

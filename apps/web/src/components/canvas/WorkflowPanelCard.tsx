@@ -1,8 +1,10 @@
 import React, { useRef } from 'react';
 import { ArrowDown, ArrowUp, Pause, Play, Plus, RotateCcw, Square, Trash2 } from 'lucide-react';
+
+import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
+import { createWorkflowCardViewModel } from '../../canvas/v3/adapters.ts';
 import type { GeneratedImage, WorkflowPanelData, WorkflowPanelNode, WorkflowPanelStep } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
-import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 
 interface WorkflowPanelCardProps {
   node: WorkflowPanelNode;
@@ -17,6 +19,18 @@ interface WorkflowPanelCardProps {
   detailLevel?: CanvasCardDetailLevel;
 }
 
+interface WorkflowStepRowProps {
+  step: WorkflowPanelStep;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onChange: (step: WorkflowPanelStep) => void;
+  onMove: (delta: -1 | 1) => void;
+  onRemove: () => void;
+}
+
+const iconButtonClass = 'h-[30px] w-[30px] rounded-[7px] text-[var(--text-tertiary)] transition-colors duration-[125ms] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] disabled:opacity-30';
+const fieldClass = 'h-7 w-full rounded-md border border-transparent bg-transparent px-2 text-[11px] text-[var(--text-secondary)] outline-none transition-colors duration-[125ms] placeholder:text-[var(--text-tertiary)] focus:border-[var(--border-medium)] focus:bg-[var(--bg-overlay)]';
+
 const moveStep = (steps: WorkflowPanelStep[], index: number, delta: -1 | 1) => {
   const target = index + delta;
   if (target < 0 || target >= steps.length) return steps;
@@ -25,6 +39,62 @@ const moveStep = (steps: WorkflowPanelStep[], index: number, delta: -1 | 1) => {
   return next;
 };
 
+const WorkflowStepRow: React.FC<WorkflowStepRowProps> = ({
+  step,
+  canMoveUp,
+  canMoveDown,
+  onChange,
+  onMove,
+  onRemove,
+}) => (
+  <div className="grid grid-cols-[20px_minmax(0,1fr)_90px] items-center gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] p-2">
+    <input
+      type="checkbox"
+      aria-label={`Enable ${step.label}`}
+      checked={step.enabled}
+      className="h-4 w-4 accent-[var(--kk-morphic-action)]"
+      onChange={(event) => onChange({ ...step, enabled: event.target.checked })}
+    />
+    <div className="min-w-0 space-y-0.5">
+      <input
+        aria-label="Step label"
+        value={step.label}
+        className={`${fieldClass} font-medium text-[var(--text-primary)]`}
+        onChange={(event) => onChange({ ...step, label: event.target.value })}
+      />
+      <input
+        aria-label="Tool name"
+        placeholder="Tool name"
+        value={String(step.parameters.toolName || '')}
+        className={fieldClass}
+        onChange={(event) => onChange({ ...step, parameters: { ...step.parameters, toolName: event.target.value } })}
+      />
+      <input
+        aria-label="Tool input JSON"
+        placeholder="Tool input JSON"
+        value={String(step.parameters.input || '')}
+        className={fieldClass}
+        onChange={(event) => onChange({ ...step, parameters: { ...step.parameters, input: event.target.value } })}
+      />
+    </div>
+    <div className="flex items-center justify-end">
+      <button type="button" title="Move up" className={iconButtonClass} disabled={!canMoveUp} onClick={() => onMove(-1)}>
+        <ArrowUp className="mx-auto h-3.5 w-3.5" />
+      </button>
+      <button type="button" title="Move down" className={iconButtonClass} disabled={!canMoveDown} onClick={() => onMove(1)}>
+        <ArrowDown className="mx-auto h-3.5 w-3.5" />
+      </button>
+      <button type="button" title="Remove step" className={`${iconButtonClass} hover:text-[var(--state-error-text)]`} onClick={onRemove}>
+        <Trash2 className="mx-auto h-3.5 w-3.5" />
+      </button>
+    </div>
+  </div>
+);
+
+/**
+ * Canvas V3 workflow editor keeps execution controls available while allowing
+ * the card body to shrink to its actual step count.
+ */
 export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
   node,
   selected,
@@ -40,20 +110,31 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
   const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const data = node.data;
   const updateSteps = (steps: WorkflowPanelStep[]) => onDataChange({ ...data, steps });
+  const viewModel = createWorkflowCardViewModel({
+    id: node.id,
+    kind: 'workflow-panel',
+    label: data.title,
+    position: node.position,
+    data: { ...data },
+  });
+  const estimatedHeight = 72 + Math.min(352, (data.steps.length * 104) + 44);
 
   return (
     <CanvasCardShell
       id={node.id}
       position={node.position}
       presentation={node.presentation!}
-      height={node.height || 420}
+      width={viewModel.width}
+      height={estimatedHeight}
       zIndex={node.zIndex}
       selected={selected}
       detailLevel={detailLevel}
-      className="pointer-events-auto bg-zinc-950/95"
+      data-card-v3-kind={viewModel.kind}
+      data-card-v3-status={viewModel.status}
+      className="kk-canvas-v3-workflow-editor pointer-events-auto"
     >
       <header
-        className="flex h-11 cursor-grab items-center justify-between border-b border-white/10 px-3"
+        className="flex h-9 cursor-grab items-center justify-between border-b border-[var(--border-light)] px-3"
         onPointerDown={(event) => {
           event.stopPropagation();
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -76,76 +157,64 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
         }}
         onPointerCancel={() => { dragRef.current = null; }}
       >
-        <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-zinc-100">{data.title}</div>
-          <div className="text-[10px] text-zinc-500">{data.status}</div>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--kk-morphic-action)]" />
+          <span className="truncate text-xs font-medium text-[var(--text-primary)]">{viewModel.title}</span>
+          <span className="shrink-0 text-[10px] text-[var(--text-tertiary)]">{viewModel.statusLabel}</span>
         </div>
-        <button type="button" title="Delete workflow" className="h-11 w-11 text-zinc-500 hover:text-red-300" onPointerDown={(event) => event.stopPropagation()} onClick={onDelete}>
+        <button
+          type="button"
+          title="Delete workflow"
+          className={`${iconButtonClass} hover:text-[var(--state-error-text)]`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onDelete}
+        >
           <Trash2 className="mx-auto h-4 w-4" />
         </button>
       </header>
 
-      <div className="flex h-[309px] flex-col overflow-y-auto px-3 py-2">
+      <div className="flex max-h-[min(50vh,352px)] flex-col gap-1.5 overflow-y-auto p-2">
         {data.steps.map((step, index) => (
-          <div key={step.id} className="grid grid-cols-[24px_minmax(0,1fr)_132px] items-center gap-2 border-b border-white/5 py-2">
-            <input
-              type="checkbox"
-              aria-label={`Enable ${step.label}`}
-              checked={step.enabled}
-              onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, enabled: event.target.checked } : item))}
-            />
-            <div className="min-w-0">
-              <input
-                value={step.label}
-                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, label: event.target.value } : item))}
-                className="h-7 w-full border-0 bg-transparent text-xs text-zinc-200 outline-none"
-              />
-              <input
-                placeholder="Tool name"
-                value={String(step.parameters.toolName || '')}
-                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, parameters: { ...item.parameters, toolName: event.target.value } } : item))}
-                className="h-7 w-full border-0 bg-transparent text-[11px] text-zinc-500 outline-none"
-              />
-              <input
-                value={String(step.parameters.input || '')}
-                placeholder="Tool input JSON"
-                onChange={(event) => updateSteps(data.steps.map((item) => item.id === step.id ? { ...item, parameters: { ...item.parameters, input: event.target.value } } : item))}
-                className="h-7 w-full border-0 bg-transparent text-[11px] text-zinc-500 outline-none"
-              />
-            </div>
-            <div className="flex items-center justify-end">
-              <button type="button" title="Move up" className="h-11 w-11 text-zinc-500 hover:text-zinc-200" onClick={() => updateSteps(moveStep(data.steps, index, -1))}><ArrowUp className="mx-auto h-3.5 w-3.5" /></button>
-              <button type="button" title="Move down" className="h-11 w-11 text-zinc-500 hover:text-zinc-200" onClick={() => updateSteps(moveStep(data.steps, index, 1))}><ArrowDown className="mx-auto h-3.5 w-3.5" /></button>
-              <button type="button" title="Remove step" className="h-11 w-11 text-zinc-500 hover:text-red-300" onClick={() => updateSteps(data.steps.filter((item) => item.id !== step.id))}><Trash2 className="mx-auto h-3.5 w-3.5" /></button>
-            </div>
-          </div>
+          <WorkflowStepRow
+            key={step.id}
+            step={step}
+            canMoveUp={index > 0}
+            canMoveDown={index < data.steps.length - 1}
+            onChange={(nextStep) => updateSteps(data.steps.map((item) => item.id === step.id ? nextStep : item))}
+            onMove={(delta) => updateSteps(moveStep(data.steps, index, delta))}
+            onRemove={() => updateSteps(data.steps.filter((item) => item.id !== step.id))}
+          />
         ))}
         <button
           type="button"
-          className="mt-2 flex h-11 items-center justify-center gap-1 text-xs text-zinc-400 hover:text-zinc-100"
+          className="flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg text-xs text-[var(--text-secondary)] transition-colors duration-[125ms] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
           onClick={() => updateSteps([...data.steps, { id: `step-${Date.now().toString(36)}`, label: 'New step', enabled: true, parameters: {} }])}
         >
           <Plus className="h-4 w-4" /> Add step
         </button>
       </div>
 
-      <footer className="flex h-[60px] items-center justify-between gap-2 border-t border-white/10 px-3">
-        <div className="flex min-w-0 items-center gap-1.5" aria-label={`${data.outputNodeIds.length} workflow outputs`}>
-          {outputMedia.slice(0, 4).map((media) => {
+      <footer className="flex h-9 items-center justify-between gap-2 border-t border-[var(--border-light)] px-2">
+        <div className="flex min-w-0 items-center gap-1" aria-label={`${data.outputNodeIds.length} workflow outputs`}>
+          {outputMedia.slice(0, 3).map((media) => {
             const source = media.originalUrl || media.apiResultUrl || media.url;
             return source ? (
-              <img key={media.id} src={source} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
+              <img key={media.id} src={source} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
             ) : (
-              <div key={media.id} className="h-8 w-8 shrink-0 rounded border border-white/10 bg-white/5" />
+              <div key={media.id} className="h-6 w-6 shrink-0 rounded border border-[var(--border-light)] bg-[var(--bg-tertiary)]" />
             );
           })}
-          <span className="truncate text-[10px] text-zinc-500">{data.outputNodeIds.length} outputs</span>
+          <span className="truncate text-[10px] text-[var(--text-tertiary)]">{data.outputNodeIds.length} outputs</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button type="button" title="Run" className="h-11 w-11 text-emerald-400" onClick={() => onCommand('run')}><Play className="mx-auto h-4 w-4" /></button>
-          <button type="button" title="Pause" className="h-11 w-11 text-amber-300" onClick={() => onCommand('pause')}><Pause className="mx-auto h-4 w-4" /></button>
-          <button type="button" title="Cancel" className="h-11 w-11 text-zinc-400" onClick={() => onCommand('cancel')}><Square className="mx-auto h-4 w-4" /></button>
-          {data.status === 'failed' && <button type="button" title="Retry failed workflow" className="h-11 w-11 text-sky-300" onClick={() => onCommand('retry')}><RotateCcw className="mx-auto h-4 w-4" /></button>}
+        <div className="flex items-center gap-0.5">
+          <button type="button" title="Run" className={`${iconButtonClass} text-[var(--state-success-text)]`} onClick={() => onCommand('run')}><Play className="mx-auto h-4 w-4" /></button>
+          <button type="button" title="Pause" className={iconButtonClass} onClick={() => onCommand('pause')}><Pause className="mx-auto h-4 w-4" /></button>
+          <button type="button" title="Cancel" className={iconButtonClass} onClick={() => onCommand('cancel')}><Square className="mx-auto h-4 w-4" /></button>
+          {data.status === 'failed' && (
+            <button type="button" title="Retry failed workflow" className={iconButtonClass} onClick={() => onCommand('retry')}>
+              <RotateCcw className="mx-auto h-4 w-4" />
+            </button>
+          )}
         </div>
       </footer>
     </CanvasCardShell>

@@ -67,6 +67,18 @@ export const UI_SYSTEM_TOKENS = {
     durationPanel: "160ms",
     easeStandard: "var(--kk-motion-ease-standard)",
   },
+  canvas: {
+    card: {
+      surface: 'oklch(0.22 0 0)',
+      border: 'rgba(255, 255, 255, 0.07)',
+      selectedRing: 'color-mix(in oklch, oklch(0.5926 0.2236 258.42) 26%, transparent)',
+    },
+    edge: {
+      idle: 'rgba(255, 255, 255, 0.18)',
+      disabled: 'rgba(255, 255, 255, 0.08)',
+      selected: 'oklch(0.5926 0.2236 258.42)',
+    },
+  },
   glass: {
     surface: "var(--kk-glass-surface-bg)",
     border: "var(--kk-glass-surface-border)",

@@ -305,6 +305,101 @@
 这些尺寸只约束视觉和交互密度。Canvas 模式、Copilot 模式、Provider、提示词优化、上传及生成
 能力仍使用 KK Studio 的现有业务实现，不因参考设计而改写产品内容或新增无业务支撑的能力。
 
+## 16. Canvas V3 双参考融合规范
+
+Canvas V3 的产品外壳继续遵循 Morphic 的黑色舞台、弱边界、紧凑按钮和内容留白；节点卡片、连线与触控交互吸收 Tapnow 的节点化工作流思路。KK Studio 的 Prompt、Image、Workflow、Agent、Provider、计费与持久化对象仍是唯一业务事实，不复制参考产品的名称、素材或不存在的能力。
+
+### 16.1 展示适配层
+
+- `CanvasCardViewModel`、`CanvasCardAction`、`CanvasCardStatus`、`CanvasPortViewModel` 与 `CanvasEdgeViewModel` 只负责展示。
+- 旧项目加载后直接由 Adapter 转换，不迁移数据库，不修改 Canvas DTO。
+- Prompt 与 Image 业务实体是主卡来源；Workflow 图中的镜像 `prompt` / `image` 节点不得重复渲染。
+- 卡片宽度只允许 `280 / 320 / 420px`，Header 与 Footer 均为 `36px`，圆角为 `14px`。
+- Body 使用内容高度；禁止通过固定 176/200/420px 高度制造空白。
+- 缩放细节等级统一为 `full → compact → thumbnail-shell`。
+
+### 16.2 卡片语义
+
+| 卡片 | Body | Footer |
+|---|---|---|
+| Prompt / Text | 提示词摘要、模式和运行反馈 | 模型、规格、消耗 |
+| Image / Video / Audio | 主媒体、Poster 或波形 | 模型、尺寸、时长 |
+| PPT / Storyboard | 封面、页数或镜头完成度 | 版本、页数、状态 |
+| Ecommerce | 商品任务摘要与当前阶段 | 输出数、规格、消耗 |
+| Agent / Workflow | 目标、步骤摘要和错误 | 类型、状态、输出 |
+| Preview / Save | 来源摘要、格式和目标 | 来源数、状态、数量 |
+| Pending / Error | 骨架或可操作错误原因 | 取消、重试或详情 |
+
+Hover 只改变边界。Selected 使用主操作色边界和低透明外环，不改变尺寸和位置。Dragging 禁止位置过渡；落位后才允许 `160ms` 以内的轻微位置收口。
+
+### 16.3 连线与端口
+
+- 默认连线为白色 18% 的 1px 实线三次贝塞尔曲线；选中为 1.5px 主操作蓝色。
+- Canvas2D 绘制常规边，SVG Overlay 只承载选中、运行和交互状态。
+- 连线使用圆角端点；SVG 状态使用 `vector-effect="non-scaling-stroke"`。
+- 运行状态仍为实线，可选单个柔和高亮点；Reduced Motion 下关闭。
+- 端口视觉直径 6px；鼠标命中区 20px；触控命中区 44px。
+- 业务 Renderer 不得自行设置虚线、颜色、线宽或另建边几何算法。
+
+### 16.4 卡片工具栏避让
+
+桌面选择工具栏统一调用 `resolveCanvasV3ToolbarPlacement`，顺序为：
+
+1. 卡片右侧居中；
+2. 卡片右上；
+3. 卡片右下；
+4. 卡片左侧；
+5. 在视口内钳制。
+
+每个候选都必须检测未选中 Prompt、Image 与 Workflow 卡片。右侧存在相邻卡片时，候选先沿水平方向越过阻挡卡片，再验证视口；不得覆盖卡片内容。移动端不使用悬浮侧工具栏，统一转为安全区上方的 Bottom Sheet Inspector。
+
+## 17. 移动 Canvas V3
+
+### 17.1 信息架构
+
+底部四个主入口固定为：
+
+1. 创作；
+2. 画布；
+3. Copilot；
+4. 资源。
+
+账户通过顶部头像进入。`library / chat / me` 旧值继续兼容读取，并分别归一到 `assets / copilot / create`。
+
+### 17.2 触控与布局
+
+- 创作默认使用结果优先流；画布在同一 Workspace 内切换。
+- 画布空白区域单指平移，卡片单指拖动并在释放时写回现有位置 API。
+- 双指围绕触点中点同时缩放和平移；变换由 `requestAnimationFrame` 合并。
+- 卡片轻触选中；检查器显示在 Bottom Navigation 上方，二者间不得重叠。
+- 连接必须先进入显式连接模式，再轻触目标卡片。
+- Composer 默认折叠为“输入提示词”按钮；展开后位于 Bottom Navigation 与安全区上方。
+- 手机默认以 `0.72` 可读缩放聚焦首个 Prompt；平板默认以 `1.0` 展示完整卡片；“适应画布”允许进入低缩放概览。
+- 任务中心折叠入口固定在顶部 Chrome 下方，不得覆盖 Composer、Inspector 或 Bottom Navigation。
+
+### 17.3 响应式验收
+
+| 视口 | 必须满足 |
+|---:|---|
+| 375×812 | 主 Prompt 完整可见；输入入口与导航至少 10px 间隔 |
+| 390×844 | Inspector 与导航不重叠；全部触控目标至少 44px |
+| 430×932 | 无横向页面溢出；安全区和主要文案完整 |
+| 768×1024 | 使用移动四入口与完整触控画布 |
+| 834×1112 | 使用平板 1.0 卡片档，不回退到桌面悬浮 Rail |
+
+所有视口必须满足 `scrollWidth <= innerWidth`。画布世界可平移超出屏幕，但页面自身不得产生横向滚动条。
+
+## 18. 当前唯一实现来源
+
+- 几何与 Token：`packages/ui/src/core/layout.ts`、`packages/ui/src/core/tokens.ts`
+- Canvas V3 类型、Adapter、卡片、边：`apps/web/src/canvas/v3/`
+- 桌面选择工具栏碰撞：`apps/web/src/app/useSelectionMenuOverlay.ts`
+- 移动触控画布：`apps/web/src/components/mobile/MobileCanvasV3Surface.tsx`
+- 移动主导航：`apps/web/src/components/mobile/MobileTabBar.tsx`
+- Web 视觉适配：`apps/web/src/styles/morphic-ui.css`、`apps/web/src/styles/canvas-v3.css`
+
+后续功能卡片必须先扩展 ViewModel / Adapter，再进入共享卡片渲染器；不得恢复旧 Frost/Clay 卡片、虚线 Edge Renderer 或平行移动画布。
+
 ## 13. 布局精确收口补充
 
 - 桌面 Canvas 左面板默认常驻：`x=12px`、`top=48px`、`bottom=10px`、`width=262px`。桌面不使用 Modal Backdrop，也不自动关闭；移动端仍使用 Drawer/Sheet 与遮罩。

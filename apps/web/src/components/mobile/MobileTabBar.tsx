@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { KK_LAYER } from '@kk/ui';
-import { Images, MessageSquare, Sparkles, User } from 'lucide-react';
+import { Images, LayoutTemplate, MessageSquare, Sparkles } from 'lucide-react';
 import { GenerationMode, type MobilePrimaryTab } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
 
@@ -40,25 +40,34 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
       icon: <Sparkles size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'library' as const,
-      label: pick('资源', 'Library'),
-      icon: <Images size={18} strokeWidth={2.1} />,
+      key: 'canvas' as const,
+      label: pick('画布', 'Canvas'),
+      icon: <LayoutTemplate size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'chat' as const,
-      label: pick('聊天', 'Chat'),
+      key: 'copilot' as const,
+      label: 'Copilot',
       icon: <MessageSquare size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'me' as const,
-      label: pick('我的', 'Me'),
-      icon: <User size={18} strokeWidth={2.1} />,
+      key: 'assets' as const,
+      label: pick('资源', 'Assets'),
+      icon: <Images size={18} strokeWidth={2.1} />,
     },
   ], [pick, currentMode, modeLabelMap]);
 
+  const canonicalTab = currentTab === 'library'
+    ? 'assets'
+    : currentTab === 'chat'
+      ? 'copilot'
+      : currentTab === 'me'
+        ? 'create'
+        : currentTab;
+
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 transition-transform duration-300 ease-out md:hidden ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'}`}
+      data-mobile-primary-navigation="true"
+      className={`fixed bottom-0 left-0 right-0 transition-[transform,opacity] duration-[125ms] ease-out lg:hidden ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[140%] opacity-0'}`}
       style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))', zIndex: KK_LAYER.mobileChrome }}
       onTouchStart={onInteract}
       onClick={onInteract}
@@ -66,7 +75,7 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
       <div id="mobile-tab-bar" className="mobile-tab-bar ios-mobile-tabbar-shell mx-3 px-2 py-1.5">
         <div className="grid grid-cols-4 gap-1.5">
           {tabs.map((tab) => {
-            const isActive = currentTab === tab.key;
+            const isActive = canonicalTab === tab.key;
             return (
               <button
                 key={tab.key}

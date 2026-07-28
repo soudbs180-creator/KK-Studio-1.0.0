@@ -28,11 +28,14 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   assert.match(promptBarSource, /className="kk-composer-reference-button/);
   assert.match(promptBarSource, /className="kk-composer-reference-label">/);
   assert.match(topRowSource, /kk-composer-floating-tools/);
-  assert.match(modeSwitcherSource, /kk-composer-mode-switcher__track/);
-  assert.match(modeSwitcherSource, /kk-composer-mode-switcher__indicator/);
-  assert.match(modeSwitcherSource, /kk-composer-mode-switcher__button/);
+  assert.match(modeSwitcherSource, /kk-composer-type-picker__trigger/);
+  assert.match(modeSwitcherSource, /kk-composer-type-picker__menu/);
+  assert.match(modeSwitcherSource, /kk-composer-type-picker__option/);
+  assert.doesNotMatch(modeSwitcherSource, /kk-composer-mode-switcher__indicator/);
   assert.match(promptToolsSource, /kk-composer-prompt-tools__group/);
-  assert.match(promptToolsSource, /kk-composer-prompt-tools__optimize/);
+  assert.match(promptToolsSource, /kk-composer-prompt-tools__workflow/);
+  assert.match(promptToolsSource, /kk-composer-prompt-tools__trigger/);
+  assert.match(promptToolsSource, /kk-composer-prompt-tools__menu/);
   assert.match(footerSource, /kk-composer-compact-footer/);
 
   assert.match(
@@ -45,11 +48,15 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   );
   assert.match(
     cssSource,
-    /\.kk-composer-mode-switcher__track,[\s\S]*\.kk-composer-prompt-tools__group\s*\{[\s\S]*height:\s*32px\s*!important[\s\S]*padding:\s*1px\s*!important/,
+    /\.kk-composer-type-picker__trigger,[\s\S]*\.kk-composer-prompt-tools__group\s*\{[\s\S]*height:\s*32px\s*!important/,
   );
   assert.match(
     cssSource,
-    /\.kk-composer-mode-switcher__button,[\s\S]*\.kk-composer-prompt-tools__optimize\s*\{[\s\S]*height:\s*30px\s*!important[\s\S]*padding-top:\s*0\s*!important/,
+    /\.kk-composer-type-picker__trigger,[\s\S]*transition-duration:\s*125ms\s*!important/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-composer-prompt-tools__trigger,[\s\S]*transition-duration:\s*125ms\s*!important/,
   );
   assert.match(
     cssSource,
@@ -73,8 +80,24 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   );
   assert.match(
     cssSource,
-    /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*button,[\s\S]*textarea[\s\S]*min-height:\s*44px\s*!important/,
+    /@media\s*\(max-width:\s*1023px\)\s*\{[\s\S]*button,[\s\S]*textarea[\s\S]*min-height:\s*44px\s*!important/,
   );
+});
+
+test('composer owns workflow and tool entry points without duplicating them in the canvas rail', () => {
+  const promptToolsSource = readSource(
+    'apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx',
+  );
+  const projectManagerSource = readSource(
+    'apps/web/src/components/settings/ProjectManager.tsx',
+  );
+
+  assert.match(promptToolsSource, /KK_OPEN_WORKFLOW_BROWSER_EVENT/);
+  assert.match(promptToolsSource, />工作流</);
+  assert.match(promptToolsSource, />工具</);
+  assert.match(projectManagerSource, /KK_OPEN_WORKFLOW_BROWSER_EVENT/);
+  assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleWorkflowMenu/);
+  assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleTheme/);
 });
 
 test('Copilot composer matches the reference compact shell and keeps attachment access visible', () => {

@@ -64,14 +64,14 @@ test('prompt bar tones down send button and mode switcher motion flourishes on d
   assert.doesNotMatch(modeSwitcherSource, /cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/);
 });
 
-test('desktop mode switcher animates the active pill with transform instead of layout-driven left changes', () => {
+test('desktop creative type picker uses one compact trigger and a content-fit menu', () => {
   const modeSwitcherSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
 
-  assert.match(modeSwitcherSource, /const sliderOffset =/);
-  assert.match(modeSwitcherSource, /transition-\[transform,background-color,border-color,box-shadow\]/);
-  assert.match(modeSwitcherSource, /transform:\s*`translate3d\(\$\{sliderOffset\}px, 0, 0\)`/);
-  assert.doesNotMatch(modeSwitcherSource, /const sliderLeft =/);
-  assert.doesNotMatch(modeSwitcherSource, /left:\s*`\$\{sliderLeft\}px`/);
+  assert.match(modeSwitcherSource, /kk-composer-type-picker__trigger/);
+  assert.match(modeSwitcherSource, /kk-composer-type-picker__menu/);
+  assert.match(modeSwitcherSource, /aria-haspopup="listbox"/);
+  assert.match(modeSwitcherSource, /role="option"/);
+  assert.doesNotMatch(modeSwitcherSource, /sliderOffset|sliderLeft|duration-300/);
 });
 
 test('mobile embedded composer keeps the upload affordance inside the input area instead of spending a dedicated row when empty', () => {

@@ -29,6 +29,6 @@ test('workflow browser uses the Morphic full-height search, tabs, categories, an
   );
   assert.match(
     cssSource,
-    /@media\s*\(max-width:\s*768px\)[\s\S]*\.kk-morphic-workflow-panel\s*\{[\s\S]*bottom:\s*0\s*!important/,
+    /@media\s*\(max-width:\s*1023px\)[\s\S]*\.kk-morphic-workflow-panel\s*\{[\s\S]*bottom:\s*0\s*!important/,
   );
 });

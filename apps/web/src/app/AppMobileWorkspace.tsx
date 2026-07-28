@@ -1,12 +1,18 @@
 import React from 'react';
 
-import { MobileWorkspaceSurface, MobileEcommercePanel } from '../components/mobile';
+import {
+  MobileEcommercePanel,
+  MobileTabBar,
+  MobileWorkspaceSurface,
+} from '../components/mobile';
+import MobileCanvasV3Surface from '../components/mobile/MobileCanvasV3Surface';
 import { selectMobileFeedResults } from '../components/mobile/mobileFeedSelectors';
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type {
   Canvas,
   EcommerceFrameworkRuntimeState,
   MobileResultEntry,
+  MobilePrimaryTab,
   MobileSurfaceScreen,
   RedrawRequest,
   ResponsiveSurface,
@@ -86,10 +92,36 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
   promptBarProps,
   overlays,
 }) => {
+  const [primaryTab, setPrimaryTab] = React.useState<MobilePrimaryTab>('create');
   const resultEntries = React.useMemo<MobileResultEntry[]>(
     () => selectMobileFeedResults(activeCanvas?.promptNodes || [], activeCanvas?.imageNodes || [], frameworkRuntime),
     [activeCanvas?.imageNodes, activeCanvas?.promptNodes, frameworkRuntime],
   );
+
+  React.useEffect(() => {
+    if (workspaceSurface === 'library' || workspaceSurface === 'favorites') {
+      setPrimaryTab('assets');
+    }
+  }, [workspaceSurface]);
+
+  const handleSelectPrimaryTab = React.useCallback((tab: MobilePrimaryTab) => {
+    const canonicalTab = tab === 'library'
+      ? 'assets'
+      : tab === 'chat'
+        ? 'copilot'
+        : tab === 'me'
+          ? 'create'
+          : tab;
+    setPrimaryTab(canonicalTab);
+    setMobileScreen('home');
+    if (canonicalTab === 'assets') {
+      setIsChatOpen(false);
+      setWorkspaceSurface('library');
+      return;
+    }
+    focusWorkspace();
+    setIsChatOpen(canonicalTab === 'copilot');
+  }, [focusWorkspace, setIsChatOpen, setMobileScreen, setWorkspaceSurface]);
 
   if (!isMobile) {
     return null;
@@ -113,65 +145,92 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
     );
   }
 
-  return (
-    <MobileWorkspaceSurface
-      activeScreen={mobileScreen}
-      surface={surface}
-      workspaceSurface={workspaceSurface}
-      onCloseHistory={() => setWorkspaceSurface('workspace')}
-      onScreenChange={setMobileScreen}
-      onOpenSettings={onOpenSettings}
-      title="KK Studio"
-      userName={userName}
-      userAvatarUrl={userAvatarUrl}
-      balance={balance}
-      balanceLoading={billingLoading}
-      projectName={activeCanvas?.name || '项目'}
-      projectCount={projectCount}
-      isLoading={promptBarProps.isGenerating}
-      onOpenProjects={() => setMobileScreen('more-sheet')}
-      onOpenSearch={() => {
-        focusWorkspace();
-        setIsSearchOpen(true);
-        setMobileScreen('home');
-      }}
-      onOpenHistory={() => {
-        setWorkspaceSurface('library');
-        setMobileScreen('home');
-      }}
-      onOpenFavorites={() => {
-        setWorkspaceSurface('favorites');
-        setMobileScreen('home');
-      }}
-      onOpenChat={() => {
-        focusWorkspace();
-        setIsChatOpen(true);
-        setMobileScreen('home');
-      }}
-      onOpenProfile={() => openProfileSurface('main')}
-      onBillingClick={billingUiEnabled ? () => openProfileSurface('main') : undefined}
-      onRechargeClick={billingUiEnabled ? onShowRecharge : undefined}
-      resultEntries={resultEntries}
-      activeEntryId={activeEntryId}
-      activeSourceImage={activeSourceImage}
-      onEntryOpen={onEntryOpen}
-      onPreviewImage={onPreviewImage}
-      onUseResultAsSource={onUseResultAsSource}
-      onPartialRedraw={onPartialRedraw}
-      onDownloadEntry={onDownloadEntry}
-      onDeleteImage={onDeleteImage}
-      onEditEcommerceTask={onEditEcommerceTask}
-      onConfirmEcommerceDesktop={onConfirmEcommerceDesktop}
-      onGenerateEcommerceMobile={onGenerateEcommerceMobile}
-      onToggleEcommerceSelected={onToggleEcommerceSelected}
-      composer={(
-        <AppPromptComposer
-          variant="mobile"
-          promptBarProps={promptBarProps}
-        />
-      )}
-      overlays={overlays}
+  const mobileNavigation = (
+    <MobileTabBar
+      currentMode={promptBarProps.config.mode}
+      currentTab={primaryTab}
+      onSelectTab={handleSelectPrimaryTab}
     />
+  );
+
+  if (primaryTab === 'canvas') {
+    return (
+      <>
+        <MobileCanvasV3Surface
+          activeCanvas={activeCanvas}
+          composer={<AppPromptComposer variant="mobile" promptBarProps={promptBarProps} />}
+          userName={userName}
+          userAvatarUrl={userAvatarUrl}
+          onOpenProfile={() => openProfileSurface('main')}
+        />
+        {mobileNavigation}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MobileWorkspaceSurface
+        activeScreen={mobileScreen}
+        surface={surface}
+        workspaceSurface={workspaceSurface}
+        onCloseHistory={() => {
+          setWorkspaceSurface('workspace');
+          setPrimaryTab('create');
+        }}
+        onScreenChange={setMobileScreen}
+        onOpenSettings={onOpenSettings}
+        title="KK Studio"
+        userName={userName}
+        userAvatarUrl={userAvatarUrl}
+        balance={balance}
+        balanceLoading={billingLoading}
+        projectName={activeCanvas?.name || '项目'}
+        projectCount={projectCount}
+        isLoading={promptBarProps.isGenerating}
+        onOpenProjects={() => setMobileScreen('more-sheet')}
+        onOpenSearch={() => {
+          focusWorkspace();
+          setIsSearchOpen(true);
+          setMobileScreen('home');
+        }}
+        onOpenHistory={() => {
+          setPrimaryTab('assets');
+          setWorkspaceSurface('library');
+          setMobileScreen('home');
+        }}
+        onOpenFavorites={() => {
+          setPrimaryTab('assets');
+          setWorkspaceSurface('favorites');
+          setMobileScreen('home');
+        }}
+        onOpenChat={() => {
+          setPrimaryTab('copilot');
+          focusWorkspace();
+          setIsChatOpen(true);
+          setMobileScreen('home');
+        }}
+        onOpenProfile={() => openProfileSurface('main')}
+        onBillingClick={billingUiEnabled ? () => openProfileSurface('main') : undefined}
+        onRechargeClick={billingUiEnabled ? onShowRecharge : undefined}
+        resultEntries={resultEntries}
+        activeEntryId={activeEntryId}
+        activeSourceImage={activeSourceImage}
+        onEntryOpen={onEntryOpen}
+        onPreviewImage={onPreviewImage}
+        onUseResultAsSource={onUseResultAsSource}
+        onPartialRedraw={onPartialRedraw}
+        onDownloadEntry={onDownloadEntry}
+        onDeleteImage={onDeleteImage}
+        onEditEcommerceTask={onEditEcommerceTask}
+        onConfirmEcommerceDesktop={onConfirmEcommerceDesktop}
+        onGenerateEcommerceMobile={onGenerateEcommerceMobile}
+        onToggleEcommerceSelected={onToggleEcommerceSelected}
+        composer={<AppPromptComposer variant="mobile" promptBarProps={promptBarProps} />}
+        overlays={overlays}
+      />
+      {mobileNavigation}
+    </>
   );
 };
 

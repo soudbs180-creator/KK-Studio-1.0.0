@@ -44,7 +44,7 @@ test('Project Manager project-list and danger-zone controls expose project actio
   }
 });
 
-test('Project Manager shell, canvas, workflow, and theme controls expose project action metadata', () => {
+test('Project Manager shell and canvas controls expose project action metadata', () => {
   for (const key of [
     'openSearch',
     'openFavorites',
@@ -53,12 +53,10 @@ test('Project Manager shell, canvas, workflow, and theme controls expose project
     'toggleCanvasMode',
     'toggleSnapToGrid',
     'autoArrange',
-    'toggleWorkflowMenu',
     'addWorkflowPreviewCard',
     'addWorkflowSaveCard',
     'addWorkflowAgentCard',
     'applyWorkflowTemplate',
-    'toggleTheme',
   ] as const) {
     assert.match(
       projectManagerSource,
@@ -66,4 +64,9 @@ test('Project Manager shell, canvas, workflow, and theme controls expose project
       `Project Manager should mark ${key}`
     );
   }
+
+  assert.doesNotMatch(
+    projectManagerSource,
+    /PROJECT_MANAGER_ACTIONS\.(?:toggleWorkflowMenu|toggleTheme)\.uiAction/,
+  );
 });

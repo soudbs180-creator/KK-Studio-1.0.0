@@ -34,9 +34,10 @@ test('ProjectManager keeps mobile prompt props declared without destructuring un
   assert.doesNotMatch(destructuredPropsSource, /\bonOpenMobilePromptLibrary\b/);
 });
 
-test('ProjectManager keeps a persistent keyboard-accessible 44px desktop rail', () => {
+test('ProjectManager keeps a persistent keyboard-accessible 30px desktop rail', () => {
   const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
-  assert.match(projectManagerSource, /className="fixed left-3 z-50 flex w-11/);
-  assert.match(projectManagerSource, /h-11 w-11 shrink-0/);
+  assert.match(projectManagerSource, /className="fixed left-3 z-50 flex w-\[30px\]/);
+  assert.match(projectManagerSource, /h-\[30px\] w-\[30px\] shrink-0/);
+  assert.match(projectManagerSource, /focus-visible:outline/);
   assert.doesNotMatch(projectManagerSource, /setIsCollapsed|inactivityTimerRef|tabIndex=\{-1\}/);
 });

@@ -6,22 +6,21 @@ import { test } from 'node:test';
 const sourcePath = path.join(process.cwd(), 'apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 const source = readFileSync(sourcePath, 'utf8');
 
-test('mobile more sheet keeps theme, language, favorites, and project in a 20/20/20/40 top row', () => {
-  assert.match(source, /grid-cols-\[20fr_20fr_20fr_40fr\]/);
+test('mobile more sheet keeps language, favorites, and project in a compact 22/22/56 top row', () => {
+  assert.match(source, /grid-cols-\[22fr_22fr_56fr\]/);
 
-  const topRowStart = source.indexOf('grid-cols-[20fr_20fr_20fr_40fr]');
+  const topRowStart = source.indexOf('grid-cols-[22fr_22fr_56fr]');
   const topRowEnd = source.indexOf('{showProjectList ?', topRowStart);
   assert.notEqual(topRowStart, -1);
   assert.notEqual(topRowEnd, -1);
 
   const topRow = source.slice(topRowStart, topRowEnd);
-  const themeIndex = topRow.indexOf('onClick={toggleTheme}');
   const languageIndex = topRow.indexOf('onClick={toggleLanguage}');
   const favoritesIndex = topRow.indexOf('data-testid="mobile-more-menu-favorites"');
   const projectIndex = topRow.indexOf('onClick={() => setShowProjectList');
 
-  assert.ok(themeIndex >= 0, 'theme action should stay in the top row');
-  assert.ok(languageIndex > themeIndex, 'language action should follow theme');
+  assert.doesNotMatch(topRow, /toggleTheme/);
+  assert.ok(languageIndex >= 0, 'language action should start the top row');
   assert.ok(favoritesIndex > languageIndex, 'favorites action should move into the compact top-row slot');
   assert.ok(projectIndex > favoritesIndex, 'project action should remain the final half-width top-row item');
 });

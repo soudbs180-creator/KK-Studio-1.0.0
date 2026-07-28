@@ -13,7 +13,7 @@ test('mobile component index exports MobileAppShell', () => {
   assert.match(indexSource, /export \{ default as MobileAppShell \} from '\.\/MobileAppShell';/);
 });
 
-test('MobileAppShell keeps the adaptive three-layer slot contract and stays tab-bar agnostic', () => {
+test('MobileAppShell keeps the adaptive three-layer slots and reserves the safe navigation area', () => {
   const shellExists = existsSync(workspacePath(MOBILE_APP_SHELL_PATH));
 
   assert.equal(shellExists, true, 'expected MobileAppShell.tsx to exist');
@@ -42,7 +42,8 @@ test('MobileAppShell keeps the adaptive three-layer slot contract and stays tab-
   assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
   assert.doesNotMatch(shellSource, /min-h-dvh/);
   assert.match(shellSource, /env\(safe-area-inset-top\)/);
-  assert.match(shellSource, /env\(safe-area-inset-bottom\)/);
+  assert.match(shellSource, /env\(safe-area-inset-bottom,\s*0px\)/);
+  assert.match(shellSource, /--mobile-tabbar-total-height/);
   assert.match(
     shellSource,
     /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/,

@@ -157,6 +157,7 @@ function verifyPromptGroupSourceContracts() {
   const dragHookSource = readSource('apps/web/src/app/usePromptGroupDragHandlers.ts');
   const promptSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
   const imageSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const groupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
 
   const checks = [
     { source: appSource, pattern: /usePromptGroupDragHandlers\(/, label: 'App prompt-group drag hook wiring' },
@@ -164,6 +165,8 @@ function verifyPromptGroupSourceContracts() {
     { source: dragHookSource, pattern: /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/, label: 'Hook live-drag regroup wiring' },
     { source: promptSource, pattern: /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Prompt card bottom-center transform origin' },
     { source: imageSource, pattern: /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Image card bottom-center transform origin' },
+    { source: groupRendererSource, pattern: /id=\{`connector-\$\{segment\.key\}`\}[\s\S]*vectorEffect="non-scaling-stroke"/, label: 'Solid prompt-group connector identity' },
+    { source: groupRendererSource, pattern: /strokeLinecap="round"/, label: 'Solid prompt-group connector caps' },
   ];
 
   for (const check of checks) {
@@ -403,7 +406,9 @@ async function measureScene(page) {
       return await page.evaluate(() => {
     const promptSurface = document.querySelector('[data-canvas-surface="prompt"]');
     const imageSurfaces = Array.from(document.querySelectorAll('[data-canvas-surface="image"]'));
-    const connectorPaths = Array.from(document.querySelectorAll('path[stroke-dasharray]'));
+    const connectorPaths = Array.from(
+      document.querySelectorAll('path[id^="connector-"][vector-effect="non-scaling-stroke"]'),
+    );
 
     const promptBox = promptSurface?.getBoundingClientRect();
     const imageBoxes = imageSurfaces.map((element) => {

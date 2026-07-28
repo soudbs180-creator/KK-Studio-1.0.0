@@ -144,14 +144,16 @@ test('prompt-group settle phase keeps animating after drop instead of snapping t
   assert.match(promptGroupLayoutSource, /settlePromptGroupRegroup\(promptNode\.id\)/);
 });
 
-test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
+test('prompt-group and follow-up connectors use stable non-scaling solid strokes', () => {
   const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const imageGroupRendererSource = readSource('apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx');
 
   assert.match(workspacePageSource, /<svg[\s\S]*shapeRendering="geometricPrecision"/);
-  assert.match(imageGroupRendererSource, /strokeDasharray=\{groupConnectorDash\}[\s\S]*vectorEffect="non-scaling-stroke"/);
-  assert.match(workspacePageSource, /strokeDasharray=\{connectorStrokeDasharray\}[\s\S]*vectorEffect="non-scaling-stroke"/);
-  assert.match(workspacePageSource, /strokeDasharray=\{\`[\s\S]*activeDragDashA[\s\S]*activeDragDashB[\s\S]*\`\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(imageGroupRendererSource, /strokeWidth=\{groupConnectorStroke\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(workspacePageSource, /strokeWidth=\{connectorStroke\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.match(workspacePageSource, /strokeWidth=\{activeDragStroke\}[\s\S]*vectorEffect="non-scaling-stroke"/);
+  assert.doesNotMatch(imageGroupRendererSource, /strokeDasharray|groupConnectorDash/);
+  assert.doesNotMatch(workspacePageSource, /connectorStrokeDasharray|activeDragDash/);
 });
 
 test('explicit regroup target slots keep recycle assignments stable even if live positions jitter', () => {

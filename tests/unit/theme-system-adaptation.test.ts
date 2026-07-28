@@ -51,15 +51,14 @@ test('theme-aware shells use resolved theme when preference is set to system', (
   assert.match(sidebarSource, /title=\{isDarkMode \? '切换到亮色模式' : '切换到暗色模式'\}/);
   assert.match(sidebarSource, /\{isDarkMode \? \(/);
 
-  assert.match(projectManagerSource, /const \{ resolvedTheme, toggleTheme \} = useTheme\(\);/);
-  assert.match(projectManagerSource, /const isDarkMode = resolvedTheme === 'dark';/);
-  assert.match(projectManagerSource, /frostedProjectManagerShellStyle/);
-  assert.match(projectManagerSource, /frostedProjectManagerSubSurfaceStyle/);
-  assert.match(projectManagerSource, /var\(--frost-card-framework-bg\)/);
-  assert.match(projectManagerSource, /var\(--frost-card-framework-border\)/);
-  assert.match(projectManagerSource, /var\(--frost-card-framework-shadow\)/);
-  assert.match(projectManagerSource, /title=\{isDarkMode \? '切换到浅色模式' : '切换到深色模式'\}/);
-  assert.match(projectManagerSource, /\{isDarkMode \? <Moon size=\{20\} \/> : <Sun size=\{20\} \/>}/);
+  assert.doesNotMatch(projectManagerSource, /useTheme|toggleTheme|isDarkMode/);
+  assert.match(projectManagerSource, /projectManagerPanelStyle/);
+  assert.match(projectManagerSource, /projectManagerControlStyle/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-panel\)/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-control\)/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-border\)/);
+  assert.doesNotMatch(projectManagerSource, /var\(--frost-card-framework-/);
+  assert.doesNotMatch(projectManagerSource, /<Moon|<Sun/);
   assert.doesNotMatch(projectManagerSource, /accent-indigo|text-sky|bg-indigo|#27272a|shadow-2xl/);
 
   assert.doesNotMatch(notificationToastSource, /import \{ useTheme \} from '\.\.\/\.\.\/context\/ThemeContext';/);

@@ -1,19 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
 import type { WorkflowNode } from '../../types';
-import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
+import { canvasLivePositionStore } from '../../app/canvasLivePositionStore';
+import { createWorkflowCardViewModel } from '../../canvas/v3/adapters.ts';
+import CanvasV3Card from '../../canvas/v3/CanvasV3Card.tsx';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
-import { canvasLivePositionStore } from '../../app/canvasLivePositionStore';
-import CanvasCardShell from '../../components/canvas/CanvasCardShell.tsx';
-import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
-
-const snapCanvasCoordinate = (value: number, scale: number = 1) => {
-  return Math.round(value * scale) / scale;
-};
 
 interface WorkflowUtilityCardProps<TNode extends UtilityCardNode = UtilityCardNode> {
   node: TNode;
@@ -34,246 +28,153 @@ interface WorkflowUtilityCardProps<TNode extends UtilityCardNode = UtilityCardNo
   onAction?: (node: TNode) => void;
 }
 
-const getWorkflowCardStackZIndex = (node: UtilityCardNode, isSelected: boolean) => {
-  const persistedOrder = (node.zIndex ?? 0) * 100;
-  if (isSelected) return persistedOrder + 20;
-  return persistedOrder + 10;
-};
+interface DragState {
+  originX: number;
+  originY: number;
+  startX: number;
+  startY: number;
+}
+
+const snapCanvasCoordinate = (value: number, scale = 1): number => (
+  Math.round(value * scale) / scale
+);
+
+const getStackZIndex = (node: UtilityCardNode, selected: boolean): number => (
+  elevateCanvasStackZIndex((node.zIndex ?? 0) * 100 + (selected ? 20 : 10), false)
+);
 
 const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   node,
   title,
   subtitle,
-  accentClassName,
   icon,
   actionLabel,
   infoRows = [],
   isSelected = false,
-  highlighted = false,
   zoomScale = 1,
   snapToGrid = false,
   onSelect,
   onBringToFront,
-  onDelete,
   onPositionChange,
   onAction,
 }: WorkflowUtilityCardProps<TNode>) => {
-  const width = node.width || 284;
-  const height = node.height || 176;
-  const dragStateRef = useRef<{
-    originX: number;
-    originY: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<DragState | null>(null);
   const pointerIdRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewModel = useMemo(() => createWorkflowCardViewModel({
+    ...node,
+    label: title,
+    data: { ...node.data, summary: subtitle },
+  }), [node, subtitle, title]);
+  const visibleRows = useMemo(() => infoRows.filter(Boolean).slice(0, 3), [infoRows]);
 
-  useEffect(() => {
-    const unsubscribe = canvasLivePositionStore.subscribe(node.id, (pos) => {
-      if (containerRef.current) {
-        if (pos) {
-          const renderLeft = snapCanvasCoordinate(pos.x - width / 2, zoomScale || 1);
-          const renderTop = snapCanvasCoordinate(pos.y - height, zoomScale || 1);
-          const originalLeft = node.position.x - width / 2;
-          const originalTop = node.position.y - height;
-          containerRef.current.style.transform = `translate3d(${renderLeft - originalLeft}px, ${renderTop - originalTop}px, 0px)`;
-        } else {
-          containerRef.current.style.transform = '';
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [node.id, width, height, zoomScale, node.position.x, node.position.y]);
+  const flushDrag = () => {
+    frameRef.current = null;
+    const drag = dragRef.current;
+    const pointer = latestPointerRef.current;
+    if (!drag || !pointer) return;
+    onPositionChange(node.id, snapCanvasPointToGrid({
+      x: drag.originX + (pointer.x - drag.startX) / Math.max(zoomScale, 0.1),
+      y: drag.originY + (pointer.y - drag.startY) / Math.max(zoomScale, 0.1),
+    }, { enabled: snapToGrid }));
+  };
 
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, []);
+  const scheduleDrag = (event: PointerEvent) => {
+    if (!dragRef.current || event.pointerId !== pointerIdRef.current) return;
+    latestPointerRef.current = { x: event.clientX, y: event.clientY };
+    if (frameRef.current === null) frameRef.current = window.requestAnimationFrame(flushDrag);
+  };
 
-  const handleDragEnd = () => {
-    dragStateRef.current = null;
+  const stopDrag = (event: PointerEvent) => {
+    if (event.pointerId !== pointerIdRef.current) return;
+    window.removeEventListener('pointermove', scheduleDrag);
+    window.removeEventListener('pointerup', stopDrag);
+    window.removeEventListener('pointercancel', stopDrag);
+    pointerIdRef.current = null;
+    dragRef.current = null;
     latestPointerRef.current = null;
     setIsDragging(false);
-    document.body.style.userSelect = '';
   };
 
-  const schedulePositionUpdate = () => {
-    if (rafRef.current !== null) return;
-
-    rafRef.current = window.requestAnimationFrame(() => {
-      rafRef.current = null;
-      const dragState = dragStateRef.current;
-      const pointer = latestPointerRef.current;
-      if (!dragState || !pointer) return;
-
-      const nextPosition = snapCanvasPointToGrid({
-        x: dragState.originX + (pointer.x - dragState.startX) / Math.max(zoomScale, 0.0001),
-        y: dragState.originY + (pointer.y - dragState.startY) / Math.max(zoomScale, 0.0001),
-      }, { enabled: snapToGrid });
-      onPositionChange(node.id, nextPosition);
-    });
-  };
-
-  const handleDragMove = (event: PointerEvent) => {
-    if (!dragStateRef.current) return;
-    if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) return;
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
-
-    latestPointerRef.current = { x: clientX as number, y: clientY as number };
-    schedulePositionUpdate();
-  };
-
-  const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('button')) return;
-
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
-
-    dragStateRef.current = {
+  const startDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerIdRef.current = event.pointerId;
+    dragRef.current = {
       originX: node.position.x,
       originY: node.position.y,
-      startX: clientX as number,
-      startY: clientY as number,
+      startX: event.clientX,
+      startY: event.clientY,
     };
-    pointerIdRef.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-
     onSelect?.();
     onBringToFront?.();
     setIsDragging(true);
-    document.body.style.userSelect = 'none';
-
-    window.addEventListener('pointermove', handleDragMove);
-    window.addEventListener('pointerup', handleWindowPointerUp);
-    window.addEventListener('pointercancel', handleWindowPointerUp);
+    window.addEventListener('pointermove', scheduleDrag);
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
   };
 
-  const handleWindowPointerUp = (event: PointerEvent) => {
-    if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) return;
-    window.removeEventListener('pointermove', handleDragMove);
-    window.removeEventListener('pointerup', handleWindowPointerUp);
-    window.removeEventListener('pointercancel', handleWindowPointerUp);
-    pointerIdRef.current = null;
-    handleDragEnd();
-  };
+  useEffect(() => {
+    const width = viewModel.width;
+    return canvasLivePositionStore.subscribe(node.id, (position) => {
+      if (!containerRef.current) return;
+      if (!position) {
+        containerRef.current.style.transform = '';
+        return;
+      }
+      const left = snapCanvasCoordinate(position.x - width / 2, zoomScale);
+      const top = snapCanvasCoordinate(position.y, zoomScale);
+      containerRef.current.style.transform = `translate3d(${left - (node.position.x - width / 2)}px, ${top - node.position.y}px, 0)`;
+    });
+  }, [node.id, node.position.x, node.position.y, viewModel.width, zoomScale]);
 
-  const contentRows = useMemo(
-    () => infoRows.filter((row): row is string => typeof row === 'string' && row.trim().length > 0).slice(0, 3),
-    [infoRows],
-  );
-  const stackZIndex = elevateCanvasStackZIndex(getWorkflowCardStackZIndex(node, isSelected), isDragging);
+  useEffect(() => () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    window.removeEventListener('pointermove', scheduleDrag);
+    window.removeEventListener('pointerup', stopDrag);
+    window.removeEventListener('pointercancel', stopDrag);
+  }, []);
 
   return (
-    <CanvasCardShell
-      ref={containerRef}
-      id={node.id}
-      domId={`workflow-card-${node.id}`}
-      position={node.position}
-      presentation={node.presentation || createCanvasCardPresentation('workflow-panel', 'column', 'standard')}
-      width={width}
-      height={height}
-      zIndex={stackZIndex}
-      selected={isSelected}
-      surface={false}
-      className={`rounded-lg border ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
+    <div
+      className="absolute pointer-events-auto"
       style={{
-        background: 'var(--frost-card-main-bg)',
-        borderColor: isSelected ? 'var(--accent-coral)' : 'var(--frost-card-main-border)',
-        boxShadow: isSelected
-          ? 'var(--frost-card-main-shadow)'
-          : getCanvasCardShadow({ accent: 'coral', boost: true, zoomScale }),
-        backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(160%)',
-        WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(160%)',
-      }}
-      onMouseDown={(event) => {
-        event.stopPropagation();
-        onSelect?.();
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect?.();
+        left: node.position.x - viewModel.width / 2,
+        top: node.position.y - 176,
+        width: viewModel.width,
+        zIndex: getStackZIndex(node, isSelected),
       }}
     >
-      <div
-        className="flex items-start justify-between gap-3 rounded-t-[22px] border-b px-4 py-3"
-        style={{ borderColor: 'var(--frost-card-main-border)' }}
-        onPointerDown={handleDragStart}
+      <CanvasV3Card
+        ref={containerRef}
+        viewModel={viewModel}
+        renderState={{ detailLevel: 'full', selected: isSelected, dragging: isDragging, mobile: false }}
+        onPointerDown={startDrag}
+        onAction={(action) => {
+          if (action.id === 'run' || action.id === 'open' || action.id === 'export') {
+            onAction?.(node);
+          }
+        }}
       >
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]">
-            {icon}
+        <div className="kk-canvas-v3-utility-card__content">
+          <div className="kk-canvas-v3-utility-card__lead">
+            <span className="kk-canvas-v3-utility-card__icon">{icon}</span>
+            <p>{subtitle}</p>
           </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</div>
-            <div className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{subtitle}</div>
-          </div>
+          {visibleRows.length > 0 && (
+            <ul>
+              {visibleRows.map((row) => <li key={row}>{row}</li>)}
+            </ul>
+          )}
+          {actionLabel && onAction && (
+            <button type="button" onClick={() => onAction(node)}>{actionLabel}</button>
+          )}
         </div>
-
-        <button
-          type="button"
-          className="rounded-xl p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-red-400"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete?.(node.id);
-          }}
-          aria-label="删除附加卡"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      <div className="space-y-3 px-4 py-4">
-        {contentRows.length > 0 && (
-          <div className="space-y-2">
-            {contentRows.map((row) => (
-              <div
-                key={row}
-                className="rounded-2xl border px-3 py-2 text-xs leading-5 text-[var(--text-secondary)]"
-                style={{
-                  borderColor: 'var(--frost-card-sub-border)',
-                  background: 'var(--frost-card-sub-bg)',
-                  boxShadow: 'var(--frost-card-sub-shadow)',
-                  backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(150%)',
-                  WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(150%)',
-                }}
-              >
-                {row}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {actionLabel && onAction && (
-          <button
-            type="button"
-            className="w-full rounded-2xl px-4 py-2.5 text-sm font-medium text-white transition-transform active:scale-[0.99]"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-coral) 0%, var(--clay-brand-peach) 100%)',
-              boxShadow: '0 10px 24px rgb(255 107 90 / 0.16)',
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              onAction(node);
-            }}
-          >
-            {actionLabel}
-          </button>
-        )}
-      </div>
-    </CanvasCardShell>
+      </CanvasV3Card>
+    </div>
   );
 };
 

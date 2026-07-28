@@ -5132,16 +5132,11 @@ const isRectIntersecting = (
   const showConnectorHitAreas = !simplifiedConnectorMode;
   const showConnectorButtons = !simplifiedConnectorMode && canvasPerformanceProfile.cardDetailLevel === 'full';
 
-  // Adaptive connector styles for zoomed canvas (keep dashed lines visible when zoomed out)
+  // Canvas V3 keeps connector weight stable in screen space through non-scaling strokes.
   const zoomForConnectors = Math.max(0.1, canvasTransform.scale || 1);
-  const connectorStroke = Math.max(1, Math.min(3, 1 / zoomForConnectors));
-  const connectorDashA = Math.max(2, Math.min(10, 4 / zoomForConnectors));
-  const connectorDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
-  const connectorStrokeDasharray = `${connectorDashA} ${connectorDashB}`;
+  const connectorStroke = 1;
   const connectorStrokeLinecap: 'butt' | 'round' = 'round';
-  const activeDragStroke = Math.max(2, Math.min(6, 3 / zoomForConnectors));
-  const activeDragDashA = Math.max(3, Math.min(12, 6 / zoomForConnectors));
-  const activeDragDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
+  const activeDragStroke = 1.5;
   const connectorHitStroke = Math.max(16, Math.min(40, 20 / zoomForConnectors));
   const connectorDotStart = Math.max(2, Math.min(4.5, 3 / zoomForConnectors));
   const connectorDotEnd = Math.max(1.5, Math.min(3.5, 2 / zoomForConnectors));
@@ -5819,9 +5814,8 @@ const isRectIntersecting = (
               id="active-drag-connector-path"
               d={`M${dragConnection.startPos.x},${dragConnection.startPos.y} L${dragConnection.currentPos.x},${dragConnection.currentPos.y}`}
               fill="none"
-              stroke="#6366f1"
+              stroke="var(--kk-morphic-action)"
               strokeWidth={activeDragStroke}
-              strokeDasharray={`${activeDragDashA} ${activeDragDashB}`}
               vectorEffect="non-scaling-stroke"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -5863,8 +5857,8 @@ const isRectIntersecting = (
             /* Follow-up connector colors mirror the active generation mode. */
             const isRedrawMode = pn.mode === GenerationMode.REDRAW || pn.mode === GenerationMode.INPAINT;
             if (!isRedrawMode) return null; // 简体中文：追问功能已删除，不再显示非重绘模式下的黄色虚线连线
-            const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
-            const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
+            const baseColor = 'rgba(255, 255, 255, 0.18)';
+            const hoverClass = 'group-hover:stroke-[var(--kk-morphic-action)]';
 
             return (
               <g key={`followup-${pn.id}`} className={showConnectorButtons ? 'group' : undefined}>
@@ -5874,7 +5868,6 @@ const isRectIntersecting = (
                   fill="none"
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
-                  strokeDasharray={connectorStrokeDasharray}
                   vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
                   strokeLinejoin="round"
@@ -5937,8 +5930,8 @@ const isRectIntersecting = (
             /* Pending connection colors follow the active generation mode. */
             const isRedrawMode = config.mode === GenerationMode.REDRAW || config.mode === GenerationMode.INPAINT;
             if (!isRedrawMode) return null; // 简体中文：追问功能已删除，不再显示非重绘模式下的黄色虚线连线
-            const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
-            const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
+            const baseColor = 'rgba(255, 255, 255, 0.18)';
+            const hoverClass = 'group-hover:stroke-[var(--kk-morphic-action)]';
 
             return (
               <g key="pending-connection" className={showConnectorButtons ? 'group' : undefined}>
@@ -5947,7 +5940,6 @@ const isRectIntersecting = (
                   fill="none"
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
-                  strokeDasharray={connectorStrokeDasharray}
                   vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
                   strokeLinejoin="round"
@@ -6005,11 +5997,7 @@ const isRectIntersecting = (
             const endX = targetPosition.x;
             const endY = targetPosition.y - targetHeight;
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
-            const strokeColor = targetNode.kind === 'preview'
-              ? '#38bdf8'
-              : targetNode.kind === 'save'
-                ? '#34d399'
-                : '#f59e0b';
+            const strokeColor = 'rgba(255, 255, 255, 0.18)';
 
             const midPoint = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
             const btnX = midPoint.x;
@@ -6023,7 +6011,6 @@ const isRectIntersecting = (
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={connectorStroke}
-                  strokeDasharray={connectorStrokeDasharray}
                   vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
                   strokeLinejoin="round"

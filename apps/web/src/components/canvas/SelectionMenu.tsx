@@ -107,22 +107,22 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
                 {getSelectionLabel()}
             </div>
 
-            <button onClick={onGroup} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="pink" title="分组 (Group)">
+            <button onClick={onGroup} className="kk-canvas-selection-menu-item rounded-lg" data-tone="pink" title="分组 (Group)">
                 <Group size={18} />
             </button>
 
-            <button onClick={onTag} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="teal" title="添加标签 (Tag)">
+            <button onClick={onTag} className="kk-canvas-selection-menu-item rounded-lg" data-tone="teal" title="添加标签 (Tag)">
                 <Tag size={18} />
             </button>
 
             {onFavorite && (
-                <button onClick={onFavorite} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="pink" title={isAllFavorite ? "取消收藏 (Unfavorite)" : "添加收藏 (Favorite)"}>
+                <button onClick={onFavorite} className="kk-canvas-selection-menu-item rounded-lg" data-tone="pink" title={isAllFavorite ? "取消收藏 (Unfavorite)" : "添加收藏 (Favorite)"}>
                     <Heart size={18} fill={isAllFavorite ? 'currentColor' : 'none'} style={{ color: isAllFavorite ? 'var(--accent-coral)' : undefined }} />
                 </button>
             )}
 
             {onMigrate && (
-                <button onClick={onMigrate} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="ochre" title="迁移到其他项目 (Migrate)">
+                <button onClick={onMigrate} className="kk-canvas-selection-menu-item rounded-lg" data-tone="ochre" title="迁移到其他项目 (Migrate)">
                     <FolderOutput size={18} />
                 </button>
             )}
@@ -131,7 +131,7 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
                 <div className="relative">
                     <button
                         onClick={() => canArrange && setShowArrangeMenu(!showArrangeMenu)}
-                        className={`kk-canvas-selection-menu-item rounded-lg haptic-press ${canArrange ? 'cursor-pointer' : 'cursor-not-allowed opacity-35'}`}
+                        className={`kk-canvas-selection-menu-item rounded-lg ${canArrange ? 'cursor-pointer' : 'cursor-not-allowed opacity-35'}`}
                         data-tone="lavender"
                         title={canArrange ? "整理选中项 (Arrange)" : "框选 2 个以上项目或单 Prompt 拥有子图方可整理"}
                         disabled={!canArrange}
@@ -168,9 +168,9 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
                 </div>
             )}
 
-            <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--frost-card-sub-border)' }} />
+            <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--kk-morphic-border)' }} />
 
-            <button onClick={onDelete} className="kk-canvas-selection-menu-item rounded-lg haptic-press" data-tone="coral" title="删除选中 (Delete)">
+            <button onClick={onDelete} className="kk-canvas-selection-menu-item rounded-lg" data-tone="coral" title="删除选中 (Delete)">
                 <Trash2 size={18} />
             </button>
         </div>

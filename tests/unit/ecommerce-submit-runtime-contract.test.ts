@@ -37,14 +37,14 @@ test('ecommerce submit runtime owns the ecommerce submit branch in handleGenerat
   assert.doesNotMatch(dependencyList, /ecommerceState\.analysis/);
 });
 
-test('ecommerce optimization contract for 1128px width, 600x450 aspect sizing and mobile resolution normalization', () => {
+test('ecommerce optimization contract for 420px task cards, 600x450 aspect sizing and mobile resolution normalization', () => {
   const cardWidthSource = readSource('apps/web/src/utils/promptNodeCardWidth.ts');
   const autoArrangeSource = readSource('apps/web/src/context/canvasAutoArrange.ts');
   const renderTaskBuilderSource = readSource('apps/web/src/services/ecommerce/renderTaskBuilder.ts');
   const exportRuntimeSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
 
-  // 1. 验证 1128px 共享宽度契约
-  assert.match(cardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 1128;/);
+  // Canvas V3 keeps the framework task in the shared wide-card geometry.
+  assert.match(cardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 420;/);
   assert.match(autoArrangeSource, /import \{ ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH \} from '\.\.\/utils\/promptNodeCardWidth\.ts';/);
   assert.match(autoArrangeSource, /ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH/);
 

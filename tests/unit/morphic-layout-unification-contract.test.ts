@@ -5,14 +5,25 @@ import { readSource } from '../support/workspacePaths.js';
 
 test('canvas selection actions avoid card content and keep a mobile safe-area fallback', () => {
   const overlaySource = readSource('apps/web/src/app/useSelectionMenuOverlay.ts');
+  const edgeGeometrySource = readSource('apps/web/src/canvas/v3/edgeGeometry.ts');
   const menuSource = readSource('apps/web/src/components/canvas/SelectionMenu.tsx');
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
 
-  assert.match(overlaySource, /shiftScreenRectRightPastBlocks/);
-  assert.match(overlaySource, /rightCandidates[\s\S]*elevatedCenterY[\s\S]*loweredCenterY/);
-  assert.match(overlaySource, /resolvedRightCandidate/);
-  assert.match(overlaySource, /if\s*\(canUseLeft\)/);
-  assert.match(overlaySource, /clampedRightCandidateLeft/);
+  assert.match(overlaySource, /resolveCanvasV3ToolbarPlacement/);
+  assert.doesNotMatch(overlaySource, /shiftScreenRectRightPastBlocks/);
+  assert.match(edgeGeometrySource, /const shiftRightPastBlockedRects/);
+  assert.match(
+    edgeGeometrySource,
+    /const candidates = \[[\s\S]*card\.right \+ TOOLBAR_GAP,[\s\S]*centerY[\s\S]*card\.top[\s\S]*card\.bottom - toolbar\.height[\s\S]*card\.left - TOOLBAR_GAP - toolbar\.width/,
+  );
+  assert.match(
+    edgeGeometrySource,
+    /candidates\.find\(\(\{ rect \}\) => inside\(rect, viewport\) && !blocked\.some/,
+  );
+  assert.match(
+    edgeGeometrySource,
+    /Math\.max\(viewport\.left \+ TOOLBAR_GAP,[\s\S]*Math\.min\(card\.right \+ TOOLBAR_GAP/,
+  );
   assert.match(overlaySource, /if\s*\(isMobile\)[\s\S]*placement:\s*'bottom'/);
   assert.match(menuSource, /data-placement=\{placement\}/);
   assert.doesNotMatch(menuSource, /translate\(-50%, -100%\)/);
@@ -22,7 +33,7 @@ test('canvas selection actions avoid card content and keep a mobile safe-area fa
   );
   assert.match(
     cssSource,
-    /@media\s*\(max-width:\s*768px\)[\s\S]*\.kk-canvas-selection-menu\[data-placement='bottom'\]\s*\{[\s\S]*safe-area-inset-bottom/,
+    /@media\s*\(max-width:\s*1023px\)[\s\S]*\.kk-canvas-selection-menu\[data-placement='bottom'\]\s*\{[\s\S]*safe-area-inset-bottom/,
   );
 });
 

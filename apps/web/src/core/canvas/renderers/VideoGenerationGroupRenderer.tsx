@@ -137,7 +137,6 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
     connectorLayerZIndex,
     promptCardZIndex,
     groupConnectorStroke,
-    groupConnectorDash,
     connectorSvgLeft,
     connectorSvgTop,
     connectorSvgWidth,
@@ -189,9 +188,8 @@ export const VideoGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
                   key={segment.key}
                   d={segment.path}
                   fill="none"
-                  stroke="var(--connector-color, #6366f1)"
+                  stroke={isGroupFocused ? 'var(--kk-morphic-action)' : 'rgba(255, 255, 255, 0.18)'}
                   strokeWidth={groupConnectorStroke}
-                  strokeDasharray={groupConnectorDash}
                   vectorEffect="non-scaling-stroke"
                   strokeLinecap="round"
                   strokeLinejoin="round"

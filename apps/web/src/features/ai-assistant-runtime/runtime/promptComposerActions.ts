@@ -57,6 +57,14 @@ export const PROMPT_COMPOSER_ACTIONS = {
     uiAction: 'prompt-composer-toggle-mode',
     toolName: undefined,
   },
+  openWorkflowBrowser: {
+    uiAction: 'prompt-composer-open-workflow-browser',
+    toolName: undefined,
+  },
+  toggleComposerTools: {
+    uiAction: 'prompt-composer-toggle-tools',
+    toolName: undefined,
+  },
   selectMobileMode: {
     uiAction: 'prompt-composer-select-mobile-mode',
     toolName: undefined,

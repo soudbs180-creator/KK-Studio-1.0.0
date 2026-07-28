@@ -1715,3 +1715,57 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 当前卡片和连接仍属于旧渲染系统；下一阶段按已批准计划新增 UI-only Canvas V3 ViewModel、内容自适应卡片与唯一实线 Edge Layer。
 - 手机端当前仍默认结果流；后续会新增明确的“画布”主入口和 Bottom Sheet Inspector，而不是把桌面浮层直接缩小。
+
+---
+
+## 245. 2026-07-29 - feat(ui): 完成双参考 Canvas V3 与移动触控画布
+
+**修改范围**
+- 以 Morphic 的产品外壳、控件密度、Composer、面板与短动效为主线，收口桌面工作区的信息架构与重复入口。
+- 新增 UI-only Canvas V3 ViewModel、语义卡片、内容自适应布局、LOD 和共享选择工具条碰撞算法；保持现有 Canvas DTO、持久化、生成与 Agent 契约不变。
+- 将画布连接统一为细腻实线曲线；移动画布使用单一 Edge Layer，桌面业务分组复用相同的连接几何与状态样式。
+- 新增“创作 / 画布 / Copilot / 资源”移动主导航、触控平移/拖卡/双指缩放、显式连接模式、Bottom Sheet Inspector 和可折叠 Composer。
+- 将创作类型收纳为单一选择器，把工作流与工具集中到 Composer 上方，并将提示词优化移入工具层；项目侧栏只保留项目、搜索与收藏。
+
+**修改文件**
+- `apps/web/src/canvas/v3/`
+- `apps/web/src/styles/canvas-v3.css`
+- `apps/web/src/styles/morphic-ui.css`
+- `apps/web/src/components/canvas/`
+- `apps/web/src/components/mobile/`
+- `apps/web/src/components/layout/prompt-bar/`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/core/canvas/renderers/`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `packages/ui/src/core/layout.ts`
+- `packages/ui/src/core/tokens.ts`
+- `tests/unit/canvas-v3-*.test.ts`
+- `tests/unit/mobile-canvas-v3-contract.test.ts`
+- `scripts/test/verify-prompt-group-drag.mjs`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Canvas 卡片使用 280 / 320 / 420px 三档、14px 圆角、36px Header/Footer 和内容决定高度；电商任务不再渲染 1128px 巨型卡。
+2. 默认边为约 1px 屏幕空间实线贝塞尔曲线，选中边为 1.5px；端口视觉 6px、鼠标命中 20px、触控命中 44px。
+3. 选择工具条按右侧、右上、右下、左侧、视口钳制顺序放置；手机端使用 Inspector Sheet，不缩小桌面工具条。
+4. 桌面 Composer 保持 570×94px 空状态并向上生长；创作类型、工作流和工具各保留一个入口，主题切换不再占用工作区。
+5. 手机默认进入结果优先的“创作”，同时提供同路由专业“画布”；平板使用完整卡片比例，手机使用紧凑 LOD。
+6. 移动画布使用 Pointer 事件和 rAF 更新实时变换；手势结束后才写回节点位置，减少拖动期间 React 全页重渲染。
+
+**已运行验证**
+- Canvas V3、移动画布和 Morphic 专项契约全部通过；全量 unit 为 2272 通过 / 0 失败 / 2 跳过。
+- `npm run verify:changes` 完整通过：`architecture:check`、`governance:check`、`typecheck`、生产 `build`、Local Runner、integration、contract、E2E、OpenAPI 和编码检查全部通过；Vite 构建 2582 modules。
+- Prompt Group Drag 浏览器验证通过，拖动后连接端点误差约 0.56px；连接跟随节点且无虚线回退。
+- 移动设置、桌面设置、AI Takeover、启动横向居中 Smoke 和 Canvas performance 3/3 全部通过。
+- 本地浏览器实测 375、390、430、768、834px 均无横向溢出；834×1112 平板画布使用完整比例，四个移动主入口均保留至少 44px 触控高度。
+- 1280×720 桌面实测项目面板、卡片、Composer 与视图工具无重叠；页面横向溢出为 0，实线连接为 1、虚线连接为 0。
+- `design-qa.md` 的 P0/P1/P2 全部清零，`final result: passed`。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围为本地实现、本地预览、真实浏览器操作检查与本地 Git Commit。
+
+**风险与下一步**
+- 桌面 Prompt/Image/Video 仍按业务语义保留不同 Renderer，但已共享卡片几何、实线边样式与选择工具条算法；后续面向超大画布时可继续将桌面普通边完全汇聚到同一个 Canvas2D 绘制层。
+- 真实媒体生成仍依赖登录、额度和 Provider，本轮只验证 UI、数据流适配、画布交互与现有业务回调，没有更改生产凭据或计费契约。

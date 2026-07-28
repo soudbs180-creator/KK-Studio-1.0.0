@@ -3,7 +3,7 @@ import { getCanvasCardWidth } from '../canvas/canvasCardMetrics.ts';
 
 export const DEFAULT_PROMPT_CARD_WIDTH = 320;
 export const PROMPT_NODE_BOUNDS_WIDTH = 380;
-export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 1128;
+export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 420;
 
 export function isEcommerceFrameworkPromptNode(node: Pick<PromptNode, 'mode' | 'ecommerce'>): boolean {
   return node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';

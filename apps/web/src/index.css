@@ -2,5 +2,5 @@
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/canvas.css";
+@import "./styles/canvas-v3.css";
 @import "./styles/vendor-overrides.css";
-

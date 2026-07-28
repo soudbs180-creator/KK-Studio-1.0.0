@@ -45,7 +45,7 @@ test('ecommerce framework prompt width is shared with canvas layout bounds', () 
   const canvasAutoArrangeSource = readSource('apps/web/src/context/canvasAutoArrange.ts');
   const appSource = readSource('apps/web/src/App.tsx');
 
-  assert.match(promptNodeCardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 1128;/);
+  assert.match(promptNodeCardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 420;/);
   assert.match(promptNodeCardWidthSource, /export function getPromptNodeBoundsWidth/);
   assert.match(canvasAutoArrangeSource, /ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH/);
   assert.doesNotMatch(canvasAutoArrangeSource, /ECOMMERCE_FRAMEWORK_PROMPT_WIDTH = 920/);

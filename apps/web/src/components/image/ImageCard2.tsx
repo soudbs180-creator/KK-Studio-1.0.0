@@ -30,6 +30,7 @@ import { CanvasMeasurementScheduler } from '../../canvas/CanvasMeasurementSchedu
 import { CanvasConnectorScheduler } from '../../canvas/CanvasConnectorScheduler';
 import CanvasCardShell from '../canvas/CanvasCardShell.tsx';
 import { createCanvasCardPresentation } from '../../context/canvasPresentationMigration.ts';
+import { createImageCardViewModel } from '../../canvas/v3/adapters.ts';
 
 const dominantColorCache = new Map<string, string>();
 
@@ -295,6 +296,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return { w: finalWidth, h: finalHeight };
     };
     const { w: nodeWidth, h: nodeHeight } = getDims();
+    const canvasV3ViewModel = useMemo(
+        () => createImageCardViewModel({ ...image, position }),
+        [image, position],
+    );
     const [cardHeight, setCardHeight] = useState(nodeHeight);
     const [footerDensity, setFooterDensity] = useState<FooterDensity>(nodeWidth < 260 ? 'compact' : 'normal');
     const originX = renderOrigin?.x ?? 0;
@@ -1541,7 +1546,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 <div
                     ref={cardSurfaceRef}
                     data-canvas-surface="image"
-                    className="relative w-full overflow-hidden rounded-[20px] border flex flex-col"
+                    data-card-v3-kind={canvasV3ViewModel.kind}
+                    data-card-v3-status={canvasV3ViewModel.status}
+                    data-selected={isSelected || undefined}
+                    className="kk-canvas-v3-adapted-card relative w-full overflow-hidden rounded-[20px] border flex flex-col"
                     style={{
                         backgroundColor: 'var(--frost-card-main-bg)',
                         borderColor: cardBorderColor,
@@ -1713,8 +1721,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 <div
                     ref={cardSurfaceRef}
                     data-canvas-surface="image"
+                    data-card-v3-kind={canvasV3ViewModel.kind}
+                    data-card-v3-status={canvasV3ViewModel.status}
+                    data-selected={isSelected || undefined}
                     className={`
-                        relative w-full overflow-hidden flex flex-col
+                        kk-canvas-v3-adapted-card relative w-full overflow-hidden flex flex-col
                         border
                         ${isDragging ? '' : 'transition-shadow'}
                     `}
@@ -2065,10 +2076,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         <div className="h-1"></div>
 
                         {/* 下模块：信息模块（完整圆角 + 边框 + 背景色） */}
-                        <div className="w-full overflow-hidden bg-[var(--bg-elevated)] rounded-lg border border-[var(--border-light)]">
+                        <div className="kk-canvas-v3-media-footer w-full overflow-hidden bg-[var(--bg-elevated)] rounded-lg border border-[var(--border-light)]">
                             {/* Footer - 根据卡片类型显示不同布局 */}
                             <div
-                                className="px-2 py-2 flex flex-col gap-1 relative z-10 box-border cursor-pointer"
+                                className="kk-canvas-v3-media-footer__content px-2 py-2 flex flex-col gap-1 relative z-10 box-border cursor-pointer"
                                 style={{
                                     backgroundColor: 'transparent',
                                     minHeight: image.orphaned ? '32px' : (image.isGenerating ? '32px' : 'auto')
@@ -2080,7 +2091,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                             >
                                 {/* 状态1: 孤独副卡（从外面拖入的图片）- 只有一层 */}
                                 {image.orphaned && (
-                                    <div className="flex items-center justify-between h-5" style={secondaryTextRenderStyle}>
+                                    <div className="kk-canvas-v3-media-footer__primary flex items-center justify-between h-5" style={secondaryTextRenderStyle}>
                                         {/* 左侧：文档名 + 像素尺寸 */}
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
                                             {isEditingAlias ? (
@@ -2126,7 +2137,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                 {/* 状态2: 生成过程中 - 只有一层，居中显示 */}
                                 {!image.orphaned && image.isGenerating && (
-                                    <div className={joinClasses('flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')} style={secondaryTextRenderStyle}>
+                                    <div className={joinClasses('kk-canvas-v3-media-footer__primary flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')} style={secondaryTextRenderStyle}>
                                         <div className={joinClasses(`flex items-center gap-1 rounded-lg border min-w-0 ${isCreditModel ? getModelThemeBgColor(image.model || '') : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`, generatingBadgeMaxWidthClass, capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
                                             <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'kk-image-card-credit-text' : modelBadge.colorClass}`)} title={modelText || 'AI'}>
                                                 {truncateByChars(modelText || 'AI', 15)}
@@ -2171,7 +2182,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 {!image.orphaned && !image.isGenerating && (
                                     <>
                                         {/* 第一层：模型/供应商 + 参数/操作 */}
-                                        <div ref={topMetaRowRef} className={joinClasses('flex items-center justify-between w-full min-h-[20px] overflow-hidden', metaRowGapClass)} style={secondaryTextRenderStyle}>
+                                        <div ref={topMetaRowRef} className={joinClasses('kk-canvas-v3-media-footer__primary flex items-center justify-between w-full min-h-[20px] overflow-hidden', metaRowGapClass)} style={secondaryTextRenderStyle}>
                                             {/* 左侧：模型名 + 供应商（积分模型不显示供应商） */}
                                             <div className={joinClasses('min-w-0 flex items-center overflow-hidden', metaLeftGapClass)}>
                                                 {(() => {
@@ -2266,7 +2277,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         </div>
 
                                         {/* 分隔细线 */}
-                                        <div className="w-full h-px bg-[var(--border-light)] my-1"></div>
+                                        <div className="kk-canvas-v3-media-footer__separator w-full h-px bg-[var(--border-light)] my-1"></div>
 
                                         {/* 第二层：耗时/费用 */}
                                         <div
@@ -2278,7 +2289,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     showTokenInfo ? `词元 ${displayTokens}` : null,
                                                     hasResolvedDisplayCost ? `\u8d39\u7528 $${displayCost.toFixed(4)}` : '\u8d39\u7528 \u672a\u83b7\u53d6',
                                                 ].filter(Boolean).join(' | ')}
-                                            className={joinClasses('flex items-center justify-center leading-none text-[var(--text-secondary)] relative group/info overflow-hidden whitespace-nowrap', footerInfoGapClass, isTightFooter ? 'h-[18px]' : 'h-5', footerInfoTextClass)}
+                                            className={joinClasses('kk-canvas-v3-media-footer__secondary flex items-center justify-center leading-none text-[var(--text-secondary)] relative group/info overflow-hidden whitespace-nowrap', footerInfoGapClass, isTightFooter ? 'h-[18px]' : 'h-5', footerInfoTextClass)}
                                             style={primaryTextRenderStyle}
                                         >
                                             {image.generationTime ? (
@@ -2309,7 +2320,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                         {/* 第三层：标签（如果有），最多4个，每个最多6个字 */}
                                         {image.tags && image.tags.length > 0 && (
-                                            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5" style={secondaryTextRenderStyle}>
+                                            <div className="kk-canvas-v3-media-footer__tags flex items-center justify-center gap-1.5 flex-wrap pt-0.5" style={secondaryTextRenderStyle}>
                                                 {image.tags.slice(0, 4).map(tag => {
                                                     const colors = generateTagColor(tag);
                                                     // 截断超过6个字的标签

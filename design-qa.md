@@ -116,3 +116,63 @@ No new P0, P1 or P2 finding remains after the second same-viewport comparison.
 No new P0, P1 or P2 finding remains after the workflow-browser comparison.
 
 final result: passed
+
+## Canvas V3 fusion pass — 2026-07-29
+
+### Scope
+
+- Morphic shell: top bar, project panel, Composer, compact controls, dark surface hierarchy and motion.
+- Tapnow-inspired canvas behavior: content-fit node cards, solid connections, right-side collision-aware selection toolbar and touch canvas.
+- Mobile navigation: Create / Canvas / Copilot / Assets with account access in the top avatar.
+
+### Measured desktop geometry
+
+| Element | Measured at 1280×720 | Result |
+|---|---:|---|
+| Canvas Composer | `570×94 @ (355,616)`, bottom `10px` | passed |
+| Project rail | `30×112 @ (282,304)` while 262px project panel is open | passed |
+| Canvas view tools | `144×32 @ (960,678)` | passed |
+| Zoom tools | `156×32 @ (1112,678)` | passed |
+| Gap between view and zoom tools | `8px` | passed |
+| Content-fit Prompt after Fit All | `278×113` at 87% canvas zoom | passed |
+| Content-fit Save card after Fit All | `278×205` at 87% canvas zoom | passed |
+
+The Fit All action places both current cards above the Composer with zero intersection area. Canvas controls are no longer mixed into the project rail.
+
+### Canvas V3 findings and resolutions
+
+| Priority | Finding | Resolution |
+|---|---|---|
+| P1 | Prompt/Image Workflow mirrors produced duplicate mobile cards | Workflow renderer now excludes mirror `prompt` and `image` nodes |
+| P1 | Mobile Fit All made card copy unreadably small | Initial phone focus uses 0.72 readable scale; tablet uses 1.0; overview remains explicit |
+| P1 | Selection toolbar maintained a parallel collision algorithm | Desktop overlay now consumes `resolveCanvasV3ToolbarPlacement` |
+| P1 | Neighbor cards could cover the right-side toolbar | Right candidates shift past blocked card rectangles before viewport validation |
+| P1 | Mobile task-center rail overlapped the Inspector | Collapsed rail moved below the top Chrome |
+| P2 | Selection menu retained press-scale and Frost divider behavior | Removed `haptic-press` and switched the divider to the shared Morphic border |
+| P2 | Project, view and generation controls were duplicated | Project rail now contains project/search/favorites only; view controls are a separate right-bottom group |
+
+### Mobile viewport verification
+
+| Viewport | Document overflow | Prompt initial position | Composer-to-nav gap | Result |
+|---:|---:|---:|---:|---|
+| 375×812 | `0px` | `230×85 @ (14,92)` | `10px` | passed |
+| 390×844 | `0px` | `230×85 @ (14,92)` | `10px` | passed |
+| 430×932 | `0px` | `230×85 @ (14,92)` | `10px` | passed |
+| 768×1024 | `0px` | touch canvas active | `10px` | passed |
+| 834×1112 | `0px` | tablet canvas active | `10px` | passed |
+
+At 390×844 the selected-card Inspector measured `374×127 @ (8,647)` and ended at `774px`; the Bottom Navigation started at `782px`, leaving an 8px separation and zero overlap.
+
+### Interaction verification
+
+- The single creative-type trigger exposes the five existing KK Studio generation modes in a content-fit listbox.
+- Prompt optimization is contained in the Tools menu; Workflow opens the existing workflow browser.
+- Mobile Canvas uses real persisted Prompt, Image and Workflow data.
+- Card dragging writes through the existing Prompt/Image/Workflow position APIs.
+- Empty-space pan, two-pointer pinch/translate, explicit connection mode, fit, zoom, selection and Inspector close were retained in one touch surface.
+- Normal edges render in one Canvas2D layer; selected/running edges use the SVG overlay and retain non-scaling strokes.
+- Reduced Motion disables the optional moving edge bead and nonessential UI animation.
+
+All new P0, P1 and P2 findings are resolved. No backend, billing, auth, Provider, Agent ToolRegistry, Canvas DTO or database contract changed.
+
+final result: passed

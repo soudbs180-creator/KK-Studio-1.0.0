@@ -20,9 +20,9 @@ test("generated batch layout keeps the existing default desktop grid geometry", 
   });
 
   assert.deepEqual(positions, [
-    { x: 346, y: 743 },
-    { x: 654, y: 743 },
-    { x: 500, y: 1142 },
+    { x: 346, y: 696 },
+    { x: 654, y: 696 },
+    { x: 500, y: 1040 },
   ]);
 });
 
@@ -40,17 +40,17 @@ test("docked regroup layout keeps child cards under the parent with a compact do
   assert.deepEqual(
     layouts.map((layout) => layout.dockedPosition),
     [
-      { x: 348, y: 719 },
-      { x: 652, y: 719 },
-      { x: 500, y: 1106 },
+      { x: 348, y: 672 },
+      { x: 652, y: 672 },
+      { x: 500, y: 1012 },
     ],
   );
   assert.deepEqual(
     layouts.map((layout) => layout.settledPosition),
     [
-      { x: 344, y: 719 },
-      { x: 656, y: 719 },
-      { x: 500, y: 1114 },
+      { x: 344, y: 672 },
+      { x: 656, y: 672 },
+      { x: 500, y: 1020 },
     ],
   );
   assert.deepEqual(
@@ -93,10 +93,10 @@ test("docked regroup layout supports fast-then-slow interpolation from caller-pr
   })[0];
 
   assert.deepEqual(initialLayout.position, { x: 100, y: 100 });
-  assert.deepEqual(initialLayout.dockedPosition, { x: 500, y: 719 });
-  assert.deepEqual(initialLayout.settledPosition, { x: 500, y: 719 });
-  assert.deepEqual(halfwayToDock.position, { x: 300, y: 409.5 });
+  assert.deepEqual(initialLayout.dockedPosition, { x: 500, y: 672 });
+  assert.deepEqual(initialLayout.settledPosition, { x: 500, y: 672 });
+  assert.deepEqual(halfwayToDock.position, { x: 300, y: 386 });
   assert.deepEqual(dockedLayout.position, dockedLayout.dockedPosition);
-  assert.deepEqual(halfwayToSettled.position, { x: 500, y: 719 });
+  assert.deepEqual(halfwayToSettled.position, { x: 500, y: 672 });
   assert.deepEqual(settledLayout.position, settledLayout.settledPosition);
 });

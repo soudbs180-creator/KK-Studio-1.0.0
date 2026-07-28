@@ -33,6 +33,19 @@ export const KK_LAYOUT = {
     selectionToolbarViewportInset: 12,
     selectionToolbarEstimatedHalfHeight: 26,
     selectionToolbarMobileBottom: 72,
+    canvasCardWidths: {
+      compact: 280,
+      standard: 320,
+      wide: 420,
+    },
+    canvasCardHeaderHeight: 36,
+    canvasCardFooterHeight: 36,
+    canvasCardRadius: 14,
+    canvasPortVisibleSize: 6,
+    canvasPortHitSize: 20,
+    canvasPortMobileHitSize: 44,
+    canvasEdgeWidth: 1,
+    canvasEdgeSelectedWidth: 1.5,
     composerMaxWidth: 570,
     composerBottom: 10,
     dialogWidth: 412,
@@ -45,6 +58,7 @@ export const KK_LAYOUT = {
     mobileDrawerMaxWidth: 320,
     mobileDrawerViewportWidth: 88,
     mobileComposerInset: 8,
+    mobileInspectorMaxHeight: 560,
   },
 } as const;
 

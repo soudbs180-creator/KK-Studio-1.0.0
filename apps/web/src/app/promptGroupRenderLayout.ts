@@ -47,7 +47,6 @@ export function buildPromptGroupRenderLayout({
   groupStackZIndex,
   focusedGroupId,
   generatingGroupIds,
-  canvasScale,
   layoutMode,
   promptGroupLayoutState,
   regroupLayoutsById,
@@ -60,10 +59,7 @@ export function buildPromptGroupRenderLayout({
   const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
   const isGeneratingGroup = generatingGroupIds.includes(node.id);
   const promptDetailLevel: CanvasCardDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
-  const groupConnectorZoom = Math.max(canvasScale || 1, 0.5);
-  const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
-  const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
-  const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
+  const groupConnectorStroke = isGroupFocused ? 1.5 : 1;
   const promptCardZIndex = groupStackZIndex + 20;
   const connectorLayerZIndex = -10; // 简体中文：将组内连接线 zIndex 固定为 -10，确保其沉在卡片最下方，不遮挡视线
   const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
@@ -143,7 +139,6 @@ export function buildPromptGroupRenderLayout({
     connectorLayerZIndex,
     promptCardZIndex,
     groupConnectorStroke,
-    groupConnectorDash: `${groupConnectorDashLength} ${groupConnectorGapLength}`,
     connectorSvgLeft,
     connectorSvgTop,
     connectorSvgWidth,

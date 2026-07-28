@@ -49,7 +49,7 @@ test('desktop canvas toolbar exposes a dedicated snap toggle wired to card drags
   assert.match(projectManagerSource, /showSnapToGrid\?: boolean;/);
   assert.match(projectManagerSource, /onToggleSnapToGrid: \(\) => void;/);
   assert.match(projectManagerSource, /data-testid="canvas-snap-to-grid-toggle"/);
-  assert.match(projectManagerSource, /<Magnet size=\{20\} \/>/);
+  assert.match(projectManagerSource, /<Magnet size=\{16\} \/>/);
 
   assert.match(promptCardSource, /snapToGrid\?: boolean;/);
   assert.match(promptCardSource, /snapCanvasPointToGrid\(/);
@@ -57,7 +57,10 @@ test('desktop canvas toolbar exposes a dedicated snap toggle wired to card drags
   assert.match(imageCardSource, /snapCanvasPointToGrid\(/);
   assert.match(workflowCardSource, /snapToGrid\?: boolean;/);
   assert.match(workflowCardSource, /snapCanvasPointToGrid\(/);
-  assert.match(workflowCardSource, /onPositionChange\(node\.id, nextPosition\);/);
+  assert.match(
+    workflowCardSource,
+    /onPositionChange\(node\.id,\s*snapCanvasPointToGrid\(\{/,
+  );
   assert.doesNotMatch(workflowCardSource, /snapCanvasCoordinate\(nextPosition\.x, zoomScale\)/);
   assert.doesNotMatch(workflowCardSource, /snapCanvasCoordinate\(nextPosition\.y, zoomScale\)/);
 

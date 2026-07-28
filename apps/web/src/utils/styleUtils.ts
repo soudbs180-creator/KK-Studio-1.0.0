@@ -29,7 +29,7 @@ export const CARD_WIDTHS = {
     PORTRAIT: 240, // Increased from 200 for better text fit
 };
 
-export const FOOTER_HEIGHT = 83; // Standard footer height for Image Cards
+export const FOOTER_HEIGHT = 36; // Canvas V3 keeps result metadata in one compact footer row.
 
 /**
  * Returns the dimensions for a card based on aspect ratio.

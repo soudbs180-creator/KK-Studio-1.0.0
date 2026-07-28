@@ -8,10 +8,8 @@ import {
     LayoutDashboard,
     Magnet,
     Maximize2,
-    Moon,
     Search,
     Square,
-    Sun,
     Trash2,
     Palette,
     Network,
@@ -50,7 +48,6 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
     </svg>
 );
 
-import { useTheme } from '../../context/ThemeContext';
 import { notify } from '../../services/system/notificationService';
 import type { WorkflowUtilityNodeKind } from '../../workflow/schema';
 import type { WorkflowTemplateDefinition, WorkflowTemplateId } from '../../workflow/templates/workflowTemplates';
@@ -59,6 +56,7 @@ import {
     SETTINGS_MODAL_PANEL_CLASSNAME,
 } from './SettingsScaffold';
 import { PROJECT_MANAGER_ACTIONS } from './settingsModuleActions';
+import { KK_OPEN_WORKFLOW_BROWSER_EVENT } from '../layout/prompt-bar/composerEvents';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -134,21 +132,15 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         mergeCanvasInto,
         cleanupInvalidCards,
     } = useCanvas();
-    const { resolvedTheme, toggleTheme } = useTheme();
-    const isDarkMode = resolvedTheme === 'dark';
-    const frostedProjectManagerShellStyle: React.CSSProperties = {
-        background: 'var(--frost-card-framework-bg)',
-        border: '1px solid var(--frost-card-framework-border)',
-        boxShadow: 'var(--frost-card-framework-shadow)',
-        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+    const projectManagerPanelStyle: React.CSSProperties = {
+        background: 'var(--kk-morphic-panel)',
+        border: '1px solid var(--kk-morphic-border)',
+        boxShadow: 'none',
     };
-    const frostedProjectManagerSubSurfaceStyle: React.CSSProperties = {
-        background: 'var(--frost-card-sub-bg)',
-        border: '1px solid var(--frost-card-sub-border)',
-        boxShadow: 'var(--frost-card-sub-shadow)',
-        WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
-        backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    const projectManagerControlStyle: React.CSSProperties = {
+        background: 'var(--kk-morphic-control)',
+        border: '1px solid var(--kk-morphic-border)',
+        boxShadow: 'none',
     };
 
     const [showDropdown, setShowDropdown] = useState(() => !isMobile);
@@ -157,6 +149,15 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const [workflowCategory, setWorkflowCategory] = useState<WorkflowCategory>('all');
     const [workflowQuery, setWorkflowQuery] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+    useEffect(() => {
+        const openWorkflowBrowser = () => {
+            setWorkflowBrowserTab('workflows');
+            setShowWorkflowDropdown(true);
+        };
+        window.addEventListener(KK_OPEN_WORKFLOW_BROWSER_EVENT, openWorkflowBrowser);
+        return () => window.removeEventListener(KK_OPEN_WORKFLOW_BROWSER_EVENT, openWorkflowBrowser);
+    }, []);
 
     const previousIsMobileRef = useRef(isMobile);
 
@@ -457,14 +458,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 data-desktop-persistent={!isMobile}
                 className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] w-[262px]'} overflow-hidden rounded-[14px] border`}
                 style={{
-                    ...frostedProjectManagerShellStyle,
+                    ...projectManagerPanelStyle,
                     ...dropdownPositionStyle,
                     zIndex: isMobile ? KK_LAYER.modal : KK_LAYER.floatingPanel,
                 }}
             >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
-                    style={frostedProjectManagerSubSurfaceStyle}
+                    style={projectManagerControlStyle}
                 >
                     <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
                         我的项目
@@ -530,9 +531,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         onBlur={saveEdit}
                                         className="flex-1 rounded-md border px-2 py-1 text-sm focus:outline-none"
                                         style={{
-                                            backgroundColor: 'var(--frost-input-bg)',
-                                            borderColor: 'var(--frost-input-border)',
-                                            boxShadow: 'var(--frost-input-shadow)',
+                                            backgroundColor: 'var(--kk-morphic-control)',
+                                            borderColor: 'var(--kk-morphic-border)',
+                                            boxShadow: 'none',
                                             color: 'var(--text-primary)',
                                         }}
                                         autoFocus
@@ -580,7 +581,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                 <div
                     className="space-y-1 border-t p-2"
-                    style={frostedProjectManagerSubSurfaceStyle}
+                    style={projectManagerControlStyle}
                 >
                     <button
                         id="btn-create-canvas"
@@ -688,7 +689,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 aria-modal="true"
                 aria-labelledby="workflow-browser-title"
                 className="kk-morphic-workflow-panel fixed overflow-hidden border"
-                style={{ ...frostedProjectManagerShellStyle, zIndex: KK_LAYER.modal }}
+                style={{ ...projectManagerPanelStyle, zIndex: KK_LAYER.modal }}
             >
                 <div className="kk-morphic-workflow-panel__header">
                     <div>
@@ -887,7 +888,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         </div>
                     </div>
 
-                    <p className="mb-6 rounded-lg border p-3 text-sm leading-relaxed text-[var(--text-secondary)]" style={frostedProjectManagerSubSurfaceStyle}>
+                    <p className="mb-6 rounded-lg border p-3 text-sm leading-relaxed text-[var(--text-secondary)]" style={projectManagerControlStyle}>
                         删除后，该项目会从当前工作区消失。如果你之后重新同步本地素材，还可以重新导入回来。
                     </p>
 
@@ -895,7 +896,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <button
                             data-project-manager-action={PROJECT_MANAGER_ACTIONS.cancelDeleteProject.uiAction}
                             onClick={() => setShowDeleteConfirm(null)}
-                            className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)]"
+                            className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--kk-morphic-control-hover)] hover:text-[var(--text-primary)]"
                         >
                             取消
                         </button>
@@ -945,7 +946,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             data-project-manager-action={PROJECT_MANAGER_ACTIONS.closeMergeModal.uiAction}
                             onClick={() => setShowMergeModal(false)}
                             disabled={!!mergingCanvasId}
-                            className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--kk-morphic-control-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             关闭
                         </button>
@@ -953,7 +954,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                     <div className="mt-4 space-y-2">
                         {mergeCandidates.length === 0 ? (
-                            <div className="rounded-xl border px-4 py-5 text-sm text-[var(--text-secondary)]" style={frostedProjectManagerSubSurfaceStyle}>
+                            <div className="rounded-xl border px-4 py-5 text-sm text-[var(--text-secondary)]" style={projectManagerControlStyle}>
                                 当前没有其他项目可合并。
                             </div>
                         ) : (
@@ -963,7 +964,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     data-project-manager-action={PROJECT_MANAGER_ACTIONS.mergeIntoCurrentProject.uiAction}
                                     onClick={() => handleMergeIntoCurrent(canvas.id)}
                                     disabled={!!mergingCanvasId}
-                                    className="flex w-full items-center justify-between rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-4 py-3 text-left transition-colors hover:bg-[var(--frost-card-main-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex w-full items-center justify-between rounded-xl border border-[color:var(--kk-morphic-border)] bg-[var(--kk-morphic-control)] px-4 py-3 text-left transition-colors hover:bg-[var(--kk-morphic-control-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <div>
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{canvas.name}</div>
@@ -1049,16 +1050,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     transform: 'translateY(-50%)',
                 }}
             >
-                <div
-                    className="flex max-h-[calc(100dvh-144px)] w-full flex-col items-center gap-1 overflow-x-hidden overflow-y-auto rounded-lg p-0.5"
-                    style={{
-                        background: 'var(--frost-card-framework-bg)',
-                        border: '1px solid var(--frost-card-framework-border)',
-                        boxShadow: 'var(--frost-card-framework-shadow)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-                    }}
-                >
+                <div className="kk-project-rail flex max-h-[calc(100dvh-144px)] w-full flex-col items-center gap-1 overflow-x-hidden overflow-y-auto rounded-lg p-0.5">
                     <div className="flex w-full flex-col items-center gap-2">
                                 <div className="relative">
                                     <button
@@ -1072,7 +1064,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         title={activeProjectName}
                                     >
                                         <Layers size={20} />
-                                        <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
+                                        <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--kk-morphic-border)]" />
                                     </button>
                                 </div>
 
@@ -1104,101 +1096,70 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     </button>
                                 )}
 
-                                <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onFitToAll();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="缩放到全局"
-                                >
-                                    <Maximize2 size={20} />
-                                </button>
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onResetView();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="定位卡组"
-                                >
-                                    <Focus size={20} />
-                                </button>
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onToggleCanvasMode();
-                                    }}
-                                    className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                                    title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
-                                >
-                                    {canvasMode === 'board' ? <Palette size={20} /> : <Grid3x3 size={20} />}
-                                </button>
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleSnapToGrid.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onToggleSnapToGrid();
-                                    }}
-                                    className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                                    title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
-                                    aria-pressed={showSnapToGrid}
-                                    data-testid="canvas-snap-to-grid-toggle"
-                                >
-                                    <Magnet size={20} />
-                                </button>
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onAutoArrange();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="自动整理"
-                                >
-                                    <LayoutDashboard size={20} />
-                                </button>
-
-                                {onAddWorkflowUtilityCard && onApplyWorkflowTemplate && (
-                                    <div className="relative">
-                                        <button
-                                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleWorkflowMenu.uiAction}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                setShowWorkflowDropdown((prev) => !prev);
-                                            }}
-                                            className={`${desktopIconButtonClass} ${showWorkflowDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
-                                            title="工作流与模板"
-                                        >
-                                            <Network size={20} />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
-
-                                <button
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleTheme.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        toggleTheme();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
-                                >
-                                    {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
-                                </button>
                     </div>
                 </div>
+            </div>
+            <div
+                className="kk-canvas-view-tools fixed z-50 flex h-8 items-center gap-0.5 rounded-full p-0.5"
+                aria-label="画布视图工具"
+            >
+                <button
+                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onFitToAll();
+                    }}
+                    className={desktopIconButtonClass}
+                    title="缩放到全局"
+                >
+                    <Maximize2 size={16} />
+                </button>
+                <button
+                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onResetView();
+                    }}
+                    className={desktopIconButtonClass}
+                    title="定位卡组"
+                >
+                    <Focus size={16} />
+                </button>
+                <button
+                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleCanvasMode();
+                    }}
+                    className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                    title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
+                >
+                    {canvasMode === 'board' ? <Palette size={16} /> : <Grid3x3 size={16} />}
+                </button>
+                <button
+                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleSnapToGrid.uiAction}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleSnapToGrid();
+                    }}
+                    className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                    title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
+                    aria-pressed={showSnapToGrid}
+                    data-testid="canvas-snap-to-grid-toggle"
+                >
+                    <Magnet size={16} />
+                </button>
+                <button
+                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onAutoArrange();
+                    }}
+                    className={desktopIconButtonClass}
+                    title="自动整理"
+                >
+                    <LayoutDashboard size={16} />
+                </button>
             </div>
             {projectDropdown ? ReactDOM.createPortal(projectDropdown, document.body) : null}
             {workflowDropdown ? ReactDOM.createPortal(workflowDropdown, document.body) : null}

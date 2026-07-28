@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./web": "./src/web/index.ts",
     "./core": "./src/core/tokens.ts",
+    "./layout": "./src/core/layout.ts",
     "./focus-management": "./src/web/focusManagement.ts"
   },
   "scripts": {

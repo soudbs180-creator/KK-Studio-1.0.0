@@ -174,10 +174,11 @@ test('secondary framework surfaces from audit findings use frosted tokens instea
   assert.match(pendingNodeSource, /var\(--frost-card-sub-bg\)/);
   assert.doesNotMatch(pendingNodeSource, /var\(--bg-secondary\)|var\(--bg-tertiary\)|rgba\(99,102,241|rgba\(56,189,248|shadow-xl/);
 
-  assert.match(projectManagerSource, /var\(--frost-card-framework-bg\)/);
-  assert.match(projectManagerSource, /var\(--frost-card-sub-bg\)/);
-  assert.match(projectManagerSource, /var\(--frost-input-bg\)/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-panel\)/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-control\)/);
+  assert.match(projectManagerSource, /var\(--kk-morphic-border\)/);
   assert.match(projectManagerSource, /var\(--accent-coral\)/);
+  assert.doesNotMatch(projectManagerSource, /var\(--frost-|var\(--clay-/);
   assert.doesNotMatch(projectManagerSource, /var\(--accent-indigo\)|text-sky|bg-indigo|#27272a|shadow-2xl|bg-white\/5|border-white\/10|backgroundColor: 'var\(--bg-tertiary\)'|backgroundColor: 'var\(--bg-secondary\)'/);
 
   assert.match(cssSource, /\.ios-mobile-project-pill,[\s\S]*\.mobile-card-group\s*\{[\s\S]*background:\s*var\(--mobile-clay-shell-bg\) !important;/);
@@ -214,7 +215,6 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
 
   for (const source of [
     chatSidebarSource,
-    workflowUtilitySource,
     lazyBoundarySource,
     errorBoundarySource,
     mainSource,
@@ -243,8 +243,8 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   assert.doesNotMatch(ecommerceImportPanelSource, /hover:bg-white\/5/);
   assert.match(promptNodeSource, /var\(--clay-brand-lavender\)|var\(--state-info-text\)/);
   assert.doesNotMatch(promptNodeSource, /text-violet-|rgba\(59, 130, 246/);
-  assert.match(workflowUtilitySource, /var\(--frost-card-main-bg\)/);
-  assert.match(workflowUtilitySource, /var\(--frost-card-sub-bg\)/);
+  assert.match(workflowUtilitySource, /kk-canvas-v3-utility-card/);
+  assert.doesNotMatch(workflowUtilitySource, /var\(--frost-|var\(--clay-/);
   assert.match(lazyBoundarySource, /var\(--frost-card-framework-blur\)/);
   assert.match(errorBoundarySource, /var\(--bg-canvas\)/);
   assert.match(mainSource, /var\(--bg-canvas,\s*#(?:0b0b0c|ffffff)\)/);

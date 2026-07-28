@@ -49,7 +49,14 @@ export type AppSurface = 'workspace' | 'library' | 'favorites' | 'chat' | 'setti
 
 export type WorkspacePanel = 'history' | 'favorites' | 'chat' | null;
 
-export type MobilePrimaryTab = 'create' | 'library' | 'chat' | 'me';
+export type MobilePrimaryTab =
+  | 'create'
+  | 'canvas'
+  | 'copilot'
+  | 'assets'
+  | 'library'
+  | 'chat'
+  | 'me';
 
 export type ResponsiveSurface = 'phone' | 'tablet' | 'desktop';
 
