@@ -23,9 +23,10 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('kk_canvas_minimap_collapsed') === 'true';
+      const savedCollapsedState = localStorage.getItem('kk_canvas_minimap_collapsed');
+      return savedCollapsedState === null ? true : savedCollapsedState === 'true';
     }
-    return false;
+    return true;
   });
 
   const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
@@ -463,7 +464,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   if (isCollapsed) {
     return (
       <div
-        className="kk-workspace-chrome-surface canvas-nav-panel flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
+        className="kk-workspace-chrome-surface canvas-nav-panel canvas-nav-panel--compact flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
         style={{
           width: '224px',
           maxWidth: '224px',

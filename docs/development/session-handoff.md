@@ -1564,3 +1564,101 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - KK Studio 保留比参考站更多的业务模式、提示词优化和登录 Provider，因此内容数量不同；
   外壳几何、密度和交互规律已按参考统一。
 - 本轮视觉证据位于 `temp/input-audit-2026-07-28/`，属于本地 QA 证据，不进入发布产物。
+
+---
+
+## 242. 2026-07-28 - fix(ui): 收口 Morphic 工作区布局与常驻面板
+
+**修改范围**
+- 继续在本地运行态以 1280×720 同视口对比 Morphic Canvas 与 Copilot，修复输入框之外仍可见的布局差距。
+- 将桌面项目面板从定时关闭的 Modal 改为默认常驻的 262px 工作区面板；移动端仍保留遮罩和自动关闭语义。
+- 将 Canvas 大型小地图默认收起为右下角紧凑缩放胶囊，移除 Canvas/创作模式重复的 AI 侧栏拉手。
+- 收紧 Copilot 左栏头部、搜索和历史控制密度，并在顶栏补充工作区/当前项目上下文。
+- 保持 KK Studio 现有业务模式、生成能力、Provider、鉴权、计费、Canvas、Agent、路由和持久化契约不变。
+
+**修改文件**
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx`
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/morphic-layout-fidelity-contract.test.ts`
+- `tests/unit/morphic-input-fidelity-contract.test.ts`
+- `scripts/test/verify-ai-takeover-smoke.mjs`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 桌面项目面板默认常驻，严格使用 `x=12、y=48、width=262、bottom=10`；桌面无 Backdrop、无 5 秒自动关闭，移动端行为不变。
+2. Canvas 导航默认折叠为 `156×32px`、`right=12、bottom=10`，完整小地图仍可由用户主动展开。
+3. Canvas 与创作通过顶部三段切换进入 Copilot，不再保留右侧重复拉手；业务入口没有删除。
+4. Copilot 左栏采用 `46px` 头部与 `28px` 搜索/历史节奏；全屏模式隐藏上下文摘要和多余快捷动作，其它助手 Surface 仍保留这些能力。
+5. 参考站 Compose 的视频时间线没有 KK Studio 业务支撑，因此不伪造；创作继续复用现有生成与编辑能力。
+6. AI Takeover 浏览器 Smoke 改从顶部三段式 `Copilot` 入口进入，避免测试依赖已被视觉系统收起的旧右侧拉手，同时继续验证同一 Chat/Agent Runtime、DurableGenerationQueue 和权限执行链。
+
+**已运行验证**
+- TDD 红测：新增布局契约首次 0/4 通过；实现后 4/4 通过。
+- Morphic、输入、Workspace Chrome 与响应式相关专项 23/23 通过。
+- 浏览器同视口测量：Canvas 面板 `262×662 @ (12,48)`；Composer `570×127 @ (355,583)`；导航 `156×32` 且 `right=12、bottom=10`。
+- 浏览器同视口测量：Copilot rail `262×662 @ (12,48)`；Composer `968×94 @ (294,609)`。
+- Canvas 与 Copilot 的本地/参考组合图已在同一输入中检查，证据位于 `temp/layout-audit-2026-07-28-pass2/`；`design-qa.md` 保持 `final result: passed`。
+- `architecture:check`、`governance:check`、`typecheck`、生产 `build` 与完整 `verify:changes` 通过；全量 unit 为 2252 通过 / 0 失败 / 2 跳过，integration 14/14、contract 15/15、E2E 11/11、Canvas performance 3/3。
+- Prompt Group Drag、移动设置、桌面设置、AI Takeover 与启动横向居中浏览器 Smoke 全部通过；OpenAPI 规范有效，生产依赖审计未发现已知漏洞。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围是本地预览、浏览器操作检查和本地 Git Commit。
+- Codex 内置浏览器当前窗口固定为 1280×720，无法在本轮直接改变物理视口；移动端继续由上一轮真实 375/390/430/768 浏览器证据和本轮响应式契约回归共同守卫。
+
+**风险与下一步**
+- 风险低。桌面项目面板默认常驻会减少画布左侧可见空间，但不改变 Canvas 坐标系、数据或工具回调。
+- 后续若新增工作区 Surface，必须复用相同顶栏、262px 面板、Composer 和移动端 Sheet 契约。
+
+---
+
+## 243. 2026-07-28 - fix(ui): 精确收口 Morphic 工作流浏览器
+
+**修改范围**
+- 继续同视口复核 Morphic 工作流弹窗与 KK Studio，修复原工作流弹窗尺寸偏小、信息层级不足、
+  缺少搜索/分类/工具视图以及卡片密度与参考差距明显的问题。
+- 将现有工作流模板和工具编排进统一的 820px 全高浏览器；桌面保持 12px 上下舞台留白，
+  移动端转换为安全区 Bottom Sheet。
+- 保持现有 3 个模板、4 个工具、Canvas/Agent 回调、路由和后端契约不变；没有复制参考站素材，
+  也没有伪造时间线、模板或业务能力。
+
+**修改文件**
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/morphic-workflow-fidelity-contract.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 桌面工作流浏览器采用 `width: min(820px, calc(100vw - 24px))`、
+   `height: calc(100dvh - 24px)` 和 `top: 12px`，与参考站保持同一舞台密度。
+2. Header 使用 `工作流 / 工具` Tab、36px 搜索框和直接关闭按钮；工作流为三列卡片，
+   工具为两列卡片，只呈现现有业务入口。
+3. `max-width: 768px` 时改为全宽底部 Sheet、单列卡片并叠加安全区；桌面固定几何不会泄漏到
+   移动端。
+4. 搜索、分类、Tab、模板应用、Backdrop 和关闭行为保留可访问语义及现有回调。
+
+**已运行验证**
+- TDD：新增工作流视觉契约首次 0/1，通过实现后 1/1。
+- Morphic 工作流、布局、输入、Surface、Workspace Chrome 和响应式专项 13/13 通过。
+- 浏览器实测工作流浏览器 `820×696 @ (230,12)`；搜索 `PPT` 将 3 个模板过滤为 1 个，
+  工具 Tab 显示 4 个现有工具。
+- 浏览器冷重载后重新关闭欢迎页、收起项目面板并打开工作流，重载后的新增 error 日志为 0。
+- 全量 unit 为 2253 通过 / 0 失败 / 2 跳过。
+- `architecture:check`、`governance:check`、`typecheck`、生产 `build` 和完整
+  `verify:changes` 通过；Vite 构建 2573 modules，Canvas performance 3/3。
+- 工作流截图保存在 `temp/layout-audit-2026-07-28-pass3/workflow-browser-final.png`；
+  `design-qa.md` 的 P0/P1/P2 全部清零，`final result: passed`。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围是本地预览、浏览器操作检查和本地 Git Commit。
+- Codex 内置浏览器物理视口固定为 1280×720；移动端由 375/390/430/768 既有浏览器证据、
+  新增响应式契约和完整移动 Smoke 共同守卫。
+
+**风险与下一步**
+- 风险低。工作流浏览器只重排现有数据和回调，不改变模板应用或工具创建逻辑。
+- 后续新增模板或工具必须进入相同的 Tab、搜索、分类和响应式网格契约，不得另建平行浮层。

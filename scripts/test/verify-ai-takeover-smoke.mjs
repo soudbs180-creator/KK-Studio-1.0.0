@@ -335,9 +335,9 @@ async function collectFailureDiagnostics(page) {
 }
 
 async function ensureWorkspaceReady(page) {
-  const desktopEntry = page.locator('#btn-desktop-ai-assistant');
-  if (await isVisibleWithin(desktopEntry, 6000)) {
-    return desktopEntry;
+  const copilotEntry = page.getByRole('button', { name: 'Copilot', exact: true });
+  if (await isVisibleWithin(copilotEntry, 6000)) {
+    return copilotEntry;
   }
 
   const landingLogin = page.locator('.kk-landing-nav__login').first();
@@ -350,8 +350,8 @@ async function ensureWorkspaceReady(page) {
     await tempAccessButton.click();
   }
 
-  await assertVisible(desktopEntry, 'Desktop AI assistant entry did not render after temporary access.');
-  return desktopEntry;
+  await assertVisible(copilotEntry, 'Desktop Copilot entry did not render after temporary access.');
+  return copilotEntry;
 }
 
 async function assertHttpHtml(url) {
@@ -373,12 +373,15 @@ async function assertHttpHtml(url) {
 }
 
 function verifySourceContracts() {
+  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
   const modeSwitchSource = readSource('apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx');
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const generationToolsSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
 
   const checks = [
+    { source: desktopChromeSource, pattern: />\s*Copilot\s*</, label: 'desktop Copilot workspace entrypoint' },
+    { source: desktopChromeSource, pattern: /onClick=\{openCopilotMode\}/, label: 'desktop Copilot open state' },
     { source: chatSidebarSource, pattern: /id="btn-desktop-ai-assistant"/, label: 'desktop AI assistant edge entrypoint' },
     { source: chatSidebarSource, pattern: /data-chat-shell-action=\{CHAT_SHELL_ACTIONS\.toggleSidebar\.uiAction\}/, label: 'desktop AI entry state' },
     { source: modeSwitchSource, pattern: /id:\s*['"]btn-ai-direct-mode['"]/, label: 'direct mode toggle' },

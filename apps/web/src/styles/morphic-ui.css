@@ -665,6 +665,33 @@ select,
   min-height: 30px !important;
 }
 
+.desktop-navigation-panel:has(.canvas-nav-panel--compact) {
+  top: auto !important;
+  right: 12px !important;
+  bottom: 10px !important;
+}
+
+.canvas-nav-panel--compact {
+  width: 156px !important;
+  max-width: 156px !important;
+  height: 32px !important;
+  gap: 4px !important;
+  padding: 2px 6px !important;
+  border-radius: 999px !important;
+}
+
+.canvas-nav-panel--compact input[type='range'] {
+  display: none;
+}
+
+.canvas-nav-panel--compact > :has(input[type='range']) {
+  display: none;
+}
+
+.canvas-nav-panel--compact > span {
+  min-width: 38px !important;
+}
+
 .kk-morphic-brand {
   display: inline-flex;
   align-items: center;
@@ -718,6 +745,66 @@ select,
 
 .kk-morphic-command-group {
   border-color: var(--kk-morphic-border);
+}
+
+.kk-morphic-command-group [data-global-ai-entry='true'] {
+  display: none;
+}
+
+.kk-morphic-workspace-context {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--kk-morphic-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kk-morphic-workspace-context > :last-child {
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--kk-morphic-text-primary);
+  text-overflow: ellipsis;
+}
+
+.kk-morphic-workspace-context__separator {
+  color: var(--kk-morphic-text-disabled);
+}
+
+.kk-morphic-project-panel[data-desktop-persistent='true'] {
+  top: var(--kk-morphic-topbar-height) !important;
+  bottom: 10px !important;
+  left: 12px !important;
+  width: var(--kk-morphic-left-panel-width) !important;
+  border-color: var(--kk-morphic-border) !important;
+  border-radius: var(--kk-morphic-radius-panel) !important;
+  background: var(--kk-morphic-panel) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.kk-morphic-project-panel__close {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--kk-morphic-text-muted);
+}
+
+.kk-morphic-project-panel__close:hover {
+  background: var(--kk-morphic-control-hover);
+  color: var(--kk-morphic-text-primary);
+}
+
+#project-manager-container[data-panel-open='true'] {
+  pointer-events: none;
+  opacity: 0;
 }
 
 .kk-workspace-menu-action__icon {
@@ -841,14 +928,296 @@ select,
 }
 
 .kk-morphic-workflow-panel {
-  max-height: calc(100dvh - 120px);
+  top: 12px;
+  left: 50%;
+  display: flex;
+  width: calc(100vw - 32px);
+  height: calc(100dvh - 24px);
+  max-width: 820px;
+  flex-direction: column;
+  border-radius: var(--kk-morphic-radius-panel) !important;
   border-color: var(--kk-morphic-border) !important;
   background: var(--kk-morphic-panel) !important;
   box-shadow: var(--kk-morphic-dialog-shadow) !important;
+  transform: translateX(-50%);
 }
 
-.kk-morphic-workflow-panel > div:last-child {
-  max-height: min(52dvh, 420px) !important;
+.kk-morphic-workflow-backdrop {
+  background: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(8px);
+}
+
+.kk-morphic-workflow-panel__header {
+  display: flex;
+  min-height: 68px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 14px 10px 18px;
+  border-bottom: 1px solid var(--kk-morphic-border);
+}
+
+.kk-morphic-workflow-panel__header h3 {
+  margin: 0 0 8px;
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.kk-morphic-workflow-panel__tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.kk-morphic-workflow-panel__tabs button {
+  min-height: 24px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 0 0 5px;
+  background: transparent;
+  color: var(--kk-morphic-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.kk-morphic-workflow-panel__tabs button[aria-selected='true'] {
+  border-bottom-color: var(--kk-morphic-text-primary);
+  color: var(--kk-morphic-text-primary);
+}
+
+.kk-morphic-workflow-panel__close {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--kk-morphic-radius-button);
+  background: transparent;
+  color: var(--kk-morphic-text-secondary);
+}
+
+.kk-morphic-workflow-panel__close:hover {
+  background: var(--kk-morphic-control-hover);
+  color: var(--kk-morphic-text-primary);
+}
+
+.kk-morphic-workflow-panel__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.kk-morphic-workflow-panel__toolbar {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kk-morphic-workflow-panel__toolbar > span {
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.kk-morphic-workflow-panel__search {
+  display: flex;
+  width: min(100%, 360px);
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+  color: var(--kk-morphic-text-muted);
+}
+
+.kk-morphic-workflow-panel__search input {
+  min-width: 0;
+  height: 34px;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--kk-morphic-text-primary);
+  font-size: 12px;
+}
+
+.kk-morphic-workflow-panel__search input::placeholder {
+  color: var(--kk-morphic-text-muted);
+}
+
+.kk-morphic-workflow-panel__categories {
+  display: flex;
+  gap: 6px;
+  padding: 10px 0 12px;
+  overflow-x: auto;
+}
+
+.kk-morphic-workflow-panel__categories button {
+  min-height: 28px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--kk-morphic-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.kk-morphic-workflow-panel__categories button:hover {
+  background: var(--kk-morphic-control-hover);
+  color: var(--kk-morphic-text-primary);
+}
+
+.kk-morphic-workflow-panel__categories button[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--kk-morphic-text-primary);
+  color: var(--kk-morphic-canvas);
+}
+
+.kk-morphic-workflow-panel__grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.kk-morphic-workflow-card {
+  display: flex;
+  min-height: 198px;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--kk-morphic-control);
+  color: var(--kk-morphic-text-primary);
+  text-align: left;
+}
+
+.kk-morphic-workflow-card:hover {
+  border-color: var(--kk-morphic-border-strong);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-morphic-workflow-card__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--kk-morphic-text-secondary);
+}
+
+.kk-morphic-workflow-card__category {
+  margin-bottom: 5px;
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
+}
+
+.kk-morphic-workflow-card strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.kk-morphic-workflow-card__description {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--kk-morphic-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.kk-morphic-workflow-card__action {
+  margin-top: auto;
+  padding-top: 14px;
+  color: var(--kk-morphic-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kk-morphic-workflow-panel__empty {
+  grid-column: 1 / -1;
+  padding: 72px 20px;
+  color: var(--kk-morphic-text-muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+.kk-morphic-workflow-panel__tools {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.kk-morphic-workflow-panel__tools button {
+  display: grid;
+  min-height: 138px;
+  grid-template-columns: 32px 1fr;
+  grid-template-rows: auto 1fr;
+  align-items: start;
+  gap: 5px 10px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--kk-morphic-control);
+  color: var(--kk-morphic-text-primary);
+  text-align: left;
+}
+
+.kk-morphic-workflow-panel__tools button:hover {
+  border-color: var(--kk-morphic-border-strong);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-morphic-workflow-panel__tools svg {
+  grid-row: 1 / span 2;
+  color: var(--kk-morphic-text-secondary);
+}
+
+.kk-morphic-workflow-panel__tools strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kk-morphic-workflow-panel__tools span {
+  color: var(--kk-morphic-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kk-morphic-workflow-panel__footer {
+  display: flex;
+  min-height: 42px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
 }
 
 #prompt-bar-container:not(.kk-prompt-bar-mobile-collapse-handle) {
@@ -1023,12 +1392,21 @@ select,
   color: var(--kk-morphic-text-primary) !important;
 }
 
+body[data-kk-workspace-mode='canvas'] .kk-workspace-edge-toggle,
+body[data-kk-workspace-mode='create'] .kk-workspace-edge-toggle {
+  display: none !important;
+}
+
 /* Copilot reuses the existing assistant runtime while matching the reference
    three-zone geometry: conversation rail, central transcript, wide composer. */
 body[data-kk-workspace-mode='copilot'] #project-manager-container,
 body[data-kk-workspace-mode='copilot'] #prompt-bar-container,
 body[data-kk-workspace-mode='copilot'] .desktop-navigation-panel,
 body[data-kk-workspace-mode='copilot'] .kk-task-center-host {
+  display: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-morphic-project-panel {
   display: none !important;
 }
 
@@ -1086,28 +1464,18 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
 }
 
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(1) {
-  min-height: 44px;
-  height: 44px;
-  padding: 6px 8px !important;
+  min-height: 46px;
+  height: 46px;
+  padding: 6px 16px !important;
   border-bottom: 1px solid var(--kk-morphic-border);
 }
 
-body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(2) {
-  width: calc(100% - 16px) !important;
-  min-height: 32px;
-  height: 32px;
-  margin: 4px 8px !important;
-  padding: 4px 8px !important;
-  gap: 0 !important;
-  border-color: var(--kk-morphic-border) !important;
-  border-radius: 8px;
-  background: var(--kk-morphic-control) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(1) > :last-child > :nth-child(-n + 2) {
+  display: none;
 }
 
-body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(2) > :last-child {
-  display: none;
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(2) {
+  display: none !important;
 }
 
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(3) {
@@ -1119,9 +1487,13 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
 }
 
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(3) > :first-child {
-  min-height: 38px;
-  height: 38px;
-  padding: 4px 8px !important;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 16px !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(3) > :first-child > :last-child {
+  display: none;
 }
 
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) {
@@ -2118,6 +2490,49 @@ body .settings-panel .apple-soft-card {
     border-left: 0;
     border-radius: var(--kk-morphic-radius-panel) var(--kk-morphic-radius-panel) 0 0;
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .kk-morphic-workflow-panel {
+    top: auto !important;
+    right: 0;
+    bottom: 0 !important;
+    left: 0;
+    width: 100%;
+    height: calc(100dvh - env(safe-area-inset-top) - 8px);
+    max-width: none;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-radius: var(--kk-morphic-radius-panel) var(--kk-morphic-radius-panel) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: none;
+  }
+
+  .kk-morphic-workflow-panel__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .kk-morphic-workflow-panel__toolbar > span {
+    display: none;
+  }
+
+  .kk-morphic-workflow-panel__search {
+    width: 100%;
+    height: 44px;
+  }
+
+  .kk-morphic-workflow-panel__grid,
+  .kk-morphic-workflow-panel__tools {
+    grid-template-columns: 1fr;
+  }
+
+  .kk-morphic-workflow-card {
+    min-height: 176px;
+  }
+
+  .kk-morphic-workflow-panel__footer > :first-child {
+    display: none;
   }
 
   .auth-modal-overlay {

@@ -16,7 +16,7 @@
 | Canvas | `temp/design-audit-2026-07-28/ref-02-canvas-desktop.png` | `temp/design-audit-2026-07-28/45-project-panel-final-desktop.png` |
 | Copilot | `temp/design-audit-2026-07-28/ref-03-copilot-desktop.png` | `temp/design-audit-2026-07-28/41-copilot-final-desktop.png` |
 | Canvas + Copilot comparison | Reference and implementation combined in the same input | `temp/design-audit-2026-07-28/44-reference-vs-kk-final-comparison.png` |
-| Workflow | `temp/design-audit-2026-07-28/ref-01-workflows-desktop.png` | `temp/design-audit-2026-07-28/43-workflow-final-desktop.png` |
+| Workflow | `temp/design-audit-2026-07-28/ref-01-workflows-desktop.png` | `temp/layout-audit-2026-07-28-pass3/workflow-browser-final.png` |
 | Login | `temp/design-audit-2026-07-28/ref-04-login-desktop.png` | `temp/design-audit-2026-07-28/36-auth-refactored-desktop.png` |
 | Landing | Reference dark stage language | `temp/design-audit-2026-07-28/35-landing-refactored-desktop.png`, `39-landing-mobile-refactored-375.png` |
 | Account menu | Reference right-side top-bar menu | `temp/design-audit-2026-07-28/29-account-menu-refactored-desktop.png` |
@@ -42,6 +42,7 @@
 | Account menu | right=12px, top=52px | x=1012, y=52, width=256px | passed |
 | Auth dialog | width=412px, max-height=546px/90vh | 412px × 546px at 1280 × 720 | passed |
 | Auth input | 38px, 16/22px type | 38px, 16/22px type | passed |
+| Workflow browser | x=230, y=12, width=820px, bottom=12px | x=230, y=12, width=820px, height=696px | passed |
 | Mobile more sheet | no gradient, no overflow | 375px wide, background image `none` | passed |
 | Mobile target size | at least 44px | zero visible targets below 43.5px | passed |
 
@@ -62,6 +63,7 @@ No required viewport produced horizontal overflow, a clipped primary action, ver
 - Copilot reuses the existing assistant runtime and presents a 262px conversation rail, central transcript and wide bottom composer.
 - The project panel and workflow dialog are portaled to `document.body`, so the desktop tool rail cannot clip them.
 - The workflow dialog has a visible close button; backdrop close and existing action callbacks remain intact.
+- Workflow tabs, search, category filters, template application and the existing tool entries were operated in the local runtime.
 - The account menu opens directly below the avatar and stays anchored to the right edge.
 - Desktop and mobile ecommerce composers scroll internally while their primary actions remain reachable.
 - Mobile mode tabs stay on one line and every visible interactive target satisfies the 44px rule.
@@ -87,5 +89,30 @@ No required viewport produced horizontal overflow, a clipped primary action, ver
 | P2 | Copilot rail and welcome state remained visually denser than the reference | Compacted the rail header/context meter and flattened the welcome message |
 
 All P0, P1 and P2 findings are resolved. KK Studio keeps its own brand, copy, routes, business capabilities and existing icon assets; Morphic trademarks and proprietary media were not copied.
+
+## Layout fidelity pass 2
+
+- Canvas same-viewport comparison: `temp/layout-audit-2026-07-28-pass2/20-canvas-final-compare-preview.jpg`.
+- Copilot same-viewport comparison: `temp/layout-audit-2026-07-28-pass2/21-copilot-final-compare-preview.jpg`.
+- Canvas measured geometry: panel `x=12, y=48, 262×662`; composer `x=355, y=583, 570×127`; compact navigation `right=12, bottom=10, 156×32`.
+- Copilot measured geometry: rail `x=12, y=48, 262×662`; composer `x=294, y=609, 968×94`.
+- The desktop project panel is persistent by default and no longer behaves like a timed modal. Its modal backdrop remains mobile-only.
+- The large minimap now defaults to a compact bottom-right zoom pill. The redundant Canvas/Create assistant edge handle is hidden because the top mode switch remains the canonical entry.
+- Copilot removes the extra context meter row in full-screen mode and uses a `46px` header plus `28px` search/history rhythm.
+- Existing 375/390/430/768 responsive evidence remains valid; the new selectors are desktop-persistent only and the affected responsive contracts pass.
+
+No new P0, P1 or P2 finding remains after the second same-viewport comparison.
+
+## Workflow fidelity pass 3
+
+- Desktop workflow browser evidence: `temp/layout-audit-2026-07-28-pass3/workflow-browser-final.png`.
+- At 1280×720 the browser measures `820×696px @ (230,12)`, leaving the required 12px top and bottom stage inset.
+- The header contains a two-state Workflows/Tools tablist, a 36px search control and a direct close action.
+- Workflow mode uses compact category pills and a three-column template grid; Tools mode uses a two-column grid of the four existing KK Studio tool entries.
+- Search was operated with `PPT` and reduced the three existing templates to one result; switching to Tools exposed four existing tools.
+- At widths up to 768px the same content becomes a safe-area bottom sheet with a single-column card flow and no fixed desktop width.
+- No target-site proprietary assets or unsupported workflow abilities were introduced.
+
+No new P0, P1 or P2 finding remains after the workflow-browser comparison.
 
 final result: passed

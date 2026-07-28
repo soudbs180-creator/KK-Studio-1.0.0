@@ -98,7 +98,7 @@ test('Copilot composer matches the reference compact shell and keeps attachment 
   );
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar[\s\S]*nth-child\(1\)\s*>\s*:nth-child\(2\)\s*\{[\s\S]*min-height:\s*32px[\s\S]*border-radius:\s*8px/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar[\s\S]*nth-child\(1\)\s*>\s*:nth-child\(2\)\s*\{[\s\S]*display:\s*none\s*!important/,
   );
   assert.match(
     cssSource,

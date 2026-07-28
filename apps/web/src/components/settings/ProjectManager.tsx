@@ -90,6 +90,20 @@ interface ProjectManagerProps {
     onOpenMermaidImport?: () => void;
 }
 
+type WorkflowBrowserTab = 'workflows' | 'tools';
+type WorkflowCategory = 'all' | 'image' | 'presentation';
+
+const WORKFLOW_CATEGORIES: Array<{ id: WorkflowCategory; label: string }> = [
+    { id: 'all', label: '所有' },
+    { id: 'image', label: '图像创作' },
+    { id: 'presentation', label: '演示文稿' },
+];
+
+/** 分类只整理已有模板，避免为了视觉复刻引入没有业务实现的工作流。 */
+const getWorkflowTemplateCategory = (templateId: WorkflowTemplateId): Exclude<WorkflowCategory, 'all'> => (
+    templateId === 'ppt-prompt-export' ? 'presentation' : 'image'
+);
+
 const ProjectManager: React.FC<ProjectManagerProps> = ({
     onSearch,
     onFavorites,
@@ -137,35 +151,23 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
     };
 
-    const [showDropdown, setShowDropdown] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(() => !isMobile);
     const [showWorkflowDropdown, setShowWorkflowDropdown] = useState(false);
+    const [workflowBrowserTab, setWorkflowBrowserTab] = useState<WorkflowBrowserTab>('workflows');
+    const [workflowCategory, setWorkflowCategory] = useState<WorkflowCategory>('all');
+    const [workflowQuery, setWorkflowQuery] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-    const workflowTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const previousIsMobileRef = useRef(isMobile);
 
-    const openWorkflowMenu = useCallback(() => {
-        if (workflowTimerRef.current) {
-            clearTimeout(workflowTimerRef.current);
-            workflowTimerRef.current = null;
+    useEffect(() => {
+        if (previousIsMobileRef.current === isMobile) {
+            return;
         }
-        setShowWorkflowDropdown(true);
-    }, []);
 
-    const closeWorkflowMenuDelayed = useCallback(() => {
-        if (workflowTimerRef.current) {
-            clearTimeout(workflowTimerRef.current);
-        }
-        workflowTimerRef.current = setTimeout(() => {
-            setShowWorkflowDropdown(false);
-        }, 1200);
-    }, []);
-
-    const handleWorkflowMenuMouseEnter = useCallback(() => {
-        if (workflowTimerRef.current) {
-            clearTimeout(workflowTimerRef.current);
-            workflowTimerRef.current = null;
-        }
-    }, []);
+        previousIsMobileRef.current = isMobile;
+        setShowDropdown(!isMobile);
+    }, [isMobile]);
 
     const handleAddUtilityCardWithSafety = useCallback((kind: WorkflowUtilityNodeKind) => {
         try {
@@ -213,13 +215,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
     }, [activeCanvas, onApplyWorkflowTemplate]);
 
-    useEffect(() => {
-        return () => {
-            if (workflowTimerRef.current) {
-                clearTimeout(workflowTimerRef.current);
-            }
-        };
-    }, []);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
@@ -292,7 +287,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     };
 
     useEffect(() => {
-        if (!showDropdown) {
+        if (!showDropdown || !isMobile) {
             return;
         }
 
@@ -301,7 +296,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }, 5000);
 
         return () => clearTimeout(timer);
-    }, [showDropdown]);
+    }, [isMobile, showDropdown]);
 
     // 采用防抖控制，已安全地移除硬编码的 8s 销毁定时器
 
@@ -326,8 +321,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
 
         createCanvas();
-        setShowDropdown(false);
-    }, [canCreateCanvas, createCanvas]);
+        setShowDropdown(isMobile ? false : true);
+    }, [canCreateCanvas, createCanvas, isMobile]);
 
     const handleClearAll = useCallback(() => {
         if (window.confirm('确定要清空当前项目的数据吗？此操作无法撤销。')) {
@@ -448,20 +443,23 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
     const projectDropdown = showDropdown ? (
         <>
+            {isMobile ? (
+                <div
+                    className="fixed inset-0 cursor-default"
+                    style={{ zIndex: KK_LAYER.modalBackdrop }}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        setShowDropdown(false);
+                    }}
+                />
+            ) : null}
             <div
-                className="fixed inset-0 cursor-default"
-                style={{ zIndex: KK_LAYER.modalBackdrop }}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    setShowDropdown(false);
-                }}
-            />
-            <div
+                data-desktop-persistent={!isMobile}
                 className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] bottom-[10px] w-[262px]'} overflow-hidden rounded-[14px] border`}
                 style={{
                     ...frostedProjectManagerShellStyle,
                     ...dropdownPositionStyle,
-                    zIndex: KK_LAYER.modal,
+                    zIndex: isMobile ? KK_LAYER.modal : KK_LAYER.floatingPanel,
                 }}
             >
                 <div
@@ -471,9 +469,22 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
                         我的项目
                     </h3>
-                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                        {activeProjectName}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span className="max-w-[118px] truncate text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                            {activeProjectName}
+                        </span>
+                        <button
+                            type="button"
+                            className="kk-morphic-project-panel__close"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setShowDropdown(false);
+                            }}
+                            aria-label="收起工作区面板"
+                        >
+                            <X size={13} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="custom-scrollbar max-h-60 overflow-y-auto">
@@ -493,7 +504,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     event.stopPropagation();
                                     if (editingId !== canvas.id) {
                                         switchCanvas(canvas.id);
-                                        setShowDropdown(false);
+                                        if (isMobile) {
+                                            setShowDropdown(false);
+                                        }
                                     }
                                 }}
                             >
@@ -651,10 +664,19 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         </>
     ) : null;
 
+    const normalizedWorkflowQuery = workflowQuery.trim().toLocaleLowerCase();
+    const visibleWorkflowTemplates = workflowTemplates.filter((template) => {
+        const matchesCategory = workflowCategory === 'all'
+            || getWorkflowTemplateCategory(template.id) === workflowCategory;
+        const matchesQuery = normalizedWorkflowQuery.length === 0
+            || `${template.title} ${template.description}`.toLocaleLowerCase().includes(normalizedWorkflowQuery);
+        return matchesCategory && matchesQuery;
+    });
+
     const workflowDropdown = showWorkflowDropdown && onAddWorkflowUtilityCard && onApplyWorkflowTemplate ? (
         <>
             <div
-                className="fixed inset-0 cursor-default"
+                className="kk-morphic-workflow-backdrop fixed inset-0 cursor-default"
                 style={{ zIndex: KK_LAYER.modalBackdrop }}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -662,123 +684,177 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 }}
             />
             <div
-                className="kk-morphic-workflow-panel fixed left-1/2 top-1/2 w-[min(820px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border transition-[opacity,transform] duration-150"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="workflow-browser-title"
+                className="kk-morphic-workflow-panel fixed overflow-hidden border"
                 style={{ ...frostedProjectManagerShellStyle, zIndex: KK_LAYER.modal }}
-                onMouseEnter={handleWorkflowMenuMouseEnter}
-                onMouseLeave={closeWorkflowMenuDelayed}
             >
-                <div
-                    className="flex items-center justify-between border-b px-4 py-3"
-                    style={frostedProjectManagerSubSurfaceStyle}
-                >
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
-                        工作流引擎
-                    </h3>
-                    <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                            BETA
-                        </span>
-                        <button
-                            type="button"
-                            aria-label="关闭工作流"
-                            className="flex size-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                setShowWorkflowDropdown(false);
-                            }}
-                        >
-                            <X size={16} aria-hidden="true" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="p-3 border-b border-[color:var(--frost-card-sub-border)]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                        添加工作流卡片
+                <div className="kk-morphic-workflow-panel__header">
+                    <div>
+                        <h3 id="workflow-browser-title">工作流浏览器</h3>
+                        <div className="kk-morphic-workflow-panel__tabs" role="tablist" aria-label="工作流浏览器内容">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={workflowBrowserTab === 'workflows'}
+                                onClick={() => setWorkflowBrowserTab('workflows')}
+                            >
+                                工作流
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={workflowBrowserTab === 'tools'}
+                                onClick={() => setWorkflowBrowserTab('tools')}
+                            >
+                                工具
+                            </button>
+                        </div>
                     </div>
                     <button
                         type="button"
+                        aria-label="关闭工作流"
+                        className="kk-morphic-workflow-panel__close"
                         onClick={(event) => {
                             event.stopPropagation();
-                            handleAddUtilityCardWithSafety('workflow-panel');
                             setShowWorkflowDropdown(false);
                         }}
-                        className="mb-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-main-bg)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--toolbar-hover)]"
                     >
-                        <Network size={16} className="text-blue-400" />
-                        工作流面板
+                        <X size={16} aria-hidden="true" />
                     </button>
-                    <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowPreviewCard.uiAction}
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                handleAddUtilityCardWithSafety('preview');
-                                setShowWorkflowDropdown(false);
-                            }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
-                        >
-                            <Eye size={16} className="text-indigo-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
-                            <span className="text-[11px] font-medium">预览卡</span>
-                        </button>
-                        <button
-                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowSaveCard.uiAction}
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                handleAddUtilityCardWithSafety('save');
-                                setShowWorkflowDropdown(false);
-                            }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
-                        >
-                            <Save size={16} className="text-emerald-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
-                            <span className="text-[11px] font-medium">保存卡</span>
-                        </button>
-                        <button
-                            data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowAgentCard.uiAction}
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                handleAddUtilityCardWithSafety('agent');
-                                setShowWorkflowDropdown(false);
-                            }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
-                        >
-                            <Cpu size={16} className="text-amber-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
-                            <span className="text-[11px] font-medium">增强卡</span>
-                        </button>
-                    </div>
                 </div>
 
-                <div
-                    className="p-3 space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar"
-                    style={frostedProjectManagerSubSurfaceStyle}
-                >
-                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                        应用工作流模板
+                {workflowBrowserTab === 'workflows' ? (
+                    <div className="kk-morphic-workflow-panel__body" role="tabpanel">
+                        <div className="kk-morphic-workflow-panel__toolbar">
+                            <label className="kk-morphic-workflow-panel__search">
+                                <Search size={15} aria-hidden="true" />
+                                <input
+                                    type="search"
+                                    value={workflowQuery}
+                                    onChange={(event) => setWorkflowQuery(event.target.value)}
+                                    placeholder="搜索工作流..."
+                                    aria-label="搜索工作流"
+                                />
+                            </label>
+                            <span>{visibleWorkflowTemplates.length} 个可用模板</span>
+                        </div>
+
+                        <div className="kk-morphic-workflow-panel__categories" aria-label="工作流分类">
+                            {WORKFLOW_CATEGORIES.map((category) => (
+                                <button
+                                    key={category.id}
+                                    type="button"
+                                    data-workflow-category={category.id}
+                                    aria-pressed={workflowCategory === category.id}
+                                    onClick={() => setWorkflowCategory(category.id)}
+                                >
+                                    {category.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="kk-morphic-workflow-panel__grid">
+                            {visibleWorkflowTemplates.length > 0 ? (
+                                visibleWorkflowTemplates.map((template) => (
+                                    <button
+                                        key={template.id}
+                                        type="button"
+                                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.applyWorkflowTemplate.uiAction}
+                                        className="kk-morphic-workflow-card"
+                                        aria-label={`应用工作流：${template.title}`}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleApplyTemplateWithSafety(template.id, template.title);
+                                            setShowWorkflowDropdown(false);
+                                        }}
+                                    >
+                                        <span className="kk-morphic-workflow-card__icon" aria-hidden="true">
+                                            {template.id === 'ppt-prompt-export' ? <LayoutDashboard size={21} /> : <Network size={21} />}
+                                        </span>
+                                        <span className="kk-morphic-workflow-card__category">
+                                            {getWorkflowTemplateCategory(template.id) === 'presentation' ? '演示文稿' : '图像创作'}
+                                        </span>
+                                        <strong>{template.title}</strong>
+                                        <span className="kk-morphic-workflow-card__description">{template.description}</span>
+                                        <span className="kk-morphic-workflow-card__action">应用模板</span>
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="kk-morphic-workflow-panel__empty">
+                                    没有匹配的工作流。请尝试其他关键词或分类。
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="kk-morphic-workflow-panel__footer">
+                            <span>模板会添加到当前画布，不会替换已有卡片。</span>
+                            <span>KK Studio 工作流</span>
+                        </div>
                     </div>
-                    {workflowTemplates && workflowTemplates.length > 0 ? (
-                        workflowTemplates.map((template) => (
+                ) : (
+                    <div className="kk-morphic-workflow-panel__body" role="tabpanel">
+                        <div className="kk-morphic-workflow-panel__tools">
                             <button
-                                key={template.id}
-                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.applyWorkflowTemplate.uiAction}
+                                type="button"
                                 onClick={(event) => {
                                     event.stopPropagation();
-                                    handleApplyTemplateWithSafety(template.id, template.title);
+                                    handleAddUtilityCardWithSafety('workflow-panel');
                                     setShowWorkflowDropdown(false);
                                 }}
-                                className="flex w-full flex-col rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2 text-left transition-colors hover:bg-[var(--frost-card-main-bg)] active:scale-[0.98] cursor-pointer group"
                             >
-                                <div className="text-xs font-semibold text-gray-900 dark:text-white group-hover:text-[var(--accent-coral)] transition-colors">
-                                    {template.title}
-                                </div>
-                                <div className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-                                    {template.description}
-                                </div>
+                                <Network size={20} aria-hidden="true" />
+                                <strong>工作流面板</strong>
+                                <span>在画布添加可编排的工作流控制面板。</span>
                             </button>
-                        ))
-                    ) : (
-                        <div className="text-xs py-2 px-1 text-[var(--text-tertiary)] italic">暂无预设模板</div>
-                    )}
-                </div>
+                            <button
+                                type="button"
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowPreviewCard.uiAction}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleAddUtilityCardWithSafety('preview');
+                                    setShowWorkflowDropdown(false);
+                                }}
+                            >
+                                <Eye size={20} aria-hidden="true" />
+                                <strong>预览卡</strong>
+                                <span>检查工作流的中间产物与最终结果。</span>
+                            </button>
+                            <button
+                                type="button"
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowSaveCard.uiAction}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleAddUtilityCardWithSafety('save');
+                                    setShowWorkflowDropdown(false);
+                                }}
+                            >
+                                <Save size={20} aria-hidden="true" />
+                                <strong>保存卡</strong>
+                                <span>把现有工作流结果导出到受支持的格式。</span>
+                            </button>
+                            <button
+                                type="button"
+                                data-project-manager-action={PROJECT_MANAGER_ACTIONS.addWorkflowAgentCard.uiAction}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleAddUtilityCardWithSafety('agent');
+                                    setShowWorkflowDropdown(false);
+                                }}
+                            >
+                                <Cpu size={20} aria-hidden="true" />
+                                <strong>提示增强卡</strong>
+                                <span>复用现有 Agent 能力改写和扩展提示词。</span>
+                            </button>
+                        </div>
+
+                        <div className="kk-morphic-workflow-panel__footer">
+                            <span>所有工具均复用现有 Canvas 与 Agent 契约。</span>
+                            <span>4 个可用工具</span>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     ) : null;
@@ -966,6 +1042,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
+                data-panel-open={showDropdown}
                 className="fixed left-3 z-50 flex w-11 flex-col items-center select-none"
                 style={{ 
                     top: '50%',
@@ -1092,11 +1169,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 </button>
 
                                 {onAddWorkflowUtilityCard && onApplyWorkflowTemplate && (
-                                    <div 
-                                        className="relative"
-                                        onMouseEnter={openWorkflowMenu}
-                                        onMouseLeave={closeWorkflowMenuDelayed}
-                                    >
+                                    <div className="relative">
                                         <button
                                             data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleWorkflowMenu.uiAction}
                                             onClick={(event) => {

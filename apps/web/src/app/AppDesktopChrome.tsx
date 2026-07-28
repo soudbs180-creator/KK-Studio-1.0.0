@@ -171,7 +171,15 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         </button>
       </div>
 
-      {/* 简体中文：头像按钮区域 (高度与右侧资产齐平) */}
+      {/* 顶部工作区路径用于补足参考站的层级感，不改变现有项目路由。 */}
+      <div className="kk-morphic-workspace-context" aria-label="当前工作区">
+        <span>工作区</span>
+        <span className="kk-morphic-workspace-context__separator" aria-hidden="true">
+          /
+        </span>
+        <span>当前项目</span>
+      </div>
+
       <nav className="kk-morphic-mode-switch" aria-label="工作区模式">
         <button type="button" aria-current={activeMode === 'canvas' ? 'page' : undefined} onClick={openCanvasMode}>
           画布
