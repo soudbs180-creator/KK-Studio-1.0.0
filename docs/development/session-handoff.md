@@ -1312,3 +1312,42 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   确认后再核销；不得机械批量通过。
 - 在受控 PostgreSQL 上至少演练 fresh、repeat、含旧 027 数据和旧 JSON 四种场景，并对真实
   Stripe 同步/异步成功、币种不匹配、重复 Webhook、人工充值重复交易号与重复审核做 smoke。
+
+---
+
+## 237. 2026-07-28 - fix(auth): 修复 OAuth 回调深链的 Vercel 404
+
+**修改范围**
+- 完成 Google OAuth 生产授权 smoke，确认 Google 授权码交换与 VPS 令牌签发成功，但
+  `https://kkai.plus/auth/callback` 被 Vercel 返回 404。
+- 修复 `cleanUrls: true` 下不兼容的 SPA 回退规则，让 OAuth 回调和其它前端深链回落到应用根文档，
+  同时保持 `/healthz`、`/api/v1/*`、`/api/ai-assistant/*` 与兼容认证代理优先匹配。
+
+**修改文件**
+- `vercel.json`
+- `tests/unit/vercel-vps-proxy.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 按 Vercel Vite SPA 官方契约使用 `{ "source": "/(.*)", "destination": "/" }`；
+   当 `cleanUrls` 开启时不再把 fallback 指向 `/index.html`。
+2. API 与健康检查 rewrite 保持在 catch-all 之前，不改变 VPS 代理目标和 OAuth 服务端 callback。
+3. Google OAuth 临时令牌只用于真实 smoke，未写入源码、文档或日志；包含令牌的浏览器测试页已关闭。
+
+**已运行验证**
+- TDD 红测先复现旧负向正则与 `/index.html` fallback，修复后专项测试 2/2 通过。
+- `architecture:check` 全绿。
+- `governance:check` 全绿。
+- Vite 8.1.4 生产构建通过，2566 modules，并产出 `AuthCallback` chunk。
+- `git diff --check` 通过；工作区变更仅包含本条列出的三个文件。
+
+**未运行验证及原因**
+- 本机无系统 `npm`，使用 bundled Node 24 与临时只支持 `npm run` 的无凭据 shim 执行等价检查；
+  未改变依赖批准策略。
+- Vercel Connector 的直接部署入口返回参数错误；改由现有 Git 集成触发生产部署并在下一条记录
+  最终线上 smoke 结果。
+
+**风险与下一步**
+- 风险低，变更仅影响未被前序 API rewrite 命中的前端路径。
+- 推送后必须确认最新生产 deployment 为 READY，并实测 `/auth/callback` 返回应用 HTML；
+  随后重新完成一次 Google 登录，验证回调页面消费会话并返回工作区。

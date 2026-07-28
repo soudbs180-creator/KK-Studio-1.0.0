@@ -8,9 +8,23 @@ const VPS_API_ORIGIN = "https://172-245-156-16.sslip.io";
 
 function readVercelConfig() {
   return JSON.parse(readFileSync(path.join(ROOT_DIR, "vercel.json"), "utf8")) as {
+    cleanUrls?: boolean;
     rewrites?: Array<{ source?: string; destination?: string }>;
   };
 }
+
+test("Vercel serves OAuth callback deep links through the SPA root", () => {
+  const config = readVercelConfig();
+  const rewrites = config.rewrites || [];
+  const spaFallback = rewrites.at(-1);
+
+  assert.equal(config.cleanUrls, true);
+  assert.deepEqual(
+    spaFallback,
+    { source: "/(.*)", destination: "/" },
+    "expected cleanUrls-compatible SPA fallback so /auth/callback resolves to the web app",
+  );
+});
 
 test("Vercel proxies hosted auth and health routes to the VPS API origin", () => {
   const config = readVercelConfig();
