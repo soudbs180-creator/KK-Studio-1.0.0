@@ -4229,7 +4229,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         return (
             <div
                 id="prompt-bar-container"
-                className={`input-bar ios-mobile-prompt kk-prompt-bar-mobile-expanded ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full`}
+                className={`input-bar ios-mobile-prompt kk-prompt-bar-mobile-expanded ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} w-full max-w-full overflow-hidden transition-all duration-300`}
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{
@@ -4238,7 +4238,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     transition: 'height 0.2s cubic-bezier(0.32,0.72,0,1)'
                 }}
             >
-                <div className="input-bar-inner !overflow-visible flex flex-col gap-2.5 p-3 h-full">
+                <div className="input-bar-inner flex h-full flex-col gap-2.5 overflow-y-auto p-3">
                     {mobileSubView === 'input' && (
                         <>
                             {/* 1. 第一排：模式选择均分 5 列 (4模式 + 1收起) */}
@@ -5282,7 +5282,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 )}
 
                 <div
-                    className="input-bar-inner !overflow-visible"
+                    className="input-bar-inner kk-morphic-scrollable-composer"
                     style={{
                         position: 'relative',
                         // Mobile: No capsule wrapper - keep it clean and flat

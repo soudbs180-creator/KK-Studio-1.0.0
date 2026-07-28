@@ -86,9 +86,8 @@ export interface MobileWorkspaceSurfaceProps {
   onCloseHistory?: () => void;
 }
 
-// 磨砂玻璃风格按钮样式定义，带背景和边框的半透明组合
 const moreSheetActionClass =
-  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]';
+  'kk-mobile-more-action rounded-[14px] border p-3.5 text-left text-[var(--text-primary)] active:scale-[0.985]';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -224,8 +223,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         <div
           data-testid="mobile-more-sheet"
           data-kk-mobile-overlay-layer="true"
-          className="fixed inset-0 flex flex-col justify-end"
-          style={{ background: 'var(--mobile-clay-overlay-bg)', zIndex: KK_LAYER.modal }}
+          className="kk-mobile-more-sheet fixed inset-0 flex flex-col justify-end"
+          style={{ zIndex: KK_LAYER.modal }}
         >
           <button
             type="button"
@@ -234,21 +233,13 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             aria-label={pick('关闭更多菜单', 'Close Menu')}
           />
 
-          {/* 更多操作底部滑出式抽屉面板，强行指定为极具质感的暗色磨砂玻璃背景 rgba(20, 20, 22, 0.90) */}
           <div
             ref={moreSheetRef}
             role="dialog"
             aria-modal="true"
             aria-label={pick('更多操作', 'More Actions')}
             tabIndex={-1}
-            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
-            style={{
-              background: 'var(--mobile-clay-shell-bg)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              borderColor: 'var(--mobile-clay-border)',
-              boxShadow: 'var(--mobile-clay-shadow)'
-            }}
+            className="kk-mobile-more-sheet__panel relative rounded-t-[14px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -259,56 +250,32 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               </div>
             </div>
 
-            <div className="mb-3 grid w-full grid-cols-[20fr_20fr_20fr_40fr] gap-2">
-              {/* 左侧：主题大主图（点击切换亮/暗，下压 1px 且缩水 4% 阻尼物理回弹） */}
+            <div className="kk-mobile-more-sheet__shortcuts mb-3 grid w-full grid-cols-[20fr_20fr_20fr_40fr] gap-2">
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-white/8 px-1.5 text-center active:scale-[0.97] active:translate-y-px cursor-pointer"
-                style={{
-                  background: isDarkMode
-                    ? 'linear-gradient(135deg, rgba(255, 77, 139, 0.85) 0%, rgba(184, 164, 237, 0.85) 100%)'
-                    : 'linear-gradient(135deg, rgba(255, 176, 132, 0.95) 0%, rgba(232, 185, 74, 0.95) 100%)',
-                  boxShadow: 'inset 0 0 12px rgba(255, 255, 255, 0.15)',
-                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 240ms cubic-bezier(0.16, 1, 0.3, 1), border-color 240ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
+                data-active-theme={isDarkMode ? 'dark' : 'light'}
+                className="kk-mobile-more-shortcut kk-mobile-more-shortcut--theme relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center active:scale-[0.97] cursor-pointer"
               >
-                {/* 切换主题时的微小物理偏转反馈 */}
-                <div 
-                  className="relative text-white/90 shrink-0"
-                  style={{
-                    transform: isDarkMode ? 'rotate(0deg) scale(1)' : 'rotate(30deg) scale(0.95)',
-                    transition: 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
+                <div className="relative shrink-0 text-[var(--text-secondary)]">
                   {isDarkMode ? <Moon size={18} strokeWidth={2} /> : <Sun size={18} strokeWidth={2} />}
                 </div>
                 <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
-                  <div className="text-[10px] font-bold text-white uppercase tracking-wider">
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                     {isChinese ? '主题' : 'Theme'}
                   </div>
-                  <div className="text-[10px] font-bold text-white uppercase tracking-wider">
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                     {isChinese ? '偏好' : 'Pref'}
                   </div>
                 </div>
               </button>
 
-              {/* 中间：中英文切换按钮 */}
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-1.5 text-center active:scale-[0.975] active:translate-y-px cursor-pointer"
-                style={{
-                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
+                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center active:scale-[0.975] cursor-pointer"
               >
-                <div 
-                  className="relative text-[var(--text-secondary)] shrink-0"
-                  style={{
-                    transform: isChinese ? 'rotate(0deg) scale(1)' : 'rotate(15deg) scale(0.95)',
-                    transition: 'transform 240ms cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
+                <div className="relative text-[var(--text-secondary)] shrink-0">
                   <Languages size={18} strokeWidth={2} />
                 </div>
                 <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
@@ -321,15 +288,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 </div>
               </button>
 
-              {/* 收藏：扩充为 20% 大小，加了图标和文字以保持跟前两个的视觉对称美 */}
               <button
                 type="button"
                 onClick={() => runFromMoreSheet(onOpenFavorites)}
                 data-testid="mobile-more-menu-favorites"
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-1.5 text-center text-[var(--accent-coral)] active:scale-[0.975] active:translate-y-px cursor-pointer"
-                style={{
-                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
+                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center text-[var(--text-secondary)] active:scale-[0.975] cursor-pointer"
               >
                 <div className="relative text-[var(--accent-coral)] shrink-0">
                   <Heart size={18} strokeWidth={2} />
@@ -344,11 +307,10 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 </div>
               </button>
 
-              {/* 右侧：当前项目按钮，调小了 padding 并去掉了 Collapse/Switch 文本以完美适应 40% 的排版空间 */}
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-2.5 text-left transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]"
+                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[8px] border px-2.5 text-left active:scale-[0.985]"
               >
                 <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
                 <div className="min-w-0 flex-1 text-left">
@@ -361,7 +323,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             </div>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] p-2.5">
+              <div className="kk-mobile-more-projects mb-4 rounded-[14px] border p-2.5">
                 <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   {pick('项目列表', 'Projects')}
                 </div>
@@ -372,10 +334,10 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     return (
                       <div
                         key={canvas.id}
-                        className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-2 transition-all ${
+                        className={`kk-mobile-more-project-row flex w-full items-center justify-between gap-3 rounded-[8px] border px-3 py-2 ${
                           isActive
-                            ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
-                            : 'border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/80 text-[var(--text-secondary)]'
+                            ? 'is-active text-[var(--text-primary)]'
+                            : 'text-[var(--text-secondary)]'
                         }`}
                       >
                         {/* 简体中文：项目切换触发按钮，使用 flex-1 撑满左侧区域 */}
@@ -435,7 +397,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-surface-bg)]/80 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45 cursor-pointer"
+                  className="kk-mobile-more-project-action mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] border border-dashed px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45 cursor-pointer"
                 >
                   <Plus size={16} />
                   {canCreateCanvas ? pick('新建项目', 'New Project') : pick('项目已满', 'Project Full')}
@@ -462,7 +424,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     }
                     closeMoreSheet();
                   }}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-surface-bg)]/80 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] active:scale-[0.99] transition-transform cursor-pointer"
+                  className="kk-mobile-more-project-action mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] border border-dashed px-3 py-3 text-sm font-medium text-[var(--text-secondary)] active:scale-[0.99] cursor-pointer"
                 >
                   <Broom size={16} />
                   {pick('清理错误卡片', 'Clean Invalid Cards')}

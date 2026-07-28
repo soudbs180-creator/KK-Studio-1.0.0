@@ -18,6 +18,7 @@ import {
     Cpu,
     Eye,
     Save,
+    X,
 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import { useCanvas } from '../../context/CanvasContext';
@@ -448,15 +449,20 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const projectDropdown = showDropdown ? (
         <>
             <div
-                className="fixed inset-0 z-40 cursor-default"
+                className="fixed inset-0 cursor-default"
+                style={{ zIndex: KK_LAYER.modalBackdrop }}
                 onClick={(event) => {
                     event.stopPropagation();
                     setShowDropdown(false);
                 }}
             />
             <div
-                className={`absolute ${isMobile ? '' : 'left-full top-0 ml-3 w-64'} z-50 overflow-hidden rounded-2xl border`}
-                style={{ ...frostedProjectManagerShellStyle, ...dropdownPositionStyle }}
+                className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] bottom-[10px] w-[262px]'} overflow-hidden rounded-[14px] border`}
+                style={{
+                    ...frostedProjectManagerShellStyle,
+                    ...dropdownPositionStyle,
+                    zIndex: KK_LAYER.modal,
+                }}
             >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
@@ -648,15 +654,16 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const workflowDropdown = showWorkflowDropdown && onAddWorkflowUtilityCard && onApplyWorkflowTemplate ? (
         <>
             <div
-                className="fixed inset-0 z-40 cursor-default"
+                className="fixed inset-0 cursor-default"
+                style={{ zIndex: KK_LAYER.modalBackdrop }}
                 onClick={(event) => {
                     event.stopPropagation();
                     setShowWorkflowDropdown(false);
                 }}
             />
             <div
-                className="absolute left-full top-0 ml-3 w-72 z-50 overflow-hidden rounded-2xl border transition-all duration-300 ease-out will-change-[transform,opacity]"
-                style={frostedProjectManagerShellStyle}
+                className="kk-morphic-workflow-panel fixed left-1/2 top-1/2 w-[min(820px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border transition-[opacity,transform] duration-150"
+                style={{ ...frostedProjectManagerShellStyle, zIndex: KK_LAYER.modal }}
                 onMouseEnter={handleWorkflowMenuMouseEnter}
                 onMouseLeave={closeWorkflowMenuDelayed}
             >
@@ -667,9 +674,22 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
                         工作流引擎
                     </h3>
-                    <span className="text-[10px] text-blue-400 font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 animate-pulse">
-                        BETA
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                            BETA
+                        </span>
+                        <button
+                            type="button"
+                            aria-label="关闭工作流"
+                            className="flex size-8 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setShowWorkflowDropdown(false);
+                            }}
+                        >
+                            <X size={16} aria-hidden="true" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-3 border-b border-[color:var(--frost-card-sub-border)]">
@@ -977,7 +997,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         <Layers size={20} />
                                         <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
                                     </button>
-                                    {projectDropdown}
                                 </div>
 
                                 <button
@@ -1089,7 +1108,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         >
                                             <Network size={20} />
                                         </button>
-                                        {workflowDropdown}
                                     </div>
                                 )}
 
@@ -1109,6 +1127,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </div>
                 </div>
             </div>
+            {projectDropdown ? ReactDOM.createPortal(projectDropdown, document.body) : null}
+            {workflowDropdown ? ReactDOM.createPortal(workflowDropdown, document.body) : null}
             {deleteConfirmModal}
             {mergeModal}
         </>

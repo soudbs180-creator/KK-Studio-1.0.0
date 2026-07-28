@@ -51,6 +51,22 @@ function focusWorkspaceComposer(fallback: () => void) {
   fallback();
 }
 
+function revealCopilotHistory() {
+  window.setTimeout(() => {
+    const historySearch = document.querySelector<HTMLInputElement>(
+      'input[placeholder="搜索历史记录..."]',
+    );
+    if (historySearch) {
+      return;
+    }
+
+    const historyButton = document.querySelector<HTMLButtonElement>(
+      'button[title="历史记录与分支"]',
+    );
+    historyButton?.click();
+  }, 0);
+}
+
 const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
   icon,
   label,
@@ -91,6 +107,20 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 }) => {
   const { adminLevel } = useAuth();
   const [activeMode, setActiveMode] = React.useState<'canvas' | 'copilot' | 'create'>('canvas');
+  React.useEffect(() => {
+    if (isMobile) {
+      delete document.body.dataset.kkWorkspaceMode;
+      return undefined;
+    }
+
+    document.body.dataset.kkWorkspaceMode = activeMode;
+    return () => {
+      if (document.body.dataset.kkWorkspaceMode === activeMode) {
+        delete document.body.dataset.kkWorkspaceMode;
+      }
+    };
+  }, [activeMode, isMobile]);
+
   if (isMobile) {
     return null;
   }
@@ -103,6 +133,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   const openCopilotMode = () => {
     setActiveMode('copilot');
     onOpenAssistant();
+    revealCopilotHistory();
   };
   const openCreateMode = () => {
     setActiveMode('create');
@@ -209,7 +240,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             <div
               id="desktop-user-menu-panel"
               onClick={(e) => e.stopPropagation()}
-              className="kk-workspace-menu-surface fixed left-4 top-[88px] w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
+              className="kk-workspace-menu-surface fixed right-3 top-[52px] w-64 origin-top-right animate-in rounded-[14px] border p-2 duration-100 fade-in zoom-in-95"
               style={{ zIndex: KK_LAYER.modal }}
             >
               <div className="space-y-1">

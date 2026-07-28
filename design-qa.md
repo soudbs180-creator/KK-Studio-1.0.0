@@ -3,69 +3,77 @@
 ## QA scope
 
 - Reference: `https://studio.morphic.com/invite/MDE5ZmE3ZTItNjk4MC03M2JhLWE1OTMtOTA3NTAzMTM4NzNi`
-- Implementation preview: `http://127.0.0.1:4173`
+- Local preview: `http://127.0.0.1:4173`
 - Desktop viewport: `1280 × 720`
-- Responsive viewports: `375 × 812`, `390 × 844`, `430 × 932`, `768 × 1024`
-- Surfaces: Canvas、Copilot、创作、登录、工作流、设置、移动端工作区
+- Responsive widths: `375`, `390`, `430`, `768`
+- Surfaces: landing, login, Canvas, Copilot, Create composer, projects, workflow, account menu, settings, profile, recharge, mobile composer and mobile more sheet
+- Audit date: `2026-07-28`
 
 ## Evidence matrix
 
 | State | Reference evidence | KK Studio evidence |
 |---|---|---|
-| Canvas | `temp/design-qa/morphic-source-canvas-1280.png` | `temp/design-qa/kk-local-final-1280.png` |
-| Canvas comparison | — | `temp/design-qa/compare-final-canvas-1280.png` |
-| Copilot | `temp/design-qa/morphic-source-copilot-1280.png` | `temp/design-qa/kk-local-copilot-1280.png` |
-| Copilot comparison | — | `temp/design-qa/compare-copilot-1280.png` |
-| Compose | `temp/design-qa/morphic-source-compose-1280.png` | `temp/design-qa/kk-local-final-1280.png` |
-| Login | `temp/design-qa/morphic-source-login-1280.png` | Auth Modal checked in the shared dark system |
-| Workflow | `temp/design-qa/morphic-source-workflow-1280.png` | Workflow launcher checked in the shared dark system |
-| Settings | — | `temp/design-qa/kk-local-settings-1280.png` |
-| Mobile | — | `temp/design-qa/kk-local-mobile-375.png`, `kk-local-mobile-390.png`, `kk-local-mobile-430.png`, `kk-local-mobile-768.png` |
+| Canvas | `temp/design-audit-2026-07-28/ref-02-canvas-desktop.png` | `temp/design-audit-2026-07-28/45-project-panel-final-desktop.png` |
+| Copilot | `temp/design-audit-2026-07-28/ref-03-copilot-desktop.png` | `temp/design-audit-2026-07-28/41-copilot-final-desktop.png` |
+| Canvas + Copilot comparison | Reference and implementation combined in the same input | `temp/design-audit-2026-07-28/44-reference-vs-kk-final-comparison.png` |
+| Workflow | `temp/design-audit-2026-07-28/ref-01-workflows-desktop.png` | `temp/design-audit-2026-07-28/43-workflow-final-desktop.png` |
+| Login | `temp/design-audit-2026-07-28/ref-04-login-desktop.png` | `temp/design-audit-2026-07-28/36-auth-refactored-desktop.png` |
+| Landing | Reference dark stage language | `temp/design-audit-2026-07-28/35-landing-refactored-desktop.png`, `39-landing-mobile-refactored-375.png` |
+| Account menu | Reference right-side top-bar menu | `temp/design-audit-2026-07-28/29-account-menu-refactored-desktop.png` |
+| Settings / account | Reference panel and control language | `temp/design-audit-2026-07-28/19b-mobile-settings-375x700.png`, `20-mobile-profile-375x700.png`, `21-mobile-recharge-375x700.png` |
+| Mobile shell | Reference dark sheet and compact controls | `temp/design-audit-2026-07-28/46-mobile-menu-final-375.png` |
+| Mobile composer | Reference safe-area composer behavior | `temp/design-audit-2026-07-28/32-mobile-commerce-composer-top-375.png`, `33-mobile-commerce-composer-bottom-375.png`, `34-mobile-commerce-composer-tabs-375.png` |
 
 ## Geometry verification
 
-| Metric | Reference | KK Studio | Result |
+| Metric | Target | Measured | Result |
 |---|---:|---:|---|
 | Top bar height | 48px | 48px | passed |
-| Left floating panel open width | 262px target | 262px token / open state | passed |
-| Composer width | 570px | 570px | passed |
-| Composer bottom offset | 10px | 10px | passed |
-| Workspace horizontal overflow | none | none | passed |
-| Desktop mode button height | 30px | 30px | passed |
-| Mobile target size | ≥44px | ≥44px | passed |
+| Project panel | x=12, y=48, width=262px, bottom=10px | x=12, y=48, width=262px, height=662px | passed |
+| Copilot work area | x=12, y=48, right=12, bottom=10px | x=12, y=48, width=1256px, height=662px | passed |
+| Canvas composer | max-width=570px, bottom=10px | 570px, bottom=10px | passed |
+| Account menu | right=12px, top=52px | x=1012, y=52, width=256px | passed |
+| Auth dialog | width=412px, max-height=546px/90vh | 412px × 546px at 1280 × 720 | passed |
+| Mobile more sheet | no gradient, no overflow | 375px wide, background image `none` | passed |
+| Mobile target size | at least 44px | zero visible targets below 43.5px | passed |
 
 ## Responsive verification
 
-| Viewport | Document width | Composer | Main actions | Result |
-|---|---:|---|---|---|
-| 375px | 375px | x=8, width=359px | visible, ≥44px | passed |
-| 390px | 390px | x=8, width=374px | visible, ≥44px | passed |
-| 430px | 430px | x=8, width=414px | visible, ≥44px | passed |
-| 768px | 768px | x=8, width=752px | visible, ≥44px | passed |
+| Width | Document width | Body width | Visible small targets | Result |
+|---:|---:|---:|---:|---|
+| 375px | 375px | 375px | 0 | passed |
+| 390px | 390px | 390px | 0 | passed |
+| 430px | 430px | 430px | 0 | passed |
+| 768px | 768px | 768px | 0 | passed |
 
-Safe-area rules were verified for the top bar and bottom Composer. No required viewport produced horizontal overflow, a clipped primary action, or an obscured input.
+No required viewport produced horizontal overflow, a clipped primary action, vertical mode labels, or an obscured composer.
 
 ## Interaction verification
 
-- Canvas → Copilot opens the existing AI assistant and synchronizes the selected top mode.
-- Copilot → Canvas closes the AI assistant and restores the Canvas mode.
-- 创作 focuses the existing Composer without adding a route or unsupported capability.
-- Desktop avatar remains clickable after moving the Canvas navigation panel below the 48px top bar.
-- Sheet and Modal support Escape, focus containment, focus restoration, background scroll lock, and backdrop close.
-- Responsive panels convert to the existing drawer/sheet flows without changing callbacks or persisted state.
+- Canvas, Copilot and Create all receive the click target directly; the task center no longer covers the top switch.
+- Copilot reuses the existing assistant runtime and presents a 262px conversation rail, central transcript and wide bottom composer.
+- The project panel and workflow dialog are portaled to `document.body`, so the desktop tool rail cannot clip them.
+- The workflow dialog has a visible close button; backdrop close and existing action callbacks remain intact.
+- The account menu opens directly below the avatar and stays anchored to the right edge.
+- Desktop and mobile ecommerce composers scroll internally while their primary actions remain reachable.
+- Mobile mode tabs stay on one line and every visible interactive target satisfies the 44px rule.
+- Landing and authentication CTAs remain visible and non-overlapping on desktop and mobile.
 
 ## Findings and resolutions
 
 | Priority | Finding | Resolution |
 |---|---|---|
-| P0 | Morphic stylesheet was initially imported only by the fallback entry | Imported it from the actual `bootstrap.tsx` entry and kept the fallback import compatible |
-| P0 | Closed AI sidebar was still translated into the visible Canvas area | Corrected desktop and mobile closed-state transforms |
-| P1 | Canvas navigation panel intercepted top-bar avatar input | Repositioned it below the 48px top bar and verified the desktop settings smoke path |
-| P1 | Late-loaded settings CSS restored legacy action colors | Added final Morphic token normalization for settings surfaces |
-| P1 | Mobile controls below 44px | Added mobile interaction target and safe-area rules |
-| P2 | Landing page contained decorative CSS-art placeholders | Removed decorative DOM while preserving KK Studio content and routes |
-| P2 | Sheet allowed background page scrolling | Added body scroll lock with exact cleanup |
+| P0 | Task center trigger intercepted Canvas / Copilot / Create | Moved the desktop task center below the 48px top bar |
+| P0 | Project and workflow surfaces were clipped by the desktop tool rail | Portaled both overlays and applied the shared modal layers |
+| P1 | Account menu opened at the detached upper-left position | Right-anchored it at `right=12px`, `top=52px` |
+| P1 | Copilot remained a narrow right sidebar | Reused the assistant runtime in the reference three-zone layout |
+| P1 | Desktop ecommerce composer exceeded the viewport | Added bounded internal scrolling and preserved bottom controls |
+| P1 | Mobile composer exceeded the viewport and double-scrolled | Bounded the shell to `66dvh` and moved scrolling to the inner content |
+| P1 | Mobile mode labels wrapped vertically | Enforced 44px targets, 12px type and `white-space: nowrap` |
+| P1 | Mobile more sheet retained Clay gradients and oversized radii | Replaced it with neutral Morphic panel/control surfaces |
+| P2 | Settings hero surfaces retained legacy gradients and shadows | Normalized headers and presets to flat shared surfaces |
+| P2 | Landing and auth layouts could overlap or expose scrollbars | Reset decorative positioning, centered auth content and hid cosmetic scrollbars |
 
-All listed P0, P1, and P2 findings are resolved. Reference-specific names, trademarks, generated media, and proprietary assets were not copied; KK Studio content and existing linear icon assets remain in use.
+All P0, P1 and P2 findings are resolved. KK Studio keeps its own brand, copy, routes, business capabilities and existing icon assets; Morphic trademarks and proprietary media were not copied.
 
 final result: passed

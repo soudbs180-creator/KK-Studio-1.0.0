@@ -1453,3 +1453,60 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   已禁止回退。后续页面开发必须直接消费 `packages/ui` 的 Morphic Token 和语义组件。
 - `temp/design-qa/` 中的参考与实现截图是本地 QA 证据且不进入发布产物；可按相同视口继续更新。
 - 若需要团队评审，可在用户明确授权后通过现有 Vercel 流程发布预览；本次不触发部署。
+
+---
+
+## 240. 2026-07-28 - fix(ui): 完成 Morphic 全产品浏览器复核与响应式收口
+
+**修改范围**
+- 在本地运行态逐一操作并复核 Canvas、Copilot、创作、项目、工作流、账户菜单、设置、首页、
+  登录及移动端关键路径；用 1280 × 720 同视口将 Morphic 参考截图与 KK Studio 实现截图合并
+  对比，并针对可见差异完成第二轮修正。
+- 修复桌面顶栏被任务中心遮挡、项目/工作流浮层被工具轨裁切、账户菜单锚点错位、Copilot 仍为
+  右侧窄栏、桌面与移动电商 Composer 越界，以及移动端旧 Clay 渐变和模式文字竖排问题。
+- 保持后端、鉴权、计费、Provider、Canvas、Agent、路由和持久化契约不变。
+
+**修改文件**
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/mobile/MobileWorkspaceSurface.tsx`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/clay-global-ui-refit-contract.test.ts`
+- `tests/unit/morphic-surface-migration.test.ts`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 项目和工作流浮层使用 `ReactDOM.createPortal(..., document.body)` 脱离工具轨裁切边界，并继续
+   使用 `KK_LAYER`；项目面板严格为 x=12、y=48、width=262、bottom=10。
+2. Copilot 只重排现有 `ChatSidebar` 运行时：左侧 262px 会话栏、中央消息区、底部宽 Composer；
+   不新增平行助手、路由或能力。
+3. Composer 超出可用高度时只让内容区滚动；桌面和移动外壳保持固定几何，主操作始终可达。
+4. 移动端更多菜单统一使用 Morphic panel/control Token，取消 Clay 渐变、装饰阴影和超大圆角。
+5. 工作流弹窗补充可见关闭按钮；Backdrop、模板和工作流卡片回调语义不变。
+
+**已运行验证**
+- TDD：`morphic-surface-migration.test.ts` 先出现 2 个预期失败，实施后 5/5 通过。
+- Morphic/旧 Surface 专项：17/17 通过。
+- 浏览器桌面实测：项目面板 x=12、y=48、262×662；Copilot 外壳 x=12、y=48、
+  1256×662；账户菜单 x=1012、y=52、width=256；Canvas/Copilot/创作切换与工作流关闭通过。
+- 浏览器响应式实测：375/390/430/768px 的 document/body 宽度均等于 viewport；
+  所有视口可见小于 44px 的交互目标数量均为 0。
+- `architecture:check`、`governance:check`、`typecheck`、生产 `build` 和 `git diff --check`
+  通过；Vite 8.1.4 构建 2573 modules。
+- 首轮 `verify:changes` 捕获旧 Clay 移动壳契约仍要求已移除的渐变 Token；将该历史契约更新为
+  “Morphic Shell + 旧结果页 Token 桥”后，专项 15/15 通过，完整 `verify:changes` 重新运行通过，
+  包含 dependency audit、Local Runner、spec、全量测试、移动/桌面设置 Smoke、AI Takeover、
+  encoding 和 Canvas performance 3/3。
+- `design-qa.md` 已更新为本轮真实截图与测量，P0/P1/P2 全部清零，
+  `final result: passed`。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围是本地预览、浏览器操作检查和本地 Git Commit。
+
+**风险与下一步**
+- 旧业务组件仍通过兼容 Token 桥读取部分 Frost/Clay 变量，但本轮所有可见关键 Surface 已归一到
+  Morphic 深色语义，且新移动菜单不再引用旧 Clay 变量。
+- QA 截图保留在 `temp/design-audit-2026-07-28/`，不进入发布产物；若后续业务新增 Surface，
+  必须复用共享 Token 并更新同视口视觉对比。

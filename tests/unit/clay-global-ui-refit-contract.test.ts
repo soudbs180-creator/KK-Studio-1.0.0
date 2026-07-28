@@ -149,7 +149,7 @@ test('tutorial overlay uses Clay spotlight and flat action treatment', () => {
   assert.doesNotMatch(source, /shadow-lg|shadow-\[0_32px_64px/);
 });
 
-test('mobile workspace shell uses Clay theme tokens instead of hard-coded dark glass', () => {
+test('mobile workspace shell uses Morphic surfaces while legacy result views stay tokenized', () => {
   const mobileHeader = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
   const mobileWorkspaceSurface = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
   const mobileMoreMenu = readSource('apps/web/src/components/mobile/MobileMoreMenu.tsx');
@@ -167,9 +167,10 @@ test('mobile workspace shell uses Clay theme tokens instead of hard-coded dark g
     appPromptComposer,
   ].join('\n');
 
-  assert.match(combined, /var\(--mobile-clay-shell-bg\)/);
+  assert.match(mobileHeader, /kk-mobile-header-surface/);
+  assert.match(mobileWorkspaceSurface, /kk-mobile-more-sheet__panel/);
+  assert.doesNotMatch(mobileWorkspaceSurface, /mobile-clay|linear-gradient/i);
   assert.match(combined, /var\(--mobile-clay-surface-bg\)/);
-  assert.match(combined, /var\(--mobile-clay-shadow\)/);
   assert.match(mobileResultTile, /var\(--mobile-clay-active-border\)/);
   assert.match(mobileResultDetail, /var\(--mobile-clay-stage-info-bg\)/);
   assert.match(mobileResultDetail, /var\(--mobile-clay-bottom-bar-bg\)/);
