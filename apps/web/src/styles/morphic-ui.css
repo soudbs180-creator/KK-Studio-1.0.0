@@ -863,9 +863,137 @@ select,
 }
 
 #prompt-bar-container .input-bar-inner {
-  overflow-y: auto !important;
   overscroll-behavior: contain;
+}
+
+#prompt-bar-container[data-composer-mode='ecommerce'] .input-bar-inner {
+  overflow-y: auto !important;
   scrollbar-gutter: stable;
+}
+
+#prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) {
+  min-height: 127px;
+}
+
+#prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) .input-bar-inner {
+  min-height: 125px;
+  max-height: min(72dvh, 620px);
+  gap: 0 !important;
+  padding: 5px !important;
+  overflow: visible !important;
+  scrollbar-gutter: auto;
+}
+
+.kk-composer-floating-tools {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.kk-composer-floating-tools > * {
+  width: auto !important;
+  pointer-events: auto;
+}
+
+.kk-composer-floating-tools > [data-mobile-composer-section='mode-strip'] {
+  flex: 0 1 auto;
+}
+
+.kk-composer-floating-tools button {
+  min-height: 30px;
+}
+
+.kk-composer-floating-tools .kk-composer-mode-switcher__track,
+.kk-composer-floating-tools .kk-composer-prompt-tools__group {
+  height: 32px !important;
+  padding: 1px !important;
+  border-radius: 9999px !important;
+}
+
+.kk-composer-floating-tools .kk-composer-mode-switcher__indicator {
+  top: 1px !important;
+  height: 28px !important;
+  border-radius: 9999px !important;
+}
+
+.kk-composer-floating-tools .kk-composer-mode-switcher__button,
+.kk-composer-floating-tools .kk-composer-prompt-tools__optimize {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-radius: 9999px !important;
+}
+
+.kk-composer-reference-row {
+  min-height: 30px;
+  padding-left: 7px;
+}
+
+.kk-composer-reference-button {
+  height: 30px;
+  padding: 0 8px;
+  border-color: transparent !important;
+  background: transparent;
+  color: var(--kk-morphic-text-secondary) !important;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.kk-composer-reference-button:hover {
+  border-color: var(--kk-morphic-border) !important;
+}
+
+.kk-composer-reference-label {
+  line-height: 14px;
+}
+
+#prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) [data-mobile-composer-section='primary-input'] {
+  min-height: 32px;
+}
+
+#prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) .input-bar-textarea {
+  width: calc(100% - 7px);
+  min-height: 24px !important;
+  height: 24px !important;
+  max-height: 142px !important;
+  margin: 8px 0 0 7px !important;
+  padding: 0 7px 0 0 !important;
+  font-size: 14px !important;
+  line-height: 21px !important;
+}
+
+.kk-composer-compact-footer {
+  min-height: 32px !important;
+  margin-top: auto;
+  padding: 0 !important;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+  border-top: 0 !important;
+}
+
+.kk-composer-compact-footer button,
+.kk-composer-compact-footer .input-bar-model {
+  min-height: 30px !important;
+  height: 30px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+
+.kk-composer-compact-footer .text-sm {
+  font-size: 12px !important;
+  line-height: 14px !important;
+}
+
+.kk-composer-compact-footer .h-10 {
+  height: 30px !important;
+}
+
+.kk-composer-compact-footer .w-10 {
+  width: 30px !important;
 }
 
 #prompt-bar-container textarea,
@@ -950,6 +1078,52 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
   flex: 1;
 }
 
+/* The existing assistant header keeps all KK controls, but compresses them into
+   the same quiet 262px rail rhythm as the reference Copilot surface. */
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) {
+  height: 100%;
+  padding-top: 0 !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(1) {
+  min-height: 44px;
+  height: 44px;
+  padding: 6px 8px !important;
+  border-bottom: 1px solid var(--kk-morphic-border);
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(2) {
+  width: calc(100% - 16px) !important;
+  min-height: 32px;
+  height: 32px;
+  margin: 4px 8px !important;
+  padding: 4px 8px !important;
+  gap: 0 !important;
+  border-color: var(--kk-morphic-border) !important;
+  border-radius: 8px;
+  background: var(--kk-morphic-control) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(2) > :last-child {
+  display: none;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(3) {
+  min-height: 0;
+  max-height: none !important;
+  flex: 1;
+  border-top-color: var(--kk-morphic-border) !important;
+  background: transparent !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(3) > :first-child {
+  min-height: 38px;
+  height: 38px;
+  padding: 4px 8px !important;
+}
+
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) {
   grid-column: 2;
   grid-row: 1;
@@ -958,12 +1132,35 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
   background: var(--kk-morphic-canvas);
 }
 
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child {
+  margin-top: clamp(48px, 10vh, 84px);
+  gap: 0 !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child > :first-child {
+  display: none;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child > :nth-child(2) {
+  max-width: 560px !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child > :nth-child(2) > div {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--kk-morphic-text-secondary) !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
 body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(3) {
   grid-column: 2;
   grid-row: 2;
-  width: min(calc(100% - 40px), 968px);
-  margin: 0 auto 0;
-  padding: 8px 0 0 !important;
+  width: min(calc(100% - 25px), 968px);
+  margin: 0 0 7px 20px;
+  padding: 0 !important;
   background: var(--kk-morphic-canvas);
 }
 
@@ -971,6 +1168,91 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar textarea {
   border-color: var(--kk-morphic-border) !important;
   background: var(--kk-morphic-control) !important;
   box-shadow: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-composer {
+  min-height: 94px;
+  padding: 5px !important;
+  gap: 0 !important;
+  border: 0 !important;
+  outline: 1px solid var(--kk-morphic-border);
+  outline-offset: -1px;
+  border-radius: 20px !important;
+  background: var(--kk-morphic-control) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-composer > :first-child {
+  min-height: 54px;
+  padding: 6px 7px 6px 32px;
+}
+
+body[data-kk-workspace-mode='copilot'] textarea.kk-chat-sidebar-composer-input {
+  min-height: 42px !important;
+  height: 42px;
+  max-height: 142px !important;
+  padding: 0 7px 24px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  font-size: 14px !important;
+  line-height: 17.5px !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-composer-actions {
+  min-height: 30px;
+  height: 30px !important;
+  max-height: 30px;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+  border-top: 0 !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-agent-controls {
+  min-height: 30px;
+  height: 30px;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-attachment-host {
+  position: static !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-attachment-host > button {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 28px;
+  height: 28px;
+  padding: 0 !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-composer-actions button {
+  min-width: 30px;
+  min-height: 30px;
+  box-shadow: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .assistant-collaboration-mode-switch {
+  min-height: 30px;
+  height: 30px;
+  padding: 1px !important;
+  box-shadow: none !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .assistant-collaboration-mode-switch button {
+  min-height: 28px;
+  height: 28px;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-send-control,
+body[data-kk-workspace-mode='copilot'] .kk-chat-sidebar-send-control button {
+  width: 30px !important;
+  height: 30px !important;
 }
 
 /* Public landing */
@@ -1214,13 +1496,27 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar textarea {
   color: var(--kk-morphic-text-primary) !important;
 }
 
+body:has(.auth-modal-overlay) {
+  overflow: hidden;
+}
+
+html:has(.auth-modal-overlay) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
 .auth-modal-overlay {
   position: fixed;
   z-index: var(--kk-layer-modal, 3000);
-  inset: 0;
+  top: 0;
+  right: auto;
+  bottom: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100vw;
+  height: 100dvh;
   padding: 20px;
   background: rgba(0, 0, 0, 0.66) !important;
   backdrop-filter: blur(8px) !important;
@@ -1229,6 +1525,7 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar textarea {
 .auth-modal-content {
   position: relative;
   width: min(calc(100vw - 32px), var(--kk-morphic-dialog-width)) !important;
+  height: min(546px, 90vh) !important;
   max-height: min(90vh, 546px) !important;
   overflow: auto !important;
   border: 1px solid var(--kk-morphic-border) !important;
@@ -1302,6 +1599,18 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar textarea {
   gap: 12px !important;
 }
 
+.auth-field {
+  gap: 5px !important;
+}
+
+.auth-field > span {
+  line-height: 14px !important;
+}
+
+.auth-field-help:not(.auth-field-error) {
+  display: none;
+}
+
 .auth-input-wrap,
 .auth-social-btn,
 .auth-captcha-container {
@@ -1313,11 +1622,22 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar textarea {
 }
 
 .auth-input-wrap {
-  min-height: 36px !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 10px !important;
+  border: 0 !important;
+  outline: 1px solid var(--kk-morphic-border);
+  outline-offset: -1px;
+}
+
+.auth-input-wrap > svg {
+  display: none;
 }
 
 .auth-input-wrap input {
   color: var(--kk-morphic-text-primary) !important;
+  font-size: 16px !important;
+  line-height: 22px !important;
 }
 
 .auth-input-wrap input::placeholder {
@@ -1665,6 +1985,7 @@ body .settings-panel .apple-soft-card {
   [role="button"],
   a,
   input,
+  textarea,
   select {
     min-height: 44px !important;
   }

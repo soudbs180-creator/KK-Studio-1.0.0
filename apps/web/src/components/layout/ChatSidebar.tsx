@@ -3162,7 +3162,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                         {/* 一体化卡片输入容器 */}
                         <div
-                            className={`flex flex-col rounded-2xl border transition-all duration-300 ${
+                            className={`kk-chat-sidebar-composer flex flex-col rounded-2xl border transition-all duration-300 ${
                                 isDropActive
                                     ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/10 ring-2 ring-[var(--accent-coral)]/20'
                                     : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] focus-within:border-[var(--accent-coral-glow)] focus-within:ring-1 focus-within:ring-[var(--accent-coral-ring)] focus-within:shadow-[0_0_12px_rgba(255,107,90,0.04)]'
@@ -3203,7 +3203,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             ? 'ai-assist-composer-input'
                                             : 'chat-composer-input'}
                                     ref={inputRef}
-                                    className="w-full border-none shadow-none text-[15px] p-0.5 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed"
+                                    className="kk-chat-sidebar-composer-input w-full border-none shadow-none bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                     placeholder={collaborationMode === 'takeover'
                                         ? '描述目标，AI 将跨工具执行...'
                                         : collaborationMode === 'assist'
@@ -3324,7 +3324,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     />
 
                                     {/* 附件添加按钮 */}
-                                    <div className="relative shrink-0">
+                                    <div className="kk-chat-sidebar-attachment-host relative shrink-0">
                                         <button
                                             id="btn-takeover-plus-button"
                                             type="button"

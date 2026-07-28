@@ -5253,7 +5253,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             <div
                 id="prompt-bar-container"
-                data-desktop-composer-state="expanded"
+                data-desktop-composer-state="expanded" data-composer-mode={config.mode} data-composer-layout={isMobile ? 'mobile' : 'desktop'}
                 className={`input-bar kk-desktop-composer-expanded ${isMobile ? 'ios-mobile-prompt' : ''} ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
@@ -5748,10 +5748,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         )}
 
                         {shouldRenderStandaloneUploadRow && (
-                            <div className="mt-0.5 flex items-center px-2 py-0.5">
+                            <div className="kk-composer-reference-row flex items-center">
                                 <button
                                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-dashed opacity-45 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-85"
+                                    className="kk-composer-reference-button flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border transition-colors duration-125 hover:bg-[var(--toolbar-hover)]"
                                     style={{
                                         color: 'var(--text-secondary)',
                                         borderColor: 'var(--frost-card-sub-border)'
@@ -5763,7 +5763,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                                         <polyline points="17 8 12 3 7 8" />
                                         <line x1="12" y1="3" x2="12" y2="15" />
-                                    </svg>
+                                    </svg><span className="kk-composer-reference-label">参考</span>
                                 </button>
                             </div>
                         )}

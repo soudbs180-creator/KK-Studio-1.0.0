@@ -1510,3 +1510,57 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
   Morphic 深色语义，且新移动菜单不再引用旧 Clay 变量。
 - QA 截图保留在 `temp/design-audit-2026-07-28/`，不进入发布产物；若后续业务新增 Surface，
   必须复用共享 Token 并更新同视口视觉对比。
+
+---
+
+## 241. 2026-07-28 - fix(ui): 精确收口 Morphic 输入框与 Copilot 密度
+
+**修改范围**
+- 继续以 Morphic Canvas、Copilot 和登录状态为同视口参照，精确收口输入框、Composer、
+  模式切换、提示词工具条、Copilot 会话栏及欢迎状态。
+- 在本地运行态实际输入、清空并检查 Canvas 与 Copilot Prompt；复核移动端
+  375/390/430/768px 的安全区、触控目标与横向溢出。
+- 保持 KK Studio 现有模式、Provider、登录方式、生成能力和所有后端契约不变。
+
+**修改文件**
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx`
+- `apps/web/src/components/layout/ChatSidebar.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/morphic-input-fidelity-contract.test.ts`
+- `tests/unit/prompt-bar-layout-regression.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Canvas 标准 Composer 为 570 × 127px，编辑区 24px、14/21px；引用和操作按钮 30px，
+   模式/提示词轨道 32px，Footer 32px。
+2. Copilot 标准 Composer 为 968 × 94px，编辑区 42px、14/17.5px；会话栏保持 262px，
+   顶部操作区 44px、上下文摘要 32px，并使用平面欢迎消息。
+3. 认证 Dialog 保持 412 × 546px；输入框 38px、左右内边距 10px、16/22px。
+4. 移动 Composer 左右各 8px，底部叠加安全区；输入和可见操作目标最小 44px。
+5. 精确几何由语义 class 与共享 Token 控制；不为参考站新增无业务支撑的路由、模式或能力。
+
+**已运行验证**
+- TDD：新增精确输入契约先出现预期失败，完成实现后 3/3 通过。
+- PromptBar 布局回归 11/11、Morphic Surface 迁移 5/5、Canvas 响应式契约 8/8 通过。
+- 全量 unit 2250 项：2248 通过 / 0 失败 / 2 跳过。
+- 浏览器实测 Canvas Prompt 输入、发送启用、清空和禁用状态；Copilot Prompt 输入、发送启用及
+  原生 React 输入清空状态全部通过。
+- 浏览器实测 375/390/430/768px 均满足 `scrollWidth === innerWidth`，输入高度 45px，
+  无横向溢出。
+- Canvas、Copilot、登录同视口组合图已检查并登记到 `design-qa.md`；P0/P1/P2 全部清零。
+- `architecture:check`、`governance:check`、`typecheck`、生产 `build` 和完整
+  `npm run verify:changes` 通过；Vite 构建 2573 modules，Canvas performance 3/3。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围是本地预览、浏览器操作检查和本地 Git Commit。
+
+**风险与下一步**
+- KK Studio 保留比参考站更多的业务模式、提示词优化和登录 Provider，因此内容数量不同；
+  外壳几何、密度和交互规律已按参考统一。
+- 本轮视觉证据位于 `temp/input-audit-2026-07-28/`，属于本地 QA 证据，不进入发布产物。

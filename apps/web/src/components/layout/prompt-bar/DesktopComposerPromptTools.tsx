@@ -63,11 +63,11 @@ export default function DesktopComposerPromptTools({
         </button>
       ) : null}
 
-      <div className="flex h-9 items-center gap-1 bg-[var(--prompt-bar-shell-bg)] rounded-lg border border-[var(--prompt-bar-shell-border)] p-[2px] transition-all">
+      <div className="kk-composer-prompt-tools__group flex h-9 items-center gap-1 bg-[var(--prompt-bar-shell-bg)] rounded-lg border border-[var(--prompt-bar-shell-border)] p-[2px] transition-all">
         <button
           type="button"
           data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.togglePromptOptimization.uiAction}
-          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${
+          className={`kk-composer-prompt-tools__optimize flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${
             config.enablePromptOptimization
               ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] font-bold'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

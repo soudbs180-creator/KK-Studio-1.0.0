@@ -26,7 +26,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
   return (
     <div className={isMobile ? 'w-full overflow-x-auto scrollbar-none pb-0.5' : 'flex items-center gap-2'}>
       <div
-        className={`relative inline-flex items-center rounded-xl border p-1 ${isMobile ? 'min-w-max' : ''}`}
+        className={`kk-composer-mode-switcher__track relative inline-flex items-center rounded-xl border p-1 ${isMobile ? 'min-w-max' : ''}`}
         style={{
           background: 'var(--prompt-bar-shell-bg)',
           borderColor: 'var(--prompt-bar-shell-border)',
@@ -34,7 +34,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
         }}
       >
         <div
-          className="pointer-events-none absolute left-0 top-1 h-[calc(100%-8px)] rounded-lg transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          className="kk-composer-mode-switcher__indicator pointer-events-none absolute left-0 top-1 h-[calc(100%-8px)] rounded-lg transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
             width: `${sliderWidth}px`,
             transform: `translate3d(${sliderOffset}px, 0, 0)`,
@@ -46,7 +46,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
         />
 
         {Array.from({ length: Math.max(0, modeOptions.length - 1) }, (_, index) => index + 1).map((splitIndex) => {
-          const dividerCenter = 4 + splitIndex * modeSlotWidth;
+          const dividerCenter = (isMobile ? 4 : 1) + splitIndex * modeSlotWidth;
 
           return (
             <span
@@ -70,7 +70,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
               <button
                 type="button"
                 data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleMode.uiAction}
-                className={`rounded-lg px-2 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-16 text-xs'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
+                className={`kk-composer-mode-switcher__button rounded-lg px-2 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-16 text-xs'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
                 style={{ color: isActive ? item.color : 'var(--text-secondary)' }}
                 onMouseDown={(event) => {
                   event.stopPropagation();

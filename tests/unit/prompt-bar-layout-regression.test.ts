@@ -2,7 +2,7 @@ import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-test('prompt bar keeps footer wrapping while allowing full desktop control labels', () => {
+test('prompt bar keeps the desktop footer compact while allowing full control labels', () => {
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const ecommercePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const topRowSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarTopRow.tsx');
@@ -15,7 +15,7 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
 
   assert.match(
     footerSource,
-    /className="input-bar-footer flex w-full min-w-0 flex-wrap items-center gap-1\.5 px-1 pb-1 pt-0\.5 min-h-\[42px\]"/,
+    /className="input-bar-footer kk-composer-compact-footer flex w-full min-w-0 flex-nowrap items-center gap-1 px-1"/,
   );
   assert.match(promptBarSource, /DesktopComposerEcommercePanel = (lazyWithRetry|React\.lazy|lazy)/);
   assert.match(ecommercePanelSource, /const DesktopComposerEcommercePanel: React\.FC/);
@@ -23,7 +23,10 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
   assert.match(promptBarSource, /import PromptBarFooter from '\.\/prompt-bar\/PromptBarFooter';/);
   assert.match(topRowSource, /if \(isMobile\) \{\s*return <PromptBarTopRowMobile>\{children\}<\/PromptBarTopRowMobile>;\s*\}/);
   assert.match(topRowSource, /return <PromptBarTopRowDesktop>\{children\}<\/PromptBarTopRowDesktop>;/);
-  assert.match(topRowDesktopSource, /className="flex items-center justify-between gap-1\.5"/);
+  assert.match(
+    topRowDesktopSource,
+    /className="kk-composer-floating-tools flex items-center justify-between gap-1\.5"/,
+  );
   assert.match(footerShellSource, /if \(isMobile\) \{\s*return <PromptBarFooterMobile>\{children\}<\/PromptBarFooterMobile>;\s*\}/);
   assert.match(footerShellSource, /return <PromptBarFooterDesktop>\{children\}<\/PromptBarFooterDesktop>;/);
   assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);

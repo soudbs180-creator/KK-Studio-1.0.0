@@ -23,6 +23,9 @@
 | Settings / account | Reference panel and control language | `temp/design-audit-2026-07-28/19b-mobile-settings-375x700.png`, `20-mobile-profile-375x700.png`, `21-mobile-recharge-375x700.png` |
 | Mobile shell | Reference dark sheet and compact controls | `temp/design-audit-2026-07-28/46-mobile-menu-final-375.png` |
 | Mobile composer | Reference safe-area composer behavior | `temp/design-audit-2026-07-28/32-mobile-commerce-composer-top-375.png`, `33-mobile-commerce-composer-bottom-375.png`, `34-mobile-commerce-composer-tabs-375.png` |
+| Canvas input fidelity | Same-viewport reference and implementation comparison | `temp/input-audit-2026-07-28/compare-canvas-final.png` |
+| Copilot input fidelity | Same-viewport reference and implementation comparison | `temp/input-audit-2026-07-28/compare-copilot-final.png` |
+| Login input fidelity | Same-viewport reference and implementation comparison | `temp/input-audit-2026-07-28/compare-login.png` |
 
 ## Geometry verification
 
@@ -32,8 +35,13 @@
 | Project panel | x=12, y=48, width=262px, bottom=10px | x=12, y=48, width=262px, height=662px | passed |
 | Copilot work area | x=12, y=48, right=12, bottom=10px | x=12, y=48, width=1256px, height=662px | passed |
 | Canvas composer | max-width=570px, bottom=10px | 570px, bottom=10px | passed |
+| Canvas composer standard state | 570 × 127px | 570 × 127px | passed |
+| Canvas editor | 24px, 14/21px type | 24px, 14/21px type | passed |
+| Copilot composer standard state | 968 × 94px | 968 × 94px | passed |
+| Copilot editor | 42px, 14/17.5px type | 42px, 14/17.5px type | passed |
 | Account menu | right=12px, top=52px | x=1012, y=52, width=256px | passed |
 | Auth dialog | width=412px, max-height=546px/90vh | 412px × 546px at 1280 × 720 | passed |
+| Auth input | 38px, 16/22px type | 38px, 16/22px type | passed |
 | Mobile more sheet | no gradient, no overflow | 375px wide, background image `none` | passed |
 | Mobile target size | at least 44px | zero visible targets below 43.5px | passed |
 
@@ -58,6 +66,8 @@ No required viewport produced horizontal overflow, a clipped primary action, ver
 - Desktop and mobile ecommerce composers scroll internally while their primary actions remain reachable.
 - Mobile mode tabs stay on one line and every visible interactive target satisfies the 44px rule.
 - Landing and authentication CTAs remain visible and non-overlapping on desktop and mobile.
+- Canvas prompt was typed, verified with the enabled send state, then cleared back to the disabled state.
+- Copilot prompt was typed, verified with the enabled send state, then cleared through the native React input path.
 
 ## Findings and resolutions
 
@@ -73,6 +83,8 @@ No required viewport produced horizontal overflow, a clipped primary action, ver
 | P1 | Mobile more sheet retained Clay gradients and oversized radii | Replaced it with neutral Morphic panel/control surfaces |
 | P2 | Settings hero surfaces retained legacy gradients and shadows | Normalized headers and presets to flat shared surfaces |
 | P2 | Landing and auth layouts could overlap or expose scrollbars | Reset decorative positioning, centered auth content and hid cosmetic scrollbars |
+| P1 | Canvas and Copilot inputs retained oversized legacy geometry and loose tool density | Matched the reference shell, editor, action, mode-track and footer geometry |
+| P2 | Copilot rail and welcome state remained visually denser than the reference | Compacted the rail header/context meter and flattened the welcome message |
 
 All P0, P1 and P2 findings are resolved. KK Studio keeps its own brand, copy, routes, business capabilities and existing icon assets; Morphic trademarks and proprietary media were not copied.
 
