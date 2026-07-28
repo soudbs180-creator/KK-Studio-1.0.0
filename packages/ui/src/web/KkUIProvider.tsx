@@ -7,20 +7,20 @@ export interface KkUIProviderProps extends PropsWithChildren {
 
 const THEME_VARIABLES: Record<NonNullable<KkUIProviderProps['appearance']>, Record<string, string>> = {
   light: {
-    '--kk-ui-color-primary': '#6366f1',
-    '--kk-ui-bg-layout': '#f8fafc',
-    '--kk-ui-bg-container': '#ffffff',
-    '--kk-ui-text-primary': '#0f172a',
-    '--kk-ui-text-secondary': '#475569',
-    '--kk-ui-border-radius': '16px',
+    '--kk-ui-color-primary': 'var(--kk-morphic-action)',
+    '--kk-ui-bg-layout': 'var(--kk-morphic-page)',
+    '--kk-ui-bg-container': 'var(--kk-morphic-panel)',
+    '--kk-ui-text-primary': 'var(--kk-morphic-text-primary)',
+    '--kk-ui-text-secondary': 'var(--kk-morphic-text-secondary)',
+    '--kk-ui-border-radius': 'var(--kk-morphic-radius-panel)',
   },
   dark: {
-    '--kk-ui-color-primary': '#6366f1',
-    '--kk-ui-bg-layout': '#050608',
-    '--kk-ui-bg-container': '#121216',
-    '--kk-ui-text-primary': 'rgba(255, 255, 255, 0.96)',
-    '--kk-ui-text-secondary': 'rgba(226, 232, 240, 0.74)',
-    '--kk-ui-border-radius': '16px',
+    '--kk-ui-color-primary': 'var(--kk-morphic-action)',
+    '--kk-ui-bg-layout': 'var(--kk-morphic-page)',
+    '--kk-ui-bg-container': 'var(--kk-morphic-panel)',
+    '--kk-ui-text-primary': 'var(--kk-morphic-text-primary)',
+    '--kk-ui-text-secondary': 'var(--kk-morphic-text-secondary)',
+    '--kk-ui-border-radius': 'var(--kk-morphic-radius-panel)',
   },
 };
 
@@ -35,7 +35,8 @@ export function KkUIProvider({
 
     const root = document.documentElement;
     const previousAppearance = root.getAttribute('data-kk-ui-appearance');
-    root.setAttribute('data-kk-ui-appearance', appearance);
+    root.setAttribute('data-kk-ui-appearance', 'dark');
+    root.setAttribute('data-kk-ui-preference', appearance);
 
     const variables = THEME_VARIABLES[appearance];
     for (const [name, value] of Object.entries(variables)) {
@@ -48,6 +49,7 @@ export function KkUIProvider({
       } else {
         root.removeAttribute('data-kk-ui-appearance');
       }
+      root.removeAttribute('data-kk-ui-preference');
       for (const name of Object.keys(variables)) {
         root.style.removeProperty(name);
       }

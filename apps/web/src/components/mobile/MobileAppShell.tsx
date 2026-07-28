@@ -23,12 +23,12 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   return (
     <div
       data-testid="mobile-app-shell"
-      className="relative isolate grid h-dvh max-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] lg:hidden"
+      className="mobile-app-shell relative isolate grid h-dvh max-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] lg:hidden"
       style={shellStyle}
     >
       <div
         data-slot="header"
-        className="absolute top-0 left-0 right-0 z-20 min-h-0"
+        className="mobile-header-layer absolute top-0 left-0 right-0 z-20 min-h-0"
       >
         <div
           data-testid="mobile-header-scrim"

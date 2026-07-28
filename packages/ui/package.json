@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./web": "./src/web/index.ts",
-    "./core": "./src/core/tokens.ts"
+    "./core": "./src/core/tokens.ts",
+    "./focus-management": "./src/web/focusManagement.ts"
   },
   "scripts": {
     "build": "tsc"

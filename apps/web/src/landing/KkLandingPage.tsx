@@ -31,19 +31,16 @@ const workItems = [
     index: '01',
     title: { zh: '跟得上意图的无限画布。', en: 'Canvas that keeps up with intent.' },
     type: { zh: '无限画布 / 创作生产', en: 'Infinite canvas / Creation' },
-    visualClass: 'canvas',
   },
   {
     index: '02',
     title: { zh: '带记忆和控制的批量生产。', en: 'Batch work with memory and control.' },
     type: { zh: '持久队列 / 自动化', en: 'Durable queue / Automation' },
-    visualClass: 'batch',
   },
   {
     index: '03',
     title: { zh: '每一步都可见的 AI 接管。', en: 'AI takeover with a visible trail.' },
     type: { zh: 'Agent 运行时 / 验证', en: 'Agent runtime / Verification' },
-    visualClass: 'takeover',
   },
 ] as const;
 
@@ -83,9 +80,6 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
 
   return (
     <div className="kk-landing-root">
-      <div className="kk-landing-continuous-stage" aria-hidden />
-      <div className="kk-landing-noise" aria-hidden />
-
       <header className="kk-landing-nav" aria-label={t({ zh: '主导航', en: 'Primary navigation' })}>
         <a className="kk-landing-nav__brand" href="#top" aria-label="KK Studio home">
           KK Studio
@@ -145,7 +139,6 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
           <div className="kk-landing-work-grid">
             {workItems.map((item) => (
               <article className="kk-landing-work-card" key={item.index}>
-                <div className={`kk-landing-work-card__image kk-landing-work-card__image--${item.visualClass}`} aria-hidden />
                 <div className="kk-landing-work-card__body">
                   <span>{item.index}</span>
                   <h3>{t(item.title)}</h3>
@@ -208,7 +201,6 @@ export const KkLandingPage: React.FC<KkLandingPageProps> = ({
         </section>
 
         <footer className="kk-landing-footer" id="contact">
-          <div className="kk-landing-footer__flower" aria-hidden />
           <div className="kk-landing-footer__content">
             <p>{t({ zh: '从 KK Studio 开始', en: 'Start with KK Studio' })}</p>
             <h2>

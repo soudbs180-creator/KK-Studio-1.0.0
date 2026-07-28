@@ -1,5 +1,6 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { trapFocusWithin } from './focusManagement';
 
 export interface KkModalProps {
   open?: boolean;
@@ -21,16 +22,35 @@ export interface KkModalProps {
 }
 
 function resolveWidth(width: KkModalProps['width']): string {
-  if (typeof width === 'number') {
-    return `${width}px`;
-  }
-
-  return width || '640px';
+  return typeof width === 'number' ? `${width}px` : width || '412px';
 }
 
 function mergeClassName(...values: Array<string | undefined>): string | undefined {
   const className = values.filter(Boolean).join(' ');
   return className || undefined;
+}
+
+function useModalA11y(
+  isOpen: boolean,
+  panelRef: React.RefObject<HTMLElement | null>,
+  onCancel: KkModalProps['onCancel'],
+) {
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return undefined;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panelRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel?.(event);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [isOpen, onCancel, panelRef]);
 }
 
 export function KkModal({
@@ -48,164 +68,52 @@ export function KkModal({
   bodyStyle,
   className,
   wrapClassName,
-  zIndex = 3000,
+  zIndex,
   children,
 }: KkModalProps) {
   const isOpen = open ?? visible ?? false;
   const titleId = useId();
+  const panelRef = useRef<HTMLElement | null>(null);
+  useModalA11y(isOpen, panelRef, onCancel);
 
-  useEffect(() => {
-    if (!isOpen || typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCancel?.(event);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onCancel]);
-
-  useEffect(() => {
-    if (!isOpen || typeof document === 'undefined') {
-      return undefined;
-    }
-
-    const body = document.body;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = 'hidden';
-
-    return () => {
-      body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
-
-  if (!isOpen && destroyOnClose) {
-    return null;
-  }
-
-  if (!isOpen || typeof document === 'undefined') {
-    return null;
-  }
+  if ((!isOpen && destroyOnClose) || !isOpen || typeof document === 'undefined') return null;
 
   const handleMaskClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
-    if (maskClosable && event.target === event.currentTarget) {
-      onCancel?.(event);
-    }
+    if (maskClosable && event.target === event.currentTarget) onCancel?.(event);
   };
 
-  const modal = (
+  return createPortal(
     <div
       className={mergeClassName('kk-modal-root', wrapClassName)}
+      data-centered={centered || undefined}
       onMouseDown={handleMaskClick}
       role="presentation"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex,
-        display: 'flex',
-        alignItems: centered ? 'center' : 'flex-start',
-        justifyContent: 'center',
-        overflowY: 'auto',
-        padding: centered ? '24px' : '64px 24px 24px',
-        background: 'rgba(0, 0, 0, 0.62)',
-        backdropFilter: 'blur(12px)',
-      }}
+      style={zIndex === undefined ? undefined : { zIndex }}
     >
       <section
+        ref={panelRef}
         className={mergeClassName('kk-modal-panel', className)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        style={{
-          width: `min(calc(100vw - 32px), ${resolveWidth(width)})`,
-          borderRadius: 'var(--kk-ui-border-radius, 16px)',
-          border: '1px solid var(--frost-card-framework-border, rgba(148, 163, 184, 0.18))',
-          background: 'var(--frost-card-framework-bg-solid, var(--kk-ui-bg-container, #121216))',
-          color: 'var(--text-primary, var(--kk-ui-text-primary, #fff))',
-          boxShadow: 'var(--kk-shadow-floating, 0 30px 80px rgba(0, 0, 0, 0.45))',
-          overflow: 'hidden',
-          ...style,
-        }}
+        tabIndex={-1}
+        onKeyDown={(event) => trapFocusWithin(event.nativeEvent, panelRef.current)}
+        style={{ width: `min(calc(100vw - 32px), ${resolveWidth(width)})`, ...style }}
       >
         {title || closable ? (
-          <header
-            className="kk-modal-header"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px',
-              padding: '18px 20px',
-              borderBottom: '1px solid var(--frost-card-framework-border, rgba(148, 163, 184, 0.16))',
-            }}
-          >
-            {title ? (
-              <h2
-                id={titleId}
-                style={{
-                  margin: 0,
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  lineHeight: 1.35,
-                }}
-              >
-                {title}
-              </h2>
-            ) : <span />}
+          <header className="kk-modal-header">
+            {title ? <h2 id={titleId}>{title}</h2> : <span />}
             {closable ? (
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={onCancel}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  border: 0,
-                  borderRadius: '10px',
-                  background: 'transparent',
-                  color: 'var(--text-secondary, var(--kk-ui-text-secondary, #cbd5e1))',
-                  cursor: 'pointer',
-                  fontSize: '22px',
-                  lineHeight: '30px',
-                }}
-              >
+              <button type="button" aria-label="Close" onClick={onCancel} className="kk-modal-close">
                 ×
               </button>
             ) : null}
           </header>
         ) : null}
-        <div
-          className="kk-modal-body"
-          style={{
-            padding: '20px',
-            ...bodyStyle,
-          }}
-        >
-          {children}
-        </div>
-        {footer !== null ? (
-          <footer
-            className="kk-modal-footer"
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              padding: '16px 20px',
-              borderTop: '1px solid var(--frost-card-framework-border, rgba(148, 163, 184, 0.16))',
-            }}
-          >
-            {footer}
-          </footer>
-        ) : null}
+        <div className="kk-modal-body" style={bodyStyle}>{children}</div>
+        {footer !== null ? <footer className="kk-modal-footer">{footer}</footer> : null}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
-
-  return createPortal(modal, document.body);
 }

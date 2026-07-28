@@ -213,7 +213,6 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   const tokenSource = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   for (const source of [
-    desktopChromeSource,
     chatSidebarSource,
     workflowUtilitySource,
     lazyBoundarySource,
@@ -226,8 +225,13 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
     assert.doesNotMatch(source, /shadow-2xl|shadow-xl|#111217|#18181b|#09090b|#27272a|#2a2a2e/);
   }
 
-  assert.match(desktopChromeSource, /var\(--frost-card-framework-bg\)/);
-  assert.match(desktopChromeSource, /var\(--accent-coral\)/);
+  // The desktop shell is the first surface migrated to the Morphic design
+  // system, so it must not regress to the legacy Frost/Clay material layer.
+  assert.match(desktopChromeSource, /kk-morphic-mode-switch/);
+  assert.match(desktopChromeSource, /aria-current=\{activeMode === 'canvas' \? 'page' : undefined\}/);
+  assert.doesNotMatch(desktopChromeSource, /var\(--frost-|var\(--clay-|var\(--accent-coral\)/);
+  assert.doesNotMatch(desktopChromeSource, /from-blue|to-cyan|bg-blue|border-blue|text-blue|focus:border-indigo|bg-indigo|from-indigo|via-purple|hover:shadow-blue/);
+  assert.doesNotMatch(desktopChromeSource, /shadow-2xl|shadow-xl|#111217|#18181b|#09090b|#27272a|#2a2a2e/);
   assert.match(chatSidebarSource, /var\(--frost-input-bg\)/);
   assert.match(chatSidebarSource, /var\(--clay-brand-lavender\)/);
   assert.doesNotMatch(chatSidebarSource, /bg-violet-500\/15|border-violet-400\/30|text-violet-300|hover:bg-violet-500\/25/);

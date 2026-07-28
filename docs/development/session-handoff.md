@@ -1384,3 +1384,72 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 风险低，只修正一个已固定版本的完整性摘要。
 - 推送后等待生产部署到 READY，再验证版本清单、OAuth callback 深链、API 代理和完整
   Google 登录回调。
+
+---
+
+## 239. 2026-07-28 - feat(ui): 全面迁移 Morphic 深色设计系统
+
+**修改范围**
+- 保留 KK Studio 品牌、业务能力、路由、鉴权、计费、Canvas、Agent、Provider 与持久化契约，
+  将公开首页、桌面工作区、AI 助手、Composer、设置、账户浮层和移动端外壳统一到 Morphic
+  风格的黑色点阵画布、48px 顶栏、深色浮动面板、紧凑控件和蓝色主操作。
+- 在 `packages/ui` 建立唯一共享来源，扩展 Token 和工作区几何，迁移 Button、Input、Select、
+  Dropdown、Modal，并新增 Surface、Tabs、Composer、Sheet、Tooltip 与焦点管理能力。
+- 桌面顶栏新增“画布 / Copilot / 创作”三段切换，复用现有 Canvas、AI Assistant 和 Prompt
+  Composer；没有新增无业务支撑的路由或功能。
+- 完成 375、390、430、768px 移动端安全区、抽屉、底部 Composer 和最小 44px 交互目标适配。
+- 通过同视口浏览器对比完成视觉 QA，并修复样式入口遗漏、关闭侧栏错位、导航面板遮挡头像、
+  设置页延迟样式回退和移动端小目标等问题。
+
+**修改文件**
+- 设计系统：`packages/ui/src/core/tokens.ts`、`packages/ui/src/core/layout.ts`、
+  `packages/ui/src/web/` 下共享控件与新增 Morphic primitives、`packages/ui/package.json`。
+- Web 外壳：`apps/web/src/styles/morphic-ui.css`、`apps/web/src/bootstrap.tsx`、
+  `apps/web/src/main.tsx`、`apps/web/src/app/AppDesktopChrome.tsx`、
+  `apps/web/src/components/workspace/WorkspaceShell.tsx`、
+  `apps/web/src/pages/Workspace/WorkspacePage.tsx`。
+- 页面与移动端：`apps/web/src/landing/KkLandingPage.tsx`、
+  `apps/web/src/components/mobile/MobileAppShell.tsx`、`MobileHeader.tsx`、
+  `MobileTabBar.tsx`。
+- 规范与 QA：`docs/design-system/kk-studio-morphic-ui-spec.md`、`design-qa.md`、
+  `docs/governance/DOCUMENTATION_INDEX.md`。
+- 测试：新增 Morphic 设计系统、Surface 迁移和焦点管理测试；更新旧 Frost/Clay 桌面壳契约。
+  `tests/unit/vercel-vps-proxy.test.ts` 仅把 `.at(-1)` 改为 ES2020 兼容索引，使项目既有测试类型
+  检查与其 `ES2020` lib 配置一致。
+
+**当前设计决策**
+1. `UI_SYSTEM_TOKENS` 与 `KK_LAYOUT.workspace` 是颜色、圆角、动效、顶栏、面板、Composer、
+   Dialog 和移动端尺寸的事实来源；旧字段继续保留兼容，但实际界面归一为深色主题。
+2. `KkSurface` 仅允许 `canvas | panel | control | dialog | sheet`；业务层通过语义类和共享 Token
+   消费视觉，不复制 Morphic 名称、商标、媒体或专有素材。
+3. 顶栏模式只调度现有功能：Copilot 打开现有 AI 侧栏，画布关闭侧栏并聚焦 Canvas，创作关闭
+   侧栏并聚焦现有 Composer。
+4. 桌面 Canvas 导航卡移到 48px 顶栏下方，避免覆盖头像和充值入口；Composer 保持 570px、
+   距底 10px。移动端 Composer 距左右 8px，并叠加 `safe-area-inset-bottom`。
+5. Modal/Sheet 统一 Escape、焦点围栏、焦点恢复、遮罩关闭；Sheet 额外锁定背景滚动。
+
+**已运行验证**
+- TDD 红测确认 Morphic Token、primitives、Surface 迁移和焦点行为缺失；实现后专项测试全部通过。
+- 全量 unit 2246 项：2244 通过 / 0 失败 / 2 跳过。
+- integration 14/14、contract 15/15、E2E 11/11、Local Runner 14/14 通过。
+- 根 TypeScript、architecture TypeScript、UI、Web、server syntax（116 文件）及 tests semantic
+  （582 文件）全部通过。
+- `architecture:check`、`governance:check` 等价完整脚本、dependency audit、OpenAPI 校验、
+  encoding/mojibake 和 `git diff --check` 通过。
+- Prompt group drag、移动设置、桌面设置、AI Takeover、启动横向居中 smoke 全部通过；
+  Canvas benchmark 3/3 通过。
+- 生产构建通过：共享包、UI、API Client 与 Vite 8.1.4 Web 构建，2573 modules。
+- `design-qa.md` 达到 `final result: passed`；1280px 同视口组合图以及 375/390/430/768px
+  响应式证据均已检查，P0/P1/P2 清零。
+
+**未运行验证及原因**
+- 未直接运行聚合命令 `npm run verify:changes`：本机没有系统 `npm`。已使用 bundled Node 24、
+  bundled pnpm 与项目原脚本逐项执行其 typecheck、Local Runner、spec、build、测试、smoke、
+  encoding 和 Canvas performance 子项。
+- 未部署生产环境；用户范围明确要求只保留本地预览和本地 Git Commit。
+
+**风险与下一步**
+- 旧 Frost/Clay Token 仍作为尚未逐文件迁移的历史业务组件兼容桥存在；新桌面壳和共享 primitives
+  已禁止回退。后续页面开发必须直接消费 `packages/ui` 的 Morphic Token 和语义组件。
+- `temp/design-qa/` 中的参考与实现截图是本地 QA 证据且不进入发布产物；可按相同视口继续更新。
+- 若需要团队评审，可在用户明确授权后通过现有 Vercel 流程发布预览；本次不触发部署。

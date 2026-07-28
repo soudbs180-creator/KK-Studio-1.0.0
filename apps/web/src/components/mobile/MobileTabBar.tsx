@@ -63,7 +63,7 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
       onTouchStart={onInteract}
       onClick={onInteract}
     >
-      <div id="mobile-tab-bar" className="ios-mobile-tabbar-shell mx-3 px-2 py-1.5">
+      <div id="mobile-tab-bar" className="mobile-tab-bar ios-mobile-tabbar-shell mx-3 px-2 py-1.5">
         <div className="grid grid-cols-4 gap-1.5">
           {tabs.map((tab) => {
             const isActive = currentTab === tab.key;

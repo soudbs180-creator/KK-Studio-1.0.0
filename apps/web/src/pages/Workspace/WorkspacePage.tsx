@@ -5643,7 +5643,7 @@ const isRectIntersecting = (
               onOpenProfile={openProfileSurface}
               onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
               onSignOut={() => { void signOut(); }}
-              onOpenAssistant={() => setIsChatOpen(true)}
+              onOpenAssistant={() => setIsChatOpen(true)} onCloseAssistant={() => setIsChatOpen(false)}
               onOpenCommandPalette={() => setIsSearchOpen(true)}
             />
           </React.Suspense>

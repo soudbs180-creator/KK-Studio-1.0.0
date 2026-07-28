@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css';
 import './styles/kk-ui-tokens.css';
+import './styles/morphic-ui.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';

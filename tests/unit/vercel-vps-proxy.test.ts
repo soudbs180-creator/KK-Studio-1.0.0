@@ -16,7 +16,7 @@ function readVercelConfig() {
 test("Vercel serves OAuth callback deep links through the SPA root", () => {
   const config = readVercelConfig();
   const rewrites = config.rewrites || [];
-  const spaFallback = rewrites.at(-1);
+  const spaFallback = rewrites[rewrites.length - 1];
 
   assert.equal(config.cleanUrls, true);
   assert.deepEqual(

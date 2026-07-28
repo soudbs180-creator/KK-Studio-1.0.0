@@ -31,20 +31,10 @@ export function KkInput({
       {...props}
       value={value}
       onChange={onChange}
-      className={className}
+      className={['kk-input', className].filter(Boolean).join(' ')}
       data-status={status}
       data-size={size}
-      style={{
-        width: '100%',
-        minHeight: size === 'large' ? '44px' : size === 'small' ? '32px' : '38px',
-        border: '1px solid var(--frost-card-framework-border, rgba(148, 163, 184, 0.18))',
-        borderRadius: '10px',
-        padding: '0 12px',
-        background: 'var(--frost-card-framework-bg-solid, rgba(255, 255, 255, 0.08))',
-        color: 'var(--text-primary, var(--kk-ui-text-primary, #fff))',
-        outline: 'none',
-        ...style,
-      }}
+      style={style}
     />
   );
 
@@ -53,46 +43,11 @@ export function KkInput({
   }
 
   return (
-    <span
-      className="kk-input-affix-wrapper"
-      style={{
-        display: 'inline-flex',
-        width: style?.width ?? '100%',
-        alignItems: 'center',
-        gap: '8px',
-        border: '1px solid var(--frost-card-framework-border, rgba(148, 163, 184, 0.18))',
-        borderRadius: '10px',
-        padding: '0 10px',
-        background: 'var(--frost-card-framework-bg-solid, rgba(255, 255, 255, 0.08))',
-      }}
-    >
+    <span className="kk-input-affix-wrapper" data-size={size} data-status={status}>
       {prefix ? <span className="kk-input-prefix">{prefix}</span> : null}
-      {React.cloneElement(input, {
-        className: undefined,
-        style: {
-          minWidth: 0,
-          minHeight: size === 'large' ? '42px' : size === 'small' ? '30px' : '36px',
-          flex: 1,
-          border: 0,
-          borderRadius: 0,
-          padding: 0,
-          background: 'transparent',
-          color: 'var(--text-primary, var(--kk-ui-text-primary, #fff))',
-          outline: 'none',
-        },
-      })}
+      {React.cloneElement(input, { className: 'kk-input', style: undefined })}
       {allowClear && value ? (
-        <button
-          type="button"
-          aria-label="Clear"
-          onClick={onClear}
-          style={{
-            border: 0,
-            background: 'transparent',
-            color: 'var(--text-secondary, var(--kk-ui-text-secondary, #cbd5e1))',
-            cursor: 'pointer',
-          }}
-        >
+        <button type="button" aria-label="Clear" onClick={onClear} className="kk-input__clear">
           ×
         </button>
       ) : null}

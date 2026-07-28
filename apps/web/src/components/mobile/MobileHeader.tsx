@@ -33,7 +33,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
 }) => {
     const { pick, language } = useLocale();
     const resolvedUserName = userName || pick('用户', 'User');
-    const iconButtonClass = 'h-12 w-12 rounded-[16px] flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-12 w-12 rounded-[8px] flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = resolvedUserName?.trim()?.[0]?.toUpperCase() || 'U';
     const maxCredits = 999999;
@@ -43,30 +43,20 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
     return (
-        <div className="w-full lg:hidden">
+        <div className="mobile-header w-full lg:hidden">
             <div
-                className="ios-mobile-header-glass rounded-[20px] border p-2"
-                style={{
-                    background: 'var(--mobile-clay-shell-bg)',
-                    borderColor: 'var(--mobile-clay-border)',
-                    boxShadow: 'var(--mobile-clay-shadow)'
-                }}
+                className="kk-mobile-header-surface ios-mobile-header-glass rounded-[14px] border p-2"
             >
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={onUserClick}
                         aria-label={pick('打开个人中心', 'Open Profile')}
-                        className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[16px] border px-2.5 text-left transition-[background-color,border-color]"
-                        style={{
-                            background: 'var(--mobile-clay-surface-bg)',
-                            borderColor: 'var(--mobile-clay-border)'
-                        }}
+                        className="kk-mobile-header-control flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[8px] border px-2.5 text-left transition-[background-color,border-color]"
                         title={resolvedUserName}
                     >
                         <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] text-xs font-bold text-white"
-                            style={{ background: 'linear-gradient(135deg, var(--clay-brand-coral), var(--clay-brand-pink))' }}
+                            className="kk-mobile-avatar flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[8px] text-xs font-bold text-white"
                         >
                             {resolvedAvatarUrl ? (
                                 <img src={resolvedAvatarUrl} alt={resolvedUserName} className="h-full w-full object-cover" />
@@ -110,11 +100,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label={pick('查看积分', 'View Credits')}
-                        className="flex h-12 shrink-0 items-center gap-1.5 rounded-[16px] border px-2.5 transition-all active:scale-95 disabled:opacity-55"
-                        style={{
-                            background: 'var(--mobile-clay-surface-bg)',
-                            borderColor: 'var(--mobile-clay-border)'
-                        }}
+                        className="kk-mobile-header-control flex h-12 shrink-0 items-center gap-1.5 rounded-[8px] border px-2.5 transition-all active:scale-95 disabled:opacity-55"
                         disabled={!handleRechargeClick}
                     >
                         <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-[0.08em]">
@@ -131,11 +117,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={onMenuClick}
                         data-testid="mobile-header-menu-button"
                         aria-label={pick('打开功能菜单', 'Open Menu')}
-                        className={`${iconButtonClass} shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}
-                        style={{
-                            background: 'var(--mobile-clay-surface-bg)',
-                            borderColor: 'var(--mobile-clay-border)'
-                        }}
+                        className={`kk-mobile-header-control ${iconButtonClass} shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}
                     >
                         <Menu size={16} strokeWidth={2.15} />
                     </button>
