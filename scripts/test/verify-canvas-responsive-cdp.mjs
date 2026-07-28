@@ -29,7 +29,10 @@ const responsiveViewportCases = [
   { width: 1180, height: 820, surface: "canvas" },
   { width: 1023, height: 720, surface: "canvas" },
   { width: 834, height: 1112, surface: "results" },
+  { width: 768, height: 1024, surface: "results" },
+  { width: 430, height: 932, surface: "results" },
   { width: 390, height: 844, surface: "results" },
+  { width: 375, height: 812, surface: "results" },
 ];
 
 function createCanvasState() {
@@ -319,15 +322,53 @@ try {
       screenHeight: viewport.height,
     });
     await wait(500);
+    if (viewport.surface === "canvas") {
+      await evaluate(
+        cdp,
+        `(() => {
+          const card = document.querySelector('[data-card-kind]');
+          const rect = card?.getBoundingClientRect();
+          if (!card || !rect) return false;
+          card.dispatchEvent(new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+            button: 2,
+            buttons: 2,
+          }));
+          card.dispatchEvent(new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+            button: 2,
+          }));
+          return true;
+        })()`,
+      );
+      await wait(100);
+    }
     const metrics = await evaluate(
       cdp,
       `(() => {
       const canvas = document.querySelector('.canvas-container');
       const mobileShell = document.querySelector('[data-testid="mobile-app-shell"]');
-      const composer = document.querySelector('[data-desktop-composer-state="compact"]');
+      const composer = document.querySelector('#prompt-bar-container[data-composer-layout="desktop"]');
       const rail = document.getElementById('project-manager-container');
+      const selectionToolbar = document.querySelector('.kk-canvas-selection-menu[data-placement]');
       const composerRect = composer?.getBoundingClientRect();
       const railRect = rail?.getBoundingClientRect();
+      const selectionToolbarRect = selectionToolbar?.getBoundingClientRect();
+      const cardRects = [...document.querySelectorAll('[data-card-kind]')]
+        .map((card) => card.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      const rectsOverlap = (first, second) => !(
+        first.right <= second.left
+        || first.left >= second.right
+        || first.bottom <= second.top
+        || first.top >= second.bottom
+      );
       return {
         url: location.href,
         title: document.title,
@@ -348,6 +389,15 @@ try {
         composerHeight: composerRect?.height || 0,
         railWidth: railRect?.width || 0,
         cardCount: document.querySelectorAll('[data-card-kind]').length,
+        selectionToolbarVisible: !!selectionToolbarRect,
+        selectionToolbarOverflow: !!selectionToolbarRect && (
+          selectionToolbarRect.left < 0
+          || selectionToolbarRect.right > window.innerWidth
+          || selectionToolbarRect.top < 48
+          || selectionToolbarRect.bottom > window.innerHeight
+        ),
+        selectionToolbarCardOverlap: !!selectionToolbarRect
+          && cardRects.some((cardRect) => rectsOverlap(selectionToolbarRect, cardRect)),
         horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
         chromeOverlap: !!(composerRect && railRect && composerRect.left < railRect.right && composerRect.right > railRect.left && composerRect.top < railRect.bottom && composerRect.bottom > railRect.top),
       };
@@ -368,17 +418,25 @@ try {
         throw new Error(
           `${viewport.width}x${viewport.height} did not render the canvas surface`,
         );
-      if (Math.abs(metrics.composerHeight - 68) > 1)
+      if (Math.abs(metrics.composerHeight - 94) > 1)
         throw new Error(
-          `${viewport.width}x${viewport.height} compact composer height=${metrics.composerHeight}`,
+          `${viewport.width}x${viewport.height} composer height=${metrics.composerHeight}`,
         );
-      if (Math.abs(metrics.railWidth - 44) > 1)
+      if (Math.abs(metrics.railWidth - 30) > 1)
         throw new Error(
           `${viewport.width}x${viewport.height} rail width=${metrics.railWidth}`,
         );
       if (metrics.cardCount < 1)
         throw new Error(
           `${viewport.width}x${viewport.height} rendered no cards`,
+        );
+      if (
+        !metrics.selectionToolbarVisible
+        || metrics.selectionToolbarOverflow
+        || metrics.selectionToolbarCardOverlap
+      )
+        throw new Error(
+          `${viewport.width}x${viewport.height} selection toolbar is hidden, outside the viewport, or overlapping a card`,
         );
       if (metrics.seededNodeCount !== sceneNodeCount)
         throw new Error(

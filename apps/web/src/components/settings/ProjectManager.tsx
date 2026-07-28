@@ -436,7 +436,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
     }, [activeCanvas, mergeCanvasInto, state.canvases]);
 
-    const desktopIconButtonClass = 'group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-all active:scale-95 hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-coral)]';
+    const desktopIconButtonClass = 'group relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[7px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-coral)]';
     const dropdownPositionStyle = isMobile
         ? { top: 'calc(100% + 10px)', left: 0, width: 'min(92vw, 340px)' }
         : undefined;
@@ -455,7 +455,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             ) : null}
             <div
                 data-desktop-persistent={!isMobile}
-                className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] bottom-[10px] w-[262px]'} overflow-hidden rounded-[14px] border`}
+                className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] w-[262px]'} overflow-hidden rounded-[14px] border`}
                 style={{
                     ...frostedProjectManagerShellStyle,
                     ...dropdownPositionStyle,
@@ -487,7 +487,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     </div>
                 </div>
 
-                <div className="custom-scrollbar max-h-60 overflow-y-auto">
+                <div className="kk-morphic-project-panel__list custom-scrollbar max-h-60 overflow-y-auto">
                     {state.canvases.map((canvas) => {
                         const isActive = canvas.id === activeCanvas?.id;
 
@@ -1043,7 +1043,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             <div
                 id="project-manager-container"
                 data-panel-open={showDropdown}
-                className="fixed left-3 z-50 flex w-11 flex-col items-center select-none"
+                className="fixed left-3 z-50 flex w-[30px] flex-col items-center select-none"
                 style={{ 
                     top: '50%',
                     transform: 'translateY(-50%)',

@@ -5631,6 +5631,7 @@ const isRectIntersecting = (
           <React.Suspense fallback={null}>
             <AppDesktopChrome
               isMobile={isMobile}
+              activeMode={isChatOpen ? 'copilot' : workspaceSurface === 'library' ? 'create' : 'canvas'}
               billingUiEnabled={billingUiEnabled}
               remainingBalanceDisplay={remainingBalanceDisplay}
               onRecharge={() => setShowRechargeModal(true)}
@@ -5644,6 +5645,8 @@ const isRectIntersecting = (
               onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
               onSignOut={() => { void signOut(); }}
               onOpenAssistant={() => setIsChatOpen(true)} onCloseAssistant={() => setIsChatOpen(false)}
+              onOpenCanvasWorkspace={focusWorkspace}
+              onOpenCreateWorkspace={openLibrarySurface}
               onOpenCommandPalette={() => setIsSearchOpen(true)}
             />
           </React.Suspense>
@@ -5690,7 +5693,7 @@ const isRectIntersecting = (
 
       <AppCanvasOverlays
         selectionBox={selectionBox}
-        selectionMenu={selectionMenuOverlay}
+        selectionMenu={isMobile ? null : selectionMenuOverlay}
       />
       <React.Suspense fallback={null}>
         <AppMobileWorkspace

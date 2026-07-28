@@ -26,6 +26,7 @@
   --kk-morphic-motion-fast: 100ms;
   --kk-morphic-motion-control: 125ms;
   --kk-morphic-motion-panel: 160ms;
+  --kk-morphic-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --kk-morphic-focus-ring: 0 0 0 2px
     color-mix(in oklch, var(--kk-morphic-action) 58%, transparent);
   --kk-morphic-dialog-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
@@ -126,10 +127,23 @@ textarea,
 select,
 [tabindex]:not([tabindex="-1"]) {
   transition:
-    color var(--kk-morphic-motion-control) ease,
-    background-color var(--kk-morphic-motion-control) ease,
-    border-color var(--kk-morphic-motion-control) ease,
-    opacity var(--kk-morphic-motion-fast) ease;
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    opacity var(--kk-morphic-motion-fast) var(--kk-morphic-ease-standard);
+}
+
+.kk-morphic-workspace :where(
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [tabindex]:not([tabindex="-1"]),
+  [class*='transition']
+) {
+  transition-duration: var(--kk-morphic-motion-control) !important;
+  transition-timing-function: var(--kk-morphic-ease-standard) !important;
 }
 
 :focus-visible {
@@ -720,7 +734,7 @@ select,
   height: 30px;
   border: 0;
   border-radius: 9999px;
-  padding: 0 12px;
+  padding: 0 15px;
   background: transparent;
   color: var(--kk-morphic-text-secondary);
   font-size: 12px;
@@ -775,9 +789,11 @@ select,
 
 .kk-morphic-project-panel[data-desktop-persistent='true'] {
   top: var(--kk-morphic-topbar-height) !important;
-  bottom: 10px !important;
+  bottom: auto !important;
   left: 12px !important;
   width: var(--kk-morphic-left-panel-width) !important;
+  height: max-content;
+  max-height: calc(100dvh - 58px);
   border-color: var(--kk-morphic-border) !important;
   border-radius: var(--kk-morphic-radius-panel) !important;
   background: var(--kk-morphic-panel) !important;
@@ -803,8 +819,24 @@ select,
 }
 
 #project-manager-container[data-panel-open='true'] {
-  pointer-events: none;
-  opacity: 0;
+  left: 282px !important;
+  pointer-events: auto;
+  opacity: 1;
+}
+
+#project-manager-container {
+  transition-property: left, opacity !important;
+  transition-duration:
+    var(--kk-morphic-motion-panel),
+    var(--kk-morphic-motion-fast) !important;
+  transition-timing-function:
+    var(--kk-morphic-ease-standard),
+    var(--kk-morphic-ease-standard) !important;
+}
+
+#project-manager-container button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .kk-workspace-menu-action__icon {
@@ -919,12 +951,53 @@ select,
   border-color: var(--kk-morphic-border) !important;
   background: var(--kk-morphic-panel) !important;
   box-shadow: none !important;
+  transition:
+    opacity var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard) !important;
 }
 
 .kk-morphic-project-panel > .custom-scrollbar {
   min-height: 0;
-  max-height: none !important;
-  flex: 1;
+  flex: none;
+}
+
+.kk-morphic-project-panel__list {
+  max-height: min(240px, calc(100dvh - 300px)) !important;
+}
+
+.kk-canvas-selection-menu[data-placement] {
+  max-width: min(480px, calc(100vw - 24px));
+  border-color: var(--kk-morphic-border) !important;
+  border-radius: var(--kk-morphic-radius-panel) !important;
+  background: var(--kk-morphic-panel) !important;
+  box-shadow: var(--kk-morphic-dialog-shadow) !important;
+  backdrop-filter: none !important;
+  transition:
+    left var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
+    top var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
+    opacity var(--kk-morphic-motion-fast) var(--kk-morphic-ease-standard);
+}
+
+.kk-canvas-selection-menu[data-placement='right'] {
+  transform: translate(12px, -50%);
+}
+
+.kk-canvas-selection-menu[data-placement='left'] {
+  transform: translate(calc(-100% - 12px), -50%);
+}
+
+.kk-canvas-selection-menu[data-placement] .kk-canvas-selection-menu-label {
+  min-width: 0;
+  max-width: 112px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kk-canvas-selection-menu[data-placement] .kk-canvas-selection-menu-item {
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: var(--kk-morphic-radius-button);
 }
 
 .kk-morphic-workflow-panel {
@@ -1231,6 +1304,12 @@ select,
   backdrop-filter: none !important;
 }
 
+body:has(#project-manager-container[data-panel-open='true'])
+  #prompt-bar-container[data-composer-layout='desktop'] {
+  left: max(50%, 615px) !important;
+  width: min(var(--kk-morphic-composer-width), calc(100vw - 342px)) !important;
+}
+
 #prompt-bar-container .input-bar-inner {
   overscroll-behavior: contain;
 }
@@ -1241,11 +1320,11 @@ select,
 }
 
 #prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) {
-  min-height: 127px;
+  min-height: 94px;
 }
 
 #prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) .input-bar-inner {
-  min-height: 125px;
+  min-height: 92px;
   max-height: min(72dvh, 620px);
   gap: 0 !important;
   padding: 5px !important;
@@ -1298,6 +1377,10 @@ select,
 }
 
 .kk-composer-reference-row {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 1;
   min-height: 30px;
   padding-left: 7px;
 }
@@ -1333,6 +1416,13 @@ select,
   padding: 0 7px 0 0 !important;
   font-size: 14px !important;
   line-height: 21px !important;
+}
+
+#prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce'])
+  .input-bar-inner:has(.kk-composer-reference-row)
+  .input-bar-textarea {
+  width: calc(100% - 80px);
+  margin-left: 80px !important;
 }
 
 .kk-composer-compact-footer {
@@ -1375,6 +1465,16 @@ select,
   color: var(--kk-morphic-text-muted) !important;
 }
 
+#prompt-bar-container textarea:focus-visible,
+#prompt-bar-container input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#prompt-bar-container:focus-within {
+  border-color: var(--kk-morphic-border-strong) !important;
+}
+
 .kk-prompt-bar-tooltip,
 .kk-prompt-bar-count-bubble,
 .kk-prompt-bar-deep-model-section,
@@ -1395,6 +1495,122 @@ select,
 body[data-kk-workspace-mode='canvas'] .kk-workspace-edge-toggle,
 body[data-kk-workspace-mode='create'] .kk-workspace-edge-toggle {
   display: none !important;
+}
+
+/* Create is a real asset surface. It reuses KK Studio media capabilities while
+   adopting the same persistent 262px rail as the reference Compose workspace. */
+body[data-kk-workspace-mode='create'] #project-manager-container,
+body[data-kk-workspace-mode='create'] .kk-morphic-project-panel,
+body[data-kk-workspace-mode='create'] .desktop-navigation-panel {
+  display: none !important;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-panel-backdrop {
+  display: none;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-panel.is-desktop {
+  top: var(--kk-morphic-topbar-height);
+  right: auto;
+  bottom: 10px;
+  left: 12px;
+  width: var(--kk-morphic-left-panel-width);
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-card {
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-panel);
+  background: var(--kk-morphic-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-sheet-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-sheet-eyebrow {
+  margin-bottom: 4px;
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-sheet-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-sheet-description {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-sheet-actions {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-action-button {
+  min-width: 30px;
+  min-height: 30px;
+  padding-inline: 8px;
+  border-radius: var(--kk-morphic-radius-button);
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-summary {
+  gap: 8px;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-summary-card {
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-summary-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--kk-morphic-radius-button);
+  background: var(--kk-morphic-control-hover);
+  color: var(--kk-morphic-text-secondary);
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-summary-value {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-grid {
+  gap: 8px;
+  padding-right: 0;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-item,
+body[data-kk-workspace-mode='create'] .workspace-library-empty {
+  padding: 10px;
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body[data-kk-workspace-mode='create'] .workspace-library-empty-copy {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 /* Copilot reuses the existing assistant runtime while matching the reference
@@ -2342,6 +2558,35 @@ body .settings-panel .apple-soft-card {
 @media (max-width: 768px) {
   :root {
     --kk-morphic-topbar-height: 48px;
+  }
+
+  .kk-canvas-selection-menu[data-placement='bottom'] {
+    top: auto !important;
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom) + 72px);
+    left: 8px !important;
+    width: auto;
+    max-width: none;
+    min-height: 44px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    transform: none;
+    scrollbar-width: none;
+  }
+
+  .kk-canvas-selection-menu[data-placement='bottom']::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kk-canvas-selection-menu[data-placement='bottom'] .kk-canvas-selection-menu-label {
+    max-width: 116px;
+    flex: 0 0 auto;
+    padding-inline: 8px;
+  }
+
+  .kk-canvas-selection-menu[data-placement='bottom'] .kk-canvas-selection-menu-item {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   html,

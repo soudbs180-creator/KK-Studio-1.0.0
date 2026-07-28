@@ -1,4 +1,5 @@
 import React from 'react';
+import { KK_LAYOUT } from '@kk/ui';
 
 import { type AspectRatio, type Canvas, type CanvasGroup } from '../types';
 import type { ArrangeMode } from '../context/CanvasContext';
@@ -12,6 +13,48 @@ interface SelectionMenuPosition {
   x: number;
   y: number;
 }
+
+interface PositionedSelectionMenu extends SelectionMenuPosition {
+  placement: SelectionMenuOverlay['placement'];
+}
+
+interface SelectionMenuScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+const doScreenRectsOverlap = (
+  first: SelectionMenuScreenRect,
+  second: SelectionMenuScreenRect,
+) => !(
+  first.right <= second.left
+  || first.left >= second.right
+  || first.bottom <= second.top
+  || first.top >= second.bottom
+);
+
+const shiftScreenRectRightPastBlocks = (
+  candidate: SelectionMenuScreenRect,
+  blockedRects: SelectionMenuScreenRect[],
+  gap: number,
+): SelectionMenuScreenRect => {
+  const resolvedCandidate = { ...candidate };
+  const blocksFromLeftToRight = [...blockedRects].sort((first, second) => first.left - second.left);
+
+  blocksFromLeftToRight.forEach((blockedRect) => {
+    if (!doScreenRectsOverlap(resolvedCandidate, blockedRect)) {
+      return;
+    }
+
+    const shift = blockedRect.right + gap - resolvedCandidate.left;
+    resolvedCandidate.left += shift;
+    resolvedCandidate.right += shift;
+  });
+
+  return resolvedCandidate;
+};
 
 interface SelectionCardDimensions {
   width: number;
@@ -343,7 +386,7 @@ export function useSelectionMenuOverlay({
     }
   }, [activeCanvas, selectedNodeIdSet, addPromptFavorite, addImageFavorite, removeFavorite]);
 
-  const dynamicPosition = React.useMemo(() => {
+  const dynamicPosition = React.useMemo<PositionedSelectionMenu | null>(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
       return null;
     }
@@ -391,17 +434,140 @@ export function useSelectionMenuOverlay({
       });
 
     if (!hasNodes) {
-      return selectionMenuPosition;
+      return {
+        ...selectionMenuPosition,
+        placement: isMobile ? 'bottom' : 'right',
+      };
     }
 
-    const centerX = (minX + maxX) / 2;
-    const topY = minY;
+    const viewportWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
+    const viewportHeight = typeof window === 'undefined' ? 720 : window.innerHeight;
+    const viewportInset = KK_LAYOUT.workspace.selectionToolbarViewportInset;
+    const toolbarGap = KK_LAYOUT.workspace.selectionToolbarGap;
+    const estimatedToolbarWidth = KK_LAYOUT.workspace.selectionToolbarEstimatedWidth;
+    const estimatedToolbarHalfHeight = KK_LAYOUT.workspace.selectionToolbarEstimatedHalfHeight;
+    const selectionRight = maxX * canvasTransform.scale + canvasTransform.x;
+    const selectionLeft = minX * canvasTransform.scale + canvasTransform.x;
+    const selectionTop = minY * canvasTransform.scale + canvasTransform.y;
+    const selectionBottom = maxY * canvasTransform.scale + canvasTransform.y;
+    const selectionCenterY = ((minY + maxY) / 2) * canvasTransform.scale + canvasTransform.y;
+    const viewportTop = 48 + viewportInset;
+    const viewportRight = viewportWidth - viewportInset;
+    const viewportBottom = viewportHeight - viewportInset;
+    const defaultCenterY = Math.min(
+      viewportBottom - estimatedToolbarHalfHeight,
+      Math.max(viewportTop + estimatedToolbarHalfHeight, selectionCenterY),
+    );
+    const blockedRects: SelectionMenuScreenRect[] = [];
+    const addBlockedRect = (left: number, top: number, right: number, bottom: number) => {
+      blockedRects.push({
+        left: left * canvasTransform.scale + canvasTransform.x,
+        top: top * canvasTransform.scale + canvasTransform.y,
+        right: right * canvasTransform.scale + canvasTransform.x,
+        bottom: bottom * canvasTransform.scale + canvasTransform.y,
+      });
+    };
+    activeCanvas.promptNodes.filter((node) => !selectedNodeIdSet.has(node.id)).forEach((node) => {
+      const width = getPromptNodeBoundsWidth(node, isMobile);
+      addBlockedRect(
+        node.position.x - width / 2,
+        node.position.y - (node.height || 200),
+        node.position.x + width / 2,
+        node.position.y,
+      );
+    });
+    activeCanvas.imageNodes.filter((node) => !selectedNodeIdSet.has(node.id)).forEach((node) => {
+      const dimensions = getCardDimensions(node.aspectRatio, true);
+      addBlockedRect(
+        node.position.x - dimensions.width / 2,
+        node.position.y - dimensions.totalHeight,
+        node.position.x + dimensions.width / 2,
+        node.position.y,
+      );
+    });
+    (activeCanvas.workflow?.nodes || []).filter((node) => !selectedNodeIdSet.has(node.id)).forEach((node) => {
+      const width = node.width || 284;
+      addBlockedRect(
+        node.position.x - width / 2,
+        node.position.y - (node.height || 176),
+        node.position.x + width / 2,
+        node.position.y,
+      );
+    });
+    const elevatedCenterY = selectionTop - toolbarGap - estimatedToolbarHalfHeight;
+    const loweredCenterY = selectionBottom + toolbarGap + estimatedToolbarHalfHeight;
+    const createRightCandidate = (centerY: number) => shiftScreenRectRightPastBlocks({
+      left: selectionRight + toolbarGap,
+      top: centerY - estimatedToolbarHalfHeight,
+      right: selectionRight + toolbarGap + estimatedToolbarWidth,
+      bottom: centerY + estimatedToolbarHalfHeight,
+    }, blockedRects, toolbarGap);
+    const rightCandidates = [
+      createRightCandidate(defaultCenterY),
+      createRightCandidate(elevatedCenterY),
+      createRightCandidate(loweredCenterY),
+    ];
+    const resolvedRightCandidate = rightCandidates.find((candidate) => (
+      candidate.left >= viewportInset
+      && candidate.right <= viewportRight
+      && candidate.top >= viewportTop
+      && candidate.bottom <= viewportBottom
+      && !blockedRects.some((rect) => doScreenRectsOverlap(candidate, rect))
+    ));
+    const leftCandidate: SelectionMenuScreenRect = {
+      left: selectionLeft - toolbarGap - estimatedToolbarWidth,
+      top: defaultCenterY - estimatedToolbarHalfHeight,
+      right: selectionLeft - toolbarGap,
+      bottom: defaultCenterY + estimatedToolbarHalfHeight,
+    };
+    const canUseLeft = (
+      leftCandidate.left >= viewportInset
+      && !blockedRects.some((rect) => doScreenRectsOverlap(leftCandidate, rect))
+    );
+
+    if (isMobile) {
+      return {
+        x: selectionRight,
+        y: defaultCenterY,
+        placement: 'bottom',
+      };
+    }
+
+    if (resolvedRightCandidate) {
+      return {
+        x: resolvedRightCandidate.left - toolbarGap,
+        y: (resolvedRightCandidate.top + resolvedRightCandidate.bottom) / 2,
+        placement: 'right',
+      };
+    }
+
+    if (canUseLeft) {
+      return {
+        x: selectionLeft,
+        y: defaultCenterY,
+        placement: 'left',
+      };
+    }
+
+    const clampedRightCandidateLeft = Math.max(
+      viewportInset,
+      Math.min(selectionRight + toolbarGap, viewportRight - estimatedToolbarWidth),
+    );
 
     return {
-      x: centerX * canvasTransform.scale + canvasTransform.x,
-      y: topY * canvasTransform.scale + canvasTransform.y,
+      x: clampedRightCandidateLeft - toolbarGap,
+      y: defaultCenterY,
+      placement: 'right',
     };
-  }, [selectionMenuPosition, selectedNodeIds.length, activeCanvas, canvasTransform, isMobile, getCardDimensions, selectedNodeIdSet]);
+  }, [
+    selectionMenuPosition,
+    selectedNodeIds.length,
+    activeCanvas,
+    canvasTransform,
+    isMobile,
+    getCardDimensions,
+    selectedNodeIdSet,
+  ]);
 
   return React.useMemo(() => {
     if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
@@ -464,6 +630,7 @@ export function useSelectionMenuOverlay({
 
     return {
       position: dynamicPosition || selectionMenuPosition,
+      placement: dynamicPosition?.placement || (isMobile ? 'bottom' : 'right'),
       selectedCount: selectedNodeIds.length,
       cardGroupCount,
       isolatedPromptCount,

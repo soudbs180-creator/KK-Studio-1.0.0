@@ -48,6 +48,7 @@ test('workspace persists canvas views per responsive surface', () => {
   assert.match(source, /resolveCanvasWorkspaceSurface/);
   assert.match(source, /getCanvasViewportSurfaceKey\(canvasWorkspaceSurface\)/);
   assert.match(source, /isCanvasWorkspaceResultFlow\(canvasWorkspaceSurface\)/);
+  assert.match(source, /selectionMenu=\{isMobile \? null : selectionMenuOverlay\}/);
   assert.doesNotMatch(source, /getCanvasViewportStorageKey\([^)]*,\s*'desktop'\)/);
 });
 
@@ -67,8 +68,8 @@ test('desktop canvas chrome preserves the original composer layout at a compact 
   assert.match(css, /padding:\s*6px;[\s\S]*gap:\s*4px;/);
   assert.doesNotMatch(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:/);
   assert.match(promptBar, /<DesktopComposerPromptTools[\s\S]*shouldRenderStandaloneUploadRow[\s\S]*<PromptBarFooter isMobile=\{isMobile\}>/);
-  assert.match(projectManager, /fixed left-3 z-50 flex w-11/);
-  assert.match(projectManager, /h-11 w-11 shrink-0/);
+  assert.match(projectManager, /fixed left-3 z-50 flex w-\[30px\]/);
+  assert.match(projectManager, /h-\[30px\] w-\[30px\] shrink-0/);
   assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);
   assert.doesNotMatch(projectManager, /setIsCollapsed|w-2 justify-center/);
   assert.doesNotMatch(projectManager, /scale\(\$\{desktopScale\}\)/);

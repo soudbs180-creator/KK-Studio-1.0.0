@@ -6,6 +6,7 @@ import type { SelectionBoxState } from './appCanvasTypes';
 
 export type SelectionMenuOverlay = {
   position: { x: number; y: number };
+  placement: 'right' | 'left' | 'bottom';
   selectedCount: number;
   cardGroupCount: number;
   isolatedPromptCount: number;
@@ -47,6 +48,7 @@ const AppCanvasOverlays: React.FC<AppCanvasOverlaysProps> = ({
     {selectionMenu && (
       <SelectionMenu
         position={selectionMenu.position}
+        placement={selectionMenu.placement}
         selectedCount={selectionMenu.selectedCount}
         cardGroupCount={selectionMenu.cardGroupCount}
         isolatedPromptCount={selectionMenu.isolatedPromptCount}

@@ -11,8 +11,9 @@ test('desktop workspace chrome exposes the three approved product modes', () => 
   assert.match(source, />\s*Copilot\s*</);
   assert.match(source, />\s*创作\s*</);
   assert.match(source, /onCloseAssistant:\s*\(\) => void/);
-  assert.match(source, /setActiveMode\('canvas'\);[\s\S]*onCloseAssistant\(\)/);
-  assert.match(source, /setActiveMode\('create'\);[\s\S]*onCloseAssistant\(\)/);
+  assert.match(source, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
+  assert.match(source, /onOpenCanvasWorkspace\(\);[\s\S]*focusWorkspaceCanvas\(\)/);
+  assert.match(source, /onOpenCreateWorkspace\(\);[\s\S]*focusWorkspaceComposer/);
   assert.match(source, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
   assert.match(source, /input\[placeholder="搜索历史记录\.\.\."\]/);
   assert.match(

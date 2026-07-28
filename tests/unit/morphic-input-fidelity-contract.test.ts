@@ -37,7 +37,7 @@ test('canvas composer publishes a compact desktop contract without changing ecom
 
   assert.match(
     cssSource,
-    /#prompt-bar-container\[data-composer-layout='desktop'\]:not\(\[data-composer-mode='ecommerce'\]\)\s*\{[\s\S]*min-height:\s*127px/,
+    /#prompt-bar-container\[data-composer-layout='desktop'\]:not\(\[data-composer-mode='ecommerce'\]\)\s*\{[\s\S]*min-height:\s*94px/,
   );
   assert.match(
     cssSource,
@@ -53,7 +53,11 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   );
   assert.match(
     cssSource,
-    /\.kk-composer-reference-row\s*\{[\s\S]*min-height:\s*30px/,
+    /\.kk-composer-reference-row\s*\{[\s\S]*position:\s*absolute[\s\S]*min-height:\s*30px/,
+  );
+  assert.match(
+    cssSource,
+    /\.input-bar-inner:has\(\.kk-composer-reference-row\)[\s\S]*\.input-bar-textarea\s*\{[\s\S]*margin-left:\s*80px\s*!important/,
   );
   assert.match(
     cssSource,

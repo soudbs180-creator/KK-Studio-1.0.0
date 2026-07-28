@@ -5,6 +5,7 @@ import { type ArrangeMode} from '../../context/CanvasContext';
 
 interface SelectionMenuProps {
     position: { x: number; y: number };
+    placement: 'right' | 'left' | 'bottom';
     selectedCount: number;
     cardGroupCount?: number;
     isolatedPromptCount?: number;
@@ -21,6 +22,7 @@ interface SelectionMenuProps {
 
 export const SelectionMenu: React.FC<SelectionMenuProps> = ({
     position,
+    placement,
     selectedCount,
     cardGroupCount = 0,
     isolatedPromptCount = 0,
@@ -87,12 +89,16 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
 
     return (
         <div
-            className="kk-canvas-selection-menu fixed flex items-center rounded-xl p-1 animate-in zoom-in-95 duration-200 cursor-grab active:cursor-grabbing"
+            className="kk-canvas-selection-menu fixed flex items-center rounded-xl p-1 cursor-grab active:cursor-grabbing"
+            data-placement={placement}
             style={{
                 zIndex: KK_LAYER.floating,
-                left: position.x + dragOffset.x,
-                top: position.y + dragOffset.y,
-                transform: 'translate(-50%, -100%) translateY(-12px)',
+                ...(placement === 'bottom'
+                    ? {}
+                    : {
+                        left: position.x + dragOffset.x,
+                        top: position.y + dragOffset.y,
+                    }),
             }}
             onMouseDown={handleMouseDown}
         >

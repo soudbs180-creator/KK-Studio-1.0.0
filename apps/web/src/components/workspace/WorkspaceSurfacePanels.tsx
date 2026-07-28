@@ -75,41 +75,53 @@ export function WorkspaceSurfacePanels({
       activePanel={activePanel}
       isMobile={isMobile}
       renderChatSidebar={() => (
-        <div id="chat-sidebar-wrapper" style={{ pointerEvents: 'auto' }}>
-          <Suspense fallback={null}>
-            <ChatSidebar
-              isOpen={isChatOpen}
-              onToggle={toggleChatPanel}
-              onClose={() => setIsChatOpen(false)}
-              isMobile={isMobile}
-              onOpenSettings={(view) => {
-                openSettingsSurface(view || 'api-management');
-              }}
-              openLibrarySurface={openLibrarySurface}
-              openFavoritesSurface={openFavoritesSurface}
-              openProfileSurface={openProfileSurface}
-              focusWorkspace={focusWorkspace}
-              onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
-              onWidthChange={setChatSidebarWidth}
-              config={config}
-              setConfig={setConfig}
-              ecommerceState={ecommerceState}
-              onGenerate={onGenerate}
-              canvasTransform={canvasTransform}
-              canvasRef={canvasRef}
-              workspaceSurface={activeSurface}
-              openToolWindowInstance={openToolWindowInstance}
-              updateToolWindowLayout={updateToolWindowLayout}
-              setPptEditorMode={setPptEditorMode}
-              togglePinTool={togglePinTool}
-            />
-          </Suspense>
+        <div
+          id="chat-sidebar-wrapper"
+          aria-hidden={!isChatOpen}
+          inert={!isChatOpen}
+          style={{ pointerEvents: isChatOpen ? 'auto' : 'none' }}
+        >
+          {isChatOpen ? (
+            <Suspense fallback={null}>
+              <ChatSidebar
+                isOpen={isChatOpen}
+                onToggle={toggleChatPanel}
+                onClose={() => setIsChatOpen(false)}
+                isMobile={isMobile}
+                onOpenSettings={(view) => {
+                  openSettingsSurface(view || 'api-management');
+                }}
+                openLibrarySurface={openLibrarySurface}
+                openFavoritesSurface={openFavoritesSurface}
+                openProfileSurface={openProfileSurface}
+                focusWorkspace={focusWorkspace}
+                onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
+                onWidthChange={setChatSidebarWidth}
+                config={config}
+                setConfig={setConfig}
+                ecommerceState={ecommerceState}
+                onGenerate={onGenerate}
+                canvasTransform={canvasTransform}
+                canvasRef={canvasRef}
+                workspaceSurface={activeSurface}
+                openToolWindowInstance={openToolWindowInstance}
+                updateToolWindowLayout={updateToolWindowLayout}
+                setPptEditorMode={setPptEditorMode}
+                togglePinTool={togglePinTool}
+              />
+            </Suspense>
+          ) : null}
         </div>
       )}
 
       renderLibraryPanel={() => (
         isMobile ? null : (
-          <div id="asset-library-wrapper" style={{ pointerEvents: 'auto' }}>
+          <div
+            id="asset-library-wrapper"
+            aria-hidden={workspaceSurface !== 'library'}
+            inert={workspaceSurface !== 'library'}
+            style={{ pointerEvents: workspaceSurface === 'library' ? 'auto' : 'none' }}
+          >
             <AssetLibraryPanel
               isOpen={workspaceSurface === 'library'}
               isMobile={isMobile}
@@ -124,7 +136,12 @@ export function WorkspaceSurfacePanels({
       )}
 
       renderFavoritesPanel={() => (
-        <div id="favorites-panel-wrapper" style={{ pointerEvents: 'auto' }}>
+        <div
+          id="favorites-panel-wrapper"
+          aria-hidden={workspaceSurface !== 'favorites'}
+          inert={workspaceSurface !== 'favorites'}
+          style={{ pointerEvents: workspaceSurface === 'favorites' ? 'auto' : 'none' }}
+        >
           <FavoritesPanel
             isOpen={workspaceSurface === 'favorites'}
             isMobile={isMobile}

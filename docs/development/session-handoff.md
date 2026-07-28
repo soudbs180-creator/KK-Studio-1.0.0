@@ -1662,3 +1662,56 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。工作流浏览器只重排现有数据和回调，不改变模板应用或工具创建逻辑。
 - 后续新增模板或工具必须进入相同的 Tab、搜索、分类和响应式网格契约，不得另建平行浮层。
+
+---
+
+## 244. 2026-07-29 - fix(ui): 固化 Morphic 紧凑工作区基线
+
+**修改范围**
+- 将 Canvas 标准 Composer 从遗留的 127px 收口为与 Copilot 同节奏的 94px 外壳，并修复嵌套“参考”行未触发文本避让导致的按钮与输入文字碰撞。
+- 将桌面模式切换、项目工具栏、内容自适应项目面板、选择工具条碰撞避让和短动效统一到共享 Morphic 几何。
+- 补充真实 CDP 响应式检查：通过应用实际的右键选中链路打开工具条，并验证其优先出现在卡片右侧、不会越界或覆盖任一卡片。
+- 在手机和竖屏平板结果流中卸载桌面选择工具条，避免从桌面缩放到移动视口后遗留浮层。
+- 保持生成、Canvas 数据、Agent、鉴权、计费、Provider、路由和持久化契约不变。
+
+**修改文件**
+- `apps/web/src/app/AppCanvasOverlays.tsx`
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/app/useSelectionMenuOverlay.ts`
+- `apps/web/src/components/canvas/SelectionMenu.tsx`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `packages/ui/src/core/layout.ts`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `tests/unit/canvas-responsive-v2-contract.test.ts`
+- `tests/unit/morphic-input-fidelity-contract.test.ts`
+- `tests/unit/morphic-layout-unification-contract.test.ts`
+- `tests/unit/morphic-surface-migration.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Canvas 与 Copilot 的标准空 Composer 都使用 94px 高度；Canvas 保持 570px 内容宽和 10px 底部间距，内容增长只向上扩展。
+2. “参考”操作保留在 Composer 内，但文本编辑区必须为嵌套引用行预留 80px 左侧空间，任何业务模式不得覆盖输入文字。
+3. 桌面选择工具条按右侧、右上、右下、左侧、视口钳制顺序放置；手机结果流不渲染桌面工具条，移动画布后续使用 Bottom Sheet。
+4. 项目快捷容器按实际内容收缩，工具栏在面板右侧独立停靠；不再让少量内容占满可用高度。
+5. 桌面交互动效使用 125ms 控件与 160ms 面板节奏，不使用按压缩放、弹跳或长时间发光。
+
+**已运行验证**
+- Composer 输入契约 TDD：修复前 2/3 通过并准确复现碰撞，修复后 3/3 通过。
+- Morphic、Overlay、Workspace Chrome、助手模式和响应式专项 44/44 通过。
+- Canvas 响应式契约 8/8 通过。
+- `npm run typecheck` 通过：Web、架构、116 个服务文件语法和 586 个测试文件语义检查全部通过。
+- CDP 实测 1440×900、1280×720、1024×720、1180×820、1023×720：Composer 94px、工具栏 30px，选择工具条可见且无越界、无卡片重叠、无 Chrome 重叠。
+- CDP 实测 834×1112、768×1024、430×932、390×844、375×812：结果流无横向溢出，桌面选择工具条不再遗留。
+
+**未运行验证及原因**
+- 本阶段未运行生产部署；范围为重大 Canvas V3 重构前的独立本地基线固化。
+- 完整 `build`、Canvas 性能和 `verify:changes` 将在 Canvas V3 与移动画布完成后统一运行。
+
+**风险与下一步**
+- 当前卡片和连接仍属于旧渲染系统；下一阶段按已批准计划新增 UI-only Canvas V3 ViewModel、内容自适应卡片与唯一实线 Edge Layer。
+- 手机端当前仍默认结果流；后续会新增明确的“画布”主入口和 Bottom Sheet Inspector，而不是把桌面浮层直接缩小。

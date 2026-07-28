@@ -35,7 +35,7 @@
 | Project panel | x=12, y=48, width=262px, bottom=10px | x=12, y=48, width=262px, height=662px | passed |
 | Copilot work area | x=12, y=48, right=12, bottom=10px | x=12, y=48, width=1256px, height=662px | passed |
 | Canvas composer | max-width=570px, bottom=10px | 570px, bottom=10px | passed |
-| Canvas composer standard state | 570 × 127px | 570 × 127px | passed |
+| Canvas composer standard state | 570 × 94px | 570 × 94px | passed |
 | Canvas editor | 24px, 14/21px type | 24px, 14/21px type | passed |
 | Copilot composer standard state | 968 × 94px | 968 × 94px | passed |
 | Copilot editor | 42px, 14/17.5px type | 42px, 14/17.5px type | passed |
@@ -94,7 +94,7 @@ All P0, P1 and P2 findings are resolved. KK Studio keeps its own brand, copy, ro
 
 - Canvas same-viewport comparison: `temp/layout-audit-2026-07-28-pass2/20-canvas-final-compare-preview.jpg`.
 - Copilot same-viewport comparison: `temp/layout-audit-2026-07-28-pass2/21-copilot-final-compare-preview.jpg`.
-- Canvas measured geometry: panel `x=12, y=48, 262×662`; composer `x=355, y=583, 570×127`; compact navigation `right=12, bottom=10, 156×32`.
+- Canvas measured geometry: panel `x=12, y=48, 262×662`; composer `x=355, y=616, 570×94`; compact navigation `right=12, bottom=10, 156×32`.
 - Copilot measured geometry: rail `x=12, y=48, 262×662`; composer `x=294, y=609, 968×94`.
 - The desktop project panel is persistent by default and no longer behaves like a timed modal. Its modal backdrop remains mobile-only.
 - The large minimap now defaults to a compact bottom-right zoom pill. The redundant Canvas/Create assistant edge handle is hidden because the top mode switch remains the canonical entry.

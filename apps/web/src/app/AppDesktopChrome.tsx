@@ -10,6 +10,7 @@ import { navigateAppRoot } from './navigation/appRootNavigation';
 
 interface AppDesktopChromeProps {
   isMobile: boolean;
+  activeMode: 'canvas' | 'copilot' | 'create';
   billingUiEnabled: boolean;
   remainingBalanceDisplay: string;
   onRecharge: () => void;
@@ -24,6 +25,8 @@ interface AppDesktopChromeProps {
   onSignOut: () => void | Promise<void>;
   onOpenAssistant: () => void;
   onCloseAssistant: () => void;
+  onOpenCanvasWorkspace: () => void;
+  onOpenCreateWorkspace: () => void;
   onOpenCommandPalette: () => void;
 }
 
@@ -89,6 +92,7 @@ const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
 
 const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   isMobile,
+  activeMode,
   billingUiEnabled,
   remainingBalanceDisplay,
   onRecharge,
@@ -103,10 +107,11 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onSignOut,
   onOpenAssistant,
   onCloseAssistant,
+  onOpenCanvasWorkspace,
+  onOpenCreateWorkspace,
   onOpenCommandPalette,
 }) => {
   const { adminLevel } = useAuth();
-  const [activeMode, setActiveMode] = React.useState<'canvas' | 'copilot' | 'create'>('canvas');
   React.useEffect(() => {
     if (isMobile) {
       delete document.body.dataset.kkWorkspaceMode;
@@ -126,19 +131,18 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   }
 
   const openCanvasMode = () => {
-    setActiveMode('canvas');
     onCloseAssistant();
+    onOpenCanvasWorkspace();
     focusWorkspaceCanvas();
   };
   const openCopilotMode = () => {
-    setActiveMode('copilot');
     onOpenAssistant();
     revealCopilotHistory();
   };
   const openCreateMode = () => {
-    setActiveMode('create');
     onCloseAssistant();
-    focusWorkspaceComposer(onOpenCommandPalette);
+    onOpenCreateWorkspace();
+    window.setTimeout(() => focusWorkspaceComposer(() => undefined), 0);
   };
 
   return (
@@ -201,7 +205,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             event.stopPropagation();
             setShowUserMenu((prev) => !prev);
           }}
-          className="kk-workspace-avatar-button relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
+          className="kk-workspace-avatar-button relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
         >
           {avatarUrl ? (
             <img src={avatarUrl} className="h-full w-full object-cover" />
@@ -233,7 +237,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           <button
             id="btn-desktop-recharge"
             onClick={onRecharge}
-            className="kk-workspace-primary-action inline-flex h-7.5 items-center justify-center rounded-xl px-2.5 text-[11px] font-black leading-none active:scale-95 shrink-0"
+            className="kk-workspace-primary-action inline-flex h-7.5 shrink-0 items-center justify-center rounded-xl px-2.5 text-[11px] font-black leading-none"
           >
             充值
           </button>
