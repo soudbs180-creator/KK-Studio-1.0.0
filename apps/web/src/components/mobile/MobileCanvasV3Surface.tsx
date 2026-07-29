@@ -54,6 +54,11 @@ interface MobileCanvasScene {
   height: number;
 }
 
+interface SceneOrigin {
+  offsetX: number;
+  offsetY: number;
+}
+
 interface DragState {
   pointerId: number;
   nodeId: string;
@@ -116,17 +121,18 @@ const buildScene = (
       ? E
       : never
     : never,
+  sceneOrigin: SceneOrigin,
 ): MobileCanvasScene => {
   if (viewModels.length === 0) {
     return { cards: [], edges: [], width: 640, height: 640 };
   }
-  const baseMinX = Math.min(...viewModels.map((card) => card.position.x));
-  const baseMinY = Math.min(...viewModels.map((card) => card.position.y));
-  const offsetX = WORLD_PADDING - baseMinX;
-  const offsetY = WORLD_PADDING - baseMinY;
   const cards = viewModels.map((viewModel) => {
     const position = positionOverrides[viewModel.id] || viewModel.position;
-    return { viewModel, x: position.x + offsetX, y: position.y + offsetY };
+    return {
+      viewModel,
+      x: position.x + sceneOrigin.offsetX,
+      y: position.y + sceneOrigin.offsetY,
+    };
   });
   const byId = new Map(cards.map((card) => [card.viewModel.id, card]));
   const relations = [
@@ -163,6 +169,14 @@ const buildScene = (
   const width = Math.max(640, ...cards.map((card) => card.x + card.viewModel.width + WORLD_PADDING));
   const height = Math.max(640, ...cards.map((card) => card.y + CARD_ESTIMATED_HEIGHT + WORLD_PADDING));
   return { cards, edges, width, height };
+};
+
+const resolveSceneOrigin = (viewModels: CanvasCardViewModel[]): SceneOrigin => {
+  if (viewModels.length === 0) return { offsetX: 0, offsetY: 0 };
+  return {
+    offsetX: WORLD_PADDING - Math.min(...viewModels.map((card) => card.position.x)),
+    offsetY: WORLD_PADDING - Math.min(...viewModels.map((card) => card.position.y)),
+  };
 };
 
 const CanvasCardBody: React.FC<{ viewModel: CanvasCardViewModel }> = ({ viewModel }) => {
@@ -216,8 +230,35 @@ const MobileCanvasV3Surface: React.FC<MobileCanvasV3SurfaceProps> = ({
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const viewModels = useMemo(() => buildViewModels(activeCanvas), [activeCanvas]);
+  // Keep one origin per mounted canvas: recomputing the minimum after persistence
+  // would normalize the dragged card back to its pre-drag screen position.
+  const sceneOriginRef = useRef<{
+    canvasId: string | null;
+    initialized: boolean;
+    origin: SceneOrigin;
+  }>({
+    canvasId: null,
+    initialized: false,
+    origin: { offsetX: 0, offsetY: 0 },
+  });
+  const activeCanvasId = activeCanvas?.id ?? null;
+  if (
+    sceneOriginRef.current.canvasId !== activeCanvasId
+    || (!sceneOriginRef.current.initialized && viewModels.length > 0)
+  ) {
+    sceneOriginRef.current = {
+      canvasId: activeCanvasId,
+      initialized: viewModels.length > 0,
+      origin: resolveSceneOrigin(viewModels),
+    };
+  }
   const scene = useMemo(
-    () => buildScene(viewModels, positionOverrides, activeCanvas?.workflow?.edges || []),
+    () => buildScene(
+      viewModels,
+      positionOverrides,
+      activeCanvas?.workflow?.edges || [],
+      sceneOriginRef.current.origin,
+    ),
     [activeCanvas?.workflow?.edges, positionOverrides, viewModels],
   );
   const selectedCard = scene.cards.find((card) => card.viewModel.id === selectedNodeId) || null;

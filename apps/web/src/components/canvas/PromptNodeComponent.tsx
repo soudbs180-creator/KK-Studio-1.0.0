@@ -750,14 +750,16 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         onDragCommitRef.current = onDragCommit;
         onLivePositionChangeRef.current = onLivePositionChange;
         onDragStateChangeRef.current = onDragStateChange;
-        dragRenderMetricsRef.current = {
-            cardWidth,
-            cardHeight,
-            originX,
-            originY,
-            zoomScale: zoomScale || 1,
-            nodeId: node.id,
-        };
+        if (!isDraggingRef.current) {
+            dragRenderMetricsRef.current = {
+                cardWidth,
+                cardHeight,
+                originX,
+                originY,
+                zoomScale: zoomScale || 1,
+                nodeId: node.id,
+            };
+        }
     }, [cardHeight, cardWidth, node.id, onDragCommit, onDragDelta, onDragStateChange, onLivePositionChange, originX, originY, zoomScale]);
 
     // Sync ref when node.position updates externally (and not dragging)
@@ -765,22 +767,17 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     useEffect(() => {
         if (!isDragging && !isDraggingRef.current && !isChatMode) {
             localPosRef.current = node.position;
-            // 🚀 [Fix] 只在位置差异较大时才强制更新 DOM，避免微小更新导致的抖动
-            if (containerRef.current) {
-                const currentLeft = parseFloat(containerRef.current.style.left) || 0;
-                const currentTop = parseFloat(containerRef.current.style.top) || 0;
-                const targetLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1) - originX;
-                const targetTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1) - originY;
-
-                // 只在差异超过 5px 时才更新，避免微小抖动
-                if (Math.abs(currentLeft - targetLeft) > 5 || Math.abs(currentTop - targetTop) > 5) {
-                    containerRef.current.style.left = `${targetLeft}px`;
-                    containerRef.current.style.top = `${targetTop}px`;
-                    containerRef.current.style.transform = 'translate3d(0, 0, 0)';
-                }
+            const isEntryAnimationActive = Boolean(
+                node.timestamp
+                && Date.now() - node.timestamp < 1500
+                && canvasTransform
+            );
+            if (containerRef.current && !isEntryAnimationActive) {
+                // world 布局已由 React 提交，此处只清理实时位移残留。
+                containerRef.current.style.transform = '';
             }
         }
-    }, [node.position.x, node.position.y, isDragging, cardWidth, cardHeight, isChatMode, originX, originY, zoomScale]);
+    }, [node.position.x, node.position.y, node.timestamp, isDragging, isChatMode, canvasTransform]);
 
     useEffect(() => () => {
         onLivePositionChangeRef.current?.(node.id, null);
@@ -790,12 +787,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         if (isChatMode) return;
 
         const unsubscribe = canvasLivePositionStore.subscribe(node.id, (pos) => {
+            if (isDraggingRef.current) return;
+
             if (containerRef.current) {
                 if (pos) {
                     const renderLeft = snapCanvasCoordinate(pos.x - cardWidth / 2, zoomScale || 1);
                     const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+                    const currentLeft = parseFloat(containerRef.current.style.left) || 0;
+                    const currentTop = parseFloat(containerRef.current.style.top) || 0;
+                    const nextTranslateX = renderLeft - originX - currentLeft;
+                    const nextTranslateY = renderTop - originY - currentTop;
 
-                    containerRef.current.style.transform = `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`;
+                    containerRef.current.style.transform = `translate3d(${nextTranslateX}px, ${nextTranslateY}px, 0px)`;
 
                     // 🚀 同时更新这组下属所有子图像节点的局部连接线！
                     if (node.childImageIds && node.childImageIds.length > 0) {
@@ -1107,6 +1110,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         dragStartPos.current = { x: clientX, y: clientY };
         dragStartCanvasPos.current = { x: node.position.x, y: node.position.y };
         localPosRef.current = node.position;
+        dragRenderMetricsRef.current = {
+            cardWidth,
+            cardHeight,
+            originX,
+            originY,
+            zoomScale: zoomScale || 1,
+            nodeId: node.id,
+        };
 
         isDraggingRef.current = true;
         setIsDragging(true);
@@ -1123,7 +1134,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         if (!isDraggingRef.current || !latestPointerRef.current) return;
 
         const { clientX, clientY } = latestPointerRef.current;
-        const scale = zoomScale || 1;
+        const scale = dragRenderMetricsRef.current.zoomScale;
         const nextPos = snapCanvasPointToGrid({
             x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
             y: dragStartCanvasPos.current.y + ((clientY - dragStartPos.current.y) / scale),
@@ -1190,7 +1201,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             // 如果 latestPointer 存在，在 mouseup 时做最后一次更新以保证最新坐标被算入
             if (latestPointerRef.current) {
                 const { clientX, clientY } = latestPointerRef.current;
-                const scale = zoomScale || 1;
+                const scale = dragRenderMetricsRef.current.zoomScale;
                 const finalPos = snapCanvasPointToGrid({
                     x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
                     y: dragStartCanvasPos.current.y + ((clientY - dragStartPos.current.y) / scale),
@@ -1287,6 +1298,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         ? stackZIndex + 120
         : stackZIndex;
     const renderPos = isDragging ? localPosRef.current : node.position;
+    const activeOriginX = isDragging ? dragRenderMetricsRef.current.originX : originX;
+    const activeOriginY = isDragging ? dragRenderMetricsRef.current.originY : originY;
     const renderLeft = snapCanvasCoordinate(renderPos.x - cardWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(renderPos.y - cardHeight, zoomScale || 1);
     const textSoftening = getCanvasTextSofteningProfile(
@@ -1318,15 +1331,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ref={containerRef}
                 id={node.id}
                 domId={`prompt-card-${node.id}`}
-                position={renderPos}
-                origin={{ x: originX, y: originY }}
+                position={{
+                    x: renderLeft + cardWidth / 2 - activeOriginX,
+                    y: renderTop + cardHeight - activeOriginY,
+                }}
+                origin={{ x: activeOriginX, y: activeOriginY }}
                 presentation={shellPresentation}
                 width={cardWidth}
                 height={cardHeight}
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel={detailLevel}
-                positioning="origin-transform"
+                positioning="world"
                 surface={false}
                 renderDetailPlaceholder={false}
                 className="prompt-node flex flex-col items-center select-none"
@@ -1334,7 +1350,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     height: cardHeight,
                     opacity: 0.8,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+                    transition: isDragging ? 'none' : 'opacity 125ms var(--kk-motion-ease-standard)',
                 }}
                 onMouseDown={handleMouseDown}
                 onTouchStart={handleMouseDown}
@@ -1363,15 +1379,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ref={containerRef}
                 id={node.id}
                 domId={`prompt-card-${node.id}`}
-                position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
-                origin={{ x: originX, y: originY }}
+                position={{
+                    x: renderLeft + cardWidth / 2 - activeOriginX,
+                    y: renderTop + cardHeight - activeOriginY,
+                }}
+                origin={{ x: activeOriginX, y: activeOriginY }}
                 presentation={shellPresentation}
                 width={cardWidth}
                 height={cardHeight}
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel="skeleton"
-                positioning="origin-transform"
+                positioning="world"
                 surface={false}
                 renderDetailPlaceholder={false}
                 style={{
@@ -1405,15 +1424,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ref={containerRef}
                 id={node.id}
                 domId={`prompt-card-${node.id}`}
-                position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
-                origin={{ x: originX, y: originY }}
+                position={{
+                    x: renderLeft + cardWidth / 2 - activeOriginX,
+                    y: renderTop + cardHeight - activeOriginY,
+                }}
+                origin={{ x: activeOriginX, y: activeOriginY }}
                 presentation={shellPresentation}
                 width={cardWidth}
                 height={cardHeight}
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel={detailLevel}
-                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                positioning={isChatMode ? 'flow' : 'world'}
                 surface={false}
                 renderDetailPlaceholder={false}
                 data-x={node.position.x}
@@ -1422,13 +1444,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 style={isChatMode ? {
                     opacity: 1,
                 } : {
-                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
-                    left: 0,
-                    top: 0,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     willChange: isDragging ? 'left, top' : 'auto',
-                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
+                    transition: isDragging ? 'none' : 'opacity 125ms var(--kk-motion-ease-standard)',
                     pointerEvents: 'auto',
                     touchAction: 'none'
                 }}
@@ -1586,15 +1605,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             ref={containerRef}
             id={node.id}
             domId={`prompt-card-${node.id}`}
-            position={{ x: renderLeft + cardWidth / 2, y: renderTop + cardHeight }}
-            origin={{ x: originX, y: originY }}
+            position={{
+                x: renderLeft + cardWidth / 2 - activeOriginX,
+                y: renderTop + cardHeight - activeOriginY,
+            }}
+            origin={{ x: activeOriginX, y: activeOriginY }}
             presentation={shellPresentation}
             width={cardWidth}
             height={cardHeight}
             zIndex={effectiveStackZIndex}
             selected={isSelected}
             detailLevel={detailLevel}
-            positioning={isChatMode ? 'flow' : 'origin-transform'}
+            positioning={isChatMode ? 'flow' : 'world'}
             surface={false}
             renderDetailPlaceholder={false}
             data-x={node.position.x}
@@ -1603,14 +1625,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             style={isChatMode ? {
                 opacity: 1,
             } : {
-                transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
-                left: 0,
-                top: 0,
                 zIndex: effectiveStackZIndex,
                 opacity: 1,
                 cursor: isDragging ? 'grabbing' : 'grab',
                 willChange: isDragging ? 'left, top' : 'auto',
-                transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
+                transition: isDragging ? 'none' : 'opacity 125ms var(--kk-motion-ease-standard)',
                 pointerEvents: 'auto',
                 touchAction: 'none'
             }}

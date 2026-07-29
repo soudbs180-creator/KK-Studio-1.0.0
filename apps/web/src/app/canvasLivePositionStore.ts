@@ -2,7 +2,7 @@ import { buildDockedVerticalConnectorPath } from '../canvas/connectorGeometry';
 import { CanvasConnectorScheduler } from '../canvas/CanvasConnectorScheduler';
 
 export type Point = { x: number; y: number };
-export type PositionListener = (position: Point) => void;
+export type PositionListener = (position: Point | null) => void;
 export type GlobalPositionListener = (id: string, position: Point | null) => void;
 
 class CanvasLivePositionStore {
@@ -25,10 +25,10 @@ class CanvasLivePositionStore {
       this.positions.set(id, position);
     }
 
-    // 简体中文：通知单个节点的订阅者。历史订阅签名不接受 null，因此清理时继续发送零点兜底值。
+    // 清理必须保留 null 语义；伪造零点会让订阅卡片瞬间跳向画布原点。
     const nodeListeners = this.listeners.get(id);
     if (nodeListeners) {
-      nodeListeners.forEach((listener) => listener(position || { x: 0, y: 0 }));
+      nodeListeners.forEach((listener) => listener(position));
     }
 
     // 简体中文：通知全局订阅者
@@ -73,7 +73,7 @@ class CanvasLivePositionStore {
     clearedIds.forEach((id) => {
       const nodeListeners = this.listeners.get(id);
       if (nodeListeners) {
-        nodeListeners.forEach((listener) => listener({ x: 0, y: 0 }));
+        nodeListeners.forEach((listener) => listener(null));
       }
       this.globalListeners.forEach((listener) => listener(id, null));
     });

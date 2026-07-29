@@ -213,6 +213,100 @@ async function evaluate(cdp, expression) {
   return result.result.value;
 }
 
+async function clickMobileTab(cdp, label) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const label = ${JSON.stringify(label)};
+      const button = [...document.querySelectorAll('button')]
+        .find((candidate) => (
+          candidate.getAttribute('aria-label') === label
+          || candidate.textContent?.trim() === label
+        ));
+      button?.click();
+      return !!button;
+    })()`,
+  );
+}
+
+async function measureMobileCanvasCard(cdp) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const surface = document.querySelector('[data-testid="mobile-canvas-v3"]');
+      const card = document.querySelector('.kk-mobile-canvas-card');
+      const rect = card?.getBoundingClientRect();
+      return {
+        surface: !!surface,
+        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        card: rect ? {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          centerX: rect.left + rect.width / 2,
+          centerY: rect.top + rect.height / 2,
+        } : null,
+      };
+    })()`,
+  );
+}
+
+async function dispatchMobileTouchDrag(cdp, start, movement) {
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ ...start, id: 1 }],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: start.x + movement.x, y: start.y + movement.y, id: 1 }],
+  });
+}
+
+async function verifyMobileCanvasDrag(cdp, viewport) {
+  if (!await clickMobileTab(cdp, "画布")) {
+    throw new Error(`${viewport.width}x${viewport.height} mobile canvas tab is unavailable`);
+  }
+  await wait(500);
+  const initial = await measureMobileCanvasCard(cdp);
+  if (!initial.surface || !initial.card) {
+    throw new Error(`${viewport.width}x${viewport.height} mobile canvas rendered no card`);
+  }
+
+  const start = { x: initial.card.centerX, y: initial.card.centerY };
+  const movement = { x: 72, y: 44 };
+  await dispatchMobileTouchDrag(cdp, start, movement);
+  await wait(120);
+  const during = await measureMobileCanvasCard(cdp);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await wait(180);
+  const released = await measureMobileCanvasCard(cdp);
+  await wait(350);
+  const settled = await measureMobileCanvasCard(cdp);
+  const pointerError = {
+    x: Math.abs((during.card?.centerX || 0) - initial.card.centerX - movement.x),
+    y: Math.abs((during.card?.centerY || 0) - initial.card.centerY - movement.y),
+  };
+  const settledPositionError = {
+    x: Math.abs((settled.card?.centerX || 0) - initial.card.centerX - movement.x),
+    y: Math.abs((settled.card?.centerY || 0) - initial.card.centerY - movement.y),
+  };
+  const postReleaseDrift = Math.hypot(
+    (settled.card?.centerX || 0) - (released.card?.centerX || 0),
+    (settled.card?.centerY || 0) - (released.card?.centerY || 0),
+  );
+  await clickMobileTab(cdp, "创作");
+  await wait(250);
+  return {
+    initial,
+    during,
+    settled,
+    pointerError,
+    settledPositionError,
+    postReleaseDrift,
+  };
+}
+
 mkdirSync(artifactDir, { recursive: true });
 if (existsSync(profileDir))
   rmSync(profileDir, { recursive: true, force: true });
@@ -450,6 +544,21 @@ try {
       throw new Error(
         `${viewport.width}x${viewport.height} did not preserve the result-flow surface`,
       );
+    } else {
+      const mobileCanvasDrag = await verifyMobileCanvasDrag(cdp, viewport);
+      if (
+        mobileCanvasDrag.pointerError.x > 2
+        || mobileCanvasDrag.pointerError.y > 2
+        || mobileCanvasDrag.settledPositionError.x > 2
+        || mobileCanvasDrag.settledPositionError.y > 2
+        || mobileCanvasDrag.postReleaseDrift > 1
+        || mobileCanvasDrag.settled.horizontalOverflow
+      ) {
+        throw new Error(
+          `${viewport.width}x${viewport.height} mobile canvas drag is unstable: ${JSON.stringify(mobileCanvasDrag)}`,
+        );
+      }
+      metrics.mobileCanvasDrag = mobileCanvasDrag;
     }
     if (metrics.horizontalOverflow || metrics.chromeOverlap)
       throw new Error(

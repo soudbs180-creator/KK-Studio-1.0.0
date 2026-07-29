@@ -79,7 +79,7 @@ export const CanvasCardShell = React.forwardRef<HTMLDivElement, CanvasCardShellP
         zIndex,
         borderRadius: surface ? 14 : undefined,
         opacity: isGhost ? 0.72 : 1,
-        transition: 'var(--canvas-card-transition, left 160ms var(--kk-motion-ease-standard), top 160ms var(--kk-motion-ease-standard), transform 160ms var(--kk-motion-ease-standard), opacity 125ms var(--kk-motion-ease-standard), border-color 125ms var(--kk-motion-ease-standard))',
+        transition: 'var(--canvas-card-transition, opacity 125ms var(--kk-motion-ease-standard), border-color 125ms var(--kk-motion-ease-standard))',
         ...style,
       }}
     >

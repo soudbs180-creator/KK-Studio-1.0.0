@@ -622,8 +622,19 @@ try {
   });
   await page.mouse.up();
   await page.waitForTimeout(250);
+  const mainDragReleaseScene = await measureScene(page);
+  await page.waitForTimeout(350);
+  const mainDragSettledScene = await measureScene(page);
 
   const mainDragSpread = computeSpread(mainDragScene.imageBoxes);
+  const mainDragPointerError = {
+    x: Math.abs((mainDragScene.promptBox?.centerX ?? 0) - (initialScene.promptBox?.centerX ?? 0) - 180),
+    y: Math.abs((mainDragScene.promptBox?.centerY ?? 0) - (initialScene.promptBox?.centerY ?? 0) - 120),
+  };
+  const mainDragPostReleaseDrift = Math.hypot(
+    (mainDragSettledScene.promptBox?.centerX ?? 0) - (mainDragReleaseScene.promptBox?.centerX ?? 0),
+    (mainDragSettledScene.promptBox?.centerY ?? 0) - (mainDragReleaseScene.promptBox?.centerY ?? 0),
+  );
   const promptBottomDuringMainDrag = mainDragScene.promptBox?.bottom ?? 0;
   const promptDockTolerance = 60;
   const imagesDockedUnderPrompt = mainDragScene.imageBoxes.every((box) => box.top >= promptBottomDuringMainDrag - promptDockTolerance);
@@ -671,6 +682,8 @@ try {
     initialSpread,
     mainDragSpread,
     mainDragGrouped,
+    mainDragPointerError,
+    mainDragPostReleaseDrift,
     childConnectorDistance: nearestConnectorEnd?.distance ?? null,
     childConnectorFollows,
     artifactDir: ARTIFACT_DIR,
@@ -680,6 +693,14 @@ try {
 
   if (!mainDragGrouped) {
     throw new Error(`Main-card drag did not regroup child cards under the parent: ${JSON.stringify(result)}`);
+  }
+
+  if (mainDragPointerError.x > 2 || mainDragPointerError.y > 2) {
+    throw new Error(`Main-card drag did not match the pointer trajectory: ${JSON.stringify(result)}`);
+  }
+
+  if (mainDragPostReleaseDrift > 1) {
+    throw new Error(`Main-card position drifted after pointer release: ${JSON.stringify(result)}`);
   }
 
   if (!childConnectorFollows) {

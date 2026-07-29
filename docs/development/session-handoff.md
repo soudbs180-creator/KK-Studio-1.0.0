@@ -1893,3 +1893,53 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。新增样式层只收口内容几何，不覆盖颜色、业务状态或回调。
 - 后续新增按钮必须先判断其语义属于“居中功能操作”还是“左对齐菜单/列表”，不得用全局 `text-align: center` 破坏信息浏览效率。
+
+---
+
+## 249. 2026-07-29 - fix(canvas): 消除桌面与移动画布卡片漂移
+
+**修改范围**
+- 修复 Prompt/Image 卡片同时使用绝对位置与绝对 `transform` 导致坐标重复叠加、缩放或拖拽时卡片持续追位的问题。
+- 将桌面卡片的已提交位置统一交给 React `left/top` 布局，实时 Store 只承担其它节点的相对跟随；拖动节点不再消费自身实时位置广播。
+- 在 Prompt Pointer Down 时冻结 `renderOrigin / zoomScale / card geometry`，直到 Commit 后释放，避免选中态、分组边界或缩放刷新改变拖拽坐标系。
+- 修复实时位置清理发送伪造画布原点的问题，统一使用 `null` 清理语义。
+- 修复移动画布在节点持久化后重新按最小坐标归一化场景、导致卡片松手回到原位的问题；同一画布挂载周期内保持固定场景原点。
+- 强化桌面分组拖拽和 375 / 390 / 430 / 768 / 834px 移动触控 Smoke，验收指针轨迹、最终落位、松手漂移和横向溢出。
+
+**修改文件**
+- `apps/web/src/app/canvasLivePositionStore.ts`
+- `apps/web/src/components/canvas/CanvasCardShell.tsx`
+- `apps/web/src/components/canvas/PromptNodeComponent.tsx`
+- `apps/web/src/components/image/ImageCard2.tsx`
+- `apps/web/src/components/mobile/MobileCanvasV3Surface.tsx`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `scripts/test/verify-prompt-group-drag.mjs`
+- `tests/contract/canvas-card-position-stability.test.ts`
+- `tests/unit/prompt-group-regroup-behavior.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 已提交卡片位置只有一个坐标源：桌面使用 `left/top`；`transform` 仅可表达其它卡片的相对实时跟随，不得再次表达完整绝对坐标。
+2. 拖拽期间不启用 `left/top/transform` 位置过渡，不执行自身实时 Store 回放；从按下到松手保持同一坐标帧。
+3. Live Position 清理只使用 `null`，禁止使用 `{ x: 0, y: 0 }` 兼容值，因为它会把订阅节点瞬间移向画布原点。
+4. 移动画布的场景原点在当前 Canvas 挂载周期内固定；节点位置持久化不得重新归一化其它节点或抵消刚完成的拖动。
+5. 拖拽验收必须同时检查“拖动中跟手”和“松手后保持”，两者的轨迹/落位误差上限为 2px，稳定帧漂移上限为 1px。
+
+**已运行验证**
+- TDD：新增卡片位置稳定契约先准确复现自身广播和坐标帧未冻结，修复后与 Prompt Group 专项共 47/47 通过。
+- 本地浏览器 103% 缩放真实拖拽 `-120×-80px`，卡片位移误差小于 0.01px；松手后连续 30 帧只有一个位置。
+- Prompt Group Drag 真实浏览器 Smoke：`180×120px` 指针轨迹误差约 0.01px，松手漂移 0px，子卡连接端点误差约 0.56px。
+- 移动触控 Smoke：834×1112、768×1024、430×932、390×844、375×812 的拖动中和松手后落位误差均约 0.001px，稳定漂移 0px，横向溢出为 0。
+- `architecture:check`、`governance:check`、`typecheck` 独立通过；服务端 116 个文件语法检查和 591 个测试文件语义检查通过。
+- 完整 `verify:changes` 通过：生产构建、Local Runner、unit、integration、contract、E2E、Prompt Group Drag、移动/桌面设置 Smoke、AI Takeover、启动居中、编码检查与 Canvas performance 全部通过；Vite 构建 2584 modules。
+- `pnpm audit --prod --audit-level moderate` 在注册表请求重试后完成，未发现已知漏洞。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围为本地画布交互修复、真实浏览器检查与本地 Git Commit。
+- 未执行真实媒体生成；修复未更改 Provider、计费、鉴权、生成或后端契约。
+
+**风险与下一步**
+- 风险低。位置持久化 DTO 未改变，旧项目直接使用新的单坐标源渲染。
+- 后续新增卡片 Renderer 必须复用相同的位置所有权规则，并把“拖动中轨迹 + 松手后稳定”加入对应浏览器 Smoke。

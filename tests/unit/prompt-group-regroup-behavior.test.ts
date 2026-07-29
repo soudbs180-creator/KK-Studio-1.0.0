@@ -525,7 +525,7 @@ test('App syncs live-scene versions after main-card live and derived child posit
   );
 });
 
-test('ImageCard live-store transforms stay relative to the current absolute layout position', () => {
+test('ImageCard keeps committed world position in React layout and live movement relative', () => {
   const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
   const subscribeStart = imageCardSource.indexOf('const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {');
   const subscribeEnd = imageCardSource.indexOf('return () => unsubscribe();', subscribeStart);
@@ -659,9 +659,10 @@ test('ImageCard live-store transforms stay relative to the current absolute layo
   const syncSource = imageCardSource.slice(syncStart, syncEnd);
   const subscribeSource = imageCardSource.slice(subscribeStart, subscribeEnd);
 
-  assert.match(syncSource, /containerRef\.current\.style\.left = `\$\{targetLeft\}px`;/);
-  assert.match(syncSource, /containerRef\.current\.style\.top = `\$\{targetTop\}px`;/);
-  assert.match(syncSource, /containerRef\.current\.style\.transform = 'translate3d\(0, 0, 0\)';/);
+  assert.match(syncSource, /containerRef\.current\.style\.transform = '';/);
+  assert.doesNotMatch(syncSource, /containerRef\.current\.style\.left/);
+  assert.doesNotMatch(syncSource, /containerRef\.current\.style\.top/);
+  assert.match(imageCardSource, /positioning=\{isChatMode \? 'flow' : 'world'\}/);
   assert.match(subscribeSource, /const currentLeft = parseFloat\(containerRef\.current\.style\.left\) \|\| 0;/);
   assert.match(subscribeSource, /const currentTop = parseFloat\(containerRef\.current\.style\.top\) \|\| 0;/);
   assert.match(subscribeSource, /const nextTranslateX = renderLeft - originX - currentLeft;/);

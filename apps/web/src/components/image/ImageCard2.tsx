@@ -325,15 +325,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 🚀 [关键修复] 当外部通过 React Props 驱动位置变化时（例如在重组动画播放的每一帧中），
             // 同步将最新的位置更新到 canvasLivePositionStore，确保虚线连线能完美获取到该帧的最新位置！
             if (containerRef.current) {
-                const currentLeft = parseFloat(containerRef.current.style.left) || 0;
-                const currentTop = parseFloat(containerRef.current.style.top) || 0;
-                const targetLeft = snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX;
-                const targetTop = snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY;
-                if (Math.abs(currentLeft - targetLeft) > 1 || Math.abs(currentTop - targetTop) > 1) {
-                    containerRef.current.style.left = `${targetLeft}px`;
-                    containerRef.current.style.top = `${targetTop}px`;
-                    containerRef.current.style.transform = 'translate3d(0, 0, 0)';
-                }
+                containerRef.current.style.transform = '';
             }
 
             // Notify after normalizing DOM positioning so subscribers compute relative transforms.
@@ -354,6 +346,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         if (isChatMode) return;
 
         const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {
+            if (isDraggingRef.current) return;
+
             if (containerRef.current) {
                 if (pos) {
                     const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
@@ -1461,7 +1455,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 ref={containerRef}
                 id={image.id}
                 domId={`image-card-${image.id}`}
-                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                position={{
+                    x: renderLeft + nodeWidth / 2 - originX,
+                    y: renderTop + cardHeight - originY,
+                }}
                 origin={{ x: originX, y: originY }}
                 presentation={shellPresentation}
                 width={nodeWidth}
@@ -1469,7 +1466,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel="skeleton"
-                positioning="origin-transform"
+                positioning="world"
                 surface={false}
                 renderDetailPlaceholder={false}
                 data-card-height={cardHeight}
@@ -1506,7 +1503,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 ref={containerRef}
                 id={image.id}
                 domId={`image-card-${image.id}`}
-                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                position={{
+                    x: renderLeft + nodeWidth / 2 - originX,
+                    y: renderTop + cardHeight - originY,
+                }}
                 origin={{ x: originX, y: originY }}
                 presentation={shellPresentation}
                 width={nodeWidth}
@@ -1514,7 +1514,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel={detailLevel}
-                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                positioning={isChatMode ? 'flow' : 'world'}
                 surface={false}
                 renderDetailPlaceholder={false}
                 data-x={image.position.x}
@@ -1528,15 +1528,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
-                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
-                    left: 0,
-                    top: 0,
                     zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
-                    willChange: isDragging ? 'transform' : 'auto',
+                    transition: isDragging ? 'none' : 'opacity 125ms var(--kk-motion-ease-standard)',
+                    willChange: isDragging ? 'left, top' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'
                 }}
@@ -1676,7 +1673,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 ref={containerRef}
                 id={image.id}
                 domId={`image-card-${image.id}`}
-                position={{ x: renderLeft + nodeWidth / 2, y: renderTop + cardHeight }}
+                position={{
+                    x: renderLeft + nodeWidth / 2 - originX,
+                    y: renderTop + cardHeight - originY,
+                }}
                 origin={{ x: originX, y: originY }}
                 presentation={shellPresentation}
                 width={nodeWidth}
@@ -1684,7 +1684,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 zIndex={effectiveStackZIndex}
                 selected={isSelected}
                 detailLevel={detailLevel}
-                positioning={isChatMode ? 'flow' : 'origin-transform'}
+                positioning={isChatMode ? 'flow' : 'world'}
                 surface={false}
                 renderDetailPlaceholder={false}
                 data-x={image.position.x}
@@ -1698,15 +1698,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
-                    transform: `translate3d(${renderLeft - originX}px, ${renderTop - originY}px, 0px)`,
-                    left: 0,
-                    top: 0,
                     zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease',
-                    willChange: isDragging ? 'transform' : 'auto',
+                    transition: isDragging ? 'none' : 'opacity 125ms var(--kk-motion-ease-standard)',
+                    willChange: isDragging ? 'left, top' : 'auto',
                     touchAction: 'none',
                     contain: 'layout style'
                 }}
