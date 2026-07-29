@@ -68,7 +68,7 @@ test('desktop canvas chrome preserves the original composer layout at a compact 
   assert.match(css, /padding:\s*6px;[\s\S]*gap:\s*4px;/);
   assert.doesNotMatch(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:/);
   assert.match(promptBar, /<DesktopComposerPromptTools[\s\S]*shouldRenderStandaloneUploadRow[\s\S]*<PromptBarFooter isMobile=\{isMobile\}>/);
-  assert.match(projectManager, /fixed left-3 z-50 flex w-\[30px\]/);
+  assert.match(projectManager, /kk-project-rail-host fixed left-3 z-50 flex w-\[30px\]/);
   assert.match(projectManager, /h-\[30px\] w-\[30px\] shrink-0/);
   assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);
   assert.doesNotMatch(projectManager, /setIsCollapsed|w-2 justify-center/);

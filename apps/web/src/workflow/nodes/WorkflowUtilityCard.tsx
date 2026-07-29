@@ -170,7 +170,13 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
             </ul>
           )}
           {actionLabel && onAction && (
-            <button type="button" onClick={() => onAction(node)}>{actionLabel}</button>
+            <button
+              type="button"
+              className="kk-morphic-function-button"
+              onClick={() => onAction(node)}
+            >
+              {actionLabel}
+            </button>
           )}
         </div>
       </CanvasV3Card>

@@ -1,0 +1,138 @@
+/*
+ * Morphic button content geometry
+ *
+ * Icon-only controls, compact toolbar controls, list rows, and text actions
+ * intentionally use different widths. They share the same optical-centering
+ * contract: symmetric insets, a stable icon box, and a one-line label box.
+ */
+
+:root {
+  --kk-morphic-button-icon-size: 16px;
+  --kk-morphic-button-content-gap: 6px;
+  --kk-morphic-button-action-padding-x: 12px;
+}
+
+.kk-workspace-icon-control {
+  display: inline-flex !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+.kk-workspace-icon-control > svg {
+  width: var(--kk-morphic-button-icon-size);
+  height: var(--kk-morphic-button-icon-size);
+  flex: none;
+  margin: 0;
+}
+
+.kk-canvas-view-tools button {
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.kk-canvas-view-tools button > svg {
+  width: var(--kk-morphic-button-icon-size);
+  height: var(--kk-morphic-button-icon-size);
+  flex: none;
+  margin: 0;
+}
+
+.prompt-bar-liquid-send {
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  padding: 4px !important;
+  line-height: 1 !important;
+}
+
+.kk-prompt-send-button-content {
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 8px !important;
+  line-height: 1;
+}
+
+.kk-prompt-send-button-content span {
+  line-height: 1;
+}
+
+.kk-prompt-send-button-icon {
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  flex: none;
+  margin: 0;
+}
+
+.kk-prompt-send-button-icon > svg {
+  width: var(--kk-morphic-button-icon-size);
+  height: var(--kk-morphic-button-icon-size);
+}
+
+.kk-morphic-function-button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kk-morphic-button-content-gap);
+  padding-block: 0;
+  padding-inline: var(--kk-morphic-button-action-padding-x);
+  text-align: center;
+  line-height: 1;
+}
+
+:is(
+  .kk-composer-type-picker__trigger,
+  .kk-composer-prompt-tools__workflow,
+  .kk-composer-prompt-tools__trigger,
+  .kk-composer-reference-button,
+  .kk-composer-config-control,
+  .assistant-collaboration-mode-switch > button
+) > span {
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.kk-composer-prompt-tools__workflow,
+.kk-composer-prompt-tools__trigger,
+.kk-composer-reference-button {
+  justify-content: center;
+}
+
+@media (max-width: 1023px) {
+  .kk-mobile-header-control {
+    padding-block: 0 !important;
+    align-items: center;
+    line-height: 1;
+  }
+
+  .kk-mobile-header-control:active {
+    transform: none !important;
+  }
+
+  .kk-workspace-icon-control {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .kk-morphic-function-button {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+}

@@ -43,6 +43,7 @@ test('prompt bar deep model overlays expose reusable primitives', () => {
 
 test('prompt bar deep model overlays consume semantic layers and primitive classes', () => {
   const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const countControlSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerCountControl.tsx');
   const desktopModelMenuStart = source.indexOf('const modelDropdownContent = (');
   const footerStart = source.indexOf('<PromptBarFooter', desktopModelMenuStart);
   assert.notEqual(desktopModelMenuStart, -1, 'desktop model dropdown content should exist');
@@ -78,8 +79,8 @@ test('prompt bar deep model overlays consume semantic layers and primitive class
   assert.match(deepOverlaySource, /className="kk-prompt-bar-deep-field/);
   assert.match(deepOverlaySource, /className="kk-prompt-bar-deep-modal-action/);
   assert.match(deepOverlaySource, /className="kk-prompt-bar-deep-modal-action kk-prompt-bar-deep-modal-action--primary/);
-  assert.match(source, /className="kk-prompt-bar-deep-count-popover/);
-  assert.match(source, /className=\{`kk-prompt-bar-deep-count-option/);
+  assert.match(countControlSource, /className="kk-prompt-bar-deep-count-popover/);
+  assert.match(countControlSource, /className=\{`kk-prompt-bar-deep-count-option/);
   assert.match(source, /style=\{\{\s*zIndex:\s*PROMPT_BAR_DEEP_SHEET_LAYER\s*\}\}/);
 
   assert.doesNotMatch(deepOverlaySource, /zIndex:\s*KK_LAYER\.modal(?!Backdrop)/);

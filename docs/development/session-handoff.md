@@ -1847,3 +1847,49 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 当前本地环境未加载可用 Provider 模型，因此已验证模型/参数 Trigger 的尺寸与状态，未执行真实模型选项和动态参数内容的业务生成。
+
+---
+
+## 248. 2026-07-29 - fix(ui): 统一按钮内容留白与视觉居中
+
+**修改范围**
+- 统一工作区常用图标按钮、Composer 功能按钮、发送按钮和工作流卡片主操作的内容几何，修复图标偏左、文案行盒偏高和发送图标越出按钮的问题。
+- 修复移动端顶栏内部控件被宽泛安全区选择器重复施加顶部留白，导致头像、积分和菜单按钮上下间距不一致的问题。
+- 将“功能操作居中”与“菜单/列表左对齐”区分为两条明确规则：一般功能按钮视觉居中，导航、菜单和项目列表保持左对齐但四周留白对称。
+- 保持 Canvas、生成、Provider、鉴权、计费、路由、移动主导航和持久化契约不变。
+
+**修改文件**
+- `apps/web/src/styles/morphic-button-geometry.css`
+- `apps/web/src/bootstrap.tsx`
+- `apps/web/src/main.tsx`
+- `apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx`
+- `tests/unit/morphic-button-content-geometry-contract.test.ts`
+- `tests/unit/prompt-bar-layout-regression.test.ts`
+- `tests/unit/prompt-bar-deep-overlay-ui-system-contract.test.ts`
+- `tests/unit/canvas-responsive-v2-contract.test.ts`
+- `tests/unit/project-manager-unused-cleanup-contract.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 桌面独立图标按钮统一为 `30×30px`，内部图标 `16×16px` 且水平、垂直居中；移动端相同入口扩展为 `44×44px` 触控目标。
+2. Canvas 右下角视图工具保持 `32px` 外壳、`2px` 内边距和 `26×26px` 内部按钮，不错误套用独立 30px 按钮尺寸。
+3. 普通功能按钮统一使用居中布局、6px 图文间距和对称横向内边距；菜单、导航和项目行继续左对齐，但上下与左右内边距必须成对一致。
+4. Composer 发送按钮使用 `4px` 外层内边距、`4px` 图文间距和 `22×22px` 图标区，图标与文案均不再越过 30px 控件边界。
+5. 移动安全区只由顶栏外壳承担；头像、积分和菜单等内部控件使用零纵向内边距并在 48px 顶栏内精确居中。
+
+**已运行验证**
+- TDD：新增按钮内容几何契约先因缺少统一样式入口失败，实施后相关 Morphic 输入、布局与按钮契约 9/9 通过。
+- 完整单测首次发现前序组件抽离后的四条静态断言仍读取旧文件或旧 class 顺序；守卫改为读取独立张数控件和项目轨道语义 class 后，全量 unit 为 2273 通过 / 0 失败 / 2 跳过。
+- 本地浏览器桌面实测：顶栏图标按钮 `30×30px`、图标 `16×16px` 且四周 7px；工作流、工具和参考按钮的图文与左右留白对称；发送按钮内容四周 4px 且无图标溢出。
+- 本地浏览器 390×844 实测：头像控件 48px 高，头像上下各 8px；积分和菜单图标均垂直居中；页面横向溢出为 0。
+- 完整 `npm run verify:changes` 通过：`architecture:check`、`governance:check`、`typecheck`、OpenAPI、生产构建、Local Runner、unit、integration、contract、E2E、Prompt Group Drag、移动/桌面设置 Smoke、AI Takeover、启动居中、编码检查和 Canvas performance 全部通过。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未部署生产环境；本次范围为本地 UI 几何、设计规则、浏览器操作检查和本地 Git Commit。
+- 未执行真实媒体生成；当前环境没有可用 Provider 模型，本轮不修改生成与计费逻辑。
+
+**风险与下一步**
+- 风险低。新增样式层只收口内容几何，不覆盖颜色、业务状态或回调。
+- 后续新增按钮必须先判断其语义属于“居中功能操作”还是“左对齐菜单/列表”，不得用全局 `text-align: center` 破坏信息浏览效率。
