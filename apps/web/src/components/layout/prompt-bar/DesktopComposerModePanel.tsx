@@ -147,20 +147,23 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
         <button
           data-options-toggle
           data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAdvancedOptions.uiAction}
-          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-9 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[42vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[40vw] min-w-0 overflow-hidden') : 'px-2.5 flex-shrink-0'}`}
+          className={`kk-composer-config-control kk-composer-parameter-control ${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[42vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[40vw] min-w-0 overflow-hidden') : 'flex-shrink-0'}`}
           style={{
             background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
             color: 'var(--text-secondary)',
             borderColor: showOptionsPanel ? 'var(--prompt-bar-shell-border-strong)' : 'var(--prompt-bar-shell-border)',
           }}
+          aria-label="打开生成参数"
+          aria-haspopup="dialog"
+          aria-expanded={showOptionsPanel}
           onClick={(event) => {
             event.stopPropagation();
             onToggleOptionsPanel();
           }}
-          title="图片/视频选项"
+          title="生成参数"
         >
-          {summary}
-          <svg className={`w-3 h-3 transition-transform ${showOptionsPanel ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <span className="kk-composer-parameter-control__summary">{summary}</span>
+          <svg className={`kk-composer-config-control__chevron w-3 h-3 ${showOptionsPanel ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>

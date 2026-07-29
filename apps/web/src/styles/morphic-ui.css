@@ -848,8 +848,8 @@ select,
 }
 
 .kk-project-rail-host {
-  top: calc(var(--kk-morphic-topbar-height) + 10px);
-  transform: none;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 #project-manager-container {
@@ -1499,6 +1499,182 @@ body:has(#project-manager-container[data-panel-open='true'])
 
 .kk-composer-compact-footer .w-10 {
   width: 30px !important;
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-group {
+  gap: 4px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.kk-composer-config-control {
+  height: 30px !important;
+  min-height: 30px !important;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--kk-morphic-border) !important;
+  border-radius: 8px !important;
+  background: var(--kk-morphic-control) !important;
+  color: var(--kk-morphic-text-secondary) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard) !important;
+}
+
+.kk-composer-config-control:hover:not(:disabled),
+.kk-composer-config-control[aria-expanded='true'],
+.kk-composer-config-control[data-open='true'] {
+  border-color: var(--kk-morphic-border-strong) !important;
+  background: var(--kk-morphic-control-hover) !important;
+  color: var(--kk-morphic-text-primary) !important;
+}
+
+.kk-composer-config-control:disabled {
+  color: var(--kk-morphic-text-disabled) !important;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.kk-composer-model-control {
+  width: auto;
+  min-width: 112px;
+  max-width: 164px;
+  justify-content: flex-start;
+}
+
+.kk-composer-parameter-control {
+  min-width: 118px;
+  max-width: 150px;
+}
+
+.kk-composer-parameter-control__summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.kk-composer-parameter-control__summary > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kk-composer-count-control {
+  width: 74px;
+  justify-content: center;
+}
+
+.kk-composer-count-control__value {
+  color: var(--kk-morphic-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.kk-composer-count-control__unit {
+  color: var(--kk-morphic-text-muted);
+  font-size: 11px;
+}
+
+.kk-composer-config-control__chevron {
+  margin-left: auto;
+  opacity: 0.56;
+  transition: transform var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.kk-prompt-bar-deep-count-popover {
+  display: flex;
+  width: 176px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 14px;
+  background: var(--kk-morphic-panel);
+  color: var(--kk-morphic-text-primary);
+  box-shadow: var(--kk-morphic-dialog-shadow);
+  animation: kk-morphic-popover-in var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.kk-composer-count-menu__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 0;
+  color: var(--kk-morphic-text-muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.kk-composer-count-menu__title {
+  color: var(--kk-morphic-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.kk-composer-count-menu__grid {
+  display: grid;
+  max-height: 210px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.kk-composer-compact-footer .kk-prompt-bar-deep-count-option {
+  display: inline-flex;
+  min-width: 0;
+  height: 36px !important;
+  min-height: 36px !important;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--kk-morphic-control) !important;
+  color: var(--kk-morphic-text-secondary) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.kk-prompt-bar-deep-count-option strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kk-prompt-bar-deep-count-option span {
+  color: var(--kk-morphic-text-muted);
+  font-size: 9px;
+}
+
+.kk-prompt-bar-deep-count-option:hover,
+.kk-prompt-bar-deep-count-option--active,
+.kk-prompt-bar-deep-count-option[aria-selected='true'] {
+  border-color: color-mix(in oklch, var(--kk-morphic-action) 48%, transparent);
+  background: color-mix(in oklch, var(--kk-morphic-action) 18%, var(--kk-morphic-control)) !important;
+  color: var(--kk-morphic-text-primary) !important;
+}
+
+@keyframes kk-morphic-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 #prompt-bar-container textarea,
@@ -2656,6 +2832,11 @@ body .settings-panel .apple-soft-card {
   button,
   [role="button"] {
     min-width: 44px;
+  }
+
+  .kk-composer-config-control {
+    height: 44px !important;
+    min-height: 44px !important;
   }
 
   .mobile-app-shell,

@@ -1804,3 +1804,46 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 风险低。项目面板右边界由 274px 增加到 312px；Composer 已有面板避让规则，Canvas 卡片坐标系不受影响。
+
+---
+
+## 247. 2026-07-29 - fix(ui): 居中项目轨道并统一 Composer 参数控件
+
+**修改范围**
+- 将画布最左侧项目轨道从固定顶部位置调整为视口垂直居中，同时保持 `x=12px` 和项目面板 `x=50px` 不变。
+- 统一桌面 Composer 的模型、生成参数和生成张数控件，收口高度、圆角、字重、边界、展开态和 Chevron 动效。
+- 将张数选择改为带 Listbox 语义的 176px 四列弹层，并把独立逻辑抽出为可维护的桌面控件组件。
+- 补充 Composer 配置控件与项目轨道的设计规范和契约测试。
+
+**修改文件**
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerCountControl.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/morphic-input-fidelity-contract.test.ts`
+- `tests/unit/morphic-layout-unification-contract.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 桌面项目轨道固定为 `x=12px`、`top=50%`、`translateY(-50%)`，项目面板继续从 `x=50px` 展开。
+2. 模型、参数和张数控件统一为 30px 高、8px 圆角和 125ms 过渡；移动端触控目标保持至少 44px。
+3. 张数触发器固定为 74px，弹层固定为 176px，默认四列；PPT 的 20 个数量选项沿用相同网格并允许纵向滚动。
+4. 展开与选中状态只改变文字、背景和边界，不产生尺寸跳动、缩放或厚重阴影。
+5. 张数控件从 `PromptBar.tsx` 抽离，避免主输入组件超过维护性行数阈值。
+
+**已运行验证**
+- Morphic 输入与布局专项契约 8/8 通过。
+- `npm run architecture:check` 通过；`PromptBar.tsx` 为 6688 行，维护性 Ratchet 未增长。
+- `npm run governance:check` 通过。
+- `npm run typecheck` 通过：Web、架构、116 个服务文件语法和 589 个测试文件语义检查全部通过。
+- 生产 `build` 通过，Vite 构建 2583 modules。
+- 本地浏览器桌面实测：项目轨道 `30×112 @ (12,580)`，视口中心偏差 0px；模型、参数和张数触发器高度均为 30px，页面横向溢出为 0。
+- 张数弹层实测为 `176×78px`，四个选项均为 36px 高，弹层横向和底部越界均为 0。
+- 390×844 手机视口实测横向溢出为 0，折叠/展开 Composer 与底部主导航无重叠。
+
+**未运行验证及原因**
+- 未部署生产环境；本次仅调整本地 UI 几何、控件呈现和设计规范，不修改后端、计费、鉴权或持久化契约。
+
+**风险与下一步**
+- 当前本地环境未加载可用 Provider 模型，因此已验证模型/参数 Trigger 的尺寸与状态，未执行真实模型选项和动态参数内容的业务生成。

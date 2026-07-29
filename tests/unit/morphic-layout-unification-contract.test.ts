@@ -46,14 +46,13 @@ test('project rail stays at the leading edge while its content panel opens besid
   assert.doesNotMatch(projectManagerSource, /top-\[48px\]\s+bottom-\[10px\]/);
   assert.match(projectManagerSource, /kk-morphic-project-panel__list/);
   assert.match(projectManagerSource, /className="kk-project-rail-host fixed left-3/);
-  assert.doesNotMatch(projectManagerSource, /top:\s*'50%'|translateY\(-50%\)/);
   assert.match(
     cssSource,
     /\.kk-morphic-project-panel\[data-desktop-persistent='true'\]\s*\{[\s\S]*left:\s*50px\s*!important[\s\S]*height:\s*max-content[\s\S]*max-height:\s*calc\(100dvh - 58px\)/,
   );
   assert.match(
     cssSource,
-    /\.kk-project-rail-host\s*\{[\s\S]*top:\s*calc\(var\(--kk-morphic-topbar-height\) \+ 10px\)[\s\S]*transform:\s*none/,
+    /\.kk-project-rail-host\s*\{[\s\S]*top:\s*50%[\s\S]*transform:\s*translateY\(-50%\)/,
   );
   assert.match(
     cssSource,

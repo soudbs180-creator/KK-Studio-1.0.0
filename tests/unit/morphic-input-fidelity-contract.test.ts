@@ -17,6 +17,12 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   const footerSource = readSource(
     'apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx',
   );
+  const modePanelSource = readSource(
+    'apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx',
+  );
+  const countControlSource = readSource(
+    'apps/web/src/components/layout/prompt-bar/DesktopComposerCountControl.tsx',
+  );
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
 
   assert.match(promptBarSource, /data-composer-mode=\{config\.mode\}/);
@@ -37,6 +43,13 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   assert.match(promptToolsSource, /kk-composer-prompt-tools__trigger/);
   assert.match(promptToolsSource, /kk-composer-prompt-tools__menu/);
   assert.match(footerSource, /kk-composer-compact-footer/);
+  assert.match(promptBarSource, /kk-composer-config-control kk-composer-model-control/);
+  assert.match(countControlSource, /kk-composer-config-control kk-composer-count-control/);
+  assert.match(countControlSource, /kk-composer-count-menu__title/);
+  assert.match(countControlSource, /role="listbox"[\s\S]*aria-label="生成张数"/);
+  assert.match(countControlSource, /role="option"[\s\S]*aria-selected=\{parallelCount === count\}/);
+  assert.match(modePanelSource, /kk-composer-config-control kk-composer-parameter-control/);
+  assert.match(modePanelSource, /aria-expanded=\{showOptionsPanel\}/);
 
   assert.match(
     cssSource,
@@ -73,6 +86,18 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   assert.match(
     cssSource,
     /\.kk-composer-compact-footer\s*\{[\s\S]*min-height:\s*32px\s*!important[\s\S]*flex-wrap:\s*nowrap\s*!important/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-composer-config-control\s*\{[\s\S]*height:\s*30px\s*!important[\s\S]*background:\s*var\(--kk-morphic-control\)[\s\S]*transition:/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-prompt-bar-deep-count-popover\s*\{[\s\S]*width:\s*176px[\s\S]*border-radius:\s*14px/,
+  );
+  assert.match(
+    cssSource,
+    /\.kk-composer-count-menu__grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
   );
   assert.match(
     cssSource,

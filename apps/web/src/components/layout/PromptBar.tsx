@@ -37,6 +37,7 @@ import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
 import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
+import DesktopComposerCountControl from './prompt-bar/DesktopComposerCountControl';
 const DesktopComposerEcommercePanel = lazyWithRetry(() => import('./prompt-bar/DesktopComposerEcommercePanel'));
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
@@ -5944,10 +5945,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <button
                                     type="button"
                                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.openModelLibrary.uiAction}
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full min-w-0 justify-start' : 'w-auto max-w-[calc(28ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`kk-composer-config-control kk-composer-model-control input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap overflow-hidden ${isMobile ? 'w-full min-w-0 justify-start' : 'flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
+                                    aria-label={`选择模型：${displayModelLabel}`}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isModelMenuOpen}
                                     style={(() => {
                                         if (isModelListEmpty) {
                                             return {};
@@ -6017,7 +6021,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     </span>
                                                 ) : null}
                                                 <span
-                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[28ch] text-sm'}`}
+                                                    className={`font-medium truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'text-xs'}`}
                                                     style={{ color: currentModel?.isSystemInternal ? currentModelTextColor : 'var(--text-primary)' }}
                                                     title={currentModelName}
                                                 >
@@ -6055,6 +6059,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             </span>
                                         ) : null
                                     )}
+                                    <ChevronDown
+                                        className={`kk-composer-config-control__chevron h-3 w-3 flex-shrink-0 ${isModelMenuOpen ? 'rotate-180' : ''}`}
+                                        aria-hidden="true"
+                                    />
                                 </button>
 
                                 {/* Dropdown Menu */}
@@ -6425,45 +6433,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
                                     {!isMobile && (
-                                        <div className="relative h-full w-[58px]">
-                                            <button
-                                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleParallelCountMenu.uiAction}
-                                                className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
-                                                style={{ color: 'var(--text-secondary)' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleMenu('count');
-                                                }}
-                                                title="并发数量"
-                                            >
-                                                <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
-                                                <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                                            </button>
-                                            {
-                                                activeMenu === 'count' && (
-                                                    <div className="absolute bottom-full mb-2" style={{ left: '50%', transform: 'translateX(-50%)', zIndex: PROMPT_BAR_DEEP_DROPDOWN_LAYER }}>
-                                                        <div className="kk-prompt-bar-deep-count-popover w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1 rounded-xl">
-                                                            {(config.mode === GenerationMode.PPT
-                                                                ? Array.from({ length: 20 }, (_, i) => i + 1)
-                                                                : [1, 2, 3, 4]
-                                                            ).map((count) => (
-                                                                <button
-                                                                    key={count}
-                                                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectParallelCount.uiAction}
-                                                                    className={`kk-prompt-bar-deep-count-option justify-between rounded-md px-3 py-2 text-xs font-medium ${config.parallelCount === count ? 'kk-prompt-bar-deep-count-option--active' : ''}`}
-                                                                    onClick={() => {
-                                                                        updateConfigFields({ parallelCount: count as number });
-                                                                        setActiveMenu(null);
-                                                                    }}
-                                                                >
-                                                                    <span>{`${count} 张`}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            }
-                                        </div>
+                                        <DesktopComposerCountControl
+                                            mode={config.mode}
+                                            parallelCount={config.parallelCount}
+                                            open={activeMenu === 'count'}
+                                            onToggle={() => toggleMenu('count')}
+                                            onSelect={(count) => {
+                                                updateConfigFields({ parallelCount: count });
+                                                setActiveMenu(null);
+                                            }}
+                                        />
                                     )}
 
                                         {/* Context Menu for Pinning */}
