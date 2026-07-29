@@ -813,7 +813,7 @@ select,
 .kk-morphic-project-panel[data-desktop-persistent='true'] {
   top: var(--kk-morphic-topbar-height) !important;
   bottom: auto !important;
-  left: 12px !important;
+  left: 50px !important;
   width: var(--kk-morphic-left-panel-width) !important;
   height: max-content;
   max-height: calc(100dvh - 58px);
@@ -842,19 +842,20 @@ select,
 }
 
 #project-manager-container[data-panel-open='true'] {
-  left: 282px !important;
+  left: 12px !important;
   pointer-events: auto;
   opacity: 1;
 }
 
+.kk-project-rail-host {
+  top: calc(var(--kk-morphic-topbar-height) + 10px);
+  transform: none;
+}
+
 #project-manager-container {
-  transition-property: left, opacity !important;
-  transition-duration:
-    var(--kk-morphic-motion-panel),
-    var(--kk-morphic-motion-fast) !important;
-  transition-timing-function:
-    var(--kk-morphic-ease-standard),
-    var(--kk-morphic-ease-standard) !important;
+  transition-property: opacity !important;
+  transition-duration: var(--kk-morphic-motion-fast) !important;
+  transition-timing-function: var(--kk-morphic-ease-standard) !important;
 }
 
 #project-manager-container button svg {

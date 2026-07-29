@@ -222,70 +222,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergingCanvasId, setMergingCanvasId] = useState<string | null>(null);
     const [cleaningInvalid, setCleaningInvalid] = useState(false);
-    const [topPosition, setTopPosition] = useState(() => {
-        const saved = localStorage.getItem('kk_pm_pos');
-        const parsed = saved ? Number.parseFloat(saved) : 80;
-        return Number.isFinite(parsed) ? parsed : 80;
-    });
-    const [isDragging, setIsDragging] = useState(false);
-
-    const dragStartRef = useRef({ y: 0, startTop: 0 });
-    const initialTop = 60;
     const activeProjectName = activeCanvas?.name || '项目';
-
-    useEffect(() => {
-        localStorage.setItem('kk_pm_pos', String(topPosition));
-    }, [topPosition]);
-
-    useEffect(() => {
-        if (!isDragging) {
-            return;
-        }
-
-        const handleMove = (event: MouseEvent | TouchEvent) => {
-            const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
-            const deltaY = clientY - dragStartRef.current.y;
-            const maxTop = window.innerHeight / 2;
-            const nextTop = Math.min(maxTop, Math.max(initialTop, dragStartRef.current.startTop + deltaY));
-            setTopPosition(nextTop);
-        };
-
-        const handleEnd = () => {
-            setIsDragging(false);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            document.body.style.touchAction = '';
-        };
-
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleEnd);
-        document.addEventListener('touchmove', handleMove, { passive: false });
-        document.addEventListener('touchend', handleEnd);
-
-        document.body.style.cursor = 'grab';
-        document.body.style.userSelect = 'none';
-        document.body.style.touchAction = 'none';
-
-        return () => {
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleEnd);
-            document.removeEventListener('touchmove', handleMove);
-            document.removeEventListener('touchend', handleEnd);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            document.body.style.touchAction = '';
-        };
-    }, [isDragging]);
-
-    const handleDragStart = (event: React.MouseEvent | React.TouchEvent) => {
-        if (isMobile || (event.target as HTMLElement).closest('button')) {
-            return;
-        }
-
-        const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
-        dragStartRef.current = { y: clientY, startTop: topPosition };
-        setIsDragging(true);
-    };
 
     useEffect(() => {
         if (!showDropdown || !isMobile) {
@@ -1044,11 +981,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             <div
                 id="project-manager-container"
                 data-panel-open={showDropdown}
-                className="fixed left-3 z-50 flex w-[30px] flex-col items-center select-none"
-                style={{ 
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                }}
+                className="kk-project-rail-host fixed left-3 z-50 flex w-[30px] flex-col items-center select-none"
             >
                 <div className="kk-project-rail flex max-h-[calc(100dvh-144px)] w-full flex-col items-center gap-1 overflow-x-hidden overflow-y-auto rounded-lg p-0.5">
                     <div className="flex w-full flex-col items-center gap-2">

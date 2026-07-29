@@ -37,7 +37,7 @@ test('canvas selection actions avoid card content and keep a mobile safe-area fa
   );
 });
 
-test('project utility panel fits its content while its toolbar moves beside the panel', () => {
+test('project rail stays at the leading edge while its content panel opens beside it', () => {
   const projectManagerSource = readSource(
     'apps/web/src/components/settings/ProjectManager.tsx',
   );
@@ -45,13 +45,19 @@ test('project utility panel fits its content while its toolbar moves beside the 
 
   assert.doesNotMatch(projectManagerSource, /top-\[48px\]\s+bottom-\[10px\]/);
   assert.match(projectManagerSource, /kk-morphic-project-panel__list/);
+  assert.match(projectManagerSource, /className="kk-project-rail-host fixed left-3/);
+  assert.doesNotMatch(projectManagerSource, /top:\s*'50%'|translateY\(-50%\)/);
   assert.match(
     cssSource,
-    /\.kk-morphic-project-panel\[data-desktop-persistent='true'\]\s*\{[\s\S]*height:\s*max-content[\s\S]*max-height:\s*calc\(100dvh - 58px\)/,
+    /\.kk-morphic-project-panel\[data-desktop-persistent='true'\]\s*\{[\s\S]*left:\s*50px\s*!important[\s\S]*height:\s*max-content[\s\S]*max-height:\s*calc\(100dvh - 58px\)/,
   );
   assert.match(
     cssSource,
-    /#project-manager-container\[data-panel-open='true'\]\s*\{[\s\S]*left:\s*282px\s*!important[\s\S]*opacity:\s*1/,
+    /\.kk-project-rail-host\s*\{[\s\S]*top:\s*calc\(var\(--kk-morphic-topbar-height\) \+ 10px\)[\s\S]*transform:\s*none/,
+  );
+  assert.match(
+    cssSource,
+    /#project-manager-container\[data-panel-open='true'\]\s*\{[\s\S]*left:\s*12px\s*!important[\s\S]*opacity:\s*1/,
   );
   const openToolbarRule = cssSource.match(
     /#project-manager-container\[data-panel-open='true'\]\s*\{([^}]*)\}/,
