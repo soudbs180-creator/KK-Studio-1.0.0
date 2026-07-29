@@ -51,14 +51,14 @@ test('theme-aware shells use resolved theme when preference is set to system', (
   assert.match(sidebarSource, /title=\{isDarkMode \? '切换到亮色模式' : '切换到暗色模式'\}/);
   assert.match(sidebarSource, /\{isDarkMode \? \(/);
 
-  assert.doesNotMatch(projectManagerSource, /useTheme|toggleTheme|isDarkMode/);
+  assert.match(projectManagerSource, /const \{ resolvedTheme, toggleTheme \} = useTheme\(\);/);
   assert.match(projectManagerSource, /projectManagerPanelStyle/);
   assert.match(projectManagerSource, /projectManagerControlStyle/);
   assert.match(projectManagerSource, /var\(--kk-morphic-panel\)/);
   assert.match(projectManagerSource, /var\(--kk-morphic-control\)/);
   assert.match(projectManagerSource, /var\(--kk-morphic-border\)/);
   assert.doesNotMatch(projectManagerSource, /var\(--frost-card-framework-/);
-  assert.doesNotMatch(projectManagerSource, /<Moon|<Sun/);
+  assert.match(projectManagerSource, /resolvedTheme === 'dark' \? <Sun size=\{16\} \/> : <Moon size=\{16\} \/>/);
   assert.doesNotMatch(projectManagerSource, /accent-indigo|text-sky|bg-indigo|#27272a|shadow-2xl/);
 
   assert.doesNotMatch(notificationToastSource, /import \{ useTheme \} from '\.\.\/\.\.\/context\/ThemeContext';/);

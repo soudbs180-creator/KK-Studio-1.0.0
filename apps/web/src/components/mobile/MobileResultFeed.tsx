@@ -309,9 +309,23 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   }, [resultEntries, searchQuery, isHistoryView]);
 
   const totalResults = filteredEntries.length;
+  const taskEntries = useMemo(
+    () => filteredEntries.flatMap((entry) => (
+      entry.groupEntries && entry.groupEntries.length > 0 ? entry.groupEntries : [entry]
+    )),
+    [filteredEntries],
+  );
+  const pendingTaskCount = taskEntries.filter((entry) => entry.isGenerating).length;
+  const failedTaskCount = taskEntries.filter((entry) => Boolean(entry.error)).length;
+  const completedTaskCount = taskEntries.filter((entry) => (
+    Boolean(entry.displaySrc) && !entry.isGenerating && !entry.error
+  )).length;
+  const totalTaskCount = Math.max(taskEntries.length, completedTaskCount + pendingTaskCount + failedTaskCount);
+  const taskProgressPercent = totalTaskCount > 0
+    ? Math.round((completedTaskCount / totalTaskCount) * 100)
+    : 0;
   const hasSelectedSource =
     Boolean(activeSourceImage) && filteredEntries.some((entry) => entry.imageId === activeSourceImage);
-  const counterLabel = totalResults === 0 ? pick('等待中', 'Waiting') : pick(`${totalResults} 个结果`, `${totalResults} results`);
   const selectedSourceLabel = pick('已选源图', 'source selected');
   const columnCount = getAdaptiveResultColumnCount({
     surface,
@@ -705,20 +719,37 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         ) : (
           // 简体中文：常规模式下的切换胶囊和计数器
           <>
-            <div 
-              className="flex min-h-11 min-w-0 touch-manipulation flex-col justify-center gap-0.5 pointer-events-auto"
+            <div
+              data-testid="mobile-generation-task-status"
+              className="kk-mobile-generation-status min-w-0 touch-manipulation pointer-events-auto"
+              role="progressbar"
+              aria-label={pick('生成任务状态', 'Generation task status')}
+              aria-valuemin={0}
+              aria-valuemax={Math.max(totalTaskCount, 1)}
+              aria-valuenow={completedTaskCount}
+              style={{ '--mobile-task-progress': `${taskProgressPercent}%` } as React.CSSProperties}
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
               onClick={stopMobileResultControlEvent}
               onTouchStart={stopMobileResultControlEvent}
               onTouchEnd={stopMobileResultControlEvent}
             >
-              <p className="text-[11px] leading-none text-[var(--text-primary)] font-semibold">
-                {pick('生成结果', 'Generated results')}
-              </p>
-              <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
-                {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
+              <div className="kk-mobile-generation-status__heading">
+                <p>{pick('生成结果', 'Generated results')}</p>
+                <span data-state={failedTaskCount > 0 ? 'error' : pendingTaskCount > 0 ? 'running' : 'ready'}>
+                  {failedTaskCount > 0
+                    ? pick(`${failedTaskCount} 个失败`, `${failedTaskCount} failed`)
+                    : pendingTaskCount > 0
+                      ? pick(`${pendingTaskCount} 个等待中`, `${pendingTaskCount} pending`)
+                      : pick('任务已完成', 'Completed')}
+                </span>
               </div>
+              <div className="kk-mobile-generation-status__meta">
+                <span>{pick(`${totalTaskCount} 张图`, `${totalTaskCount} images`)}</span>
+                <span>{pick(`${completedTaskCount}/${totalTaskCount} 完成`, `${completedTaskCount}/${totalTaskCount} done`)}</span>
+                {hasSelectedSource ? <span>{selectedSourceLabel}</span> : null}
+              </div>
+              <span className="kk-mobile-generation-status__track" aria-hidden="true"><span /></span>
             </div>
             {/* 简体中文：模式滑块与回底按钮保持独立外壳，避免把命令按钮误读为第三个模式。 */}
             <div 

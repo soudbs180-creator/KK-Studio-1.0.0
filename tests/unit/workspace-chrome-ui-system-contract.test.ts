@@ -43,10 +43,12 @@ test('desktop workspace chrome and minimap consume the shared chrome system', ()
   assert.match(desktopChromeSource, /className="kk-workspace-chrome-surface/);
   assert.match(desktopChromeSource, /className="kk-workspace-menu-surface/);
   assert.match(desktopChromeSource, /className="kk-workspace-control/);
-  assert.match(desktopChromeSource, /className="kk-workspace-primary-action/);
+  assert.match(desktopChromeSource, /className="kk-workspace-icon-control/);
   assert.match(desktopChromeSource, /className="kk-workspace-danger-action/);
-  assert.match(desktopChromeSource, /data-global-ai-entry="true"/);
-  assert.match(desktopChromeSource, /data-command-entry="true"/);
+  assert.match(desktopChromeSource, /data-chrome-region="project"/);
+  assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
+  assert.match(desktopChromeSource, /data-chrome-region="account"/);
+  assert.match(desktopChromeSource, /data-composer-copilot-toggle="true"/);
   assert.doesNotMatch(desktopChromeSource, /bg-red-500\/10|text-red-400|hover:bg-red-500\/10/);
   assert.doesNotMatch(desktopChromeSource, /0 4px 12px rgba\(255, 107, 90, 0\.35\)|#ff5240/);
 

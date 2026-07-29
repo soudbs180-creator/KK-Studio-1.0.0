@@ -349,98 +349,41 @@ async function verifyDesktopAuxiliaryCardDrag(cdp, cardId, movement) {
   };
 }
 
-async function clickMobileTab(cdp, label) {
-  return evaluate(
+async function verifyComposerCopilotToggle(cdp) {
+  const opened = await evaluate(
     cdp,
     `(() => {
-      const label = ${JSON.stringify(label)};
-      const button = [...document.querySelectorAll('button')]
-        .find((candidate) => (
-          candidate.getAttribute('aria-label') === label
-          || candidate.textContent?.trim() === label
-        ));
-      button?.click();
-      return !!button;
+      const toggle = document.querySelector('[data-composer-copilot-toggle="true"]');
+      toggle?.click();
+      return !!toggle;
     })()`,
   );
-}
-
-async function measureMobileCanvasCard(cdp) {
-  return evaluate(
+  await wait(500);
+  const expanded = await evaluate(
     cdp,
     `(() => {
-      const surface = document.querySelector('[data-testid="mobile-canvas-v3"]');
-      const card = document.querySelector('.kk-mobile-canvas-card');
-      const rect = card?.getBoundingClientRect();
+      const sidebarRect = document.querySelector('.kk-workspace-sidebar')?.getBoundingClientRect();
+      const centerComposerRect = document.querySelector('#prompt-bar-container[data-composer-layout="desktop"]')?.getBoundingClientRect();
+      const chatComposerRect = document.querySelector('.kk-chat-sidebar-composer')?.getBoundingClientRect();
       return {
-        surface: !!surface,
-        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-        card: rect ? {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-          centerX: rect.left + rect.width / 2,
-          centerY: rect.top + rect.height / 2,
-        } : null,
+        workspaceMode: document.body.dataset.kkWorkspaceMode,
+        sidebarVisible: !!sidebarRect && sidebarRect.width > 0 && sidebarRect.height > 0,
+        centerComposerVisible: !!centerComposerRect && centerComposerRect.width > 0 && centerComposerRect.height > 0,
+        chatComposerVisible: !!chatComposerRect && chatComposerRect.width > 0 && chatComposerRect.height > 0,
       };
     })()`,
   );
-}
-
-async function dispatchMobileTouchDrag(cdp, start, movement) {
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ ...start, id: 1 }],
-  });
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [{ x: start.x + movement.x, y: start.y + movement.y, id: 1 }],
-  });
-}
-
-async function verifyMobileCanvasDrag(cdp, viewport) {
-  if (!await clickMobileTab(cdp, "画布")) {
-    throw new Error(`${viewport.width}x${viewport.height} mobile canvas tab is unavailable`);
-  }
-  await wait(500);
-  const initial = await measureMobileCanvasCard(cdp);
-  if (!initial.surface || !initial.card) {
-    throw new Error(`${viewport.width}x${viewport.height} mobile canvas rendered no card`);
-  }
-
-  const start = { x: initial.card.centerX, y: initial.card.centerY };
-  const movement = { x: 72, y: 44 };
-  await dispatchMobileTouchDrag(cdp, start, movement);
-  await wait(120);
-  const during = await measureMobileCanvasCard(cdp);
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await wait(180);
-  const released = await measureMobileCanvasCard(cdp);
-  await wait(350);
-  const settled = await measureMobileCanvasCard(cdp);
-  const pointerError = {
-    x: Math.abs((during.card?.centerX || 0) - initial.card.centerX - movement.x),
-    y: Math.abs((during.card?.centerY || 0) - initial.card.centerY - movement.y),
-  };
-  const settledPositionError = {
-    x: Math.abs((settled.card?.centerX || 0) - initial.card.centerX - movement.x),
-    y: Math.abs((settled.card?.centerY || 0) - initial.card.centerY - movement.y),
-  };
-  const postReleaseDrift = Math.hypot(
-    (settled.card?.centerX || 0) - (released.card?.centerX || 0),
-    (settled.card?.centerY || 0) - (released.card?.centerY || 0),
+  const closed = await evaluate(
+    cdp,
+    `(() => {
+      const toggle = document.querySelector('[data-composer-copilot-toggle="true"]');
+      toggle?.click();
+      return !!toggle;
+    })()`,
   );
-  await clickMobileTab(cdp, "创作");
-  await wait(250);
-  return {
-    initial,
-    during,
-    settled,
-    pointerError,
-    settledPositionError,
-    postReleaseDrift,
-  };
+  await wait(350);
+  const restoredMode = await evaluate(cdp, `document.body.dataset.kkWorkspaceMode`);
+  return { opened, expanded, closed, restoredMode };
 }
 
 mkdirSync(artifactDir, { recursive: true });
@@ -553,6 +496,7 @@ try {
     });
     await wait(500);
     let desktopAuxiliaryDrags = null;
+    let copilotToggleFlow = null;
     if (viewport.surface === "canvas") {
       if (viewport.width === 1440) {
         desktopAuxiliaryDrags = {
@@ -567,6 +511,7 @@ try {
             { x: -52, y: -24 },
           ),
         };
+        copilotToggleFlow = await verifyComposerCopilotToggle(cdp);
       }
       await evaluate(
         cdp,
@@ -599,11 +544,17 @@ try {
       `(() => {
       const canvas = document.querySelector('.canvas-container');
       const mobileShell = document.querySelector('[data-testid="mobile-app-shell"]');
+      const mobilePrimaryNavigation = document.querySelector('[data-mobile-primary-navigation]');
+      const mobileTaskStatus = document.querySelector('[data-testid="mobile-generation-task-status"]');
       const composer = document.querySelector('#prompt-bar-container[data-composer-layout="desktop"]');
       const rail = document.getElementById('project-manager-container');
+      const chromeRegions = document.querySelectorAll('[data-chrome-region]');
+      const composerCopilotToggle = document.querySelector('[data-composer-copilot-toggle="true"]');
       const selectionToolbar = document.querySelector('.kk-canvas-selection-menu[data-placement]');
       const composerRect = composer?.getBoundingClientRect();
       const railRect = rail?.getBoundingClientRect();
+      const mobileTaskStatusRect = mobileTaskStatus?.getBoundingClientRect();
+      const composerCopilotToggleRect = composerCopilotToggle?.getBoundingClientRect();
       const selectionToolbarRect = selectionToolbar?.getBoundingClientRect();
       const cardRects = [...document.querySelectorAll('[data-card-kind]')]
         .map((card) => card.getBoundingClientRect())
@@ -650,6 +601,14 @@ try {
         })(),
         canvas: !!canvas,
         mobileShell: !!mobileShell,
+        mobilePrimaryNavigation: !!mobilePrimaryNavigation,
+        mobileTaskStatusVisible: !!mobileTaskStatusRect
+          && mobileTaskStatusRect.width > 0
+          && mobileTaskStatusRect.height > 0,
+        chromeRegionCount: chromeRegions.length,
+        composerCopilotToggleVisible: !!composerCopilotToggleRect
+          && composerCopilotToggleRect.width > 0
+          && composerCopilotToggleRect.height > 0,
         composerHeight: composerRect?.height || 0,
         railWidth: railRect?.width || 0,
         cardCount: document.querySelectorAll('[data-card-kind]').length,
@@ -668,6 +627,7 @@ try {
     })()`,
     );
     metrics.desktopAuxiliaryDrags = desktopAuxiliaryDrags;
+    metrics.copilotToggleFlow = copilotToggleFlow;
     const screenshot = await cdp.send("Page.captureScreenshot", {
       format: "png",
       captureBeyondViewport: false,
@@ -687,9 +647,28 @@ try {
         throw new Error(
           `${viewport.width}x${viewport.height} composer height=${metrics.composerHeight}`,
         );
-      if (Math.abs(metrics.railWidth - 30) > 1)
+      if (Math.abs(metrics.railWidth - 38) > 1)
         throw new Error(
           `${viewport.width}x${viewport.height} rail width=${metrics.railWidth}`,
+        );
+      if (metrics.chromeRegionCount !== 3 || !metrics.composerCopilotToggleVisible)
+        throw new Error(
+          `${viewport.width}x${viewport.height} desktop V3 chrome is incomplete`,
+        );
+      if (
+        copilotToggleFlow
+        && (
+          !copilotToggleFlow.opened
+          || !copilotToggleFlow.closed
+          || copilotToggleFlow.expanded.workspaceMode !== "copilot"
+          || !copilotToggleFlow.expanded.sidebarVisible
+          || copilotToggleFlow.expanded.centerComposerVisible
+          || !copilotToggleFlow.expanded.chatComposerVisible
+          || copilotToggleFlow.restoredMode !== "canvas"
+        )
+      )
+        throw new Error(
+          `${viewport.width}x${viewport.height} Composer Copilot expansion is incomplete`,
         );
       if (metrics.cardCount < 1)
         throw new Error(
@@ -732,20 +711,11 @@ try {
         `${viewport.width}x${viewport.height} did not preserve the result-flow surface`,
       );
     } else {
-      const mobileCanvasDrag = await verifyMobileCanvasDrag(cdp, viewport);
-      if (
-        mobileCanvasDrag.pointerError.x > 2
-        || mobileCanvasDrag.pointerError.y > 2
-        || mobileCanvasDrag.settledPositionError.x > 2
-        || mobileCanvasDrag.settledPositionError.y > 2
-        || mobileCanvasDrag.postReleaseDrift > 1
-        || mobileCanvasDrag.settled.horizontalOverflow
-      ) {
+      if (metrics.mobilePrimaryNavigation || !metrics.mobileTaskStatusVisible) {
         throw new Error(
-          `${viewport.width}x${viewport.height} mobile canvas drag is unstable: ${JSON.stringify(mobileCanvasDrag)}`,
+          `${viewport.width}x${viewport.height} mobile simple result hierarchy is incomplete`,
         );
       }
-      metrics.mobileCanvasDrag = mobileCanvasDrag;
     }
     if (metrics.horizontalOverflow || metrics.chromeOverlap)
       throw new Error(

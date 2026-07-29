@@ -1,0 +1,397 @@
+/*
+ * KK Studio Workspace UI V3
+ * Five text levels, three icon levels, and one responsive workspace hierarchy.
+ */
+
+:root {
+  --kk-type-display: 24px;
+  --kk-type-title: 16px;
+  --kk-type-body: 14px;
+  --kk-type-button: 12px;
+  --kk-type-caption: 11px;
+  --kk-icon-feature: 20px;
+  --kk-icon-button: 16px;
+  --kk-icon-assist: 13px;
+  --kk-color-content: var(--kk-morphic-panel);
+  --kk-color-accent: var(--kk-morphic-action);
+  --kk-color-support: var(--state-info-text);
+  --kk-color-success: var(--state-success-text);
+  --kk-color-warning: var(--state-warning-text);
+  --kk-color-danger: var(--state-danger-text);
+  --kk-color-selected: color-mix(in oklch, var(--kk-morphic-text-primary) 12%, transparent);
+  --kk-radius-pill: 9999px;
+}
+
+.desktop-left-chrome {
+  top: 8px !important;
+  left: 12px !important;
+  width: calc(100vw - 24px) !important;
+}
+
+.kk-workspace-chrome-v3 {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+  align-items: center;
+  min-height: 40px;
+  padding: 4px !important;
+  gap: 12px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.kk-workspace-chrome-v3__project,
+.kk-workspace-chrome-v3__canvas,
+.kk-workspace-chrome-v3__billing,
+.kk-workspace-chrome-v3__account {
+  min-width: 0;
+  font-size: var(--kk-type-button);
+}
+
+.kk-workspace-chrome-v3__project {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 32px;
+  max-width: min(280px, 28vw);
+  gap: 8px;
+  padding: 3px 10px 3px 8px;
+  color: var(--text-secondary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+  transition:
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.kk-workspace-chrome-v3__project:hover {
+  color: var(--text-primary);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-workspace-chrome-v3__project > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kk-workspace-chrome-v3__project small {
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  font-weight: 500;
+}
+
+.kk-workspace-chrome-v3__project strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kk-workspace-chrome-v3__canvas {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  min-width: 88px;
+  min-height: 32px;
+  gap: 7px;
+  padding: 0 14px;
+  color: var(--text-primary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-color-selected);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+}
+
+.kk-workspace-chrome-v3__account {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 6px;
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-avatar-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  place-items: center;
+  color: var(--text-primary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-morphic-control);
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-avatar-button img,
+.kk-workspace-chrome-v3 .kk-workspace-avatar-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-status-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--kk-morphic-panel);
+  border-radius: var(--kk-radius-pill);
+  background: var(--text-tertiary);
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-status-dot[data-status='success'] {
+  background: var(--kk-color-success);
+}
+
+.kk-workspace-chrome-v3 .kk-workspace-status-dot[data-status='error'] {
+  background: var(--kk-color-danger);
+}
+
+.kk-workspace-chrome-v3__billing {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 2px;
+  padding-left: 8px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-morphic-control);
+}
+
+.kk-workspace-chrome-v3__billing > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-primary);
+  font-size: var(--kk-type-button);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.kk-workspace-chrome-v3__billing small {
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  font-weight: 500;
+}
+
+.kk-workspace-chrome-v3__billing button {
+  min-height: 26px;
+  padding: 0 10px;
+  color: var(--text-primary);
+  border: 0;
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-color-accent);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+}
+
+.kk-composer-copilot-toggle {
+  position: fixed;
+  bottom: 17px;
+  left: calc(50% + 292px);
+  z-index: var(--kk-layer-workspace-chrome, 100);
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--text-secondary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+  transition:
+    left var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.kk-composer-copilot-toggle:hover,
+.kk-composer-copilot-toggle[data-state='expanded'] {
+  color: var(--text-primary);
+  background: var(--kk-color-selected);
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-composer-copilot-toggle {
+  left: calc(50% + 82px);
+}
+
+.kk-project-rail-host {
+  top: 50% !important;
+  width: 38px !important;
+  transform: translateY(-50%);
+}
+
+.kk-project-rail {
+  width: 38px !important;
+  max-height: calc(100dvh - 96px) !important;
+  padding: 4px !important;
+  gap: 4px !important;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 12px !important;
+  background: var(--kk-morphic-panel);
+}
+
+.kk-project-rail > div {
+  gap: 4px !important;
+}
+
+.kk-project-rail__divider {
+  width: 18px;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--kk-morphic-border);
+}
+
+.kk-project-rail button svg,
+.kk-workspace-chrome-v3 button svg,
+.kk-composer-copilot-toggle svg {
+  width: var(--kk-icon-button);
+  height: var(--kk-icon-button);
+  flex: 0 0 auto;
+}
+
+body[data-kk-canvas-grid='hidden'] .canvas-grid {
+  display: none !important;
+}
+
+.kk-composer-prompt-tools__workflow,
+.kk-composer-prompt-tools__trigger,
+.kk-composer-config-control,
+.kk-composer-mode-control {
+  font-size: var(--kk-type-button) !important;
+  line-height: 1 !important;
+}
+
+.kk-composer-prompt-tools__workflow svg,
+.kk-composer-prompt-tools__trigger svg,
+.kk-composer-config-control__chevron {
+  width: var(--kk-icon-assist) !important;
+  height: var(--kk-icon-assist) !important;
+}
+
+.kk-mobile-generation-status {
+  display: grid;
+  width: min(230px, calc(100vw - 166px));
+  min-height: 58px;
+  align-content: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 14px;
+  background: var(--kk-morphic-panel);
+}
+
+.kk-mobile-generation-status__heading,
+.kk-mobile-generation-status__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kk-mobile-generation-status__heading p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kk-mobile-generation-status__heading span {
+  flex: 0 0 auto;
+  color: var(--kk-color-success);
+  font-size: var(--kk-type-caption);
+  font-weight: 600;
+}
+
+.kk-mobile-generation-status__heading span[data-state='running'] {
+  color: var(--kk-color-support);
+}
+
+.kk-mobile-generation-status__heading span[data-state='error'] {
+  color: var(--kk-color-danger);
+}
+
+.kk-mobile-generation-status__meta {
+  justify-content: flex-start;
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  line-height: 1;
+}
+
+.kk-mobile-generation-status__meta span + span::before {
+  margin-right: 8px;
+  color: var(--text-disabled);
+  content: '·';
+}
+
+.kk-mobile-generation-status__track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-morphic-border);
+}
+
+.kk-mobile-generation-status__track > span {
+  display: block;
+  width: var(--mobile-task-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--kk-color-accent);
+  transition: width var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
+}
+
+@media (max-width: 1023px) {
+  [data-mobile-primary-navigation='true'] {
+    display: none !important;
+  }
+
+  .kk-result-bottom-bar {
+    padding: 8px 10px 6px !important;
+  }
+
+  .kk-result-bottom-bar button {
+    transform: none !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .kk-mobile-generation-status {
+    width: min(205px, calc(100vw - 154px));
+    padding-inline: 8px;
+  }
+
+  .kk-mobile-generation-status__meta span:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kk-workspace-chrome-v3 *,
+  .kk-composer-copilot-toggle,
+  .kk-mobile-generation-status__track > span {
+    transition: none !important;
+  }
+}

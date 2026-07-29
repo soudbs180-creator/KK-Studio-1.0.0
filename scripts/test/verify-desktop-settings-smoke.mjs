@@ -463,6 +463,7 @@ function readDesktopContractSources() {
     'apps/web/src/components/settings/SettingsWorkbenchPanel.tsx',
     'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',
     'apps/web/src/styles/settings-console.css',
+    'apps/web/src/styles/settings-v3.css',
     'apps/web/src/components/settings/settingsRouteConfig.tsx',
     'apps/web/src/components/settings/ApiSettingsView.tsx',
     'apps/web/src/components/settings/apiWorkbenchSections.tsx',
@@ -475,12 +476,12 @@ function readDesktopContractSources() {
 function verifyDesktopSourceContracts() {
   const checks = [
     /data-testid="desktop-user-menu-trigger"/,
-    /desktop-user-menu-settings/,
+    /data-testid="desktop-settings-trigger"/,
     /data-testid="settings-page-root"/,
     /SettingsConsoleSidebar/,
     /SettingsConsoleRoutes/,
-    /--console-sidebar-width:\s*232px/,
-    /--console-topbar-height:\s*64px/,
+    /--settings-v3-sidebar-width:\s*248px/,
+    /min-height:\s*76px/,
     /path:\s*'recharge'/,
     /path:\s*'user-profile\/security'/,
     /dashboard-grid-card/,
@@ -655,9 +656,10 @@ try {
   await gotoWithRetry(page, targetUrl);
 
   const desktopUserMenuTrigger = page.getByTestId('desktop-user-menu-trigger');
+  const desktopSettingsTrigger = page.getByTestId('desktop-settings-trigger');
   await assertVisible(desktopUserMenuTrigger, 'Desktop user menu trigger did not render on the workspace.');
-  await desktopUserMenuTrigger.click();
-  await page.getByTestId('desktop-user-menu-settings').click();
+  await assertVisible(desktopSettingsTrigger, 'Desktop settings trigger did not render on the workspace.');
+  await desktopSettingsTrigger.click();
 
   const overlayShell = page.locator('.settings-shell-backdrop');
   await assertVisible(overlayShell, 'Workspace settings overlay did not open.');

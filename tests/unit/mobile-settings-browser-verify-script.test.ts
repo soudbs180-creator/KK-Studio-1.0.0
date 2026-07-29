@@ -112,7 +112,7 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /\/settings'/);
   assert.match(scriptSource, /\/settings\/capability-sources'/);
   assert.match(scriptSource, /desktop-user-menu-trigger/);
-  assert.match(scriptSource, /desktop-user-menu-settings/);
+  assert.match(scriptSource, /desktop-settings-trigger/);
   assert.match(scriptSource, /settings-page-root/);
   assert.match(scriptSource, /SettingsWorkbenchPanel\.tsx/);
   assert.match(scriptSource, /SettingsWorkbenchShell\.tsx/);
@@ -157,7 +157,7 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /migrationApiState\.verifyCalls/);
 
   assert.match(desktopChromeSource, /data-testid="desktop-user-menu-trigger"/);
-  assert.match(desktopChromeSource, /testId="desktop-user-menu-settings"/);
+  assert.match(desktopChromeSource, /data-testid="desktop-settings-trigger"/);
   assert.match(settingsPanelSource, /data-testid="settings-page-root"/);
   assert.match(workbenchSectionsSource, /testId="settings-model-center"/);
   assert.ok((apiSettingsViewSource.match(/data-testid="api-official-editor-back"/g) || []).length >= 2);

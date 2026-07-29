@@ -5,7 +5,19 @@ import { UI_SYSTEM_TOKENS } from '@kk/ui/core';
 import { readSource } from '../support/workspacePaths.js';
 
 test('Morphic workspace geometry is published by the shared UI package', () => {
-  assert.deepEqual(UI_SYSTEM_TOKENS.color, {
+  assert.deepEqual({
+    canvas: UI_SYSTEM_TOKENS.color.canvas,
+    page: UI_SYSTEM_TOKENS.color.page,
+    panel: UI_SYSTEM_TOKENS.color.panel,
+    control: UI_SYSTEM_TOKENS.color.control,
+    hover: UI_SYSTEM_TOKENS.color.hover,
+    border: UI_SYSTEM_TOKENS.color.border,
+    textPrimary: UI_SYSTEM_TOKENS.color.textPrimary,
+    textSecondary: UI_SYSTEM_TOKENS.color.textSecondary,
+    textMuted: UI_SYSTEM_TOKENS.color.textMuted,
+    textDisabled: UI_SYSTEM_TOKENS.color.textDisabled,
+    actionPrimary: UI_SYSTEM_TOKENS.color.actionPrimary,
+  }, {
     canvas: '#000000',
     page: '#171717',
     panel: 'oklch(0.235 0 0)',
@@ -18,6 +30,8 @@ test('Morphic workspace geometry is published by the shared UI package', () => {
     textDisabled: 'oklch(0.439 0 0)',
     actionPrimary: 'oklch(0.5926 0.2236 258.42)',
   });
+  assert.equal(UI_SYSTEM_TOKENS.color.content, 'oklch(0.235 0 0)');
+  assert.equal(UI_SYSTEM_TOKENS.color.accent, 'oklch(0.5926 0.2236 258.42)');
 
   assert.equal(UI_SYSTEM_TOKENS.typography.fontFamily, 'Inter, sans-serif');
   const layoutSource = readSource('packages/ui/src/core/layout.ts');

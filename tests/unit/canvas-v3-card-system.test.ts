@@ -150,14 +150,16 @@ test('Editable workflow cards use content-fit V3 geometry instead of legacy fixe
   assert.doesNotMatch(workflowPanel, /node\.height\s*\|\|\s*420|h-\[309px\]|h-\[60px\]/);
 });
 
-test('Canvas controls are separated from the project rail and dock beside the zoom controls', () => {
+test('Canvas controls share one left rail without a duplicate view toolbar', () => {
   const projectManager = fs.readFileSync('apps/web/src/components/settings/ProjectManager.tsx', 'utf8');
-  const morphicCss = fs.readFileSync('apps/web/src/styles/morphic-ui.css', 'utf8');
+  const workspaceCss = fs.readFileSync('apps/web/src/styles/workspace-ui-v3.css', 'utf8');
   const projectRail = projectManager.match(/<div className="kk-project-rail[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/)?.[0] || '';
 
-  assert.match(projectManager, /aria-label="画布视图工具"/);
-  assert.match(projectManager, /className="kk-canvas-view-tools/);
-  assert.doesNotMatch(projectRail, /fitToAll|resetView|toggleCanvasMode|toggleSnapToGrid|autoArrange/);
-  assert.match(morphicCss, /\.kk-canvas-view-tools\s*\{[\s\S]*right:\s*176px;[\s\S]*bottom:\s*10px;/);
+  assert.match(projectRail, /data-canvas-interaction-mode="normal"/);
+  assert.match(projectRail, /data-canvas-interaction-mode="board"/);
+  assert.match(projectRail, /data-canvas-grid-toggle="true"/);
+  assert.match(projectRail, /fitToAll|resetView|autoArrange/);
+  assert.doesNotMatch(projectManager, /className="kk-canvas-view-tools/);
+  assert.match(workspaceCss, /\.kk-project-rail-host\s*\{[\s\S]*width:\s*38px/);
   assert.doesNotMatch(projectManager, /var\(--frost-card-framework-(bg|border|shadow|blur)\)/);
 });

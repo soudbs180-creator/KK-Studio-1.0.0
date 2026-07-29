@@ -122,7 +122,8 @@ test('composer owns workflow and tool entry points without duplicating them in t
   assert.match(promptToolsSource, />工具</);
   assert.match(projectManagerSource, /KK_OPEN_WORKFLOW_BROWSER_EVENT/);
   assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleWorkflowMenu/);
-  assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleTheme/);
+  assert.match(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleTheme/);
+  assert.match(projectManagerSource, /data-canvas-theme-toggle="true"/);
 });
 
 test('Copilot composer matches the reference compact shell and keeps attachment access visible', () => {

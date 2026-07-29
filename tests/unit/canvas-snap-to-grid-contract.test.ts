@@ -39,7 +39,7 @@ test('snap-to-grid helper leaves invalid coordinates untouched', async () => {
   assert.deepEqual(snapCanvasPointToGrid({ x: 23, y: Infinity }, { enabled: true }), { x: 23, y: Infinity });
 });
 
-test('desktop canvas toolbar exposes a dedicated snap toggle wired to card drags', () => {
+test('desktop canvas rail exposes background-grid visibility while preserving snap-capable card drags', () => {
   const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
   const promptCardSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
   const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
@@ -48,8 +48,9 @@ test('desktop canvas toolbar exposes a dedicated snap toggle wired to card drags
 
   assert.match(projectManagerSource, /showSnapToGrid\?: boolean;/);
   assert.match(projectManagerSource, /onToggleSnapToGrid: \(\) => void;/);
-  assert.match(projectManagerSource, /data-testid="canvas-snap-to-grid-toggle"/);
-  assert.match(projectManagerSource, /<Magnet size=\{16\} \/>/);
+  assert.match(projectManagerSource, /data-canvas-grid-toggle="true"/);
+  assert.match(projectManagerSource, /<Grid3x3 size=\{16\} \/>/);
+  assert.doesNotMatch(projectManagerSource, /data-testid="canvas-snap-to-grid-toggle"|<Magnet/);
 
   assert.match(promptCardSource, /snapToGrid\?: boolean;/);
   assert.match(promptCardSource, /snapCanvasPointToGrid\(/);

@@ -1986,3 +1986,63 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。Workflow Utility 为保持连接线实时跟随，拖动中仍按 rAF 更新其既有位置状态，但最终帧现在会同步提交，不再丢失。
 - 后续接入新的辅助卡类型时必须复用 `useTransientCanvasCardDrag`，不得重新引入 Pointer Move 逐帧 React Commit。
+
+---
+
+## 251. 2026-07-29 - feat(ui): 收口 Workspace 与 Settings V3 信息架构
+
+**修改范围**
+- 删除手机端常驻四按钮导航，保留轻量结果流，并把图片数量、完成数量、失败数量、运行状态和进度集中到生成结果等待区。
+- 将桌面顶栏收口为“当前项目 / 画布 / 账户”三个区域；账户区统一承载头像、个人中心、积分、充值和设置。
+- 将画布模式、画板模式、网格开关、视图操作和主题切换收口到唯一左侧工具栏，删除重复视图工具组。
+- 将 Composer 上方的模式、工作流和工具统一为同级字号与几何；在发送按钮右侧新增 Copilot 展开入口，并复用现有 AI Assistant Runtime 与对话输入。
+- 建立五级文字、三级图标和语义颜色 Token，重构桌面与手机设置页的导航、内容卡、表单、反馈和安全区留白。
+- 扩展桌面、手机、设置页和 Canvas 拖动浏览器 Smoke，覆盖 375–1440px、Copilot 展开/收起、任务状态和无横向溢出。
+
+**修改文件**
+- `packages/ui/src/core/tokens.ts`
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/app/AppMobileWorkspace.tsx`
+- `apps/web/src/bootstrap.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx`
+- `apps/web/src/components/mobile/MobileAppShell.tsx`
+- `apps/web/src/components/mobile/MobileResultFeed.tsx`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/components/settings/SettingsWorkbenchPanel.tsx`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `apps/web/src/styles/settings-v3.css`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `scripts/test/verify-desktop-settings-smoke.mjs`
+- `tests/contract/ui-v3-information-architecture.test.ts`
+- 相关 Morphic、移动端、Canvas、主题与项目工具栏契约测试
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 手机端不再提供常驻底部主导航；默认优先展示生成结果和任务状态，次要功能继续通过现有菜单、详情与上下文操作进入。
+2. 桌面顶栏只保留三块稳定信息架构：左侧项目名默认“项目 1”，中间只显示“画布”，右侧聚合账户、积分/充值和设置。
+3. 左侧工具栏统一为 38px：画布模式负责常规节点操作，画板模式负责绘制，网格按钮只控制背景点阵，主题切换继续保留。
+4. Composer 是 AI 能力的唯一入口；展开后隐藏中间 Composer、打开右侧 Copilot 对话，并继续使用既有 Chat、Agent、鉴权和数据契约。
+5. 文字固定为 Display / Title / Body / Button / Caption 五级，图标固定为 Feature / Button / Assist 三级；同层级不得通过任意字号或图标尺寸制造视觉噪声。
+6. 背景、内容、主操作、辅助、成功、警告和危险使用独立语义 Token；业务组件不得重新硬编码颜色、圆角、阴影和 z-index。
+7. 设置页不沿用旧 Clay/Frost 结构：桌面使用 248px 导航与受控内容宽度，手机使用单列 44px 触控目标和独立安全区留白。
+8. 顶栏项目名订阅被隔离为独立子组件，拖动卡片时不会让整条 Chrome 重渲染；Canvas 坐标与持久化契约保持不变。
+
+**已运行验证**
+- TDD：新增 V3 信息架构契约先出现 6 条预期失败，完成实现后 7/7 通过。
+- 全量 unit：2275 个用例，2273 通过、0 失败、2 跳过；integration 14/14、contract 31/31、E2E 11/11 通过。
+- Canvas performance：3/3 通过；Prompt Group Drag 的拖动误差约 0.00003px、松手漂移 0px、连接端点距离约 0.258px。
+- Canvas 响应式 CDP：1440×900、1280×720、1180×820、1024×720、1023×720 无横向溢出、工具条遮挡或卡片重叠；Notebook 与 WorkflowPanel 拖动误差和松手漂移均为 0px。
+- Composer Copilot 浏览器回归：展开后工作区进入 `copilot`、右侧会话与聊天 Composer 可见、中间 Composer 隐藏；关闭后完整恢复画布模式。
+- 手机端 CDP：834×1112、768×1024、430×932、390×844、375×812 均无常驻四按钮导航、任务状态可见、横向溢出为 0。
+- 手机与桌面 Settings Smoke 通过；设置首页、模型中心、API、覆盖层和返回路径均可操作，未出现文字与容器边缘拥挤。
+- `architecture:check`、`governance:check`、Web / Architecture / Server / Tests TypeScript 检查、生产 Build、编码检查和 `git diff --check` 均通过。
+
+**未运行验证及原因**
+- 当前系统没有全局 `npm`，因此未直接运行聚合命令 `npm run verify:changes`；已使用 Bundled Node 与 pnpm 分别完成其本轮相关的架构、治理、类型、构建、测试、浏览器和性能检查。
+- 本地 API 3001 未启动，浏览器 Smoke 中模型列表刷新出现预期 502；未执行真实媒体生成，本轮不修改 API、Provider、计费、鉴权或数据库。
+- 未部署生产环境；本轮范围为本地 UI 信息架构、交互、响应式验证与本地 Git Commit。
+
+**风险与下一步**
+- 风险低。旧 `MobileTabBar` 与移动 Canvas 组件仍作为兼容实现保留，但已经从手机主工作区卸载，不会形成可见的平行导航。
+- 后续新增工作区或设置功能必须复用 V3 Token 与现有 Surface；同级文字、图标、控件和留白需要先通过信息架构契约，再进入浏览器视觉验收。

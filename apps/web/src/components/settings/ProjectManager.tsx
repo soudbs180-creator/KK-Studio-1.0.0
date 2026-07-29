@@ -6,20 +6,21 @@ import {
     Heart,
     Layers,
     LayoutDashboard,
-    Magnet,
     Maximize2,
+    Moon,
+    MousePointer2,
+    PenTool,
     Search,
-    Square,
-    Trash2,
-    Palette,
     Network,
     Cpu,
     Eye,
     Save,
+    Sun,
     X,
 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import { useCanvas } from '../../context/CanvasContext';
+import { useTheme } from '../../context/ThemeContext';
 import { createZipArchive, saveBlobAs } from '../../utils/archiveRuntime';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
@@ -109,10 +110,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onFitToAll,
     onResetView,
     onToggleCanvasMode,
-    onToggleSnapToGrid,
     onAutoArrange,
     canvasMode = 'normal',
-    showSnapToGrid = false,
     isUserMenuOpen = false,
     onOpenMarkdownImport,
     onOpenMermaidImport,
@@ -120,6 +119,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onApplyWorkflowTemplate,
     onAddWorkflowUtilityCard,
 }) => {
+    const { resolvedTheme, toggleTheme } = useTheme();
     const {
         state,
         activeCanvas,
@@ -149,6 +149,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const [workflowCategory, setWorkflowCategory] = useState<WorkflowCategory>('all');
     const [workflowQuery, setWorkflowQuery] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+    const [isGridVisible, setIsGridVisible] = useState(true);
+
+    useEffect(() => {
+        document.body.dataset.kkCanvasGrid = isGridVisible ? 'visible' : 'hidden';
+        return () => {
+            delete document.body.dataset.kkCanvasGrid;
+        };
+    }, [isGridVisible]);
 
     useEffect(() => {
         const openWorkflowBrowser = () => {
@@ -996,7 +1004,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
                                         title={activeProjectName}
                                     >
-                                        <Layers size={20} />
+                                        <Layers size={16} />
                                         <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--kk-morphic-border)]" />
                                     </button>
                                 </div>
@@ -1010,7 +1018,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     className={desktopIconButtonClass}
                                     title="搜索提示词"
                                 >
-                                    <Search size={20} />
+                                    <Search size={16} />
                                 </button>
 
                                 {onFavorites && (
@@ -1025,74 +1033,119 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         className={desktopIconButtonClass}
                                         title="收藏"
                                     >
-                                        <Heart size={20} />
+                                        <Heart size={16} />
                                     </button>
                                 )}
 
+                                <span className="kk-project-rail__divider" aria-hidden="true" />
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
+                                    data-canvas-interaction-mode="normal"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (canvasMode !== 'normal') onToggleCanvasMode();
+                                    }}
+                                    className={`${desktopIconButtonClass} ${canvasMode === 'normal' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title="画布模式"
+                                    aria-label="切换到画布模式"
+                                    aria-pressed={canvasMode === 'normal'}
+                                >
+                                    <MousePointer2 size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
+                                    data-canvas-interaction-mode="board"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (canvasMode !== 'board') onToggleCanvasMode();
+                                    }}
+                                    className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title="画板模式"
+                                    aria-label="切换到画板模式"
+                                    aria-pressed={canvasMode === 'board'}
+                                >
+                                    <PenTool size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-canvas-grid-toggle="true"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        setIsGridVisible((visible) => !visible);
+                                    }}
+                                    className={`${desktopIconButtonClass} ${isGridVisible ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title={isGridVisible ? '隐藏背景点阵' : '显示背景点阵'}
+                                    aria-label={isGridVisible ? '隐藏背景点阵' : '显示背景点阵'}
+                                    aria-pressed={isGridVisible}
+                                >
+                                    <Grid3x3 size={16} />
+                                </button>
+
+                                <span className="kk-project-rail__divider" aria-hidden="true" />
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onFitToAll();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="适应全部卡片"
+                                    aria-label="适应全部卡片"
+                                >
+                                    <Maximize2 size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onResetView();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="重置画布视图"
+                                    aria-label="重置画布视图"
+                                >
+                                    <Focus size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onAutoArrange();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="自动整理卡片"
+                                    aria-label="自动整理卡片"
+                                >
+                                    <LayoutDashboard size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleTheme.uiAction}
+                                    data-canvas-theme-toggle="true"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleTheme();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title={resolvedTheme === 'dark' ? '切换浅色主题' : '切换深色主题'}
+                                    aria-label={resolvedTheme === 'dark' ? '切换浅色主题' : '切换深色主题'}
+                                >
+                                    {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                                </button>
                     </div>
                 </div>
-            </div>
-            <div
-                className="kk-canvas-view-tools fixed z-50 flex h-8 items-center gap-0.5 rounded-full p-0.5"
-                aria-label="画布视图工具"
-            >
-                <button
-                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onFitToAll();
-                    }}
-                    className={desktopIconButtonClass}
-                    title="缩放到全局"
-                >
-                    <Maximize2 size={16} />
-                </button>
-                <button
-                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onResetView();
-                    }}
-                    className={desktopIconButtonClass}
-                    title="定位卡组"
-                >
-                    <Focus size={16} />
-                </button>
-                <button
-                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleCanvasMode();
-                    }}
-                    className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                    title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
-                >
-                    {canvasMode === 'board' ? <Palette size={16} /> : <Grid3x3 size={16} />}
-                </button>
-                <button
-                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleSnapToGrid.uiAction}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleSnapToGrid();
-                    }}
-                    className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                    title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
-                    aria-pressed={showSnapToGrid}
-                    data-testid="canvas-snap-to-grid-toggle"
-                >
-                    <Magnet size={16} />
-                </button>
-                <button
-                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onAutoArrange();
-                    }}
-                    className={desktopIconButtonClass}
-                    title="自动整理"
-                >
-                    <LayoutDashboard size={16} />
-                </button>
             </div>
             {projectDropdown ? ReactDOM.createPortal(projectDropdown, document.body) : null}
             {workflowDropdown ? ReactDOM.createPortal(workflowDropdown, document.body) : null}

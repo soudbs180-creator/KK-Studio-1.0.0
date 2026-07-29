@@ -32,7 +32,7 @@ type DesktopComposerPromptToolsProps = {
   pptOutlinePanel?: React.ReactNode;
 };
 
-const composerPillClass = 'inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[11px] font-medium text-[var(--text-secondary)] transition-colors duration-[125ms] hover:bg-[var(--prompt-bar-shell-hover)] hover:text-[var(--text-primary)]';
+const composerPillClass = 'inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-[125ms] hover:bg-[var(--prompt-bar-shell-hover)] hover:text-[var(--text-primary)]';
 
 export default function DesktopComposerPromptTools({
   config,

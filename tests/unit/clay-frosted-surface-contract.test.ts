@@ -227,8 +227,11 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
 
   // The desktop shell is the first surface migrated to the Morphic design
   // system, so it must not regress to the legacy Frost/Clay material layer.
-  assert.match(desktopChromeSource, /kk-morphic-mode-switch/);
-  assert.match(desktopChromeSource, /aria-current=\{activeMode === 'canvas' \? 'page' : undefined\}/);
+  assert.match(desktopChromeSource, /kk-workspace-chrome-v3/);
+  assert.match(desktopChromeSource, /data-chrome-region="project"/);
+  assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
+  assert.match(desktopChromeSource, /data-chrome-region="account"/);
+  assert.match(desktopChromeSource, /aria-current="page"/);
   assert.doesNotMatch(desktopChromeSource, /var\(--frost-|var\(--clay-|var\(--accent-coral\)/);
   assert.doesNotMatch(desktopChromeSource, /from-blue|to-cyan|bg-blue|border-blue|text-blue|focus:border-indigo|bg-indigo|from-indigo|via-purple|hover:shadow-blue/);
   assert.doesNotMatch(desktopChromeSource, /shadow-2xl|shadow-xl|#111217|#18181b|#09090b|#27272a|#2a2a2e/);

@@ -3,17 +3,19 @@ import { test } from 'node:test';
 
 import { readSource } from '../support/workspacePaths.js';
 
-test('desktop workspace chrome exposes the three approved product modes', () => {
+test('desktop workspace chrome exposes project, canvas and account with Composer-owned Copilot', () => {
   const source = readSource('apps/web/src/app/AppDesktopChrome.tsx');
 
-  assert.match(source, /className="kk-morphic-mode-switch"/);
+  assert.match(source, /data-chrome-region="project"/);
+  assert.match(source, /data-chrome-region="canvas"/);
+  assert.match(source, /data-chrome-region="account"/);
   assert.match(source, />\s*画布\s*</);
-  assert.match(source, />\s*Copilot\s*</);
-  assert.match(source, />\s*创作\s*</);
+  assert.doesNotMatch(source, />\s*Copilot\s*</);
+  assert.doesNotMatch(source, />\s*创作\s*</);
+  assert.match(source, /data-composer-copilot-toggle="true"/);
   assert.match(source, /onCloseAssistant:\s*\(\) => void/);
   assert.match(source, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
   assert.match(source, /onOpenCanvasWorkspace\(\);[\s\S]*focusWorkspaceCanvas\(\)/);
-  assert.match(source, /onOpenCreateWorkspace\(\);[\s\S]*focusWorkspaceComposer/);
   assert.match(source, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
   assert.match(source, /input\[placeholder="搜索历史记录\.\.\."\]/);
   assert.match(

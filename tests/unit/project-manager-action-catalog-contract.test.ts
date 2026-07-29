@@ -51,8 +51,8 @@ test('Project Manager shell and canvas controls expose project action metadata',
     'fitToAll',
     'resetView',
     'toggleCanvasMode',
-    'toggleSnapToGrid',
     'autoArrange',
+    'toggleTheme',
     'addWorkflowPreviewCard',
     'addWorkflowSaveCard',
     'addWorkflowAgentCard',
@@ -67,6 +67,6 @@ test('Project Manager shell and canvas controls expose project action metadata',
 
   assert.doesNotMatch(
     projectManagerSource,
-    /PROJECT_MANAGER_ACTIONS\.(?:toggleWorkflowMenu|toggleTheme)\.uiAction/,
+    /PROJECT_MANAGER_ACTIONS\.toggleWorkflowMenu\.uiAction/,
   );
 });

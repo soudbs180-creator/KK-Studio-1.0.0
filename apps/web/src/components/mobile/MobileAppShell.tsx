@@ -16,9 +16,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   const shellStyle = {
     gridTemplateRows: 'minmax(0, 1fr) auto',
     '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 76px)',
-    '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 76px)',
-    '--mobile-tabbar-height': '64px',
-    '--mobile-tabbar-total-height': 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
+    '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
   } as React.CSSProperties;
 
   return (
@@ -50,7 +48,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
       <div
         data-slot="composer"
         className="z-20 min-h-0 overflow-hidden"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {composer}
       </div>

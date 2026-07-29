@@ -74,7 +74,9 @@ test('workspace modes are controlled by the real surface and hidden panels are i
   assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
   assert.doesNotMatch(chromeSource, /useState<'canvas'\s*\|\s*'copilot'\s*\|\s*'create'>/);
   assert.match(chromeSource, /onOpenCanvasWorkspace\(\)/);
-  assert.match(chromeSource, /onOpenCreateWorkspace\(\)/);
+  assert.match(chromeSource, /data-composer-copilot-toggle="true"/);
+  assert.doesNotMatch(chromeSource, />Copilot</);
+  assert.doesNotMatch(chromeSource, />创作</);
   assert.match(
     workspacePageSource,
     /activeMode=\{isChatOpen\s*\?\s*'copilot'\s*:\s*workspaceSurface\s*===\s*'library'\s*\?\s*'create'\s*:\s*'canvas'\}/,

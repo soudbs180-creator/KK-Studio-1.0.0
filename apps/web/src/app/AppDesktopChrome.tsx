@@ -1,11 +1,22 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, LayoutDashboard, LogOut, User, Zap, Shield, Search } from 'lucide-react';
+import {
+  FolderKanban,
+  LayoutPanelTop,
+  LogOut,
+  PanelRightClose,
+  PanelRightOpen,
+  Settings,
+  Shield,
+  User,
+  Zap,
+} from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { useCanvas } from '../context/CanvasContext.tsx';
 import { navigateAppRoot } from './navigation/appRootNavigation';
 
 interface AppDesktopChromeProps {
@@ -41,17 +52,6 @@ interface DesktopMenuActionButtonProps {
 function focusWorkspaceCanvas() {
   const canvas = document.querySelector<HTMLElement>('[data-canvas-viewport], .canvas-container, canvas');
   canvas?.focus();
-}
-
-function focusWorkspaceComposer(fallback: () => void) {
-  const composer = document.querySelector<HTMLElement>(
-    '#prompt-bar-container textarea, #prompt-bar-container input',
-  );
-  if (composer) {
-    composer.focus();
-    return;
-  }
-  fallback();
 }
 
 function revealCopilotHistory() {
@@ -90,6 +90,14 @@ const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
   </button>
 );
 
+/**
+ * 只让项目名称文本订阅 CanvasContext，避免卡片拖拽时重绘整条桌面 Chrome。
+ */
+const ActiveProjectName: React.FC = () => {
+  const { activeCanvas } = useCanvas();
+  return <>{activeCanvas?.name || '项目 1'}</>;
+};
+
 const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   isMobile,
   activeMode,
@@ -108,8 +116,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onOpenAssistant,
   onCloseAssistant,
   onOpenCanvasWorkspace,
-  onOpenCreateWorkspace,
-  onOpenCommandPalette,
 }) => {
   const { adminLevel } = useAuth();
   React.useEffect(() => {
@@ -139,111 +145,100 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
     onOpenAssistant();
     revealCopilotHistory();
   };
-  const openCreateMode = () => {
-    onCloseAssistant();
-    onOpenCreateWorkspace();
-    window.setTimeout(() => focusWorkspaceComposer(() => undefined), 0);
+  const toggleCopilotMode = () => {
+    if (activeMode === 'copilot') {
+      openCanvasMode();
+      return;
+    }
+    openCopilotMode();
+  };
+  const openProjectMenu = () => {
+    document.getElementById('project-manager-trigger')?.click();
   };
 
   return (
     <div
-      className="kk-workspace-chrome-surface w-full flex items-center gap-3 rounded-2xl border p-2.5 select-none relative"
+      className="kk-workspace-chrome-surface kk-workspace-chrome-v3 w-full select-none"
+      style={{ '--kk-desktop-chrome-right-offset': rightOffset } as React.CSSProperties}
     >
-      <span className="kk-morphic-brand">KK Studio</span>
-      <div className="kk-morphic-command-group flex items-center gap-1 border-r pr-2" role="group" aria-label="Workspace commands">
-        <button
-          type="button"
-          id="btn-global-ai-assistant"
-          data-global-ai-entry="true"
-          className="kk-workspace-icon-control"
-          onClick={openCopilotMode}
-          aria-label="Open AI assistant"
-          title="Open AI assistant"
-        >
-          <Bot size={17} />
-        </button>
-        <button
-          type="button"
-          id="btn-global-command-palette"
-          data-command-entry="true"
-          className="kk-workspace-icon-control"
-          onClick={onOpenCommandPalette}
-          aria-label="Open command search"
-          title="Open command search"
-        >
-          <Search size={16} />
-        </button>
-      </div>
+      <button
+        type="button"
+        data-chrome-region="project"
+        className="kk-workspace-chrome-v3__project"
+        onClick={openProjectMenu}
+        aria-label="打开当前项目"
+      >
+        <FolderKanban size={16} aria-hidden="true" />
+        <span><small>项目</small><strong><ActiveProjectName /></strong></span>
+      </button>
 
-      {/* 顶部工作区路径用于补足参考站的层级感，不改变现有项目路由。 */}
-      <div className="kk-morphic-workspace-context" aria-label="当前工作区">
-        <span>工作区</span>
-        <span className="kk-morphic-workspace-context__separator" aria-hidden="true">
-          /
-        </span>
-        <span>当前项目</span>
-      </div>
+      <button
+        type="button"
+        data-chrome-region="canvas"
+        className="kk-workspace-chrome-v3__canvas"
+        aria-current="page"
+        onClick={openCanvasMode}
+      >
+        <LayoutPanelTop size={16} aria-hidden="true" />
+        <span>画布</span>
+      </button>
 
-      <nav className="kk-morphic-mode-switch" aria-label="工作区模式">
-        <button type="button" aria-current={activeMode === 'canvas' ? 'page' : undefined} onClick={openCanvasMode}>
-          画布
-        </button>
-        <button type="button" aria-current={activeMode === 'copilot' ? 'page' : undefined} onClick={openCopilotMode}>
-          Copilot
-        </button>
-        <button type="button" aria-current={activeMode === 'create' ? 'page' : undefined} onClick={openCreateMode}>
-          创作
-        </button>
-      </nav>
-
-      <div className="kk-morphic-chrome-spacer flex-1" />
-
-      <div className="relative flex-shrink-0">
-        <button
-          data-testid="desktop-user-menu-trigger"
-          onClick={(event) => {
-            event.stopPropagation();
-            setShowUserMenu((prev) => !prev);
-          }}
-          className="kk-workspace-avatar-button relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} className="h-full w-full object-cover" />
-          ) : (
-            <div className="kk-workspace-avatar-fallback flex h-full w-full items-center justify-center text-sm font-bold text-white">
-              {user?.email?.[0].toUpperCase() || 'K'}
-            </div>
-          )}
-        </button>
-
-        {/* 简体中文：服务/API 状态指示灯 */}
-        <div
-          className="kk-workspace-status-dot absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 shadow-lg"
-          data-status={apiStatus}
-        />
-      </div>
-
-      {/* 简体中文：积分展示 & 充值模块（精简布局：⚡积分 + 充值） */}
-      {billingUiEnabled && (
-        <div className="flex items-center gap-1.5 h-10 shrink-0">
-          <div className="flex items-center gap-1 select-none shrink-0">
-            <Zap size={14} className="kk-morphic-balance-icon" />
-            <span className="kk-morphic-balance-value text-[15px] font-mono font-black tracking-tight shrink-0">
-              {remainingBalanceDisplay}
-            </span>
-            <span className="kk-morphic-balance-label text-[10px] font-bold shrink-0">积分</span>
-          </div>
-
+      <div data-chrome-region="account" className="kk-workspace-chrome-v3__account">
+        <div className="relative flex-shrink-0">
           <button
-            id="btn-desktop-recharge"
-            onClick={onRecharge}
-            className="kk-workspace-primary-action inline-flex h-7.5 shrink-0 items-center justify-center rounded-xl px-2.5 text-[11px] font-black leading-none"
+            data-testid="desktop-user-menu-trigger"
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowUserMenu((prev) => !prev);
+            }}
+            className="kk-workspace-avatar-button"
+            aria-label="打开个人中心"
           >
-            充值
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" />
+            ) : (
+              <span className="kk-workspace-avatar-fallback">
+                {user?.email?.[0].toUpperCase() || 'K'}
+              </span>
+            )}
           </button>
+          <span className="kk-workspace-status-dot" data-status={apiStatus} aria-hidden="true" />
         </div>
-      )}
 
+        {billingUiEnabled ? (
+          <div className="kk-workspace-chrome-v3__billing">
+            <span><Zap size={13} aria-hidden="true" />{remainingBalanceDisplay}<small>积分</small></span>
+            <button id="btn-desktop-recharge" type="button" onClick={onRecharge}>充值</button>
+          </div>
+        ) : null}
+
+        <button
+          id="btn-desktop-settings"
+          type="button"
+          data-testid="desktop-settings-trigger"
+          className="kk-workspace-icon-control"
+          onClick={onOpenSettings}
+          aria-label="打开设置"
+          title="设置"
+        >
+          <Settings size={16} aria-hidden="true" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        data-composer-copilot-toggle="true"
+        data-state={activeMode === 'copilot' ? 'expanded' : 'collapsed'}
+        className="kk-composer-copilot-toggle"
+        onClick={toggleCopilotMode}
+        aria-label={activeMode === 'copilot' ? '收起 AI 助手' : '展开 AI 助手'}
+        aria-expanded={activeMode === 'copilot'}
+        title={activeMode === 'copilot' ? '收起 AI 助手' : '展开 AI 助手'}
+      >
+        {activeMode === 'copilot'
+          ? <PanelRightClose size={16} aria-hidden="true" />
+          : <PanelRightOpen size={16} aria-hidden="true" />}
+      </button>
 
       {showUserMenu ? (
         createPortal(
@@ -261,16 +256,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                   label="个人中心"
                   onClick={() => {
                     onOpenProfile('main');
-                    setShowUserMenu(false);
-                  }}
-                />
-                <DesktopMenuActionButton
-                  id="btn-desktop-settings"
-                  icon={<LayoutDashboard size={14} />}
-                  label="管理设置"
-                  testId="desktop-user-menu-settings"
-                  onClick={() => {
-                    onOpenSettings();
                     setShowUserMenu(false);
                   }}
                 />
@@ -310,4 +295,4 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   );
 };
 
-export default AppDesktopChrome;
+export default React.memo(AppDesktopChrome);

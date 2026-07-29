@@ -65,7 +65,9 @@ test('mobile result feed localizes chrome copy instead of hard-coding English in
 
   assert.match(feedSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
   assert.match(feedSource, /const \{ pick \} = useLocale\(\);/);
-  assert.match(feedSource, /const counterLabel = totalResults === 0 \? pick\([^)]*'Waiting'\)/);
+  assert.match(feedSource, /data-testid="mobile-generation-task-status"/);
+  assert.match(feedSource, /pick\('生成结果', 'Generated results'\)/);
+  assert.match(feedSource, /pick\(`\$\{pendingTaskCount\} 个等待中`, `\$\{pendingTaskCount\} pending`\)/);
   assert.match(feedSource, /const selectedSourceLabel = pick\([^)]*'source selected'\);/);
   assert.doesNotMatch(feedSource, />\s*Results\s*</);
   assert.doesNotMatch(feedSource, /totalResults === 0 \? 'Waiting'/);

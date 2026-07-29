@@ -1,0 +1,410 @@
+/*
+ * Settings V3
+ * A single responsive hierarchy with deliberate spacing and shared type/icon levels.
+ */
+
+.settings-console-host {
+  --settings-v3-section-gap: 24px;
+  --settings-v3-card-padding: 20px;
+  --settings-v3-control-gap: 12px;
+  --settings-v3-content-width: 1160px;
+  --settings-v3-sidebar-width: 248px;
+}
+
+.settings-console--desktop {
+  grid-template-columns: var(--settings-v3-sidebar-width) minmax(0, 1fr);
+  width: min(1420px, calc(100vw - var(--chat-sidebar-width, 0px) - 32px));
+  border-color: var(--console-border);
+  border-radius: var(--kk-morphic-radius-panel);
+  background: var(--console-page);
+  box-shadow: var(--kk-morphic-dialog-shadow);
+}
+
+.settings-console-sidebar {
+  padding: 20px 14px 14px;
+}
+
+.settings-console-brand {
+  gap: var(--settings-v3-control-gap);
+  padding: 0 8px 22px;
+}
+
+.settings-console-nav {
+  gap: 20px;
+}
+
+.settings-console-nav__group + .settings-console-nav__group {
+  margin-top: 20px;
+  padding-top: 20px;
+}
+
+.settings-console-nav__group h2 {
+  margin: 0 8px 8px;
+  font-size: var(--kk-type-caption);
+  line-height: 1.35;
+}
+
+.settings-console-nav__group > div {
+  gap: 4px;
+}
+
+.settings-console-nav__item {
+  min-height: 38px;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: var(--kk-morphic-radius-control);
+  font-size: var(--kk-type-button);
+}
+
+.settings-console-nav__item > svg:first-child {
+  width: var(--kk-icon-button);
+  height: var(--kk-icon-button);
+}
+
+.settings-console-account {
+  min-height: 54px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--kk-morphic-radius-control);
+}
+
+.settings-console-topbar {
+  min-height: 76px;
+  flex-basis: 76px;
+  gap: 20px;
+  padding: 14px 24px;
+}
+
+.settings-console-topbar__title {
+  gap: var(--settings-v3-control-gap);
+}
+
+.settings-console-topbar__title > span {
+  padding: 5px 7px;
+  border-radius: var(--kk-morphic-radius-button);
+  font-size: var(--kk-type-caption);
+}
+
+.settings-console-topbar h1 {
+  font-size: var(--kk-type-title);
+  line-height: 1.35;
+}
+
+.settings-console-topbar p {
+  margin-top: 3px;
+  font-size: var(--kk-type-caption);
+  line-height: 1.4;
+}
+
+.settings-console-topbar__actions {
+  gap: 8px;
+}
+
+.settings-console-topbar__actions button {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--kk-morphic-radius-control);
+}
+
+.settings-console-content {
+  padding: 28px 32px 48px;
+  scroll-padding-bottom: 48px;
+}
+
+.settings-console-content :where(
+  .console-page,
+  .settings-system-page,
+  .storage-settings-page,
+  .user-profile-page,
+  .consumption-records-page,
+  .api-management-page,
+  .system-logs-page
+) {
+  width: min(100%, var(--settings-v3-content-width));
+  margin-inline: auto;
+  gap: var(--settings-v3-section-gap);
+}
+
+.settings-console-content :where(
+  .console-card,
+  .console-metric-card,
+  .settings-system-card,
+  .settings-section-card,
+  .settings-reference-card,
+  .settings-provider-card
+) {
+  min-width: 0;
+  padding: var(--settings-v3-card-padding) !important;
+  border-color: var(--console-border);
+  border-radius: var(--kk-morphic-radius-panel);
+  background: var(--console-surface);
+  box-shadow: none;
+}
+
+.settings-console-content :where(
+  .console-card-heading,
+  .settings-system-card__heading,
+  .settings-section-header,
+  .settings-reference-card__header
+) {
+  gap: var(--settings-v3-control-gap);
+  margin-bottom: 16px;
+}
+
+.settings-console-content :where(
+  .console-setting-row,
+  .settings-system-field,
+  .settings-field-row,
+  .settings-provider-field
+) {
+  min-width: 0;
+  gap: var(--settings-v3-control-gap);
+  padding-block: 12px;
+}
+
+.settings-console-content :where(
+  .console-setting-row,
+  .settings-field-row
+) + :where(
+  .console-setting-row,
+  .settings-field-row
+) {
+  border-top: 1px solid var(--console-border);
+}
+
+.settings-console :where(button, input, textarea, select) {
+  font: inherit;
+  font-size: var(--kk-type-button);
+}
+
+.settings-console :where(input, textarea, select) {
+  min-height: 38px;
+  padding-inline: 12px;
+  border-radius: var(--kk-morphic-radius-control);
+}
+
+.settings-console textarea {
+  min-height: 96px;
+  padding-block: 10px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.settings-console :where(
+  .console-page-header h2,
+  .settings-system-page h2,
+  .storage-settings-page h2
+) {
+  font-size: var(--kk-type-display);
+  line-height: 1.25;
+}
+
+.settings-console :where(
+  .console-card-heading h3,
+  .settings-system-card__title,
+  .settings-section-header h3
+) {
+  font-size: var(--kk-type-title);
+  line-height: 1.35;
+}
+
+.settings-console :where(
+  .console-setting-row,
+  .settings-system-field,
+  .settings-field-row,
+  .settings-provider-field,
+  .console-card p
+) {
+  font-size: var(--kk-type-body);
+  line-height: 1.55;
+}
+
+.settings-console :where(
+  .console-setting-row label,
+  .settings-system-field__label,
+  .console-field > span,
+  button
+) {
+  font-size: var(--kk-type-button);
+  line-height: 1.35;
+}
+
+.settings-console :where(
+  small,
+  .console-field-note,
+  .settings-system-field__description,
+  .console-card-heading p
+) {
+  font-size: var(--kk-type-caption);
+  line-height: 1.5;
+}
+
+.settings-console :where(
+  .console-button-row,
+  .console-card-actions,
+  .settings-system-actions
+) {
+  gap: var(--settings-v3-control-gap);
+  flex-wrap: wrap;
+}
+
+.settings-console :where(
+  .console-button-row button,
+  .console-card-actions button,
+  .settings-system-actions button
+) {
+  min-height: 36px;
+  padding-inline: 14px;
+  border-radius: var(--kk-morphic-radius-control);
+}
+
+@media (max-width: 767px) {
+  .settings-console-host.settings-shell-backdrop {
+    padding: 0;
+  }
+
+  .settings-console--mobile {
+    min-height: 100dvh;
+  }
+
+  .settings-console-mobile-topbar {
+    min-height: calc(env(safe-area-inset-top, 0px) + 60px);
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+  }
+
+  .settings-console-mobile-topbar button {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--kk-morphic-radius-control);
+  }
+
+  .settings-console-mobile-topbar strong {
+    font-size: var(--kk-type-body);
+  }
+
+  .settings-console-content--mobile {
+    padding: 20px 14px calc(env(safe-area-inset-bottom, 0px) + 28px);
+    scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  }
+
+  .settings-console-mobile-home {
+    gap: var(--settings-v3-section-gap);
+  }
+
+  .settings-console-mobile-overview {
+    gap: 14px;
+    padding: 4px 2px 0;
+  }
+
+  .settings-console-mobile-overview__copy > span {
+    font-size: var(--kk-type-caption);
+  }
+
+  .settings-console-mobile-overview__copy h2 {
+    margin-top: 5px;
+    font-size: var(--kk-type-title);
+    line-height: 1.35;
+  }
+
+  .settings-console-mobile-overview__performance {
+    min-height: 44px;
+    padding-inline: 12px;
+    border-radius: var(--kk-morphic-radius-control);
+    font-size: var(--kk-type-button);
+  }
+
+  .settings-console-mobile-home section h2 {
+    margin-bottom: 10px;
+    font-size: var(--kk-type-button);
+    line-height: 1.4;
+  }
+
+  .settings-console-mobile-list,
+  .settings-console-mobile-account {
+    overflow: hidden;
+    border: 1px solid var(--console-border);
+    border-radius: var(--kk-morphic-radius-panel);
+    background: var(--console-surface);
+  }
+
+  .settings-console-mobile-list button,
+  .settings-console-mobile-account {
+    min-height: 72px;
+    grid-template-columns: 36px minmax(0, 1fr) 18px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .settings-console-mobile-primary-list button > span:first-child {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--kk-morphic-radius-control);
+    font-size: var(--kk-type-caption);
+  }
+
+  .settings-console-mobile-list strong {
+    font-size: var(--kk-type-body);
+    line-height: 1.35;
+  }
+
+  .settings-console-mobile-list small {
+    margin-top: 4px;
+    font-size: var(--kk-type-caption);
+    line-height: 1.4;
+  }
+
+  .settings-console-mobile-account {
+    grid-template-columns: minmax(0, 1fr) 18px;
+  }
+
+  .settings-console-content :where(
+    .console-page,
+    .settings-system-page,
+    .storage-settings-page,
+    .user-profile-page,
+    .consumption-records-page,
+    .api-management-page,
+    .system-logs-page
+  ) {
+    gap: 18px;
+  }
+
+  .settings-console-content :where(
+    .console-card,
+    .console-metric-card,
+    .settings-system-card,
+    .settings-section-card,
+    .settings-reference-card,
+    .settings-provider-card
+  ) {
+    padding: 16px !important;
+  }
+
+  .settings-console-content :where(
+    .console-setting-row,
+    .settings-field-row
+  ) {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+  }
+
+  .settings-console :where(
+    .console-button-row button,
+    .console-card-actions button,
+    .settings-system-actions button
+  ) {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-console *,
+  .settings-console *::before,
+  .settings-console *::after {
+    transition: none !important;
+    animation-duration: 1ms !important;
+  }
+}

@@ -30,19 +30,21 @@ test('desktop canvas keeps the 262px workspace panel persistent without a modal 
   );
 });
 
-test('desktop chrome publishes reference-like workspace context and a quiet command area', () => {
+test('desktop chrome publishes the V3 project, canvas and account hierarchy', () => {
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
-  const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+  const cssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
-  assert.match(desktopChromeSource, /className="kk-morphic-workspace-context"/);
-  assert.match(desktopChromeSource, /kk-morphic-workspace-context__separator/);
+  assert.match(desktopChromeSource, /data-chrome-region="project"/);
+  assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
+  assert.match(desktopChromeSource, /data-chrome-region="account"/);
+  assert.match(desktopChromeSource, /data-composer-copilot-toggle="true"/);
   assert.match(
     cssSource,
-    /\.kk-morphic-command-group\s+\[data-global-ai-entry='true'\]\s*\{[\s\S]*display:\s*none/,
+    /\.kk-workspace-chrome-v3\s*\{[\s\S]*grid-template-columns:\s*minmax\(180px,\s*1fr\)\s*auto\s*minmax\(180px,\s*1fr\)/,
   );
   assert.match(
     cssSource,
-    /\.kk-morphic-workspace-context\s*\{[\s\S]*font-size:\s*12px/,
+    /\.kk-workspace-chrome-v3__project,[\s\S]*font-size:\s*var\(--kk-type-button\)/,
   );
 });
 

@@ -27,7 +27,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(appSource, /<AppMobileWorkspace[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
   assert.match(workspaceSource, /if \(!showRechargeModal\)[\s\S]*setShowRechargeModal\(false\);[\s\S]*openSettingsSurfaceTracked\('recharge'\);/);
 
-  assert.match(desktopChromeSource, /\{billingUiEnabled && \(/);
+  assert.match(desktopChromeSource, /\{billingUiEnabled \? \(/);
   assert.match(desktopChromeSource, /onOpenProfile\('main'\)/);
   assert.match(desktopChromeSource, /onClick=\{onRecharge\}/);
 
