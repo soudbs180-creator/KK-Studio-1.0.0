@@ -63,6 +63,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   const pointerIdRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const viewModel = useMemo(() => createWorkflowCardViewModel({
     ...node,
@@ -90,9 +91,16 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
 
   const stopDrag = (event: PointerEvent) => {
     if (event.pointerId !== pointerIdRef.current) return;
-    window.removeEventListener('pointermove', scheduleDrag);
-    window.removeEventListener('pointerup', stopDrag);
-    window.removeEventListener('pointercancel', stopDrag);
+    if (event.type === 'pointerup') {
+      latestPointerRef.current = { x: event.clientX, y: event.clientY };
+    }
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    flushDrag();
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
     pointerIdRef.current = null;
     dragRef.current = null;
     latestPointerRef.current = null;
@@ -115,6 +123,11 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
     window.addEventListener('pointermove', scheduleDrag);
     window.addEventListener('pointerup', stopDrag);
     window.addEventListener('pointercancel', stopDrag);
+    dragCleanupRef.current = () => {
+      window.removeEventListener('pointermove', scheduleDrag);
+      window.removeEventListener('pointerup', stopDrag);
+      window.removeEventListener('pointercancel', stopDrag);
+    };
   };
 
   useEffect(() => {
@@ -133,9 +146,8 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
 
   useEffect(() => () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    window.removeEventListener('pointermove', scheduleDrag);
-    window.removeEventListener('pointerup', stopDrag);
-    window.removeEventListener('pointercancel', stopDrag);
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
   }, []);
 
   return (

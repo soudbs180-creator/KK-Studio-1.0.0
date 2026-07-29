@@ -79,10 +79,62 @@ function createCanvasState() {
               },
             },
           ],
-          noteNodes: [],
+          noteNodes: [
+            {
+              id: "note-responsive",
+              title: "Responsive notebook",
+              position: { x: -100, y: 0 },
+              width: 320,
+              height: 240,
+              elements: [],
+              presentation: {
+                version: 2,
+                kind: "notebook",
+                layoutMode: "column",
+                size: "standard",
+                ports: { source: "bottom", target: "top" },
+              },
+              createdAt: 3,
+              updatedAt: 3,
+            },
+          ],
+          workflow: {
+            version: 1,
+            nodes: [
+              {
+                id: "workflow-panel-responsive",
+                kind: "workflow-panel",
+                position: { x: 480, y: 0 },
+                width: 420,
+                height: 220,
+                presentation: {
+                  version: 2,
+                  kind: "workflow-panel",
+                  layoutMode: "column",
+                  size: "wide",
+                  ports: { source: "bottom", target: "top" },
+                },
+                data: {
+                  title: "Responsive workflow",
+                  status: "idle",
+                  steps: [
+                    {
+                      id: "workflow-step-responsive",
+                      label: "Generate",
+                      enabled: true,
+                      parameters: {},
+                      status: "idle",
+                    },
+                  ],
+                  outputNodeIds: [],
+                },
+              },
+            ],
+            edges: [],
+          },
           groups: [],
           drawings: [],
-          lastModified: 2,
+          lastModified: 4,
         },
       ],
       activeCanvasId: "default",
@@ -153,7 +205,10 @@ const seededCanvas = seedState.canvases[0];
 const sceneNodeCount =
   seededCanvas.promptNodes.length +
   seededCanvas.imageNodes.length +
-  seededCanvas.noteNodes.length;
+  seededCanvas.noteNodes.length +
+  (seededCanvas.workflow?.nodes.filter((node) => (
+    ["preview", "save", "agent", "workflow-panel"].includes(node.kind)
+  )).length || 0);
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -211,6 +266,87 @@ async function evaluate(cdp, expression) {
       result.exceptionDetails.text || "Runtime evaluation failed",
     );
   return result.result.value;
+}
+
+async function measureDesktopAuxiliaryCard(cdp, cardId) {
+  return evaluate(
+    cdp,
+    `(() => {
+      const card = document.getElementById(${JSON.stringify(`canvas-card-${cardId}`)});
+      const handle = card?.querySelector(':scope > header, :scope > div:first-child');
+      const cardRect = card?.getBoundingClientRect();
+      const handleRect = handle?.getBoundingClientRect();
+      return cardRect && handleRect ? {
+        left: cardRect.left,
+        top: cardRect.top,
+        centerX: cardRect.left + cardRect.width / 2,
+        centerY: cardRect.top + cardRect.height / 2,
+        handleX: handleRect.left + Math.min(handleRect.width * 0.35, 120),
+        handleY: handleRect.top + handleRect.height / 2,
+        transform: card.style.transform,
+        dragging: card.dataset.dragging === 'true',
+      } : null;
+    })()`,
+  );
+}
+
+async function beginDesktopMouseDrag(cdp, start, end) {
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...start });
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    ...start,
+    button: "left",
+    buttons: 1,
+    clickCount: 1,
+  });
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    ...end,
+    button: "left",
+    buttons: 1,
+  });
+}
+
+async function releaseDesktopMouseDrag(cdp, end) {
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    ...end,
+    button: "left",
+    buttons: 0,
+    clickCount: 1,
+  });
+}
+
+async function verifyDesktopAuxiliaryCardDrag(cdp, cardId, movement) {
+  const initial = await measureDesktopAuxiliaryCard(cdp, cardId);
+  if (!initial) throw new Error(`Desktop auxiliary card ${cardId} is unavailable`);
+  const start = { x: initial.handleX, y: initial.handleY };
+  const end = { x: start.x + movement.x, y: start.y + movement.y };
+  await beginDesktopMouseDrag(cdp, start, end);
+  await wait(120);
+  const during = await measureDesktopAuxiliaryCard(cdp, cardId);
+  await releaseDesktopMouseDrag(cdp, end);
+  await wait(120);
+  const released = await measureDesktopAuxiliaryCard(cdp, cardId);
+  await wait(350);
+  const settled = await measureDesktopAuxiliaryCard(cdp, cardId);
+  return {
+    initial,
+    during,
+    settled,
+    pointerError: {
+      x: Math.abs((during?.centerX || 0) - initial.centerX - movement.x),
+      y: Math.abs((during?.centerY || 0) - initial.centerY - movement.y),
+    },
+    settledPositionError: {
+      x: Math.abs((settled?.centerX || 0) - initial.centerX - movement.x),
+      y: Math.abs((settled?.centerY || 0) - initial.centerY - movement.y),
+    },
+    postReleaseDrift: Math.hypot(
+      (settled?.centerX || 0) - (released?.centerX || 0),
+      (settled?.centerY || 0) - (released?.centerY || 0),
+    ),
+  };
 }
 
 async function clickMobileTab(cdp, label) {
@@ -416,11 +552,26 @@ try {
       screenHeight: viewport.height,
     });
     await wait(500);
+    let desktopAuxiliaryDrags = null;
     if (viewport.surface === "canvas") {
+      if (viewport.width === 1440) {
+        desktopAuxiliaryDrags = {
+          note: await verifyDesktopAuxiliaryCardDrag(
+            cdp,
+            "note-responsive",
+            { x: 48, y: -32 },
+          ),
+          workflow: await verifyDesktopAuxiliaryCardDrag(
+            cdp,
+            "workflow-panel-responsive",
+            { x: -52, y: -24 },
+          ),
+        };
+      }
       await evaluate(
         cdp,
         `(() => {
-          const card = document.querySelector('[data-card-kind]');
+          const card = document.querySelector('[data-card-id="prompt-responsive"]');
           const rect = card?.getBoundingClientRect();
           if (!card || !rect) return false;
           card.dispatchEvent(new MouseEvent('mousedown', {
@@ -473,9 +624,28 @@ try {
           try {
             const state = JSON.parse(localStorage.getItem('kk_studio_canvas_state') || '{}');
             const seededCanvas = state.canvases?.[0];
-            return (seededCanvas?.promptNodes?.length || 0) + (seededCanvas?.imageNodes?.length || 0) + (seededCanvas?.noteNodes?.length || 0);
+            return (seededCanvas?.promptNodes?.length || 0)
+              + (seededCanvas?.imageNodes?.length || 0)
+              + (seededCanvas?.noteNodes?.length || 0)
+              + (seededCanvas?.workflow?.nodes?.filter((node) => (
+                ['preview', 'save', 'agent', 'workflow-panel'].includes(node.kind)
+              )).length || 0);
           } catch {
             return 0;
+          }
+        })(),
+        seededNodeCounts: (() => {
+          try {
+            const state = JSON.parse(localStorage.getItem('kk_studio_canvas_state') || '{}');
+            const seededCanvas = state.canvases?.[0];
+            return {
+              prompt: seededCanvas?.promptNodes?.length || 0,
+              image: seededCanvas?.imageNodes?.length || 0,
+              note: seededCanvas?.noteNodes?.length || 0,
+              workflow: seededCanvas?.workflow?.nodes?.length || 0,
+            };
+          } catch {
+            return null;
           }
         })(),
         canvas: !!canvas,
@@ -497,6 +667,7 @@ try {
       };
     })()`,
     );
+    metrics.desktopAuxiliaryDrags = desktopAuxiliaryDrags;
     const screenshot = await cdp.send("Page.captureScreenshot", {
       format: "png",
       captureBeyondViewport: false,
@@ -536,6 +707,22 @@ try {
         throw new Error(
           `${viewport.width}x${viewport.height} loaded ${metrics.seededNodeCount}/${sceneNodeCount} seeded nodes`,
         );
+      for (const [cardKind, drag] of Object.entries(desktopAuxiliaryDrags || {})) {
+        if (
+          drag.pointerError.x > 2
+          || drag.pointerError.y > 2
+          || drag.settledPositionError.x > 2
+          || drag.settledPositionError.y > 2
+          || drag.postReleaseDrift > 1
+          || !drag.during.transform.includes("translate3d")
+          || drag.settled.transform
+          || drag.settled.dragging
+        ) {
+          throw new Error(
+            `${viewport.width}x${viewport.height} ${cardKind} drag is unstable: ${JSON.stringify(drag)}`,
+          );
+        }
+      }
       if (stress10k && metrics.cardCount >= 1000)
         throw new Error(
           `10k canvas rendered ${metrics.cardCount} DOM cards instead of a virtualized subset`,

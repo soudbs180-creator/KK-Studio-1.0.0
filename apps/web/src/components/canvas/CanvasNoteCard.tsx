@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import type { CanvasNoteNode, CanvasDrawing } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
 import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 import CanvasDrawingsLayer from './CanvasDrawingsLayer.tsx';
 import { Link2, Pencil, Trash2 } from 'lucide-react';
+import { useTransientCanvasCardDrag } from './useTransientCanvasCardDrag.ts';
 
 export interface CanvasNoteCardProps {
   note: CanvasNoteNode;
@@ -28,10 +29,17 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
   onPositionChange,
   detailLevel = 'full',
 }) => {
-  const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const drawings = note.elements as CanvasDrawing[];
+  const { cardRef, dragHandleProps } = useTransientCanvasCardDrag({
+    position: note.position,
+    zoomScale,
+    onSelect,
+    onPositionChange,
+  });
+
   return (
     <CanvasCardShell
+      ref={cardRef}
       id={note.id}
       position={note.position}
       presentation={note.presentation}
@@ -43,27 +51,7 @@ export const CanvasNoteCard: React.FC<CanvasNoteCardProps> = ({
     >
       <div
         className="flex h-11 cursor-grab items-center justify-between border-b border-white/10 px-3"
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          dragRef.current = { x: event.clientX, y: event.clientY, originX: note.position.x, originY: note.position.y };
-          onSelect();
-        }}
-        onPointerMove={(event) => {
-          const drag = dragRef.current;
-          if (!drag) return;
-          onPositionChange({
-            x: drag.originX + (event.clientX - drag.x) / Math.max(zoomScale, 0.1),
-            y: drag.originY + (event.clientY - drag.y) / Math.max(zoomScale, 0.1),
-          });
-        }}
-        onPointerUp={(event) => {
-          dragRef.current = null;
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-        }}
-        onPointerCancel={() => { dragRef.current = null; }}
+        {...dragHandleProps}
       >
         <span className="truncate text-xs font-medium text-zinc-200">{note.title}</span>
         <div className="flex items-center gap-1">

@@ -74,3 +74,63 @@ test('prompt drag freezes its coordinate frame from pointer down through commit'
   assert.match(pointerMove, /const scale = dragRenderMetricsRef\.current\.zoomScale;/);
   assert.match(pointerUp, /const scale = dragRenderMetricsRef\.current\.zoomScale;/);
 });
+
+test('workflow utility drag commits the final pointer before clearing its drag session', () => {
+  const workflowUtility = read('apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx');
+  const stopStart = workflowUtility.indexOf('const stopDrag =');
+  const stopEnd = workflowUtility.indexOf('const startDrag =', stopStart);
+  const stopDrag = workflowUtility.slice(stopStart, stopEnd);
+
+  assert.notEqual(stopStart, -1);
+  assert.notEqual(stopEnd, -1);
+  assert.match(workflowUtility, /const dragCleanupRef = useRef<\(\(\) => void\) \| null>\(null\);/);
+  assert.match(stopDrag, /latestPointerRef\.current = \{ x: event\.clientX, y: event\.clientY \};/);
+  assert.match(stopDrag, /cancelAnimationFrame\(frameRef\.current\);/);
+  assert.match(stopDrag, /flushDrag\(\);/);
+  assert.match(stopDrag, /dragCleanupRef\.current\?\.\(\);/);
+  assert.ok(
+    stopDrag.indexOf('flushDrag();') < stopDrag.indexOf('dragRef.current = null;'),
+    'the final pointer must be committed before drag state is cleared',
+  );
+});
+
+test('canvas groups keep one persistent transform coordinate source', () => {
+  const group = read('apps/web/src/components/canvas/CanvasGroupComponent.tsx');
+  const styleStart = group.indexOf('style={{');
+  const styleEnd = group.indexOf('}}', styleStart);
+  const surfaceStyle = group.slice(styleStart, styleEnd);
+  const transformDeclarations = surfaceStyle.match(
+    /transform:\s*`translate\(\$\{renderedBounds\.x\}px,\s*\$\{renderedBounds\.y\}px\)`/g,
+  ) ?? [];
+
+  assert.equal(transformDeclarations.length, 1);
+});
+
+test('auxiliary cards use one transient DOM drag path and commit state once on release', () => {
+  const dragHook = read('apps/web/src/components/canvas/useTransientCanvasCardDrag.ts');
+  const workflowPanel = read('apps/web/src/components/canvas/WorkflowPanelCard.tsx');
+  const note = read('apps/web/src/components/canvas/CanvasNoteCard.tsx');
+
+  assert.match(dragHook, /window\.requestAnimationFrame\(flushPendingTransform\)/);
+  assert.match(dragHook, /element\.style\.transform = `translate3d\(/);
+  assert.match(dragHook, /onPositionChange\(finalPosition\);/);
+  assert.match(dragHook, /committedPositionRef\.current = finalPosition;/);
+
+  for (const source of [workflowPanel, note]) {
+    assert.match(source, /useTransientCanvasCardDrag/);
+    assert.match(source, /ref=\{cardRef\}/);
+    assert.match(source, /\{\.\.\.dragHandleProps\}/);
+    assert.doesNotMatch(source, /onPointerMove=\{\(event\) => \{[\s\S]{0,320}onPositionChange\(/);
+  }
+});
+
+test('responsive browser smoke measures settled desktop auxiliary-card drags', () => {
+  const smoke = read('scripts/test/verify-canvas-responsive-cdp.mjs');
+
+  assert.match(smoke, /id: "note-responsive"/);
+  assert.match(smoke, /id: "workflow-panel-responsive"/);
+  assert.match(smoke, /async function verifyDesktopAuxiliaryCardDrag/);
+  assert.match(smoke, /postReleaseDrift/);
+  assert.match(smoke, /during\.transform/);
+  assert.match(smoke, /settled\.transform/);
+});

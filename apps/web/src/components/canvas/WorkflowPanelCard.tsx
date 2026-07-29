@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { ArrowDown, ArrowUp, Pause, Play, Plus, RotateCcw, Square, Trash2 } from 'lucide-react';
 
 import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 import { createWorkflowCardViewModel } from '../../canvas/v3/adapters.ts';
 import type { GeneratedImage, WorkflowPanelData, WorkflowPanelNode, WorkflowPanelStep } from '../../types.ts';
 import CanvasCardShell from './CanvasCardShell.tsx';
+import { useTransientCanvasCardDrag } from './useTransientCanvasCardDrag.ts';
 
 interface WorkflowPanelCardProps {
   node: WorkflowPanelNode;
@@ -107,7 +108,6 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
   outputMedia = [],
   detailLevel = 'full',
 }) => {
-  const dragRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
   const data = node.data;
   const updateSteps = (steps: WorkflowPanelStep[]) => onDataChange({ ...data, steps });
   const viewModel = createWorkflowCardViewModel({
@@ -118,9 +118,16 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
     data: { ...data },
   });
   const estimatedHeight = 72 + Math.min(352, (data.steps.length * 104) + 44);
+  const { cardRef, dragHandleProps } = useTransientCanvasCardDrag({
+    position: node.position,
+    zoomScale,
+    onSelect,
+    onPositionChange,
+  });
 
   return (
     <CanvasCardShell
+      ref={cardRef}
       id={node.id}
       position={node.position}
       presentation={node.presentation!}
@@ -135,27 +142,7 @@ export const WorkflowPanelCard: React.FC<WorkflowPanelCardProps> = ({
     >
       <header
         className="flex h-9 cursor-grab items-center justify-between border-b border-[var(--border-light)] px-3"
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          dragRef.current = { x: event.clientX, y: event.clientY, originX: node.position.x, originY: node.position.y };
-          onSelect();
-        }}
-        onPointerMove={(event) => {
-          const drag = dragRef.current;
-          if (!drag) return;
-          onPositionChange({
-            x: drag.originX + (event.clientX - drag.x) / Math.max(zoomScale, 0.1),
-            y: drag.originY + (event.clientY - drag.y) / Math.max(zoomScale, 0.1),
-          });
-        }}
-        onPointerUp={(event) => {
-          dragRef.current = null;
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          }
-        }}
-        onPointerCancel={() => { dragRef.current = null; }}
+        {...dragHandleProps}
       >
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--kk-morphic-action)]" />

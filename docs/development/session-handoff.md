@@ -1943,3 +1943,46 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。位置持久化 DTO 未改变，旧项目直接使用新的单坐标源渲染。
 - 后续新增卡片 Renderer 必须复用相同的位置所有权规则，并把“拖动中轨迹 + 松手后稳定”加入对应浏览器 Smoke。
+
+---
+
+## 250. 2026-07-29 - fix(canvas): 收口辅助卡拖动时序与零漂移回归
+
+**修改范围**
+- 修复 Preview、Save、Agent 等 Workflow Utility 卡片在 Pointer Up 前仍有待执行 rAF 时丢失最后一帧坐标、偶发松手回跳的问题。
+- 将 Notebook 与 WorkflowPanel 从每次 Pointer Move 写入全局 React 状态，改为共享的 DOM 临时位移通道；松手后只提交一次最终画布坐标。
+- 扩展桌面 Canvas CDP Smoke，真实拖动 Notebook 与 WorkflowPanel，并继续覆盖 375 / 390 / 430 / 768 / 834px 手机触控画布。
+- 保持 Canvas DTO、Provider、生成、计费、鉴权和持久化契约不变。
+
+**修改文件**
+- `apps/web/src/components/canvas/useTransientCanvasCardDrag.ts`
+- `apps/web/src/components/canvas/CanvasNoteCard.tsx`
+- `apps/web/src/components/canvas/WorkflowPanelCard.tsx`
+- `apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `tests/contract/canvas-card-position-stability.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 已提交位置继续只有一个持久坐标源；`translate3d` 只允许作为拖动会话内的临时视觉位移。
+2. Pointer Down 时冻结缩放和画布原点，避免拖动中布局刷新改变坐标帧。
+3. Notebook 与 WorkflowPanel 的高频移动使用 DOM + rAF 合帧，Pointer Up 后仅向 React 提交一次最终位置；持久位置 Prop 追平后再清除临时 Transform。
+4. Workflow Utility 在清空拖动引用前必须先取消待执行 rAF 并同步 Flush 最终指针坐标；Unmount 时移除当前会话的精确监听器。
+5. 浏览器回归必须同时验证拖动中 Transform、松手后的持久位置、临时样式清理和稳定帧漂移。
+
+**已运行验证**
+- TDD：新增 Workflow Utility 最终帧时序与辅助卡共享拖动契约，先失败后修复；Canvas 卡片位置稳定契约最终 9/9 通过。
+- Canvas Note Pointer、Canvas Movement、Snap、全部 Contract 和 Canvas Performance 专项均通过。
+- 1440×900 真实浏览器拖动：Notebook 移动 `48×-32px`，WorkflowPanel 移动 `-52×-24px`；拖动中误差、最终落位误差和松手后漂移均为 0px，临时 Transform 与 `data-dragging` 均已清理。
+- 1280×720、1180×820、1024×720、1023×720 桌面回归无横向溢出、工具条越界、工具条与卡片重叠或工作区 Chrome 重叠。
+- 834×1112、768×1024、430×932、390×844、375×812 手机触控拖动误差约 0.0013px，稳定帧漂移 0px，横向溢出为 0。
+- `architecture:check`、`governance:check`、Web / Architecture / Server / Tests TypeScript 检查、生产 Build、编码检查和 `git diff --check` 均通过。
+
+**未运行验证及原因**
+- 系统环境没有可用的 `npm` 可执行文件，因此未直接运行聚合命令 `npm run verify:changes`；已使用 Bundled Node 与 pnpm 运行本次范围相关的等价检查和专项测试。
+- 本地 API 3001 未启动，浏览器 Smoke 中模型库刷新出现预期的 502；本轮未修改 API、Provider 或真实媒体生成链路。
+- 未部署生产环境；本次范围为本地画布稳定性修复、桌面与手机真实浏览器检查和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。Workflow Utility 为保持连接线实时跟随，拖动中仍按 rAF 更新其既有位置状态，但最终帧现在会同步提交，不再丢失。
+- 后续接入新的辅助卡类型时必须复用 `useTransientCanvasCardDrag`，不得重新引入 Pointer Move 逐帧 React Commit。
