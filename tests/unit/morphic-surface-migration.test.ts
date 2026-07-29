@@ -4,29 +4,32 @@ import { test } from 'node:test';
 import { readSource } from '../support/workspacePaths.js';
 
 test('desktop workspace chrome exposes project, canvas and account with Composer-owned Copilot', () => {
-  const source = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const chromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
-  assert.match(source, /data-chrome-region="project"/);
-  assert.match(source, /data-chrome-region="canvas"/);
-  assert.match(source, /data-chrome-region="account"/);
-  assert.match(source, />\s*画布\s*</);
-  assert.doesNotMatch(source, />\s*Copilot\s*</);
-  assert.doesNotMatch(source, />\s*创作\s*</);
-  assert.match(source, /data-composer-copilot-toggle="true"/);
-  assert.match(source, /onCloseAssistant:\s*\(\) => void/);
-  assert.match(source, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
-  assert.match(source, /onOpenCanvasWorkspace\(\);[\s\S]*focusWorkspaceCanvas\(\)/);
-  assert.match(source, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
-  assert.match(source, /input\[placeholder="搜索历史记录\.\.\."\]/);
+  assert.match(chromeSource, /data-chrome-region="project"/);
+  assert.match(chromeSource, /data-chrome-region="canvas"/);
+  assert.match(chromeSource, /data-chrome-region="account"/);
+  assert.match(chromeSource, />\s*画布\s*</);
+  assert.doesNotMatch(chromeSource, />\s*Copilot\s*</);
+  assert.doesNotMatch(chromeSource, />\s*创作\s*</);
+  assert.doesNotMatch(chromeSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
+  assert.match(workspaceSource, /onToggleAssistant:\s*toggleChatPanel/);
+  assert.match(chromeSource, /onCloseAssistant:\s*\(\) => void/);
+  assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
+  assert.match(chromeSource, /onOpenCanvasWorkspace\(\);[\s\S]*focusWorkspaceCanvas\(\)/);
+  assert.match(chromeSource, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
   assert.match(
-    source,
+    chromeSource,
     /id="desktop-user-menu-panel"[\s\S]*className="[^"]*fixed right-3 top-\[52px\]/,
   );
   assert.doesNotMatch(
-    source,
+    chromeSource,
     /id="desktop-user-menu-panel"[\s\S]*className="[^"]*fixed left-4/,
   );
-  assert.doesNotMatch(source, /frost|clay/i);
+  assert.doesNotMatch(chromeSource, /frost|clay/i);
 });
 
 test('desktop project and workflow panels escape the scroll rail clipping boundary', () => {
@@ -34,7 +37,7 @@ test('desktop project and workflow panels escape the scroll rail clipping bounda
 
   assert.match(source, /ReactDOM\.createPortal\(\s*projectDropdown/);
   assert.match(source, /ReactDOM\.createPortal\(\s*workflowDropdown/);
-  assert.match(source, /kk-morphic-project-panel[\s\S]*top-\[48px\]/);
+  assert.match(source, /kk-morphic-project-panel[\s\S]*top-\[52px\]/);
   assert.match(source, /kk-morphic-workflow-panel/);
   assert.match(source, /aria-label="关闭工作流"/);
 });
@@ -65,6 +68,7 @@ test('landing does not render decorative CSS-art placeholders', () => {
 
 test('responsive stylesheet explicitly guards every required QA viewport', () => {
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+  const workspaceCssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   for (const viewport of [375, 390, 430, 768]) {
     assert.match(
@@ -82,8 +86,8 @@ test('responsive stylesheet explicitly guards every required QA viewport', () =>
     /\.kk-task-center-host:not\(\[data-mobile='true'\]\)\s*\{[\s\S]*--kk-morphic-topbar-height/,
   );
   assert.match(
-    cssSource,
-    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar[\s\S]*left:\s*12px/,
+    workspaceCssSource,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar[\s\S]*right:\s*10px[\s\S]*left:\s*auto[\s\S]*width:\s*min\(420px/,
   );
   assert.match(
     cssSource,

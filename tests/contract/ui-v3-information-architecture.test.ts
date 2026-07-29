@@ -25,15 +25,19 @@ test('mobile result footer reports image count and generation task progress in o
   assert.match(resultFeed, /--mobile-task-progress/);
 });
 
-test('desktop chrome has project, canvas and account regions only and owns the composer Copilot expansion', () => {
+test('desktop chrome has three regions and the composer owns Copilot expansion', () => {
   const chrome = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBar = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const workspacePage = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
   assert.match(chrome, /data-chrome-region="project"/);
   assert.match(chrome, /data-chrome-region="canvas"/);
   assert.match(chrome, /data-chrome-region="account"/);
   assert.match(chrome, /activeCanvas\?\.name \|\| '项目 1'/);
-  assert.match(chrome, /data-composer-copilot-toggle="true"/);
-  assert.match(chrome, /onOpenAssistant/);
+  assert.doesNotMatch(chrome, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBar, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBar, /onToggleAssistant/);
+  assert.match(workspacePage, /onToggleAssistant:\s*toggleChatPanel/);
   assert.match(chrome, /onCloseAssistant/);
   assert.doesNotMatch(chrome, /kk-morphic-mode-switch/);
   assert.doesNotMatch(chrome, />Copilot</);

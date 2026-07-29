@@ -150,18 +150,22 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
                                 宫格(6列)
                             </button>
                             <button 
+                                type="button"
+                                data-canvas-layout-mode="row"
                                 onClick={() => { onArrange('row'); setShowArrangeMenu(false); }} 
                                 className="kk-canvas-selection-menu-row flex items-center gap-2 px-3 py-1.5 text-xs rounded whitespace-nowrap cursor-pointer"
                             >
                                 <Rows size={14} />
-                                横向排列
+                                思维导图
                             </button>
                             <button 
+                                type="button"
+                                data-canvas-layout-mode="column"
                                 onClick={() => { onArrange('column'); setShowArrangeMenu(false); }} 
                                 className="kk-canvas-selection-menu-row flex items-center gap-2 px-3 py-1.5 text-xs rounded whitespace-nowrap cursor-pointer"
                             >
                                 <Columns size={14} />
-                                纵向排列
+                                瀑布式
                             </button>
                         </div>
                     )}

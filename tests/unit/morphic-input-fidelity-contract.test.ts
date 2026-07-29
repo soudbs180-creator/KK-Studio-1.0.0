@@ -116,11 +116,16 @@ test('composer owns workflow and tool entry points without duplicating them in t
   const projectManagerSource = readSource(
     'apps/web/src/components/settings/ProjectManager.tsx',
   );
+  const composerEventsSource = readSource(
+    'apps/web/src/components/layout/prompt-bar/composerEvents.ts',
+  );
 
-  assert.match(promptToolsSource, /KK_OPEN_WORKFLOW_BROWSER_EVENT/);
+  assert.match(promptToolsSource, /requestWorkflowBrowser\(\)/);
   assert.match(promptToolsSource, />工作流</);
   assert.match(promptToolsSource, />工具</);
-  assert.match(projectManagerSource, /KK_OPEN_WORKFLOW_BROWSER_EVENT/);
+  assert.match(projectManagerSource, /subscribeWorkflowBrowser/);
+  assert.match(composerEventsSource, /workflowBrowserRequestPending/);
+  assert.match(composerEventsSource, /queueMicrotask/);
   assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleWorkflowMenu/);
   assert.match(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.toggleTheme/);
   assert.match(projectManagerSource, /data-canvas-theme-toggle="true"/);

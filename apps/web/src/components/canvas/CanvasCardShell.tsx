@@ -2,6 +2,7 @@ import React from 'react';
 import type { CanvasCardPresentation } from '@kk/shared';
 import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile.ts';
 import { getCanvasCardWidth } from '../../canvas/canvasCardMetrics.ts';
+import { getCanvasCardDefinition } from '../../canvas/v3/cardCatalog.ts';
 
 export type CanvasCardPositioning = 'world' | 'origin-transform' | 'flow';
 
@@ -41,6 +42,7 @@ export const CanvasCardShell = React.forwardRef<HTMLDivElement, CanvasCardShellP
   ...elementProps
 }, ref) => {
   const width = widthOverride ?? getCanvasCardWidth(presentation);
+  const definition = getCanvasCardDefinition(presentation.kind);
   const isGhost = detailLevel === 'ghost' || detailLevel === 'skeleton' || detailLevel === 'thumbnail-shell';
   const positionStyle: React.CSSProperties = positioning === 'flow'
     ? { position: 'relative' }
@@ -67,10 +69,12 @@ export const CanvasCardShell = React.forwardRef<HTMLDivElement, CanvasCardShellP
       id={domId || `canvas-card-${id}`}
       data-card-id={id}
       data-card-kind={presentation.kind}
+      data-card-family={definition.family}
+      data-card-density="stable"
       data-layout-mode={presentation.layoutMode}
       data-card-size={presentation.size}
       data-detail-level={detailLevel}
-      aria-label={elementProps['aria-label'] || (presentation.kind === 'unknown' ? 'Unknown canvas card' : undefined)}
+      aria-label={elementProps['aria-label'] || definition.label}
       className={`canvas-card-shell ${surfaceClassName} ${className}`}
       style={{
         ...positionStyle,

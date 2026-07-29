@@ -374,12 +374,18 @@ async function verifyComposerCopilotToggle(cdp) {
     cdp,
     `(() => {
       const sidebarRect = document.querySelector('.kk-workspace-sidebar')?.getBoundingClientRect();
+      const canvasRect = document.querySelector('.canvas-container')?.getBoundingClientRect();
+      const edgeToggleRect = document.querySelector('.kk-workspace-sidebar > .kk-workspace-edge-toggle')?.getBoundingClientRect();
       const centerComposerRect = document.querySelector('#prompt-bar-container[data-composer-layout="desktop"]')?.getBoundingClientRect();
       const chatComposerRect = document.querySelector('.kk-chat-sidebar-composer')?.getBoundingClientRect();
       const navigationRect = document.querySelector('.desktop-navigation-panel')?.getBoundingClientRect();
       return {
         workspaceMode: document.body.dataset.kkWorkspaceMode,
         sidebarVisible: !!sidebarRect && sidebarRect.width > 0 && sidebarRect.height > 0,
+        sidebarWidth: sidebarRect?.width || 0,
+        sidebarRightInset: sidebarRect ? window.innerWidth - sidebarRect.right : null,
+        canvasVisible: !!canvasRect && canvasRect.width > 0 && canvasRect.height > 0,
+        edgeToggleVisible: !!edgeToggleRect && edgeToggleRect.width > 0 && edgeToggleRect.height > 0,
         centerComposerVisible: !!centerComposerRect && centerComposerRect.width > 0 && centerComposerRect.height > 0,
         chatComposerVisible: !!chatComposerRect && chatComposerRect.width > 0 && chatComposerRect.height > 0,
         navigationVisible: !!navigationRect && navigationRect.width > 0 && navigationRect.height > 0,
@@ -388,17 +394,65 @@ async function verifyComposerCopilotToggle(cdp) {
       };
     })()`,
   );
+  const expandedScreenshot = await cdp.send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+  });
+  const expandedScreenshotPath = path.join(artifactDir, "1440x900-copilot.png");
+  writeFileSync(expandedScreenshotPath, Buffer.from(expandedScreenshot.data, "base64"));
   const closed = await evaluate(
     cdp,
     `(() => {
-      const toggle = document.querySelector('[data-composer-copilot-toggle="true"]');
+      const toggle = document.querySelector('.kk-workspace-sidebar > .kk-workspace-edge-toggle');
       toggle?.click();
       return !!toggle;
     })()`,
   );
   await wait(350);
   const restoredMode = await evaluate(cdp, `document.body.dataset.kkWorkspaceMode`);
-  return { collapsedNavigation, opened, expanded, closed, restoredMode };
+  return {
+    collapsedNavigation,
+    opened,
+    expanded,
+    expandedScreenshotPath,
+    closed,
+    restoredMode,
+  };
+}
+
+async function verifyWorkflowBrowser(cdp) {
+  const opened = await evaluate(
+    cdp,
+    `(() => {
+      const trigger = document.querySelector('.kk-composer-prompt-tools__workflow');
+      trigger?.click();
+      return !!trigger;
+    })()`,
+  );
+  await wait(250);
+  const dialog = await evaluate(
+    cdp,
+    `(() => {
+      const panel = document.querySelector('.kk-morphic-workflow-panel');
+      const rect = panel?.getBoundingClientRect();
+      return {
+        visible: !!rect && rect.width > 0 && rect.height > 0,
+        title: panel?.querySelector('#workflow-browser-title')?.textContent?.trim() || '',
+        hasSearch: !!panel?.querySelector('input[type="search"]'),
+        categoryCount: panel?.querySelectorAll('[data-workflow-category]').length || 0,
+      };
+    })()`,
+  );
+  const closed = await evaluate(
+    cdp,
+    `(() => {
+      const closeButton = document.querySelector('.kk-morphic-workflow-panel__close');
+      closeButton?.click();
+      return !!closeButton;
+    })()`,
+  );
+  await wait(150);
+  return { opened, dialog, closed };
 }
 
 async function verifyCanvasNavigationExpansion(cdp) {
@@ -549,6 +603,7 @@ try {
     await wait(500);
     let desktopAuxiliaryDrags = null;
     let copilotToggleFlow = null;
+    let workflowBrowserFlow = null;
     if (viewport.surface === "canvas") {
       if (viewport.width === 1440) {
         desktopAuxiliaryDrags = {
@@ -563,6 +618,7 @@ try {
             { x: -52, y: -24 },
           ),
         };
+        workflowBrowserFlow = await verifyWorkflowBrowser(cdp);
         const canvasNavigationExpansion = await verifyCanvasNavigationExpansion(cdp);
         copilotToggleFlow = await verifyComposerCopilotToggle(cdp);
         copilotToggleFlow.canvasNavigationExpansion = canvasNavigationExpansion;
@@ -663,6 +719,7 @@ try {
         composerCopilotToggleVisible: !!composerCopilotToggleRect
           && composerCopilotToggleRect.width > 0
           && composerCopilotToggleRect.height > 0,
+        composerCopilotToggleInside: !!composer?.contains(composerCopilotToggle),
         composerHeight: composerRect?.height || 0,
         railWidth: railRect?.width || 0,
         cardCount: document.querySelectorAll('[data-card-kind]').length,
@@ -682,6 +739,7 @@ try {
     );
     metrics.desktopAuxiliaryDrags = desktopAuxiliaryDrags;
     metrics.copilotToggleFlow = copilotToggleFlow;
+    metrics.workflowBrowserFlow = workflowBrowserFlow;
     const screenshot = await cdp.send("Page.captureScreenshot", {
       format: "png",
       captureBeyondViewport: false,
@@ -705,9 +763,26 @@ try {
         throw new Error(
           `${viewport.width}x${viewport.height} rail width=${metrics.railWidth}`,
         );
-      if (metrics.chromeRegionCount !== 3 || !metrics.composerCopilotToggleVisible)
+      if (
+        metrics.chromeRegionCount !== 3
+        || !metrics.composerCopilotToggleVisible
+        || !metrics.composerCopilotToggleInside
+      )
         throw new Error(
           `${viewport.width}x${viewport.height} desktop V3 chrome is incomplete`,
+        );
+      if (
+        workflowBrowserFlow
+        && (
+          !workflowBrowserFlow.opened
+          || !workflowBrowserFlow.dialog.visible
+          || !workflowBrowserFlow.dialog.hasSearch
+          || workflowBrowserFlow.dialog.categoryCount !== 3
+          || !workflowBrowserFlow.closed
+        )
+      )
+        throw new Error(
+          `${viewport.width}x${viewport.height} workflow browser did not open from Composer`,
         );
       if (
         copilotToggleFlow
@@ -716,6 +791,10 @@ try {
           || !copilotToggleFlow.closed
           || copilotToggleFlow.expanded.workspaceMode !== "copilot"
           || !copilotToggleFlow.expanded.sidebarVisible
+          || Math.abs(copilotToggleFlow.expanded.sidebarWidth - 420) > 1
+          || Math.abs(copilotToggleFlow.expanded.sidebarRightInset - 10) > 1
+          || !copilotToggleFlow.expanded.canvasVisible
+          || !copilotToggleFlow.expanded.edgeToggleVisible
           || copilotToggleFlow.expanded.centerComposerVisible
           || !copilotToggleFlow.expanded.chatComposerVisible
           || !copilotToggleFlow.expanded.navigationVisible

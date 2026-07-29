@@ -117,6 +117,47 @@ No new P0, P1 or P2 finding remains after the workflow-browser comparison.
 
 final result: passed
 
+## Canvas card and Companion Copilot pass — 2026-07-30
+
+### Scope
+
+- Kept the Canvas visible while the existing AI Assistant Runtime opens as a right-side Companion Panel.
+- Moved the Copilot expand action inside the Composer, directly after the send action.
+- Unified creative type, workflow, tools, model, parameters, count and secondary switches under one Composer control language.
+- Catalogued every persisted card kind and fixed normal-project cards to one stable visual presentation during Canvas transforms.
+- Added explicit Mind Map (rightward) and Waterfall (downward) arrangement semantics to the selection and Tools menus.
+- Repaired the Composer workflow trigger so it opens the existing workflow browser without changing workflow business logic.
+
+### Browser evidence and geometry
+
+| State | Evidence / measurement | Result |
+|---|---:|---|
+| Canvas default | `temp/playwright/canvas-responsive-cdp/1440x900.png` | passed |
+| Companion Copilot | `temp/playwright/canvas-responsive-cdp/1440x900-copilot.png` | passed |
+| Mobile result flow | `temp/playwright/canvas-responsive-cdp/390x844.png` | passed |
+| Companion Panel | `420px` wide, `right=10px`, Canvas remains visible | passed |
+| Composer Copilot action | inside Composer, directly after send | passed |
+| Canvas navigation avoidance | `right=10px` closed, `right=430px` open | passed |
+| Workflow browser | opens from Composer; search and three categories visible | passed |
+| Desktop range | 1440 / 1280 / 1180 / 1024 / 1023px, zero horizontal overflow | passed |
+| Mobile range | 834 / 768 / 430 / 390 / 375px, no persistent four-button bar | passed |
+
+### Findings and resolutions
+
+| Priority | Finding | Resolution |
+|---|---|---|
+| P1 | Expanding the input replaced the Canvas with a separate assistant page | The existing Assistant Runtime now opens in a 420px right Companion Panel while the Canvas remains mounted and visible |
+| P1 | The Copilot expand action was outside the Composer | Send and expand actions now share the Composer footer and stable 30px geometry |
+| P1 | Workflow requests could be lost before the project manager listener mounted | The shared request channel now buffers one pending request and consumes it after subscription |
+| P1 | Normal zoom/pan could switch cards into alternate visual shells | Normal projects retain one stable card density; large-scene LOD remains performance-gated |
+| P1 | Arrangement labels did not explain connection direction | Mind Map is rightward with right-to-left ports; Waterfall is downward with bottom-to-top ports |
+| P2 | Model, parameters, count and toggles retained mixed legacy surfaces | All Composer configuration and secondary menus now consume the same control, panel, spacing and motion rules |
+| P2 | Project panel touched the top bar | The panel now starts at `top=52px`, preserving a 4px gap and left-rail alignment |
+
+All new P0, P1 and P2 findings are resolved. Card layout changes remain UI-only and continue to use the existing arrangement callback, position persistence, edge layer, Assistant Runtime and workflow browser.
+
+final result: passed
+
 ## Canvas navigation consolidation pass — 2026-07-30
 
 ### Current ownership

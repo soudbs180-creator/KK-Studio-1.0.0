@@ -66,6 +66,7 @@ test('project rail stays at the leading edge while its content panel opens besid
 
 test('workspace modes are controlled by the real surface and hidden panels are inert', () => {
   const chromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const workspacePageSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const panelsSource = readSource(
     'apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx',
@@ -74,7 +75,9 @@ test('workspace modes are controlled by the real surface and hidden panels are i
   assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
   assert.doesNotMatch(chromeSource, /useState<'canvas'\s*\|\s*'copilot'\s*\|\s*'create'>/);
   assert.match(chromeSource, /onOpenCanvasWorkspace\(\)/);
-  assert.match(chromeSource, /data-composer-copilot-toggle="true"/);
+  assert.doesNotMatch(chromeSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
+  assert.match(workspacePageSource, /onToggleAssistant:\s*toggleChatPanel/);
   assert.doesNotMatch(chromeSource, />Copilot</);
   assert.doesNotMatch(chromeSource, />创作</);
   assert.match(

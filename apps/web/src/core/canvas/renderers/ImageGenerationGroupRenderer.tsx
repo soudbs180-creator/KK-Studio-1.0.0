@@ -25,7 +25,6 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
   selectedNodeIds,
   highlightedIdVal,
   snapToGrid,
-  isCanvasTransforming,
   nowTimestamp,
   ecommerceFrameworkTaskNodesById,
   handlePromptGroupChildDragCommit,
@@ -84,7 +83,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
       onConnectStart={handleConnectStart}
       zoomScale={zoomScale}
       snapToGrid={snapToGrid}
-      isCanvasTransforming={isCanvasTransforming}
+      isCanvasTransforming={false}
       isMobile={isMobile}
       sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
       ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
@@ -220,7 +219,7 @@ export const ImageGenerationGroupRenderer: React.FC<CanvasCardRenderContext> = (
             onLivePositionChange={handleLiveNodePositionChange}
             onHeightChange={handleImageCardHeightChange}
             isVisible={true}
-            isCanvasTransforming={isCanvasTransforming}
+            isCanvasTransforming={false}
             highlighted={highlightedIdVal === childLayout.childNode.id || isGroupFocused}
             isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
             onSelect={() => handlePromptGroupNodeSelect(node.id, childLayout.childNode.id)}

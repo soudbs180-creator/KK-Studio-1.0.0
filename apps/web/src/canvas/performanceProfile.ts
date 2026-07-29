@@ -242,7 +242,7 @@ export const getCanvasPerformanceProfile = (
   const isInteracting = interactionPhase !== 'idle';
 
   let cardDetailLevel: CanvasCardDetailLevel = 'full';
-  if (zoomBand === 'tiny') {
+  if (projectSize !== 'normal' && zoomBand === 'tiny') {
     cardDetailLevel = 'thumbnail-shell';
   } else if (projectSize !== 'normal' && zoomBand === 'mid') {
     cardDetailLevel = 'compact';

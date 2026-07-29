@@ -5636,7 +5636,7 @@ const isRectIntersecting = (
               onOpenProfile={openProfileSurface}
               onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
               onSignOut={() => { void signOut(); }}
-              onOpenAssistant={() => setIsChatOpen(true)} onCloseAssistant={() => setIsChatOpen(false)}
+              onCloseAssistant={() => setIsChatOpen(false)}
               onOpenCanvasWorkspace={focusWorkspace}
               onOpenCreateWorkspace={openLibrarySurface}
               onOpenCommandPalette={() => setIsSearchOpen(true)}
@@ -6176,7 +6176,9 @@ const isRectIntersecting = (
           promptBarProps={{
             ...desktopPromptBarProps,
             isChatOpen,
-            chatSidebarWidth
+            chatSidebarWidth,
+            onToggleAssistant: toggleChatPanel,
+            onArrangeCanvas: arrangeAllNodes,
           }}
         />
       )}

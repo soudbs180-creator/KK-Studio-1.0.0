@@ -128,21 +128,20 @@
 ### 5.1 桌面
 
 ```text
-┌──────────────────────────── 48px Top bar ────────────────────────────┐
-│ KK Studio        [ 画布 | Copilot | 创作 ]             Credits/User │
-├───────────────┬──────────────────────────────────────────────────────┤
-│ 262px panel   │                                                      │
-│ inset 12px    │                 Canvas / Copilot / Create            │
-│ radius 14px   │                                                      │
-│               │                  570px Composer                      │
-└───────────────┴──────────────────────────────────────────────────────┘
+┌──────────────────────────── 48px Top bar ─────────────────────────────┐
+│ 项目 1                         画布              Avatar/Credits/设置 │
+├──────┬───────────────┬───────────────────────────────────────────────┤
+│ Rail │ Project panel │                    Canvas                     │
+│ 38px │ 262px         │                                               │
+│ x=12 │ x=50          │                570px Composer                 │
+└──────┴───────────────┴───────────────────────────────────────────────┘
 ```
 
-- 顶栏固定 48px，分段切换视觉居中。
+- 顶栏固定 48px，采用“项目 / 画布 / 账户”三列结构；“画布”严格按视口居中。
 - Canvas 不因面板出现而改变坐标系；浮动面板覆盖在舞台上。
-- 左面板距左 12px，底部 10px，宽 262px。
+- 左侧一级轨道距左 12px、垂直居中；项目面板从轨道右侧 `x=50px` 展开，宽 262px。
 - Composer 水平居中，底部 10px，最大宽 570px。
-- 打开 Copilot 时复用现有 Chat/Agent Runtime，不创建平行助手。
+- 打开 Copilot 时复用现有 Chat/Agent Runtime，在右侧显示 420px Companion Panel，不跳转页面、不创建平行助手。
 
 ### 5.2 移动
 
@@ -150,6 +149,7 @@
 - Composer 左右 8px，底部 `env(safe-area-inset-bottom) + 8px`。
 - 抽屉宽度 `min(88vw, 320px)`。
 - 工作流、设置、资产和复杂选择器优先使用 `KkSheet`。
+- 手机默认是轻量结果流，不显示或预留常驻四按钮底栏；账户与次级能力从顶部菜单、结果卡或上下文操作进入。
 - 375、390、430、768px 都必须无横向滚动、按钮裁切或输入遮挡。
 - 软键盘打开时 Composer 保持可见，结果流允许独立滚动。
 
@@ -227,15 +227,15 @@
 |---|---|---|
 | 公开首页 | 48px 黑色导航、黑色点阵 Hero、紧凑能力分区 | Header、Primary Button、Panel |
 | 登录/注册 | 遮罩 + 412px Dialog | Input、Button、Modal |
-| Canvas | Top bar + 左浮动 Panel + Canvas + Composer | Surface、Tabs、Composer |
-| Copilot | Top bar + 会话 Panel + 对话区 + Composer | Surface、Tabs、Composer |
+| Canvas | Top bar + 左侧 Rail/Panel + Canvas + Composer | Surface、Composer、Canvas Navigation |
+| Copilot | Canvas + 右侧 420px Companion Panel + 对话区 + 内部 Composer | Surface、Sheet、Composer |
 | 创作 | Top bar + 资产 Panel + 生成工作区 | Surface、Tabs、Dropdown |
 | 资产/收藏/历史 | 262px Panel + Tabs + 列表 | Surface、Tabs、Tooltip |
 | 工作流/工具 | Dialog/Sheet + 搜索 + 分类 + 网格 | Modal、Sheet、Input、Tabs |
 | 设置 | 左导航 + 主内容 | Surface、Tabs、Input、Select |
 | 个人中心/充值 | Dialog 或设置主区 | Modal、Button、表单 |
 | 管理后台 | 高密度侧栏 + 表格/筛选/统计 | Surface、Tabs、Dropdown |
-| 移动工作区 | 安全区 Header + Feed + Composer + Bottom Nav | Sheet、Composer、Tabs |
+| 移动工作区 | 安全区 Header + 结果 Feed + 任务状态 + Composer | Sheet、Composer、Result Card |
 
 ## 9. 响应式验收矩阵
 
@@ -357,28 +357,24 @@ Hover 只改变边界。Selected 使用主操作色边界和低透明外环，�
 
 每个候选都必须检测未选中 Prompt、Image 与 Workflow 卡片。右侧存在相邻卡片时，候选先沿水平方向越过阻挡卡片，再验证视口；不得覆盖卡片内容。移动端不使用悬浮侧工具栏，统一转为安全区上方的 Bottom Sheet Inspector。
 
-## 17. 移动 Canvas V3
+## 17. 移动工作区与兼容 Canvas V3
 
 ### 17.1 信息架构
 
-底部四个主入口固定为：
-
-1. 创作；
-2. 画布；
-3. Copilot；
-4. 资源。
-
-账户通过顶部头像进入。`library / chat / me` 旧值继续兼容读取，并分别归一到 `assets / copilot / create`。
+- 手机工作区不显示常驻四按钮导航，也不为旧底栏保留高度。
+- 默认只挂载轻量结果流、任务状态和必要 Composer；账户通过顶部头像进入。
+- `library / chat / me / canvas` 等旧状态继续兼容读取，但不得据此重新挂载可见的持久底栏。
+- 完整触控 Canvas 作为兼容能力保留，只能由明确的上下文入口按需挂载，不得成为手机默认 DOM 负担。
 
 ### 17.2 触控与布局
 
-- 创作默认使用结果优先流；画布在同一 Workspace 内切换。
+- 创作默认使用结果优先流；需要完整画布时在同一 Workspace 内按需切换，不新增生产路由。
 - 画布空白区域单指平移，卡片单指拖动并在释放时写回现有位置 API。
 - 移动画布在同一画布挂载周期内保持固定场景原点；节点写回后不得重新按最小坐标归一化整个场景。
 - 双指围绕触点中点同时缩放和平移；变换由 `requestAnimationFrame` 合并。
 - 卡片轻触选中；检查器显示在 Bottom Navigation 上方，二者间不得重叠。
 - 连接必须先进入显式连接模式，再轻触目标卡片。
-- Composer 默认折叠为“输入提示词”按钮；展开后位于 Bottom Navigation 与安全区上方。
+- Composer 默认折叠为“输入提示词”按钮；展开后位于安全区上方，不得被任务状态或 Inspector 遮挡。
 - 手机默认以 `0.72` 可读缩放聚焦首个 Prompt；平板默认以 `1.0` 展示完整卡片；“适应画布”允许进入低缩放概览。
 - 任务中心折叠入口固定在顶部 Chrome 下方，不得覆盖 Composer、Inspector 或 Bottom Navigation。
 
@@ -386,11 +382,11 @@ Hover 只改变边界。Selected 使用主操作色边界和低透明外环，�
 
 | 视口 | 必须满足 |
 |---:|---|
-| 375×812 | 主 Prompt 完整可见；输入入口与导航至少 10px 间隔 |
-| 390×844 | Inspector 与导航不重叠；全部触控目标至少 44px |
+| 375×812 | 结果卡和任务状态完整可见；Composer 与安全区至少保留 8px |
+| 390×844 | Inspector 与 Composer 不重叠；全部触控目标至少 44px |
 | 430×932 | 无横向页面溢出；安全区和主要文案完整 |
-| 768×1024 | 使用移动四入口与完整触控画布 |
-| 834×1112 | 使用平板 1.0 卡片档，不回退到桌面悬浮 Rail |
+| 768×1024 | 使用轻量结果流；完整触控画布仅按需挂载 |
+| 834×1112 | 使用平板结果流；进入兼容画布后使用 1.0 卡片档 |
 
 所有视口必须满足 `scrollWidth <= innerWidth`。画布世界可平移超出屏幕，但页面自身不得产生横向滚动条。
 
@@ -411,10 +407,10 @@ Hover 只改变边界。Selected 使用主操作色边界和低透明外环，�
 - Canvas Composer 标准态固定为 `570×94px`、距底 `10px`；其业务模式数量可以多于参考站，但不得改变外壳几何。
 - Canvas 导航默认折叠为右下角 `156×32px` 胶囊，`right=10px`、`bottom=10px`；展开后保持同一底边与右边锚点，只允许面板向上生长。
 - Composer 展开 Copilot 后，Canvas 导航整体使用 `right=chatSidebarWidth+10px` 向左避让；小地图、缩放与画布视图操作不得分开移动或被隐藏。
-- Canvas 与创作模式不显示独立的 AI 侧栏拉手，统一通过顶部三段式切换进入 Copilot，避免重复入口破坏舞台边缘。
-- Copilot 左栏固定 `262px`；顶部操作区为 `46px`，搜索/历史控制区为 `28px`。全屏 Copilot 隐藏上下文摘要行和多余快捷操作，但不删除其在其它助手 Surface 中的业务能力。
-- Copilot Composer 标准态为 `968×94px`，位于 `x=294px`、`bottom=10px`（1280×720 基准视口）。
-- 顶栏左侧顺序为品牌、全局搜索、工作区/项目上下文；AI 入口不与中央 Copilot 切换重复。
+- Canvas 不显示独立的 AI 侧栏拉手；Copilot 的唯一工作区入口位于 Composer 发送键右侧，并处于 Composer 外框内部。
+- Copilot 作为右侧 420px Companion Panel 展开，保持 Canvas 可见；面板使用 `top=48px`、`right=10px`、`bottom=10px`。
+- Companion Panel 内的聊天记录与 Composer 必须复用现有 Assistant Runtime；关闭时恢复中央 Composer，不导航到其它页面。
+- 顶栏左侧只显示项目上下文；AI 入口不与 Composer 内的 Copilot 开关重复。
 - 同视口视觉验收必须把本地截图放在左侧、参考截图放在右侧，组合成单张比较图后再判断差异。
 
 ## 14. 工作流浏览器精确规范
@@ -602,3 +598,81 @@ Hover 只改变边界。Selected 使用主操作色边界和低透明外环，�
 - 浏览器回归必须点击 Composer AI 展开键，并验证中央 Composer 隐藏、右侧聊天记录和输入框可见、
   收起后恢复 Canvas。
 - 设置页必须同时运行桌面和手机 Smoke，并保留 Overview、Model Center、直接路由与工作区弹层截图。
+
+## 23. Canvas 卡片、排列与 Companion Copilot V4
+
+本节是 Canvas 卡片呈现、排列方向、Composer 二级控件和右侧 Copilot 的当前唯一规范；与前文历史
+描述冲突时以本节为准。
+
+### 23.1 卡片目录
+
+`apps/web/src/canvas/v3/cardCatalog.ts` 是持久化卡片类型到 UI 家族的唯一目录。所有卡片共享
+`CanvasCardShell` 的 Header、Body、Footer、状态与留白，不得在 Renderer 内重建平行外壳。
+
+| 持久化 Kind | UI 家族 | 默认尺寸 | 主内容 | Footer |
+|---|---|---:|---|---|
+| `prompt-result-group` | Prompt 与结果组 | 320px | 提示词、生成状态、关联结果 | 模型、模式、结果数 |
+| `prompt-only` | Prompt | 320px | 提示词摘要与运行反馈 | 模型、规格、消耗 |
+| `media-only` | Image / Video | 280px | 主媒体或 Poster | 模型、尺寸、时长 |
+| `ecommerce` | Ecommerce | 420px | 商品任务与当前阶段 | 输出数、规格、状态 |
+| `ppt-deck` | PPT / Storyboard | 420px | 封面、页数或镜头完成度 | 版本、页数、状态 |
+| `audio` | Audio / Music | 320px | 波形、时长、风格 | 模型、时长、状态 |
+| `text` | Text | 320px | 正文摘要 | 字数、来源、状态 |
+| `notebook` | Notebook | 320px | 笔记与上下文 | 修改时间、来源 |
+| `multi-image` | Multi Image | 420px | 多图引用与顺序 | 图片数、规格、状态 |
+| `workflow-panel` | Workflow / Agent | 420px | 目标、步骤与执行状态 | 类型、输出、状态 |
+| 未识别 Kind | Unknown | 320px | 可诊断的降级说明 | 原始类型、状态 |
+
+- Pending、Running、Success、Error 是卡片状态，不是另一套卡片外观；状态变化不得改变卡片宽度、
+  圆角、Header/Footer 几何或主内容槽位。
+- 普通项目在画布缩放时保持固定卡片 DOM 与视觉密度，不因 Pan/Zoom 临时切换 Skeleton、
+  Thumbnail 或另一套样式；只有 large/huge 场景可以按性能档进入既定 LOD。
+- Hover、Selected、Dragging、Canvas Transforming 只改变边界、Focus Ring、光标或必要透明度，
+  不得替换卡片内容、重新测量固定槽位或触发位置归一化。
+
+### 23.2 两种排列模式与端口
+
+| 排列模式 | UI 命名 | 主方向 | 父卡端口 | 子卡端口 | 适用场景 |
+|---|---|---|---|---|---|
+| `row` | 思维导图 | 向右 | 右侧 | 左侧 | 主题分支、知识结构、横向工作流 |
+| `column` | 瀑布式 | 向下 | 底部 | 顶部 | 生成步骤、任务阶段、纵向结果链 |
+| `grid` | 网格整理 | 行列自适应 | 保留当前语义 | 保留当前语义 | 无父子关系的批量整理 |
+
+- 选择菜单和 Composer“工具”菜单必须使用同一 `onArrangeCanvas` 业务回调，不维护第二套排列状态。
+- 右键卡片或框选后的上下文菜单提供“思维导图 / 瀑布式”；Composer 工具菜单提供相同入口，
+  便于在未选中和已选中场景使用。
+- 排列完成后，`CanvasEdgeLayer` 根据排列模式选择对应端口；实线贝塞尔曲线、命中区和选中状态
+  继续使用共享 Edge 契约。
+- 排列只写回现有卡片位置，不修改父子关系、Canvas DTO、生成链路或持久化格式。
+
+### 23.3 Composer 内部控件
+
+- 创作类型、工作流、工具、模型、参数、张数、业务开关、发送和 Copilot 展开都必须位于
+  Composer 外框内部；禁止把发送或展开按钮悬挂在外框之外。
+- 模型、参数、张数与开关统一使用 `kk-composer-config-control`：30px 桌面高度、8px 圆角、
+  12px Button 字级、16px Button 图标、13px Assist Chevron、6px 内容间距。
+- 二级菜单统一使用 Panel 背景、14px 圆角、8px 内边距、弱边界和内容自适应高度；不得混入旧
+  Frost/Clay、装饰渐变、厚阴影或任意缩放动效。
+- 发送键为稳定的 `30×30px` 圆形主操作，Disabled、Ready 与 Sending 状态保持相同几何。
+- Copilot 展开键位于发送键右侧、间距 7px；点击只切换右侧 Companion Panel，不触发路由变化。
+- 工作流触发必须同时支持已挂载订阅与挂载前短暂请求；打开后继续使用现有搜索、分类、模板和
+  关闭回调，不改变工作流业务逻辑。
+
+### 23.4 右侧 Companion Copilot
+
+- 桌面面板固定为 `width=420px`、`top=48px`、`right=10px`、`bottom=10px`、`radius=14px`。
+- 面板内从上到下只有 Header、可滚动聊天记录、Composer 三个主槽位；空内容不得撑出额外卡片。
+- 面板展开时中央 Composer 隐藏，Canvas 保持可见；右下地图、缩放和画布操作整体移动到
+  `right=430px`，不得被面板覆盖。
+- 面板关闭后 Canvas 导航回到 `right=10px`，中央 Composer 恢复；切换过程中卡片坐标、缩放和
+  选择状态保持不变。
+- 项目面板位于 `x=50px`、`top=52px`，与 48px 顶栏保持 4px 间隙，并与 38px 左轨道保留
+  8px 水平间隙。
+
+### 23.5 验收
+
+- 浏览器回归必须验证：展开键在 Composer 内、Companion Panel 为 420px、Canvas 仍可见、
+  中央 Composer 隐藏、右下导航从 10px 移到 430px、关闭后全部恢复。
+- 工作流回归必须从 Composer 点击打开，验证搜索框、分类、模板和关闭。
+- 卡片拖动回归必须记录 Pointer Up、稳定帧与视图变换后的坐标；任一卡片漂移不得超过 1px。
+- 1440/1280/1180/1024/1023px 桌面与 834/768/430/390/375px 手机均不得产生页面横向溢出。

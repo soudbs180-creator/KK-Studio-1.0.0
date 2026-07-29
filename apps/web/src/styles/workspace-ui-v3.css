@@ -201,35 +201,6 @@
   font-weight: 600;
 }
 
-.kk-composer-copilot-toggle {
-  position: fixed;
-  bottom: 17px;
-  left: calc(50% + 292px);
-  z-index: var(--kk-layer-workspace-chrome, 100);
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  color: var(--text-secondary);
-  border: 1px solid var(--kk-morphic-border);
-  border-radius: var(--kk-morphic-radius-control);
-  background: var(--kk-morphic-control);
-  transition:
-    left var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
-    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
-    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
-}
-
-.kk-composer-copilot-toggle:hover,
-.kk-composer-copilot-toggle[data-state='expanded'] {
-  color: var(--text-primary);
-  background: var(--kk-color-selected);
-}
-
-body[data-kk-workspace-mode='copilot'] .kk-composer-copilot-toggle {
-  left: calc(50% + 82px);
-}
-
 .desktop-navigation-panel {
   top: auto !important;
   right: var(--kk-canvas-navigation-right, 10px) !important;
@@ -253,6 +224,93 @@ body[data-kk-workspace-mode='copilot'] .kk-composer-copilot-toggle {
 
 body[data-kk-workspace-mode='copilot'] .desktop-navigation-panel {
   display: block !important;
+}
+
+/*
+ * Copilot is a companion panel, not a destination page. Morphic's earlier
+ * full-stage composition is deliberately reset here so the live Canvas stays
+ * visible and every assistant control remains collected on the right.
+ */
+body[data-kk-workspace-mode='copilot'] #project-manager-container {
+  display: flex !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-morphic-project-panel {
+  display: flex !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar {
+  top: 48px !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  left: auto !important;
+  width: min(420px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  border: 1px solid var(--kk-morphic-border) !important;
+  border-radius: 14px !important;
+  background: var(--kk-morphic-panel) !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .kk-workspace-edge-toggle {
+  display: flex !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > div:nth-child(2) {
+  display: block !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full {
+  display: flex !important;
+  min-width: 0;
+  flex-direction: column;
+  grid-template-columns: none !important;
+  grid-template-rows: none !important;
+  background: var(--kk-morphic-panel);
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) {
+  display: flex !important;
+  width: 100%;
+  min-height: 46px;
+  height: auto !important;
+  flex: 0 0 auto;
+  overflow: visible;
+  border: 0 !important;
+  border-bottom: 1px solid var(--kk-morphic-border) !important;
+  border-radius: 0;
+  background: var(--kk-morphic-panel);
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(1) > :nth-child(1) {
+  min-height: 46px;
+  height: auto;
+  padding: 6px 12px !important;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) {
+  display: block !important;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 12px !important;
+  background: var(--kk-morphic-panel);
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child {
+  margin-top: 0;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(2) > .group:first-child > :first-child {
+  display: flex;
+}
+
+body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > :nth-child(3) {
+  display: block !important;
+  width: auto;
+  margin: 0;
+  padding: 0 12px 12px !important;
+  flex: 0 0 auto;
+  background: var(--kk-morphic-panel);
 }
 
 .desktop-navigation-panel .canvas-nav-panel {
@@ -289,6 +347,174 @@ body[data-kk-workspace-mode='copilot'] .desktop-navigation-panel {
 .kk-canvas-navigation-actions .kk-workspace-icon-control:hover {
   color: var(--text-primary);
   background: var(--kk-morphic-control-hover);
+}
+
+.kk-composer-assistant-toggle {
+  display: grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  place-items: center;
+  padding: 0;
+  color: var(--text-secondary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 8px;
+  background: var(--kk-morphic-control);
+  transition:
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.kk-composer-assistant-toggle:hover,
+.kk-composer-assistant-toggle[data-state='expanded'] {
+  color: var(--text-primary);
+  border-color: var(--kk-morphic-border-strong);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-composer-assistant-toggle svg {
+  width: var(--kk-icon-button);
+  height: var(--kk-icon-button);
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-send {
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  color: var(--text-primary) !important;
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: var(--kk-morphic-action) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-send:disabled {
+  color: var(--text-disabled) !important;
+  background: var(--kk-morphic-control) !important;
+  opacity: 1;
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-content {
+  display: none;
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-icon {
+  width: 30px !important;
+  height: 30px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-icon svg {
+  width: 16px;
+  height: 16px;
+  animation: none !important;
+}
+
+.kk-composer-prompt-tools__menu {
+  width: 280px !important;
+}
+
+.kk-composer-layout-tools__label {
+  display: block;
+  padding: 6px 10px 4px;
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  font-weight: 500;
+}
+
+.kk-composer-layout-tools__item {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.kk-composer-layout-tools__item:hover {
+  color: var(--text-primary);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-composer-layout-tools__item > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.kk-composer-layout-tools__item strong {
+  color: var(--text-primary);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.kk-composer-layout-tools__item small {
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  line-height: 14px;
+}
+
+:is(
+  .kk-composer-prompt-tools__menu,
+  .kk-prompt-bar-deep-count-popover,
+  .kk-prompt-bar-deep-model-search,
+  .kk-prompt-bar-deep-model-list,
+  .kk-prompt-bar-deep-audio-panel,
+  .kk-prompt-bar-deep-context-menu,
+  .kk-prompt-bar-deep-modal-panel
+) {
+  border: 1px solid var(--kk-morphic-border) !important;
+  border-radius: 14px !important;
+  background: var(--kk-morphic-panel) !important;
+  box-shadow: var(--kk-morphic-dialog-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+:is(
+  .kk-prompt-bar-deep-model-item,
+  .kk-prompt-bar-deep-provider-row,
+  .kk-prompt-bar-deep-menu-item,
+  .kk-prompt-bar-deep-audio-option
+) {
+  min-height: 36px;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition:
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard) !important;
+}
+
+:is(
+  .kk-prompt-bar-deep-model-item,
+  .kk-prompt-bar-deep-provider-row,
+  .kk-prompt-bar-deep-menu-item,
+  .kk-prompt-bar-deep-audio-option
+):hover {
+  background: var(--kk-morphic-control-hover) !important;
+}
+
+.kk-prompt-bar-deep-field,
+.kk-prompt-bar-deep-model-search-input {
+  min-height: 36px;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--kk-morphic-border) !important;
+  border-radius: 8px !important;
+  background: var(--kk-morphic-control) !important;
+  box-shadow: none !important;
 }
 
 @keyframes kk-canvas-navigation-open {
@@ -331,8 +557,7 @@ body[data-kk-workspace-mode='copilot'] .desktop-navigation-panel {
 }
 
 .kk-project-rail button svg,
-.kk-workspace-chrome-v3 button svg,
-.kk-composer-copilot-toggle svg {
+.kk-workspace-chrome-v3 button svg {
   width: var(--kk-icon-button);
   height: var(--kk-icon-button);
   flex: 0 0 auto;
@@ -463,7 +688,7 @@ body[data-kk-canvas-grid='hidden'] .canvas-grid {
 
 @media (prefers-reduced-motion: reduce) {
   .kk-workspace-chrome-v3 *,
-  .kk-composer-copilot-toggle,
+  .kk-composer-assistant-toggle,
   .kk-mobile-generation-status__track > span {
     transition: none !important;
   }

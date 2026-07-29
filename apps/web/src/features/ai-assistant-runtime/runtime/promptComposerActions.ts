@@ -65,6 +65,10 @@ export const PROMPT_COMPOSER_ACTIONS = {
     uiAction: 'prompt-composer-toggle-tools',
     toolName: undefined,
   },
+  toggleAssistant: {
+    uiAction: 'prompt-composer-toggle-assistant',
+    toolName: undefined,
+  },
   selectMobileMode: {
     uiAction: 'prompt-composer-select-mobile-mode',
     toolName: undefined,

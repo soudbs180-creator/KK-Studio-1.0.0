@@ -4,8 +4,6 @@ import {
   FolderKanban,
   LayoutPanelTop,
   LogOut,
-  PanelRightClose,
-  PanelRightOpen,
   Settings,
   Shield,
   User,
@@ -34,7 +32,6 @@ interface AppDesktopChromeProps {
   onOpenProfile: (view: UserProfileView) => void;
   onOpenSettings: () => void;
   onSignOut: () => void | Promise<void>;
-  onOpenAssistant: () => void;
   onCloseAssistant: () => void;
   onOpenCanvasWorkspace: () => void;
   onOpenCreateWorkspace: () => void;
@@ -52,22 +49,6 @@ interface DesktopMenuActionButtonProps {
 function focusWorkspaceCanvas() {
   const canvas = document.querySelector<HTMLElement>('[data-canvas-viewport], .canvas-container, canvas');
   canvas?.focus();
-}
-
-function revealCopilotHistory() {
-  window.setTimeout(() => {
-    const historySearch = document.querySelector<HTMLInputElement>(
-      'input[placeholder="搜索历史记录..."]',
-    );
-    if (historySearch) {
-      return;
-    }
-
-    const historyButton = document.querySelector<HTMLButtonElement>(
-      'button[title="历史记录与分支"]',
-    );
-    historyButton?.click();
-  }, 0);
 }
 
 const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
@@ -113,7 +94,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onOpenProfile,
   onOpenSettings,
   onSignOut,
-  onOpenAssistant,
   onCloseAssistant,
   onOpenCanvasWorkspace,
 }) => {
@@ -140,17 +120,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
     onCloseAssistant();
     onOpenCanvasWorkspace();
     focusWorkspaceCanvas();
-  };
-  const openCopilotMode = () => {
-    onOpenAssistant();
-    revealCopilotHistory();
-  };
-  const toggleCopilotMode = () => {
-    if (activeMode === 'copilot') {
-      openCanvasMode();
-      return;
-    }
-    openCopilotMode();
   };
   const openProjectMenu = () => {
     document.getElementById('project-manager-trigger')?.click();
@@ -224,21 +193,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           <Settings size={16} aria-hidden="true" />
         </button>
       </div>
-
-      <button
-        type="button"
-        data-composer-copilot-toggle="true"
-        data-state={activeMode === 'copilot' ? 'expanded' : 'collapsed'}
-        className="kk-composer-copilot-toggle"
-        onClick={toggleCopilotMode}
-        aria-label={activeMode === 'copilot' ? '收起 AI 助手' : '展开 AI 助手'}
-        aria-expanded={activeMode === 'copilot'}
-        title={activeMode === 'copilot' ? '收起 AI 助手' : '展开 AI 助手'}
-      >
-        {activeMode === 'copilot'
-          ? <PanelRightClose size={16} aria-hidden="true" />
-          : <PanelRightOpen size={16} aria-hidden="true" />}
-      </button>
 
       {showUserMenu ? (
         createPortal(

@@ -322,7 +322,7 @@ async function collectFailureDiagnostics(page) {
           width: window.innerWidth,
           height: window.innerHeight,
         },
-        desktopEntry: serializeElement('#btn-desktop-ai-assistant'),
+        desktopEntry: serializeElement('[data-composer-copilot-toggle="true"]'),
         desktopChrome: serializeElement('.desktop-left-chrome'),
         workspaceChromeSurface: serializeElement('.kk-workspace-chrome-surface'),
         durableQueuePanel: serializeElement('.ai-takeover-durable-queue-panel'),
@@ -335,7 +335,7 @@ async function collectFailureDiagnostics(page) {
 }
 
 async function ensureWorkspaceReady(page) {
-  const copilotEntry = page.getByRole('button', { name: 'Copilot', exact: true });
+  const copilotEntry = page.locator('[data-composer-copilot-toggle="true"]').first();
   if (await isVisibleWithin(copilotEntry, 6000)) {
     return copilotEntry;
   }
@@ -350,7 +350,7 @@ async function ensureWorkspaceReady(page) {
     await tempAccessButton.click();
   }
 
-  await assertVisible(copilotEntry, 'Desktop Copilot entry did not render after temporary access.');
+  await assertVisible(copilotEntry, 'Composer Copilot entry did not render after temporary access.');
   return copilotEntry;
 }
 
@@ -373,15 +373,19 @@ async function assertHttpHtml(url) {
 }
 
 function verifySourceContracts() {
-  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
+  const workspaceCssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
   const modeSwitchSource = readSource('apps/web/src/features/ai-takeover/components/AITakeoverToggle.tsx');
   const dockSource = readSource('apps/web/src/features/ai-takeover/components/AIAssistantDock.tsx');
   const generationToolsSource = readSource('apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts');
 
   const checks = [
-    { source: desktopChromeSource, pattern: />\s*Copilot\s*</, label: 'desktop Copilot workspace entrypoint' },
-    { source: desktopChromeSource, pattern: /onClick=\{openCopilotMode\}/, label: 'desktop Copilot open state' },
+    { source: promptBarSource, pattern: /data-composer-copilot-toggle="true"/, label: 'Composer Copilot entrypoint' },
+    { source: promptBarSource, pattern: /onToggleAssistant\(\)/, label: 'Composer Copilot open state' },
+    { source: workspaceSource, pattern: /onToggleAssistant:\s*toggleChatPanel/, label: 'workspace Copilot callback' },
+    { source: workspaceCssSource, pattern: /width:\s*min\(420px,\s*calc\(100vw - 24px\)\)/, label: 'right companion panel geometry' },
     { source: chatSidebarSource, pattern: /id="btn-desktop-ai-assistant"/, label: 'desktop AI assistant edge entrypoint' },
     { source: chatSidebarSource, pattern: /data-chat-shell-action=\{CHAT_SHELL_ACTIONS\.toggleSidebar\.uiAction\}/, label: 'desktop AI entry state' },
     { source: modeSwitchSource, pattern: /id:\s*['"]btn-ai-direct-mode['"]/, label: 'direct mode toggle' },
@@ -541,8 +545,9 @@ try {
   await page.waitForTimeout(1200);
 
   const desktopEntry = await ensureWorkspaceReady(page);
-  await assertElementInViewport(desktopEntry, 'Desktop AI assistant entry is outside the viewport');
+  await assertElementInViewport(desktopEntry, 'Composer Copilot entry is outside the viewport');
   await desktopEntry.click();
+  await assertVisible(page.locator('.kk-workspace-sidebar'), 'Right-side Companion Copilot did not render.');
 
   const assistToggle = page.locator('#btn-ai-assist-mode');
   await assertVisible(assistToggle, 'AI assist mode did not render after opening chat.');

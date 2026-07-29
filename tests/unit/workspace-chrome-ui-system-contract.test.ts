@@ -38,6 +38,7 @@ test('workspace chrome exposes shared tokens and reusable surface/control classe
 
 test('desktop workspace chrome and minimap consume the shared chrome system', () => {
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const minimapSource = readSource('apps/web/src/app/AppCanvasNavigationPanel.tsx');
 
   assert.match(desktopChromeSource, /className="kk-workspace-chrome-surface/);
@@ -48,7 +49,9 @@ test('desktop workspace chrome and minimap consume the shared chrome system', ()
   assert.match(desktopChromeSource, /data-chrome-region="project"/);
   assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
   assert.match(desktopChromeSource, /data-chrome-region="account"/);
-  assert.match(desktopChromeSource, /data-composer-copilot-toggle="true"/);
+  assert.doesNotMatch(desktopChromeSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /className="kk-composer-assistant-toggle"/);
   assert.doesNotMatch(desktopChromeSource, /bg-red-500\/10|text-red-400|hover:bg-red-500\/10/);
   assert.doesNotMatch(desktopChromeSource, /0 4px 12px rgba\(255, 107, 90, 0\.35\)|#ff5240/);
 

@@ -8,6 +8,7 @@ test('desktop canvas keeps the 262px workspace panel persistent without a modal 
     'apps/web/src/components/settings/ProjectManager.tsx',
   );
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+  const workspaceCssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.match(projectManagerSource, /useState\(\(\) => !isMobile\)/);
   assert.match(projectManagerSource, /setShowDropdown\(!isMobile\)/);
@@ -28,16 +29,23 @@ test('desktop canvas keeps the 262px workspace panel persistent without a modal 
     cssSource,
     /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-morphic-project-panel\s*\{[\s\S]*display:\s*none\s*!important/,
   );
+  assert.match(
+    workspaceCssSource,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-morphic-project-panel\s*\{[\s\S]*display:\s*flex\s*!important/,
+  );
 });
 
-test('desktop chrome publishes the V3 project, canvas and account hierarchy', () => {
+test('desktop chrome publishes the V3 hierarchy while PromptBar owns Copilot expansion', () => {
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const cssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.match(desktopChromeSource, /data-chrome-region="project"/);
   assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
   assert.match(desktopChromeSource, /data-chrome-region="account"/);
-  assert.match(desktopChromeSource, /data-composer-copilot-toggle="true"/);
+  assert.doesNotMatch(desktopChromeSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
+  assert.match(promptBarSource, /className="kk-composer-assistant-toggle"/);
   assert.match(
     cssSource,
     /\.kk-workspace-chrome-v3\s*\{[\s\S]*grid-template-columns:\s*minmax\(180px,\s*1fr\)\s*auto\s*minmax\(180px,\s*1fr\)/,
@@ -84,23 +92,23 @@ test('canvas navigation uses one bottom-right dock and keeps its minimap bottom-
   );
 });
 
-test('Copilot rail removes the extra context row and matches the 46px plus 28px reference rhythm', () => {
-  const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+test('Copilot is a right companion panel and keeps the live canvas visible', () => {
+  const cssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='copilot'\][\s\S]*:nth-child\(1\)\s*>\s*:nth-child\(1\)\s*\{[\s\S]*height:\s*46px/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar\s*\{[\s\S]*right:\s*10px\s*!important[\s\S]*left:\s*auto\s*!important[\s\S]*width:\s*min\(420px,\s*calc\(100vw - 24px\)\)\s*!important/,
   );
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='copilot'\][\s\S]*:nth-child\(1\)\s*>\s*:nth-child\(2\)\s*\{[\s\S]*display:\s*none/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar\s*>\s*\.w-full\.h-full\s*\{[\s\S]*display:\s*flex\s*!important[\s\S]*flex-direction:\s*column/,
   );
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='copilot'\][\s\S]*:nth-child\(3\)\s*>\s*:first-child\s*\{[\s\S]*height:\s*28px/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-workspace-sidebar\s*>\s*\.w-full\.h-full\s*>\s*:nth-child\(2\)\s*\{[\s\S]*flex:\s*1 1 auto/,
   );
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='copilot'\][\s\S]*:nth-child\(3\)\s*>\s*:first-child\s*>\s*:last-child\s*\{[\s\S]*display:\s*none/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.desktop-navigation-panel\s*\{[\s\S]*display:\s*block\s*!important/,
   );
 });

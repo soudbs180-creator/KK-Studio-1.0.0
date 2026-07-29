@@ -55,7 +55,7 @@ import {
     SETTINGS_MODAL_PANEL_CLASSNAME,
 } from './SettingsScaffold';
 import { PROJECT_MANAGER_ACTIONS } from './settingsModuleActions';
-import { KK_OPEN_WORKFLOW_BROWSER_EVENT } from '../layout/prompt-bar/composerEvents';
+import { subscribeWorkflowBrowser } from '../layout/prompt-bar/composerEvents';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -155,8 +155,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             setWorkflowBrowserTab('workflows');
             setShowWorkflowDropdown(true);
         };
-        window.addEventListener(KK_OPEN_WORKFLOW_BROWSER_EVENT, openWorkflowBrowser);
-        return () => window.removeEventListener(KK_OPEN_WORKFLOW_BROWSER_EVENT, openWorkflowBrowser);
+        return subscribeWorkflowBrowser(openWorkflowBrowser);
     }, []);
 
     const previousIsMobileRef = useRef(isMobile);
@@ -393,7 +392,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             ) : null}
             <div
                 data-desktop-persistent={!isMobile}
-                className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[48px] w-[262px]'} overflow-hidden rounded-[14px] border`}
+                className={`kk-morphic-project-panel ${isMobile ? 'absolute' : 'fixed left-3 top-[52px] w-[262px]'} overflow-hidden rounded-[14px] border`}
                 style={{
                     ...projectManagerPanelStyle,
                     ...dropdownPositionStyle,

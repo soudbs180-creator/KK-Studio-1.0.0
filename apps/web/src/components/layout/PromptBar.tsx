@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal, ArrowUp } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal, ArrowUp, PanelRightClose, PanelRightOpen } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -753,6 +753,8 @@ interface PromptBarProps {
     isGenerating: boolean;
     isChatOpen?: boolean;
     chatSidebarWidth?: number;
+    onToggleAssistant?: () => void;
+    onArrangeCanvas?: (mode: 'grid' | 'row' | 'column') => void;
     onFilesDrop?: (files: File[]) => void;
     activeSourceImage?: { id: string; url: string; prompt: string } | null;
     onClearSource?: () => void;
@@ -1243,6 +1245,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     onAnalyzeEcommerceFile,
     isChatOpen = false,
     chatSidebarWidth = 420,
+    onToggleAssistant,
+    onArrangeCanvas,
 }) => {
     const { pick } = useLocale();
     const { activeCanvas } = useCanvas();
@@ -5367,6 +5371,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
                                     onTogglePromptOptimization={handleTogglePromptOptimization}
                                     onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
+                                    onArrangeCanvas={onArrangeCanvas}
                                 />
 
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
@@ -6602,6 +6607,21 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 }}
                             />
                         </div>
+                        {!isMobile && onToggleAssistant ? (
+                            <button
+                                type="button"
+                                data-composer-copilot-toggle="true"
+                                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleAssistant.uiAction}
+                                data-state={isChatOpen ? 'expanded' : 'collapsed'}
+                                className="kk-composer-assistant-toggle"
+                                onClick={(event) => { event.stopPropagation(); onToggleAssistant(); }}
+                                aria-label={isChatOpen ? '收起 AI 助手' : '展开 AI 助手'}
+                                aria-expanded={isChatOpen}
+                                title={isChatOpen ? '收起 AI 助手' : '展开 AI 助手'}
+                            >
+                                {isChatOpen ? <PanelRightClose size={16} aria-hidden="true" /> : <PanelRightOpen size={16} aria-hidden="true" />}
+                            </button>
+                        ) : null}
                         </div>
                     </PromptBarFooter>
                 </div>

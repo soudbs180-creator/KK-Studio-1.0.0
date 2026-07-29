@@ -2095,3 +2095,82 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。导航位置由单个共享 CSS 变量驱动，后续如调整 Copilot 宽度只需继续传入实时侧栏宽度。
 - 后续新增画布视图操作必须进入展开导航区或上下文面板，不得恢复左侧重复按钮或新增独立右侧浮动工具栏。
+
+---
+
+## 253. 2026-07-30 - fix(ui): 收口 Companion Copilot、卡片目录与定向排列
+
+**修改范围**
+- 将 Composer 的 AI 展开入口移动到发送键右侧并保持在输入框内部；展开后不再进入另一页面，而是在 Canvas 右侧显示 420px Companion Copilot。
+- 保持 Copilot 展开时 Canvas、项目轨道和卡片可见，并让右下地图、缩放与画布操作整体从 `right=10px` 移到 `right=430px`。
+- 修复工作流按钮在 ProjectManager 尚未挂载时丢失请求的问题，继续复用现有工作流浏览器、模板、搜索、分类和回调。
+- 将项目面板调整到 `top=52px`，与 48px 顶栏保留 4px 间隙，并继续由 CSS 固定到左轨道右侧 `x=50px`。
+- 新增 Canvas V3 卡片目录，覆盖 11 个持久化 Kind，并由共享 Card Shell 暴露统一家族、名称和稳定密度。
+- 普通项目在 Canvas Pan/Zoom 时保持同一套完整卡片外观；Image/Video 组不再因视图变换切换内部样式。
+- 将 `row` 命名为“思维导图”、`column` 命名为“瀑布式”，同时加入选择菜单与 Composer 工具菜单；继续使用既有排列回调和右→左、下→上端口规则。
+- 统一模型、参数、张数、开关、发送、工具菜单和二级浮层的 Morphic 控件几何，移除本轮范围内的旧 Frost/Clay 表现。
+- 更新响应式、AI Takeover、设计 QA、设计规范和测试契约，覆盖桌面 1023–1440px 与手机 375–834px。
+
+**修改文件**
+- `apps/web/src/app/AppDesktopChrome.tsx`
+- `apps/web/src/canvas/performanceProfile.ts`
+- `apps/web/src/canvas/v3/cardCatalog.ts`
+- `apps/web/src/components/canvas/CanvasCardShell.tsx`
+- `apps/web/src/components/canvas/SelectionMenu.tsx`
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx`
+- `apps/web/src/components/layout/prompt-bar/composerEvents.ts`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/core/canvas/renderers/ImageGenerationGroupRenderer.tsx`
+- `apps/web/src/core/canvas/renderers/VideoGenerationGroupRenderer.tsx`
+- `apps/web/src/features/ai-assistant-runtime/runtime/promptComposerActions.ts`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `scripts/test/verify-ai-takeover-smoke.mjs`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `tests/contract/ui-v3-information-architecture.test.ts`
+- `tests/unit/morphic-input-fidelity-contract.test.ts`
+- `tests/unit/morphic-layout-fidelity-contract.test.ts`
+- `tests/unit/morphic-layout-unification-contract.test.ts`
+- `tests/unit/morphic-surface-migration.test.ts`
+- `tests/unit/prompt-composer-action-catalog-contract.test.ts`
+- `tests/unit/workspace-chrome-ui-system-contract.test.ts`
+- `tests/unit/workspace-composer-canvas-layout-v4.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Copilot 是 Canvas 的右侧 Companion Panel，不是另一个工作区页面；唯一入口属于 Composer，顶部 Chrome 不再重复暴露。
+2. Companion Panel 固定为 420px，并继续复用现有 Assistant Runtime、Chat、Agent、Session 与 DurableGenerationQueue；不建立平行助手或新路由。
+3. `CANVAS_CARD_CATALOG` 是卡片类型到 UI 语义的唯一目录；Renderer 可以专门化 Body，但不得重建 Header/Footer、状态或第二套外壳。
+4. 普通项目使用稳定 `full` 卡片密度；只有 large/huge 场景可以按性能档进入 LOD。Hover、Selected、Dragging 和 Canvas Transform 不得改变卡片几何。
+5. 思维导图使用 `row`、父卡右端口到子卡左端口；瀑布式使用 `column`、父卡底端口到子卡顶端口；排列只写回现有位置和 Presentation，不改父子关系或 DTO。
+6. 工作流请求通道允许在懒加载监听器挂载前暂存一次请求，订阅后消费；业务行为仍由 ProjectManager 中唯一工作流浏览器负责。
+7. React 变更使用稳定的 `toggleChatPanel` 回调和模块级卡片目录，避免为顶栏或卡片渲染增加新的高频订阅。
+
+**已运行验证**
+- 新增/受影响专项共 31/31 通过；`morphic-surface-migration` 更新到新归属后 5/5 通过。
+- 全量 unit 2281：2279 通过、0 失败、2 跳过；integration 14/14、contract 31/31、E2E 11/11 通过。
+- Root / Architecture TypeScript 通过；服务端 116 个文件语法检查和 593 个测试文件语义检查通过。
+- Shared、UI、API Client 与 Web 生产构建通过；Vite 共转换 2584 modules。
+- `architecture:check` 等价完整子命令通过，PromptBar 维护性基线保持在 6708 行且未增长。
+- `governance:check` 等价完整子命令通过；文档、版本、Provider、安全与 OpenSpec 均无冲突。
+- Local Runner typecheck、build 与 14/14 独立测试通过。
+- Canvas Performance 3/3 通过；Prompt Group Drag 指针误差约 0.00003px、松手漂移 0px、连接端点误差约 0.258px。
+- Canvas 响应式 CDP 通过：Companion Panel `420px/right=10px`、Canvas 可见、中央 Composer 隐藏、Chat Composer 可见、导航 `right=430px`；Workflow 从 Composer 打开并显示搜索与 3 个分类。
+- 1440、1280、1180、1024、1023px 桌面与 834、768、430、390、375px 手机均无横向溢出；手机无常驻四按钮导航且任务状态可见。
+- AI Takeover、手机设置、桌面设置、启动提示居中和编码检查通过。
+- `git diff --check` 与两份浏览器脚本的 Node 语法检查通过。
+
+**未运行验证及原因**
+- 当前环境没有全局 `npm`，Bundled pnpm 又因根项目声明 `npm@11.12.1` 拒绝代执行，因此无法直接运行聚合命令 `npm run verify:changes`；已逐项执行本轮相关的等价架构、治理、类型、构建、测试、Local Runner、浏览器、设置、AI Takeover、编码与性能检查。
+- 本地未安装 `swagger-cli`，未重复执行 OpenAPI CLI 校验；架构 Spec scaffold 检查通过，本轮没有修改 OpenAPI。
+- 未执行依赖审计网络请求；本轮不修改依赖或锁文件。
+- 本地 API 3001 未启动，浏览器 Smoke 出现预期 502 警告；测试已使用本地数据或路由拦截验证 UI，未执行真实媒体生成。
+- 未部署生产环境；本轮范围为本地 UI、Canvas 交互、响应式验证与本地 Git Commit。
+
+**风险与下一步**
+- 风险低。Canvas DTO、父子关系、持久化、Provider、计费、鉴权、数据库和 Agent ToolRegistry 均未改变。
+- 右侧 Companion Panel 当前通过既有 Chat DOM 结构的工作区适配层收口；后续若调整 Chat 内部槽位，应同步更新 `workspace-composer-canvas-layout-v4` 与响应式 CDP，不能恢复全页 Copilot。
+- 后续新增卡片 Kind 必须先加入 `CANVAS_CARD_CATALOG` 并定义内容、Footer、默认尺寸和排列端口，再实现 Renderer。

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Network, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { Columns3, Network, Rows3, SlidersHorizontal, Wand2 } from 'lucide-react';
 
 import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
 import { type GenerationConfig, GenerationMode } from '../../../types';
-import { KK_OPEN_WORKFLOW_BROWSER_EVENT } from './composerEvents';
+import { requestWorkflowBrowser } from './composerEvents';
 
 export const OPTIMIZER_ARCHETYPES = [
   { id: 'auto', label_zh: '自动路由', label_en: 'Auto' },
@@ -28,6 +28,7 @@ type DesktopComposerPromptToolsProps = {
   onTogglePptOutlinePanel: () => void;
   onTogglePromptOptimization: () => void;
   onSelectPromptOptimizerArchetype?: (archetype: string) => void;
+  onArrangeCanvas?: (mode: 'grid' | 'row' | 'column') => void;
   promptLibraryPanel?: React.ReactNode;
   pptOutlinePanel?: React.ReactNode;
 };
@@ -40,6 +41,7 @@ export default function DesktopComposerPromptTools({
   onTogglePptOutlinePanel,
   onTogglePromptOptimization,
   onSelectPromptOptimizerArchetype,
+  onArrangeCanvas,
   pptOutlinePanel,
 }: DesktopComposerPromptToolsProps) {
   const [showTools, setShowTools] = useState(false);
@@ -76,7 +78,7 @@ export default function DesktopComposerPromptTools({
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
-            window.dispatchEvent(new CustomEvent(KK_OPEN_WORKFLOW_BROWSER_EVENT));
+            requestWorkflowBrowser();
           }}
         >
           <Network size={13} aria-hidden="true" />
@@ -144,6 +146,40 @@ export default function DesktopComposerPromptTools({
               </select>
             </label>
           )}
+
+          {onArrangeCanvas ? (
+            <div className="kk-composer-layout-tools mt-1 border-t border-[var(--prompt-bar-shell-border)] pt-1">
+              <span className="kk-composer-layout-tools__label">画布排布</span>
+              <button
+                type="button"
+                role="menuitem"
+                data-canvas-layout-mode="row"
+                className="kk-composer-layout-tools__item"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onArrangeCanvas('row');
+                  setShowTools(false);
+                }}
+              >
+                <Rows3 size={15} aria-hidden="true" />
+                <span><strong>思维导图</strong><small>主卡向右连接副卡</small></span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-canvas-layout-mode="column"
+                className="kk-composer-layout-tools__item"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onArrangeCanvas('column');
+                  setShowTools(false);
+                }}
+              >
+                <Columns3 size={15} aria-hidden="true" />
+                <span><strong>瀑布式</strong><small>主卡向下连接副卡</small></span>
+              </button>
+            </div>
+          ) : null}
 
           {config.mode === GenerationMode.PPT && (
             <button
