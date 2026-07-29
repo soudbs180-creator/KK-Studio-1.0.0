@@ -2046,3 +2046,52 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。旧 `MobileTabBar` 与移动 Canvas 组件仍作为兼容实现保留，但已经从手机主工作区卸载，不会形成可见的平行导航。
 - 后续新增工作区或设置功能必须复用 V3 Token 与现有 Surface；同级文字、图标、控件和留白需要先通过信息架构契约，再进入浏览器视觉验收。
+
+---
+
+## 252. 2026-07-30 - fix(ui): 统一右下画布导航与 Copilot 避让
+
+**修改范围**
+- 删除左侧项目工具栏中重复的适应全部、重置视图和自动排列按钮，保留项目、搜索、收藏、画布/画板模式、网格与主题职责。
+- 将地图、缩放和三项画布视图操作合并为唯一右下角导航栈；紧凑状态只展示地图和缩放，地图展开后再显示次级画布操作。
+- 统一地图折叠与展开状态的底部锚点，展开面板只向上生长，不再跳到右上角。
+- Copilot 展开时让地图与画布操作整组向左避让聊天侧栏，关闭后以 160ms 过渡恢复到右侧 10px。
+- 扩展响应式浏览器检查与设计契约，锁定按钮归属、地图几何、Copilot 可见性和避让行为。
+
+**修改文件**
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx`
+- `apps/web/src/components/settings/ProjectManager.tsx`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `tests/contract/ui-v3-information-architecture.test.ts`
+- `tests/unit/canvas-v3-card-system.test.ts`
+- `tests/unit/morphic-layout-fidelity-contract.test.ts`
+- `tests/unit/project-manager-action-catalog-contract.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `design-qa.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 右下角只能存在一个画布导航栈；地图、缩放和画布视图操作不得再拆分为互相竞争的浮动工具栏。
+2. 紧凑状态保持低噪声，只常驻地图与缩放；适应全部、重置视图和自动排列在地图展开后按需显示。
+3. 地图的折叠与展开共享 `right: 10px`、`bottom: 10px`，展开内容向上生长，避免空间位置认知跳变。
+4. Copilot 使用共享右侧偏移变量驱动画布导航，偏移量为聊天侧栏宽度加 10px；地图与操作按钮不得分别移动。
+5. 画布坐标、拖动、边渲染、持久化、Canvas DTO 和业务回调语义保持不变，本轮只调整 UI 归属与响应式几何。
+
+**已运行验证**
+- TDD：画布导航与信息架构专项先出现 2 条预期失败，完成实现后 7/7 通过。
+- 全量 unit：2275 个用例，2273 通过、0 失败、2 跳过；integration 14/14、contract 31/31、E2E 11/11 通过。
+- Canvas performance：3/3 通过。
+- Canvas 响应式 CDP：折叠导航右/底均为 10px；展开地图仍保持右/底 10px并显示 3 项画布操作；Copilot 展开后导航右侧避让为 430px、底部保持 10px。
+- 1440×900、1280×720、1180×820、1024×720、1023×720 桌面视口，以及 834×1112、768×1024、430×932、390×844、375×812 手机视口均无横向溢出、工具遮挡或卡片漂移。
+- Web / Architecture / Server / Tests TypeScript 检查、Shared / UI / API Client 编译、Web 生产 Build、`architecture:check`、`governance:check` 和 `git diff --check` 均通过。
+
+**未运行验证及原因**
+- 当前系统没有全局 `npm`，因此未直接运行聚合命令 `npm run verify:changes`；已使用 Bundled Node 与项目脚本执行本轮相关的等价测试、类型、构建、架构、治理、性能和浏览器检查。
+- 本地 API 3001 未启动，浏览器 Smoke 中模型列表刷新出现预期 502；本轮未修改 API、Provider、鉴权、计费、数据库或真实生成链路。
+- 未部署生产环境；本轮范围为本地画布导航布局修复、响应式验证和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。导航位置由单个共享 CSS 变量驱动，后续如调整 Copilot 宽度只需继续传入实时侧栏宽度。
+- 后续新增画布视图操作必须进入展开导航区或上下文面板，不得恢复左侧重复按钮或新增独立右侧浮动工具栏。

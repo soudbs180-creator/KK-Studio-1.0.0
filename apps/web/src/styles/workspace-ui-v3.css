@@ -230,6 +230,79 @@ body[data-kk-workspace-mode='copilot'] .kk-composer-copilot-toggle {
   left: calc(50% + 82px);
 }
 
+.desktop-navigation-panel {
+  top: auto !important;
+  right: var(--kk-canvas-navigation-right, 10px) !important;
+  bottom: 10px !important;
+  display: block;
+  transition: right var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
+}
+
+.desktop-navigation-panel:has(.canvas-nav-panel--compact) {
+  top: auto !important;
+  right: var(--kk-canvas-navigation-right, 10px) !important;
+  bottom: 10px !important;
+}
+
+.kk-canvas-navigation-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  transform-origin: right bottom;
+}
+
+body[data-kk-workspace-mode='copilot'] .desktop-navigation-panel {
+  display: block !important;
+}
+
+.desktop-navigation-panel .canvas-nav-panel {
+  border: 1px solid var(--kk-morphic-border) !important;
+  background: var(--kk-morphic-panel) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.desktop-navigation-panel .canvas-nav-panel:not(.canvas-nav-panel--compact) {
+  transform-origin: right bottom;
+  animation: kk-canvas-navigation-open var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
+}
+
+.kk-canvas-navigation-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.kk-canvas-navigation-actions .kk-workspace-icon-control {
+  display: grid;
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  place-items: center;
+  color: var(--text-secondary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-small);
+  background: var(--kk-morphic-control);
+}
+
+.kk-canvas-navigation-actions .kk-workspace-icon-control:hover {
+  color: var(--text-primary);
+  background: var(--kk-morphic-control-hover);
+}
+
+@keyframes kk-canvas-navigation-open {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .kk-project-rail-host {
   top: 50% !important;
   width: 38px !important;

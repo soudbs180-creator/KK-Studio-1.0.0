@@ -5,6 +5,7 @@ import { PROJECT_MANAGER_ACTIONS } from '../../apps/web/src/components/settings/
 import { readSource } from '../support/workspacePaths.js';
 
 const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
+const canvasNavigationSource = readSource('apps/web/src/app/AppCanvasNavigationPanel.tsx');
 
 test('Project Manager exposes its own settings action namespace', () => {
   const values = Object.values(PROJECT_MANAGER_ACTIONS).map((action) => action.uiAction);
@@ -48,10 +49,7 @@ test('Project Manager shell and canvas controls expose project action metadata',
   for (const key of [
     'openSearch',
     'openFavorites',
-    'fitToAll',
-    'resetView',
     'toggleCanvasMode',
-    'autoArrange',
     'toggleTheme',
     'addWorkflowPreviewCard',
     'addWorkflowSaveCard',
@@ -62,6 +60,24 @@ test('Project Manager shell and canvas controls expose project action metadata',
       projectManagerSource,
       new RegExp(`data-project-manager-action=\\{PROJECT_MANAGER_ACTIONS\\.${key}\\.uiAction\\}`),
       `Project Manager should mark ${key}`
+    );
+  }
+
+  for (const key of ['fitToAll', 'resetView', 'autoArrange'] as const) {
+    assert.doesNotMatch(
+      projectManagerSource,
+      new RegExp(`data-project-manager-action=\\{PROJECT_MANAGER_ACTIONS\\.${key}\\.uiAction\\}`),
+      `Project Manager rail should not duplicate ${key}`,
+    );
+    assert.match(
+      canvasNavigationSource,
+      new RegExp(`data-canvas-navigation-action="${key}"`),
+      `Canvas navigation dock should own ${key}`,
+    );
+    assert.match(
+      canvasNavigationSource,
+      new RegExp(`data-project-manager-action=\\{PROJECT_MANAGER_ACTIONS\\.${key}\\.uiAction\\}`),
+      `Canvas navigation dock should preserve ${key} action metadata`,
     );
   }
 

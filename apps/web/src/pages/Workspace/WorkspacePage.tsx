@@ -5355,13 +5355,10 @@ const isRectIntersecting = (
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
         isMobile={isMobile}
-        onFitToAll={handleFitToAll}
-        onResetView={resetViewFn}
         onToggleCanvasMode={() => setCanvasMode(prev => prev === 'normal' ? 'board' : 'normal')}
         onToggleSnapToGrid={handleToggleSnapToGrid}
         canvasMode={canvasMode}
         showSnapToGrid={snapToGrid}
-        onAutoArrange={handleAutoArrange}
         onToggleChat={toggleChatPanel}
         isChatOpen={isChatOpen}
         workflowTemplates={WORKFLOW_TEMPLATES}
@@ -5651,19 +5648,21 @@ const isRectIntersecting = (
       {/* 简体中文：右上角悬浮缩放与小地图卡片 */}
       {!isMobile && (
         <div 
-          className="desktop-navigation-panel fixed top-4 z-[650] pointer-events-auto select-none"
+          className="desktop-navigation-panel kk-canvas-navigation-stack fixed z-[650] pointer-events-auto select-none"
           style={{
-            right: isChatOpen
-              ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))`
-              : '16px',
-            transition: 'right 0.3s ease-out'
-          }}
+            '--kk-canvas-navigation-right': isChatOpen
+              ? `${chatSidebarWidth + 10}px`
+              : '10px',
+          } as React.CSSProperties}
         >
           <AppCanvasNavigationPanel
             activeCanvas={activeCanvas}
             canvasTransform={canvasTransform}
             canvasRef={canvasRef}
             isMobile={isMobile}
+            onFitToAll={handleFitToAll}
+            onResetView={resetViewFn}
+            onAutoArrange={handleAutoArrange}
           />
         </div>
       )}

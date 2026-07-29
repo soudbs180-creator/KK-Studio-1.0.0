@@ -350,6 +350,17 @@ async function verifyDesktopAuxiliaryCardDrag(cdp, cardId, movement) {
 }
 
 async function verifyComposerCopilotToggle(cdp) {
+  const collapsedNavigation = await evaluate(
+    cdp,
+    `(() => {
+      const navigation = document.querySelector('.desktop-navigation-panel');
+      const rect = navigation?.getBoundingClientRect();
+      return rect ? {
+        bottomInset: window.innerHeight - rect.bottom,
+        rightInset: window.innerWidth - rect.right,
+      } : null;
+    })()`,
+  );
   const opened = await evaluate(
     cdp,
     `(() => {
@@ -365,11 +376,15 @@ async function verifyComposerCopilotToggle(cdp) {
       const sidebarRect = document.querySelector('.kk-workspace-sidebar')?.getBoundingClientRect();
       const centerComposerRect = document.querySelector('#prompt-bar-container[data-composer-layout="desktop"]')?.getBoundingClientRect();
       const chatComposerRect = document.querySelector('.kk-chat-sidebar-composer')?.getBoundingClientRect();
+      const navigationRect = document.querySelector('.desktop-navigation-panel')?.getBoundingClientRect();
       return {
         workspaceMode: document.body.dataset.kkWorkspaceMode,
         sidebarVisible: !!sidebarRect && sidebarRect.width > 0 && sidebarRect.height > 0,
         centerComposerVisible: !!centerComposerRect && centerComposerRect.width > 0 && centerComposerRect.height > 0,
         chatComposerVisible: !!chatComposerRect && chatComposerRect.width > 0 && chatComposerRect.height > 0,
+        navigationVisible: !!navigationRect && navigationRect.width > 0 && navigationRect.height > 0,
+        navigationBottomInset: navigationRect ? window.innerHeight - navigationRect.bottom : null,
+        navigationRightInset: navigationRect ? window.innerWidth - navigationRect.right : null,
       };
     })()`,
   );
@@ -383,7 +398,44 @@ async function verifyComposerCopilotToggle(cdp) {
   );
   await wait(350);
   const restoredMode = await evaluate(cdp, `document.body.dataset.kkWorkspaceMode`);
-  return { opened, expanded, closed, restoredMode };
+  return { collapsedNavigation, opened, expanded, closed, restoredMode };
+}
+
+async function verifyCanvasNavigationExpansion(cdp) {
+  const collapsed = await evaluate(
+    cdp,
+    `(() => {
+      const navigation = document.querySelector('.desktop-navigation-panel');
+      const dock = document.querySelector('[data-canvas-navigation-dock="true"]');
+      const rect = navigation?.getBoundingClientRect();
+      const dockRect = dock?.getBoundingClientRect();
+      document.querySelector('[data-canvas-minimap-toggle="true"]')?.click();
+      return rect && dockRect ? {
+        bottomInset: window.innerHeight - rect.bottom,
+        rightInset: window.innerWidth - rect.right,
+        dockHeight: dockRect.height,
+      } : null;
+    })()`,
+  );
+  await wait(260);
+  const expanded = await evaluate(
+    cdp,
+    `(() => {
+      const navigation = document.querySelector('.desktop-navigation-panel');
+      const popover = document.querySelector('[data-canvas-minimap-popover="true"]');
+      const actions = document.querySelectorAll('[data-canvas-navigation-action]');
+      const rect = navigation?.getBoundingClientRect();
+      const popoverRect = popover?.getBoundingClientRect();
+      return rect && popoverRect ? {
+        bottomInset: window.innerHeight - rect.bottom,
+        rightInset: window.innerWidth - rect.right,
+        top: rect.top,
+        popoverHeight: popoverRect.height,
+        actionCount: actions.length,
+      } : null;
+    })()`,
+  );
+  return { collapsed, expanded };
 }
 
 mkdirSync(artifactDir, { recursive: true });
@@ -511,7 +563,9 @@ try {
             { x: -52, y: -24 },
           ),
         };
+        const canvasNavigationExpansion = await verifyCanvasNavigationExpansion(cdp);
         copilotToggleFlow = await verifyComposerCopilotToggle(cdp);
+        copilotToggleFlow.canvasNavigationExpansion = canvasNavigationExpansion;
       }
       await evaluate(
         cdp,
@@ -664,11 +718,34 @@ try {
           || !copilotToggleFlow.expanded.sidebarVisible
           || copilotToggleFlow.expanded.centerComposerVisible
           || !copilotToggleFlow.expanded.chatComposerVisible
+          || !copilotToggleFlow.expanded.navigationVisible
+          || Math.abs(copilotToggleFlow.expanded.navigationBottomInset - 10) > 1
+          || copilotToggleFlow.expanded.navigationRightInset
+            <= copilotToggleFlow.collapsedNavigation.rightInset + 200
           || copilotToggleFlow.restoredMode !== "canvas"
         )
       )
         throw new Error(
           `${viewport.width}x${viewport.height} Composer Copilot expansion is incomplete`,
+        );
+      const navigationExpansion = copilotToggleFlow?.canvasNavigationExpansion;
+      if (
+        navigationExpansion
+        && (
+          !navigationExpansion.collapsed
+          || !navigationExpansion.expanded
+          || Math.abs(navigationExpansion.collapsed.bottomInset - 10) > 1
+          || Math.abs(navigationExpansion.expanded.bottomInset - 10) > 1
+          || Math.abs(
+            navigationExpansion.collapsed.rightInset
+            - navigationExpansion.expanded.rightInset
+          ) > 1
+          || navigationExpansion.expanded.actionCount !== 3
+          || navigationExpansion.expanded.top < 48
+        )
+      )
+        throw new Error(
+          `${viewport.width}x${viewport.height} canvas navigation does not remain bottom-anchored: ${JSON.stringify(navigationExpansion)}`,
         );
       if (metrics.cardCount < 1)
         throw new Error(

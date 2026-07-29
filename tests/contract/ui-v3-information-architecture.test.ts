@@ -40,14 +40,20 @@ test('desktop chrome has project, canvas and account regions only and owns the c
   assert.doesNotMatch(chrome, />创作</);
 });
 
-test('canvas rail owns interaction modes, grid visibility, view actions and theme in one vertical tool system', () => {
+test('canvas rail owns modes and theme while the bottom navigation owns view actions', () => {
   const projectManager = readSource('apps/web/src/components/settings/ProjectManager.tsx');
+  const canvasNavigation = readSource('apps/web/src/app/AppCanvasNavigationPanel.tsx');
 
   assert.match(projectManager, /data-canvas-interaction-mode="normal"/);
   assert.match(projectManager, /data-canvas-interaction-mode="board"/);
   assert.match(projectManager, /data-canvas-grid-toggle="true"/);
   assert.match(projectManager, /data-canvas-theme-toggle="true"/);
   assert.match(projectManager, /useTheme\(\)/);
+  assert.doesNotMatch(projectManager, /PROJECT_MANAGER_ACTIONS\.(fitToAll|resetView|autoArrange)\.uiAction/);
+  assert.match(canvasNavigation, /data-canvas-minimap-popover="true"/);
+  assert.match(canvasNavigation, /data-canvas-navigation-action="fitToAll"/);
+  assert.match(canvasNavigation, /data-canvas-navigation-action="resetView"/);
+  assert.match(canvasNavigation, /data-canvas-navigation-action="autoArrange"/);
   assert.doesNotMatch(projectManager, /className="kk-canvas-view-tools/);
 });
 
@@ -89,6 +95,8 @@ test('responsive browser QA verifies the simple mobile surface instead of reopen
   assert.match(responsiveSmoke, /mobileTaskStatusVisible/);
   assert.match(responsiveSmoke, /chromeRegionCount/);
   assert.match(responsiveSmoke, /verifyComposerCopilotToggle/);
+  assert.match(responsiveSmoke, /verifyCanvasNavigationExpansion/);
   assert.match(responsiveSmoke, /chatComposerVisible/);
+  assert.match(responsiveSmoke, /navigationRightInset/);
   assert.match(responsiveSmoke, /Math\.abs\(metrics\.railWidth - 38\)/);
 });

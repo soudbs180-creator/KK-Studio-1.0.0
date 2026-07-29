@@ -117,6 +117,42 @@ No new P0, P1 or P2 finding remains after the workflow-browser comparison.
 
 final result: passed
 
+## Canvas navigation consolidation pass — 2026-07-30
+
+### Current ownership
+
+- The 38px left rail owns project, search, favorites, Canvas/Board mode, grid visibility and theme only.
+- The bottom-right navigation dock owns minimap, zoom, Fit All, Reset View and Auto Arrange.
+- Fit All, Reset View and Auto Arrange are revealed with the expanded minimap instead of remaining as duplicate persistent buttons.
+- Collapsed and expanded minimap states share one bottom anchor. The expanded panel grows upward without changing its bottom or right inset.
+- When Copilot opens, the complete navigation stack moves left by the chat sidebar width. The minimap and Canvas actions move as one unit.
+
+### Measured browser geometry
+
+| State | Measured at 1440×900 | Result |
+|---|---:|---|
+| Collapsed navigation dock | `156×32`, right `10px`, bottom `10px` | passed |
+| Expanded minimap stack | `224×274`, right `10px`, bottom `10px` | passed |
+| Expanded Canvas action count | `3` | passed |
+| Copilot-open navigation inset | right `430px`, bottom `10px` | passed |
+| Desktop responsive range | `1023–1440px`, zero horizontal overflow | passed |
+| Mobile responsive range | `375–834px`, zero horizontal overflow | passed |
+
+### Findings and resolutions
+
+| Priority | Finding | Resolution |
+|---|---|---|
+| P1 | Expanded minimap inherited a top-right position and appeared to jump upward | Both states now consume the same bottom-right geometry token and the panel expands upward from the bottom |
+| P1 | Canvas view actions were duplicated in the left rail and right-side controls | The left duplicates were removed; the actions now live in the expanded bottom-right navigation stack |
+| P1 | Copilot mode hid or overlaid the Canvas navigation | Navigation remains visible and transitions left with the chat sidebar width |
+| P2 | Persistent right-side controls created unnecessary visual noise | The compact dock retains only minimap and zoom controls; secondary Canvas actions are progressively disclosed |
+
+Responsive CDP verification also retained zero post-release drift for Notebook and WorkflowPanel drag interactions. No Canvas coordinate, persistence, generation, billing, auth, Provider or backend contract changed.
+
+All new P0, P1 and P2 findings are resolved.
+
+final result: passed
+
 ## Canvas V3 fusion pass — 2026-07-29
 
 ### Scope

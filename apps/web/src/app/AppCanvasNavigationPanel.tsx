@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Minus, Plus, Minimize2, Map } from 'lucide-react';
+import { Focus, LayoutDashboard, Map, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
+import { PROJECT_MANAGER_ACTIONS } from '../components/settings/settingsModuleActions';
 import { buildMinimapSpatialIndex, selectMinimapVisibleNodes } from './minimapSpatialIndex';
 
 // 简体中文：定义导航面板 of Props 接口
@@ -8,6 +9,9 @@ interface AppCanvasNavigationPanelProps {
   canvasTransform: { x: number; y: number; scale: number }; // 画布实时变换
   canvasRef: React.RefObject<any>; // 大画布实例引用
   isMobile: boolean; // 是否是移动端
+  onFitToAll: () => void;
+  onResetView: () => void;
+  onAutoArrange: () => void;
 }
 
 const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
@@ -15,6 +19,9 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   canvasTransform,
   canvasRef,
   isMobile,
+  onFitToAll,
+  onResetView,
+  onAutoArrange,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const lastTargetCenterRef = useRef<{ x: number; y: number } | null>(null);
@@ -464,6 +471,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   if (isCollapsed) {
     return (
       <div
+        data-canvas-navigation-dock="true"
         className="kk-workspace-chrome-surface canvas-nav-panel canvas-nav-panel--compact flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
         style={{
           width: '224px',
@@ -479,6 +487,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       >
         {/* 展开按钮，用带有 Map 图标的按钮 */}
         <button
+          data-canvas-minimap-toggle="true"
           onClick={toggleCollapsed}
           className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer transition-colors"
           style={{
@@ -542,6 +551,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
   return (
     <div
+      data-canvas-navigation-dock="true"
+      data-canvas-minimap-popover="true"
       className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-3 select-none transition-all duration-300 ease-in-out"
       style={{
         width: '224px',
@@ -562,6 +573,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         </div>
         <div className="w-11 flex justify-center items-center">
           <button
+            data-canvas-minimap-toggle="true"
             onClick={toggleCollapsed}
             className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             title="收起小地图"
@@ -646,6 +658,42 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               }}
             />
           </svg>
+        </div>
+
+        <div className="kk-canvas-navigation-actions" aria-label="画布操作">
+          <button
+            type="button"
+            data-canvas-navigation-action="fitToAll"
+            data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
+            onClick={onFitToAll}
+            className="kk-workspace-icon-control"
+            title="适应全部卡片"
+            aria-label="适应全部卡片"
+          >
+            <Maximize2 size={13} />
+          </button>
+          <button
+            type="button"
+            data-canvas-navigation-action="resetView"
+            data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
+            onClick={onResetView}
+            className="kk-workspace-icon-control"
+            title="重置画布视图"
+            aria-label="重置画布视图"
+          >
+            <Focus size={13} />
+          </button>
+          <button
+            type="button"
+            data-canvas-navigation-action="autoArrange"
+            data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+            onClick={onAutoArrange}
+            className="kk-workspace-icon-control"
+            title="自动整理卡片"
+            aria-label="自动整理卡片"
+          >
+            <LayoutDashboard size={13} />
+          </button>
         </div>
 
         {/* 缩放控制栏 (移至小地图下方，不再受折叠按钮挤压，使滑块拥有充足的可操作宽度) */}
@@ -733,6 +781,9 @@ export default React.memo(AppCanvasNavigationPanel, (prev, next) => {
     prev.canvasTransform.x === next.canvasTransform.x &&
     prev.canvasTransform.y === next.canvasTransform.y &&
     prev.canvasTransform.scale === next.canvasTransform.scale &&
-    prev.activeCanvas === next.activeCanvas
+    prev.activeCanvas === next.activeCanvas &&
+    prev.onFitToAll === next.onFitToAll &&
+    prev.onResetView === next.onResetView &&
+    prev.onAutoArrange === next.onAutoArrange
   );
 });

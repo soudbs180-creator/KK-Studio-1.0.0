@@ -48,28 +48,39 @@ test('desktop chrome publishes the V3 project, canvas and account hierarchy', ()
   );
 });
 
-test('canvas navigation defaults to a compact bottom-right zoom control', () => {
+test('canvas navigation uses one bottom-right dock and keeps its minimap bottom-anchored', () => {
   const navigationSource = readSource(
     'apps/web/src/app/AppCanvasNavigationPanel.tsx',
   );
-  const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+  const workspaceSource = readSource(
+    'apps/web/src/pages/Workspace/WorkspacePage.tsx',
+  );
+  const cssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.match(
     navigationSource,
     /savedCollapsedState\s*===\s*null\s*\?\s*true\s*:\s*savedCollapsedState\s*===\s*'true'/,
   );
-  assert.match(navigationSource, /canvas-nav-panel--compact/);
+  assert.match(navigationSource, /data-canvas-navigation-dock="true"/);
+  assert.match(navigationSource, /data-canvas-minimap-popover="true"/);
+  assert.match(navigationSource, /onFitToAll:\s*\(\)\s*=>\s*void/);
+  assert.match(navigationSource, /onResetView:\s*\(\)\s*=>\s*void/);
+  assert.match(navigationSource, /onAutoArrange:\s*\(\)\s*=>\s*void/);
   assert.match(
     cssSource,
-    /\.desktop-navigation-panel:has\(\.canvas-nav-panel--compact\)\s*\{[\s\S]*bottom:\s*10px\s*!important/,
+    /\.desktop-navigation-panel\s*\{[\s\S]*top:\s*auto\s*!important[\s\S]*bottom:\s*10px\s*!important/,
   );
   assert.match(
     cssSource,
-    /\.canvas-nav-panel--compact\s*\{[\s\S]*width:\s*156px\s*!important[\s\S]*height:\s*32px\s*!important/,
+    /\.kk-canvas-navigation-stack\s*\{[\s\S]*align-items:\s*flex-end/,
+  );
+  assert.match(
+    workspaceSource,
+    /<AppCanvasNavigationPanel[\s\S]*onFitToAll=\{handleFitToAll\}[\s\S]*onResetView=\{resetViewFn\}[\s\S]*onAutoArrange=\{handleAutoArrange\}/,
   );
   assert.match(
     cssSource,
-    /body\[data-kk-workspace-mode='canvas'\]\s+\.kk-workspace-edge-toggle[\s\S]*display:\s*none\s*!important/,
+    /body\[data-kk-workspace-mode='copilot'\]\s+\.desktop-navigation-panel\s*\{[\s\S]*display:\s*block\s*!important/,
   );
 });
 

@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import {
-    Focus,
     Grid3x3,
     Heart,
     Layers,
     LayoutDashboard,
-    Maximize2,
     Moon,
     MousePointer2,
     PenTool,
@@ -65,11 +63,8 @@ interface ProjectManagerProps {
     isSidebarOpen: boolean;
     onToggleSidebar: () => void;
     isMobile: boolean;
-    onFitToAll: () => void;
-    onResetView: () => void;
     onToggleCanvasMode: () => void;
     onToggleSnapToGrid: () => void;
-    onAutoArrange: () => void;
     onToggleChat?: () => void;
     isChatOpen?: boolean;
     canvasMode?: 'normal' | 'board';
@@ -107,10 +102,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onSearch,
     onFavorites,
     isMobile,
-    onFitToAll,
-    onResetView,
     onToggleCanvasMode,
-    onAutoArrange,
     canvasMode = 'normal',
     isUserMenuOpen = false,
     onOpenMarkdownImport,
@@ -1084,50 +1076,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     aria-pressed={isGridVisible}
                                 >
                                     <Grid3x3 size={16} />
-                                </button>
-
-                                <span className="kk-project-rail__divider" aria-hidden="true" />
-
-                                <button
-                                    type="button"
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onFitToAll();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="适应全部卡片"
-                                    aria-label="适应全部卡片"
-                                >
-                                    <Maximize2 size={16} />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onResetView();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="重置画布视图"
-                                    aria-label="重置画布视图"
-                                >
-                                    <Focus size={16} />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onAutoArrange();
-                                    }}
-                                    className={desktopIconButtonClass}
-                                    title="自动整理卡片"
-                                    aria-label="自动整理卡片"
-                                >
-                                    <LayoutDashboard size={16} />
                                 </button>
 
                                 <button
