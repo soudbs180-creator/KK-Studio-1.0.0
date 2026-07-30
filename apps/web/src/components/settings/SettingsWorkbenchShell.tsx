@@ -199,7 +199,7 @@ const SettingsConsoleMobileHome: React.FC<{
           </div>
         </section>
       ))}
-      <button type="button" className="settings-console-mobile-account" onClick={() => onNavigate('user-profile')}><span>个人中心</span><ChevronRight size={14} /></button>
+      <button type="button" className="settings-console-mobile-account" onClick={() => onNavigate('user-profile')}><span>{pick('个人中心', 'Account')}</span><ChevronRight size={14} /></button>
     </div>
   );
 };
@@ -255,6 +255,7 @@ export const SettingsConsoleShell: React.FC<{
     const topbarState = resolveMobileSettingsTopbarState(
       atHome,
       getSettingsViewMeta(activeView, language).title,
+      pick('系统设置', 'System Settings'),
     );
     return (
       <div className="settings-console settings-console--mobile" onClick={(event) => event.stopPropagation()}>

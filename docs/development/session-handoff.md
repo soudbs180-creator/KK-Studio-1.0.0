@@ -2314,3 +2314,47 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。语音识别属于浏览器能力增强，不可用时不影响文本输入和发送；所有业务回调与持久化契约保持不变。
 - 后续新增设置模块必须复用统一按钮、Switch、Segmented Control、Select 和最多两层 Surface 规则，并在 357/375/390/430/768/1440px 视口检查文字、留白、展开高度和横向溢出。
+
+---
+
+## 257. 2026-07-31 - fix(ui): 收口设置共享控件与错误兜底视觉
+
+**修改范围**
+- 继续审计设置工作台共享控件，确认“高级性能”页面仍局部实现 Switch，导致开关状态、动效和无障碍语义存在再次分叉风险；新增唯一 `SettingSwitchControl` 并让字段开关与页面开关共同复用。
+- 将设置 Select 的手写 Chevron SVG 替换为现有 Lucide 线性图标，并把遗留 200ms 图标转场收口为 Morphic 125ms 控件动效。
+- 修复移动设置首页标题和个人中心入口的英文模式文案，首页标题继续居中，二级页继续使用当前路由标题与左对齐状态。
+- 将设置页 Chunk 加载失败兜底从旧浅色、珊瑚色和任意 18px 圆角改为共享 `KkSurface(dialog)` 与 `KkButton(primary)`，保持 412px 弹窗宽度和统一深色层级。
+- 不改变设置路由、Provider、API、Canvas、鉴权、计费、Agent、数据库或持久化契约。
+
+**修改文件**
+- `apps/web/src/app/SettingsPageRoot.tsx`
+- `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`
+- `apps/web/src/components/settings/mobileSettingsNavigation.ts`
+- `apps/web/src/components/settings/ui/index.tsx`
+- `apps/web/src/components/settings/views/AppearanceMotionView.tsx`
+- `tests/unit/mobile-settings-navigation.test.ts`
+- `tests/unit/settings-canonical-entry-regression.test.ts`
+- `tests/unit/settings-ui-system-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 设置 Switch 的 DOM、ARIA、状态属性和控件动效只由 `SettingSwitchControl` 定义；业务页面不得再次直接创建 `role="switch"` 外观。
+2. 设置下拉继续使用共享菜单 Surface 和层级 Token；Chevron 使用图标库现有线性图标，旋转只使用 125ms Morphic 控件动效。
+3. 移动设置顶栏的首页标题由调用方按语言传入，辅助函数只负责 Home/Nested 的布局状态，不再硬编码单一语言。
+4. 设置入口错误兜底也是产品 UI 的一部分，必须消费共享 Surface、Button、颜色和圆角，禁止恢复旧浅色 fallback。
+
+**已运行验证**
+- TDD 红绿闭环：移动顶栏本地化、共享 Switch、共享 Select 图标/动效和设置错误兜底契约均先出现预期失败，实施后相关 13 项全部通过。
+- 全量 unit：2294 项，2292 通过、0 失败、2 跳过。
+- `npm run architecture:check`、`npm run governance:check`、`npm run typecheck`、`npm run build`、`npm run check:encoding` 与 `git diff --check` 均以退出码 0 通过。
+- React 最佳实践复核：新增控件位于模块顶层、无新增订阅或副作用、受控状态与 ARIA 同步、未新增 `any`、`console.log`、`debugger` 或生产依赖。
+
+**未运行验证及原因**
+- 内置浏览器当前停留在本地错误页，接管刷新被浏览器安全策略拒绝；遵循策略未改用 Raw CDP、外部 Playwright 或其他浏览器绕过，因此本轮没有新增可接受的真实页面截图，也不声称完成视觉截图复验。
+- 未执行移动/桌面浏览器 Smoke，因为这些脚本会重新驱动浏览器完成与被拒绝操作相同的视觉验证；本轮以单元契约、类型、治理、编码和生产构建作为可用证据。
+- 未运行完整 `verify:changes`，原因同上：该命令包含移动/桌面设置浏览器 Smoke。其非浏览器核心子集已分别通过。
+- 未部署生产环境；本次范围为本地设置 UI 审计、共享控件收口和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。变更集中在设置 UI 表现层和纯导航辅助函数，业务回调与数据契约保持不变。
+- 下次内置浏览器可正常接管时，应优先补验 375/390/430/768/1440px 的设置首页、外观性能 Select/Switch、英文模式顶栏和 Chunk 错误兜底，并继续迁移 Browser Assistant 中仍直接声明的本地 Switch 语义。

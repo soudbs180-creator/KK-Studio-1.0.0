@@ -50,9 +50,13 @@ export function buildMobileSettingsGroups(items: SettingsNavItem[], english: boo
  * Keeps the mobile header predictable: the landing title is centered while a
  * nested route makes room for the visible back control.
  */
-export function resolveMobileSettingsTopbarState(atHome: boolean, currentTitle: string) {
+export function resolveMobileSettingsTopbarState(
+  atHome: boolean,
+  currentTitle: string,
+  homeTitle = '系统设置',
+) {
   return {
-    title: atHome ? '系统设置' : currentTitle,
+    title: atHome ? homeTitle : currentTitle,
     titleAlignment: atHome ? 'center' : 'start',
     showBackButton: !atHome,
   } as const;

@@ -39,12 +39,12 @@ test('mobile settings home is the overview and does not render a duplicate overv
 });
 
 test('mobile settings topbar exposes home and nested navigation states without an extra back action', () => {
-  assert.deepEqual(resolveMobileSettingsTopbarState(true, '系统设置'), {
-    title: '系统设置',
+  assert.deepEqual(resolveMobileSettingsTopbarState(true, '能力来源', 'System Settings'), {
+    title: 'System Settings',
     titleAlignment: 'center',
     showBackButton: false,
   });
-  assert.deepEqual(resolveMobileSettingsTopbarState(false, '能力来源'), {
+  assert.deepEqual(resolveMobileSettingsTopbarState(false, '能力来源', 'System Settings'), {
     title: '能力来源',
     titleAlignment: 'start',
     showBackButton: true,

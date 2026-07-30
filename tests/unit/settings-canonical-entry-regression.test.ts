@@ -22,6 +22,10 @@ test('production settings entry delegates to the localized router-backed workben
   assert.match(settingsPageRootSource, /const SettingsPanel = lazyWithRetry\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
   assert.match(settingsPageRootSource, /presentation="page"/);
   assert.match(settingsPageRootSource, /initialPathname=\{window\.location\.pathname\}/);
+  assert.match(settingsPageRootSource, /import \{ KkButton, KkSurface \} from '@kk\/ui';/);
+  assert.match(settingsPageRootSource, /<KkSurface variant="dialog"/);
+  assert.match(settingsPageRootSource, /<KkButton[\s\S]*tone="primary"[\s\S]*block/);
+  assert.doesNotMatch(settingsPageRootSource, /#ffffff|#0a0a0a|#ff6b5a|rgba\(17,\s*24,\s*39/);
   assert.doesNotMatch(appSource, /const MobileApiSettingsView = lazy\(\(\) => import\('\.\/components\/settings\/ApiSettingsView'\)\);/);
   assert.doesNotMatch(appSource, /const MobileSystemLogsView = lazy\(\(\) => import\('\.\/components\/settings\/views\/SystemLogsView\.localized\.tsx'\)\);/);
   assert.doesNotMatch(appSource, /const MobileUsageView = lazy\(\(\) => import\('\.\/pages\/CostEstimation'\)\);/);

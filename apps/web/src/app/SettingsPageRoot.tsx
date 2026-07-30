@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { KkButton, KkSurface } from '@kk/ui';
 import { isChunkLoadError, lazyWithRetry } from '../utils/lazyWithRetry';
 import { shouldUseHistoryBackForSettingsClose } from './settingsPageClose';
 
@@ -31,16 +32,16 @@ class SettingsPageLoadBoundary extends React.Component<
     if (!this.state.error) return this.props.children;
 
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--bg-canvas, #ffffff)' }}>
-        <div style={{ width: 'min(520px, 100%)', border: '1px solid var(--border-default, rgba(17,24,39,0.14))', borderRadius: 18, padding: 20, color: 'var(--text-primary, #0a0a0a)', background: 'var(--bg-surface, #ffffff)' }}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>设置页加载失败</div>
-          <div style={{ marginTop: 8, color: 'var(--text-secondary, #3a3a3a)', fontSize: 13, lineHeight: 1.7 }}>
+      <div className="grid min-h-[100dvh] place-items-center bg-[var(--kk-morphic-page)] p-4">
+        <KkSurface variant="dialog" className="w-full max-w-[412px] p-5">
+          <div className="text-base font-semibold leading-6">设置页加载失败</div>
+          <div className="mt-2 text-sm leading-6 text-[var(--kk-morphic-text-secondary)]">
             {isChunkLoadError(this.state.error) ? '设置资源刚刚更新或开发服务短暂重启，重新加载后即可继续。' : '设置模块加载时遇到异常。'}
           </div>
-          <button type="button" onClick={this.retry} style={{ marginTop: 16, minHeight: 38, border: 0, borderRadius: 10, padding: '0 14px', background: 'var(--accent-coral, #ff6b5a)', color: '#ffffff', fontWeight: 800, cursor: 'pointer' }}>
+          <KkButton tone="primary" block className="mt-4" onClick={this.retry}>
             重新加载设置页
-          </button>
-        </div>
+          </KkButton>
+        </KkSurface>
       </div>
     );
   }

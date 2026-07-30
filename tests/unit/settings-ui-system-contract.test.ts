@@ -69,10 +69,12 @@ test('appearance and motion view consumes only the shared settings system primit
   assert.ok(existsSync(viewPath), 'AppearanceMotionView.tsx must exist');
 
   const viewSource = readSource('apps/web/src/components/settings/views/AppearanceMotionView.tsx');
+  const primitiveSource = readSource('apps/web/src/components/settings/ui/index.tsx');
 
   assert.match(viewSource, /SettingsHero/);
   assert.match(viewSource, /SettingsSystemCard/);
   assert.match(viewSource, /SettingsSystemField/);
+  assert.match(viewSource, /SettingSwitchControl/);
   assert.match(viewSource, /SETTINGS_PAGE_CONTAINER_CLASSNAME/);
   assert.match(viewSource, /SETTINGS_RESPONSIVE_GRID_CLASSNAME/);
   assert.match(viewSource, /useAppearanceMotion/);
@@ -84,6 +86,9 @@ test('appearance and motion view consumes only the shared settings system primit
   assert.doesNotMatch(viewSource, /#[0-9a-fA-F]{3,8}/);
   assert.doesNotMatch(viewSource, /rgba?\(/);
   assert.doesNotMatch(viewSource, /hsla?\(/);
+  assert.doesNotMatch(viewSource, /<button[\s\S]*?role="switch"/);
+  assert.match(primitiveSource, /export const SettingSwitchControl/);
+  assert.match(primitiveSource, /<SettingSwitchControl[\s\S]*?checked=\{checked\}/);
 });
 
 test('mobile settings shell title stays out of heading landmarks', () => {
@@ -155,6 +160,7 @@ test('shared settings select dropdown consumes control-menu primitive and layer 
   assert.match(scaffoldSource, /SETTINGS_CONTROL_MENU_OPTION_CLASSNAME/);
 
   assert.match(uiSource, /import \{ KK_LAYER \} from '@kk\/ui';/);
+  assert.match(uiSource, /ChevronDown/);
   assert.match(uiSource, /SETTINGS_CONTROL_MENU_CLASSNAME/);
   assert.match(uiSource, /SETTINGS_CONTROL_MENU_OPTION_CLASSNAME/);
   assert.match(uiSource, /style=\{\{\s*zIndex:\s*KK_LAYER\.dropdown\s*\}\}/);
@@ -166,6 +172,7 @@ test('shared settings select dropdown consumes control-menu primitive and layer 
   assert.match(settingsStylesSource, /\.settings-panel \.settings-system-control-menu-option\[data-state='selected'\]/);
 
   assert.doesNotMatch(uiSource, /z-\[100\]/);
+  assert.doesNotMatch(uiSource, /<svg[\s\S]*?M19 9l-7 7-7-7/);
   assert.doesNotMatch(uiSource, /shadow-lg/);
   assert.doesNotMatch(uiSource, /backdrop-blur-md/);
 });

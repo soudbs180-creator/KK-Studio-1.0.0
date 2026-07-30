@@ -25,25 +25,9 @@ import {
   readCanvasPerformanceMode,
   SETTINGS_QUICK_PREFERENCES_EVENT,
 } from '../settingsQuickPreferences';
-import { SettingSelect } from '../ui/index';
+import { SettingSelect, SettingSwitchControl } from '../ui/index';
 
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
-
-const ToggleSwitch: React.FC<{
-  checked: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}> = ({ checked, label, onChange }) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    aria-label={label}
-    className="settings-system-switch"
-    data-state={checked ? 'on' : 'off'}
-    onClick={() => onChange(!checked)}
-  />
-);
 
 const AppearanceMotionView: React.FC = () => {
   const { locale, pick } = useLocale();
@@ -210,7 +194,7 @@ const AppearanceMotionView: React.FC = () => {
             value={preferences.solidFallback ? pick('开启', 'On') : pick('关闭', 'Off')}
             description={pick('在投屏、低透明度偏好或复杂背景下使用实体表面。', 'Uses solid surfaces for projection, low-transparency preference, or busy backgrounds.')}
           >
-            <ToggleSwitch
+            <SettingSwitchControl
               checked={preferences.solidFallback}
               label={pick('切换实体回退', 'Toggle solid fallback')}
               onChange={(checked) => setPreferences({ solidFallback: checked })}

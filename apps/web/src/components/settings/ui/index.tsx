@@ -3,7 +3,7 @@
  * 设置页面UI组件库 - iOS风格设计系统
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 import {
   SETTINGS_CONTROL_MENU_CLASSNAME,
@@ -325,6 +325,30 @@ export const SettingInput: React.FC<{
   );
 };
 
+export const SettingSwitchControl: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  disabled?: boolean;
+  controlAction?: string;
+}> = ({ checked, onChange, label, disabled = false, controlAction }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    onClick={() => {
+      if (!disabled) {
+        onChange(!checked);
+      }
+    }}
+    disabled={disabled}
+    data-settings-control-action={controlAction}
+    className={`settings-system-switch settings-control-toggle settings-toggle-button disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
+    data-state={checked ? 'on' : 'off'}
+  />
+);
+
 // SettingToggle 开关组件
 export const SettingToggle: React.FC<{
   label: string;
@@ -352,19 +376,12 @@ export const SettingToggle: React.FC<{
           </div>
         )}
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => {
-          if (!disabled) {
-            onChange(!checked);
-          }
-        }}
+      <SettingSwitchControl
+        checked={checked}
+        onChange={onChange}
+        label={label}
         disabled={disabled}
-        data-settings-control-action={controlAction}
-        className={`settings-system-switch settings-control-toggle settings-toggle-button disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
-        data-state={checked ? 'on' : 'off'}
+        controlAction={controlAction}
       />
     </div>
   );
@@ -413,14 +430,13 @@ export const SettingSelect: React.FC<{
         style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
         <span className="truncate">{selectedOption?.label || value}</span>
-        <svg
-          className={`w-4 h-4 ml-2 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown
+          aria-hidden="true"
+          className={`ml-2 h-4 w-4 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          style={{
+            transition: 'transform var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard)',
+          }}
+        />
       </button>
 
       {isOpen && (
