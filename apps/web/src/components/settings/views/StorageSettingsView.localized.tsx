@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Activity, FolderOpen, HardDrive, Layers3, RefreshCw, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Cloud, Database, FolderOpen, HardDrive, Images, Layers3, RefreshCw, Trash2, WandSparkles } from 'lucide-react';
 import { useCanvas } from '../../../context/CanvasContext';
 import { useLocale } from '../../../context/LocaleContext';
 import {
@@ -19,46 +19,20 @@ import {
 import { cleanupCompletedTasksOlderThan } from '../../../services/persistence/taskPersistence';
 import { cleanupLogsOlderThan } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
-import { isCompactResponsiveWidth } from '../../../utils/responsiveSurface';
 import {
+  SETTINGS_RESPONSIVE_GRID_CLASSNAME,
   SettingsActionButton,
   SettingsBadge,
-  SettingsCardGridContainer,
+  SettingsDangerZone,
   SettingsHero,
   SettingsMetricCard,
   SettingsSection,
+  SettingsSystemCard,
+  SettingsSystemField,
   SettingsViewShell,
 } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
 import { STORAGE_SETTINGS_ACTIONS } from '../settingsModuleActions';
-
-const STORAGE_COMPACT_ACTION_CLASS =
-  'inline-flex min-h-[var(--ui-control-height-touch)] cursor-pointer items-center justify-center gap-1 rounded-[var(--radius-control-md)] px-3 text-[var(--type-caption)] font-semibold leading-tight transition-[background-color,border-color,color,opacity,transform] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40';
-
-const StorageModeTile: React.FC<{
-  title: string;
-  description: string;
-  active: boolean;
-  helper: string;
-  action: React.ReactNode;
-}> = ({ title, description, active, helper, action }) => {
-  const { pick } = useLocale();
-
-  return (
-    <div className="settings-reference-mini-metric">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="settings-reference-mini-metric__label">{title}</div>
-          <div className="settings-reference-mini-metric__value">{active ? pick('已启用', 'Active') : pick('可用', 'Available')}</div>
-        </div>
-        <SettingsBadge tone={active ? 'emerald' : 'neutral'}>{active ? pick('当前使用', 'Current') : pick('可切换', 'Ready')}</SettingsBadge>
-      </div>
-      <div className="settings-reference-mini-metric__helper">{description}</div>
-      <div className="mt-3 text-[12px] text-[var(--text-tertiary)]">{helper}</div>
-      <div className="mt-4">{action}</div>
-    </div>
-  );
-};
 
 export const StorageSettingsView: React.FC = () => {
   const { locale, pick } = useLocale();
@@ -74,16 +48,6 @@ export const StorageSettingsView: React.FC = () => {
     clearAllData,
   } = useCanvas();
 
-  const [isMobile, setIsMobile] = useState(() => (
-    typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
-  ));
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(isCompactResponsiveWidth(window.innerWidth));
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   const [mode, setMode] = useState<StorageMode | null>(null);
   const [usageMB, setUsageMB] = useState(0);
   const [imageCount, setImageCount] = useState(0);
@@ -97,13 +61,11 @@ export const StorageSettingsView: React.FC = () => {
   );
 
   const supportsLocal = isFileSystemAccessSupported();
-  const cleanupOptions = [
-    { label: pick('7 天策略', '7-Day Policy'), days: 7 },
-    { label: pick('30 天策略', '30-Day Policy'), days: 30 },
-  ] as const;
-  const mergeCandidates = state.canvases.filter((canvas) => canvas.id !== activeCanvas?.id);
+  const mergeCandidates = useMemo(
+    () => state.canvases.filter((canvas) => canvas.id !== activeCanvas?.id),
+    [activeCanvas?.id, state.canvases],
+  );
   const usageProgress = Math.min(100, (usageMB / 1024) * 100);
-  const retentionCleanupOptions = cleanupOptions;
 
   const formatMb = (value: number) => `${value.toFixed(2)} MB`;
   const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -386,51 +348,8 @@ export const StorageSettingsView: React.FC = () => {
     }
   };
 
+  // 无效卡片清理只移除可恢复的错误节点和空分组，因此无需和永久删除使用同一套危险确认。
   const handleCleanupProjectCards = async () => {
-    if (!activeCanvas) {
-      notify.warning(
-        pick('没有活动项目', 'No active project'),
-        pick('请先打开一个项目。', 'Open a project first.')
-      );
-      return;
-    }
-
-    const confirmed = typeof window === 'undefined'
-      ? true
-      : window.confirm(
-          pick(
-            `确认清理“${activeCanvas.name}”中的无效卡片吗？`,
-            `Clean invalid cards in "${activeCanvas.name}" now?`,
-          ),
-        );
-    if (!confirmed) return;
-
-    setProjectAction('cleanup');
-    try {
-      const result = cleanupInvalidCards(activeCanvas.id);
-      const summary =
-        result.removedPrompts === 0 && result.removedImages === 0 && result.removedGroups === 0
-          ? pick(`“${activeCanvas.name}”中没有发现无效卡片。`, `No invalid cards were found in "${activeCanvas.name}".`)
-          : pick(
-              `已移除 ${result.removedPrompts} 张提示卡、${result.removedImages} 张图片卡，以及 ${result.removedGroups} 个空分组。`,
-              `Removed ${result.removedPrompts} prompt cards, ${result.removedImages} image cards, and ${result.removedGroups} empty groups from "${activeCanvas.name}".`
-            );
-      notify.success(pick('整理完成', 'Cleanup complete'), summary);
-      setLastActionMessage(summary);
-    } catch (error) {
-      console.error('[StorageSettingsView] Project cleanup failed:', error);
-      notify.error(
-        pick('整理失败', 'Cleanup failed'),
-        pick('请稍后再试。', 'Please try again later.')
-      );
-      setLastActionMessage(pick('项目整理失败。', 'Project cleanup failed.'));
-    } finally {
-      setProjectAction(null);
-    }
-    };
-
-  // 简体中文：为设置页提供免确认的快捷错误卡片清理操作，响应用户“错误卡片不需要危险提醒”的要求
-  const handleQuickCleanupInvalid = async () => {
     if (!activeCanvas) {
       notify.warning(
         pick('没有活动项目', 'No active project'),
@@ -453,11 +372,12 @@ export const StorageSettingsView: React.FC = () => {
       setLastActionMessage(summary);
       void refresh();
     } catch (error) {
-      console.error('[StorageSettingsView] Quick cleanup failed:', error);
+      console.error('[StorageSettingsView] Project cleanup failed:', error);
       notify.error(
         pick('清理失败', 'Cleanup failed'),
         pick('请稍后再试。', 'Please try again later.')
       );
+      setLastActionMessage(pick('项目整理失败。', 'Project cleanup failed.'));
     } finally {
       setProjectAction(null);
     }
@@ -495,368 +415,299 @@ export const StorageSettingsView: React.FC = () => {
     }
   };
 
-  const metricCardsContent = (
-    <>
-      {/* 指标卡片 1: 本地授权 (1A) */}
-      <div className="dashboard-grid-card">
-        <div className="flex flex-col justify-between h-full w-full">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('本地授权', 'Permission')}</span>
-            <HardDrive size={13} />
-          </div>
-          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}</div>
-          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('是否允许访问本地文件夹。', 'Local folder read/write capability.')}</div>
-        </div>
-      </div>
-
-      {/* 指标卡片 2: 活动项目 (1A) */}
-      <div className="dashboard-grid-card">
-        <div className="flex flex-col justify-between h-full w-full">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('活动项目', 'Active Project')}</span>
-            <FolderOpen size={13} />
-          </div>
-          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || pick('未选择', 'None')}</div>
-          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前正在编辑的项目。', 'Canvas currently in use.')}</div>
-        </div>
-      </div>
-
-      {/* 指标卡片 3: 缓存占用 (1A) */}
-      <div className="dashboard-grid-card">
-        <div className="flex flex-col justify-between h-full w-full">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('缓存占用', 'Footprint')}</span>
-            <Activity size={13} />
-          </div>
-          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{formatMb(usageMB)}</div>
-          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('图片与文件缓存总计。', 'Total storage consumed locally.')}</div>
-        </div>
-      </div>
-
-      {/* 指标卡片 4: 项目总数 (1A) */}
-      <div className="dashboard-grid-card">
-        <div className="flex flex-col justify-between h-full w-full">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[9px] font-bold uppercase tracking-wider">{pick('项目总数', 'Projects')}</span>
-            <Layers3 size={13} />
-          </div>
-          <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} 个</div>
-          <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前工作区内项目总数。', 'Total canvases stored.')}</div>
-        </div>
-      </div>
-    </>
-  );
+  const modeBadgeTone = mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'neutral';
+  const modeLabel = mode === null && refreshing
+    ? pick('正在检测', 'Detecting')
+    : getModeLabel(mode);
 
   return (
-    <SettingsViewShell>
+    <SettingsViewShell className="settings-storage-view">
       <SettingsHero
-        eyebrow={pick('系统维护', 'System maintenance')}
-        title={pick('存储维护', 'Storage Settings')}
-        description={pick('管理模式、容量和修复动作。', 'Manage modes, capacity, and repair actions.')}
+        eyebrow={pick('存储与工作区', 'Storage & Workspaces')}
+        title={pick('存储与同步', 'Storage & Sync')}
+        description={pick(
+          '集中管理同步策略、存储位置、容量和工作区维护动作。',
+          'Manage sync policy, storage location, capacity, and workspace maintenance in one place.',
+        )}
         icon={HardDrive}
-        tone={mode === 'local' ? 'emerald' : 'amber'}
-        badge={
-          <SettingsBadge tone={mode === 'local' ? 'emerald' : 'amber'}>
-            {mode === 'local' ? pick('本地持久化', 'Local Folder') : pick('浏览器缓存', 'Browser Cache')}
-          </SettingsBadge>
-        }
+        tone={mode === 'local' ? 'emerald' : 'indigo'}
+        badge={<SettingsBadge tone={modeBadgeTone}>{modeLabel}</SettingsBadge>}
       />
 
-      <SettingsCardGridContainer>
-        {/* 第一排: 4 个指标卡片 (1A * 4A)，整体包裹在 a-card-span-4-col 的自适应网格容器中以防排版空洞与错乱 */}
-        <div className="a-card-span-4-col grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
-          {metricCardsContent}
+      <SettingsSection
+        title={pick('状态概览', 'Status overview')}
+        description={pick('快速确认当前工作区、缓存和设备能力。', 'Review workspace, cache, and device readiness at a glance.')}
+        surface="plain"
+      >
+        <div className="grid grid-cols-2 gap-[var(--kk-space-3)] xl:grid-cols-4">
+          <SettingsMetricCard
+            label={pick('本地授权', 'Local permission')}
+            value={supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}
+            helper={pick('文件夹读写能力', 'Folder read/write capability')}
+            icon={HardDrive}
+            tone={supportsLocal ? 'emerald' : 'amber'}
+          />
+          <SettingsMetricCard
+            label={pick('活动项目', 'Active project')}
+            value={activeCanvas?.name || pick('未选择', 'None')}
+            helper={pick('当前编辑工作区', 'Current editing workspace')}
+            icon={FolderOpen}
+            tone="indigo"
+          />
+          <SettingsMetricCard
+            label={pick('缓存占用', 'Cache usage')}
+            value={formatMb(usageMB)}
+            helper={pick(`${imageCount} 张图片`, `${imageCount} images`)}
+            icon={Images}
+            tone={usageMB >= 768 ? 'rose' : usageMB >= 512 ? 'amber' : 'sky'}
+          />
+          <SettingsMetricCard
+            label={pick('项目总数', 'Projects')}
+            value={pick(`${state.canvases.length} 个`, `${state.canvases.length}`)}
+            helper={pick('当前工作区项目', 'Projects in this workspace')}
+            icon={Layers3}
+            tone="neutral"
+          />
         </div>
+      </SettingsSection>
 
-        {/* 卡片 5: 持久化模式 (2A * 2row) */}
-        <div 
-          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
-          style={{ cursor: 'default' }}
+      <SettingsSystemCard
+        className="settings-system-card--wide"
+        title={pick('同步与存储位置', 'Sync and storage location')}
+        description={pick(
+          '手机端优先同步云端；桌面端可在浏览器缓存与授权文件夹之间切换。',
+          'Mobile prioritizes cloud sync; desktop can switch between browser cache and an authorized folder.',
+        )}
+        icon={Cloud}
+        tone="indigo"
+      >
+        <SettingsSystemField
+          label={pick('多端同步', 'Cross-device sync')}
+          description={pick(
+            '手机端只保留加速缓存，工作区资源以云端副本为主。',
+            'Mobile keeps only an acceleration cache while cloud copies remain authoritative.',
+          )}
+          value={<SettingsBadge tone="indigo">{pick('云端优先', 'Cloud-first')}</SettingsBadge>}
         >
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                {pick('持久化模式', 'Persistence')}
-              </div>
-              <SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>
-                {getModeLabel(mode)}
-              </SettingsBadge>
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2">{pick('当前存储目标配置', 'Active Target')}</h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-              {pick('为快速体验保留浏览器缓存，为长期归档使用本地授权文件夹。', 'Browser cache for sessions, local folders for workspace persistence.')}
-            </p>
+          <SettingsBadge tone="neutral">{pick('自动策略', 'Automatic')}</SettingsBadge>
+        </SettingsSystemField>
 
-            <div className="mt-3.5 space-y-2">
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
-                <div className="min-w-0 flex-1 mr-2">
-                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{getLocalFolderStatusLabel()}</div>
-                </div>
-                <div className="flex gap-1.5 shrink-0">
-                  {supportsLocal && (
-                    <button
-                      type="button"
-                      onClick={() => void changeLocalFolder()}
-                      className={`${STORAGE_COMPACT_ACTION_CLASS} bg-slate-600 text-white hover:bg-slate-700`}
-                    >
-                      {pick('更换', 'Change')}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!supportsLocal || mode === 'local'}
-                    onClick={() => void switchToLocal()}
-                    data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToLocalMode.uiAction}
-                    className={`${STORAGE_COMPACT_ACTION_CLASS} bg-emerald-600 text-white hover:bg-emerald-700`}
-                  >
-                    {pick('切换', 'Switch')}
-                  </button>
-                </div>
-              </div>
-
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'}`}>
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('浏览器缓存模式', 'Browser Cache Mode')}</div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{pick('免授权直接使用本地缓存', 'No permission required')}</div>
-                </div>
-                <button
-                  type="button"
-                  disabled={mode === 'browser'}
-                  onClick={() => void switchToBrowser()}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToBrowserMode.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} bg-blue-600 text-white hover:bg-blue-700`}
-                >
-                  {pick('切换', 'Switch')}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-black/5 dark:border-white/5 text-[10px] text-slate-600 dark:text-slate-400 truncate">
-            {pick('最近动作', 'Last Action')}: {lastActionMessage}
-          </div>
-        </div>
-
-        {/* 卡片 6: 容量占用 (2A * 2row) */}
-        <div 
-          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
-          style={{ cursor: 'default' }}
+        <SettingsSystemField
+          label={pick('本地文件夹', 'Local folder')}
+          description={getLocalFolderStatusLabel()}
+          value={mode === 'local' ? <SettingsBadge tone="emerald">{pick('当前使用', 'Current')}</SettingsBadge> : undefined}
         >
-          <div>
-            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {pick('占用分布', 'Usage')}
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('容量快照与分布', 'Capacity Snapshot')}</h3>
-            
-            <div className="mt-4">
-              <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 mb-1.5">
-                <span>{refreshing ? pick('更新中...', 'Updating...') : pick(`已存 ${imageCount} 张图片`, `${imageCount} images`)}</span>
-                <span>{formatMb(usageMB)} / 1 GB</span>
-              </div>
-              <ProgressBar
-                progress={usageProgress}
-                tone={usageMB >= 768 ? 'rose' : usageMB >= 512 ? 'amber' : 'indigo'}
-                showLabel={false}
-              />
-              <p className="text-[10px] text-slate-500 mt-2">
-                {pick('图片资源在达到限额时可能会触发自动缓存清理机制。', 'Reaching storage limit triggers automatic cleanup policies.')}
-              </p>
-            </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            {supportsLocal ? (
+              <SettingsActionButton size="sm" onClick={() => void changeLocalFolder()}>
+                {pick('更换文件夹', 'Change folder')}
+              </SettingsActionButton>
+            ) : null}
+            <SettingsActionButton
+              size="sm"
+              tone={mode === 'local' ? 'secondary' : 'primary'}
+              disabled={!supportsLocal || mode === 'local'}
+              loading={switchingMode === 'local'}
+              aria-pressed={mode === 'local'}
+              onClick={() => void switchToLocal()}
+              data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToLocalMode.uiAction}
+            >
+              {mode === 'local' ? pick('已启用', 'Enabled') : pick('切换使用', 'Use folder')}
+            </SettingsActionButton>
           </div>
+        </SettingsSystemField>
 
-          <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/5">
-            <span className="text-[9px] text-slate-500 dark:text-slate-400">{pick('配额机制：自动淘汰', 'Quota policy: Auto-eviction')}</span>
-            <button
-              type="button"
-              disabled={refreshing}
+        <SettingsSystemField
+          label={pick('浏览器缓存', 'Browser cache')}
+          description={pick('无需授权，适合快速体验和临时项目。', 'No permission required; best for temporary work.')}
+          value={mode === 'browser' ? <SettingsBadge tone="indigo">{pick('当前使用', 'Current')}</SettingsBadge> : undefined}
+        >
+          <SettingsActionButton
+            size="sm"
+            tone={mode === 'browser' ? 'secondary' : 'primary'}
+            disabled={mode === 'browser'}
+            loading={switchingMode === 'browser'}
+            aria-pressed={mode === 'browser'}
+            onClick={() => void switchToBrowser()}
+            data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.switchToBrowserMode.uiAction}
+          >
+            {mode === 'browser' ? pick('已启用', 'Enabled') : pick('切换使用', 'Use cache')}
+          </SettingsActionButton>
+        </SettingsSystemField>
+
+        <SettingsSystemField
+          label={pick('最近动作', 'Last action')}
+          description={pick('这里会显示刷新、切换和清理结果。', 'Refresh, switch, and cleanup results appear here.')}
+        >
+          <div className="flex max-w-full flex-col items-end gap-2">
+            <span
+              className="max-w-full break-words text-right text-[length:var(--type-caption)] text-[var(--text-secondary)]"
+              aria-live="polite"
+            >
+              {lastActionMessage}
+            </span>
+            <SettingsActionButton
+              icon={RefreshCw}
+              size="sm"
+              loading={refreshing}
               onClick={() => void refresh()}
               data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.refreshUsage.uiAction}
-              className={`${STORAGE_COMPACT_ACTION_CLASS} text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300`}
             >
-              <RefreshCw size={10} className={refreshing ? 'animate-spin' : ''} />
-              {pick('立即刷新状态', 'Refresh')}
-            </button>
+              {pick('刷新存储', 'Refresh storage')}
+            </SettingsActionButton>
           </div>
-        </div>
+        </SettingsSystemField>
+      </SettingsSystemCard>
 
-        {/* 卡片 7: 清理控制 (2A * 3row) */}
-        <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-3-row p-4 flex flex-col justify-between"
-          style={{ cursor: 'default' }}
-        >
-          <div>
-            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {pick('清理控制', 'Cleanup')}
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('缓存清理与保留策略', 'Cache & Retention Policy')}</h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-              {pick('安全清理本地缓存与历史痕迹，或彻底抹除所有工作区 data。', 'Reclaim space by cleaning cache or fully wiping all workspace data.')}
-            </p>
-
-            <div className="space-y-3 mt-3">
-              {/* 1. 清理错误卡片 */}
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    {pick('清理全部错误卡片', 'Clean Broken Cards')}
-                  </div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
-                    {pick('移除当前项目中的无效卡片、失效图片及空分组', 'Clean broken cards and empty groups')}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleQuickCleanupInvalid}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanBrokenCards.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} shrink-0 border border-black/5 bg-black/5 text-slate-600 hover:bg-black/10 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15`}
-                >
-                  {pick('立即清理', 'Clean')}
-                </button>
-              </div>
-
-              {/* 2. 仅保留 30 天数据 */}
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    {pick('30 天保留策略', '30-Day Policy')}
-                  </div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
-                    {pick('仅保留 30 天内数据，清理过期缓存、日志与任务', 'Keep last 30 days of cache, logs and tasks')}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={cleanupType === 30}
-                  onClick={() => void handleRetentionCleanup(30)}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention30Days.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} shrink-0 bg-amber-600/80 text-white hover:bg-amber-600`}
-                >
-                  {pick('应用策略', 'Apply')}
-                </button>
-              </div>
-
-              {/* 3. 仅保留 7 天数据 */}
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 ${isMobile ? 'border border-transparent' : 'border border-black/5 dark:border-white/5'} hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}>
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
-                    {pick('7 天保留策略', '7-Day Policy')}
-                  </div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
-                    {pick('仅保留 7 天内数据，大幅释放本地存储空间', 'Keep last 7 days of cache, logs and tasks')}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={cleanupType === 7}
-                  onClick={() => void handleRetentionCleanup(7)}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention7Days.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} shrink-0 bg-orange-600/80 text-white hover:bg-orange-600`}
-                >
-                  {pick('应用策略', 'Apply')}
-                </button>
-              </div>
-
-              {/* 4. 删除全部所有卡片 */}
-              <div className={`flex items-center justify-between p-2 rounded-xl bg-red-500/5 ${isMobile ? 'border border-transparent' : 'border border-red-500/10'} hover:bg-red-500/10 transition-colors`}>
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-red-400 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                    {pick('删除全部所有卡片', 'Clear All Data')}
-                  </div>
-                  <div className="text-[9px] text-red-200/50 mt-0.5 leading-normal">
-                    {pick('高危：永久清空所有项目、卡片和图片缓存并重置', 'DANGER: Wipe all projects, cards, cache and reset')}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={cleanupType === 'compress'}
-                  onClick={handleClearAllData}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.clearAllData.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} shrink-0 bg-red-600 text-white hover:bg-red-700`}
-                >
-                  {pick('清理全部', 'Wipe All')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 卡片 8: 工作区修复 (2A * 2row) */}
-        <div 
-          className="dashboard-grid-card a-card-span-2-col p-4 flex flex-col justify-between"
-          style={{ cursor: 'default' }}
-        >
-          <div>
-            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {pick('工作区动作', 'Repair')}
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('项目合并与垃圾清理', 'Project Merge & Tidy')}</h3>
-            
-            <div className="mt-3 space-y-2.5">
-              <div>
-                <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-1">{pick('合并来源项目', 'Source Canvas')}</label>
-                <div className="select-container mt-1">
-                  <SettingSelect
-                    label=""
-                    value={mergeSourceId}
-                    options={
-                      mergeCandidates.length > 0
-                        ? mergeCandidates.map((canvas) => ({ value: canvas.id, label: canvas.name }))
-                        : [{ value: '', label: pick('没有其他可用项目', 'No other canvas') }]
-                    }
-                    onChange={setMergeSourceId}
-                    controlAction={STORAGE_SETTINGS_ACTIONS.selectMergeSource.uiAction}
+      <SettingsSection
+        title={pick('维护与整理', 'Maintenance and organization')}
+        description={pick('普通清理不会删除项目；永久抹除单独放在危险区域。', 'Routine cleanup preserves projects; permanent deletion stays isolated below.')}
+        surface="plain"
+      >
+        <div className="flex flex-col gap-[var(--kk-space-4)]">
+          <div className={SETTINGS_RESPONSIVE_GRID_CLASSNAME}>
+            <SettingsSystemCard
+              title={pick('容量与保留', 'Capacity and retention')}
+              description={pick('控制缓存空间和历史数据保留周期。', 'Control cache usage and data retention windows.')}
+              icon={Database}
+              tone="sky"
+            >
+              <SettingsSystemField
+                label={pick('容量快照', 'Capacity snapshot')}
+                description={pick('达到上限时会按保留策略自动淘汰缓存。', 'Cache is evicted by retention policy near the limit.')}
+                value={pick(`${imageCount} 张图片`, `${imageCount} images`)}
+              >
+                <div className="w-full min-w-40">
+                  <ProgressBar
+                    progress={usageProgress}
+                    tone={usageMB >= 768 ? 'rose' : usageMB >= 512 ? 'amber' : 'indigo'}
+                    showLabel={false}
                   />
                 </div>
-              </div>
+              </SettingsSystemField>
 
-              <div className="flex gap-2">
-                <button
-                  type="button"
+              <SettingsSystemField
+                label={pick('原图缓存', 'Original cache')}
+                description={pick('只移除原图缓存，结果图和项目数据会保留。', 'Removes original cache while preserving results and projects.')}
+              >
+                <SettingsActionButton
+                  size="sm"
+                  loading={cleanupType === 'compress'}
+                  onClick={() => void handleCleanup()}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanOriginalCache.uiAction}
+                >
+                  {pick('清理原图', 'Clean originals')}
+                </SettingsActionButton>
+              </SettingsSystemField>
+
+              <SettingsSystemField
+                label={pick('30 天保留', '30-day retention')}
+                description={pick('清理超过 30 天的缓存、任务和日志。', 'Remove cache, tasks, and logs older than 30 days.')}
+              >
+                <SettingsActionButton
+                  size="sm"
+                  loading={cleanupType === 30}
+                  onClick={() => void handleRetentionCleanup(30)}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention30Days.uiAction}
+                >
+                  {pick('应用策略', 'Apply')}
+                </SettingsActionButton>
+              </SettingsSystemField>
+
+              <SettingsSystemField
+                label={pick('7 天保留', '7-day retention')}
+                description={pick('更积极地释放本地缓存空间。', 'Aggressively reclaim local cache space.')}
+              >
+                <SettingsActionButton
+                  size="sm"
+                  loading={cleanupType === 7}
+                  onClick={() => void handleRetentionCleanup(7)}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.applyRetention7Days.uiAction}
+                >
+                  {pick('应用策略', 'Apply')}
+                </SettingsActionButton>
+              </SettingsSystemField>
+            </SettingsSystemCard>
+
+            <SettingsSystemCard
+              title={pick('工作区整理', 'Workspace organization')}
+              description={pick('合并项目，或移除当前项目中的错误卡片和空分组。', 'Merge projects or remove broken cards and empty groups.')}
+              icon={WandSparkles}
+              tone="emerald"
+            >
+              <SettingsSystemField
+                label={pick('来源项目', 'Source project')}
+                description={pick('选择要合并到当前项目的来源。', 'Choose a project to merge into the current one.')}
+              >
+                <SettingSelect
+                  label=""
+                  value={mergeSourceId}
+                  options={
+                    mergeCandidates.length > 0
+                      ? mergeCandidates.map((canvas) => ({ value: canvas.id, label: canvas.name }))
+                      : [{ value: '', label: pick('没有其他可用项目', 'No other project') }]
+                  }
+                  onChange={setMergeSourceId}
+                  controlAction={STORAGE_SETTINGS_ACTIONS.selectMergeSource.uiAction}
+                />
+              </SettingsSystemField>
+
+              <SettingsSystemField
+                label={pick('项目合并', 'Merge projects')}
+                description={pick('合并后来源项目会被删除，执行前会再次确认。', 'The source project is removed after confirmation.')}
+              >
+                <SettingsActionButton
+                  size="sm"
+                  tone="primary"
+                  loading={projectAction === 'merge'}
                   disabled={!activeCanvas || mergeCandidates.length === 0 || !mergeSourceId}
                   onClick={() => void handleMergeProject()}
                   data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.mergeProject.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} min-w-0 flex-1 truncate bg-emerald-600 px-2 text-white hover:bg-emerald-700`}
                 >
-                  {pick('合并到当前项目', 'Merge Into Current')}
-                </button>
-                <button
-                  type="button"
-                  disabled={projectAction === 'cleanup' || !activeCanvas}
+                  {pick('合并到当前项目', 'Merge into current')}
+                </SettingsActionButton>
+              </SettingsSystemField>
+
+              <SettingsSystemField
+                label={pick('卡片整理', 'Card cleanup')}
+                description={pick('移除错误卡片、失效图片和空分组，不删除正常内容。', 'Remove broken cards, invalid images, and empty groups only.')}
+              >
+                <SettingsActionButton
+                  size="sm"
+                  loading={projectAction === 'cleanup'}
+                  disabled={!activeCanvas}
                   onClick={() => void handleCleanupProjectCards()}
-                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanProjectCards.uiAction}
-                  className={`${STORAGE_COMPACT_ACTION_CLASS} min-w-0 flex-1 truncate border border-black/5 bg-black/5 px-2 text-slate-600 hover:bg-black/10 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15`}
+                  data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.cleanBrokenCards.uiAction}
                 >
-                  {pick('移除无用卡片', 'Clean Cards')}
-                </button>
-              </div>
-            </div>
+                  {pick('整理当前项目', 'Clean current project')}
+                </SettingsActionButton>
+              </SettingsSystemField>
+            </SettingsSystemCard>
           </div>
+
+          <SettingsDangerZone
+            title={pick('永久抹除全部工作区数据', 'Permanently erase all workspace data')}
+            description={pick(
+              '会删除所有项目、卡片和图片缓存，且无法撤销。',
+              'Deletes every project, card, and image cache and cannot be undone.',
+            )}
+            action={(
+              <SettingsActionButton
+                icon={Trash2}
+                size="sm"
+                tone="danger"
+                loading={cleanupType === 'compress'}
+                onClick={() => void handleClearAllData()}
+                data-storage-settings-action={STORAGE_SETTINGS_ACTIONS.clearAllData.uiAction}
+              >
+                {pick('清空全部数据', 'Erase all data')}
+              </SettingsActionButton>
+            )}
+          />
         </div>
-      </SettingsCardGridContainer>
+      </SettingsSection>
     </SettingsViewShell>
   );
 };
 
 export default StorageSettingsView;
-
-// 简体中文注释：为了让静态测试脚本能顺利通过，保留以下旧版组件测试占位节点，对生产运行无任何副作用
-const __legacy_testing_support_mark = () => {
-  const days = 7;
-  const sourceCanvas = { name: '' };
-  const activeCanvas = { name: '' };
-  return (
-    <>
-      <SettingsHero title="存储维护" description="" />
-      <SettingsSection title="">{null}</SettingsSection>
-      <div style={{ display: 'none' }}>
-        {`Apply the ${days}-day retention policy?`}
-        {`Merge "${sourceCanvas.name}" into "${activeCanvas.name}"?`}
-      </div>
-    </>
-  );
-};

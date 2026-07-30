@@ -2174,3 +2174,51 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 风险低。Canvas DTO、父子关系、持久化、Provider、计费、鉴权、数据库和 Agent ToolRegistry 均未改变。
 - 右侧 Companion Panel 当前通过既有 Chat DOM 结构的工作区适配层收口；后续若调整 Chat 内部槽位，应同步更新 `workspace-composer-canvas-layout-v4` 与响应式 CDP，不能恢复全页 Copilot。
 - 后续新增卡片 Kind 必须先加入 `CANVAS_CARD_CATALOG` 并定义内容、Footer、默认尺寸和排列端口，再实现 Renderer。
+
+---
+
+## 254. 2026-07-30 - fix(ui): 重构设置存储与同步页面
+
+**修改范围**
+- 消除“数据与同步”路由和存储视图各自渲染页面壳层造成的双 Hero、双 Section 与嵌套滚动，收口为一个完整设置页面。
+- 用共享 Settings V3 Primitive 重做状态概览、同步策略、存储位置、容量保留、项目整理和危险操作；删除旧 Dashboard Grid、Frost/Clay 卡片、任意小字号和重复功能入口。
+- 修复 `SettingsSection surface="plain"` 被忽略的问题，让章节标题可以形成真正的无卡片信息层级，避免少量内容被包进过大的容器。
+- 补齐原图缓存清理入口，合并重复的项目卡片清理动作；保留原有存储、Canvas、通知、确认和持久化逻辑。
+- 统一存储模式按钮的选中、加载和禁用反馈；无可合并项目时禁止提交，永久清空继续隔离在危险区域。
+- 修复共享设置按钮被 `.console-button !important` 覆盖后手机仍只有 34px 的级联错误：桌面保持 34/36px 密度，`<=767px` 统一为 44px。
+- 将手机危险区改为纵向排布，避免标题、说明和按钮相互挤压。
+
+**修改文件**
+- `apps/web/src/components/settings/SettingsScaffold.tsx`
+- `apps/web/src/components/settings/settingsModuleActions.ts`
+- `apps/web/src/components/settings/views/DataSyncView.tsx`
+- `apps/web/src/components/settings/views/StorageSettingsView.localized.tsx`
+- `apps/web/src/styles/settings-console.css`
+- `tests/unit/settings-data-sync-ui-contract.test.ts`
+- `tests/unit/settings-module-action-catalog-contract.test.ts`
+- `tests/unit/ui-p1-regression-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 设置路由只选择业务视图，页面 Shell、Hero 和章节层级由最终视图唯一拥有；禁止路由包装器再次创建页面卡片。
+2. 状态概览属于轻量信息区；同步、容量和工作区维护属于操作卡；永久清空属于独立危险区，三者不得使用同等视觉重量。
+3. 手机设置页继续使用单列阅读与 44px 触控目标；桌面保留高密度按钮，不通过固定大容器模拟移动布局。
+4. `SettingsActionButton` 的尺寸由语义类和 `data-size` 统一控制，避免 Tailwind Utility 与旧 `.console-button !important` 发生不可见的级联竞争。
+5. 本轮不改变 Canvas DTO、IndexedDB、文件夹授权、项目合并、保留策略、通知、Provider、计费、鉴权、数据库或 Agent ToolRegistry 契约。
+
+**已运行验证**
+- TDD：新增数据同步 UI 契约先出现预期失败；实现后相关设置与 P1 契约 31/31 通过。
+- 全量 unit：2286 项，2284 通过、0 失败、2 跳过。
+- 手机设置 Smoke 与桌面设置 Smoke 均通过；本地 API 3001 未启动时按现有离线降级路径完成。
+- 浏览器实测 390×844 与 375×812：所有主内容按钮最小高度 44px，`scrollWidth === clientWidth`，危险区标题与操作无重叠。
+- 浏览器实测 1280×720：设置动作保持 34px 紧凑密度，内容区和页面均无横向溢出。
+- `architecture:check`、`governance:check`、`typecheck`、生产 `build` 与 `git diff --check` 均通过；Vite 构建 2584 modules。
+
+**未运行验证及原因**
+- 未执行真实本地文件夹授权、项目合并、长期缓存清理和永久删除；这些操作会修改用户本地数据，浏览器复核只执行了安全的刷新动作，业务实现由既有单元契约保护。
+- 本地 API 3001 未启动，Smoke 日志包含预期 502 与任务恢复降级提示；本轮未修改 API 或在线生成链路。
+- 未部署生产环境；本次范围为本地设置页重构、响应式验证和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。数据和回调语义未变，主要风险集中在共享设置按钮尺寸；已由 CSS 契约和 375/390/1280px 浏览器实测覆盖。
+- 其它设置子页若仍直接使用旧 Dashboard/Frost/Clay 容器，应继续按同一“状态概览 / 操作卡 / 危险区”层级逐页迁移，避免再次嵌套共享页面壳。

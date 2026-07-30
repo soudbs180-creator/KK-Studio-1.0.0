@@ -24,17 +24,11 @@ test('task center uses the same inclusive 768px phone boundary as runtime detect
 
 test('storage maintenance actions share the canonical touch target and caption scale', () => {
   const source = readSource('apps/web/src/components/settings/views/StorageSettingsView.localized.tsx');
-  const sharedClassUsageCount = source.match(/STORAGE_COMPACT_ACTION_CLASS/g)?.length ?? 0;
+  const sharedActionCount = source.match(/<SettingsActionButton/g)?.length ?? 0;
 
-  assert.match(
-    source,
-    /STORAGE_COMPACT_ACTION_CLASS\s*=\s*[\s\S]*?min-h-\[var\(--ui-control-height-touch\)\]/,
-  );
-  assert.match(
-    source,
-    /STORAGE_COMPACT_ACTION_CLASS\s*=\s*[\s\S]*?text-\[var\(--type-caption\)\]/,
-  );
-  assert.ok(sharedClassUsageCount >= 10, 'all compact storage actions should use the shared control class');
+  assert.ok(sharedActionCount >= 10, 'storage actions should use the shared settings button');
+  assert.match(source, /<SettingsActionButton[\s\S]*?size="sm"/);
+  assert.doesNotMatch(source, /STORAGE_COMPACT_ACTION_CLASS|active:scale-/);
 });
 
 test('primary overlays share dialog semantics, focus trapping, Escape handling, and focus restoration', () => {

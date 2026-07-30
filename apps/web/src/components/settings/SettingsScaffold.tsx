@@ -427,12 +427,17 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   surface = 'card',
   children,
 }) => {
-  // 简体中文注释：这里强制忽略 surface="plain" 的入参，确保所有设置模块均渲染为精致毛玻璃 Frost Card 卡片样式。
-  // 这既响应了用户“保证每个模块都是卡片的形式”的绝对指示，又保证了源码中写有 surface="plain" 处的静态测试正则匹配能够安全通过。
-  // 在删除小字（即没有 eyebrow）时，将顶部内边距 pt-4 微调为 pt-3，使标题位置自然上移。
+  const isPlain = surface === 'plain';
+  const surfaceClassName = isPlain
+    ? 'settings-section--plain'
+    : 'settings-section-card settings-reference-card console-card';
+
   return (
-    <section className="console-section h-full flex flex-col" data-testid={testId}>
-      <div className="settings-section-card settings-reference-card console-card flex-1 flex flex-col min-h-0">
+    <section
+      className={`console-section flex flex-col ${isPlain ? '' : 'h-full'}`.trim()}
+      data-testid={testId}
+    >
+      <div className={`${surfaceClassName} flex flex-col min-h-0 ${isPlain ? '' : 'flex-1'}`.trim()}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {eyebrow ? (
@@ -536,11 +541,11 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
     <button
       type={type}
       onClick={handleInterceptClick}
-      className={`console-button inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium whitespace-nowrap ${motionClass} ${isGhostDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-40'} ${className}`.trim()}
+      className={`console-button settings-action-button inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium whitespace-nowrap ${motionClass} ${isGhostDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-40'} ${className}`.trim()}
+      data-size={size}
       style={{
         borderRadius: size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)',
         fontSize: size === 'sm' ? 'var(--type-caption)' : 'var(--type-body-2)',
-        minHeight: size === 'sm' ? 'var(--ui-control-height-compact)' : 'var(--ui-control-height-default)',
         boxShadow: tone === 'primary' ? 'var(--settings-button-primary-shadow)' : 'none',
         ...buttonToneStyles[tone],
         ...style,
@@ -581,7 +586,7 @@ export const SettingsDangerZone: React.FC<SettingsDangerZoneProps> = ({
       borderRadius: 'var(--radius-control-md)',
     }}
   >
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 flex-1">
         <div
           className="break-words font-medium"
@@ -605,7 +610,7 @@ export const SettingsDangerZone: React.FC<SettingsDangerZoneProps> = ({
           {description}
         </div>
       </div>
-      {action ? <div className="flex flex-shrink-0 gap-2">{action}</div> : null}
+      {action ? <div className="flex flex-shrink-0 gap-2 sm:justify-end">{action}</div> : null}
     </div>
   </div>
 );

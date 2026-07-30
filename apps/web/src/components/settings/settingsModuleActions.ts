@@ -36,6 +36,9 @@ export const STORAGE_SETTINGS_ACTIONS = {
   refreshUsage: {
     uiAction: 'storage-settings.refreshUsage',
   },
+  cleanOriginalCache: {
+    uiAction: 'storage-settings.cleanOriginalCache',
+  },
   cleanBrokenCards: {
     uiAction: 'storage-settings.cleanBrokenCards',
   },
@@ -53,9 +56,6 @@ export const STORAGE_SETTINGS_ACTIONS = {
   },
   mergeProject: {
     uiAction: 'storage-settings.mergeProject',
-  },
-  cleanProjectCards: {
-    uiAction: 'storage-settings.cleanProjectCards',
   },
 } as const satisfies Record<string, SettingsModuleActionDefinition<'storage-settings'>>;
 

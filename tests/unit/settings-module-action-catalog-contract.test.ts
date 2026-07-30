@@ -86,13 +86,13 @@ test('storage settings maintenance buttons expose storage action metadata', () =
     'switchToLocalMode',
     'switchToBrowserMode',
     'refreshUsage',
+    'cleanOriginalCache',
     'cleanBrokenCards',
     'applyRetention30Days',
     'applyRetention7Days',
     'clearAllData',
     'selectMergeSource',
     'mergeProject',
-    'cleanProjectCards',
   ] as const) {
     assert.match(
       storageSource,

@@ -596,6 +596,10 @@ body.dark-mode .settings-panel,
   cursor: pointer;
 }
 
+.settings-action-button[data-size='md'] {
+  min-height: 36px !important;
+}
+
 .console-primary-button,
 .console-secondary-button {
   display: inline-flex;
@@ -1490,6 +1494,10 @@ body.dark-mode .settings-panel,
   .console-setting-row {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .settings-action-button {
+    min-height: 44px !important;
   }
 }
 
