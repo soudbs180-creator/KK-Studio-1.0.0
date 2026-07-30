@@ -13,13 +13,14 @@ test('settings console uses the specified compact density scale', () => {
   assert.match(cssSource, /\.console-card :where\([\s\S]*font-size: 15px !important;/);
 });
 
-test('mobile settings keeps a grouped full-width home and compact 2x2 profile metrics', () => {
+test('mobile settings keeps a data-rich home and compact three-column billing metrics', () => {
   const cssSource = readSource('apps/web/src/styles/settings-console.css');
+  const v3Source = readSource('apps/web/src/styles/settings-v3.css');
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
-  assert.match(shellSource, /SettingsConsoleMobileHome/);
+  assert.match(shellSource, /SettingsMobileDashboard/);
   assert.match(cssSource, /\.settings-console-mobile-list button,[\s\S]*width: 100%;/);
-  assert.match(cssSource, /@media \(max-width: 767px\) \{[\s\S]*\.console-profile-metrics \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(v3Source, /\.console-profile-metrics \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
   assert.match(cssSource, /\.settings-console-content--mobile \{[\s\S]*padding: 14px 12px/);
 });
 

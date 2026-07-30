@@ -40,9 +40,9 @@ test('mobile settings uses a grouped home before routed console detail screens',
   const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
-  assert.match(settingsSource, /SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /SettingsMobileDashboard/);
   assert.match(settingsSource, /SettingsConsoleRoutes/);
-  assert.match(settingsSource, /atHome \? <SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /atHome \? <SettingsMobileDashboard/);
   assert.match(registrySource, /primaryActionLabelEn: 'Open API Workspace'/);
   assert.match(dashboardSource, /dashboardPrimaryAction/);
   assert.match(dashboardSource, /dashboard-grid-container/);

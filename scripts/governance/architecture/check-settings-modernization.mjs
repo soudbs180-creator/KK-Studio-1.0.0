@@ -67,8 +67,8 @@ checkImports(path.join(ROOT_DIR, 'apps/web/src'));
 // 3. check-settings-console-shared-component-tree
 expectMatch(
   'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',
-  /SettingsConsoleMobileHome\s+onNavigate=\{handleNavigate\}/,
-  'Mobile settings must render the shared console mobile home instead of the legacy dashboard.'
+  /SettingsMobileDashboard\s+onNavigate=\{handleNavigate\}/,
+  'Mobile settings must render the data-rich shared dashboard instead of a static overview.'
 );
 expectMatch(
   'apps/web/src/components/settings/SettingsWorkbenchShell.tsx',

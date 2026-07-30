@@ -21,7 +21,7 @@ test('canvas composer publishes a compact desktop contract without changing ecom
     'apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx',
   );
   const countControlSource = readSource(
-    'apps/web/src/components/layout/prompt-bar/DesktopComposerCountControl.tsx',
+    'apps/web/src/components/layout/prompt-bar/ComposerGenerationCountField.tsx',
   );
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
 
@@ -44,10 +44,9 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   assert.match(promptToolsSource, /kk-composer-prompt-tools__menu/);
   assert.match(footerSource, /kk-composer-compact-footer/);
   assert.match(promptBarSource, /kk-composer-config-control kk-composer-model-control/);
-  assert.match(countControlSource, /kk-composer-config-control kk-composer-count-control/);
-  assert.match(countControlSource, /kk-composer-count-menu__title/);
-  assert.match(countControlSource, /role="listbox"[\s\S]*aria-label="生成张数"/);
-  assert.match(countControlSource, /role="option"[\s\S]*aria-selected=\{parallelCount === count\}/);
+  assert.match(countControlSource, /kk-composer-parameter-count/);
+  assert.match(countControlSource, /role="radiogroup"/);
+  assert.match(countControlSource, /role="radio"[\s\S]*aria-checked=\{parallelCount === count\}/);
   assert.match(modePanelSource, /kk-composer-config-control kk-composer-parameter-control/);
   assert.match(modePanelSource, /aria-expanded=\{showOptionsPanel\}/);
 

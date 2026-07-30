@@ -30,10 +30,10 @@ import {
   isApiManagementEditorRoute,
 } from './apiManagementRouteState';
 import {
-  buildMobileSettingsGroups,
   resolveMobileSettingsTopbarState,
 } from './mobileSettingsNavigation';
 import { renderSettingsRouteElements } from './settingsRouteConfig';
+import SettingsMobileDashboard from './SettingsMobileDashboard';
 
 type ConsoleGroupId = 'workspace' | 'capabilities' | 'automation' | 'system';
 
@@ -158,52 +158,6 @@ const SettingsConsoleTopbar: React.FC<{
   );
 };
 
-const SettingsConsoleMobileHome: React.FC<{
-  onNavigate: (view: CanonicalSettingsViewId) => void;
-}> = ({ onNavigate }) => {
-  const { language, pick } = useLocale();
-  const items = useMemo(() => getSettingsNavItems(language), [language]);
-  const groups = useMemo(
-    () => buildMobileSettingsGroups(items, language === 'en-US'),
-    [items, language],
-  );
-
-  return (
-    <div className="settings-console-mobile-home" data-testid="settings-mobile-dashboard">
-      <section className="settings-console-mobile-overview" aria-labelledby="settings-console-mobile-overview-title">
-        <div className="settings-console-mobile-overview__copy">
-          <span>{pick('当前工作区', 'Current workspace')}</span>
-          <h2 id="settings-console-mobile-overview-title">{pick('创作与能力设置', 'Creation and capability settings')}</h2>
-          <p>
-            {pick(
-              '按模块管理生成方式、能力来源、自动化与设备性能。',
-              'Manage generation, capability inputs, automation, and device performance by module.',
-            )}
-          </p>
-        </div>
-        <div className="settings-console-mobile-overview__metrics" aria-label={pick('设置总览', 'Settings overview')}>
-          <span><strong>{items.length}</strong><small>{pick('设置项', 'settings')}</small></span>
-          <span><strong>{groups.length}</strong><small>{pick('功能模块', 'modules')}</small></span>
-          <span><strong>{pick('正常', 'Normal')}</strong><small>{pick('体验模式', 'experience')}</small></span>
-        </div>
-      </section>
-
-      {groups.map((group) => (
-        <section key={group.id}>
-          <h2>{group.label}</h2>
-          <div className="settings-console-mobile-list">
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              return <button key={item.id} type="button" onClick={() => onNavigate(item.id)}><Icon size={17} /><span><strong>{item.label}</strong><small>{item.description}</small></span><ChevronRight size={14} /></button>;
-            })}
-          </div>
-        </section>
-      ))}
-      <button type="button" className="settings-console-mobile-account" onClick={() => onNavigate('user-profile')}><span>{pick('个人中心', 'Account')}</span><ChevronRight size={14} /></button>
-    </div>
-  );
-};
-
 const SettingsConsoleRoutes: React.FC<{
   initialSupplier: Supplier | null;
   refreshKey: number;
@@ -275,7 +229,7 @@ export const SettingsConsoleShell: React.FC<{
           <button type="button" aria-label={pick('关闭设置', 'Close settings')} onClick={onClose}><X size={18} /></button>
         </header>
         <main ref={scrollRef as React.RefObject<HTMLElement>} className="settings-console-content settings-console-content--mobile">
-          {atHome ? <SettingsConsoleMobileHome onNavigate={handleNavigate} /> : <SettingsConsoleRoutes initialSupplier={initialSupplier} refreshKey={refreshKey} onNavigate={handleNavigate} />}
+          {atHome ? <SettingsMobileDashboard onNavigate={handleNavigate} /> : <SettingsConsoleRoutes initialSupplier={initialSupplier} refreshKey={refreshKey} onNavigate={handleNavigate} />}
         </main>
       </div>
     );

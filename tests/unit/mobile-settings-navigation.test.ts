@@ -38,15 +38,15 @@ test('mobile settings home is the overview and does not render a duplicate overv
   );
 });
 
-test('mobile settings topbar exposes home and nested navigation states without an extra back action', () => {
+test('mobile settings topbar left-aligns the home title and centers nested titles beside a back action', () => {
   assert.deepEqual(resolveMobileSettingsTopbarState(true, '能力来源', 'System Settings'), {
     title: 'System Settings',
-    titleAlignment: 'center',
+    titleAlignment: 'start',
     showBackButton: false,
   });
   assert.deepEqual(resolveMobileSettingsTopbarState(false, '能力来源', 'System Settings'), {
     title: '能力来源',
-    titleAlignment: 'start',
+    titleAlignment: 'center',
     showBackButton: true,
   });
 });

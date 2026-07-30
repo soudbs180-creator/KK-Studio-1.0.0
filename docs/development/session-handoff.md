@@ -2358,3 +2358,45 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。变更集中在设置 UI 表现层和纯导航辅助函数，业务回调与数据契约保持不变。
 - 下次内置浏览器可正常接管时，应优先补验 375/390/430/768/1440px 的设置首页、外观性能 Select/Switch、英文模式顶栏和 Chunk 错误兜底，并继续迁移 Browser Assistant 中仍直接声明的本地 Switch 语义。
+
+---
+
+## 258. 2026-07-31 - fix(ui): 完成移动创作与设置逐项标注收口
+
+**修改范围**
+- 按本轮 17 条手机端浏览器标注重构移动 Composer：固定为参考素材、提示词、操作区三层，输入和操作期间不再自动收起；上传、模型、参数、语音和发送保持同一行，生成数量统一收进共享参数层。
+- 让桌面与手机复用 `ComposerGenerationCountField`，删除生产树和源码中的旧独立张数按钮，保留模型能力与生成回调语义不变。
+- 重构手机设置顶栏、数据总览、无框页面说明和个人中心：首页标题左对齐且无返回，二级页恢复返回并居中标题；总览展示真实余额、消耗、网页账户和可用路由；账户入口收口为账户资料、账单余额、安全设置。
+- 收口手机电商面板、Copilot、收藏、更多菜单和生成任务：电商顶栏复用磨砂几何，灵感库一体化且三列展示，底部增加共享语音和白色向上发送；复杂模块使用全屏 Surface，结果状态通过共享事件打开居中 Task Center。
+- 更新 Settings Modernization 治理契约，明确 `SettingsMobileDashboard` 为手机设置首页唯一数据总览；同步补充 Morphic UI 设计规范，不修改 API、Provider、Canvas DTO、计费、鉴权、Agent 或数据库契约。
+
+**修改文件**
+- Composer：`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx`、`apps/web/src/components/layout/prompt-bar/PromptVoiceInputButton.tsx`、`apps/web/src/components/layout/prompt-bar/ComposerGenerationCountField.tsx`，并删除 `DesktopComposerCountControl.tsx`。
+- 移动工作区：`apps/web/src/components/mobile/MobileEcommercePanel.tsx`、`apps/web/src/components/mobile/MobileResultFeed.tsx`、`apps/web/src/components/workspace/TaskCenterTray.tsx`、`apps/web/src/components/workspace/taskCenterEvents.ts`、`apps/web/src/styles/workspace-ui-v3.css`。
+- 设置与账户：`apps/web/src/components/settings/SettingsMobileDashboard.tsx`、`SettingsWorkbenchShell.tsx`、`mobileSettingsNavigation.ts`、`views/UserProfileView.tsx`、`apps/web/src/styles/settings-v3.css`。
+- 治理、测试和文档：`scripts/governance/architecture/check-settings-modernization.mjs`、相关 Prompt/Settings/Task Center 单元契约、`tests/unit/mobile-ui-annotation-regression.test.ts`、`docs/design-system/kk-studio-morphic-ui-spec.md`、`docs/development/session-handoff.md`。
+
+**当前设计决策**
+1. Composer 只有参考、正文、操作三层；参考为空时不保留高度，草稿、引用或参数面板激活时禁止外部点击立即折叠。
+2. 生成数量属于参数语义，桌面与手机使用同一 Radio Group，不再保留 Footer 独立下拉和长按发送改张数的平行入口。
+3. 手机设置首页展示真实运行与账户数据；首页无返回时标题占据左侧位置，二级页有返回时标题居中，图标按钮保持无框。
+4. 个人中心按账户资料、账单余额、安全设置组织；充值入口不在个人中心 Hero 重复展示，账单数据和交易记录归属账单页。
+5. 手机复杂工作区使用全屏 Surface；任务摘要只触发共享 `TaskCenterTray`，不创建第二个移动任务 Store 或重复入口。
+6. 手机电商与设置共用安全区、圆角磨砂顶栏和统一按钮几何；灵感、比例、语音和发送只改变 UI 投影，不改变电商生成流程。
+
+**已运行验证**
+- 新增移动标注契约先红后绿；Composer、设置、电商、全屏 Overlay 与 Task Center 相关专项 24/24 通过。
+- 全量 unit：2299 项，2297 通过、0 失败、2 跳过；10k 小地图性能契约隔离复验 2/2 通过。
+- 完整 Architecture 32 项通过，包含 UI Token、Settings UI、隐藏交互、原始 z-index、维护性 Ratchet 和更新后的 Settings Modernization。
+- Governance 全套通过；TypeScript Web/Architecture/Server/Tests 通过，598 个测试文件语义检查通过。
+- Shared、UI、API Client 与 Vite 8.1.4 生产构建通过，共转换 2590 modules。
+- `check:encoding`、Mojibake 检查和 `git diff --check` 通过；本地预览 `http://127.0.0.1:4173/` 返回 HTTP 200。
+
+**未运行验证及原因**
+- 未重新自动接管内置浏览器或运行会驱动浏览器的移动/桌面 Smoke；此前本地 `127.0.0.1` 接管被浏览器安全策略拒绝，本轮遵循策略没有改用外部 Playwright、Raw CDP 或其它浏览器绕过。视觉依据为用户当前提供的 17 条标注截图与同视口测量。
+- 未运行聚合 `npm run verify:changes`：当前会话的 Node Runtime 没有可调用的 npm CLI，且该聚合命令包含上述浏览器 Smoke；其核心 Architecture、Governance、TypeScript、Build、Unit、Encoding 与 Canvas 10k 性能子集已分别执行。
+- 未执行真实 Provider 生成、语音权限确认或线上支付；这些链路不在本轮 UI 范围内。
+
+**风险与下一步**
+- 风险低至中。业务回调与持久化契约未改，主要风险集中在不同移动软键盘高度下的 Composer 可视区域；当前使用 `dvh + safe-area` 和内容上限保护。
+- 下次浏览器允许接管时，优先在 359/375/390/430/768px 实测软键盘、Composer 参数展开、全屏 Copilot/收藏、Task Center 居中和三个账户 Tab，并按同一规范继续处理新的可见差异。

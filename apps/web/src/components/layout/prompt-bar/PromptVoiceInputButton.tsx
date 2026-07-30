@@ -27,11 +27,32 @@ function collectFinalTranscript(event: SpeechRecognitionEventLike): string {
     .join(' ');
 }
 
-const PromptVoiceInputButton: React.FC = () => {
+interface PromptVoiceInputButtonProps {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  className?: string;
+}
+
+/**
+ * Shared dictation control. It can update a controlled prompt directly or
+ * fall back to the workspace composer event bridge.
+ */
+const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
+  value,
+  onValueChange,
+  className = '',
+}) => {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const valueRef = useRef(value);
+  const onValueChangeRef = useRef(onValueChange);
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
+
+  useEffect(() => {
+    valueRef.current = value;
+    onValueChangeRef.current = onValueChange;
+  }, [onValueChange, value]);
 
   useEffect(() => {
     setIsSupported(Boolean(resolveSpeechRecognitionConstructor(window)));
@@ -61,7 +82,13 @@ const PromptVoiceInputButton: React.FC = () => {
     const transcript = collectFinalTranscript(event);
     if (!transcript) return;
     const { textarea } = readComposerPrompt(buttonRef.current);
-    const prompt = appendVoiceTranscript(textarea?.value ?? '', transcript);
+    const prompt = appendVoiceTranscript(valueRef.current ?? textarea?.value ?? '', transcript);
+    if (onValueChangeRef.current) {
+      onValueChangeRef.current(prompt);
+      valueRef.current = prompt;
+      window.requestAnimationFrame(() => buttonRef.current?.focus());
+      return;
+    }
     window.dispatchEvent(new CustomEvent('takeover-fill-prompt', { detail: { prompt } }));
     window.requestAnimationFrame(() => textarea?.focus());
   }, []);
@@ -92,7 +119,7 @@ const PromptVoiceInputButton: React.FC = () => {
     <button
       ref={buttonRef}
       type="button"
-      className="kk-composer-voice-input"
+      className={`kk-composer-voice-input ${className}`.trim()}
       data-state={isListening ? 'listening' : 'idle'}
       disabled={!isSupported}
       onClick={isListening ? stopListening : startListening}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { KK_LAYER } from '@kk/ui';
 import { AspectRatio, type GenerationConfig, GenerationMode } from '../../../types';
 import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
+import ComposerGenerationCountField from './ComposerGenerationCountField';
 
 interface DesktopComposerModePanelProps {
   isMobile: boolean;
@@ -12,6 +13,7 @@ interface DesktopComposerModePanelProps {
   mobileFloatingSheetMaxHeight: string;
   embeddedMobileDrawer?: boolean;
   onToggleOptionsPanel: () => void;
+  onParallelCountChange?: (count: number) => void;
   optionsPanelContent: React.ReactNode;
   networkControls?: React.ReactNode;
   summaryContent?: React.ReactNode;
@@ -75,6 +77,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
   mobileFloatingSheetMaxHeight,
   embeddedMobileDrawer = false,
   onToggleOptionsPanel,
+  onParallelCountChange,
   optionsPanelContent,
   networkControls,
   summaryContent,
@@ -140,6 +143,18 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
   const shouldRenderDesktopPanel = !isMobile && (showOptionsPanel || isDesktopPanelVisible);
   const isEmbeddedMobileDrawer = isMobile && embeddedMobileDrawer;
+  const panelContentWithCount = (
+    <div className="kk-composer-options-stack">
+      {optionsPanelContent}
+      {onParallelCountChange ? (
+        <ComposerGenerationCountField
+          mode={config.mode}
+          parallelCount={config.parallelCount}
+          onSelect={onParallelCountChange}
+        />
+      ) : null}
+    </div>
+  );
 
   return (
     <>
@@ -185,7 +200,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
                   }
             }
           >
-            <div ref={optionsPanelRef}>{optionsPanelContent}</div>
+            <div ref={optionsPanelRef}>{panelContentWithCount}</div>
           </div>
         ) : null}
         {shouldRenderDesktopPanel ? (
@@ -198,7 +213,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
               pointerEvents: isDesktopPanelClosing ? 'none' : 'auto',
             }}
           >
-            <div ref={optionsPanelRef}>{optionsPanelContent}</div>
+            <div ref={optionsPanelRef}>{panelContentWithCount}</div>
           </div>
         ) : null}
       </div>

@@ -38,7 +38,7 @@ import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
 import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
-import DesktopComposerCountControl from './prompt-bar/DesktopComposerCountControl';
+import ComposerGenerationCountField from './prompt-bar/ComposerGenerationCountField';
 const DesktopComposerEcommercePanel = lazyWithRetry(() => import('./prompt-bar/DesktopComposerEcommercePanel'));
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
@@ -380,7 +380,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     const [isPressed, setIsPressed] = React.useState(false);
 
     const sendTouchStart = (e: React.TouchEvent) => {
-        if (!isMobile || !hasPrompt) return;
+        if (!isMobile || !hasPrompt || !onChangeParallelCount) return;
         const touch = e.touches[0];
         if (!touch) return;
         sendTouchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
@@ -1348,6 +1348,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 return;
             }
 
+            const mobileComposerShouldStayExpanded = Boolean(
+                textareaRef.current?.value.trim() || config.referenceImages.length > 0 || activeSourceImage || mobileSubView !== 'input'
+            );
+            if (mobileComposerShouldStayExpanded) {
+                return;
+            }
+
             // 3. 若点击在裁剪、大图预览、电商续作历史等悬浮面板里，放行
             // 4. 收起面板，且使输入框失去焦点（防键盘弹起）
             setIsExpanded(false);
@@ -1361,7 +1368,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             document.removeEventListener('click', handleOutsideClick, true);
             document.removeEventListener('touchstart', handleOutsideClick, true);
         };
-    }, [isMobile, isExpanded, textareaRef]);
+    }, [activeSourceImage, config.referenceImages.length, isMobile, isExpanded, mobileSubView, textareaRef]);
 
     // 🚀 [移动端专属] 当选择或更换了继续创作的源图时，自动展开输入面板
     useEffect(() => {
@@ -3665,6 +3672,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 setActiveMenu(null);
                 setShowOptionsPanel(prev => !prev);
             }}
+            onParallelCountChange={(count) => updateConfigFields({ parallelCount: count })}
             summaryContent={ecommerceOptionsSummary}
             optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
                 <div className="kk-prompt-bar-deep-audio-panel w-56 p-3 rounded-xl animate-scaleIn origin-bottom">
@@ -4248,7 +4256,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     {mobileSubView === 'input' && (
                         <>
                             {/* 1. 第一排：模式选择均分 5 列 (4模式 + 1收起) */}
-                            <div data-mobile-composer-section="mode-strip" className="grid grid-cols-5 gap-1.5 w-full border-b border-[var(--frost-card-sub-border)] pb-2 min-w-0 items-center justify-items-center">
+                            <div data-mobile-composer-section="mode-strip" className="hidden">
                                 {filteredModeOptions.map(option => {
                                     const isSelected = activeModeOption.mode === option.mode;
                                     return (
@@ -4308,8 +4316,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {/* 2. 第二排：输入文字和图片一排 (去边框臃肿，平铺) */}
                             <div data-mobile-composer-section="primary-input" className="flex items-start gap-2.5 w-full min-w-0 py-1">
                                 {/* 左侧：参考图预览和上传按钮组合 */}
-                                {config.mode !== GenerationMode.ECOMMERCE && (
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {config.mode !== GenerationMode.ECOMMERCE && (config.referenceImages.length > 0 || uploadingSkeletonCount > 0) && (
+                                    <div data-mobile-composer-layer="references" className="flex items-center gap-1.5 flex-shrink-0">
                                         {config.referenceImages.length > 0 ? (
                                             <div
                                                 className="flex max-w-[85px] items-center gap-1 overflow-x-auto scrollbar-none pr-0.5"
@@ -4361,7 +4369,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
 
                                 {/* 右侧：文字输入框 */}
-                                <div className="relative flex-1 min-w-0">
+                                <div data-mobile-composer-layer="prompt" className="relative flex-1 min-w-0">
                                     <ReferenceMentionPanel
                                         open={mentionState.open}
                                         query={mentionState.query}
@@ -4398,7 +4406,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         rows={1}
                                     />
                                 </div>
-                                <PromptVoiceInputButton />
                             </div>
 
                             {/* 电商配置面板（电商模式下显示） */}
@@ -4446,7 +4453,18 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
 
                             {/* 3. 第三排：模型库、设置和发送一排 */}
-                            <div data-mobile-composer-section="control-row" className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">
+                            <div data-mobile-composer-section="control-row" data-mobile-composer-layer="actions" className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">
+                                {config.mode !== GenerationMode.ECOMMERCE && (
+                                    <button
+                                        type="button"
+                                        className="kk-mobile-composer-upload"
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        aria-label={pick('上传参考图', 'Upload reference image')}
+                                    >
+                                        <Plus size={16} />
+                                    </button>
+                                )}
                                 {/* 左侧：模型选择按钮 */}
                                 <div className="flex-1 min-w-0">
                                     <button
@@ -4512,6 +4530,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </div>
 
                                 {/* 右侧：发送按钮 */}
+                                <PromptVoiceInputButton />
                                 <div className="flex-shrink-0">
                                     <CreditSendButton
                                         isCreditModel={isSystemCreditModel}
@@ -4524,18 +4543,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         textColor={currentModel?.textColor}
                                         ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
                                         isMobile={true}
-                                        parallelCount={config.parallelCount}
-                                        onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
                                         onClick={() => {
                                             if (isSystemCreditModel && authLoading) {
                                                 notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
                                                 return;
                                             }
                                             void onGenerate();
-                                            if (isMobile) {
-                                                setIsExpanded(false);
-                                                textareaRef.current?.blur();
-                                            }
                                         }}
                                     />
                                 </div>
@@ -5050,6 +5063,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                             {/* 设置内容滚动区 */}
                             <div className="flex-1 overflow-y-auto mt-2 pb-2 overscroll-contain px-0.5">
+                                <ComposerGenerationCountField mode={config.mode} parallelCount={config.parallelCount}
+                                    onSelect={(count) => updateConfigFields({ parallelCount: count })} className="kk-mobile-composer-count-setting" />
                                 {config.mode === GenerationMode.AUDIO ? (
                                     <div className="w-full p-2 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]">
                                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
@@ -6323,6 +6338,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     setActiveMenu(null);
                                     setShowOptionsPanel(prev => !prev);
                                 }}
+                                onParallelCountChange={(count) => updateConfigFields({ parallelCount: count })}
                                 summaryContent={ecommerceOptionsSummary}
                                 optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
                                     <div className="kk-prompt-bar-deep-audio-panel w-56 p-3 rounded-xl animate-scaleIn origin-bottom">
@@ -6437,20 +6453,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {/* Group 2: Generation Settings */}
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
-                                    {/* Parallel Count */}
-                                    {!isMobile && (
-                                        <DesktopComposerCountControl
-                                            mode={config.mode}
-                                            parallelCount={config.parallelCount}
-                                            open={activeMenu === 'count'}
-                                            onToggle={() => toggleMenu('count')}
-                                            onSelect={(count) => {
-                                                updateConfigFields({ parallelCount: count });
-                                                setActiveMenu(null);
-                                            }}
-                                        />
-                                    )}
-
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
                                             <div
@@ -6583,8 +6585,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
                                 className={isMobile ? '' : 'prompt-bar-liquid-button prompt-bar-liquid-send'}
                                 isMobile={isMobile}
-                                parallelCount={config.parallelCount}
-                                onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
                                 onClick={() => {
                                     if (isSystemCreditModel && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');

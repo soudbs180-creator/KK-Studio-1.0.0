@@ -47,8 +47,8 @@ export function buildMobileSettingsGroups(items: SettingsNavItem[], english: boo
 }
 
 /**
- * Keeps the mobile header predictable: the landing title is centered while a
- * nested route makes room for the visible back control.
+ * Keeps the mobile header predictable: the landing title uses the open back
+ * slot while a nested route centers its title between back and close.
  */
 export function resolveMobileSettingsTopbarState(
   atHome: boolean,
@@ -57,7 +57,7 @@ export function resolveMobileSettingsTopbarState(
 ) {
   return {
     title: atHome ? homeTitle : currentTitle,
-    titleAlignment: atHome ? 'center' : 'start',
+    titleAlignment: atHome ? 'start' : 'center',
     showBackButton: !atHome,
   } as const;
 }

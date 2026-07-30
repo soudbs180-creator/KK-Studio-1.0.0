@@ -9,6 +9,7 @@ import {
 } from '../../utils/responsiveSurface';
 import MobileResultTile from './MobileResultTile';
 import { notify } from '../../services/system/notificationService';
+import { requestTaskCenterOpen } from '../workspace/taskCenterEvents';
 
 interface MobileResultFeedProps {
   resultEntries: MobileResultEntry[];
@@ -727,10 +728,19 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               aria-valuemin={0}
               aria-valuemax={Math.max(totalTaskCount, 1)}
               aria-valuenow={completedTaskCount}
+              tabIndex={0}
               style={{ '--mobile-task-progress': `${taskProgressPercent}%` } as React.CSSProperties}
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
-              onClick={stopMobileResultControlEvent}
+              onClick={(event) => {
+                stopMobileResultControlEvent(event);
+                requestTaskCenterOpen();
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                requestTaskCenterOpen();
+              }}
               onTouchStart={stopMobileResultControlEvent}
               onTouchEnd={stopMobileResultControlEvent}
             >

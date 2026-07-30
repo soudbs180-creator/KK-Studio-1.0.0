@@ -14,7 +14,7 @@ test('mobile settings shell opens a grouped console home and shares routed detai
   const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
-  assert.match(settingsSource, /SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /SettingsMobileDashboard/);
   assert.match(settingsSource, /SettingsConsoleRoutes/);
   assert.match(settingsSource, /const atHome = location\.pathname === '\/settings'/);
   assert.match(settingsSource, /if \(activeView === 'dashboard'\) onClose\(\);/);
@@ -36,6 +36,6 @@ test('mobile settings shell treats settings root as the grouped home route', () 
   assert.doesNotMatch(settingsSource, /SettingsRouterLocationState/);
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
   assert.match(settingsSource, /const atHome = location\.pathname === '\/settings' \|\| location\.pathname === '\/settings\/'/);
-  assert.match(settingsSource, /atHome \? <SettingsConsoleMobileHome/);
+  assert.match(settingsSource, /atHome \? <SettingsMobileDashboard/);
   assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => navigate\(buildSettingsPath\(view\)\);/);
 });

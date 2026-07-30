@@ -3,10 +3,11 @@ import { KK_LAYER } from '@kk/ui';
 import { useLocale } from '../../context/LocaleContext';
 import { 
   Sparkles, Upload, X, Trash2, Image as ImageIcon, Sparkle, 
-  ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Layers, CheckCircle2, Play 
+  ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Layers, CheckCircle2, ArrowUp
 } from 'lucide-react';
 import { AspectRatio, ImageSize } from '../../types';
 import { notify } from '../../services/system/notificationService';
+import PromptVoiceInputButton from '../layout/prompt-bar/PromptVoiceInputButton';
 
 type GenerationServiceClass = import('../../features/generation/generateService').GenerationService;
 type GenerateImageFn = GenerationServiceClass['generateImage'];
@@ -483,14 +484,10 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         }
       `}} />
 
-      {/* 顶部彩色极光发光圈，体现 Rich Aesthetics */}
-      <div className="absolute top-[-120px] left-1/2 -translate-x-1/2 w-[380px] h-[380px] rounded-full bg-gradient-to-br from-[#FF5E62]/8 to-[#8A2387]/10 blur-[100px] pointer-events-none z-0" />
-      <div className="absolute bottom-[-180px] left-1/4 w-[320px] h-[320px] rounded-full bg-gradient-to-br from-[#FF9966]/4 to-[#FF5E62]/8 blur-[90px] pointer-events-none z-0" />
-
       {/* 顶部 Header，毛玻璃拟态，高度精准锁定 */}
-      <div className="relative flex h-14 shrink-0 items-center justify-between border-b border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-shell-bg)]/80 px-4 backdrop-blur-2xl z-10">
+      <div className="mobile-ecommerce-header relative flex shrink-0 items-center justify-between z-10">
         <div className="flex items-center gap-2">
-          <div className="p-1 rounded-lg bg-rose-500/10 text-rose-400 animate-pulse">
+          <div className="mobile-ecommerce-header__icon">
             <Layers size={16} />
           </div>
           <span className="text-sm font-semibold tracking-wide" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
@@ -500,7 +497,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         <button 
           type="button" 
           onClick={onClose} 
-          className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--mobile-clay-surface-bg)]/60 hover:bg-[var(--mobile-clay-active-bg)] active:scale-90 rounded-full transition-all"
+          className="mobile-ecommerce-header__close"
         >
           <X size={16} />
         </button>
@@ -725,7 +722,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         </div>
 
         {/* ================= 3. 灵感区 (折叠收纳式灵感库) ================= */}
-        <div className="space-y-1.5 shrink-0">
+        <div className="mobile-ecommerce-inspiration shrink-0">
           <button
             type="button"
             onClick={() => setIsInspirationOpen(!isInspirationOpen)}
@@ -743,7 +740,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           </button>
 
           {isInspirationOpen && (
-            <div className="mobile-ecommerce-chip-grid grid grid-cols-2 gap-2 pr-0.5 p-2 rounded-2xl no-scrollbar animate-[fadeIn_0.3s_ease]">
+            <div className="mobile-ecommerce-chip-grid grid grid-cols-3 gap-2 pr-0.5 p-2 no-scrollbar animate-[fadeIn_0.3s_ease]">
               {localizedInspirationTags.map((tag, idx) => (
                 <button
                   key={idx}
@@ -794,6 +791,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                     type="button"
                     onClick={() => handleRatioChange(item.ratio)}
                     data-state={isActive ? 'active' : 'idle'}
+                    aria-pressed={activeRatio === item.ratio}
                     className="mobile-ecommerce-ratio-option flex items-center gap-2.5 p-2 rounded-xl text-left transition-all duration-300"
                   >
                     {renderRatioSkeleton(item.w, item.h, isActive)}
@@ -912,28 +910,29 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
       </div>
 
       {/* ================= 6. 粘性底端输入控制栏 (Bottom Sticky Bar) ================= */}
-      <div className="mobile-ecommerce-bottom-bar absolute bottom-0 left-0 right-0 p-3 pb-4 flex items-end gap-2.5 z-20">
+      <div className="mobile-ecommerce-bottom-bar absolute bottom-0 left-0 right-0 p-3 pb-4 flex items-center gap-2.5 z-20">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={pick('上传主体后，简要描述产品和您想要的场景背景，AI 将生成差异化极速出图排队...', 'After uploading product body, briefly describe product and scenery, AI will batch queue generation...')}
-          className="mobile-ecommerce-prompt flex-1 h-[88px] max-h-[120px] rounded-xl px-3.5 py-2.5 text-xs outline-none resize-none transition-all no-scrollbar"
+          className="mobile-ecommerce-prompt flex-1 h-12 max-h-[120px] rounded-2xl px-3.5 py-3 text-xs outline-none resize-none transition-all no-scrollbar"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         />
-        
+        <PromptVoiceInputButton
+          value={prompt}
+          onValueChange={setPrompt}
+          className="mobile-ecommerce-voice"
+        />
+
         <button
           type="button"
           onClick={handleGenerateSubmit}
           disabled={isSubmitting}
           data-state={isSubmitting ? 'busy' : 'ready'}
-          className="mobile-ecommerce-submit w-[45px] h-[45px] shrink-0 rounded-xl flex items-center justify-center transition-all mb-0.5"
+          className="mobile-ecommerce-submit h-12 w-12 shrink-0 rounded-full flex items-center justify-center transition-all"
           title={pick('发起智能电商生图', 'Start AI E-commerce Gen')}
         >
-          <Play 
-            size={18} 
-            fill={isSubmitting ? "none" : "currentColor"} 
-            className={isSubmitting ? 'animate-spin' : ''} 
-          />
+          <ArrowUp size={19} className={isSubmitting ? 'animate-pulse' : ''} />
         </button>
       </div>
 
@@ -942,4 +941,3 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 };
 
 export default MobileEcommercePanel;
-

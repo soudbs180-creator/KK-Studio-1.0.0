@@ -5,7 +5,6 @@ import {
   RotateCw,
   Trash2,
   X,
-  ChevronUp,
   CheckCircle2,
   AlertTriangle,
   Loader2,
@@ -33,6 +32,7 @@ import { notify } from '../../services/system/notificationService';
 import { useCanvas } from '../../context/CanvasContext';
 import { getAssistantSidebarCenterLeft } from '../../utils/canvasCenter';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
+import { TASK_CENTER_OPEN_EVENT } from './taskCenterEvents';
 
 interface TaskCenterTrayProps {
   onOpenSettings?: (view?: SettingsSurfaceView) => void;
@@ -122,6 +122,12 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   }, []);
 
   useEffect(() => agentRunStore.subscribe(setAgentRuns), []);
+
+  useEffect(() => {
+    const handleOpenRequest = () => setIsOpen(true);
+    window.addEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
+    return () => window.removeEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -547,7 +553,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
           <div
             id="desktop-task-center-panel"
             role="dialog"
-            aria-modal="false"
+            aria-modal={isMobile}
             aria-labelledby="task-center-title"
             className="kk-task-center-panel flex min-h-0 flex-1 flex-col overflow-hidden"
           >
@@ -581,7 +587,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                 aria-label="收起任务状态列表"
                 title="收起任务状态列表"
               >
-                <ChevronUp size={16} />
+                <X size={16} />
               </button>
             </div>
           </div>

@@ -142,13 +142,11 @@ test('mobile settings dashboard exposes four judgment metrics, focused strategy 
   assert.doesNotMatch(dashboardSource, /SettingsHero/);
   assert.doesNotMatch(dashboardSource, /42%/);
   assert.doesNotMatch(shellSource, /SettingsHero/);
-  assert.match(shellSource, /SettingsConsoleMobileHome/);
-  assert.match(shellSource, /data-testid="settings-mobile-dashboard"/);
-  assert.match(shellSource, /buildMobileSettingsGroups/);
+  assert.match(shellSource, /SettingsMobileDashboard/);
   assert.match(navigationSource, /Capabilities/);
   assert.match(navigationSource, /'capability-sources'/);
   assert.match(navigationSource, /System/);
-  assert.doesNotMatch(shellSource, /<SettingsMobileDashboard\s/);
+  assert.match(shellSource, /<SettingsMobileDashboard\s/);
 
   assert.match(appearanceSource, /role="radiogroup"/);
   assert.match(appearanceSource, /role="radio"/);

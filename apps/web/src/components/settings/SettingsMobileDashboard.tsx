@@ -208,16 +208,14 @@ const SettingsMobileDashboard: React.FC<{
               {pick('创作系统状态', 'Creative system status')}
             </h2>
           </div>
-          <button
-            type="button"
-            className="settings-mobile-performance-button"
-            onClick={() => onNavigate('appearance-motion')}
-            aria-label={pick(`网页性能：${performanceLabel}，前往调整`, `Web performance: ${performanceLabel}. Open settings`)}
+          <span
+            className="settings-mobile-overview__health"
+            data-state="ready"
+            aria-label={pick(`网页性能：${performanceLabel}`, `Web performance: ${performanceLabel}`)}
           >
             <CircleGauge size={16} />
             <span>{performanceLabel}</span>
-            <ChevronRight size={14} />
-          </button>
+          </span>
         </header>
 
         <div className="settings-mobile-metric-grid">

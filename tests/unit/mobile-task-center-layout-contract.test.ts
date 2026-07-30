@@ -26,7 +26,9 @@ test('task center projects Queue and Agent Run state without a second mobile sto
   assert.match(tray, /data-state=\{isOpen \? ['"]open['"] : ['"]collapsed['"]\}/);
   assert.match(tray, /aria-label="展开任务状态列表"/);
   assert.match(tray, /className="kk-task-center-rail"/);
-  assert.doesNotMatch(tray, /setCustomTasks[\s\S]{0,620}setIsOpen\(true\)/);
+  const transientTaskHandler = tray.match(/const handleAddTask[\s\S]*?const handleUpdateTask/)?.[0] || '';
+  assert.doesNotMatch(transientTaskHandler, /setIsOpen\(true\)/);
+  assert.match(tray, /TASK_CENTER_OPEN_EVENT/);
   assert.doesNotMatch(tray, /kk_custom_tasks/);
   assert.match(tray, /agentRunStore\.subscribe/);
   assert.match(tray, /durableGenerationQueue\.archiveJob\(task\.id\)/);

@@ -8,7 +8,6 @@ import {
   Mail,
   ShieldCheck,
   UserRound,
-  WalletCards,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 
@@ -18,20 +17,18 @@ import { USER_PROFILE_ACTIONS } from '../settingsModuleActions';
 import { SettingsViewShell } from '../SettingsScaffold';
 import { useAccountCenterController } from '../controllers/useAccountCenterController';
 
-type ProfileRoute = 'overview' | 'security' | 'billing' | 'edit';
+type ProfileRoute = 'account' | 'billing' | 'security';
 
 const PROFILE_TABS: Array<{ id: ProfileRoute; label: string; path: string }> = [
-  { id: 'overview', label: '概览', path: '/settings/user-profile' },
-  { id: 'security', label: '安全', path: '/settings/user-profile/security' },
-  { id: 'billing', label: '账单', path: '/settings/user-profile/billing' },
-  { id: 'edit', label: '资料编辑', path: '/settings/user-profile/edit' },
+  { id: 'account', label: '账户资料', path: '/settings/user-profile' },
+  { id: 'billing', label: '账单余额', path: '/settings/user-profile/billing' },
+  { id: 'security', label: '安全设置', path: '/settings/user-profile/security' },
 ];
 
 function resolveProfileRoute(pathname: string): ProfileRoute {
   if (pathname.endsWith('/security')) return 'security';
   if (pathname.endsWith('/billing')) return 'billing';
-  if (pathname.endsWith('/edit')) return 'edit';
-  return 'overview';
+  return 'account';
 }
 
 function formatDateTime(value?: string | null): string {
@@ -51,19 +48,14 @@ function statusLabel(status?: string | null): string {
 const ProfileHeader: React.FC<{
   active: ProfileRoute;
   onNavigate: (path: string) => void;
-  onRecharge: () => void;
-}> = ({ active, onNavigate, onRecharge }) => (
+}> = ({ active, onNavigate }) => (
   <>
-    <header className="console-page-header">
+    <header className="console-page-header settings-hero-flat-header">
       <div>
         <span className="console-eyebrow">Account</span>
         <h2>个人中心</h2>
-        <p>管理身份、安全策略、积分资产和账单记录。</p>
+        <p>管理登录身份、账单余额和账户安全。</p>
       </div>
-      <button type="button" className="console-primary-button console-header-action" onClick={onRecharge}>
-        <WalletCards size={15} />
-        <span>充值积分</span>
-      </button>
     </header>
     <nav className="console-profile-tabs" aria-label="个人中心导航">
       {PROFILE_TABS.map((tab) => (
@@ -75,9 +67,8 @@ const ProfileHeader: React.FC<{
   </>
 );
 
-const OverviewView: React.FC<{ controller: ReturnType<typeof useAccountCenterController> }> = ({ controller }) => {
+const AccountView: React.FC<{ controller: ReturnType<typeof useAccountCenterController> }> = ({ controller }) => {
   const [copied, setCopied] = useState(false);
-  const identityLabel = controller.adminLevel > 0 ? '管理员账户' : controller.isTempUser ? '临时账户' : '标准账户';
 
   const copyId = () => {
     if (!controller.user?.id) return;
@@ -88,13 +79,6 @@ const OverviewView: React.FC<{ controller: ReturnType<typeof useAccountCenterCon
 
   return (
     <>
-      <div className="console-grid console-profile-metrics">
-        <article className="console-metric-card"><span>可用积分</span><strong>{formatRemainingCredits(controller.balance, 'zh-CN')}</strong><small>当前可支配额度</small></article>
-        <article className="console-metric-card"><span>累计充值</span><strong>{controller.totalRecharged}</strong><small>已完成充值总额</small></article>
-        <article className="console-metric-card"><span>累计消耗</span><strong>{controller.totalConsumed}</strong><small>生成与对话消耗</small></article>
-        <article className="console-metric-card"><span>账户级别</span><strong className="console-metric-text">{identityLabel}</strong><small>{controller.isTempUser ? '部分安全能力受限' : '账户状态正常'}</small></article>
-      </div>
-
       <div className="console-profile-columns">
         <section className="console-card">
           <div className="console-card-heading"><div><h3>账户资料</h3><p>用于 API 调用、账单和技术支持的身份信息。</p></div></div>
@@ -180,7 +164,13 @@ const BillingView: React.FC<{ controller: ReturnType<typeof useAccountCenterCont
   const [tab, setTab] = useState<'usage' | 'recharge'>('usage');
   const rows = tab === 'usage' ? controller.usageLogs : controller.billingLogs;
   return (
-    <section className="console-card console-billing-table-card">
+    <>
+      <div className="console-grid console-profile-metrics">
+        <article className="console-metric-card"><span>可用积分</span><strong>{formatRemainingCredits(controller.balance, 'zh-CN')}</strong><small>当前可支配额度</small></article>
+        <article className="console-metric-card"><span>累计充值</span><strong>{controller.totalRecharged}</strong><small>已完成充值总额</small></article>
+        <article className="console-metric-card"><span>累计消耗</span><strong>{controller.totalConsumed}</strong><small>生成与对话消耗</small></article>
+      </div>
+      <section className="console-card console-billing-table-card">
       <div className="console-card-heading">
         <div><h3>交易记录</h3><p>消费和充值记录按发生时间倒序展示。</p></div>
         <div className="console-segmented">
@@ -199,20 +189,8 @@ const BillingView: React.FC<{ controller: ReturnType<typeof useAccountCenterCont
           </div>
         ))}
       </div>
-    </section>
-  );
-};
-
-const EditView: React.FC<{ controller: ReturnType<typeof useAccountCenterController>; onDone: () => void }> = ({ controller, onDone }) => {
-  const submit = async () => { if (await controller.updateProfile()) onDone(); };
-  return (
-    <section className="console-card console-profile-editor">
-      <div className="console-card-heading"><div><h3>资料编辑</h3><p>更新昵称和头像地址，登录会话可用时同步至 KK API。</p></div></div>
-      <div className="console-profile-edit-preview"><div className="console-avatar">{resolveAvatarUrl(controller.avatarUrl) ? <img src={resolveAvatarUrl(controller.avatarUrl)} alt="头像预览" /> : controller.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{controller.displayName || '未命名用户'}</strong><span>{controller.displayEmail}</span></div></div>
-      <label className="console-field"><span>昵称</span><input value={controller.displayName} onChange={(event) => controller.setDisplayName(event.target.value)} maxLength={40} /></label>
-      <label className="console-field"><span>头像 URL</span><input value={controller.avatarUrl} onChange={(event) => controller.setAvatarUrl(event.target.value)} placeholder="https://..." /></label>
-      <div className="console-card-actions"><button type="button" className="console-primary-button" disabled={controller.busyAction === 'profile'} onClick={() => void submit()}>{controller.busyAction === 'profile' ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}保存资料</button></div>
-    </section>
+      </section>
+    </>
   );
 };
 
@@ -224,13 +202,12 @@ export const UserProfileView: React.FC = () => {
   const content = useMemo(() => {
     if (active === 'security') return <SecurityView controller={controller} />;
     if (active === 'billing') return <BillingView controller={controller} />;
-    if (active === 'edit') return <EditView controller={controller} onDone={() => navigate('/settings/user-profile')} />;
-    return <OverviewView controller={controller} />;
+    return <AccountView controller={controller} />;
   }, [active, controller, navigate]);
 
   return (
     <SettingsViewShell className="console-profile-page">
-      <ProfileHeader active={active} onNavigate={navigate} onRecharge={() => navigate('/settings/recharge')} />
+      <ProfileHeader active={active} onNavigate={navigate} />
       {controller.message ? <div className="console-notice" data-tone={controller.message.tone}>{controller.message.tone === 'success' ? <Check size={15} /> : <ChevronRight size={15} />}<span>{controller.message.text}</span></div> : null}
       {content}
     </SettingsViewShell>

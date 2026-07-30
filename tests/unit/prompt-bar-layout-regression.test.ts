@@ -10,7 +10,7 @@ test('prompt bar keeps the desktop footer compact while allowing full control la
   const footerShellSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooter.tsx');
   const footerSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx');
   const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const countControlSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerCountControl.tsx');
+  const countControlSource = readSource('apps/web/src/components/layout/prompt-bar/ComposerGenerationCountField.tsx');
   const cssSource = readSource('apps/web/src/index.css');
   const desktopLiquidSources = [promptBarSource, modePanelSource, footerSource, cssSource].join('\n');
 
@@ -42,7 +42,8 @@ test('prompt bar keeps the desktop footer compact while allowing full control la
   assert.match(desktopLiquidSources, /prompt-bar-liquid-button/);
   assert.match(desktopLiquidSources, /prompt-bar-liquid-group/);
   assert.match(desktopLiquidSources, /prompt-bar-liquid-send/);
-  assert.match(countControlSource, /className="relative h-full w-\[74px\]"/);
+  assert.match(countControlSource, /className = 'kk-composer-parameter-count'/);
+  assert.match(modePanelSource, /<ComposerGenerationCountField/);
   assert.match(promptBarSource, /enableGrounding[\s\S]*<span className="min-w-0 truncate whitespace-nowrap">/);
   assert.match(promptBarSource, /enableImageSearch[\s\S]*<span className="min-w-0 truncate whitespace-nowrap">/);
   assert.match(promptBarSource, /className=\{`\$\{className\} group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3\.5 pr-1 transition-colors duration-200`\}/);
@@ -120,7 +121,7 @@ test('prompt bar keeps a real frosted shell while desktop options stay inside th
   assert.match(modePanelSource, /const \[isDesktopPanelClosing, setIsDesktopPanelClosing\] = useState\(false\);/);
   assert.match(modePanelSource, /bottom:\s*'calc\(100% - 4px\)'/);
   assert.match(modePanelSource, /animate-fadeOut/);
-  assert.match(modePanelSource, /<div ref=\{optionsPanelRef\}>\s*\{optionsPanelContent\}\s*<\/div>/);
+  assert.match(modePanelSource, /<div ref=\{optionsPanelRef\}>\s*\{panelContentWithCount\}\s*<\/div>/);
   assert.doesNotMatch(modePanelSource, /className="rounded-\[26px\] border p-2 shadow-2xl"/);
   assert.doesNotMatch(imageOptionsSource, /const SECTION_STYLE/);
   assert.doesNotMatch(imageOptionsSource, /rounded-2xl border p-3/);
