@@ -32,6 +32,7 @@ import { adminModelService } from '../../services/model/adminModelService';
 import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '../../services/model/modelLibraryRefresh';
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
 import PromptBarFooter from './prompt-bar/PromptBarFooter';
+import PromptVoiceInputButton from './prompt-bar/PromptVoiceInputButton';
 import { PROMPT_BAR_MODE_REGISTRY, getPromptBarModeOption } from './prompt-bar/composerModeRegistry';
 import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
 import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
@@ -4397,6 +4398,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         rows={1}
                                     />
                                 </div>
+                                <PromptVoiceInputButton />
                             </div>
 
                             {/* 电商配置面板（电商模式下显示） */}
@@ -4444,7 +4446,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
 
                             {/* 3. 第三排：模型库、设置和发送一排 */}
-                            <div className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">
+                            <div data-mobile-composer-section="control-row" className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">
                                 {/* 左侧：模型选择按钮 */}
                                 <div className="flex-1 min-w-0">
                                     <button
@@ -5252,7 +5254,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
             </>
         );
     }
-
 
     return (
         <>

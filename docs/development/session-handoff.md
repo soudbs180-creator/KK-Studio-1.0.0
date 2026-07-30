@@ -2268,3 +2268,49 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。变更只影响设置页结构与样式，没有修改 API、DTO、Provider 路由或数据契约。
 - 后续新增设置模块必须复用内容自适应 Section、语义 Header 和移动端渐进披露规则，禁止重新引入固定大高度、重复 Surface 或桌面表格直接压缩到手机端。
+
+---
+
+## 256. 2026-07-30 - fix(ui): 统一移动 Composer 与设置工作台精修规则
+
+**修改范围**
+- 逐条处理本轮 24 条手机端浏览器标注，并同步修复桌面端共用的按钮、开关、选择器、Composer 与设置页结构，避免双端形成两套 UI。
+- 将手机生成结果状态、折叠输入入口、展开 Composer、用户顶栏和任务入口重新收口：任务状态与结果区同高，折叠态只保留中央上滑条，展开态按输入、模式、控制三层排列并新增语音输入。
+- 重构手机设置首页与二级页顶栏：总览直接展示状态数据，不再重复渲染“总览”按钮；首页显示“系统设置”，二级页标题左对齐并显示返回，标题与返回状态使用短动效切换。
+- 统一设置页的按钮、Switch、Segmented Control、Select、风险分级卡、Browser Assistant、模型中心、个人中心与用户 ID 操作，修复内容裁切、固定空高度、卡片套卡片、文字挤边和窄屏横向溢出。
+- 更新设计规范，新增移动 Composer、设置页信息架构、最多两层 Surface、共享控件状态及响应式验收规则；不改变业务 API、Provider、计费、鉴权、Canvas、Agent 或持久化契约。
+
+**修改文件**
+- 移动工作区与 Composer：`apps/web/src/components/mobile/MobileHeader.tsx`、`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/components/layout/prompt-bar/PromptBarFooter.tsx`、`apps/web/src/components/layout/prompt-bar/PromptVoiceInputButton.tsx`、`apps/web/src/components/layout/prompt-bar/promptVoiceInput.ts`、`apps/web/src/components/layout/prompt-bar/ImageOptionsPanel.tsx`、`apps/web/src/styles/workspace-ui-v3.css`。
+- 设置工作台：`apps/web/src/components/settings/SettingsWorkbenchShell.tsx`、`apps/web/src/components/settings/mobileSettingsNavigation.ts`、`apps/web/src/components/settings/SettingsScaffold.tsx`、`apps/web/src/components/settings/settings/ui/index.tsx`、`apps/web/src/components/settings/views/AiTakeoverView.tsx`、`AppearanceMotionView.tsx`、`UserProfileView.tsx`、`apps/web/src/styles/settings-v3.css`。
+- 测试与规范：`tests/unit/mobile-settings-navigation.test.ts`、`tests/unit/prompt-voice-input.test.ts`、`tests/unit/mobile-settings-overview-metrics.test.ts`、`tests/unit/prompt-bar-layout-regression.test.ts`、`tests/unit/settings-ui-system-contract.test.ts`、`tests/unit/clay-global-ui-refit-contract.test.ts`、`tests/unit/api-settings-capability-layout-regression.test.ts`、`tests/unit/mobile-settings-browser-verify-script.test.ts`、`scripts/test/verify-mobile-settings-smoke.mjs`、`docs/design-system/kk-studio-morphic-ui-spec.md`、`docs/development/session-handoff.md`。
+
+**当前设计决策**
+1. 手机结果状态与相邻主操作统一为 44px；折叠 Composer 是居中的 `64×44px` 手势目标，只有中央指示条可见，点击或上滑进入展开态。
+2. 展开 Composer 使用单一 20px 圆角 Surface，顺序固定为提示词输入、创作类型、模型/高级设置/发送；上传、语音、模式与控制均保持 44px 触控目标。桌面复用同一语音输入能力，但保持 30px 高密度按钮与 `570×94px` 空 Composer。
+3. 手机任务列表不再保留右上重复触发器；任务数量、完成状态和结果数量继续由底部生成状态区统一呈现。
+4. 手机设置首页顶栏居中显示“系统设置”且不显示返回；二级页标题左对齐、返回键显示。顶栏采用 16px 圆角与 160ms 位置/透明度过渡，关闭按钮始终保留。
+5. 设置页最多两层 Surface：页面章节标题可以位于卡片外，正文只使用一层内容卡；禁止开发预览、技术 Token 说明或第三层嵌套卡片进入用户界面。
+6. 全部设置 Switch 统一为 `42×24px`、同一 Selected/Focus/Disabled 语义；功能按钮统一主次色、对称内边距与 36/44px 高度；多选模式统一使用紧凑 Segmented Control，不再以三个大卡片伪装按钮。
+7. 下拉菜单在手机端进入正常文档流，展开时父容器自动增高；风险分类、Browser Assistant 和模型预设均使用响应式网格，标题与状态不得竞争同一窄列。
+8. 用户 ID 整行可点击复制，不再显示独立复制按钮；个人中心 Tab 使用四等分 44px Segment，Hero 与正文保持 16px 安全留白。
+
+**已运行验证**
+- TDD：移动设置导航与语音输入新增契约先红后绿；相关移动设置、PromptBar 和 UI System 契约共 76 项通过。
+- `npm run typecheck`、`npm run architecture:check`、`npm run governance:check`、生产 `npm run build` 均通过；`PromptBar.tsx` 保持在维护性 Ratchet 的 6709 行上限内。
+- 完整 `npm run verify:changes` 最终以退出码 0 通过，覆盖依赖审计、OpenAPI、Local Runner、全量 unit/integration/contract/E2E、Prompt Group Drag、移动/桌面设置、AI Takeover、启动居中、编码检查与 Canvas Performance 3/3。验证过程中同步更新了仍锁定旧 Switch 几何和旧移动设置标题的三条历史契约，专项复验均通过。
+- 本地浏览器 357×716：页面 `scrollWidth === viewportWidth`；生成状态 44px，折叠 Composer `64×44px` 居中，重复任务入口隐藏，用户顶栏 `333×53px` 且圆角 14px。
+- 展开 Composer 实测 `341×208px @ x=8px`，输入、类型、控制三层顺序稳定；上传、语音、类型、模型、高级设置和发送全部达到 44px。
+- 手机设置首页顶栏 `309×60px @ x=24px`、圆角 16px；无重复“总览”路由按钮。模型中心、AI 接管下拉、Browser Assistant、外观性能选择和个人中心均无页面级横向溢出。
+- AI 接管 Select 展开后卡片由 211px 自动增长到 441px；模型中心从 987px 收敛到 783px，手机预设目录改为两列；高级比例选项为四列 44px 控件、7px 圆角。
+- 桌面 1440px：设置 Shell 无横向溢出；Composer 保持 `570×94px`，Footer 的语音、模型、参数、张数、发送与 AI 控件均使用统一 30px 密度。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未执行真实媒体生成或浏览器语音权限确认；当前本地环境没有可用 Provider，语音能力由浏览器 Web Speech API 支持检测与单元契约保护，不支持时按钮会保持可访问的禁用提示。
+- 本地 API 3001 未启动，设置页与模型目录继续使用现有本地数据和离线降级路径；本轮没有修改 API、Provider、计费或数据库。
+- 未部署生产环境；范围为本地 UI 重构、浏览器操作检查、规范更新和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。语音识别属于浏览器能力增强，不可用时不影响文本输入和发送；所有业务回调与持久化契约保持不变。
+- 后续新增设置模块必须复用统一按钮、Switch、Segmented Control、Select 和最多两层 Surface 规则，并在 357/375/390/430/768/1440px 视口检查文字、留白、展开高度和横向溢出。

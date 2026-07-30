@@ -1,6 +1,7 @@
 import React from 'react';
 import PromptBarFooterMobile from './PromptBarFooterMobile';
 import PromptBarFooterDesktop from './PromptBarFooterDesktop';
+import PromptVoiceInputButton from './PromptVoiceInputButton';
 
 interface PromptBarFooterProps {
   isMobile: boolean;
@@ -9,10 +10,20 @@ interface PromptBarFooterProps {
 
 const PromptBarFooter: React.FC<PromptBarFooterProps> = ({ isMobile, children }) => {
   if (isMobile) {
-    return <PromptBarFooterMobile>{children}</PromptBarFooterMobile>;
+    return (
+      <PromptBarFooterMobile>
+        <PromptVoiceInputButton />
+        {children}
+      </PromptBarFooterMobile>
+    );
   }
 
-  return <PromptBarFooterDesktop>{children}</PromptBarFooterDesktop>;
+  return (
+    <PromptBarFooterDesktop>
+      <PromptVoiceInputButton />
+      {children}
+    </PromptBarFooterDesktop>
+  );
 };
 
 export default PromptBarFooter;

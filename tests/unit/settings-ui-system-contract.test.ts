@@ -89,8 +89,9 @@ test('appearance and motion view consumes only the shared settings system primit
 test('mobile settings shell title stays out of heading landmarks', () => {
   const panelSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
-  assert.match(panelSource, /<header className="settings-console-mobile-topbar">/);
-  assert.match(panelSource, /<strong>\{getSettingsViewMeta\(activeView, 'zh-CN'\)\.title\}<\/strong>/);
+  assert.match(panelSource, /<header[\s\S]*className="settings-console-mobile-topbar"[\s\S]*data-title-alignment=\{topbarState\.titleAlignment\}/);
+  assert.match(panelSource, /<strong>\{topbarState\.title\}<\/strong>/);
+  assert.match(panelSource, /resolveMobileSettingsTopbarState/);
   assert.doesNotMatch(panelSource, /<h[1-6][^>]*settings-console-mobile-topbar/);
 });
 

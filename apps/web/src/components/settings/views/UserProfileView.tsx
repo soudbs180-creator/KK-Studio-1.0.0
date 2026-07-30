@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   ChevronRight,
-  Copy,
   KeyRound,
   Link2,
   Loader2,
@@ -107,12 +106,17 @@ const OverviewView: React.FC<{ controller: ReturnType<typeof useAccountCenterCon
             </div>
             <div><strong>{controller.nickname}</strong><span><Mail size={13} />{controller.displayEmail}</span></div>
           </div>
-          <div className="console-setting-row">
-            <div><strong>用户 ID</strong><span className="console-mono">{controller.user?.id || '-'}</span></div>
-            <button type="button" className="console-icon-button" onClick={copyId} disabled={!controller.user?.id} title="复制用户 ID" data-user-profile-action={USER_PROFILE_ACTIONS.copyUserId.uiAction}>
-              {copied ? <Check size={15} /> : <Copy size={15} />}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="console-setting-row console-profile-copy-id"
+            onClick={copyId}
+            disabled={!controller.user?.id}
+            aria-label={copied ? '用户 ID 已复制' : '复制用户 ID'}
+            data-user-profile-action={USER_PROFILE_ACTIONS.copyUserId.uiAction}
+          >
+            <span><strong>用户 ID</strong><span className="console-mono">{controller.user?.id || '-'}</span></span>
+            <small>{copied ? '已复制' : '点击复制'}</small>
+          </button>
         </section>
 
         <section className="console-card">

@@ -28,8 +28,8 @@ test('prompt bar keeps the desktop footer compact while allowing full control la
     topRowDesktopSource,
     /className="kk-composer-floating-tools flex items-center justify-between gap-1\.5"/,
   );
-  assert.match(footerShellSource, /if \(isMobile\) \{\s*return <PromptBarFooterMobile>\{children\}<\/PromptBarFooterMobile>;\s*\}/);
-  assert.match(footerShellSource, /return <PromptBarFooterDesktop>\{children\}<\/PromptBarFooterDesktop>;/);
+  assert.match(footerShellSource, /<PromptBarFooterMobile>[\s\S]*<PromptVoiceInputButton \/>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterMobile>/);
+  assert.match(footerShellSource, /<PromptBarFooterDesktop>[\s\S]*<PromptVoiceInputButton \/>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterDesktop>/);
   assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
   assert.match(
     modePanelSource,

@@ -699,9 +699,9 @@ try {
   await settingsEntry.click();
 
   const settingsDashboard = page.getByTestId('settings-mobile-dashboard');
-  const settingsOverviewHeading = page.getByRole('heading', { name: /创作系统状态|Creative system status/i });
-  const performanceEntry = page.getByRole('button', { name: /网页性能|Web performance/i });
-  const currentApiEntry = page.getByRole('button', { name: /能力来源|Capability Sources/i });
+  const settingsOverviewHeading = page.getByRole('heading', { name: /创作与能力设置|Creation and capability settings/i });
+  const performanceEntry = page.getByRole('button', { name: /高级性能|Advanced Performance/i });
+  const currentApiEntry = page.getByRole('button', { name: /API 配置|API Configuration/i });
 
   await assertVisible(settingsDashboard, 'Mobile settings dashboard did not open by default.');
   await assertVisible(settingsOverviewHeading, 'Mobile settings operational overview did not render.');

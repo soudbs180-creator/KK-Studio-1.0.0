@@ -354,6 +354,8 @@ export const SettingToggle: React.FC<{
       </div>
       <button
         type="button"
+        role="switch"
+        aria-checked={checked}
         onClick={() => {
           if (!disabled) {
             onChange(!checked);
@@ -361,20 +363,9 @@ export const SettingToggle: React.FC<{
         }}
         disabled={disabled}
         data-settings-control-action={controlAction}
-        className={`settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-[var(--radius-control-md)] border disabled:cursor-not-allowed disabled:opacity-60 transition-[background-color] duration-200 cursor-pointer ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
-        style={{
-          background: checked ? 'rgb(var(--settings-accent-rgb))' : 'rgba(120, 120, 128, 0.32)',
-          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.15)',
-        }}
-      >
-        <span
-          className="settings-toggle-button__thumb absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out"
-          style={{
-            transform: checked ? 'translateX(20px)' : 'translateX(0px)',
-            backgroundColor: '#ffffff',
-          }}
-        />
-      </button>
+        className={`settings-system-switch settings-control-toggle settings-toggle-button disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
+        data-state={checked ? 'on' : 'off'}
+      />
     </div>
   );
 };
@@ -510,6 +501,7 @@ export const PrimaryButton: React.FC<{
       onClick={handleInterceptClick}
       disabled={loading || shouldApplyNativeDisabled}
       data-settings-control-action={controlAction}
+      data-settings-button-tone="primary"
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'transparent',
@@ -561,6 +553,7 @@ export const SecondaryButton: React.FC<{
       onClick={handleInterceptClick}
       disabled={shouldApplyNativeDisabled}
       data-settings-control-action={controlAction}
+      data-settings-button-tone="secondary"
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
@@ -609,6 +602,7 @@ export const DangerButton: React.FC<{
       onClick={handleInterceptClick}
       disabled={shouldApplyNativeDisabled}
       data-settings-control-action={controlAction}
+      data-settings-button-tone="danger"
       className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',

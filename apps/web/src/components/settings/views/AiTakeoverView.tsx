@@ -47,7 +47,7 @@ export const AiTakeoverView: React.FC = () => {
           >
             <SettingSelect
               value={takeoverMode}
-              onChange={(v) => handleModeChange(v as any)}
+              onChange={(value) => handleModeChange(value as typeof takeoverMode)}
               options={[
                 { label: pick('只建议，不执行 (只读模式)', 'Advisory Only'), value: 'advisory' },
                 { label: pick('执行低风险任务 (自动整理/提取)', 'Low Risk Auto'), value: 'low_risk' },
@@ -61,50 +61,50 @@ export const AiTakeoverView: React.FC = () => {
       </SettingsSection>
 
       <SettingsSection title={pick('安全与风险边界矩阵 (Permission Policy)', 'Permission Matrix')}>
-        <div className="space-y-3">
+        <div className="settings-risk-matrix">
           {/* 低风险 */}
-          <div className="p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-overlay)] flex items-start gap-3">
-            <span className="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5">
+          <div className="settings-risk-card" data-tone="success">
+            <span className="settings-risk-card__icon">
               <CheckCircle2 size={16} />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[var(--text-primary)]">{pick('低风险类别 (自动放行)', 'Low Risk Tiers')}</span>
+            <div className="settings-risk-card__content">
+              <div className="settings-risk-card__heading">
+                <strong>{pick('低风险类别 (自动放行)', 'Low Risk Tiers')}</strong>
                 <SettingsBadge tone="emerald">{pick('无痛放行', 'Auto')}</SettingsBadge>
               </div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+              <p>
                 {pick('读取网页内容、提取网页图像资产、卡片布局排版整理、工作流生成建议。', 'Reading pages, asset extractions, canvas grid alignments, and next-step advices.')}
               </p>
             </div>
           </div>
 
           {/* 中风险 */}
-          <div className="p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-overlay)] flex items-start gap-3">
-            <span className="p-1 rounded bg-amber-500/10 text-amber-400 mt-0.5">
+          <div className="settings-risk-card" data-tone="warning">
+            <span className="settings-risk-card__icon">
               <AlertTriangle size={16} />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[var(--text-primary)]">{pick('中风险类别 (需授权/批量提示)', 'Medium Risk Tiers')}</span>
+            <div className="settings-risk-card__content">
+              <div className="settings-risk-card__heading">
+                <strong>{pick('中风险类别 (需授权/批量提示)', 'Medium Risk Tiers')}</strong>
                 <SettingsBadge tone="amber">{pick('按需确认', 'Confirm')}</SettingsBadge>
               </div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+              <p>
                 {pick('单张图片/视频生成任务、上传本地媒体资产、调用会员网页直连进行第三方应用自动化。', 'Single media generations, file uploads, and browser web sessions automation.')}
               </p>
             </div>
           </div>
 
           {/* 高风险 */}
-          <div className="p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-overlay)] flex items-start gap-3">
-            <span className="p-1 rounded bg-rose-500/10 text-rose-400 mt-0.5">
+          <div className="settings-risk-card" data-tone="danger">
+            <span className="settings-risk-card__icon">
               <Shield size={16} />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[var(--text-primary)]">{pick('高风险类别 (必须逐次确认)', 'High Risk Tiers')}</span>
+            <div className="settings-risk-card__content">
+              <div className="settings-risk-card__heading">
+                <strong>{pick('高风险类别 (必须逐次确认)', 'High Risk Tiers')}</strong>
                 <SettingsBadge tone="rose">{pick('必须逐次确认', 'Strict Guards')}</SettingsBadge>
               </div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+              <p>
                 {pick('发布推文/帖子、购买第三方会员、删除画布核心资源、改动账号账本设置、向外发送通信消息。', 'Publishing, purchasing, deleting core assets, editing credentials, and communication logs.')}
               </p>
             </div>

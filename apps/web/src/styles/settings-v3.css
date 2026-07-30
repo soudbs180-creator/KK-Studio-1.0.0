@@ -261,6 +261,7 @@
 .settings-section__frame {
   width: 100%;
   height: auto;
+  overflow: visible;
 }
 
 .settings-section__header {
@@ -289,6 +290,303 @@
 .settings-section__body {
   min-width: 0;
   flex: 0 0 auto;
+  overflow: visible;
+}
+
+.settings-console-content .settings-system-card,
+.settings-console-content .settings-section__frame,
+.settings-console-content .settings-section__body,
+.settings-console-content .settings-system-field {
+  overflow: visible;
+}
+
+.settings-console-content .settings-system-field__control {
+  min-width: min(100%, 240px);
+  justify-content: flex-start;
+}
+
+.settings-console-content .settings-system-field__control > .relative {
+  width: 100%;
+}
+
+.settings-console :where(
+  .settings-action-button,
+  [data-settings-button-tone],
+  .console-primary-button,
+  .console-secondary-button
+) {
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 14px;
+  border-radius: var(--kk-morphic-radius-control);
+  font-size: var(--kk-type-button);
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  transform: none !important;
+  transition:
+    color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.settings-console [data-settings-button-tone='primary'],
+.settings-console .console-primary-button {
+  color: var(--kk-morphic-text-primary) !important;
+  border-color: transparent !important;
+  background: var(--kk-morphic-action) !important;
+}
+
+.settings-console [data-settings-button-tone='secondary'],
+.settings-console .console-secondary-button {
+  color: var(--kk-morphic-text-secondary) !important;
+  border-color: var(--kk-morphic-border) !important;
+  background: var(--kk-morphic-control) !important;
+}
+
+.settings-system-card-footer-actions {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-console :where(
+  [data-settings-button-tone='secondary'],
+  .console-secondary-button
+):hover {
+  color: var(--kk-morphic-text-primary) !important;
+  background: var(--kk-morphic-control-hover) !important;
+}
+
+.settings-console :where(.console-button-row, .console-card-actions, .settings-system-actions) {
+  justify-content: center;
+}
+
+.settings-console :where(
+  .settings-system-switch,
+  .settings-control-toggle,
+  .settings-toggle-button,
+  .settings-browser-toggle
+) {
+  position: relative;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  flex: 0 0 42px;
+  overflow: hidden;
+  padding: 0 !important;
+  border: 1px solid var(--kk-morphic-border-strong) !important;
+  border-radius: var(--kk-radius-pill) !important;
+  background: var(--kk-morphic-control) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition:
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    border-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard) !important;
+}
+
+.settings-console :where(
+  .settings-system-switch,
+  .settings-control-toggle,
+  .settings-toggle-button,
+  .settings-browser-toggle
+)::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--kk-radius-pill);
+  background: var(--kk-morphic-text-secondary);
+  box-shadow: none;
+  content: '';
+  transform: translateX(0);
+  transition:
+    transform var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+    background-color var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard);
+}
+
+.settings-console :where(
+  .settings-system-switch[data-state='on'],
+  .settings-control-toggle[data-state='on'],
+  .settings-toggle-button[data-state='on'],
+  .settings-browser-toggle[data-state='enabled']
+) {
+  border-color: var(--kk-morphic-action) !important;
+  background: var(--kk-morphic-action) !important;
+}
+
+.settings-console :where(
+  .settings-system-switch[data-state='on'],
+  .settings-control-toggle[data-state='on'],
+  .settings-toggle-button[data-state='on'],
+  .settings-browser-toggle[data-state='enabled']
+)::after {
+  background: var(--kk-morphic-text-primary);
+  transform: translateX(18px);
+}
+
+.settings-console .settings-browser-toggle__icon {
+  display: none;
+}
+
+.settings-console .settings-performance-mode-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--kk-morphic-control);
+}
+
+.settings-console .settings-performance-mode-option {
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--kk-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.settings-console .settings-performance-mode-option[data-state='selected'] {
+  color: var(--kk-morphic-text-primary);
+  border: 0;
+  background: var(--kk-morphic-control-hover);
+  box-shadow: none;
+}
+
+.settings-console .settings-risk-matrix {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-console .settings-risk-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-morphic-radius-control);
+  background: var(--console-subtle);
+}
+
+.settings-console .settings-risk-card__icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--kk-radius-sm);
+  color: var(--text-secondary);
+  background: var(--kk-morphic-control);
+}
+
+.settings-console .settings-risk-card[data-tone='success'] .settings-risk-card__icon {
+  color: var(--settings-state-success-text);
+}
+
+.settings-console .settings-risk-card[data-tone='warning'] .settings-risk-card__icon {
+  color: var(--settings-state-warning-text);
+}
+
+.settings-console .settings-risk-card[data-tone='danger'] .settings-risk-card__icon {
+  color: var(--settings-state-danger-text);
+}
+
+.settings-console .settings-risk-card__content {
+  min-width: 0;
+}
+
+.settings-console .settings-risk-card__heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.settings-console .settings-risk-card__heading strong {
+  min-width: 0;
+  flex: 1 1 180px;
+  color: var(--text-primary);
+  font-size: var(--kk-type-button);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.settings-console .settings-risk-card p {
+  margin: 5px 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  line-height: 1.5;
+}
+
+.settings-console .settings-card-grid-container {
+  align-items: start;
+}
+
+.settings-console .settings-browser-section-card,
+.settings-console .settings-browser-feature-card {
+  height: auto;
+  min-height: 0;
+}
+
+.settings-console .settings-browser-section-card {
+  align-self: start;
+}
+
+.settings-console .settings-browser-feature-card {
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: var(--console-subtle);
+}
+
+.settings-console .settings-browser-feature-card__header {
+  align-items: flex-start;
+}
+
+.settings-console .settings-browser-feature-card__title {
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+}
+
+.settings-console .settings-browser-feature-card__description {
+  margin-top: 0;
+}
+
+.settings-console .console-profile-copy-id {
+  width: 100%;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.settings-console .console-profile-copy-id > span {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.settings-console .console-profile-copy-id .console-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-console .console-profile-copy-id > small {
+  color: var(--text-tertiary);
+  font-size: var(--kk-type-caption);
+  white-space: nowrap;
 }
 
 .settings-capability-source-grid {
@@ -479,27 +777,49 @@
 
   .settings-console--mobile {
     min-height: 100dvh;
+    padding: 0 8px 8px;
   }
 
   .settings-console-mobile-topbar {
     min-height: calc(env(safe-area-inset-top, 0px) + 60px);
     grid-template-columns: 44px minmax(0, 1fr) 44px;
     gap: 10px;
-    padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+    margin-top: 8px;
+    padding: env(safe-area-inset-top, 0px) 8px 0;
+    overflow: hidden;
+    border: 1px solid var(--console-border);
+    border-radius: 16px;
+    background: var(--console-surface);
   }
 
-  .settings-console-mobile-topbar button {
+  .settings-console-mobile-topbar button,
+  .settings-console-mobile-topbar__placeholder {
+    display: grid;
     width: 44px;
     height: 44px;
+    place-items: center;
     border-radius: var(--kk-morphic-radius-control);
   }
 
   .settings-console-mobile-topbar strong {
     font-size: var(--kk-type-body);
+    text-align: center;
+    transform: translateX(0);
+    transition:
+      text-align var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
+      transform var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
+  }
+
+  .settings-console-mobile-topbar[data-title-alignment='start'] strong {
+    text-align: left;
+  }
+
+  .settings-console-mobile-topbar[data-navigation-state='nested'] {
+    animation: settings-mobile-topbar-enter var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
   }
 
   .settings-console-content--mobile {
-    padding: 20px 14px calc(env(safe-area-inset-bottom, 0px) + 28px);
+    padding: 18px 6px calc(env(safe-area-inset-bottom, 0px) + 20px);
     scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
   }
 
@@ -508,8 +828,12 @@
   }
 
   .settings-console-mobile-overview {
+    display: grid;
     gap: 14px;
-    padding: 4px 2px 0;
+    padding: 16px;
+    border: 1px solid var(--console-border);
+    border-radius: var(--kk-morphic-radius-panel);
+    background: var(--console-surface);
   }
 
   .settings-console-mobile-overview__copy > span {
@@ -522,11 +846,50 @@
     line-height: 1.35;
   }
 
-  .settings-console-mobile-overview__performance {
-    min-height: 44px;
-    padding-inline: 12px;
+  .settings-console-mobile-overview__copy p {
+    margin: 6px 0 0;
+    color: var(--text-tertiary);
+    font-size: var(--kk-type-caption);
+    line-height: 1.5;
+  }
+
+  .settings-console-mobile-overview__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--console-border);
     border-radius: var(--kk-morphic-radius-control);
-    font-size: var(--kk-type-button);
+    background: var(--console-border);
+  }
+
+  .settings-console-mobile-overview__metrics > span {
+    display: grid;
+    min-width: 0;
+    min-height: 58px;
+    align-content: center;
+    gap: 3px;
+    padding: 8px;
+    background: var(--console-subtle);
+    text-align: center;
+  }
+
+  .settings-console-mobile-overview__metrics strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: var(--kk-type-body);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-console-mobile-overview__metrics small {
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: var(--kk-type-caption);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .settings-console-mobile-home section h2 {
@@ -545,7 +908,7 @@
 
   .settings-console-mobile-list button,
   .settings-console-mobile-account {
-    min-height: 72px;
+    min-height: 64px;
     grid-template-columns: 36px minmax(0, 1fr) 18px;
     gap: 12px;
     padding: 12px 14px;
@@ -596,6 +959,28 @@
     padding: 16px !important;
   }
 
+  .settings-console-content .console-page-header {
+    gap: 12px;
+    padding: 16px !important;
+    border: 1px solid var(--console-border);
+    border-radius: var(--kk-morphic-radius-panel);
+    background: var(--console-surface);
+  }
+
+  .settings-console-content .console-page-header > div {
+    min-width: 0;
+  }
+
+  .settings-console-content .console-page-header p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-console-content .console-page-header .console-header-action {
+    width: auto;
+    max-width: 100%;
+  }
+
   .settings-console-content :where(
     .console-setting-row,
     .settings-field-row
@@ -605,12 +990,53 @@
     gap: 10px;
   }
 
+  .settings-console-content .settings-system-field__control {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .settings-console-content .settings-system-control-menu {
+    position: static !important;
+    width: 100%;
+    max-height: min(42dvh, 320px);
+    margin-top: 8px !important;
+    overflow-y: auto !important;
+  }
+
+  .settings-console-content .settings-system-control-menu-trigger {
+    width: 100%;
+  }
+
   .settings-console :where(
     .console-button-row button,
     .console-card-actions button,
     .settings-system-actions button
   ) {
     min-height: 44px;
+  }
+
+  .settings-console :where(
+    .settings-action-button,
+    [data-settings-button-tone],
+    .console-primary-button,
+    .console-secondary-button
+  ) {
+    min-height: 44px;
+  }
+
+  .settings-console .settings-performance-mode-option {
+    min-height: 44px;
+    padding: 0 6px;
+  }
+
+  .settings-console .settings-performance-mode-option span {
+    display: none;
+  }
+
+  .settings-console .settings-performance-mode-option strong {
+    font-size: var(--kk-type-button);
+    line-height: 1.2;
   }
 
   .settings-section__header {
@@ -623,6 +1049,64 @@
 
   .settings-section__action {
     min-height: 24px;
+  }
+
+  .settings-console .settings-browser-section-card {
+    padding: 16px !important;
+  }
+
+  .settings-console .settings-browser-section-card__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .settings-console .settings-browser-section-card--wide > .settings-browser-section-card__header {
+    padding-bottom: 10px;
+  }
+
+  .settings-console .settings-browser-feature-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+  }
+
+  .settings-console .settings-browser-feature-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+  }
+
+  .settings-console .console-profile-tabs {
+    display: grid;
+    min-height: 44px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    padding: 3px;
+    overflow: hidden;
+    border-radius: var(--kk-morphic-radius-control);
+  }
+
+  .settings-console .console-profile-tabs button {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 4px;
+    border-radius: var(--kk-radius-sm);
+    font-size: var(--kk-type-button);
+    white-space: nowrap;
+  }
+
+  .settings-console .console-profile-tabs button[data-selected='true'] {
+    color: var(--text-primary);
+    background: var(--kk-morphic-control-hover);
+  }
+
+  .settings-console .console-profile-copy-id {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .settings-capability-source-grid {
@@ -641,7 +1125,39 @@
 
   .settings-console-content .settings-model-center-layout {
     grid-template-columns: minmax(0, 1fr) !important;
-    gap: 20px !important;
+    gap: 14px !important;
+  }
+
+  .settings-capability-api-embed [data-testid='settings-model-center']
+    > .settings-section--plain
+    > .settings-section__header {
+    position: relative;
+    display: block;
+  }
+
+  .settings-capability-api-embed [data-testid='settings-model-center']
+    > .settings-section--plain
+    > .settings-section__header
+    .settings-section__copy {
+    width: 100%;
+    max-width: none;
+  }
+
+  .settings-capability-api-embed [data-testid='settings-model-center']
+    > .settings-section--plain
+    > .settings-section__header
+    .settings-section__copy
+    h3 {
+    padding-right: 74px;
+  }
+
+  .settings-capability-api-embed [data-testid='settings-model-center']
+    > .settings-section--plain
+    > .settings-section__header
+    .settings-section__action {
+    position: absolute;
+    top: 0;
+    right: 0;
   }
 
   .settings-console-content .settings-model-center-toolbar {
@@ -670,8 +1186,8 @@
   }
 
   .settings-console-content .settings-model-center-directory {
-    gap: 12px !important;
-    padding: 18px 0 0 !important;
+    gap: 10px !important;
+    padding: 14px 0 0 !important;
   }
 
   .settings-console-content .settings-model-center-directory__header {
@@ -701,8 +1217,28 @@
   }
 
   .settings-console-content .settings-model-center-preset {
-    min-height: 60px;
-    padding: 9px 10px !important;
+    min-width: 0;
+    min-height: 64px;
+    height: 64px !important;
+    padding: 8px !important;
+  }
+
+  .settings-console-content .settings-model-center-preset-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: auto !important;
+    gap: 8px !important;
+  }
+
+  .settings-console-content .settings-model-center-preset__mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .settings-console-content .settings-model-center-preset__meta,
+  .settings-console-content .settings-model-center-preset__url,
+  .settings-console-content .settings-model-center-preset__model {
+    display: none;
   }
 
   .settings-console-content .settings-model-center-preset__url,
@@ -783,6 +1319,18 @@
   .settings-route-matrix__task,
   .settings-route-matrix__reason {
     grid-column: 1 / -1;
+  }
+}
+
+@keyframes settings-mobile-topbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

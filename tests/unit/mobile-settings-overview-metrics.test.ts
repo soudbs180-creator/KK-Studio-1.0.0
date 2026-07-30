@@ -114,6 +114,7 @@ test('mobile settings overview hides OAuth sessions when the bridge is disconnec
 test('mobile settings dashboard exposes four judgment metrics, focused strategy controls, modules, and balance', () => {
   const dashboardSource = readSource('apps/web/src/components/settings/SettingsMobileDashboard.tsx');
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
+  const navigationSource = readSource('apps/web/src/components/settings/mobileSettingsNavigation.ts');
   const appearanceSource = readSource('apps/web/src/components/settings/views/AppearanceMotionView.tsx');
   const appearanceContextSource = readSource('apps/web/src/context/AppearanceMotionContext.tsx');
   const settingsStylesSource = readSource('apps/web/src/styles/settings.css');
@@ -143,8 +144,10 @@ test('mobile settings dashboard exposes four judgment metrics, focused strategy 
   assert.doesNotMatch(shellSource, /SettingsHero/);
   assert.match(shellSource, /SettingsConsoleMobileHome/);
   assert.match(shellSource, /data-testid="settings-mobile-dashboard"/);
-  assert.match(shellSource, /Capability Sources/);
-  assert.match(shellSource, /Web performance/);
+  assert.match(shellSource, /buildMobileSettingsGroups/);
+  assert.match(navigationSource, /Capabilities/);
+  assert.match(navigationSource, /'capability-sources'/);
+  assert.match(navigationSource, /System/);
   assert.doesNotMatch(shellSource, /<SettingsMobileDashboard\s/);
 
   assert.match(appearanceSource, /role="radiogroup"/);

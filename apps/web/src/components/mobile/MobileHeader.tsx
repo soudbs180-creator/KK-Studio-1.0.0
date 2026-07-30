@@ -33,7 +33,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
 }) => {
     const { pick, language } = useLocale();
     const resolvedUserName = userName || pick('用户', 'User');
-    const iconButtonClass = 'h-12 w-12 rounded-[8px] flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-12 w-12 rounded-[10px] flex items-center justify-center border transition-colors';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = resolvedUserName?.trim()?.[0]?.toUpperCase() || 'U';
     const maxCredits = 999999;
@@ -52,7 +52,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         type="button"
                         onClick={onUserClick}
                         aria-label={pick('打开个人中心', 'Open Profile')}
-                        className="kk-mobile-header-control flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[8px] border px-2.5 text-left transition-[background-color,border-color]"
+                        className="kk-mobile-header-control flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-2.5 text-left transition-[background-color,border-color]"
                         title={resolvedUserName}
                     >
                         <span
@@ -73,20 +73,20 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                                     const role = String(userRole || 'user').toLowerCase();
                                     if (role === 'admin') {
                                         return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1 py-0.5 text-[7px] font-bold text-red-400 tracking-wider scale-90 origin-left">
+                                            <span className="kk-mobile-user-role shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1.5 text-red-400">
                                                 {pick('管理员', 'Admin')}
                                             </span>
                                         );
                                     }
                                     if (role.startsWith('member')) {
                                         return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1 py-0.5 text-[7px] font-bold text-amber-400 tracking-wider scale-90 origin-left">
+                                            <span className="kk-mobile-user-role shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1.5 text-amber-400">
                                                 {pick('高级会员', 'Pro Member')}
                                             </span>
                                         );
                                     }
                                     return (
-                                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1 py-0.5 text-[7px] font-bold text-slate-400 tracking-wider scale-90 origin-left">
+                                        <span className="kk-mobile-user-role shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1.5 text-slate-400">
                                             {pick('普通用户', 'Standard User')}
                                         </span>
                                     );
@@ -100,14 +100,14 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label={pick('查看积分', 'View Credits')}
-                        className="kk-mobile-header-control flex h-12 shrink-0 items-center gap-1.5 rounded-[8px] border px-2.5 transition-all active:scale-95 disabled:opacity-55"
+                        className="kk-mobile-header-control flex h-12 shrink-0 items-center gap-1.5 rounded-[10px] border px-2.5 transition-colors disabled:opacity-55"
                         disabled={!handleRechargeClick}
                     >
                         <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-[0.08em]">
                             <Sparkles size={9} className="text-amber-300 animate-pulse" />
                             {pick('积分', 'Credits')}
                         </span>
-                        <span className="text-[12px] font-bold text-[var(--text-primary)] truncate font-variant-numeric: tabular-nums whitespace-nowrap">
+                        <span className="truncate whitespace-nowrap text-[12px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">
                             {balanceDisplay}
                         </span>
                     </button>

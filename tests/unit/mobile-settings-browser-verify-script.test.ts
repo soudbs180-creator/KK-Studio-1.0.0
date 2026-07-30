@@ -48,9 +48,9 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /localStorage\.setItem\(storageKey, JSON\.stringify\(state\)\);[\s\S]*page\.reload\(\{ waitUntil: 'domcontentloaded' \}\);[\s\S]*page\.waitForTimeout\(2500\);/);
   assert.match(scriptSource, /mobile-result-detail-screen/);
   assert.match(scriptSource, /settings-mobile-dashboard/);
-  assert.match(scriptSource, /创作系统状态\|Creative system status/);
-  assert.match(scriptSource, /网页性能\|Web performance/);
-  assert.match(scriptSource, /能力来源\|Capability Sources/);
+  assert.match(scriptSource, /创作与能力设置\|Creation and capability settings/);
+  assert.match(scriptSource, /高级性能\|Advanced Performance/);
+  assert.match(scriptSource, /API 配置\|API Configuration/);
   assert.match(scriptSource, /api-official-provider-add|api-simple-provider-add/);
   assert.match(scriptSource, /api-official-editor-back/);
   assert.match(scriptSource, /settings-model-center/);

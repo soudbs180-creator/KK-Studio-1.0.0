@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CircleGauge, Eye, Gauge, Layers3, Palette, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import { CircleGauge, Gauge, Layers3, Palette, RotateCcw, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
@@ -11,7 +11,6 @@ import {
   SettingsSystemCard,
   SettingsSystemField,
   SettingsViewShell,
-  SETTINGS_GLASS_SURFACE_CLASSNAME,
   SETTINGS_PAGE_CONTAINER_CLASSNAME,
   SETTINGS_RESPONSIVE_GRID_CLASSNAME,
 } from '../SettingsScaffold';
@@ -86,12 +85,12 @@ const AppearanceMotionView: React.FC = () => {
     },
     {
       id: 'balanced',
-      label: pick('正常', 'Normal'),
+      label: pick('均衡', 'Balanced'),
       description: pick('平衡流畅与质感', 'Balanced experience'),
     },
     {
       id: 'visual',
-      label: pick('性能', 'Performance'),
+      label: pick('高质量', 'High quality'),
       description: pick('启用完整特效与画质', 'Full effects and quality'),
     },
   ];
@@ -278,53 +277,13 @@ const AppearanceMotionView: React.FC = () => {
               ]}
             />
           </SettingsSystemField>
-          <div className="flex justify-end">
+                    <div className="settings-system-card-footer-actions">
             <SettingsActionButton icon={Gauge} tone="secondary" onClick={() => navigate('/settings/canvas-performance')}>
               {pick('高级画布细节', 'Advanced canvas details')}
             </SettingsActionButton>
           </div>
         </SettingsSystemCard>
 
-        <SettingsSystemCard
-          className="settings-system-card--wide"
-          title={pick('系统预览', 'System Preview')}
-          description={pick('这里展示同一套 token 在设置页卡片、浮层和字段上的效果。', 'Shows the same tokens across settings cards, overlays, and fields.')}
-          icon={Eye}
-          tone="indigo"
-        >
-          <div className="settings-system-preview-stage">
-            <div className={`${SETTINGS_GLASS_SURFACE_CLASSNAME} settings-system-preview-card`}>
-              <div className="settings-system-preview-title">
-                {pick('导航与浮层会使用这套玻璃变量', 'Navigation and overlays use this glass contract')}
-              </div>
-              <p className="settings-system-preview-copy">
-                {pick('新增设置页时优先组合 SettingsSystemCard、SettingsSystemField 和 semantic token。', 'New settings pages should compose SettingsSystemCard, SettingsSystemField, and semantic tokens first.')}
-              </p>
-            </div>
-            <div className="settings-system-preview-card">
-              <div className="settings-system-preview-title">
-                {pick('正文内容保持更高实体度', 'Reading areas stay more solid')}
-              </div>
-              <p className="settings-system-preview-copy">
-                {pick('动态和透明度只服务层级表达，不能牺牲可读性、触控尺寸和键盘可达性。', 'Motion and transparency serve hierarchy only; readability, touch targets, and keyboard access stay mandatory.')}
-              </p>
-            </div>
-          </div>
-        </SettingsSystemCard>
-
-        <SettingsSystemCard
-          className="settings-system-card--wide"
-          title={pick('新增页面规则', 'Rules for New Pages')}
-          description={pick('后续设置页优先复用这里的系统原语，减少硬编码样式造成的视觉和响应式 bug。', 'Future settings pages should reuse these primitives to reduce hard-coded visual and responsive bugs.')}
-          icon={Sparkles}
-          tone="amber"
-        >
-          <div className="grid gap-3 md:grid-cols-3">
-            <SettingsBadge tone="indigo">{pick('断点统一', 'Unified breakpoints')}</SettingsBadge>
-            <SettingsBadge tone="emerald">{pick('44px 触控下限', '44px touch floor')}</SettingsBadge>
-            <SettingsBadge tone="amber">{pick('减少动态可用', 'Reduced motion ready')}</SettingsBadge>
-          </div>
-        </SettingsSystemCard>
       </div>
     </SettingsViewShell>
   );

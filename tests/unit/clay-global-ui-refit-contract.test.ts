@@ -181,9 +181,10 @@ test('mobile workspace shell uses Morphic surfaces while legacy result views sta
   assert.doesNotMatch(mobileResultDetail, /blue:\s*'border-blue|bg-blue|text-blue/);
 });
 
-test('settings controls share motion and overflow-safe Clay sizing primitives', () => {
+test('settings controls share motion and the unified V3 switch primitive', () => {
   const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
   const primitiveSource = readSource('apps/web/src/components/settings/ui/index.tsx');
+  const settingsCssSource = readSource('apps/web/src/styles/settings-v3.css');
 
   assert.match(scaffoldSource, /SETTINGS_CONTROL_MOTION_CLASSNAME/);
   assert.doesNotMatch(scaffoldSource, /transition-opacity duration-150 hover:opacity-70 active:opacity-50/);
@@ -191,8 +192,13 @@ test('settings controls share motion and overflow-safe Clay sizing primitives', 
   assert.match(scaffoldSource, /boxShadow:\s*'var\(--settings-button-primary-shadow\)'/);
 
   assert.match(primitiveSource, /SETTINGS_CONTROL_MOTION_CLASSNAME/);
-  assert.match(primitiveSource, /settings-control-toggle/);
-  assert.match(primitiveSource, /translateX\(20px\)/);
+  assert.match(primitiveSource, /settings-system-switch settings-control-toggle/);
+  assert.match(primitiveSource, /role="switch"/);
+  assert.match(primitiveSource, /aria-checked=\{checked\}/);
+  assert.match(primitiveSource, /data-state=\{checked \? 'on' : 'off'\}/);
+  assert.match(settingsCssSource, /\.settings-system-switch[\s\S]*width:\s*42px !important;/);
+  assert.match(settingsCssSource, /\.settings-system-switch\[data-state='on'\][\s\S]*transform:\s*translateX\(18px\);/);
+  assert.doesNotMatch(primitiveSource, /translateX\(20px\)/);
   assert.doesNotMatch(primitiveSource, /duration-200 active:scale-95/);
   assert.match(primitiveSource, /var\(--settings-input-shadow\)/);
 });

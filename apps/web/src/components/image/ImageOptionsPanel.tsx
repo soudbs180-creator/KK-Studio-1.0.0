@@ -198,7 +198,7 @@ const ImageSizeControlSegment: React.FC<ImageSizeControlSegmentProps> = ({
   }
 
   return (
-    <div className="relative flex rounded-xl p-0.5" style={SEGMENT_STYLE}>
+    <div className="kk-image-size-segment relative flex rounded-xl p-0.5" style={SEGMENT_STYLE}>
       <div
         className="absolute bottom-0.5 top-0.5 rounded-[10px] transition-all duration-200 ease-out"
         style={{
@@ -246,7 +246,7 @@ const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
 
   return (
     <div
-      className="flex gap-1.5 overflow-hidden rounded-xl p-1.5"
+      className="kk-aspect-ratio-control flex gap-1.5 overflow-hidden rounded-xl p-1.5"
       style={SEGMENT_STYLE}
     >
       {layout.hasAuto && !layout.autoInGrid ? (
@@ -269,7 +269,7 @@ const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
       <div
         ref={scrollContainerRef}
         onWheel={handleWheel}
-        className={`grid min-w-0 flex-1 overflow-y-hidden ${layout.needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
+        className={`kk-aspect-ratio-grid grid min-w-0 flex-1 overflow-y-hidden ${layout.needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
         style={{
           gridTemplateColumns: layout.needsScroll ? `repeat(${layout.columns}, minmax(54px, 1fr))` : `repeat(${layout.columns}, minmax(0, 1fr))`,
           gridTemplateRows: layout.useDoubleRow ? 'repeat(2, 48px)' : '48px',
@@ -360,7 +360,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
 
   return (
     <div
-      className="custom-scrollbar overflow-y-auto rounded-[28px] border p-4"
+      className="kk-image-options-panel custom-scrollbar overflow-y-auto rounded-[28px] border p-4"
       style={{
         width: 'min(420px, calc(100vw - 24px))',
         maxHeight: 'min(60vh, 520px)',

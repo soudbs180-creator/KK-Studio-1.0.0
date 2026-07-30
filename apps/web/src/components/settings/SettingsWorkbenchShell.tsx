@@ -2,8 +2,6 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronRight,
-  Gauge,
-  KeyRound,
   Moon,
   RefreshCw,
   Sun,
@@ -31,6 +29,10 @@ import {
   deriveApiManagementListStateFromPath,
   isApiManagementEditorRoute,
 } from './apiManagementRouteState';
+import {
+  buildMobileSettingsGroups,
+  resolveMobileSettingsTopbarState,
+} from './mobileSettingsNavigation';
 import { renderSettingsRouteElements } from './settingsRouteConfig';
 
 type ConsoleGroupId = 'workspace' | 'capabilities' | 'automation' | 'system';
@@ -161,42 +163,30 @@ const SettingsConsoleMobileHome: React.FC<{
 }> = ({ onNavigate }) => {
   const { language, pick } = useLocale();
   const items = useMemo(() => getSettingsNavItems(language), [language]);
-  const groups = useMemo(() => buildGroups(items, language === 'en-US'), [items, language]);
-
-  const performanceLabel = pick('网页性能', 'Web performance');
-  const capabilityLabel = pick('能力来源', 'Capability Sources');
+  const groups = useMemo(
+    () => buildMobileSettingsGroups(items, language === 'en-US'),
+    [items, language],
+  );
 
   return (
     <div className="settings-console-mobile-home" data-testid="settings-mobile-dashboard">
       <section className="settings-console-mobile-overview" aria-labelledby="settings-console-mobile-overview-title">
         <div className="settings-console-mobile-overview__copy">
-          <span>{pick('工作区策略', 'Workspace strategy')}</span>
-          <h2 id="settings-console-mobile-overview-title">{pick('创作系统状态', 'Creative system status')}</h2>
+          <span>{pick('当前工作区', 'Current workspace')}</span>
+          <h2 id="settings-console-mobile-overview-title">{pick('创作与能力设置', 'Creation and capability settings')}</h2>
+          <p>
+            {pick(
+              '按模块管理生成方式、能力来源、自动化与设备性能。',
+              'Manage generation, capability inputs, automation, and device performance by module.',
+            )}
+          </p>
         </div>
-        <button
-          type="button"
-          className="settings-console-mobile-overview__performance"
-          aria-label={performanceLabel}
-          onClick={() => onNavigate('appearance-motion')}
-        >
-          <Gauge size={15} aria-hidden="true" />
-          <span>{performanceLabel}</span>
-          <ChevronRight size={14} />
-        </button>
+        <div className="settings-console-mobile-overview__metrics" aria-label={pick('设置总览', 'Settings overview')}>
+          <span><strong>{items.length}</strong><small>{pick('设置项', 'settings')}</small></span>
+          <span><strong>{groups.length}</strong><small>{pick('功能模块', 'modules')}</small></span>
+          <span><strong>{pick('正常', 'Normal')}</strong><small>{pick('体验模式', 'experience')}</small></span>
+        </div>
       </section>
-
-      <div className="settings-console-mobile-list settings-console-mobile-primary-list">
-        <button
-          type="button"
-          aria-label={capabilityLabel}
-          data-ai-settings-target="capability-sources"
-          onClick={() => onNavigate('capability-sources')}
-        >
-          <span aria-hidden="true"><KeyRound size={17} /></span>
-          <span><strong>{capabilityLabel}</strong><small>{pick('API、OAuth 与本地 Runner。', 'API, OAuth, and local runners.')}</small></span>
-          <ChevronRight size={14} />
-        </button>
-      </div>
 
       {groups.map((group) => (
         <section key={group.id}>
@@ -243,6 +233,7 @@ export const SettingsConsoleShell: React.FC<{
   const scrollRef = useRef<HTMLElement | null>(null);
   const nestedApiEditor = isApiManagementEditorRoute(location.pathname);
   const nestedApiState = useMemo(() => deriveApiManagementListStateFromPath(location.pathname), [location.pathname]);
+  const { language, pick } = useLocale();
   void initialView;
 
   useEffect(() => {
@@ -261,12 +252,26 @@ export const SettingsConsoleShell: React.FC<{
 
   if (isMobile) {
     const atHome = location.pathname === '/settings' || location.pathname === '/settings/';
+    const topbarState = resolveMobileSettingsTopbarState(
+      atHome,
+      getSettingsViewMeta(activeView, language).title,
+    );
     return (
       <div className="settings-console settings-console--mobile" onClick={(event) => event.stopPropagation()}>
-        <header className="settings-console-mobile-topbar">
-          <button type="button" aria-label="返回" onClick={handleBack}><ArrowLeft size={18} /></button>
-          <strong>{getSettingsViewMeta(activeView, 'zh-CN').title}</strong>
-          <button type="button" aria-label="关闭设置" onClick={onClose}><X size={18} /></button>
+        <header
+          className="settings-console-mobile-topbar"
+          data-title-alignment={topbarState.titleAlignment}
+          data-navigation-state={atHome ? 'home' : 'nested'}
+        >
+          {topbarState.showBackButton ? (
+            <button type="button" aria-label={pick('返回系统设置', 'Back to settings')} onClick={handleBack}>
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <span className="settings-console-mobile-topbar__placeholder" aria-hidden="true" />
+          )}
+          <strong>{topbarState.title}</strong>
+          <button type="button" aria-label={pick('关闭设置', 'Close settings')} onClick={onClose}><X size={18} /></button>
         </header>
         <main ref={scrollRef as React.RefObject<HTMLElement>} className="settings-console-content settings-console-content--mobile">
           {atHome ? <SettingsConsoleMobileHome onNavigate={handleNavigate} /> : <SettingsConsoleRoutes initialSupplier={initialSupplier} refreshKey={refreshKey} onNavigate={handleNavigate} />}

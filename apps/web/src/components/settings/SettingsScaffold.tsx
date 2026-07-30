@@ -543,6 +543,7 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
       onClick={handleInterceptClick}
       className={`console-button settings-action-button inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium whitespace-nowrap ${motionClass} ${isGhostDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-40'} ${className}`.trim()}
       data-size={size}
+      data-settings-button-tone={tone}
       style={{
         borderRadius: size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)',
         fontSize: size === 'sm' ? 'var(--type-caption)' : 'var(--type-body-2)',
