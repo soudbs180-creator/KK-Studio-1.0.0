@@ -2222,3 +2222,49 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。数据和回调语义未变，主要风险集中在共享设置按钮尺寸；已由 CSS 契约和 375/390/1280px 浏览器实测覆盖。
 - 其它设置子页若仍直接使用旧 Dashboard/Frost/Clay 容器，应继续按同一“状态概览 / 操作卡 / 危险区”层级逐页迁移，避免再次嵌套共享页面壳。
+
+---
+
+## 255. 2026-07-30 - fix(ui): 收口设置页响应式密度与模型中心布局
+
+**修改范围**
+- 全面复核设置页桌面、平板和手机端的共享 Section、能力来源、模型管理中心、供应商预设目录与路由矩阵，修复标题、说明、状态 Badge 在窄屏被挤成竖排的问题。
+- 让共享设置章节由真实内容决定高度，移除少量内容仍强制撑满容器的遗留 `h-full / flex-1` 组合。
+- 将“密钥与通道配置”中的模型中心改为单一平面 Surface，删除外卡、内卡、模型卡再次嵌套造成的臃肿层级。
+- 手机端模型目录默认显示 4 个常用预设，并提供可访问的展开/收起入口；桌面端保持双栏高密度浏览，目录内部独立滚动。
+- 将供应商路由矩阵在手机端转换为带字段标签的两列信息卡，避免五列表头逐字换行；空状态和加载状态使用稳定占位。
+- 保留 API、Provider、路由决策、密钥管理、计费、鉴权、Canvas、Agent 与持久化契约不变。
+
+**修改文件**
+- `apps/web/src/components/settings/SettingsScaffold.tsx`
+- `apps/web/src/components/settings/apiWorkbenchSections.tsx`
+- `apps/web/src/components/settings/views/CapabilitySourcesView.tsx`
+- `apps/web/src/components/settings/views/ProviderRoutesView.tsx`
+- `apps/web/src/styles/settings-v3.css`
+- `tests/unit/settings-responsive-density-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. `SettingsSection` 只负责标题、说明、操作与正文的语义层级，不再默认占满父容器；需要内部滚动的业务视图必须在自己的明确边界内声明。
+2. Section Header 使用可换行的弹性布局：文案优先获得完整行宽，状态和操作在空间足够时同行，空间不足时整体换行，不允许逐字压缩。
+3. 能力来源卡使用 `图标 / 标题说明 / 状态` 三段式内容网格，卡片高度由内容决定；768–1023px 使用两列，第三项跨两列，手机端单列。
+4. 模型中心在“密钥与通道配置”章节内使用平面内容层，不再创建第二层设置卡；手机端动作双列、目录渐进披露，桌面端连接列表与预设目录并列。
+5. 路由矩阵只在桌面使用数据表，手机端以字段标签重排为信息卡；数据、行内容和路由决策逻辑仍来自原有状态。
+6. 新增交互只使用 React 本地布尔状态、稳定列表 Key、原生 Button 和 `aria-controls / aria-expanded`，没有引入额外依赖、全局订阅或高频渲染。
+
+**已运行验证**
+- TDD 响应式密度契约 4/4 通过；相关设置与 UI 契约 52/52 通过。
+- 全量 unit：2290 项，2288 通过、0 失败、2 跳过。
+- 完整 `npm run verify:changes` 以退出码 0 通过，覆盖 `architecture:check`、`governance:check`、依赖审计、TypeScript、OpenAPI、生产构建、Local Runner、unit、integration、contract、E2E、设置页 Smoke、AI Takeover、编码检查和 Canvas performance 3/3。
+- Vite 8.1.4 生产构建通过，共转换 2584 modules；595 个测试文件语义检查通过，生产依赖审计为 0 个已知漏洞。
+- 手机与桌面设置 Smoke 均通过；模型中心、供应商卡片池和预设目录均可见并可操作。
+- 本地浏览器实测 354、375、430、768、1280px：标题/说明/Badge 不重叠，模型中心无多层空壳，预设目录可展开/收起，供应商路由不再出现逐字表头，页面无横向溢出。
+- React 最佳实践复核通过：组件职责、Hook 使用、列表 Key、Button 语义、ARIA 状态与无新增 `any` / `console.log` / `debugger` 均符合当前约束；`git diff --check` 通过。
+
+**未运行验证及原因**
+- 本地 API 3001 未启动，因此浏览器日志包含预期的 502 与任务恢复降级提示；设置页 Smoke 使用既有本地数据与降级路径通过，未执行真实 Provider 接入或在线媒体生成。
+- 未部署生产环境；本次范围为本地设置页 UI、响应式布局、交互验证和本地 Git Commit。
+
+**风险与下一步**
+- 风险低。变更只影响设置页结构与样式，没有修改 API、DTO、Provider 路由或数据契约。
+- 后续新增设置模块必须复用内容自适应 Section、语义 Header 和移动端渐进披露规则，禁止重新引入固定大高度、重复 Surface 或桌面表格直接压缩到手机端。

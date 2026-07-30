@@ -88,58 +88,58 @@ export const CapabilitySourcesView: React.FC = () => {
       />
 
       <SettingsSection title={pick('接入能力总览', 'Capability Overview')}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Local Runner */}
-          <div className="p-3.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-overlay)] flex flex-col justify-between h-[120px]">
-            <div className="flex items-start justify-between">
-              <span className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--accent-coral)]">
-                <Server size={16} />
-              </span>
-              <SettingsBadge tone={statusTone(localRunnerStatus)}>
-                {statusLabel(localRunnerStatus)}
-              </SettingsBadge>
+        <div className="settings-capability-source-grid">
+          <article className="settings-capability-source-card">
+            <span className="settings-capability-source-card__icon settings-capability-source-card__icon--runner">
+              <Server size={16} />
+            </span>
+            <div className="settings-capability-source-card__copy">
+              <div className="settings-capability-source-card__title">Local Runner</div>
+              <p className="settings-capability-source-card__description">
+                {pick('本地后台代理守护进程。', 'Local daemon helper backend.')}
+              </p>
             </div>
-            <div>
-              <div className="text-xs font-bold text-[var(--text-primary)] mt-2">Local Runner</div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">{pick('本地后台代理守护进程。', 'Local daemon helper backend.')}</p>
-            </div>
-          </div>
+            <SettingsBadge className="settings-capability-source-card__badge" tone={statusTone(localRunnerStatus)}>
+              {statusLabel(localRunnerStatus)}
+            </SettingsBadge>
+          </article>
 
-          {/* Web Extension */}
-          <div className="p-3.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-overlay)] flex flex-col justify-between h-[120px]">
-            <div className="flex items-start justify-between">
-              <span className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-sky-400">
-                <Globe size={16} />
-              </span>
-              <SettingsBadge tone={statusTone(browserBridgeStatus)}>{statusLabel(browserBridgeStatus)}</SettingsBadge>
+          <article className="settings-capability-source-card">
+            <span className="settings-capability-source-card__icon settings-capability-source-card__icon--browser">
+              <Globe size={16} />
+            </span>
+            <div className="settings-capability-source-card__copy">
+              <div className="settings-capability-source-card__title">Chrome Bridge / Web Member</div>
+              <p className="settings-capability-source-card__description">
+                {pick('浏览器直连，用于抓取或网页会员生成。', 'Browser session membership link.')}
+              </p>
             </div>
-            <div>
-              <div className="text-xs font-bold text-[var(--text-primary)] mt-2">Chrome Bridge / Web Member</div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">{pick('浏览器直连，用于抓取或网页会员生成。', 'Browser session membership link.')}</p>
-            </div>
-          </div>
+            <SettingsBadge className="settings-capability-source-card__badge" tone={statusTone(browserBridgeStatus)}>
+              {statusLabel(browserBridgeStatus)}
+            </SettingsBadge>
+          </article>
 
-          {/* Local Model */}
-          <div className="p-3.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-overlay)] flex flex-col justify-between h-[120px]">
-            <div className="flex items-start justify-between">
-              <span className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-indigo-400">
-                <Cpu size={16} />
-              </span>
-              <SettingsBadge tone="neutral">{pick('待激活', 'Standby')}</SettingsBadge>
+          <article className="settings-capability-source-card">
+            <span className="settings-capability-source-card__icon settings-capability-source-card__icon--local-model">
+              <Cpu size={16} />
+            </span>
+            <div className="settings-capability-source-card__copy">
+              <div className="settings-capability-source-card__title">Local Models</div>
+              <p className="settings-capability-source-card__description">
+                {pick('端侧轻量运行模型，支持离线文本任务。', 'On-device LLMs for offline text processing.')}
+              </p>
             </div>
-            <div>
-              <div className="text-xs font-bold text-[var(--text-primary)] mt-2">Local Models</div>
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">{pick('端侧轻量运行模型，支持离线文本任务。', 'On-device LLMs for offline text processing.')}</p>
-            </div>
-          </div>
+            <SettingsBadge className="settings-capability-source-card__badge" tone="neutral">
+              {pick('待激活', 'Standby')}
+            </SettingsBadge>
+          </article>
         </div>
       </SettingsSection>
 
       <ProviderConnectionsPanel />
 
       <SettingsSection title={pick('密钥与通道配置 (原 API 设置)', 'Keys & Channels')}>
-        <div className="border border-[var(--border-light)] rounded-xl overflow-hidden bg-[var(--bg-overlay)] p-2">
-          {/* 渲染原有的密钥管理面版，保证所有功能零折损且不产生回归漏洞 */}
+        <div className="settings-capability-api-embed">
           <ApiSettingsView initialSupplier={null} />
         </div>
       </SettingsSection>

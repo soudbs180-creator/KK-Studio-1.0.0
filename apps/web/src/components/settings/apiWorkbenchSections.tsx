@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   buildCanonicalApiRecordId,
   isCanonicalApiRecordId,
@@ -816,6 +816,8 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
   onAddOfficial,
   onAddProvider,
 }) => {
+  const [isPresetDirectoryExpanded, setIsPresetDirectoryExpanded] = useState(false);
+
   /* 按标签页类型过滤预设并对相同 baseUrl 进行去重 */
   const seenBaseUrls = new Set<string>();
   const filteredPresets = presets.filter((p) => {
@@ -840,6 +842,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
       '左侧管理已接入的官方直连和第三方供应商，右侧从预设目录快速填充新通道。',
       'Manage connected official and third-party routes on the left, and use presets on the right to prefill new routes.',
     )}
+    surface="plain"
     action={<SettingsBadge tone="indigo">{connectedSummary}</SettingsBadge>}
   >
     <div className="settings-model-center-layout">
@@ -1116,7 +1119,11 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
           ))}
         </div>
 
-        <div className="settings-model-center-preset-list">
+        <div
+          id="api-model-center-presets"
+          className="settings-model-center-preset-list"
+          data-expanded={isPresetDirectoryExpanded}
+        >
           {filteredPresets.map((preset) => (
             <button
               key={preset.id}
@@ -1144,6 +1151,26 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             </button>
           ))}
         </div>
+        {filteredPresets.length > 4 ? (
+          <button
+            type="button"
+            className="settings-model-center-directory__expand"
+            aria-controls="api-model-center-presets"
+            aria-expanded={isPresetDirectoryExpanded}
+            onClick={() => setIsPresetDirectoryExpanded((isExpanded) => !isExpanded)}
+          >
+            <span>
+              {isPresetDirectoryExpanded
+                ? pick('收起预设目录', 'Collapse directory')
+                : pick(`查看全部 ${filteredPresets.length} 个预设`, `View all ${filteredPresets.length} presets`)}
+            </span>
+            <ChevronDown
+              size={15}
+              className={isPresetDirectoryExpanded ? 'rotate-180' : ''}
+              aria-hidden="true"
+            />
+          </button>
+        ) : null}
       </aside>
     </div>
   </SettingsSection>

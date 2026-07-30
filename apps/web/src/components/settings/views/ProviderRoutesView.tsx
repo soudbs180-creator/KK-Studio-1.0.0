@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Split, RefreshCw, Layers3, Activity } from 'lucide-react';
+import { Split, RefreshCw } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
   SettingsSection,
-  SettingsSystemField,
   SettingsHero,
   SettingsBadge,
   SettingsActionButton,
@@ -91,36 +90,66 @@ export const ProviderRoutesView: React.FC = () => {
       />
 
       <SettingsSection title={pick('路由决策矩阵', 'Routing Matrix')}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-[var(--border-light)] text-[var(--text-tertiary)] font-bold">
-                <th className="py-2.5 px-3">{pick('任务类型', 'Task Type')}</th>
-                <th className="py-2.5 px-3">{pick('模拟测试模型', 'Sample Model')}</th>
-                <th className="py-2.5 px-3">{pick('默认可选路由', 'Supported Routes')}</th>
-                <th className="py-2.5 px-3">{pick('当前实际流向', 'Resolved Route')}</th>
-                <th className="py-2.5 px-3">{pick('路由决策原因', 'Routing Reason')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {routes.map((r, i) => (
-                <tr key={i} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-overlay)] transition-colors">
-                  <td className="py-3 px-3 font-semibold text-[var(--text-primary)]">{r.taskName}</td>
-                  <td className="py-3 px-3 font-mono text-[var(--text-secondary)]">{r.modelId}</td>
-                  <td className="py-3 px-3 text-[var(--text-tertiary)]">{r.defaultRoute}</td>
-                  <td className="py-3 px-3">
-                    <SettingsBadge tone={getModeTone(r.actualMode)}>
-                      {r.actualMode}
-                    </SettingsBadge>
-                  </td>
-                  <td className="py-3 px-3 text-[var(--text-secondary)] max-w-xs truncate" title={r.reason}>
-                    {r.reason}
-                  </td>
+        {routes.length > 0 ? (
+          <div className="settings-route-matrix">
+            <table className="settings-route-matrix__table">
+              <thead>
+                <tr>
+                  <th>{pick('任务类型', 'Task Type')}</th>
+                  <th>{pick('模拟测试模型', 'Sample Model')}</th>
+                  <th>{pick('默认可选路由', 'Supported Routes')}</th>
+                  <th>{pick('当前实际流向', 'Resolved Route')}</th>
+                  <th>{pick('路由决策原因', 'Routing Reason')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {routes.map((route) => (
+                  <tr key={`${route.taskType}-${route.modelId}`}>
+                    <td
+                      className="settings-route-matrix__task"
+                      data-label={pick('任务类型', 'Task Type')}
+                    >
+                      {route.taskName}
+                    </td>
+                    <td
+                      className="settings-route-matrix__model"
+                      data-label={pick('模拟测试模型', 'Sample Model')}
+                    >
+                      {route.modelId}
+                    </td>
+                    <td
+                      className="settings-route-matrix__supported"
+                      data-label={pick('默认可选路由', 'Supported Routes')}
+                    >
+                      {route.defaultRoute}
+                    </td>
+                    <td
+                      className="settings-route-matrix__resolved"
+                      data-label={pick('当前实际流向', 'Resolved Route')}
+                    >
+                      <SettingsBadge tone={getModeTone(route.actualMode)}>
+                        {route.actualMode}
+                      </SettingsBadge>
+                    </td>
+                    <td
+                      className="settings-route-matrix__reason"
+                      data-label={pick('路由决策原因', 'Routing Reason')}
+                      title={route.reason}
+                    >
+                      {route.reason}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="settings-route-matrix__empty" role="status">
+            {loading
+              ? pick('正在计算当前路由决策…', 'Resolving current routes…')
+              : pick('暂时没有可展示的路由决策。', 'No routing decisions are available yet.')}
+          </div>
+        )}
       </SettingsSection>
     </SettingsViewShell>
   );

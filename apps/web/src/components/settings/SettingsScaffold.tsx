@@ -434,12 +434,12 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
   return (
     <section
-      className={`console-section flex flex-col ${isPlain ? '' : 'h-full'}`.trim()}
+      className="console-section settings-section flex flex-col"
       data-testid={testId}
     >
-      <div className={`${surfaceClassName} flex flex-col min-h-0 ${isPlain ? '' : 'flex-1'}`.trim()}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
+      <div className={`${surfaceClassName} settings-section__frame flex min-h-0 flex-col`.trim()}>
+        <div className="settings-section__header">
+          <div className="settings-section__copy">
             {eyebrow ? (
               <div
                 className="mb-2 text-left font-semibold uppercase tracking-[0.18em]"
@@ -474,9 +474,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
               </p>
             ) : null}
           </div>
-          {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
+          {action ? <div className="settings-section__action">{action}</div> : null}
         </div>
-        <div className="console-section__body flex-1 min-h-0">{children}</div>
+        <div className="console-section__body settings-section__body min-h-0">{children}</div>
       </div>
     </section>
   );
