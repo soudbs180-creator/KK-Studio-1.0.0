@@ -166,37 +166,6 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   // 简体中文：本地搜索过滤关键词状态
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 简体中文：监听输入法/输入框的聚焦状态，以在软键盘弹出时隐藏悬浮按钮，防止误触和穿模
-  const [isInputActive, setIsInputActive] = useState(false);
-
-  React.useEffect(() => {
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        setIsInputActive(true);
-      }
-    };
-
-    const handleFocusOut = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        setTimeout(() => {
-          const activeEl = document.activeElement;
-          if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA')) {
-            setIsInputActive(false);
-          }
-        }, 100);
-      }
-    };
-
-    document.addEventListener('focusin', handleFocusIn);
-    document.addEventListener('focusout', handleFocusOut);
-    return () => {
-      document.removeEventListener('focusin', handleFocusIn);
-      document.removeEventListener('focusout', handleFocusOut);
-    };
-  }, []);
-
   // 简体中文：定义多选状态与选中条目的 Set 集合，以便进行批量操作
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -628,11 +597,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
       {/* 底部悬浮操作与模式切换控制区，多选模式下切换为批量操作栏 */}
       <div 
-        className={`kk-result-bottom-bar absolute bottom-0 inset-x-0 z-20 flex items-center justify-between gap-3 px-4 pt-4 select-none pointer-events-none transition-[opacity,transform] transform ${
-          isInputActive 
-            ? 'opacity-0 pointer-events-none translate-y-6' 
-            : 'opacity-100'
-        }`}
+        className="kk-result-bottom-bar absolute bottom-0 inset-x-0 z-20 flex items-center justify-between gap-3 px-4 pt-4 select-none pointer-events-none opacity-100"
       >
         <div 
           className="absolute inset-0 -z-10"
@@ -725,6 +690,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               className="kk-mobile-generation-status min-w-0 touch-manipulation pointer-events-auto"
               role="progressbar"
               aria-label={pick('生成任务状态', 'Generation task status')}
+              aria-haspopup="dialog"
               aria-valuemin={0}
               aria-valuemax={Math.max(totalTaskCount, 1)}
               aria-valuenow={completedTaskCount}

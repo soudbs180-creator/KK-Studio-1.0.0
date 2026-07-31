@@ -138,7 +138,10 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
     promptBarSource,
     /className="kk-prompt-bar-deep-popover-host animate-fadeIn origin-bottom"/,
   );
-  assert.match(promptBarSource, /zIndex:\s*KK_LAYER\.dropdown/);
+  assert.match(
+    promptBarSource,
+    /const PROMPT_BAR_DEEP_DROPDOWN_LAYER = KK_LAYER\.dropdown;/,
+  );
   assert.doesNotMatch(promptBarSource, /className="fixed z-\[10000\] animate-fadeIn origin-bottom"/);
 });
 

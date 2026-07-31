@@ -347,8 +347,6 @@ interface CreditSendButtonProps {
     ecommerceConfirmedMode?: boolean;
     onClick: () => void;
     isMobile?: boolean;
-    parallelCount?: number;
-    onChangeParallelCount?: (count: number) => void;
 }
 
 const CreditSendButton: React.FC<CreditSendButtonProps> = ({
@@ -364,177 +362,29 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     ecommerceConfirmedMode = false,
     onClick,
     isMobile = false,
-    parallelCount = 1,
-    onChangeParallelCount
 }) => {
-    // 🚀 移动端长按多张并发与高质感磨砂呼吸 UI 实现
-    const sendTouchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
-    const [isLongPressing, setIsLongPressing] = React.useState(false);
-    const longPressTimerRef = React.useRef<any>(null);
-    const bubbleRef = React.useRef<HTMLDivElement | null>(null);
-
     // 🚀 [添加] Hover与按压交互状态，提供高品质物理按压与悬停发光反馈
     const [isHovered, setIsHovered] = React.useState(false);
     const [isPressed, setIsPressed] = React.useState(false);
-
-    const sendTouchStart = (e: React.TouchEvent) => {
-        if (!isMobile || !hasPrompt || !onChangeParallelCount) return;
-        const touch = e.touches[0];
-        if (!touch) return;
-        sendTouchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-        setIsPressed(true);
-        
-        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = setTimeout(() => {
-            setIsLongPressing(true);
-            try {
-                if (navigator.vibrate) {
-                    navigator.vibrate(15);
-                }
-            } catch (err) {
-                // 拦截可能在某些旧机型不支持的震动API报错
-            }
-        }, 250);
-    };
-
-    const sendTouchMove = (e: React.TouchEvent) => {
-        if (!isMobile || !isLongPressing) return;
-        const touch = e.touches[0];
-        if (!touch || !bubbleRef.current) return;
-        
-        const rect = bubbleRef.current.getBoundingClientRect();
-        const x = touch.clientX;
-        const pct = (x - rect.left) / rect.width;
-        const index = Math.min(3, Math.max(0, Math.floor(pct * 4)));
-        const newCount = index + 1;
-        if (newCount !== parallelCount && onChangeParallelCount) {
-            try {
-                if (navigator.vibrate) {
-                    navigator.vibrate(5);
-                }
-            } catch (err) {}
-            onChangeParallelCount(newCount);
-        }
-    };
-
-    const sendTouchEnd = (e: React.TouchEvent) => {
-        setIsPressed(false);
-        if (!isMobile) return;
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-        
-        if (isLongPressing) {
-            e.preventDefault();
-            setIsLongPressing(false);
-        } else {
-            e.preventDefault();
-            if (hasPrompt) {
-                onClick();
-            }
-        }
-        sendTouchStartRef.current = null;
-    };
-
-    const sendTouchCancel = () => {
-        setIsPressed(false);
-        if (!isMobile) return;
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-        setIsLongPressing(false);
-        sendTouchStartRef.current = null;
-    };
 
     if (isMobile) {
         const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
         const isDisabled = !hasPrompt;
         
         return (
-            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={sendTouchMove}>
-                {/* 1-4 张数拖拽滑选气泡 */}
-                {isLongPressing && (
-                    <div 
-                        ref={bubbleRef}
-                        className="kk-prompt-bar-count-bubble absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl"
-                        style={{ zIndex: KK_LAYER.dropdown }}
-                    >
-                        {[1, 2, 3, 4].map((num) => {
-                            const isSelected = parallelCount === num;
-                            return (
-                                <div 
-                                    key={num}
-                                    className={`kk-prompt-bar-count-option w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold ${isSelected ? 'kk-prompt-bar-count-option--active' : 'scale-100'}`}
-                                
-                                >
-                                    {num}
-                                </div>
-                            );
-                        })}
-                        {/* 小气泡箭头 */}
-                        <div className="kk-prompt-bar-overlay-arrow absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 border-r border-b rotate-45" />
-                    </div>
-                )}
-
-                {/* 磨砂玻璃呼吸外框按钮 */}
-                <button
-                    type="button"
-                    disabled={isDisabled}
-                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
-                    data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
-                    onTouchStart={sendTouchStart}
-                    onTouchEnd={sendTouchEnd}
-                    onTouchCancel={sendTouchCancel}
-                    className={`
-                        relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.95] transition-all duration-300
-                        ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
-                        ${!isDisabled && isInsufficient ? 'bg-red-500/10 border border-red-500/30 text-red-400' : ''}
-                        ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl ' + ('bg-white/1' + '2') + ' dark:bg-black/24 border border-white/20 ' + ('dark:border-w' + 'hite/12') + ' ' + ('shadow-l' + 'g') + ' shadow-black/10' : ''}
-                    `}
-                    style={{
-                        WebkitTapHighlightColor: 'transparent',
-                    }}
-                >
-                    {/* 呼吸微渐变发光背景外框 - 仅在未禁用且未欠费时 */}
-                    {!isDisabled && !isInsufficient && (
-                        <div className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[var(--accent-coral)]/30 to-[var(--accent-pink)]/30 blur-sm opacity-60 animate-pulse" />
-                    )}
-
-                    {/* 发送按钮的内容 */}
-                    {isCreditModel ? (
-                        <div className="flex items-center gap-1.5 font-bold">
-                            <Sparkles size={13} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--accent-coral)]'} />
-                            <span className={`text-xs ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
-                                {isInsufficient ? '积分不足' : `${creditCost} 积分`}
-                            </span>
-                            {parallelCount > 1 && !isInsufficient && (
-                                <span className="text-[10px] text-[var(--text-secondary)] font-normal opacity-90">
-                                    ({parallelCount}张)
-                                </span>
-                            )}
-                        </div>
-                    ) : (
-                        <span className={`text-xs font-bold tracking-wide ${isDisabled ? 'text-gray-400' : 'text-[var(--text-primary)]'}`}>
-                            {ecommerceConfirmedMode ? '补充修改' : parallelCount > 1 ? `发送 (${parallelCount}张)` : '发送'}
-                        </span>
-                    )}
-
-                    {/* 箭头 */}
-                    {!isDisabled && (
-                        <div className={`
-                            flex h-6 w-6 items-center justify-center overflow-hidden rounded-full transition-colors duration-200 ml-0.5
-                            ${isInsufficient ? 'bg-red-500 text-white' : 'bg-white/15 text-[var(--text-primary)]'}
-                        `}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                                <polyline points="12 5 19 12 12 19" />
-                            </svg>
-                        </div>
-                    )}
-                </button>
-            </div>
+            <button
+                type="button"
+                disabled={isDisabled}
+                aria-label={ecommerceConfirmedMode ? '补充修改' : '发送'}
+                title={isInsufficient ? '积分不足' : ecommerceConfirmedMode ? '补充修改' : '发送'}
+                data-insufficient={isInsufficient || undefined}
+                data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.submitGeneration.uiAction}
+                data-agent-tool={PROMPT_COMPOSER_ACTIONS.submitGeneration.toolName}
+                onClick={onClick}
+                className="kk-mobile-composer-send"
+            >
+                <ArrowUp size={18} strokeWidth={2.4} aria-hidden="true" />
+            </button>
         );
     }
 
@@ -1341,6 +1191,37 @@ const PromptBar: React.FC<PromptBarProps> = ({
             setMobileActiveProvider(null);
             setActiveSortProvider(null);
         }
+    }, [isMobile, isExpanded]);
+
+    useEffect(() => {
+        const dockHeightProperty = '--kk-mobile-composer-dock-height';
+        const documentRoot = document.documentElement;
+
+        if (!isMobile || !isExpanded) {
+            documentRoot.style.removeProperty(dockHeightProperty);
+            return;
+        }
+
+        const composer = document.getElementById('prompt-bar-container');
+        if (!composer) return;
+
+        const updateComposerDockHeight = () => {
+            const nextHeight = Math.ceil(composer.getBoundingClientRect().height);
+            documentRoot.style.setProperty(dockHeightProperty, `${nextHeight}px`);
+        };
+
+        updateComposerDockHeight();
+        const composerObserver = new ResizeObserver(updateComposerDockHeight);
+        composerObserver.observe(composer);
+        const settleTimer = window.setTimeout(updateComposerDockHeight, 200);
+        composer.addEventListener('transitionend', updateComposerDockHeight);
+
+        return () => {
+            window.clearTimeout(settleTimer);
+            composer.removeEventListener('transitionend', updateComposerDockHeight);
+            composerObserver.disconnect();
+            documentRoot.style.removeProperty(dockHeightProperty);
+        };
     }, [isMobile, isExpanded]);
 
     // 🚀 [电脑端专属] 当模型库下拉菜单关闭时，重置当前选中的供应商

@@ -1698,7 +1698,6 @@ body:has(#project-manager-container[data-panel-open='true'])
 }
 
 .kk-prompt-bar-tooltip,
-.kk-prompt-bar-count-bubble,
 .kk-prompt-bar-deep-model-section,
 .kk-prompt-bar-deep-provider-row,
 .kk-prompt-bar-deep-model-item {
@@ -1708,8 +1707,7 @@ body:has(#project-manager-container[data-panel-open='true'])
   box-shadow: none !important;
 }
 
-.kk-prompt-bar-deep-model-item--active,
-.kk-prompt-bar-count-option--active {
+.kk-prompt-bar-deep-model-item--active {
   background: var(--kk-morphic-control-hover) !important;
   color: var(--kk-morphic-text-primary) !important;
 }

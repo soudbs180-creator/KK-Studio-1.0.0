@@ -3,20 +3,36 @@ import { test } from 'node:test';
 
 import { readSource } from '../support/workspacePaths.js';
 
-test('mobile composer only collapses through its explicit handle and never covers result controls', () => {
+test('mobile composer only collapses explicitly and lifts result controls above its measured height', () => {
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const resultFeedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
   const workspaceStyles = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.doesNotMatch(promptBarSource, /document\.addEventListener\('click', handleOutsideClick/);
   assert.match(promptBarSource, /收起创作提示词输入框/);
+  assert.match(promptBarSource, /--kk-mobile-composer-dock-height/);
+  assert.match(promptBarSource, /new ResizeObserver\(updateComposerDockHeight\)/);
+  assert.match(promptBarSource, /window\.setTimeout\(updateComposerDockHeight,\s*200\)/);
   assert.match(
     workspaceStyles,
     /\[data-mobile-composer-section='mode-strip'\][\s\S]*:last-child[\s\S]*::before/,
   );
   assert.match(
     workspaceStyles,
-    /:has\(\.kk-prompt-bar-mobile-expanded\)[\s\S]*\.kk-result-bottom-bar[\s\S]*pointer-events:\s*none/,
+    /:has\(\.kk-prompt-bar-mobile-expanded\)[\s\S]*\.kk-result-bottom-bar[\s\S]*--kk-mobile-composer-dock-height[\s\S]*24px/,
   );
+  assert.doesNotMatch(resultFeedSource, /isInputActive\s*\?\s*'opacity-0 pointer-events-none translate-y-6'/);
+});
+
+test('mobile composer send is one accessible ArrowUp action without a hidden count gesture', () => {
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+
+  assert.match(
+    promptBarSource,
+    /if \(isMobile\)[\s\S]*aria-label=\{ecommerceConfirmedMode \? '补充修改' : '发送'\}[\s\S]*<ArrowUp/,
+  );
+  assert.doesNotMatch(promptBarSource, /kk-prompt-bar-count-bubble/);
+  assert.doesNotMatch(promptBarSource, /sendTouchStart|isLongPressing/);
 });
 
 test('mobile action sheet gives every action a stable icon and copy column', () => {

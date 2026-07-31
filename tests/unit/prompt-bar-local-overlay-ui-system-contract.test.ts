@@ -13,16 +13,11 @@ test('prompt bar exposes reusable local overlay primitives', () => {
     '--kk-prompt-bar-overlay-text',
     '--kk-prompt-bar-overlay-muted-text',
     '--kk-prompt-bar-overlay-arrow-bg',
-    '--kk-prompt-bar-count-active-bg',
-    '--kk-prompt-bar-count-active-text',
   ]) {
     assert.match(cssSource, new RegExp(`${token}:`), `missing ${token}`);
   }
 
   for (const selector of [
-    '.kk-prompt-bar-count-bubble',
-    '.kk-prompt-bar-count-option',
-    '.kk-prompt-bar-count-option--active',
     '.kk-prompt-bar-overlay-arrow',
     '.kk-prompt-bar-tooltip',
     '.kk-prompt-bar-tooltip-arrow',
@@ -31,17 +26,18 @@ test('prompt bar exposes reusable local overlay primitives', () => {
   }
 });
 
-test('prompt bar local bubbles consume primitives instead of raw black overlays', () => {
+test('prompt bar local overlays keep tooltips but remove the obsolete mobile count bubble', () => {
   const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const tokenStyles = readSource('apps/web/src/styles/kk-ui-tokens.css');
+  const morphicStyles = readSource('apps/web/src/styles/morphic-ui.css');
 
-  assert.match(source, /import \{ KK_LAYER \} from '@kk\/ui';/);
-  assert.match(source, /className="kk-prompt-bar-count-bubble absolute bottom-full/);
-  assert.match(source, /style=\{\{ zIndex: KK_LAYER\.dropdown \}\}/);
-  assert.match(source, /className=\{`kk-prompt-bar-count-option/);
-  assert.match(source, /kk-prompt-bar-count-option--active/);
-  assert.match(source, /className="kk-prompt-bar-overlay-arrow/);
   assert.match(source, /className="kk-prompt-bar-tooltip/);
   assert.match(source, /className="kk-prompt-bar-tooltip-arrow/);
+  for (const obsoleteSource of [source, tokenStyles, morphicStyles]) {
+    assert.doesNotMatch(obsoleteSource, /kk-prompt-bar-count-bubble/);
+    assert.doesNotMatch(obsoleteSource, /kk-prompt-bar-count-option/);
+    assert.doesNotMatch(obsoleteSource, /--kk-prompt-bar-count-active-/);
+  }
 
   assert.doesNotMatch(source, /z-\[1200\]/);
   assert.doesNotMatch(source, /bg-black\/85|dark:bg-black\/90|text-white\/60|shadow-pink-500\/20/);

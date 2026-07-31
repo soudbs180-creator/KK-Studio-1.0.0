@@ -108,10 +108,13 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   // Durable generation and Agent state stay owned by their respective stores.
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const externalTriggerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeTaskCenter = useCallback(() => {
+    const returnTarget = externalTriggerRef.current ?? triggerRef.current;
+    externalTriggerRef.current = null;
     setIsOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
+    window.requestAnimationFrame(() => returnTarget?.focus());
   }, []);
 
   // 订阅生图队列更新
@@ -124,7 +127,13 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   useEffect(() => agentRunStore.subscribe(setAgentRuns), []);
 
   useEffect(() => {
-    const handleOpenRequest = () => setIsOpen(true);
+    const handleOpenRequest = () => {
+      const activeElement = document.activeElement;
+      externalTriggerRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
+        ? activeElement
+        : null;
+      setIsOpen(true);
+    };
     window.addEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
     return () => window.removeEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
   }, []);
@@ -530,7 +539,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         className="kk-task-center-morph pointer-events-auto"
         data-state={isOpen ? 'open' : 'collapsed'}
       >
-        {!isOpen && (
+        {!isOpen && !isMobile && (
           <button
             type="button"
             aria-label="展开任务状态列表"

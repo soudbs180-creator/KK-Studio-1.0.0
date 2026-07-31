@@ -233,9 +233,6 @@
   --kk-prompt-bar-overlay-text: var(--text-primary);
   --kk-prompt-bar-overlay-muted-text: var(--text-secondary);
   --kk-prompt-bar-overlay-arrow-bg: var(--prompt-bar-shell-bg);
-  --kk-prompt-bar-count-active-bg: var(--prompt-bar-toggle-active-bg);
-  --kk-prompt-bar-count-active-text: var(--prompt-bar-toggle-active-text);
-  --kk-prompt-bar-count-active-shadow: var(--prompt-bar-toggle-active-shadow);
   --kk-prompt-bar-mobile-collapse-handle-bg: rgb(115 115 115 / 0.30);
   --kk-prompt-bar-mobile-collapse-handle-bg-hover: rgb(115 115 115 / 0.50);
   --kk-prompt-bar-mobile-model-backdrop-bg: rgb(8 13 28 / 0.44);
@@ -1274,7 +1271,6 @@
   border-radius: var(--kk-search-palette-desktop-radius);
 }
 
-.kk-prompt-bar-count-bubble,
 .kk-prompt-bar-tooltip {
   border: 1px solid var(--kk-prompt-bar-overlay-border);
   background: var(--kk-prompt-bar-overlay-bg);
@@ -1282,22 +1278,6 @@
   box-shadow: var(--kk-prompt-bar-overlay-shadow);
   backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.18);
   -webkit-backdrop-filter: blur(var(--kk-ui-glass-blur)) saturate(1.18);
-}
-
-.kk-prompt-bar-count-option {
-  color: var(--kk-prompt-bar-overlay-muted-text);
-  transition:
-    background-color var(--kk-motion-standard) var(--kk-motion-ease-standard),
-    color var(--kk-motion-standard) var(--kk-motion-ease-standard),
-    box-shadow var(--kk-motion-standard) var(--kk-motion-ease-standard),
-    transform var(--kk-motion-fast) var(--kk-motion-ease-standard);
-}
-
-.kk-prompt-bar-count-option--active {
-  background: var(--kk-prompt-bar-count-active-bg);
-  color: var(--kk-prompt-bar-count-active-text);
-  box-shadow: var(--kk-prompt-bar-count-active-shadow);
-  transform: scale(1.25);
 }
 
 .kk-prompt-bar-overlay-arrow,

@@ -748,6 +748,10 @@ body[data-kk-canvas-grid='hidden'] .canvas-grid {
   .kk-result-bottom-bar {
     gap: 8px !important;
     padding: 8px 10px 6px !important;
+    transition:
+      bottom var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard),
+      opacity var(--kk-morphic-motion-control) var(--kk-morphic-ease-standard),
+      transform var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard) !important;
   }
 
   .kk-result-bottom-bar button {
@@ -1034,10 +1038,14 @@ body[data-kk-canvas-grid='hidden'] .canvas-grid {
   }
 
   .kk-morphic-workspace:has(.kk-prompt-bar-mobile-expanded) .kk-result-bottom-bar {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transform: translateY(8px);
+    bottom: calc(
+      env(safe-area-inset-bottom, 0px) +
+      var(--kk-mobile-composer-dock-height, 178px) +
+      24px
+    ) !important;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
   }
 
   .kk-prompt-bar-mobile-expanded [data-mobile-composer-section='primary-input'] {
@@ -1114,19 +1122,11 @@ body[data-kk-canvas-grid='hidden'] .canvas-grid {
     box-shadow: none !important;
   }
 
-  .kk-prompt-bar-mobile-expanded
-    [data-prompt-composer-action='prompt-composer-submit-generation']
-    > :not(:last-child) {
-    display: none !important;
-  }
-
-  .kk-prompt-bar-mobile-expanded
-    [data-prompt-composer-action='prompt-composer-submit-generation']
-    > :last-child {
+  .kk-prompt-bar-mobile-expanded .kk-mobile-composer-send svg {
+    display: block;
     margin: 0 !important;
-    color: inherit !important;
-    background: transparent !important;
-    transform: rotate(-90deg);
+    color: currentColor;
+    transform: none !important;
   }
 
   .kk-mobile-composer-count-setting {

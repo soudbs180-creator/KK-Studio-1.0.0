@@ -2441,3 +2441,51 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。变更集中在 UI 投影、响应式样式和可访问标记，业务回调与持久化契约保持不变。
 - 后续继续按第 26 节规则在 375/390/430/768px 复验软键盘实际高度、参数面板与真实任务数据；任何新问题优先用同视口标注复现后再修改。
+
+---
+
+## 260. 2026-07-31 - fix(ui): 联动移动 Composer 与任务进度排
+
+**修改范围**
+- 修复手机 Composer 展开后任务摘要被旧聚焦监听和高优先级 CSS 隐藏的问题；任务摘要与视图控制排现在跟随 Composer 实际高度整体上移。
+- 使用 `ResizeObserver`、过渡结束事件与 200ms 稳定帧重新测量 Composer，高度变化时保持任务排与 Composer 之间 8px 固定间距。
+- 将手机发送操作改为可访问的 44×44px 白色圆形向上箭头，删除长按发送选择张数的平行交互；生成数量继续只由共享参数层控制。
+- 移除移动任务中心隐藏但仍存在的顶部触发器 DOM；结果区任务摘要成为唯一入口，关闭共享 `TaskCenterTray` 后焦点恢复到原任务摘要。
+- 删除已失去生产引用的发送张数气泡 Token 与 CSS 选择器，并更新当前 UI 规范，覆盖旧的“展开期间隐藏任务摘要”规则。
+
+**修改文件**
+- `apps/web/src/components/layout/PromptBar.tsx`
+- `apps/web/src/components/mobile/MobileResultFeed.tsx`
+- `apps/web/src/components/workspace/TaskCenterTray.tsx`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `apps/web/src/styles/kk-ui-tokens.css`
+- `apps/web/src/styles/morphic-ui.css`
+- `tests/unit/mobile-ui-followup-regression.test.ts`
+- `tests/unit/mobile-task-center-layout-contract.test.ts`
+- `tests/unit/prompt-bar-layout-regression.test.ts`
+- `tests/unit/prompt-bar-local-overlay-ui-system-contract.test.ts`
+- `docs/design-system/kk-studio-morphic-ui-spec.md`
+- `artifacts/design-audit/2026-07-31-bottom-dock-followup/`
+
+**当前设计决策**
+1. 移动结果区任务摘要在 Composer 收起和展开时始终可见；展开态根据 Composer 实际高度定位，不使用固定猜测值或输入聚焦状态控制显隐。
+2. 任务排与 Composer 之间固定保留 8px；面板高度、参数层或动画变化均通过测量变量驱动，避免重叠和跳动。
+3. 手机发送键只有一个向上箭头操作，不承载积分文案、张数气泡或长按手势；张数属于参数设置。
+4. 手机不渲染折叠任务中心触发器；任务摘要通过共享事件打开同一个任务中心，桌面仍保留原折叠入口。
+5. 任务中心关闭时恢复触发点焦点，确保移动端点击、键盘和读屏路径一致。
+
+**已运行验证**
+- TDD：新增 Composer 高度联动、8px 间距、向上发送、无长按张数、无移动重复任务入口和焦点恢复契约，均先红后绿。
+- 内置浏览器 359×778：展开 Composer `343×178px @ x=8px`；任务排底部 `576px`、Composer 顶部 `584px`，实测间距 8px；页面横向溢出 0。
+- 手机发送按钮实测 44×44px、`aria-label="发送"`、直接渲染 `ArrowUp`；旧张数气泡与相关 Token/选择器均无残留。
+- 结果摘要点击后打开共享任务 Dialog，实测 `325×228px @ x=17px`；移动重复触发器 DOM 数量为 0，关闭后焦点恢复到 `role="progressbar"` 的“生成任务状态”。
+- 相关 PromptBar、移动结果流、任务中心、语音和 Morphic 输入/按钮契约 33/33 通过；全量 Unit 最终 2304 项中 2302 通过、0 失败、2 跳过。
+- Architecture、Governance、Web/Architecture/Server/Test TypeScript、Vite 8.1.4 生产构建、Encoding、Mojibake 和 `git diff --check` 全部通过。
+
+**未运行验证及原因**
+- 未执行真实 Provider 生成、浏览器语音权限、支付或生产部署；本轮不改变这些业务链路。
+- 未启动第二个浏览器实例；按接管约束使用用户当前内置浏览器完成真实点击、DOM 几何、焦点恢复和截图验收。
+
+**风险与下一步**
+- 风险低。变更只影响移动 UI 投影、焦点恢复和废弃样式清理，生成、计费、Provider、Canvas、Agent 与持久化契约不变。
+- 后续在真实软键盘和展开参数层场景继续复验动态高度；同类底部浮层必须复用 `--kk-mobile-composer-dock-height`，不得重新硬编码偏移。
