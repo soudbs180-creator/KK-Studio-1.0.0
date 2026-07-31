@@ -136,7 +136,9 @@ test('mobile settings dashboard exposes four judgment metrics, focused strategy 
   assert.match(dashboardSource, /正常/);
   assert.match(dashboardSource, /性能/);
   assert.match(dashboardSource, /settings-mobile-module-list/);
-  assert.match(dashboardSource, /module\.id !== 'overview'/);
+  assert.match(dashboardSource, /getSettingsNavItems/);
+  assert.match(dashboardSource, /创作与能力/);
+  assert.match(dashboardSource, /自动化与系统/);
   assert.match(dashboardSource, /剩余金额/);
   assert.match(dashboardSource, /data-ai-settings-target/);
   assert.doesNotMatch(dashboardSource, /SettingsHero/);

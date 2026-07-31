@@ -23,7 +23,7 @@ test('mobile composer uses the shared three-layer input hierarchy and keeps an a
     promptBarSource,
     /void onGenerate\(\);\s*setIsExpanded\(false\)/,
   );
-  assert.match(promptBarSource, /mobileComposerShouldStayExpanded/);
+  assert.doesNotMatch(promptBarSource, /document\.addEventListener\('click', handleOutsideClick/);
   assert.doesNotMatch(promptBarSource, /<DesktopComposerCountControl/);
   assert.match(countFieldSource, /kk-composer-parameter-count/);
   assert.match(modePanelSource, /onParallelCountChange/);

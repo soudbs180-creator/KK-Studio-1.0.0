@@ -7,7 +7,8 @@ test('desktop settings console keeps a real inner scroll container and viewport-
   const cssSource = readSource('apps/web/src/styles/settings-console.css');
 
   assert.match(shellSource, /const scrollRef = useRef<HTMLElement \| null>\(null\);/);
-  assert.match(shellSource, /scrollRef\.current\?\.scrollTo\(\{ top: 0 \}\);/);
+  assert.match(shellSource, /useLayoutEffect/);
+  assert.match(shellSource, /scrollContainer\.scrollTop = 0;/);
   assert.match(shellSource, /className="settings-console-content"/);
   assert.match(cssSource, /--console-sidebar-width: 232px;/);
   assert.match(cssSource, /--console-topbar-height: 64px;/);

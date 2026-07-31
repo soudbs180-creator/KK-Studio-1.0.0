@@ -38,15 +38,14 @@ test('prompt bar exposes mobile model sheet system tokens and primitives', () =>
   assert.match(cssSource, /@keyframes kk-prompt-bar-mobile-model-sheet-enter/);
 });
 
-test('prompt bar mobile model sheet consumes KK_LAYER and stable layer selectors', () => {
+test('prompt bar mobile model sheet consumes KK_LAYER and stable semantic markers', () => {
   const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const block = getMobileModelSheetBlock(source);
 
-  assert.match(source, /const PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR = '\[data-prompt-bar-mobile-model-layer="true"\]';/);
-  assert.match(source, /target\.closest\(PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR\)/);
   assert.match(block, /data-prompt-bar-mobile-model-layer="true"/);
   assert.match(block, /className="kk-prompt-bar-mobile-model-backdrop"/);
   assert.match(block, /style=\{\{ zIndex: KK_LAYER\.modalBackdrop \}\}/);
+  assert.match(block, /onClick=\{\(e\) => \{ e\.stopPropagation\(\); setActiveMenu\(null\); \}\}/);
   assert.match(block, /className="kk-prompt-bar-mobile-model-sheet-host"/);
   assert.match(block, /style=\{\{ zIndex: KK_LAYER\.modal \}\}/);
   assert.match(block, /className="kk-prompt-bar-mobile-model-sheet"/);

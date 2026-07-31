@@ -2330,7 +2330,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                     {/* Session Header */}
                     <div
-                        className={`relative z-10 flex flex-col border-b shrink-0 ${isMobile ? 'pt-1.5' : 'pt-4'}`}
+                        className={`kk-chat-sidebar-header relative z-10 flex flex-col border-b shrink-0 ${isMobile ? 'pt-1.5' : 'pt-4'}`}
                         style={{
                             background: 'var(--bg-secondary)',
                             borderColor: 'var(--border-light)',
@@ -2410,7 +2410,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         </div>
 
                         {/* Context Limit Indicator 栏 */}
-                        <div className="mx-auto my-2.5 px-5 py-2.5 rounded-full border border-[var(--border-light)]/30 bg-[var(--bg-primary)]/60 backdrop-blur-md flex flex-col gap-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.15)] w-[88%] max-w-[340px] select-none transition-all duration-300 hover:border-[var(--primary)]/50">
+                        <div className="kk-chat-sidebar-context mx-auto my-2.5 px-5 py-2.5 rounded-full border border-[var(--border-light)]/30 bg-[var(--bg-primary)]/60 backdrop-blur-md flex flex-col gap-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.15)] w-[88%] max-w-[340px] select-none transition-all duration-300 hover:border-[var(--primary)]/50">
                             <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
                                 <span className="flex items-center gap-1">
                                     <span>🧠 上下文:</span>
@@ -2620,7 +2620,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     </div>
 
                     {/* Messages */}
-                    <div className={`flex-1 overflow-y-auto space-y-4 scrollbar-thin ${isMobile ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                    <div className={`kk-chat-sidebar-messages flex-1 overflow-y-auto space-y-4 scrollbar-thin ${isMobile ? 'px-3 py-3' : 'px-6 py-4'}`}>
                         {(() => {
                             let boundaryIndex = -1;
                             for (let i = activeMessages.length - 1; i >= 0; i--) {
@@ -2655,7 +2655,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 const isBoundary = msg.content.includes('上下文压缩分界线');
 
                                 items.push(
-                                    <div key={msg.id} className={`flex ${isBoundary ? 'w-full flex-col items-center my-4 animate-in fade-in duration-300' : `gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}`}>
+                                    <div key={msg.id} className={`kk-chat-sidebar-message flex ${isBoundary ? 'w-full flex-col items-center my-4 animate-in fade-in duration-300' : `gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}`}>
                                         {isBoundary ? (
                                             <div className="w-full flex flex-col items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/5 border border-dashed border-amber-500/30 shadow-[inset_0_1px_3px_rgba(245,158,11,0.05)]">
                                                 <div className="flex items-center gap-2 text-xs font-black text-amber-500/90 tracking-wider uppercase select-none">
@@ -2667,7 +2667,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                             </div>
                                         ) : (
                                             <>
-                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
+                                                <div className={`kk-chat-sidebar-message-avatar w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
                                                     ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
                                                     : 'bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-pink-500 text-white'
                                                     }`}>
@@ -2677,9 +2677,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                                         <Bot size={16} className="animate-icon-breathe" />
                                                     )}
                                                 </div>
-                                                <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                <div className={`kk-chat-sidebar-message-content ${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                     {/* 消息文本 */}
-                                                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                                    <div className={`kk-chat-sidebar-message-bubble rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
                                                         ? 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] rounded-tr-md border border-[var(--frost-card-sub-border)]'
                                                         : 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] border border-[var(--frost-card-sub-border)] rounded-tl-md'
                                                         }`}>
@@ -2829,7 +2829,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                     {/* Bottom Area */}
                     <div
-                        className="px-4 pb-4 pt-2 shrink-0 flex flex-col"
+                        className="kk-chat-sidebar-bottom px-4 pb-4 pt-2 shrink-0 flex flex-col"
                         style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' } : undefined}
                     >
                         <AIContextSuggestions

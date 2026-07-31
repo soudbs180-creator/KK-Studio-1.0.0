@@ -1351,6 +1351,10 @@
   box-shadow: none !important;
 }
 
+.settings-console .settings-hero-flat-header::before {
+  display: none !important;
+}
+
 .settings-console .settings-browser-section-card__header .console-badge {
   width: auto;
   max-width: 152px;
@@ -1557,4 +1561,90 @@
     grid-column: 2;
     justify-self: end;
   }
+
+  .settings-console-mobile-topbar button:focus:not(:focus-visible) {
+    outline: none !important;
+  }
+
+  .settings-console-mobile-topbar button:focus-visible {
+    color: var(--text-primary);
+    outline: none !important;
+    background: var(--kk-morphic-control-hover) !important;
+  }
+
+  .settings-console .settings-mobile-module-list {
+    gap: 16px;
+  }
+
+  .settings-console .settings-mobile-module-group {
+    display: grid;
+    gap: 7px;
+  }
+
+  .settings-console .settings-mobile-module-group > h3 {
+    margin: 0;
+    padding: 0 4px;
+    color: var(--text-tertiary);
+    font-size: var(--kk-type-caption);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .settings-console .settings-mobile-module-group > div {
+    overflow: hidden;
+    border: 1px solid var(--console-border);
+    border-radius: 14px;
+    background: var(--console-surface);
+  }
+
+  .settings-console .settings-mobile-module-card {
+    min-height: 58px;
+    grid-template-columns: 36px minmax(0, 1fr) 16px;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .settings-console .settings-mobile-module-card + .settings-mobile-module-card {
+    border-top: 1px solid var(--console-border);
+  }
+
+  .settings-console .settings-mobile-module-card__icon {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--console-subtle);
+  }
+
+  .settings-console .settings-mobile-module-card > span:nth-child(2) > span {
+    margin-top: 2px;
+    line-height: 1.35;
+  }
+
+  .settings-console .console-billing-table-card {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .settings-console .console-billing-table-card .console-data-table {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .settings-console .console-table-empty {
+    min-height: 112px;
+    padding: 20px 12px;
+  }
+}
+
+.settings-console--desktop
+  .settings-console-content
+  .settings-hero-flat-header,
+.settings-console--desktop
+  .settings-console-content
+  .dashboard-console-header {
+  display: none;
 }

@@ -36,13 +36,13 @@ test('prompt bar mobile chrome exposes shared layer tokens and primitives', () =
   assert.match(cssSource, /\.dark \.kk-prompt-bar-mobile-collapse-handle\s*\{/);
 });
 
-test('prompt bar mobile chrome consumes semantic layer selectors instead of raw z-index values', () => {
+test('prompt bar mobile chrome uses explicit collapse controls and semantic layers', () => {
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
   const workspaceSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
-  assert.match(promptBarSource, /const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '\[data-kk-mobile-overlay-layer="true"\], \[data-prompt-bar-mobile-model-layer="true"\]';/);
-  assert.match(promptBarSource, /target\.closest\(PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR\)/);
+  assert.doesNotMatch(promptBarSource, /document\.addEventListener\('click', handleOutsideClick/);
+  assert.match(promptBarSource, /aria-label=\{pick\('收起创作提示词输入框'/);
   assert.match(promptBarSource, /className=\{`kk-prompt-bar-mobile-collapse-handle /);
   assert.match(promptBarSource, /kk-prompt-bar-mobile-collapse-handle--embedded/);
   assert.match(promptBarSource, /data-mobile-composer-gesture="swipe-up"/);

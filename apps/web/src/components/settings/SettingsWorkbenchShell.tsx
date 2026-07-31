@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronRight,
@@ -190,8 +190,11 @@ export const SettingsConsoleShell: React.FC<{
   const { language, pick } = useLocale();
   void initialView;
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
+  useLayoutEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = 0;
+    scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
   }, [location.pathname, refreshKey]);
 
   const handleNavigate = (view: CanonicalSettingsViewId) => navigate(buildSettingsPath(view));

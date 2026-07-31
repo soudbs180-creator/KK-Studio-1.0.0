@@ -498,6 +498,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           type="button" 
           onClick={onClose} 
           className="mobile-ecommerce-header__close"
+          aria-label={pick('关闭电商生图', 'Close e-commerce generation')}
         >
           <X size={16} />
         </button>

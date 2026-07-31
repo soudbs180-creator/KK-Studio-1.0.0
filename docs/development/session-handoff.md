@@ -2400,3 +2400,44 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低至中。业务回调与持久化契约未改，主要风险集中在不同移动软键盘高度下的 Composer 可视区域；当前使用 `dvh + safe-area` 和内容上限保护。
 - 下次浏览器允许接管时，优先在 359/375/390/430/768px 实测软键盘、Composer 参数展开、全屏 Copilot/收藏、Task Center 居中和三个账户 Tab，并按同一规范继续处理新的可见差异。
+
+---
+
+## 259. 2026-07-31 - fix(ui): 完成移动与桌面逐屏验收收口
+
+**修改范围**
+- 使用内置浏览器在 359×778 和 1440×900 重新逐屏核验工作区、Composer、Task Center、更多菜单、设置、个人中心、Copilot、收藏与电商面板，并保存修改前后验收截图。
+- 修复手机 Composer 被旧高优先级规则再次叠加左右外边距的问题；展开态稳定为左右各 8px，输入和操作期间只允许通过顶部指示条显式收起，发送键保持 44×44px 白色圆形。
+- 重构手机更多菜单为单列信息行，设置首页改为真实二级路由列表，路由切换在首次绘制前复位滚动位置；手机设置二级页移除装饰渐变并保持内容自适应高度。
+- 收口 Copilot、收藏与电商的手机全屏投影：Copilot 控件无横向滚动，收藏隐藏无内容详情列，电商灵感项三列省略且关闭按钮具备可访问名称。
+- 桌面设置隐藏内容区重复的 Overview/Hero 标题，只保留 Shell 顶栏作为页面标题与说明的唯一拥有者。
+- 更新 UI 规范与过时 PromptBar 层级契约；未修改 API、Provider、Canvas DTO、计费、鉴权、Agent、数据库或持久化契约。
+
+**修改文件**
+- 工作区与移动 Surface：`apps/web/src/components/layout/PromptBar.tsx`、`ChatSidebar.tsx`、`apps/web/src/components/mobile/MobileEcommercePanel.tsx`、`apps/web/src/styles/workspace-ui-v3.css`。
+- 设置：`apps/web/src/components/settings/SettingsMobileDashboard.tsx`、`SettingsWorkbenchShell.tsx`、`apps/web/src/styles/settings-v3.css`。
+- 测试与规范：相关移动设置/Composer 契约、`tests/unit/mobile-ui-followup-regression.test.ts`、`docs/design-system/kk-studio-morphic-ui-spec.md`。
+- 浏览器证据：`artifacts/design-audit/2026-07-31-ui-followup/`。
+
+**当前设计决策**
+1. 手机 Composer 展开态固定 `width: calc(100vw - 16px)` 且 `margin-inline: 0`；底部任务摘要在展开期间隐藏，避免两个操作层争夺安全区。
+2. 设置首页直接暴露真实目的地，不再维护会跳转到错误模块的聚合卡片；手机二级页说明无 Hero 卡片，桌面内容区不重复 Shell 标题。
+3. 手机复杂工具统一使用一层全屏 Surface、一层顶栏和一层内容区；助手消息保持平面正文，用户消息才使用强调 Surface。
+4. 空状态按内容收缩到 88–112px；按钮、Switch、Segmented Control、Select 和 Badge 继续只消费共享 Token 与状态组件。
+5. 浏览器截图与 DOM 几何同时作为验收证据；截图不能替代横向溢出、命中区和 `scrollWidth/clientWidth` 检查。
+
+**已运行验证**
+- 内置浏览器 359×778：Composer 最终为 343×178px、左右各 8px、页面横向溢出 0；发送键 44×44px，任务摘要在展开期间隐藏。
+- 内置浏览器验证 Task Center 居中 Dialog、更多菜单单列布局、设置首页与开发者诊断首屏、Copilot 359×778 全屏且控制组无溢出、收藏全屏空状态和电商三列灵感区。
+- 内置浏览器 1440×900：工作区和设置 Shell 无页面级横向溢出；桌面设置内部 `dashboard-console-header` 与 `settings-hero-flat-header` 均为隐藏状态。
+- 相关专项单测 28/28 通过；更新两项过时层级契约后全量 Unit 2303 项中 2301 通过、0 失败、2 跳过。
+- Architecture 32 项、Governance 全套、Web/Architecture/Server/Test TypeScript、Vite 8.1.4 生产构建、Encoding、Mojibake 与 `git diff --check` 全部通过。
+
+**未运行验证及原因**
+- 未运行会启动第二个浏览器实例的移动/桌面 Smoke；本轮按浏览器接管约束只使用用户当前选择的内置浏览器，并已手动覆盖相同关键路径。
+- 聚合 `pnpm run architecture:check` 被当前 pnpm 的 ignored build scripts 策略在依赖状态预检阶段拒绝；没有批准或改变依赖构建策略，改为逐项执行同一组 32 个治理脚本并全部通过。
+- 未执行真实 Provider 生成、语音权限、支付或生产部署；这些链路不在本轮 UI 收口范围内。
+
+**风险与下一步**
+- 风险低。变更集中在 UI 投影、响应式样式和可访问标记，业务回调与持久化契约保持不变。
+- 后续继续按第 26 节规则在 375/390/430/768px 复验软键盘实际高度、参数面板与真实任务数据；任何新问题优先用同视口标注复现后再修改。

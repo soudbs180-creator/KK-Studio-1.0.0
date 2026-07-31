@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   BadgeDollarSign,
-  Bot,
   ChevronRight,
   CircleGauge,
   Cloud,
@@ -34,8 +33,9 @@ import {
   type QuickGenerationRoute,
 } from './settingsQuickPreferences';
 import {
-  getSettingsModules,
+  getSettingsNavItems,
   type CanonicalSettingsViewId,
+  type SettingsNavItem,
 } from './settingsRegistry';
 
 const EMPTY_BROWSER_STATUS: BrowserBridgeStatusSnapshot = {
@@ -110,10 +110,32 @@ const SettingsMobileDashboard: React.FC<{
     };
   }, []);
 
-  const modules = useMemo(
-    () => getSettingsModules(language).filter((module) => module.id !== 'overview'),
-    [language],
-  );
+  const navigationGroups = useMemo(() => {
+    const items = getSettingsNavItems(language);
+    const resolveItems = (ids: CanonicalSettingsViewId[]) => ids
+      .map((id) => items.find((item) => item.id === id))
+      .filter((item): item is SettingsNavItem => Boolean(item));
+
+    return [
+      {
+        id: 'creation',
+        label: pick('创作与能力', 'Creation & capabilities'),
+        items: resolveItems(['generation-mode', 'capability-sources', 'provider-routes']),
+      },
+      {
+        id: 'system',
+        label: pick('自动化与系统', 'Automation & system'),
+        items: resolveItems([
+          'browser-assistant',
+          'ai-takeover',
+          'data-sync',
+          'appearance-motion',
+          'canvas-performance',
+          'dev-diagnostics',
+        ]),
+      },
+    ];
+  }, [language, pick]);
   const activePreset = getActivePerformancePreset(preferences, canvasMode);
   const metrics = useMemo(() => deriveMobileSettingsOverviewMetrics({
     slots: runtime.slots,
@@ -285,27 +307,33 @@ const SettingsMobileDashboard: React.FC<{
       </section>
 
       <nav className="settings-mobile-module-list" aria-label={pick('设置模块', 'Settings modules')}>
-        {modules.map((module) => {
-          const Icon = module.icon;
-          return (
-            <button
-              key={module.id}
-              type="button"
-              onClick={() => onNavigate(module.target)}
-              className="settings-mobile-module-card"
-              data-module={module.id}
-              data-ai-settings-target={module.target}
-            >
-              <span className="settings-mobile-module-card__icon"><Icon size={19} /></span>
-              <span className="min-w-0 flex-1 text-left">
-                <strong>{module.label}</strong>
-                <span>{module.description}</span>
-              </span>
-              {module.id === 'ai' ? <Bot size={14} className="settings-mobile-module-card__state" /> : <CircleGauge size={14} className="settings-mobile-module-card__state" />}
-              <ChevronRight size={16} />
-            </button>
-          );
-        })}
+        {navigationGroups.map((group) => (
+          <section key={group.id} className="settings-mobile-module-group" aria-labelledby={`settings-mobile-${group.id}`}>
+            <h3 id={`settings-mobile-${group.id}`}>{group.label}</h3>
+            <div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onNavigate(item.id)}
+                    className="settings-mobile-module-card"
+                    data-module={group.id}
+                    data-ai-settings-target={item.id}
+                  >
+                    <span className="settings-mobile-module-card__icon"><Icon size={18} /></span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <strong>{item.label}</strong>
+                      <span>{item.description}</span>
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </nav>
 
       <section className="settings-mobile-account-row" aria-label={pick('用户信息', 'User information')}>

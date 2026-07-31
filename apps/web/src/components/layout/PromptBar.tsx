@@ -84,8 +84,6 @@ const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TE
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 const MODEL_MENU_SKELETON_COUNT = 3;
 const INITIAL_MODEL_LIBRARY_BOOTSTRAP_DELAY_MS = 30000;
-const PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR = '[data-prompt-bar-mobile-model-layer="true"]';
-const PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR = '[data-kk-mobile-overlay-layer="true"], [data-prompt-bar-mobile-model-layer="true"]';
 const PROMPT_BAR_DEEP_DROPDOWN_LAYER = KK_LAYER.dropdown;
 const PROMPT_BAR_DEEP_MODAL_BACKDROP_LAYER = KK_LAYER.modalBackdrop;
 const PROMPT_BAR_DEEP_MODAL_PANEL_LAYER = KK_LAYER.modal;
@@ -1328,47 +1326,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const mobileTouchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const justDraggedRef = useRef<boolean>(false);
 
-
-    // 🚀 [移动端专属] 点击/触摸外部空白处时，自动收起输入面板
-    useEffect(() => {
-        if (!isMobile || !isExpanded) return;
-
-        const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
-            const container = document.getElementById('prompt-bar-container');
-            if (!container) return;
-
-            // 1. 若点击在 PromptBar 容器内部，放行
-            if (container.contains(e.target as Node)) {
-                return;
-            }
-
-            // 2. 若点击在移动端模型选择弹窗（Bottom Sheet）或其遮罩层中，放行
-            const target = e.target as HTMLElement;
-            if (target.closest(PROMPT_BAR_MOBILE_MODEL_LAYER_SELECTOR) || target.closest(PROMPT_BAR_MOBILE_EXTERNAL_LAYER_SELECTOR)) {
-                return;
-            }
-
-            const mobileComposerShouldStayExpanded = Boolean(
-                textareaRef.current?.value.trim() || config.referenceImages.length > 0 || activeSourceImage || mobileSubView !== 'input'
-            );
-            if (mobileComposerShouldStayExpanded) {
-                return;
-            }
-
-            // 3. 若点击在裁剪、大图预览、电商续作历史等悬浮面板里，放行
-            // 4. 收起面板，且使输入框失去焦点（防键盘弹起）
-            setIsExpanded(false);
-            textareaRef.current?.blur();
-        };
-
-        // 使用 capture 阶段在最外层尽早拦截
-        document.addEventListener('click', handleOutsideClick, true);
-        document.addEventListener('touchstart', handleOutsideClick, true);
-        return () => {
-            document.removeEventListener('click', handleOutsideClick, true);
-            document.removeEventListener('touchstart', handleOutsideClick, true);
-        };
-    }, [activeSourceImage, config.referenceImages.length, isMobile, isExpanded, mobileSubView, textareaRef]);
 
     // 🚀 [移动端专属] 当选择或更换了继续创作的源图时，自动展开输入面板
     useEffect(() => {
@@ -4274,6 +4231,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     );
                                 })}
                                 <button
+                                    type="button"
                                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.collapseMobileComposer.uiAction}
                                     className="flex items-center justify-center py-1.5 rounded-xl border border-transparent text-[var(--text-secondary)] active:scale-95 transition-all duration-200"
                                     onClick={(e) => {
@@ -4282,6 +4240,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         textareaRef.current?.blur();
                                     }}
                                     title="收起输入面板"
+                                    aria-label={pick('收起创作提示词输入框', 'Collapse creative prompt input')}
                                 >
                                     <ChevronDown size={16} />
                                 </button>
