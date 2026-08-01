@@ -549,8 +549,12 @@ try {
   await desktopEntry.click();
   await assertVisible(page.locator('.kk-workspace-sidebar'), 'Right-side Companion Copilot did not render.');
 
+  const composerParametersToggle = page.getByRole('button', { name: /打开参数配置|Open parameters/i });
+  await assertVisible(composerParametersToggle, 'Copilot parameter configuration did not render.');
+  await composerParametersToggle.click();
+
   const assistToggle = page.locator('#btn-ai-assist-mode');
-  await assertVisible(assistToggle, 'AI assist mode did not render after opening chat.');
+  await assertVisible(assistToggle, 'AI assist mode did not render after opening parameter configuration.');
   await assistToggle.click();
   await assertVisible(page.locator('.ai-context-suggestions'), 'Context suggestions did not render in AI assist mode.');
 

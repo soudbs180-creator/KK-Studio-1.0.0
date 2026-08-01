@@ -2489,3 +2489,52 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低。变更只影响移动 UI 投影、焦点恢复和废弃样式清理，生成、计费、Provider、Canvas、Agent 与持久化契约不变。
 - 后续在真实软键盘和展开参数层场景继续复验动态高度；同类底部浮层必须复用 `--kk-mobile-composer-dock-height`，不得重新硬编码偏移。
+
+---
+
+## 261. 2026-08-01 - fix(ui): 关联收口移动设置、Composer、Copilot 与电商交互
+
+**修改范围**
+- 按 31 条关联式手机端浏览器标注统一设置页选择、高亮、分割线、开关、指标卡和返回位置；同一状态同步影响桌面端共享控件。
+- 将移动结果区收口为标准/详细、单行任务摘要、滚到底部和定位搜索四个同高控件；折叠 Composer 只显示透明停靠区中的中央指示条。
+- 将生成数量改为手机/桌面共享的 1–10 滑块，把高级设置统一命名为“参数配置”，比例选项改为不会因选项增减失衡的等宽自适应网格。
+- 重构手机 Copilot 顶栏、上下文环、磨砂历史浮层和参数入口；直接/辅助/接管进入参数配置，不再常驻挤压输入区。
+- 重构手机电商首屏为产品事实、AI 自动优化与生成、灵感库和单行配置带，标题统一为“电商生成”，继续复用现有 LLM 分析和批量生成回调。
+- 保存 357×716 修改前后证据并在内置浏览器逐项检查关键 DOM 几何、选中状态、滚动恢复和页面级横向溢出。
+
+**修改文件**
+- 设置：`apps/web/src/components/settings/SettingsMobileDashboard.tsx`、`SettingsScaffold.tsx`、`SettingsWorkbenchShell.tsx`、`views/StorageSettingsView.localized.tsx`、`apps/web/src/styles/settings-v3.css`。
+- 工作区与 Composer：`apps/web/src/components/image/ImageOptionsPanel.tsx`、`apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/components/layout/ChatSidebar.tsx`、`apps/web/src/components/layout/prompt-bar/ComposerGenerationCountField.tsx`、`apps/web/src/components/mobile/MobileResultFeed.tsx`、`MobileWorkspaceSurface.tsx`、`MobileEcommercePanel.tsx`、`apps/web/src/styles/workspace-ui-v3.css`。
+- 测试与文档：`tests/unit/ui-associated-annotation-regression.test.ts`、`morphic-input-fidelity-contract.test.ts`、`prompt-bar-deep-overlay-ui-system-contract.test.ts`、`mobile-result-feed-detail-contract.test.ts`、`mobile-more-sheet-layout-contract.test.ts`、`scripts/test/verify-mobile-settings-smoke.mjs`、`scripts/test/verify-ai-takeover-smoke.mjs`、`docs/design-system/kk-studio-morphic-ui-spec.md`、`docs/design-system/evidence/2026-08-01-ui-audit/`、`docs/development/session-handoff.md`。
+
+**当前设计决策**
+1. Selected 是跨设置、Composer、Copilot 和电商唯一状态语言：低透明主蓝背景、主文字、弱分割线与正确 ARIA；不得用厚蓝框、发光或改变尺寸表达选中。
+2. 设置 Switch 统一为 44×26px 共享控件；四项运行指标使用独立等宽小卡，图标无第二层方框；语言切换只保留一个面向目标语言的动作。
+3. 设置二级页返回前记录总览滚动位置并在下一绘制帧恢复；直接进入二级页仍从顶部开始。
+4. 结果排与 Composer 是联动停靠系统：结果排始终可见并按 Composer 实际高度上移；折叠外壳透明，只有 38×4px 指示条可见。
+5. 参数字段由当前模型能力决定；本轮只统一 UI 容器、比例网格和 1–10 数量滑块，不改写模型目录、Provider 或生成参数契约。
+6. Copilot 历史是顶栏下方的一层磨砂浮层，上下文压缩为环形百分比；协作模式属于参数，不与发送按钮争夺 Footer。
+7. 电商配置在手机端使用一条内部横向滚动带，页面本身不得横向滚动；“AI 自动优化并生成”调用现有商品分析和批量生成能力，不新增后端接口。
+
+**已运行验证**
+- TDD：`ui-associated-annotation-regression.test.ts` 先准确复现四指标卡、单语言动作、统一高亮/分割、滚动恢复、结果排、数量滑块、Copilot 和电商缺口；实现后通过。
+- 相关六组 UI 契约通过：移动标注回归、Morphic 输入、Prompt 深层浮层、Prompt 电商 Footer、Prompt 布局和关联标注回归。
+- Root `tsc --noEmit` 通过；Vite 8.1.4 生产构建两次通过，共转换 2590 modules。
+- 内置浏览器 357×716：设置总览四张指标卡均为 127×82px、间距 8px；默认执行位置与体验模式 Selected 使用同一主蓝状态，页面横向溢出 0；从画布性能返回后总览滚动位置恢复为 508px。
+- 移动结果流：折叠 Composer 为 64×44px 透明命中区，中央指示条 38×4px，页面横向溢出 0；展开 Composer 和结果排保持 8px 联动间距。
+- 参数面板：11 个比例选项使用等宽网格；生成数量为 1–10 共享滑块；发送键保持 44×44px 向上箭头。
+- Copilot：全屏无横向溢出，顶栏为四个动作加上下文环；历史浮层使用 `blur(24px) saturate(1.1)`，二次点击关闭；参数配置包含直接/辅助/接管。
+- 电商：全屏无横向溢出，标题“电商生成”、AI 自动优化可见；配置带 `clientWidth=304px / scrollWidth=748px / overflow-x=auto`，单项高度 44px。
+- 最终本地浏览器日志只保留未启动本地 API 导致的既有 `Bad Gateway`、模型目录和任务恢复降级告警；未发现新增布局、React 或运行时异常。
+- 全量 Unit：2312 项中 2310 通过、0 失败、2 跳过；Integration 14/14、Contract 31/31、E2E 11/11 通过。
+- Local Runner TypeScript、14 项测试和生产构建通过；Prompt Group Drag、移动设置、桌面设置、AI Takeover、启动横向居中 Browser Smoke 全部通过。
+- Architecture 32 项、Governance、Root/Architecture/Server/Test TypeScript、Vite 8.1.4 生产构建、Spec Structure、Encoding、Mojibake、Canvas Performance 3/3 与 `git diff --check` 全部通过。
+
+**未运行验证及原因**
+- 受运行环境不提供系统 `npm` 且未安装 `swagger-cli` 限制，未直接调用聚合 `npm run verify:changes` 与 OpenAPI CLI 校验；已使用绑定 Node 逐项执行其中全部可用的构建、测试、治理、编码、性能和 Browser Smoke 验证，Spec Structure 已通过。
+- 未执行依赖在线审计；本轮未增加或升级生产依赖。
+- 未执行真实 Provider 生成、语音权限、支付或生产部署；本轮不修改这些链路，本地 API 3001 未启动。
+
+**风险与下一步**
+- 风险低至中，主要集中在真实软键盘与极端模型参数数量下的可用高度；配置带和参数面板已分别限制内部横向/纵向滚动，页面级溢出由契约和浏览器几何守卫。
+- 后续新增 Select、Segment、Switch、Composer 参数或电商字段必须复用第 27 节统一 Selected、高亮、分割和 44px 触控规则，不得在业务页面增加局部高优先级视觉补丁。

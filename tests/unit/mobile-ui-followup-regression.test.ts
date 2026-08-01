@@ -42,12 +42,14 @@ test('mobile action sheet gives every action a stable icon and copy column', () 
   assert.match(workspaceStyles, /\.kk-mobile-more-action\s*>\s*div[\s\S]*min-width:\s*0/);
 });
 
-test('mobile settings reset scroll before rendering a new route and expose direct destinations', () => {
+test('mobile settings resets nested routes while restoring the dashboard scroll position', () => {
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
   const dashboardSource = readSource('apps/web/src/components/settings/SettingsMobileDashboard.tsx');
 
   assert.match(shellSource, /useLayoutEffect/);
-  assert.match(shellSource, /scrollContainer\.scrollTop = 0/);
+  assert.match(shellSource, /const nextScrollTop = atHome \? dashboardScrollTopRef\.current : 0/);
+  assert.match(shellSource, /scrollContainer\.scrollTop = nextScrollTop/);
+  assert.match(shellSource, /if \(atHome\) dashboardScrollTopRef\.current = scrollRef\.current\?\.scrollTop \?\? 0/);
   assert.match(dashboardSource, /getSettingsNavItems/);
   assert.doesNotMatch(dashboardSource, /getSettingsModules/);
 });

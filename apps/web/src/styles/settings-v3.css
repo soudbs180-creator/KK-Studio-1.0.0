@@ -1648,3 +1648,185 @@
   .dashboard-console-header {
   display: none;
 }
+
+/* Unified selection language: dividers establish choice boundaries and the
+ * action color is reserved for the active value across mobile and desktop. */
+.settings-console .settings-system-control-menu-option {
+  position: relative;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px !important;
+  color: var(--kk-morphic-text-secondary);
+  transform: none !important;
+}
+
+.settings-console .settings-system-control-menu-option + .settings-system-control-menu-option {
+  border-top: 1px solid var(--kk-morphic-border) !important;
+}
+
+.settings-console .settings-system-control-menu-option[data-state='selected'] {
+  color: var(--kk-morphic-text-primary);
+  background: color-mix(in oklch, var(--kk-morphic-action) 18%, var(--kk-morphic-control)) !important;
+  box-shadow: inset 3px 0 0 var(--kk-morphic-action);
+}
+
+.settings-console .settings-browser-tabbar {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: var(--kk-radius-control);
+  background: var(--kk-morphic-control);
+}
+
+.settings-console .settings-browser-tab {
+  min-height: 42px;
+  flex: 1 1 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.settings-console .settings-browser-tab + .settings-browser-tab {
+  border-left: 1px solid var(--kk-morphic-border);
+}
+
+.settings-console .settings-browser-tab[aria-selected='true'] {
+  color: var(--kk-morphic-text-primary);
+  background: color-mix(in oklch, var(--kk-morphic-action) 18%, var(--kk-morphic-control));
+  box-shadow: inset 0 -2px 0 var(--kk-morphic-action);
+}
+
+.settings-console :where(
+  .settings-system-switch,
+  .settings-control-toggle,
+  .settings-toggle-button,
+  .settings-browser-toggle
+) {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  flex-basis: 44px;
+  border-color: color-mix(in oklch, var(--kk-morphic-text-secondary) 34%, transparent) !important;
+}
+
+.settings-console :where(
+  .settings-system-switch,
+  .settings-control-toggle,
+  .settings-toggle-button,
+  .settings-browser-toggle
+)::after {
+  width: 20px;
+  height: 20px;
+  background: var(--kk-morphic-text-secondary);
+}
+
+.settings-console :where(
+  .settings-system-switch[data-state='on'],
+  .settings-control-toggle[data-state='on'],
+  .settings-toggle-button[data-state='on'],
+  .settings-browser-toggle[data-state='enabled']
+)::after {
+  background: white;
+}
+
+@media (max-width: 767px) {
+  .settings-console .settings-mobile-metric-grid {
+    gap: 8px;
+    padding: 0 12px 12px;
+  }
+
+  .settings-console .settings-mobile-metric {
+    min-height: 82px;
+    padding: 10px 11px;
+    border: 1px solid var(--console-border) !important;
+    border-radius: 12px;
+    background: var(--console-subtle);
+  }
+
+  .settings-console .settings-mobile-metric__value {
+    margin-top: 6px;
+    font-size: var(--kk-type-body);
+  }
+
+  .settings-console .settings-mobile-quick-control {
+    gap: 8px;
+  }
+
+  .settings-console .settings-mobile-quick-control__label {
+    min-height: 20px;
+  }
+
+  .settings-console .settings-mobile-segment {
+    gap: 0;
+    overflow: hidden;
+    padding: 0;
+    border-radius: 12px;
+  }
+
+  .settings-console .settings-mobile-segment button {
+    min-height: 44px;
+    border-radius: 0;
+  }
+
+  .settings-console .settings-mobile-segment:not(.settings-mobile-segment--three) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-console .settings-mobile-segment button + button {
+    border-left: 1px solid var(--console-border);
+  }
+
+  .settings-console .settings-mobile-segment button[data-state='selected'] {
+    color: var(--kk-morphic-text-primary);
+    background: color-mix(in oklch, var(--kk-morphic-action) 18%, var(--kk-morphic-control));
+    box-shadow: inset 0 -2px 0 var(--kk-morphic-action);
+  }
+
+  .settings-console .settings-mobile-module-card__icon,
+  .settings-console .settings-mobile-account-card__icon {
+    border: 0;
+    background: transparent;
+  }
+
+  .settings-console .settings-mobile-module-card:active,
+  .settings-console .settings-mobile-module-card:focus-visible {
+    color: var(--kk-morphic-text-primary);
+    background: color-mix(in oklch, var(--kk-morphic-action) 13%, var(--console-surface));
+    box-shadow: inset 3px 0 0 var(--kk-morphic-action);
+  }
+
+  .settings-console .settings-mobile-account-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-console .settings-mobile-language {
+    display: inline-flex;
+    width: auto;
+    min-width: 82px;
+    height: 64px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid var(--console-border);
+    border-radius: 12px;
+    background: var(--console-surface);
+    color: var(--kk-morphic-text-primary);
+    font-size: var(--kk-type-caption);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .settings-console .settings-system-field__control {
+    justify-content: flex-start;
+  }
+
+  .settings-console .settings-system-field__control > :only-child {
+    margin-inline: 0;
+  }
+
+  .settings-console .settings-system-field__control > .flex:has(> button + button) {
+    width: 100%;
+    justify-content: center;
+  }
+}

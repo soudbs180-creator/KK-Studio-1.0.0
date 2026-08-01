@@ -37,5 +37,7 @@ test('mobile settings shell treats settings root as the grouped home route', () 
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
   assert.match(settingsSource, /const atHome = location\.pathname === '\/settings' \|\| location\.pathname === '\/settings\/'/);
   assert.match(settingsSource, /atHome \? <SettingsMobileDashboard/);
-  assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => navigate\(buildSettingsPath\(view\)\);/);
+  assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => \{/);
+  assert.match(settingsSource, /dashboardScrollTopRef\.current = scrollRef\.current\?\.scrollTop \?\? 0/);
+  assert.match(settingsSource, /navigate\(buildSettingsPath\(view\)\);/);
 });

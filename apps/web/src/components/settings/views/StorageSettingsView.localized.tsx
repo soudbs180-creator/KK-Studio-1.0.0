@@ -539,9 +539,9 @@ export const StorageSettingsView: React.FC = () => {
           label={pick('最近动作', 'Last action')}
           description={pick('这里会显示刷新、切换和清理结果。', 'Refresh, switch, and cleanup results appear here.')}
         >
-          <div className="flex max-w-full flex-col items-end gap-2">
+          <div className="flex max-w-full flex-col items-start gap-2">
             <span
-              className="max-w-full break-words text-right text-[length:var(--type-caption)] text-[var(--text-secondary)]"
+              className="max-w-full break-words text-left text-[length:var(--type-caption)] text-[var(--text-secondary)]"
               aria-live="polite"
             >
               {lastActionMessage}

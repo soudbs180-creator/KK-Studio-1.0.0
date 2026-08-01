@@ -249,29 +249,12 @@ const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
       className="kk-aspect-ratio-control flex gap-1.5 overflow-hidden rounded-xl p-1.5"
       style={SEGMENT_STYLE}
     >
-      {layout.hasAuto && !layout.autoInGrid ? (
-        <button
-          type="button"
-          onClick={() => onChange(AspectRatio.AUTO)}
-          className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-all duration-200"
-          style={{
-            width: '58px',
-            height: layout.useDoubleRow ? '100px' : '48px',
-            color: selectedAspectRatio === AspectRatio.AUTO ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            backgroundColor: selectedAspectRatio === AspectRatio.AUTO ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
-          }}
-        >
-          <Fullscreen size={18} />
-          <span className="text-xs">自适应</span>
-        </button>
-      ) : null}
-
       <div
         ref={scrollContainerRef}
         onWheel={handleWheel}
-        className={`kk-aspect-ratio-grid grid min-w-0 flex-1 overflow-y-hidden ${layout.needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
+        className={`kk-aspect-ratio-grid grid-auto-fit grid min-w-0 flex-1 overflow-y-hidden ${layout.needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
         style={{
-          gridTemplateColumns: layout.needsScroll ? `repeat(${layout.columns}, minmax(54px, 1fr))` : `repeat(${layout.columns}, minmax(0, 1fr))`,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(54px, 1fr))',
           gridTemplateRows: layout.useDoubleRow ? 'repeat(2, 48px)' : '48px',
           gap: '4px',
           paddingBottom: layout.needsScroll ? '4px' : '0',
@@ -279,7 +262,7 @@ const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
           overscrollBehaviorX: 'contain',
         }}
       >
-        {layout.autoInGrid ? (
+        {layout.hasAuto ? (
           <button
             type="button"
             onClick={() => onChange(AspectRatio.AUTO)}

@@ -45,8 +45,8 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   assert.match(footerSource, /kk-composer-compact-footer/);
   assert.match(promptBarSource, /kk-composer-config-control kk-composer-model-control/);
   assert.match(countControlSource, /kk-composer-parameter-count/);
-  assert.match(countControlSource, /role="radiogroup"/);
-  assert.match(countControlSource, /role="radio"[\s\S]*aria-checked=\{parallelCount === count\}/);
+  assert.match(countControlSource, /type="range"/);
+  assert.match(countControlSource, /min=\{1\}[\s\S]*max=\{10\}/);
   assert.match(modePanelSource, /kk-composer-config-control kk-composer-parameter-control/);
   assert.match(modePanelSource, /aria-expanded=\{showOptionsPanel\}/);
 

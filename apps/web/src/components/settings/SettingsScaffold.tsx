@@ -155,7 +155,7 @@ export const SETTINGS_LABEL_CLASSNAME =
   'text-[length:var(--type-micro)] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
 
 export const SETTINGS_CONTROL_MOTION_CLASSNAME =
-  'settings-control-motion transition-[background-color,border-color,box-shadow,color,transform] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] hover:-translate-y-px active:translate-y-0';
+  'settings-control-motion transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)]';
 
 export const SETTINGS_UI_SYSTEM = TOKENS.uiSystem;
 

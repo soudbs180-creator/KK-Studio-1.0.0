@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Languages, PackageOpen, Trash2 } from 'lucide-react';
+import { Check, FolderOpen, Heart, MessageSquare, Moon, Plus, Search, Settings, Sun, PackageOpen, Trash2 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
@@ -31,6 +31,7 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
 import { useCanvas } from '../../context/CanvasContext';
 import { useOverlayFocusLifecycle } from '../../hooks/useOverlayFocusLifecycle';
 import { useLocale } from '../../context/LocaleContext';
+import { useTheme } from '../../context/ThemeContext';
 // 简体中文：导入全局通知服务以在移动端提供操作反馈
 import { notify } from '../../services/system/notificationService';
 import type {
@@ -101,7 +102,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   projectName,
   projectCount,
   onOpenSearch,
-  onOpenHistory,
   onOpenFavorites,
   onOpenChat,
   onOpenProfile,
@@ -135,7 +135,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
     deleteCanvas,
     cleanupInvalidCards
   } = useCanvas();
-  const { toggleLanguage, isChinese, pick } = useLocale();
+  const { pick } = useLocale();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const moreSheetRef = useRef<HTMLDivElement>(null);
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
   const [showProjectList, setShowProjectList] = useState(false);
@@ -201,6 +202,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         isLoading={isLoading}
         isHistoryView={workspaceSurface === 'library'}
         onCloseHistory={onCloseHistory}
+        onOpenSearch={onOpenSearch}
         // 简体中文：支持多选批量删除和批量下载的回调参数向下传递
         onDeleteImage={onDeleteImage}
         onDownloadEntry={onDownloadEntry}
@@ -248,56 +250,37 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               </div>
             </div>
 
-            <div className="kk-mobile-more-sheet__shortcuts mb-3 grid w-full grid-cols-[22fr_22fr_56fr] gap-2">
-              <button
-                type="button"
-                onClick={toggleLanguage}
-                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center cursor-pointer"
-              >
-                <div className="relative text-[var(--text-secondary)] shrink-0">
-                  <Languages size={18} strokeWidth={2} />
-                </div>
-                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '系统' : 'Sys'}
-                  </div>
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '语言' : 'Lang'}
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => runFromMoreSheet(onOpenFavorites)}
-                data-testid="mobile-more-menu-favorites"
-                className="kk-mobile-more-shortcut relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[8px] border px-1.5 text-center text-[var(--text-secondary)] cursor-pointer"
-              >
-                <div className="relative text-[var(--accent-coral)] shrink-0">
-                  <Heart size={18} strokeWidth={2} />
-                </div>
-                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '我的' : 'My'}
-                  </div>
-                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                    {isChinese ? '收藏' : 'Favs'}
-                  </div>
-                </div>
-              </button>
-
+            <div className="kk-mobile-more-sheet__shortcuts mb-3 grid w-full grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-start gap-1.5 rounded-[8px] border px-2.5 text-left"
+                aria-expanded={showProjectList}
+                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-center gap-1.5 rounded-[8px] border px-2 text-center"
               >
                 <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
-                <div className="min-w-0 flex-1 text-left">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary)] leading-none truncate">
-                    {pick('当前项目', 'Project')}
-                  </div>
-                  <div className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)] leading-none">{resolvedProjectName}</div>
-                </div>
+                <span className="grid min-w-0 text-left">
+                  <small className="truncate text-[9px] text-[var(--text-tertiary)]">{pick('当前项目', 'Project')}</small>
+                  <strong className="truncate text-xs font-semibold">{resolvedProjectName}</strong>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-center gap-1.5 rounded-[8px] border px-2 text-center"
+              >
+                {resolvedTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+                <span className="text-xs font-semibold">{pick('主题切换', 'Theme')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                data-testid="mobile-more-menu-settings"
+                className="kk-mobile-more-shortcut flex h-[58px] min-w-0 items-center justify-center gap-1.5 rounded-[8px] border px-2 text-center"
+              >
+                <Settings size={17} />
+                <span className="text-xs font-semibold">{pick('设置', 'Settings')}</span>
               </button>
             </div>
 
@@ -412,11 +395,15 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             ) : null}
 
             <div className="grid grid-cols-2 gap-2.5">
-              {/* 搜索与历史合并 */}
-              <button type="button" onClick={() => runFromMoreSheet(onOpenHistory)} className={moreSheetActionClass}>
-                <Clock3 size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">{pick('历史与搜索', 'History & Search')}</div>
-                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('查找历史提示词和结果', 'Find history prompts and results')}</div>
+              <button type="button" onClick={() => runFromMoreSheet(onOpenFavorites)} data-testid="mobile-more-menu-favorites" className={moreSheetActionClass}>
+                <Heart size={17} className="mb-2.5" />
+                <div className="text-sm font-semibold">{pick('收藏', 'Favorites')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('图片与提示词', 'Images and prompts')}</div>
+              </button>
+              <button type="button" onClick={() => runFromMoreSheet(onOpenSearch)} className={moreSheetActionClass}>
+                <Search size={17} className="mb-2.5" />
+                <div className="text-sm font-semibold">{pick('搜索', 'Search')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('定位项目内容', 'Locate project content')}</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
                 <PackageOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />
@@ -427,16 +414,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 <MessageSquare size={17} className="mb-2.5" />
                 <div className="text-sm font-semibold">{pick('聊天', 'Chat')}</div>
                 <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('打开对话侧边栏', 'Open chat sidebar')}</div>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                data-testid="mobile-more-menu-settings"
-                className={moreSheetActionClass}
-              >
-                <Settings size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">{pick('设置', 'Settings')}</div>
-                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('模型、渠道和系统选项', 'Models, providers and options')}</div>
               </button>
             </div>
           </div>

@@ -198,7 +198,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
   const [modelType, setModelType] = useState(config.model || 'gemini-2.5-flash-image');
   const [resolution, setResolution] = useState(config.imageSize || '1K');
   const [batchCount, setBatchCount] = useState(1);
-  const [activeConfigTab, setActiveConfigTab] = useState<'ratio' | 'params'>('ratio');
+  const [activeConfigTab, setActiveConfigTab] = useState<'ratio' | 'params'>('params');
 
   const activeRatio = config.aspectRatio || '1:1';
   const isReadOnly = typeof window !== 'undefined' && !!window.__KK_SETTINGS_READONLY__;
@@ -491,7 +491,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
             <Layers size={16} />
           </div>
           <span className="text-sm font-semibold tracking-wide" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
-            {pick('AI 智能电商极速看板', 'AI E-commerce Board')}
+            {pick('电商生成', 'E-commerce Generation')}
           </span>
         </div>
         <button 
@@ -508,7 +508,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
       <div className="relative flex-1 overflow-y-auto pb-[170px] px-4 py-4 space-y-4 no-scrollbar z-10">
         
         {/* ================= 1. 上传区 (左右并排 6比4 大小) ================= */}
-        <div className="grid grid-cols-10 gap-3 shrink-0">
+        <div className="mobile-ecommerce-product-brief grid grid-cols-10 gap-3 shrink-0">
           
           {/* 产品主体 (左侧 60% 宽度) */}
           <div className="col-span-6 space-y-1.5">
@@ -581,6 +581,21 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
             )}
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleGenerateSubmit}
+          disabled={isSubmitting}
+          className="mobile-ecommerce-auto-optimize"
+          data-state={isSubmitting ? 'busy' : 'ready'}
+        >
+          <Sparkles size={16} />
+          <span>
+            <strong>{pick('AI 自动优化并生成', 'AI optimize and generate')}</strong>
+            <small>{pick('识别产品特性，并按平台、市场和语种规划整套图片', 'Analyze the product and plan a complete set for the selected market')}</small>
+          </span>
+          <ArrowUp size={15} />
+        </button>
 
         {/* ================= 2. 出图区 (Carousel 卡片详情滑动展示) ================= */}
         <div className="space-y-1.5">
@@ -731,7 +746,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           >
             <div className="flex items-center gap-2">
               <Sparkle size={13} className="text-amber-400" />
-              <span>{isInspirationOpen ? pick('💡 收起电商灵感库', '💡 Collapse Inspiration Lib') : pick('💡 展开一键电商灵感库', '💡 Expand Inspiration Lib')}</span>
+              <span>{isInspirationOpen ? pick('收起电商灵感库', 'Collapse inspiration library') : pick('展开电商灵感库', 'Expand inspiration library')}</span>
             </div>
             <div className={`text-[10px] text-[var(--text-tertiary)] transition-transform duration-300 ${
               isInspirationOpen ? 'rotate-180' : ''
@@ -768,7 +783,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
               className="mobile-ecommerce-segmented-button flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all"
               style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}
             >
-              {pick('📐 构图比例', '📐 Aspect Ratio')}
+              {pick('构图比例', 'Aspect Ratio')}
             </button>
             <button
               type="button"
@@ -777,7 +792,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
               className="mobile-ecommerce-segmented-button flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all"
               style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}
             >
-              {pick('⚙️ 生成参数', '⚙️ Parameters')}
+              {pick('生成参数', 'Parameters')}
             </button>
           </div>
 
@@ -812,7 +827,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
           {/* Tab 2: 高阶参数 */}
           {activeConfigTab === 'params' && (
-            <div className="grid grid-cols-2 gap-2.5 text-xs animate-[fadeIn_0.2s_ease]">
+            <div className="mobile-ecommerce-commerce-profile grid grid-cols-2 gap-2.5 text-xs animate-[fadeIn_0.2s_ease]">
               {/* 电商平台 */}
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] text-[var(--text-tertiary)]">{pick('电商平台', 'Platform')}</span>

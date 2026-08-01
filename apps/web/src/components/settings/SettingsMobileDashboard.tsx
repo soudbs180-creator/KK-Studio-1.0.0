@@ -244,7 +244,12 @@ const SettingsMobileDashboard: React.FC<{
           {metricItems.map((metric) => {
             const Icon = metric.icon;
             return (
-              <div key={metric.id} className="settings-mobile-metric" data-tone={metric.tone}>
+              <div
+                key={metric.id}
+                className="settings-mobile-metric"
+                data-metric-card={metric.id}
+                data-tone={metric.tone}
+              >
                 <div className="settings-mobile-metric__label">
                   <Icon size={14} />
                   <span>{metric.label}</span>
@@ -260,7 +265,6 @@ const SettingsMobileDashboard: React.FC<{
           <div className="settings-mobile-quick-control">
             <div className="settings-mobile-quick-control__label">
               <span>{pick('默认执行位置', 'Default execution')}</span>
-              <strong>{routeOptions.find((option) => option.id === routePreference)?.label}</strong>
             </div>
             <div className="settings-mobile-segment" role="radiogroup" aria-label={pick('默认执行位置', 'Default execution')}>
               {routeOptions.map((option) => {
@@ -345,10 +349,14 @@ const SettingsMobileDashboard: React.FC<{
           </span>
           <ChevronRight size={16} />
         </button>
-        <div className="settings-mobile-language" role="group" aria-label={pick('语言切换', 'Language switch')}>
-          <button type="button" aria-pressed={language === 'zh-CN'} onClick={() => setLanguage('zh-CN')}>中</button>
-          <button type="button" aria-pressed={language === 'en-US'} onClick={() => setLanguage('en-US')}>EN</button>
-        </div>
+        <button
+          type="button"
+          className="settings-mobile-language"
+          aria-label={pick('切换 EN', '切换中文')}
+          onClick={() => setLanguage(language === 'zh-CN' ? 'en-US' : 'zh-CN')}
+        >
+          {pick('切换 EN', '切换中文')}
+        </button>
       </section>
     </div>
   );

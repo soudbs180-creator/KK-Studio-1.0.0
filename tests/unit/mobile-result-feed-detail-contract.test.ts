@@ -66,8 +66,9 @@ test('mobile result feed localizes chrome copy instead of hard-coding English in
   assert.match(feedSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
   assert.match(feedSource, /const \{ pick \} = useLocale\(\);/);
   assert.match(feedSource, /data-testid="mobile-generation-task-status"/);
-  assert.match(feedSource, /pick\('生成结果', 'Generated results'\)/);
-  assert.match(feedSource, /pick\(`\$\{pendingTaskCount\} 个等待中`, `\$\{pendingTaskCount\} pending`\)/);
+  assert.match(feedSource, /pick\('任务', 'Tasks'\)/);
+  assert.match(feedSource, /pick\(`\$\{pendingTaskCount\} 等待`, `\$\{pendingTaskCount\} pending`\)/);
+  assert.match(feedSource, /pick\(`\$\{totalTaskCount\} 张`, `\$\{totalTaskCount\}`\)/);
   assert.match(feedSource, /const selectedSourceLabel = pick\([^)]*'source selected'\);/);
   assert.doesNotMatch(feedSource, />\s*Results\s*</);
   assert.doesNotMatch(feedSource, /totalResults === 0 \? 'Waiting'/);
@@ -124,8 +125,12 @@ test('mobile result bottom controls stop touch and pointer events before they re
   assert.match(feedSource, /data-testid="mobile-result-view-controls"/);
   assert.match(feedSource, /kk-result-view-controls/);
   assert.match(feedSource, /kk-result-view-mode-button/);
-  assert.match(feedSource, /items-center justify-between gap-3/);
-  assert.match(feedSource, /className="w-full flex touch-manipulation items-center justify-between gap-3 pointer-events-auto py-1"/);
+  assert.match(feedSource, /kk-result-command-row/);
+  assert.match(feedSource, /kk-mobile-generation-status__line/);
+  assert.match(feedSource, /requestTaskCenterOpen\(\);/);
+  assert.match(feedSource, /bottomRef\.current\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'end' \}\);/);
+  assert.match(feedSource, /onOpenSearch\?\.\(\);/);
+  assert.match(feedSource, /kk-result-locate-control pointer-events-auto/);
   assert.match(feedSource, /kk-result-control kk-result-danger-control flex touch-manipulation items-center gap-1 rounded-full/);
   assert.match(feedSource, /handleBatchDelete\(\);/);
 

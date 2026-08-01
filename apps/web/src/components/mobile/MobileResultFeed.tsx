@@ -23,6 +23,7 @@ interface MobileResultFeedProps {
   isLoading?: boolean;
   isHistoryView?: boolean;
   onCloseHistory?: () => void;
+  onOpenSearch?: () => void;
   // 简体中文：支持多选删除与多选下载所需的批量操作回调
   onDeleteImage?: (imageId: string) => void;
   onDownloadEntry?: (entry: MobileResultEntry) => void;
@@ -155,6 +156,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   isLoading = false,
   isHistoryView = false,
   onCloseHistory,
+  onOpenSearch,
   onDeleteImage,
   onDownloadEntry,
 }) => {
@@ -684,7 +686,37 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
           </div>
         ) : (
           // 简体中文：常规模式下的切换胶囊和计数器
-          <>
+          <div className="kk-result-command-row">
+            <div
+              data-testid="mobile-result-view-controls"
+              className="kk-result-view-controls touch-manipulation pointer-events-auto"
+              onPointerDown={stopMobileResultControlEvent}
+              onMouseDown={stopMobileResultControlEvent}
+              onClick={stopMobileResultControlEvent}
+              onTouchStart={stopMobileResultControlEvent}
+              onTouchEnd={stopMobileResultControlEvent}
+            >
+              <div className={`kk-result-view-mode-group kk-result-view-mode-group--${viewMode}`}>
+                <span className="kk-result-view-mode-thumb" aria-hidden="true" />
+                {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      onViewModeChange(mode);
+                    }}
+                    title={mode === 'detail' ? pick('详细视图', 'Detail view') : pick('标准视图', 'Standard view')}
+                    aria-pressed={viewMode === mode}
+                    className={`kk-result-view-mode-button ${viewMode === mode ? 'kk-result-view-mode-button--active' : ''}`}
+                  >
+                    <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Std')}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div
               data-testid="mobile-generation-task-status"
               className="kk-mobile-generation-status min-w-0 touch-manipulation pointer-events-auto"
@@ -710,72 +742,49 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchStart={stopMobileResultControlEvent}
               onTouchEnd={stopMobileResultControlEvent}
             >
-              <div className="kk-mobile-generation-status__heading">
-                <p>{pick('生成结果', 'Generated results')}</p>
+              <div className="kk-mobile-generation-status__line">
+                <p>{pick('任务', 'Tasks')}</p>
                 <span data-state={failedTaskCount > 0 ? 'error' : pendingTaskCount > 0 ? 'running' : 'ready'}>
                   {failedTaskCount > 0
-                    ? pick(`${failedTaskCount} 个失败`, `${failedTaskCount} failed`)
+                    ? pick(`${failedTaskCount} 失败`, `${failedTaskCount} failed`)
                     : pendingTaskCount > 0
-                      ? pick(`${pendingTaskCount} 个等待中`, `${pendingTaskCount} pending`)
-                      : pick('任务已完成', 'Completed')}
+                      ? pick(`${pendingTaskCount} 等待`, `${pendingTaskCount} pending`)
+                      : pick('完成', 'Done')}
                 </span>
-              </div>
-              <div className="kk-mobile-generation-status__meta">
-                <span>{pick(`${totalTaskCount} 张图`, `${totalTaskCount} images`)}</span>
-                <span>{pick(`${completedTaskCount}/${totalTaskCount} 完成`, `${completedTaskCount}/${totalTaskCount} done`)}</span>
-                {hasSelectedSource ? <span>{selectedSourceLabel}</span> : null}
+                <strong>{pick(`${totalTaskCount} 张`, `${totalTaskCount}`)}</strong>
+                {hasSelectedSource ? <i title={selectedSourceLabel}>•</i> : null}
               </div>
               <span className="kk-mobile-generation-status__track" aria-hidden="true"><span /></span>
             </div>
-            {/* 简体中文：模式滑块与回底按钮保持独立外壳，避免把命令按钮误读为第三个模式。 */}
-            <div 
-              data-testid="mobile-result-view-controls"
-              className="kk-result-view-controls flex shrink-0 touch-manipulation items-center pointer-events-auto text-[11px] font-medium"
-              onPointerDown={stopMobileResultControlEvent}
-              onMouseDown={stopMobileResultControlEvent}
-              onClick={stopMobileResultControlEvent}
-              onTouchStart={stopMobileResultControlEvent}
-              onTouchEnd={stopMobileResultControlEvent}
-            >
-              <div className={`kk-result-view-mode-group kk-result-view-mode-group--${viewMode} flex text-[11px] font-medium text-[var(--text-primary)]`}>
-                <span className="kk-result-view-mode-thumb" aria-hidden="true" />
-                {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onViewModeChange(mode);
-                    }}
-                    title={mode === 'detail' ? pick('详细视图', 'Detail view') : pick('标准视图', 'Standard view')}
-                    aria-pressed={viewMode === mode}
-                    className={`kk-result-view-mode-button ${
-                      viewMode === mode
-                        ? 'kk-result-view-mode-button--active'
-                        : ''
-                    }`}
-                  >
-                    <span>{mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Std')}</span>
-                  </button>
-                ))}
-              </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }}
-                title={pick('回到底部', 'Scroll to Bottom')}
-                aria-label={pick('回到底部', 'Scroll to Bottom')}
-                className="kk-result-view-scroll-control flex items-center justify-center text-[var(--text-primary)]"
-              >
-                <ChevronsDown size={15} aria-hidden="true" />
-              </button>
-            </div>
-          </>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              }}
+              title={pick('回到底部', 'Scroll to Bottom')}
+              aria-label={pick('回到底部', 'Scroll to Bottom')}
+              className="kk-result-locate-control pointer-events-auto"
+            >
+              <ChevronsDown size={15} aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                onOpenSearch?.();
+              }}
+              title={pick('定位项目卡片', 'Locate project cards')}
+              aria-label={pick('定位项目卡片', 'Locate project cards')}
+              className="kk-result-locate-control pointer-events-auto"
+            >
+              <Search size={15} aria-hidden="true" />
+            </button>
+          </div>
         )}
       </div>
     </section>

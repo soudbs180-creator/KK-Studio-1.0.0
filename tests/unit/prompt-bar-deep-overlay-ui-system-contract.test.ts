@@ -80,8 +80,8 @@ test('prompt bar deep model overlays consume semantic layers and primitive class
   assert.match(deepOverlaySource, /className="kk-prompt-bar-deep-modal-action/);
   assert.match(deepOverlaySource, /className="kk-prompt-bar-deep-modal-action kk-prompt-bar-deep-modal-action--primary/);
   assert.match(countControlSource, /className = 'kk-composer-parameter-count'/);
-  assert.match(countControlSource, /role="radio"/);
-  assert.match(countControlSource, /data-selected=\{parallelCount === count\}/);
+  assert.match(countControlSource, /type="range"/);
+  assert.match(countControlSource, /aria-valuetext=\{`\$\{normalizedCount\} 张`\}/);
   assert.match(source, /style=\{\{\s*zIndex:\s*PROMPT_BAR_DEEP_SHEET_LAYER\s*\}\}/);
 
   assert.doesNotMatch(deepOverlaySource, /zIndex:\s*KK_LAYER\.modal(?!Backdrop)/);

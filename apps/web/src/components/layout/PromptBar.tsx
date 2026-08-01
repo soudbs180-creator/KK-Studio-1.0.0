@@ -4365,7 +4365,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             setMobileSubView('settings');
                                         }}
                                     >
-                                        <span className="text-xs font-semibold">高级设置</span>
+                                        <span className="text-xs font-semibold">参数配置</span>
                                     </button>
                                 </div>
 
@@ -4888,7 +4888,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         >
                             {/* 顶部标题栏 */}
                             <div className="flex items-center justify-between border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
-                                <span className="text-xs font-bold text-[var(--text-primary)]">高级设置选项</span>
+                                <span className="text-xs font-bold text-[var(--text-primary)]">参数配置</span>
                                 <button
                                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.collapseMobileComposer.uiAction}
                                     className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] active:scale-95"
@@ -6514,27 +6514,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     关闭
                                 </button>
                             </div>
-                            <div className="grid grid-cols-4 gap-2">
-                                {(config.mode === GenerationMode.PPT
-                                    ? [1, 2, 3, 4, 5, 6, 8, 10]
-                                    : [1, 2, 3, 4]
-                                ).map((count) => (
-                                    <button
-                                        key={count}
-                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.selectParallelCount.uiAction}
-                                        className={`kk-prompt-bar-deep-count-option flex flex-col items-center justify-center py-3 rounded-xl font-semibold transition-all active:scale-95 ${config.parallelCount === count
-                                            ? 'kk-prompt-bar-deep-count-option--active'
-                                            : ''}`}
-                                        onClick={() => {
-                                            updateConfigFields({ parallelCount: count });
-                                            setActiveMenu(null);
-                                        }}
-                                    >
-                                        <span className="text-base">{count}</span>
-                                        <span className="text-[10px] font-normal opacity-70">张</span>
-                                    </button>
-                                ))}
-                            </div>
+                            <ComposerGenerationCountField
+                                mode={config.mode}
+                                parallelCount={config.parallelCount}
+                                onSelect={(count) => updateConfigFields({ parallelCount: count })}
+                            />
                         </div>
                     </div>,
                     document.body

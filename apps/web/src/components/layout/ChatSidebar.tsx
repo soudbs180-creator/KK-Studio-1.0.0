@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Pause, Play, Ghost } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, SlidersHorizontal, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Pause, Play, Ghost } from 'lucide-react';
 import { KK_LAYER, KK_LAYOUT, normalizeAssistantSidebarWidth } from '@kk/ui';
 
 // 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
@@ -407,6 +407,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     const [showTakeoverMenu, setShowTakeoverMenu] = useState(false);
     const [showResourcePanel, setShowResourcePanel] = useState(false);
+    const [showComposerParameters, setShowComposerParameters] = useState(false);
 
     const takeoverImgInputRef = useRef<HTMLInputElement>(null);
     const takeoverDirInputRef = useRef<HTMLInputElement>(null);
@@ -527,8 +528,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const percentUsed = useMemo(() => {
         return Math.min(100, Math.round((totalTokensUsed / maxTokens) * 100));
     }, [totalTokensUsed, maxTokens]);
-
-    const isNearLimit = percentUsed >= 80;
 
     const handleCompressContext = async () => {
         if (isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1) return;
@@ -2400,76 +2399,40 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <button
                                     type="button"
                                     onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                                    aria-pressed={showHistoryPanel}
                                     data-chat-shell-action={CHAT_SHELL_ACTIONS.toggleHistoryPanel.uiAction}
                                     className={`kk-workspace-icon-control flex items-center justify-center rounded-md ${showHistoryPanel ? 'text-[var(--primary)] bg-[var(--primary-light)]' : ''}`}
                                     title="历史记录与分支"
                                 >
                                     <Layout size={18} />
                                 </button>
-                            </div>
-                        </div>
-
-                        {/* Context Limit Indicator 栏 */}
-                        <div className="kk-chat-sidebar-context mx-auto my-2.5 px-5 py-2.5 rounded-full border border-[var(--border-light)]/30 bg-[var(--bg-primary)]/60 backdrop-blur-md flex flex-col gap-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.15)] w-[88%] max-w-[340px] select-none transition-all duration-300 hover:border-[var(--primary)]/50">
-                            <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
-                                <span className="flex items-center gap-1">
-                                    <span>🧠 上下文:</span>
-                                    <span className="font-semibold text-[var(--text-secondary)]">
-                                        {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel}
-                                    </span>
-                                    <span>({percentUsed}%)</span>
-                                </span>
-
                                 <button
+                                    type="button"
                                     onClick={handleCompressContext}
-                                    disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
+                                    disabled={isCompressing || messages.filter(message => message.id !== 'welcome').length <= 1}
                                     data-agent-action={AGENT_CONTROL_ACTIONS.compressContext.uiAction}
-                                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
-                                        isNearLimit
-                                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
-                                            : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary)]'
-                                    } disabled:opacity-30 disabled:pointer-events-none`}
-                                    title={isNearLimit ? "上下文即将满，建议立即压缩以节省额度！" : "点击对历史对话进行总结和压缩"}
+                                    className="kk-chat-context-ring"
+                                    title={`${totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / ${maxTokensLabel} · 点击压缩上下文`}
+                                    aria-label={`上下文已使用 ${percentUsed}%`}
                                 >
-                                    {isCompressing ? (
-                                        <>
-                                            <Loader2 size={10} className="animate-spin" />
-                                            <span>压缩中...</span>
-                                        </>
-                                    ) : (
-                                        <span>🗜️ 压缩</span>
-                                    )}
+                                    <svg viewBox="0 0 36 36" aria-hidden="true">
+                                        <circle cx="18" cy="18" r="15.5" />
+                                        <circle
+                                            cx="18"
+                                            cy="18"
+                                            r="15.5"
+                                            pathLength="100"
+                                            style={{ strokeDasharray: `${percentUsed} 100` }}
+                                        />
+                                    </svg>
+                                    <span>{percentUsed}%</span>
                                 </button>
                             </div>
-
-                            {/* 进度条 */}
-                            <div className="w-full bg-[var(--border-light)]/30 rounded-full h-1 relative overflow-hidden">
-                                <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                        percentUsed >= 80
-                                            ? 'bg-gradient-to-r from-amber-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
-                                            : ''
-                                    }`}
-                                    style={{ 
-                                        width: `${percentUsed}%`,
-                                        background: percentUsed >= 80 
-                                            ? undefined 
-                                            : 'linear-gradient(90deg, var(--clay-brand-lavender) 0%, var(--primary) 100%)'
-                                    }}
-                                />
-                            </div>
-
-                            {isNearLimit && (
-                                <div className="text-[9px] text-amber-400/90 flex items-center justify-center gap-1 mt-0.5 animate-pulse">
-                                    <AlertTriangle size={10} />
-                                    <span>上下文用量已超 80%，请及时压缩。</span>
-                                </div>
-                            )}
                         </div>
 
                         {/* Expandable History Panel */}
                         {showHistoryPanel && (
-                            <div className="flex flex-col border-t border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] max-h-[40vh] overflow-hidden">
+                            <div className="kk-chat-history-panel flex flex-col max-h-[40vh] overflow-hidden">
                                 {/* Panel Controls */}
                                 <div className="flex items-center px-4 py-2 gap-2 border-b border-[var(--frost-card-sub-border)]">
                                     <input
@@ -3397,7 +3360,23 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         )}
                                     </div>
 
-                                    <AITakeoverToggle onModeChange={() => registerActivity()} />
+                                    <div className="kk-chat-composer-parameter-host relative shrink-0">
+                                        <button
+                                            type="button"
+                                            aria-expanded={showComposerParameters}
+                                            aria-label="打开参数配置"
+                                            onClick={() => setShowComposerParameters(previous => !previous)}
+                                            className={`kk-chat-composer-parameter-trigger ${showComposerParameters ? 'is-active' : ''}`}
+                                        >
+                                            <SlidersHorizontal size={17} />
+                                        </button>
+                                        {showComposerParameters ? (
+                                            <div className="kk-chat-composer-parameters">
+                                                <span>参数配置</span>
+                                                <AITakeoverToggle onModeChange={() => registerActivity()} />
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
 
                                 {/* 右侧：发送 / 停止按钮 */}

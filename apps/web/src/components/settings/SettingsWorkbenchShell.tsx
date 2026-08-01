@@ -185,19 +185,28 @@ export const SettingsConsoleShell: React.FC<{
   const activeView = getCurrentSettingsViewId(location.pathname);
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<HTMLElement | null>(null);
+  const dashboardScrollTopRef = useRef(0);
   const nestedApiEditor = isApiManagementEditorRoute(location.pathname);
   const nestedApiState = useMemo(() => deriveApiManagementListStateFromPath(location.pathname), [location.pathname]);
   const { language, pick } = useLocale();
+  const atHome = location.pathname === '/settings' || location.pathname === '/settings/';
   void initialView;
 
   useLayoutEffect(() => {
     const scrollContainer = scrollRef.current;
     if (!scrollContainer) return;
-    scrollContainer.scrollTop = 0;
-    scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
-  }, [location.pathname, refreshKey]);
+    const nextScrollTop = atHome ? dashboardScrollTopRef.current : 0;
+    const frameId = requestAnimationFrame(() => {
+      scrollContainer.scrollTop = nextScrollTop;
+      scrollContainer.scrollTo({ top: nextScrollTop, behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [atHome, location.pathname, refreshKey]);
 
-  const handleNavigate = (view: CanonicalSettingsViewId) => navigate(buildSettingsPath(view));
+  const handleNavigate = (view: CanonicalSettingsViewId) => {
+    if (atHome) dashboardScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+    navigate(buildSettingsPath(view));
+  };
   const handleBack = () => {
     if (nestedApiEditor) {
       navigate('/settings/capability-sources', { state: nestedApiState || undefined });
@@ -208,7 +217,6 @@ export const SettingsConsoleShell: React.FC<{
   };
 
   if (isMobile) {
-    const atHome = location.pathname === '/settings' || location.pathname === '/settings/';
     const topbarState = resolveMobileSettingsTopbarState(
       atHome,
       getSettingsViewMeta(activeView, language).title,
