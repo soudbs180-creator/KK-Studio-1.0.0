@@ -166,6 +166,11 @@ const activeCurrentVersionDocs = [
   "docs/specs/API_INTEGRATION_GUIDE.md",
   "docs/specs/API_DOCS.md",
   "docs/specs/API_STABLE_BASELINE.md",
+  "docs/api/README.md",
+  "docs/architecture/DESIGN.md",
+  "openspec/specs/agent-capabilities/spec.md",
+  "openspec/specs/domain-workflow-engine/spec.md",
+  "openspec/specs/matrix-diffusion-architecture/spec.md",
   "docs/ai-assistant/ui-map.md",
   "docs/ai-assistant/skills/README.md",
   "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
@@ -181,7 +186,7 @@ const activeCurrentGuidanceDocs = [
   "docs/setup/SUPABASE_CLI.md",
 ];
 const staleDisplayVersions = ["v1.5.6", "KK Studio v1.5.6", "`v1.5.6`", "项目版本：KK Studio v1.5.6"];
-const staleActiveVersionPattern = /\b(?:KK Studio\s+)?v?1\.5\.(?:8|9)\b/u;
+const staleActiveVersionPattern = /\b(?:KK Studio\s+)?v?(?:1\.5\.(?:8|9)|1\.6\.0)\b/u;
 const absoluteUserPathPattern = /(?:file:\/{3})?[a-z]:[\\/](?:users|documents and settings)[\\/]/iu;
 const rootLegacyServicesPathPattern = /(?<!apps\/web\/)src\/services\//u;
 
@@ -255,7 +260,7 @@ for (const currentVersionDoc of activeCurrentVersionDocs) {
   expectIncludes(currentVersionDoc, expectedDisplayVersion, `${currentVersionDoc} must follow config/release-manifest.json (${expectedDisplayVersion}).`);
   const source = exists(currentVersionDoc) ? read(currentVersionDoc) : "";
   if (staleActiveVersionPattern.test(source)) {
-    fail(`${currentVersionDoc} contains a stale active v1.5.x version claim instead of ${expectedDisplayVersion}.`);
+    fail(`${currentVersionDoc} contains a stale active version claim instead of ${expectedDisplayVersion}.`);
   }
 }
 

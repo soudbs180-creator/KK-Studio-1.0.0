@@ -2,7 +2,7 @@
 
 Status: historical documentation contract (not a claim that every planned item
 is already implemented). Last reviewed: 2026-07-20. The release version is
-read from `config/release-manifest.json` (`KK Studio v1.6.0`).
+read from `config/release-manifest.json` (`KK Studio v1.6.1`).
 
 This file is intentionally short. Detailed behavior lives in the current AI
 assistant knowledge base and the active OpenSpec changes:

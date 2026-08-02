@@ -114,6 +114,29 @@ for (const target of workspacePackageTargets) {
   }
 }
 
+const mobileAppConfigTarget = targets.mobileAppConfig || "apps/mobile/app.json";
+const mobileAppConfig = readJsonIfExists(mobileAppConfigTarget);
+if (mobileAppConfig?.expo) {
+  if (mobileAppConfig.expo.version !== expectedVersion) {
+    fail(`${mobileAppConfigTarget} expo.version is ${mobileAppConfig.expo.version}, expected ${expectedVersion}`);
+  }
+  if (
+    typeof mobileAppConfig.expo.name !== "string"
+    || !mobileAppConfig.expo.name.startsWith(manifest.appName)
+  ) {
+    fail(`${mobileAppConfigTarget} expo.name must start with ${manifest.appName}`);
+  }
+}
+
+const openApiSpecTarget = targets.openApiSpec || "docs/specs/openapi-full.yaml";
+const openApiSpec = readIfExists(openApiSpecTarget);
+if (
+  openApiSpec
+  && !new RegExp(`^\\s+version:\\s*${escapeRegExp(expectedVersion)}\\s*$`, "m").test(openApiSpec)
+) {
+  fail(`${openApiSpecTarget} info.version must be ${expectedVersion}`);
+}
+
 const packageLockTargets = Array.from(new Set([
   "package-lock.json",
   "services/api/package-lock.json",

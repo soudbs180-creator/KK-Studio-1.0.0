@@ -93,6 +93,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   isMobile,
   onAutoArrange,
 }) => {
+  const collapsedPanelWidth = 236;
+  const expandedPanelWidth = 268;
   const svgRef = useRef<SVGSVGElement>(null);
   const lastTargetCenterRef = useRef<{ x: number; y: number } | null>(null);
   const activeDragFrameRef = useRef<number | null>(null);
@@ -107,10 +109,12 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   });
 
   useEffect(() => {
-    const panelWidth = isMobile || !activeCanvas ? 0 : 304;
+    const panelWidth = isMobile || !activeCanvas
+      ? 0
+      : (isCollapsed ? collapsedPanelWidth : expandedPanelWidth);
     setWorkspaceNavigationPanelWidth(panelWidth);
     return () => setWorkspaceNavigationPanelWidth(0);
-  }, [activeCanvas, isCollapsed, isMobile]);
+  }, [activeCanvas, collapsedPanelWidth, expandedPanelWidth, isCollapsed, isMobile]);
 
   const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
   const [minimapCenterOffset, setMinimapCenterOffset] = useState<{ x: number; y: number } | null>(null);
@@ -167,8 +171,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   }, [updateContainerSize]);
 
   // 小地图的固定物理尺寸
-  const miniWidth = 280;
-  const miniHeight = 156;
+  const miniWidth = 248;
+  const miniHeight = 138;
 
   const scale = canvasTransform.scale || 1;
 
@@ -522,8 +526,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         data-canvas-navigation-bar="true"
         className="kk-workspace-chrome-surface canvas-nav-panel flex items-center rounded-2xl border p-1.5 select-none transition-all duration-300 ease-in-out"
         style={{
-          width: '304px',
-          maxWidth: '304px',
+          width: `${collapsedPanelWidth}px`,
+          maxWidth: `${collapsedPanelWidth}px`,
           boxSizing: 'border-box',
           boxShadow: 'var(--frost-card-framework-shadow)',
           background: 'var(--frost-card-framework-bg)',
@@ -552,8 +556,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       data-canvas-minimap-popover="true"
       className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-1.5 select-none transition-all duration-300 ease-in-out"
       style={{
-        width: '304px',
-        maxWidth: '304px',
+        width: `${expandedPanelWidth}px`,
+        maxWidth: `${expandedPanelWidth}px`,
         boxSizing: 'border-box',
         boxShadow: 'var(--frost-card-framework-shadow)',
         background: 'var(--frost-card-framework-bg)',

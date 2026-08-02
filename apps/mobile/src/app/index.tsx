@@ -4,6 +4,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { MOBILE_APP_DISPLAY_VERSION } from '../config/appInfo';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function HomeScreen() {
         </View>
         <View>
           <Text style={styles.appTitle}>KK Studio Mobile</Text>
-          <Text style={styles.appSubtitle}>v1.6.0 AI 创作控制台</Text>
+          <Text style={styles.appSubtitle}>{MOBILE_APP_DISPLAY_VERSION} AI 创作控制台</Text>
         </View>
       </View>
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: KK Studio API
-  version: 1.6.0
+  version: 1.6.1
   summary: KK Studio 完整 REST API 契约（OpenAPI 3.1）
   description: |
     KK Studio 是面向多模态 AI 创作、无限画布资产管理、多模型智能路由、用户自主密钥（BYOK）

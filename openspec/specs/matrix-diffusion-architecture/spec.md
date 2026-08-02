@@ -5,7 +5,7 @@ Status: current
 矩阵扩散架构与三端拓扑分工规格书 (Matrix Diffusion Architecture & Tri-Tier Topology Spec)。
 
 ## 1. Overview
-本规格书定义 KK Studio v1.6.0 中“矩阵扩散架构设想”的物理拓扑、圈层扩展与三端职责分工。矩阵中心为 AI 助手 (`AgentRuntime`) 与无限画布；外圈为可扩展的能力圈层（图像/视频/音乐/配音/剪辑/网页自动化）。三端物理部署明确划分为：Vercel 前端交互层、VPS 服务器控制层、Local Runner 本地媒体处理层。
+本规格书定义 KK Studio v1.6.1 中“矩阵扩散架构设想”的物理拓扑、圈层扩展与三端职责分工。矩阵中心为 AI 助手 (`AgentRuntime`) 与无限画布；外圈为可扩展的能力圈层（图像/视频/音乐/配音/剪辑/网页自动化）。三端物理部署明确划分为：Vercel 前端交互层、VPS 服务器控制层、Local Runner 本地媒体处理层。
 
 ---
 

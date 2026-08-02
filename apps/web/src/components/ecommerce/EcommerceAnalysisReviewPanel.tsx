@@ -51,6 +51,7 @@ interface EcommerceAnalysisReviewPanelProps {
   onRemoveManualReferenceFile?: (sourceKey: string, index: number) => void;
   onToggleSelection: (id: string, selected: boolean) => void;
   onTaskStateChange?: EcommerceTaskStateChangeHandler;
+  activeSection?: '主图' | 'A+';
   isConfirming?: boolean;
   onConfirm: () => void | Promise<void>;
 }
@@ -145,6 +146,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
   onRemoveManualReferenceFile,
   onToggleSelection,
   onTaskStateChange,
+  activeSection = '主图',
   isConfirming = false,
   onConfirm,
 }) => {
@@ -206,25 +208,25 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
     })
   ), [activeTaskStateProp, analysis.aPlusGroup.modules, analysis.assets.referenceAssets, extractEcommerceManualReferenceBindings, selection, taskStates]);
 
-  const allReviewItems = React.useMemo(
-    () => [...mainReviewItems, ...aPlusReviewItems],
-    [aPlusReviewItems, mainReviewItems],
+  const visibleReviewItems = React.useMemo(
+    () => (activeSection === 'A+' ? aPlusReviewItems : mainReviewItems),
+    [activeSection, aPlusReviewItems, mainReviewItems],
   );
 
   React.useEffect(() => {
-    if (allReviewItems.length === 0) {
+    if (visibleReviewItems.length === 0) {
       setActiveReviewItemKey(null);
       return;
     }
 
     const preferredKey = activeTaskStateProp?.sourceRowKey || activeReviewItemKey;
-    const nextActiveItem = allReviewItems.find((item) => item.id === preferredKey) || allReviewItems[0];
+    const nextActiveItem = visibleReviewItems.find((item) => item.id === preferredKey) || visibleReviewItems[0];
     if (nextActiveItem.id !== activeReviewItemKey) {
       setActiveReviewItemKey(nextActiveItem.id);
     }
-  }, [activeReviewItemKey, activeTaskStateProp?.sourceRowKey, allReviewItems]);
+  }, [activeReviewItemKey, activeTaskStateProp?.sourceRowKey, visibleReviewItems]);
 
-  const activeReviewItem = allReviewItems.find((item) => item.id === activeReviewItemKey) || allReviewItems[0] || null;
+  const activeReviewItem = visibleReviewItems.find((item) => item.id === activeReviewItemKey) || visibleReviewItems[0] || null;
   const activeTaskState = activeReviewItem?.taskState || null;
   const configuredTaskCount = Object.values(taskStates).filter(Boolean).length;
   const dedupedAnalysisWarnings = React.useMemo(() => Array.from(new Set(analysis.reviewWarnings)), [analysis.reviewWarnings]);
@@ -615,8 +617,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
             className="min-h-0 min-w-0 flex-1 overflow-y-auto custom-scrollbar pr-1"
           >
             <div className="space-y-4">
-              {renderReviewSection('主图卡', mainReviewItems, 'var(--mobile-clay-active-border)')}
-              {renderReviewSection('A+ 模块卡', aPlusReviewItems, 'var(--state-success-border)')}
+              {activeSection === '主图' ? renderReviewSection('主图卡', mainReviewItems, 'var(--mobile-clay-active-border)') : null}
+              {activeSection === 'A+' ? renderReviewSection('A+ 模块卡', aPlusReviewItems, 'var(--state-success-border)') : null}
             </div>
           </div>
         </div>

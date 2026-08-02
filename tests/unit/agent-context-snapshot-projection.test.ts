@@ -23,6 +23,7 @@ import {
   AgentSessionProjectionStore,
 } from '../../apps/web/src/features/ai-assistant-runtime/runtime/agentSessionProjection.ts';
 import { readSource } from '../support/workspacePaths.js';
+import { APP_VERSION } from '../../apps/web/src/config/appInfo.ts';
 
 const OWNER_ID = 'snapshot-owner-a';
 const SESSION_ID = 'snapshot-session-1';
@@ -78,7 +79,7 @@ function createProjectContext(canvasId = 'canvas-authoritative'): SanitizedProje
       mode: 'image',
     },
     runtime: {
-      projectVersion: '1.6.0',
+      projectVersion: APP_VERSION,
       currentPage: 'canvas',
       canvas: {
         id: canvasId,

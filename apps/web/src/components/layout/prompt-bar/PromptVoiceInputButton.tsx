@@ -121,6 +121,7 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
       type="button"
       className={`kk-composer-voice-input ${className}`.trim()}
       data-state={isListening ? 'listening' : 'idle'}
+      data-supported={isSupported}
       disabled={!isSupported}
       onClick={isListening ? stopListening : startListening}
       aria-label={isListening ? '停止语音输入' : '语音输入'}
@@ -128,6 +129,9 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
       title={isSupported ? (isListening ? '停止语音输入' : '语音输入') : '当前浏览器不支持语音输入'}
     >
       {isListening ? <Square size={14} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+      <span className="sr-only" aria-live="polite">
+        {isListening ? '录音中，点击停止' : isSupported ? '语音输入已关闭' : '当前浏览器不支持语音输入'}
+      </span>
     </button>
   );
 };

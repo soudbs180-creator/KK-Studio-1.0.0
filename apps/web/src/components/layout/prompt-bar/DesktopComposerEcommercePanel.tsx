@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check, ClipboardList, Layers3, ListChecks } from 'lucide-react';
 
 import {
   type GenerationConfig,
@@ -294,6 +295,14 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
     return null;
   }
 
+  const [workflowStep, setWorkflowStep] = React.useState<'inputs' | 'review'>(
+    ecommerceAnalysis ? 'review' : 'inputs',
+  );
+  React.useEffect(() => {
+    setWorkflowStep(ecommerceAnalysis ? 'review' : 'inputs');
+  }, [ecommerceAnalysis]);
+
+  const resolvedWorkflowStep = workflowStep === 'review' && !ecommerceAnalysis ? 'inputs' : workflowStep;
   const resolvedGroupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> = groupSlots ?? { '主图': [], 'A+': [] };
   const workbenchMode = resolveWorkbenchMode(activeTaskState);
   const resolvedGroupSheet: EcommerceGroupSheet = activeGroupSheet
@@ -446,31 +455,130 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
     );
   };
 
+  const renderWorkflowHeader = () => (
+    <div
+      className="rounded-xl border p-3"
+      style={shellSurfaceStyle}
+      data-testid="ecommerce-workflow-header"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <Layers3 size={15} aria-hidden="true" />
+            <span>{pick('电商工作台', 'Ecommerce workbench')}</span>
+          </div>
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">
+            {pick('按资料、分区和条目推进，避免把全局素材与逐条参考图混在一起。', 'Move through assets, sections, and item-level references without mixing their scopes.')}
+          </div>
+        </div>
+        <span className="rounded-full border px-2 py-1 text-[10px]" style={chipStyle}>
+          {ecommerceAnalysis ? pick('已完成解析', 'Analysis ready') : pick('等待资料', 'Waiting for assets')}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-1.5" role="tablist" aria-label={pick('电商流程', 'Ecommerce workflow')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resolvedWorkflowStep === 'inputs'}
+          data-ecommerce-workflow-step="inputs"
+          className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-2 text-[11px] font-medium transition-all duration-200"
+          style={resolvedWorkflowStep === 'inputs' ? panelSurfaceStyle : actionButtonStyle}
+          onClick={() => setWorkflowStep('inputs')}
+        >
+          <ClipboardList size={13} aria-hidden="true" />
+          <span>{pick('资料准备', 'Assets')}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resolvedWorkflowStep === 'review'}
+          data-ecommerce-workflow-step="review"
+          className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-2 text-[11px] font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-45"
+          style={resolvedWorkflowStep === 'review' ? panelSurfaceStyle : actionButtonStyle}
+          onClick={() => setWorkflowStep('review')}
+          disabled={!ecommerceAnalysis}
+        >
+          <ListChecks size={13} aria-hidden="true" />
+          <span>{pick('逐条确认', 'Review items')}</span>
+        </button>
+      </div>
+
+      {ecommerceAnalysis ? (
+        <div className="mt-2 flex items-center gap-1.5" role="tablist" aria-label={pick('电商分区', 'Ecommerce sections')}>
+          {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => {
+            const isActive = resolvedGroupSheet === sheet;
+            const count = sheet === '主图'
+              ? ecommerceAnalysis.mainImageItems.length
+              : ecommerceAnalysis.aPlusGroup.modules.length;
+            return (
+              <button
+                key={sheet}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                data-ecommerce-group-sheet={sheet}
+                className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 text-[11px] font-medium transition-all duration-200"
+                style={isActive ? panelSurfaceStyle : actionButtonStyle}
+                onClick={() => {
+                  onActivateGroupSheet?.(sheet);
+                  setWorkflowStep('review');
+                }}
+              >
+                <span>{sectionLabelMap[sheet]}</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">{count}</span>
+                {isActive ? <Check size={12} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div
+      data-ecommerce-composer-panel="true"
       className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1"
       style={ecommercePanelViewportStyle}
     >
-      <EcommerceImportPanel
-        requirementFileName={requirementFileName}
-        productFileCount={productFileCount}
-        extraReferenceCount={extraReferenceCount}
-        productFiles={productFiles}
-        extraReferenceFiles={extraReferenceFiles}
-        analyzedProductName={ecommerceAnalysis?.projectMeta.productName}
-        isAnalyzing={ecommerceAnalyzing}
-        hasAnalysis={!!ecommerceAnalysis}
-        onPickRequirementFile={onPickRequirementFile}
-        onPickProductFiles={onPickProductFiles}
-        onPickExtraReferenceFiles={onPickExtraReferenceFiles}
-        onClearRequirementFile={() => onClearRequirementFile?.()}
-        onRemoveProductFile={(index) => onRemoveProductFile?.(index)}
-        onRemoveExtraReferenceFile={(index) => onRemoveExtraReferenceFile?.(index)}
-        onAnalyzeFile={onAnalyzeFile}
-        onResetAnalysis={() => onResetAnalysis?.()}
-      />
+      {renderWorkflowHeader()}
 
-      {ecommerceAnalysis && !analysisConfirmed && onConfirmAnalysis && onToggleSelection ? (
+      {resolvedWorkflowStep === 'inputs' ? (
+        <>
+          <EcommerceImportPanel
+            requirementFileName={requirementFileName}
+            productFileCount={productFileCount}
+            extraReferenceCount={extraReferenceCount}
+            productFiles={productFiles}
+            extraReferenceFiles={extraReferenceFiles}
+            analyzedProductName={ecommerceAnalysis?.projectMeta.productName}
+            isAnalyzing={ecommerceAnalyzing}
+            hasAnalysis={!!ecommerceAnalysis}
+            onPickRequirementFile={onPickRequirementFile}
+            onPickProductFiles={onPickProductFiles}
+            onPickExtraReferenceFiles={onPickExtraReferenceFiles}
+            onClearRequirementFile={() => onClearRequirementFile?.()}
+            onRemoveProductFile={(index) => onRemoveProductFile?.(index)}
+            onRemoveExtraReferenceFile={(index) => onRemoveExtraReferenceFile?.(index)}
+            onAnalyzeFile={onAnalyzeFile}
+            onResetAnalysis={() => onResetAnalysis?.()}
+          />
+          {ecommerceAnalysis ? (
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-medium"
+              style={actionButtonStyle}
+              onClick={() => setWorkflowStep('review')}
+            >
+              <ListChecks size={13} aria-hidden="true" />
+              {pick('查看解析结果', 'Review parsed items')}
+            </button>
+          ) : null}
+        </>
+      ) : null}
+
+      {resolvedWorkflowStep === 'review' && ecommerceAnalysis && !analysisConfirmed && onConfirmAnalysis && onToggleSelection ? (
         <EcommerceAnalysisReviewPanel
           analysis={ecommerceAnalysis}
           selection={ecommerceSelection}
@@ -483,6 +591,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           onRemoveManualReferenceFile={onRemoveItemReferenceFile}
           onToggleSelection={onToggleSelection}
           onTaskStateChange={onTaskStateChange}
+          activeSection={resolvedGroupSheet}
           isConfirming={confirmingAnalysis}
           onConfirm={onConfirmAnalysis}
         />

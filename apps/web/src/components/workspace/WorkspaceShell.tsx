@@ -29,7 +29,7 @@ const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
 }) => (
   <div
     data-workspace-shell="true"
-    className={`kk-morphic-workspace relative w-full overflow-hidden font-inter kk-canvas-dot-grid ${isMobile ? 'ios-mobile-shell' : ''}`}
+    className={`kk-morphic-workspace relative w-full overflow-hidden font-inter ${isMobile ? 'ios-mobile-shell' : ''}`}
     style={{
       backgroundColor: 'var(--bg-canvas)',
       height: isMobile ? '100dvh' : '100vh',

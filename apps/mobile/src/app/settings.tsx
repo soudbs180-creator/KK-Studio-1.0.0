@@ -3,6 +3,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { MOBILE_APP_DISPLAY_VERSION } from '../config/appInfo';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>服务版本与事实源</Text>
-          <Text style={styles.infoText}>KK Studio 移动端 v1.6.0</Text>
+          <Text style={styles.infoText}>KK Studio 移动端 {MOBILE_APP_DISPLAY_VERSION}</Text>
           <Text style={styles.infoText}>环境: Production (VPS Synchronized)</Text>
         </View>
 

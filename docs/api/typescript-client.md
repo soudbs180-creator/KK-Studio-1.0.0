@@ -1,4 +1,5 @@
 Status: reference
+适用版本：KK Studio v1.6.1（以 `config/release-manifest.json` 为准）。
 
 # TypeScript API Client
 
@@ -20,7 +21,7 @@ const client = createKkApiClient({
   getAccessToken: () => sessionStore.getAccessToken(),
   refreshAccessToken: () => sessionStore.refreshAccessToken(),
   onRefreshToken: (token) => sessionStore.setAccessToken(token),
-  getClientVersion: () => "1.6.0",
+  getClientVersion: () => "1.6.1",
   getDefaultHeaders: () => ({
     "x-app-platform": "web",
   }),

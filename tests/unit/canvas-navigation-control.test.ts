@@ -15,8 +15,8 @@ test('navigation keeps zoom, arrange, and map toggle operable in one persistent 
   const source = readSource('apps/web/src/app/AppCanvasNavigationPanel.tsx');
   const persistentBar = source.match(/data-canvas-navigation-bar="true"[\s\S]*data-canvas-minimap-toggle="true"/)?.[0] || '';
 
-  assert.match(source, /const miniWidth = 280/);
-  assert.match(source, /const miniHeight = 156/);
+  assert.match(source, /const miniWidth = 248/);
+  assert.match(source, /const miniHeight = 138/);
   assert.match(source, /data-minimap-confirmation="true"/);
   assert.doesNotMatch(source, />导航小地图</);
   assert.doesNotMatch(source, /data-canvas-navigation-action="fitToAll"/);

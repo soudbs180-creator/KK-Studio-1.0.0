@@ -3029,3 +3029,103 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 当前图谱是本机生成的 94 MB SQLite 索引；修改分支或切换 Windows/WSL 时应保持各自 `.codegraph/`，必要时通过 `codegraph sync .` 或 `codegraph init .` 重建。
 - 若要让 Codex CLI 自动调用 MCP，可先运行 `npm run codegraph:mcp:print` 审阅配置，再按需执行 CodeGraph 的 `install --target codex`。
+
+---
+
+## 274. 2026-08-02 - fix(governance): 收口运行时版本漂移与 CodeGraph MCP 启动契约
+
+**修改范围**
+- 修复 API Proxy、Web 画布徽标、AI 知识基线和移动端版本展示仍指向 `v1.6.0` 的问题；移动端 Expo 配置从模板名/`1.0.0` 对齐到 `KK Studio Mobile` / `1.6.1`。
+- 让 OpenAPI、API 参考文档、当前 OpenSpec 规格与 release manifest 保持 `v1.6.1` 一致；版本治理现在同时检查移动端 `app.json` 与 OpenAPI `info.version`。
+- 将 CodeGraph MCP 配置打印入口改为使用固定版本的 `npx --yes @colbymchenry/codegraph@1.5.0`，避免输出依赖未跟踪全局 `codegraph` 命令的不可启动配置。
+- 同步画布导航尺寸契约测试到并行 UI 改动后的 `248x138` 小地图尺寸；未回滚或重写其他并行 UI 文件。
+
+**修改文件**
+- `apps/mobile/app.json`
+- `apps/mobile/src/config/appInfo.ts`
+- `apps/mobile/src/app/index.tsx`
+- `apps/mobile/src/app/settings.tsx`
+- `apps/web/src/components/canvas/NewInfiniteCanvasConsole.tsx`
+- `apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts`
+- `services/api/lib/gateway/cliProxyApiAdapter.js`
+- `config/release-manifest.json`
+- `scripts/governance/check-version-consistency.mjs`
+- `scripts/governance/check-current-facts.mjs`
+- `scripts/maintenance/print-codegraph-mcp-config.mjs`
+- `package.json`
+- `docs/api/README.md`
+- `docs/api/typescript-client.md`
+- `docs/specs/openapi-full.yaml`
+- `docs/architecture/DESIGN.md`
+- `openspec/specs/agent-capabilities/spec.md`
+- `openspec/specs/domain-workflow-engine/spec.md`
+- `openspec/specs/matrix-diffusion-architecture/spec.md`
+- `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`
+- `tests/unit/release-runtime-version-contract.test.ts`
+- `tests/unit/runtime-governance-upgrade.test.ts`
+- `tests/unit/codegraph-integration-contract.test.ts`
+- `tests/unit/agent-context-snapshot-projection.test.ts`
+- `tests/unit/canvas-navigation-control.test.ts`
+
+**当前设计决策**
+1. 运行时版本继续以 `config/release-manifest.json` 为唯一事实源；Web 读取 `appInfo`，移动端读取 Expo 配置，服务端读取同一 manifest，避免三端各自复制字面量。
+2. 只更新 `Status: current` 或明确当前 API/设计入口的版本声明；historical、迁移注释与 dated handoff 保持原始语义。
+3. CodeGraph 不写入 workspace lockfile；MCP 配置固定 `npx` 包版本，使用者仍需自行确认并写入用户级 Codex 配置。
+
+**已运行验证**
+- Root TypeScript、Architecture TypeScript、服务端 119 文件语法和 Tests TypeScript（630 文件）通过。
+- Full Unit：2406 tests，2404 passed，2 skipped，0 failed；Integration 16、Contract 31、E2E 11 全部通过。
+- Architecture 全链、Governance 全链、Encoding、Mojibake、`git diff --check` 通过。
+- Shared、UI、API Client 构建与 Web Vite 生产构建通过（2615 modules）；OpenAPI `swagger-cli validate` 通过；生产依赖审计无已知漏洞。
+- CodeGraph `status` 保持 complete（pending changes 0），新的 MCP 配置打印脚本和版本漂移契约测试通过。
+
+**未运行验证及原因**
+- 当前桌面运行时没有系统 `npm`/`npx`，未原样运行 `npm run verify:changes`；使用 bundled Node、`pnpm dlx` 和底层脚本完成等价检查。
+- `apps/mobile` 没有安装本地 `node_modules`，未运行 Expo/原生构建；移动端 JSON、源代码契约和版本治理检查已通过。
+- 未调用真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL。
+
+**风险与下一步**
+- `apps/mobile/app.json` 的 Android 包名仍为模板值 `xyz.create.CreateExpoEnvironment`；包身份属于发布决策，需确认正式 reverse-DNS 标识后单独迁移，当前未擅自修改。
+- 工作区仍有其他并行 UI 改动未纳入本次范围；本交接只描述本轮版本治理与 CodeGraph 修复，提交前需保留那些改动。
+- Codex MCP 配置依赖用户环境可执行 `npx`；若部署环境不含 Node/npm，应改为显式 Node/CodeGraph 安装路径并补充平台契约。
+
+## 275. 2026-08-02 - fix(ui): 收紧桌面控件并将电商 Composer 改为单页布局
+
+**修改范围**
+- 修复窄桌面控件随视口缩小反而放大的几何问题；导航面板、小地图和缩放控件改为紧凑尺寸。
+- 移除工作区重复点阵来源，只保留画布底层网格；发送按钮收紧文字与箭头间距。
+- 为语音输入补充 supported/listening 状态和视觉反馈。
+- 电商 Composer 增加“资料准备 / 逐条确认”流程与“主图 / A+”分区切换；模式切换器在电商桌面布局中保持可点击。
+- 电商工作流改为输入框内单页自适应高度：工作流/上传资料区不滚动，只有文字 `textarea` 保留独立滚动上限；上传卡片和标题间距同步压缩。
+
+**修改文件**
+- `apps/web/src/styles/morphic-button-geometry.css`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `apps/web/src/components/workspace/WorkspaceShell.tsx`
+- `apps/web/src/app/AppCanvasNavigationPanel.tsx`
+- `apps/web/src/components/layout/prompt-bar/PromptVoiceInputButton.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx`
+- `apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx`
+- `tests/unit/workspace-responsive-controls.test.ts`
+- `tests/unit/ecommerce-workflow-tabs.test.ts`
+- `tests/unit/prompt-voice-visual-state.test.ts`
+
+**当前设计决策**
+1. 电商桌面模式覆盖旧的 `216px` Composer 滚动上限，`input-bar-inner` 和电商面板按内容增高并保持 `overflow: visible`；避免用户滚动工作流才能找到上传/确认按钮。
+2. `textarea` 保持 `90px` 最大高度和 `overflow-y: auto`，长 Prompt 只在输入区域内部滚动，不带动资料面板。
+3. 电商模式切换器改为滚动面板内的正常流布局，下拉菜单向下展开，避免溢出裁剪导致 `elementFromPoint` 命中画布。
+
+**已运行验证**
+- Root TypeScript `tsc --noEmit --ignoreDeprecations 6.0` — ✅
+- Web TypeScript `tsc --noEmit -p apps/web/tsconfig.json --ignoreDeprecations 6.0` — ✅
+- Full Unit：2407 项中 2405 通过、2 跳过、0 失败。
+- 定向响应式/电商/语音契约测试：5/5 通过。
+- Vite 8.1.4 production build：✅ 2615 modules。
+- 应用内浏览器 `968x724`：电商面板单页可见；模式可在“电商 → 图片 → 电商”之间切换；长文本仅 `textarea` 产生滚动，工作流面板保持 `overflow: visible`。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`，使用 bundled Node 与仓库底层脚本完成等价类型、测试和构建验证。
+- 未执行真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮仅涉及 Web UI/CSS/契约测试。
+
+**风险与下一步**
+- 解析后条目较多时，电商审核内部仍保留局部历史/图库滚动容器；若要强制所有审核条目也单页展示，应另做列表分页或画布侧工作台承接，避免把 Composer 撑出视口。

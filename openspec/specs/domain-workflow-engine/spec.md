@@ -5,7 +5,7 @@ Status: current
 通用自动化工作流与领域套件引擎规格书 (Domain Workflow & Automation Engine Spec)。
 
 ## 1. Overview
-本规格书定义 KK Studio v1.6.0 中通用自动化工作流引擎的职责边界、统一契约与安全断言。通用工作流引擎将品牌 VI 工作流、电商商品批量生成、PPT 分镜生成及节点后处理工具链统一抽象收口为五阶段通用管道 (`Brief Collection -> Domain Template -> Design Compilation -> Durable Execution -> Node-Level Editing`)。
+本规格书定义 KK Studio v1.6.1 中通用自动化工作流引擎的职责边界、统一契约与安全断言。通用工作流引擎将品牌 VI 工作流、电商商品批量生成、PPT 分镜生成及节点后处理工具链统一抽象收口为五阶段通用管道 (`Brief Collection -> Domain Template -> Design Compilation -> Durable Execution -> Node-Level Editing`)。
 
 ---
 

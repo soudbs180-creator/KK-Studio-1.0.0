@@ -87,7 +87,7 @@
     "codegraph:explore": "npm run codegraph -- explore",
     "codegraph:impact": "npm run codegraph -- impact",
     "codegraph:affected": "npm run codegraph -- affected",
-    "codegraph:mcp:print": "npm run codegraph -- install --print-config codex",
+    "codegraph:mcp:print": "node scripts/maintenance/print-codegraph-mcp-config.mjs",
     "agents:status": "node scripts/maintenance/agent-sync-guard.mjs --status",
     "agents:commit": "node scripts/maintenance/agent-sync-guard.mjs --commit"
   },

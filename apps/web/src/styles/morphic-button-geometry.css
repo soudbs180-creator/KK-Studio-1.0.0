@@ -136,3 +136,20 @@
     padding-inline: 14px;
   }
 }
+
+/* Narrow desktop windows should keep the compact canvas hit areas. The
+ * mobile shell owns the larger touch targets, so browser resizing alone must
+ * not make utility-card and navigation actions swell. */
+@media (max-width: 1023px) {
+  .kk-morphic-workspace:not(.ios-mobile-shell) .kk-workspace-icon-control {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .kk-morphic-workspace:not(.ios-mobile-shell) .kk-morphic-function-button {
+    min-height: 30px;
+    padding-inline: var(--kk-morphic-button-action-padding-x);
+  }
+}

@@ -209,6 +209,80 @@
   transition: right var(--kk-morphic-motion-panel) var(--kk-morphic-ease-standard);
 }
 
+/* The desktop composer floats its mode switcher above the input surface. It
+ * must sit above the movable drawing toolbar so the creative-mode control
+ * remains clickable when the two surfaces overlap. */
+#prompt-bar-container[data-composer-layout='desktop'] {
+  z-index: var(--kk-z-dropdown, 1000) !important;
+}
+
+/* Ecommerce keeps its body scrollable, so the mode row must stay inside the
+ * scroll surface instead of overflowing above it where hit-testing is clipped. */
+@media (min-width: 769px) {
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce'] {
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    > .input-bar-inner {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    scrollbar-gutter: auto !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    [data-ecommerce-composer-panel] {
+    max-height: none !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+    gap: 6px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    [data-testid='ecommerce-workflow-header'] {
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    [data-ecommerce-import-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    [data-ecommerce-import-grid] > * {
+    padding: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .input-bar-textarea {
+    max-height: 90px !important;
+    overflow-y: auto !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-composer-floating-tools {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    z-index: 2;
+    pointer-events: auto;
+    margin-bottom: 4px;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-composer-type-picker__menu {
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+}
+
 .desktop-navigation-panel:has(.canvas-nav-panel--compact) {
   top: auto !important;
   right: var(--kk-canvas-navigation-right, 10px) !important;
@@ -318,6 +392,29 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
   background: var(--kk-morphic-panel) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  border-radius: 12px !important;
+}
+
+.desktop-navigation-panel [data-canvas-navigation-bar='true'] {
+  gap: 4px !important;
+}
+
+.desktop-navigation-panel [data-canvas-zoom-control='true'] {
+  gap: 2px !important;
+}
+
+.desktop-navigation-panel [data-canvas-navigation-bar='true'] .kk-workspace-icon-control {
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  border-radius: 7px !important;
+}
+
+.desktop-navigation-panel [data-canvas-navigation-bar='true'] .zoom-slider {
+  min-width: 54px;
 }
 
 .desktop-navigation-panel .canvas-nav-panel:not(.canvas-nav-panel--compact) {
@@ -407,6 +504,10 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
 
 .kk-composer-voice-input[data-state='listening'] {
   color: var(--kk-color-danger);
+  border-color: var(--state-danger-border);
+  background: var(--state-danger-bg);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--state-danger-border) 34%, transparent);
+  animation: kk-voice-recording-pulse 1.35s ease-in-out infinite;
 }
 
 .kk-composer-voice-input:disabled {
@@ -426,6 +527,7 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
   background: var(--kk-morphic-action) !important;
   box-shadow: none !important;
   transform: none !important;
+  gap: 1px !important;
 }
 
 .kk-composer-compact-footer .prompt-bar-liquid-send:disabled {
@@ -436,6 +538,8 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
 
 .kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-content {
   display: none;
+  gap: 1px !important;
+  padding-inline: 3px !important;
 }
 
 .kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-icon {
@@ -449,6 +553,26 @@ body[data-kk-workspace-mode='copilot'] .kk-workspace-sidebar > .w-full.h-full > 
   width: 16px;
   height: 16px;
   animation: none !important;
+}
+
+.prompt-bar-liquid-send .kk-prompt-send-button-content {
+  gap: 1px !important;
+  padding-inline: 4px !important;
+}
+
+.prompt-bar-liquid-send .kk-prompt-send-button-icon {
+  margin-left: -1px;
+}
+
+@keyframes kk-voice-recording-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--state-danger-border) 34%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--state-danger-border) 12%, transparent);
+  }
 }
 
 .kk-composer-prompt-tools__menu {

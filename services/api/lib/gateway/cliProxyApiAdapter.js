@@ -10,6 +10,7 @@ const logger = {
   warn: (...args) => console.warn(...args),
   error: (...args) => console.error(...args)
 };
+const releaseManifest = require('../../../../config/release-manifest.json');
 
 // 支持的 Canonical Providers
 const SUPPORTED_PROVIDERS = [
@@ -56,7 +57,7 @@ function buildSanitizedProxyHeaders(headers = {}, authToken = '') {
     sanitized['Authorization'] = `Bearer ${authToken}`;
   }
 
-  sanitized['X-KK-Studio-Version'] = '1.6.0';
+  sanitized['X-KK-Studio-Version'] = releaseManifest.version;
   sanitized['X-KK-Proxy-Gateway'] = 'CLIProxyAPI-Sidecar';
 
   return sanitized;

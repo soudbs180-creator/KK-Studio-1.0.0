@@ -2,7 +2,7 @@ Status: reference
 
 # KK Studio API 文档
 
-适用版本：KK Studio v1.6.0（以 `config/release-manifest.json` 为准）。本目录整理当前 `services/api/` Express 运行时、`packages/shared/` 契约和 `packages/api-client/` 类型化客户端。历史后端目录和 `docs/archive/` 不属于当前 API。
+适用版本：KK Studio v1.6.1（以 `config/release-manifest.json` 为准）。本目录整理当前 `services/api/` Express 运行时、`packages/shared/` 契约和 `packages/api-client/` 类型化客户端。历史后端目录和 `docs/archive/` 不属于当前 API。
 
 ## 文档地图
 

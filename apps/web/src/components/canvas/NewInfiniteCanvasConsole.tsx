@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { BrandVIFlowModal } from '../../features/brand-vi/BrandVIFlowModal';
 import { SkillManagerPanel } from '../../features/skills/SkillManagerPanel';
 import { ImagePostProcessingToolbar } from './ImagePostProcessingToolbar';
+import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import type { AgentSkillManifest } from '@kk/shared';
 
 export interface NewInfiniteCanvasConsoleProps {
@@ -110,7 +111,7 @@ export const NewInfiniteCanvasConsole: React.FC<NewInfiniteCanvasConsoleProps> =
             <h1 className="text-xs font-bold tracking-wide text-slate-100 flex items-center gap-2">
               {canvasName || '无限创意画布'}
               <span className="px-1.5 py-0.5 text-[10px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded">
-                v1.6.0 Pro
+                {APP_DISPLAY_VERSION} Pro
               </span>
             </h1>
             <p className="text-[10px] text-slate-400">已选中 {selectedNodeIds.length} 个节点</p>

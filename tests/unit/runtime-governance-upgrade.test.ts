@@ -69,6 +69,25 @@ test("version governance checks adjacent package-lock root versions", () => {
   assert.match(versionCheckSource, /expectedVersion/);
 });
 
+test("version governance checks mobile app metadata and OpenAPI version", () => {
+  const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
+  const releaseManifest = JSON.parse(readSource("config/release-manifest.json")) as {
+    appName: string;
+    version: string;
+    versionTargets: { mobileAppConfig: string; openApiSpec: string };
+  };
+  const mobileAppConfig = JSON.parse(readSource(releaseManifest.versionTargets.mobileAppConfig)) as {
+    expo?: { name?: string; version?: string };
+  };
+  const openApiSpec = readSource(releaseManifest.versionTargets.openApiSpec);
+
+  assert.match(versionCheckSource, /mobileAppConfigTarget/);
+  assert.match(versionCheckSource, /openApiSpecTarget/);
+  assert.equal(mobileAppConfig.expo?.version, releaseManifest.version);
+  assert.match(mobileAppConfig.expo?.name || '', new RegExp(releaseManifest.appName));
+  assert.match(openApiSpec, new RegExp(`^  version: ${releaseManifest.version}$`, 'm'));
+});
+
 test("version governance compares release metadata without requiring local build commit freshness", () => {
   const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
 
@@ -123,6 +142,11 @@ test("current facts governance blocks stale active architecture and AI assistant
     "docs/ai-assistant/ui-map.md",
     "docs/ai-assistant/skills/README.md",
     "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
+    "docs/api/README.md",
+    "docs/architecture/DESIGN.md",
+    "openspec/specs/agent-capabilities/spec.md",
+    "openspec/specs/domain-workflow-engine/spec.md",
+    "openspec/specs/matrix-diffusion-architecture/spec.md",
   ]) {
     assert.match(currentFactsSource, new RegExp(docPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

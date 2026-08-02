@@ -5,7 +5,7 @@ Status: current
 AI Agent 控制面与协作引擎多维控制能力规格书 (Agent Control Plane & Collaboration Engine Spec)。
 
 ## 1. Overview
-本规格书定义 KK Studio v1.6.0 中 AI Agent 控制面的职责边界、交互契约与安全断言。AI Agent 负责意图识别 (IntentGate)、计划生成 (Planner)、动态重规划 (Bounded Replan Executor)、上下文压缩 (TokenBudget) 以及三态协作模式 (`direct|assist|takeover`)。
+本规格书定义 KK Studio v1.6.1 中 AI Agent 控制面的职责边界、交互契约与安全断言。AI Agent 负责意图识别 (IntentGate)、计划生成 (Planner)、动态重规划 (Bounded Replan Executor)、上下文压缩 (TokenBudget) 以及三态协作模式 (`direct|assist|takeover`)。
 
 ---
 
@@ -65,4 +65,3 @@ AI Agent 控制面与协作引擎多维控制能力规格书 (Agent Control Plan
   - **When**: 触发新一轮意图规划。
   - **Then**: 统一上下文预算器按 `20:30:20:15:10` 分配类别权重（系统规则、压缩摘要、近两轮对话、上下文快照、工具结果）；摘要与原文严格隔离，禁止重放超长原文。
 - **Failure & Rollback Boundaries**: 单条消息上界溢出时，按 UTF-8 字节上界截断并保留结构摘要，保证请求不报错。
-

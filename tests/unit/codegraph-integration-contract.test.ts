@@ -20,8 +20,20 @@ test('CodeGraph commands use the pinned CLI and project-local index path', () =>
   assert.equal(scripts['codegraph:affected'], 'npm run codegraph -- affected');
   assert.equal(
     scripts['codegraph:mcp:print'],
-    'npm run codegraph -- install --print-config codex',
+    'node scripts/maintenance/print-codegraph-mcp-config.mjs',
   );
+});
+
+test('CodeGraph MCP config uses the pinned npx launcher instead of an untracked global binary', () => {
+  const configScript = fs.readFileSync(
+    path.join(root, 'scripts/maintenance/print-codegraph-mcp-config.mjs'),
+    'utf8',
+  );
+
+  assert.match(configScript, /command = "npx"/);
+  assert.match(configScript, /codegraphVersion = '1\.5\.0'/);
+  assert.match(configScript, /@colbymchenry\/codegraph@\$\{codegraphVersion\}/);
+  assert.match(configScript, /"serve", "--mcp"/);
 });
 
 test('CodeGraph runtime data stays outside version control', () => {

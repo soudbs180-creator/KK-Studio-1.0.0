@@ -21,6 +21,8 @@
       "apps/mobile/package.json"
     ],
     "runtimeAppInfo": "apps/web/src/config/appInfo.ts",
+    "mobileAppConfig": "apps/mobile/app.json",
+    "openApiSpec": "docs/specs/openapi-full.yaml",
     "readme": "docs/README.md",
     "sessionHandoff": "docs/development/session-handoff.md",
     "progressReport": "docs/development/progress.md",
