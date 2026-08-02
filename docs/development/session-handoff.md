@@ -3219,3 +3219,37 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 画布连接真实跨设备同步和生产 Provider/数据库链路仍需受控环境验收；当前本地契约与浏览器大画布路径已通过。
 - 下一步执行 `npm run agents:commit` 固化本次全部工作区改动，并由后续会话继续处理外部门禁。
+
+## 278. 2026-08-02 - fix(canvas): 稳定连接拖动与统一右键上下文
+
+**修改范围**
+- 修复独立连接点拖动在画布缩放/平移时的坐标换算；使用指针捕获期间的端口几何命中，连接预览线跟随指针并高亮目标端口。
+- 统一通过 `data-card-id` 识别 Prompt、图片、Workflow、Notebook 等卡片，空白处右键不再因已有选区而丢失“添加空白卡片”菜单。
+- 清空绘画确认显示实际元素数量；绘画工具选择按钮改用框选图标，工具栏与设置面板增加窄视口折行约束。
+- 保留并纳入并行产生的桌面 Composer 模式切换器固定宽度契约改动。
+
+**修改文件**
+- `apps/web/src/components/canvas/CanvasConnectionLayer.tsx`
+- `apps/web/src/components/canvas/CanvasDrawingToolbar.tsx`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx`
+- `tests/unit/prompt-bar-ecommerce-layout-contract.test.ts`
+
+**当前设计决策**
+1. 连接层使用 SVG 屏幕矩形反推画布世界坐标，避免在缩放状态下把屏幕像素直接写入世界坐标。
+2. 端口拖动不依赖 `event.target` 命中，因为指针捕获后目标仍是源端口；改为按四向端口几何距离推断目标。
+3. 统一卡片外壳的 `data-card-id` 作为右键上下文入口，旧的前缀 ID 仅保留兼容。
+
+**已运行验证**
+- Root TypeScript、Tests TypeScript（633 文件）通过。
+- Full Unit：2418 项，2416 通过，2 跳过，0 失败。
+- 定向绘画/连接测试 9/9 通过；Architecture import boundary、current-facts、z-index 检查通过。
+- Web Vite production build（2618 modules）通过；`git diff --check` 通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`，使用 bundled Node 和底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建或真实浏览器端口拖动回归。
+
+**风险与下一步**
+- 多卡片混合能力过滤与 DurableGenerationQueue 结果回填仍沿用现有 draft/队列链路，建议在后续受控 E2E 中验证视频/图片混选的跳过计数与目标卡片回填。

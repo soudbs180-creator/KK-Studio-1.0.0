@@ -2151,8 +2151,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
     }
     e.preventDefault();
     const target = e.target as HTMLElement;
-    const nodeElement = target.closest('[id^="prompt-card-"], [id^="image-card-"], [id^="workflow-card-"]');
-    const nodeId = nodeElement?.id.match(/^(?:prompt-card|image-card|workflow-card)-(.+)$/)?.[1];
+    const nodeElement = target.closest<HTMLElement>('[data-card-id], [id^="prompt-card-"], [id^="image-card-"], [id^="workflow-card-"]');
+    const nodeId = nodeElement?.dataset.cardId
+      || nodeElement?.id.match(/^(?:prompt-card|image-card|workflow-card)-(.+)$/)?.[1];
     const isNode = Boolean(nodeId);
     if (isNode) {
       selectNodes([nodeId as string], 'replace');
@@ -2170,12 +2171,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const bounds = getDrawingBounds(drawing);
       return bounds && canvasPoint.x >= bounds.x && canvasPoint.x <= bounds.x + bounds.width && canvasPoint.y >= bounds.y && canvasPoint.y <= bounds.y + bounds.height;
     });
-    if (!isDrawingSurface && !drawingHit && selectedNodeIds.length > 0) {
-      setCanvasContextMenu(null);
-      return;
-    }
     setCanvasContextMenu({ x: e.clientX, y: e.clientY, context: isDrawingSurface || Boolean(drawingHit) ? 'drawing' : 'blank' });
-  }, [activeCanvas?.drawings, canvasRef, isMobile, selectNodes, selectedNodeIds.length]);
+  }, [activeCanvas?.drawings, canvasRef, isMobile, selectNodes]);
 
   const {
     selectionBox,
@@ -5573,7 +5570,9 @@ const isRectIntersecting = (
           onUndo={undo}
           onRedo={redo}
           onClear={() => {
-            if (window.confirm('确认清除当前项目的所有画板手绘和形状吗？此操作无法撤销。')) {
+            const drawingCount = activeCanvas?.drawings?.length || 0;
+            if (drawingCount === 0) return;
+            if (window.confirm(`确认清空当前画布中的 ${drawingCount} 个绘画元素吗？此操作无法撤销。`)) {
               clearCanvasDrawings();
               setSelectedDrawingIds([]);
             }
@@ -5585,7 +5584,10 @@ const isRectIntersecting = (
           className="kk-canvas-context-menu fixed z-[900] flex min-w-[190px] flex-col gap-1 rounded-xl border p-1"
           style={{ left: canvasContextMenu.x, top: canvasContextMenu.y }}
           role="menu"
-          onContextMenu={(event) => event.preventDefault()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
         >
           {canvasContextMenu.context === 'drawing' ? (
             <>
@@ -5766,6 +5768,7 @@ const isRectIntersecting = (
             ...visiblePromptNodes.map((node) => ({ id: node.id, position: resolveLivePromptPosition(node) || node.position, width: node.width || getPromptNodeBoundsWidth(node, isMobile), height: node.height || 200 })),
             ...visibleImageNodes.map((node) => ({ id: node.id, position: resolveLiveImagePosition(node) || node.position, width: getCardDimensions(node.aspectRatio, true).width, height: imageCardHeightById[node.id] || getCardDimensions(node.aspectRatio, true).totalHeight })),
             ...(visibleWorkflowUtilityNodes || []).map((node) => ({ id: node.id, position: node.position, width: node.width || 284, height: node.height || 176 })),
+            ...(activeCanvas?.noteNodes || []).map((node) => ({ id: node.id, position: node.position, width: node.width || 320, height: node.height || 240 })),
           ]}
           connections={activeCanvas?.connections || []}
           onCreateConnection={(sourceNodeId, targetNodeId, sourcePort, targetPort) => {

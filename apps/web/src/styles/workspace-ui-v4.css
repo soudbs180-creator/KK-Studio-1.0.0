@@ -440,6 +440,8 @@
   z-index: 710;
   display: flex;
   align-items: center;
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
   gap: 3px;
   padding: 3px;
   border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 88%, transparent);
@@ -521,6 +523,8 @@
   left: 0;
   display: flex;
   align-items: center;
+  max-width: min(340px, calc(100vw - 16px));
+  flex-wrap: wrap;
   gap: 4px;
   min-width: 236px;
   padding: 6px;

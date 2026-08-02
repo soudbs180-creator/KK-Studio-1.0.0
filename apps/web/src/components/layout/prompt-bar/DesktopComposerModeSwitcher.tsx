@@ -48,6 +48,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
       <button
         type="button"
         className={`kk-composer-type-picker__trigger inline-flex items-center gap-1.5 rounded-full border border-[var(--prompt-bar-shell-border)] bg-[var(--prompt-bar-shell-bg)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)] ${isMobile ? 'w-full justify-between' : ''}`}
+        style={isMobile ? undefined : { width: 84, minWidth: 84, paddingInline: 8 }}
         data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.toggleMode.uiAction}
         aria-haspopup="listbox"
         aria-expanded={isOpen}

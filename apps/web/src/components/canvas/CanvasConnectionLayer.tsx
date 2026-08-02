@@ -16,7 +16,14 @@ interface CanvasConnectionLayerProps {
   onCreateConnection: (sourceNodeId: string, targetNodeId: string, sourcePort: CanvasConnectionSide, targetPort: CanvasConnectionSide) => void;
 }
 
-type PortDrag = { sourceNodeId: string; sourcePort: CanvasConnectionSide; x: number; y: number };
+type PortDrag = {
+  sourceNodeId: string;
+  sourcePort: CanvasConnectionSide;
+  start: { x: number; y: number };
+  current: { x: number; y: number };
+  targetNodeId?: string;
+  targetPort?: CanvasConnectionSide;
+};
 
 const getNodeBounds = (node: CanvasConnectionNode) => ({
   left: node.position.x - node.width / 2,
@@ -35,34 +42,76 @@ const getPortPoint = (node: CanvasConnectionNode, side: CanvasConnectionSide) =>
 
 const PORTS: CanvasConnectionSide[] = ['top', 'right', 'bottom', 'left'];
 
+const getCanvasPoint = (svg: SVGSVGElement, clientX: number, clientY: number) => {
+  const rect = svg.getBoundingClientRect();
+  const scaleX = Math.max(rect.width, 0.0001);
+  const scaleY = Math.max(rect.height, 0.0001);
+  return { x: (clientX - rect.left) / scaleX, y: (clientY - rect.top) / scaleY };
+};
+
+const findPortHit = (
+  point: { x: number; y: number },
+  nodes: CanvasConnectionNode[],
+  sourceNodeId: string,
+  scale: number,
+) => {
+  const tolerance = Math.max(8, 14 / Math.max(scale, 0.1));
+  let closest: { nodeId: string; port: CanvasConnectionSide; distance: number } | null = null;
+  for (const node of nodes) {
+    if (node.id === sourceNodeId) continue;
+    for (const port of PORTS) {
+      const portPoint = getPortPoint(node, port);
+      const distance = Math.hypot(point.x - portPoint.x, point.y - portPoint.y);
+      if (distance > tolerance || (closest && distance >= closest.distance)) continue;
+      closest = { nodeId: node.id, port, distance };
+    }
+  }
+  return closest;
+};
+
 export const CanvasConnectionLayer: React.FC<CanvasConnectionLayerProps> = ({ nodes, connections, onCreateConnection }) => {
   const [portDrag, setPortDrag] = useState<PortDrag | null>(null);
+  const portDragRef = React.useRef<PortDrag | null>(null);
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   const handlePortPointerDown = (event: React.PointerEvent<SVGCircleElement>, nodeId: string, port: CanvasConnectionSide) => {
+    event.preventDefault();
     event.stopPropagation();
     const node = nodeById.get(nodeId);
     if (!node) return;
     const point = getPortPoint(node, port);
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    setPortDrag({ sourceNodeId: nodeId, sourcePort: port, x: point.x, y: point.y });
+    const next = { sourceNodeId: nodeId, sourcePort: port, start: point, current: point };
+    portDragRef.current = next;
+    setPortDrag(next);
   };
 
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (!portDrag) return;
+    const drag = portDragRef.current;
+    if (!drag) return;
+    event.preventDefault();
     event.stopPropagation();
-    const svg = event.currentTarget.getBoundingClientRect();
-    setPortDrag((current) => current ? { ...current, x: event.clientX - svg.left, y: event.clientY - svg.top } : current);
+    const point = getCanvasPoint(event.currentTarget, event.clientX, event.clientY);
+    const svgRect = event.currentTarget.getBoundingClientRect();
+    const target = findPortHit(point, nodes, drag.sourceNodeId, svgRect.width || 1);
+    const next = {
+      ...drag,
+      current: point,
+      targetNodeId: target?.nodeId,
+      targetPort: target?.port,
+    };
+    portDragRef.current = next;
+    setPortDrag(next);
   };
 
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (!portDrag) return;
-    const target = (event.target as Element).closest<SVGCircleElement>('[data-connection-target="true"]');
-    const targetNodeId = target?.getAttribute('data-node-id');
-    const targetPort = target?.getAttribute('data-port') as CanvasConnectionSide | null;
-    if (targetNodeId && targetPort && targetNodeId !== portDrag.sourceNodeId) {
-      onCreateConnection(portDrag.sourceNodeId, targetNodeId, portDrag.sourcePort, targetPort);
+    const drag = portDragRef.current;
+    if (!drag) return;
+    event.preventDefault();
+    if (drag.targetNodeId && drag.targetPort) {
+      onCreateConnection(drag.sourceNodeId, drag.targetNodeId, drag.sourcePort, drag.targetPort);
     }
+    portDragRef.current = null;
     setPortDrag(null);
   };
 
@@ -72,6 +121,7 @@ export const CanvasConnectionLayer: React.FC<CanvasConnectionLayerProps> = ({ no
       style={{ width: '1px', height: '1px', zIndex: KK_LAYER.connector, pointerEvents: 'none' }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       {connections.map((connection) => {
         const sourceNode = nodeById.get(connection.sourceNodeId);
@@ -107,13 +157,25 @@ export const CanvasConnectionLayer: React.FC<CanvasConnectionLayerProps> = ({ no
             data-connection-target="true"
             data-node-id={node.id}
             data-port={port}
-            style={{ pointerEvents: 'auto', cursor: 'crosshair', opacity: 0.55 }}
+            aria-label={`Connect ${port} port of ${node.id}`}
+            style={{
+              pointerEvents: 'auto',
+              cursor: 'crosshair',
+              opacity: portDrag?.targetNodeId === node.id && portDrag.targetPort === port ? 1 : 0.55,
+            }}
             onPointerDown={(event) => handlePortPointerDown(event, node.id, port)}
           />
         );
       }))}
       {portDrag && (
-        <path d={`M ${portDrag.x} ${portDrag.y} L ${portDrag.x + 1} ${portDrag.y + 1}`} fill="none" stroke="var(--kk-morphic-action)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        <path
+          d={`M ${portDrag.start.x} ${portDrag.start.y} L ${portDrag.current.x} ${portDrag.current.y}`}
+          fill="none"
+          stroke="var(--kk-morphic-action)"
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          strokeDasharray="5 4"
+        />
       )}
     </svg>
   );

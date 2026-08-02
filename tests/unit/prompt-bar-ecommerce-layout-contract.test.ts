@@ -7,6 +7,10 @@ const floatingToolsSource = fs.readFileSync(
   'apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx',
   'utf8',
 );
+const modeSwitcherSource = fs.readFileSync(
+  'apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx',
+  'utf8',
+);
 const ecommercePanelSource = fs.readFileSync(
   'apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx',
   'utf8',
@@ -20,6 +24,7 @@ test('ecommerce composer keeps mode tools outside the compact one-page surface',
   assert.match(floatingToolsSource, /createPortal\(floatingTools, document\.body\)/);
   assert.match(floatingToolsSource, /kk-composer-floating-tools-anchor/);
   assert.match(floatingToolsSource, /data-composer-layout="desktop"/);
+  assert.match(modeSwitcherSource, /style=\{isMobile \? undefined : \{ width: 84, minWidth: 84, paddingInline: 8 \}\}/);
   assert.match(ecommercePanelSource, /kk-ecommerce-composer-panel/);
   assert.match(ecommercePanelSource, /overflow-hidden/);
   assert.match(morphicUiSource, /\.kk-ecommerce-composer-panel[\s\S]*overflow:\s*hidden/);

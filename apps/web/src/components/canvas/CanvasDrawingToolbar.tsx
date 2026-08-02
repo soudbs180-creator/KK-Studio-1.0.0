@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
+  BoxSelect,
   Circle,
   GripVertical,
   Minus,
   MousePointer2,
   PenTool,
   Redo2,
-  Settings2,
   Shapes,
   Square,
   Trash2,
@@ -194,7 +194,7 @@ export const CanvasDrawingToolbar: React.FC<CanvasDrawingToolbarProps> = ({
       <div className="kk-drawing-toolbar__group">
         <ToolbarIconButton label="Idle / select canvas" active={activeTool === 'idle'} onClick={() => onToolChange('idle')}><MousePointer2 size={15} /></ToolbarIconButton>
         <ToolbarIconButton label="Pen" active={activeTool === 'pen'} onClick={() => onToolChange('pen')}><PenTool size={15} /></ToolbarIconButton>
-        <ToolbarIconButton label="Select drawings" active={activeTool === 'select'} onClick={() => onToolChange('select')}><Settings2 size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label="Select drawings" active={activeTool === 'select'} onClick={() => onToolChange('select')}><BoxSelect size={15} /></ToolbarIconButton>
         <ToolbarIconButton label="Text" active={activeTool === 'text'} onClick={() => onToolChange('text')}><Type size={15} /></ToolbarIconButton>
         <DrawingShapeControls activeTool={activeTool} onToolChange={onToolChange} />
       </div>
