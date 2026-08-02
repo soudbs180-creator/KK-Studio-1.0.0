@@ -36,6 +36,15 @@
     "updatedAt": "2026-07-26T10:29:52.721Z"
   },
   {
+    "id": "doc_multi_agent_production_prompt_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/multi-agent-production-prompt.md",
+    "title": "Multi-Agent Production Prompt",
+    "summary": "Status: reference",
+    "contentHash": "31b176f1721f9e195171a6ff4e0ce40d",
+    "updatedAt": "2026-08-02T18:07:26.839Z"
+  },
+  {
     "id": "doc_readme_md",
     "source": "doc",
     "path": "docs/ai-assistant/README.md",

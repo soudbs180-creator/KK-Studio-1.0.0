@@ -135,6 +135,16 @@ import type {
   AssistantApiResultDto,
 } from "../dto/ai-assistant.ts";
 import type {
+  AgentCoordinationAdmissionDto,
+  AgentCoordinationAdmissionResultDto,
+  AgentCoordinationEventDto,
+  AgentCoordinationHeartbeatDto,
+  AgentCoordinationMetricsDto,
+  AgentCoordinationMutationResultDto,
+  AgentCoordinationSnapshotDto,
+  AgentCoordinationTransitionDto,
+} from "../dto/agent-coordination.ts";
+import type {
   CompletePairedRuntimeCommandRequest,
   PairedRuntimeCommand,
   PairedRuntimeHeartbeatRequest,
@@ -540,6 +550,39 @@ export interface KkApiClient {
     input: AgentRunDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto>>>;
+  /** Admits a planned task through the server-owned coordination control plane. */
+  admitAgentCoordinationTask(
+    input: AgentCoordinationAdmissionDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationAdmissionResultDto>>>;
+  /** Reads the latest owner-scoped coordination snapshot. */
+  getAgentCoordinationTask(
+    taskId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationSnapshotDto>>>;
+  /** Reads ordered coordination events after a caller-owned cursor. */
+  listAgentCoordinationEvents(
+    taskId: string,
+    input?: AgentRunEventQueryDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationEventDto[]>>>;
+  /** Applies an owner, role, epoch, and version checked coordination transition. */
+  transitionAgentCoordinationTask(
+    taskId: string,
+    input: AgentCoordinationTransitionDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationMutationResultDto>>>;
+  /** Renews active resource claims without granting a new execution scope. */
+  heartbeatAgentCoordinationTask(
+    taskId: string,
+    input: AgentCoordinationHeartbeatDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationMutationResultDto>>>;
+  /** Reads owner-scoped coordination health metrics without exposing task payloads. */
+  getAgentCoordinationMetrics(
+    input?: { sinceHours?: number },
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AssistantApiResultDto<AgentCoordinationMetricsDto>>>;
   listAgentExtensions(
     type?: AgentExtensionType,
     options?: ApiClientRequestOptions,
@@ -2113,6 +2156,66 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         config,
         "api/ai-assistant/runs",
         { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    admitAgentCoordinationTask(input, options) {
+      return requestJson<AssistantApiResultDto<AgentCoordinationAdmissionResultDto>>(
+        config,
+        "api/ai-assistant/coordination/tasks/admit",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    getAgentCoordinationTask(taskId, options) {
+      return requestJson<AssistantApiResultDto<AgentCoordinationSnapshotDto>>(
+        config,
+        `api/ai-assistant/coordination/tasks/${encodeURIComponent(taskId)}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    listAgentCoordinationEvents(taskId, input, options) {
+      const query = new URLSearchParams();
+      if (typeof input?.afterSequence === "number") query.set("afterSequence", String(input.afterSequence));
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return requestJson<AssistantApiResultDto<AgentCoordinationEventDto[]>>(
+        config,
+        `api/ai-assistant/coordination/tasks/${encodeURIComponent(taskId)}/events${suffix}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    transitionAgentCoordinationTask(taskId, input, options) {
+      return requestJson<AssistantApiResultDto<AgentCoordinationMutationResultDto>>(
+        config,
+        `api/ai-assistant/coordination/tasks/${encodeURIComponent(taskId)}/transition`,
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    heartbeatAgentCoordinationTask(taskId, input, options) {
+      return requestJson<AssistantApiResultDto<AgentCoordinationMutationResultDto>>(
+        config,
+        `api/ai-assistant/coordination/tasks/${encodeURIComponent(taskId)}/heartbeat`,
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    getAgentCoordinationMetrics(input, options) {
+      const query = new URLSearchParams();
+      if (typeof input?.sinceHours === "number") query.set("sinceHours", String(input.sinceHours));
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return requestJson<AssistantApiResultDto<AgentCoordinationMetricsDto>>(
+        config,
+        `api/ai-assistant/coordination/metrics${suffix}`,
+        { method: "GET" },
         options,
       );
     },

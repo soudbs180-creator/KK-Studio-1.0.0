@@ -28,6 +28,7 @@ PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH="${KK_PAYMENT_RECHARGE_HARDENING_MIGRA
 PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH="${KK_PROVIDER_ROUTING_PRIORITY_MIGRATION:-infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
 PAIRED_RUNTIMES_MIGRATION_PATH="${KK_PAIRED_RUNTIMES_MIGRATION:-infrastructure/database/migrations/030_paired_runtimes.sql}"
 AGENT_EXTENSIONS_MIGRATION_PATH="${KK_AGENT_EXTENSIONS_MIGRATION:-infrastructure/database/migrations/031_agent_extensions.sql}"
+AGENT_COORDINATION_MIGRATION_PATH="${KK_AGENT_COORDINATION_MIGRATION:-infrastructure/database/migrations/032_agent_coordination.sql}"
 LEGACY_PAYMENT_IMPORT_SCRIPT_PATH="scripts/ops/postgres/import-legacy-payment-state.mjs"
 SYSTEMD_SERVICES=("kk-api")
 
@@ -212,7 +213,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify billing prerequisites and schemas 016, 020, 021, 022, 023, 024 and 026-031 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify billing prerequisites and schemas 016, 020, 021, 022, 023, 024 and 026-032 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -417,7 +418,8 @@ verify_database_migration_inputs() {
   for runtime_migration_path in \
     "${PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH}" \
     "${PAIRED_RUNTIMES_MIGRATION_PATH}" \
-    "${AGENT_EXTENSIONS_MIGRATION_PATH}"; do
+    "${AGENT_EXTENSIONS_MIGRATION_PATH}" \
+    "${AGENT_COORDINATION_MIGRATION_PATH}"; do
     if [[ ! -f "${NEW_RELEASE_DIR}/${runtime_migration_path}" ]]; then
       echo "[deploy-kk-vps] Runtime capability migration not found at ${NEW_RELEASE_DIR}/${runtime_migration_path}" >&2
       exit 1
@@ -479,7 +481,8 @@ apply_database_migrations() {
   for runtime_migration_path in \
     "${PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH}" \
     "${PAIRED_RUNTIMES_MIGRATION_PATH}" \
-    "${AGENT_EXTENSIONS_MIGRATION_PATH}"; do
+    "${AGENT_EXTENSIONS_MIGRATION_PATH}" \
+    "${AGENT_COORDINATION_MIGRATION_PATH}"; do
     psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${runtime_migration_path}"
   done
 
@@ -496,7 +499,9 @@ FROM (VALUES
   ('auth_identities'), ('oauth_transactions'), ('credit_exchange_rates'),
   ('recharge_submissions'), ('legacy_payment_imports'), ('plans'), ('orders'),
   ('provider_connections'), ('provider_connection_order_revisions'),
-  ('paired_runtimes'), ('paired_runtime_commands'), ('agent_extensions')
+  ('paired_runtimes'), ('paired_runtime_commands'), ('agent_extensions'),
+  ('agent_coordination_tasks'), ('agent_coordination_claims'), ('agent_coordination_waits'),
+  ('agent_coordination_events'), ('agent_coordination_commands'), ('agent_coordination_snapshots')
 ) AS ai_tables(table_name)
 \gexec
 

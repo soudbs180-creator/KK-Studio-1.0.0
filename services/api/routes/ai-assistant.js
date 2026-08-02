@@ -16,10 +16,14 @@ const agentRunReadStore = require('../lib/agent-run-read-store');
 const agentRunWriteStore = require('../lib/agent-run-write-store');
 const agentRunEventStore = require('../lib/agent-run-event-store');
 const agentSessionStore = require('../lib/agent-session-store');
+const agentCoordinationStore = require('../lib/agent-coordinator/store');
 const {
   AgentExecutionTargetSchema,
   AgentContextSnapshotInputDtoSchema,
   AgentSessionUpsertDtoSchema,
+  AgentCoordinationAdmissionDtoSchema,
+  AgentCoordinationTransitionDtoSchema,
+  AgentCoordinationHeartbeatDtoSchema,
 } = require('@kk/shared');
 
 /**
@@ -169,6 +173,98 @@ router.get('/ai-assistant/sessions/:sessionId/context-snapshots/latest', verifyA
   } catch (err) {
     console.error('[AI assistant] Failed to read Context Snapshot:', err);
     return res.status(500).json({ error: 'Failed to read Agent Context Snapshot' });
+  }
+});
+
+/** Admits a planned Agent task through the owner-scoped global coordination control plane. */
+router.post('/ai-assistant/coordination/tasks/admit', verifyAuth, async (req, res) => {
+  const parsed = AgentCoordinationAdmissionDtoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid Agent coordination admission payload' });
+  if (parsed.data.role !== 'executor') {
+    return res.status(403).json({
+      error: 'Agent coordination role is not allowed',
+      details: 'Public Agent runs may only enter the control plane as executor; coordinator and compensator roles are server-managed.',
+    });
+  }
+  try {
+    const outcome = await agentCoordinationStore.admitAgentTask(req.userId, parsed.data);
+    return res.json({ ok: true, data: outcome });
+  } catch (err) {
+    console.error('[AI assistant] Failed to admit coordination task:', err);
+    return res.status(500).json({ error: 'Failed to admit Agent coordination task' });
+  }
+});
+
+/** Reads one coordination snapshot without allowing a client to mutate global state. */
+router.get('/ai-assistant/coordination/tasks/:taskId', verifyAuth, async (req, res) => {
+  try {
+    const snapshot = await agentCoordinationStore.getAgentCoordinationTask(req.userId, req.params.taskId);
+    if (!snapshot) return res.status(404).json({ error: 'Agent coordination task not found' });
+    return res.json({ ok: true, data: snapshot });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read coordination task:', err);
+    return res.status(500).json({ error: 'Failed to read Agent coordination task' });
+  }
+});
+
+/** Returns ordered coordination events for diagnostics and cross-device projection recovery. */
+router.get('/ai-assistant/coordination/tasks/:taskId/events', verifyAuth, async (req, res) => {
+  const afterSequence = parseAfterSequence(req.query.afterSequence);
+  if (afterSequence === null) return res.status(400).json({ error: 'afterSequence must be a non-negative safe integer' });
+  try {
+    const events = await agentCoordinationStore.listAgentCoordinationEvents(
+      req.userId,
+      req.params.taskId,
+      afterSequence,
+    );
+    return res.json({ ok: true, data: events });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read coordination events:', err);
+    return res.status(500).json({ error: 'Failed to read Agent coordination events' });
+  }
+});
+
+/** Returns aggregate-only coordination health metrics for the authenticated owner. */
+router.get('/ai-assistant/coordination/metrics', verifyAuth, async (req, res) => {
+  const rawHours = Array.isArray(req.query.sinceHours) ? undefined : req.query.sinceHours;
+  const sinceHours = rawHours === undefined ? 24 : Number(rawHours);
+  if (!Number.isInteger(sinceHours) || sinceHours < 1 || sinceHours > 168) {
+    return res.status(400).json({ error: 'sinceHours must be an integer between 1 and 168' });
+  }
+  try {
+    const metrics = await agentCoordinationStore.getAgentCoordinationMetrics(req.userId, { sinceHours });
+    return res.json({ ok: true, data: metrics });
+  } catch (err) {
+    console.error('[AI assistant] Failed to read coordination metrics:', err);
+    return res.status(500).json({ error: 'Failed to read Agent coordination metrics' });
+  }
+});
+
+/** Applies a versioned state transition and rejects stale or unauthorized Agent commands. */
+router.post('/ai-assistant/coordination/tasks/:taskId/transition', verifyAuth, async (req, res) => {
+  const parsed = AgentCoordinationTransitionDtoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid Agent coordination transition payload' });
+  try {
+    const outcome = await agentCoordinationStore.transitionAgentTask(req.userId, req.params.taskId, parsed.data);
+    if (outcome.reason === 'task_not_found') return res.status(404).json({ error: 'Agent coordination task not found' });
+    return res.json({ ok: true, data: outcome });
+  } catch (err) {
+    console.error('[AI assistant] Failed to transition coordination task:', err);
+    return res.status(500).json({ error: 'Failed to transition Agent coordination task' });
+  }
+});
+
+/** Renews active resource claims while preserving owner, role, version, and epoch checks. */
+router.post('/ai-assistant/coordination/tasks/:taskId/heartbeat', verifyAuth, async (req, res) => {
+  const parsed = AgentCoordinationHeartbeatDtoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid Agent coordination heartbeat payload' });
+  try {
+    const outcome = await agentCoordinationStore.heartbeatAgentTask(req.userId, req.params.taskId, parsed.data);
+    if (outcome.reason === 'task_not_found') return res.status(404).json({ error: 'Agent coordination task not found' });
+    return res.json({ ok: true, data: outcome });
+  } catch (err) {
+    console.error('[AI assistant] Failed to heartbeat coordination task:', err);
+    return res.status(500).json({ error: 'Failed to heartbeat Agent coordination task' });
   }
 });
 
