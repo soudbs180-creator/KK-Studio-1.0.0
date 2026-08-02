@@ -26,7 +26,7 @@ test('prompt bar keeps the desktop footer compact while allowing full control la
   assert.match(topRowSource, /return <PromptBarTopRowDesktop>\{children\}<\/PromptBarTopRowDesktop>;/);
   assert.match(
     topRowDesktopSource,
-    /className="kk-composer-floating-tools flex items-center justify-between gap-1\.5"/,
+    /className="kk-composer-floating-tools kk-composer-floating-tools-host flex items-center justify-between gap-1\.5"/,
   );
   assert.match(footerShellSource, /<PromptBarFooterMobile>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterMobile>/);
   assert.match(footerShellSource, /<PromptBarFooterDesktop>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterDesktop>/);

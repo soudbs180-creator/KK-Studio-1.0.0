@@ -8,13 +8,14 @@ import { fetch as nativeFetch } from 'undici';
 
 const ROOT_DIR = process.cwd();
 const require = createRequire(import.meta.url);
-const LOCAL_STORAGE_PATH = path.resolve(ROOT_DIR, '.kk-local/local-user-apis.json');
+const LOCAL_STORAGE_PATH = path.resolve(ROOT_DIR, '.tmp', `local-user-apis-test-${process.pid}.json`);
 
 describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics', () => {
   const previousEnv = {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
     KKAI_LOCAL_ONLY: process.env.KKAI_LOCAL_ONLY,
+    KKAI_LOCAL_USER_API_STORE_PATH: process.env.KKAI_LOCAL_USER_API_STORE_PATH,
     NODE_ENV: process.env.NODE_ENV,
     PASSWORD_SALT: process.env.PASSWORD_SALT,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
@@ -47,6 +48,7 @@ describe('VPS Backend Credentials Encryption and Enhanced /healthz Diagnostics',
     process.env.JWT_SECRET = 'vps-health-test-secret';
     process.env.PASSWORD_SALT = 'vps-health-test-salt';
     process.env.USER_API_ENCRYPTION_SECRET = 'my-super-encryption-secret-key-32-chars';
+    process.env.KKAI_LOCAL_USER_API_STORE_PATH = LOCAL_STORAGE_PATH;
 
     // Mock 数据库模块 getPool
     const dbHelper = require('../../services/api/lib/db.js');

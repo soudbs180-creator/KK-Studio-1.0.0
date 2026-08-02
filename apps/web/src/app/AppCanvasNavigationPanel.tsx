@@ -93,8 +93,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   isMobile,
   onAutoArrange,
 }) => {
-  const collapsedPanelWidth = 236;
-  const expandedPanelWidth = 268;
+  const collapsedPanelWidth = 220;
+  const expandedPanelWidth = 248;
   const svgRef = useRef<SVGSVGElement>(null);
   const lastTargetCenterRef = useRef<{ x: number; y: number } | null>(null);
   const activeDragFrameRef = useRef<number | null>(null);

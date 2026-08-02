@@ -81,7 +81,10 @@ export async function writeHandoff(
       const fs = await import(/* @vite-ignore */ 'node:fs');
       const path = await import(/* @vite-ignore */ 'node:path');
       const root = process.cwd();
-      const docsPath = path.join(root, 'docs', 'development', 'session-handoff.md');
+      const configuredPath = String(process.env.KK_HANDOFF_FS_PATH || '').trim();
+      const docsPath = configuredPath
+        ? path.resolve(configuredPath)
+        : path.join(root, 'docs', 'development', 'session-handoff.md');
       
       if (fs.existsSync(docsPath)) {
         fs.appendFileSync(docsPath, mdContent, 'utf8');

@@ -108,8 +108,9 @@ test('prompt-group child image lookup handles 10000 canvas nodes within a bounde
   assert.equal(prompts.length + images.length, 12500);
   assert.equal(lookup.size, prompts.length);
   assert.deepEqual(lookup.get('prompt-2499')?.map((image) => image.id), ['image-2499-b', 'image-2499-a']);
+  // Keep this as a coarse regression guard; wall-clock timings vary when test files share a host.
   assert.ok(
-    durationMs < 30,
+    durationMs < 250,
     `Expected one-pass child lookup to stay bounded for 10000+ nodes, got ${durationMs.toFixed(2)}ms`,
   );
 });

@@ -97,8 +97,8 @@ test('workspace composer reserves the navigation panel instead of overlapping it
 
 test('desktop drawing toolbar stays compact, draggable, persisted, and viewport-clamped', () => {
   const toolbar = fs.readFileSync('apps/web/src/components/canvas/CanvasDrawingToolbar.tsx', 'utf8');
-  assert.match(toolbar, /className="kk-drawing-toolbar__control h-9 w-9"/);
-  assert.match(toolbar, /className="kk-drawing-toolbar__swatch h-9 w-6"/);
+  assert.match(toolbar, /className="kk-drawing-toolbar__control h-8 w-8"/);
+  assert.match(toolbar, /className="kk-drawing-toolbar__swatch h-7 w-7"/);
   assert.match(toolbar, /setPointerCapture\(event\.pointerId\)/);
   assert.match(toolbar, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(toolbar, /DRAWING_TOOLBAR_STORAGE_KEY/);

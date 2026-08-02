@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, type CanvasDrawing, type CanvasNoteNode, type WorkflowNode, type WorkflowPanelNode } from '../types';
+import type { CanvasConnection } from '@kk/shared';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
 import type { CanvasCardFactoryResult, CanvasCreateCardInput } from './canvasCardFactory.ts';
@@ -96,6 +97,12 @@ export interface CanvasContextType {
     addCanvasDrawing: (drawing: CanvasDrawing) => void;
     deleteCanvasDrawing: (id: string) => void;
     clearCanvasDrawings: () => void;
+    updateCanvasDrawings: (ids: string[], updates: Partial<CanvasDrawing>) => void;
+    moveCanvasDrawings: (ids: string[], delta: { x: number; y: number }) => void;
+    addCanvasConnection: (connection: CanvasConnection) => void;
+    deleteCanvasConnection: (id: string) => void;
+    updateCanvasConnection: (id: string, updates: Partial<CanvasConnection>) => void;
+    createCanvasConnection: (sourceNodeId: string, targetNodeId: string, sourcePort?: CanvasConnection['sourcePort'], targetPort?: CanvasConnection['targetPort']) => CanvasConnection | null;
     convertDrawingsToNote: (drawingIds: string[], title?: string) => CanvasNoteNode | null;
     editNoteNode: (id: string) => string[];
     rasterizeNote: (id: string, scale?: number) => Promise<(CanvasNoteRasterResult & { previewStorageId: string }) | null>;
@@ -127,6 +134,7 @@ export const DEFAULT_CANVAS: Canvas = {
     imageNodes: [],
     groups: [] as CanvasGroup[],
     drawings: [] as CanvasDrawing[],
+    connections: [],
     noteNodes: [],
     workflow: createCanvasWorkflow(),
     presentationVersion: 2,

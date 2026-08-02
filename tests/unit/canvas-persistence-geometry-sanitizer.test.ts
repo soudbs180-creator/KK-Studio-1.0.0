@@ -57,6 +57,17 @@ class MemoryStorage {
   }
 }
 
+class QuotaBackupStorage extends MemoryStorage {
+  override setItem(key: string, value: string): void {
+    if (key.includes(':backup')) {
+      const error = new Error('Storage quota exceeded');
+      error.name = 'QuotaExceededError';
+      throw error;
+    }
+    super.setItem(key, value);
+  }
+}
+
 function withLocalStorage<T>(storage: MemoryStorage, callback: () => T): T {
   const globalLike = globalThis as typeof globalThis & { localStorage?: unknown };
   const previous = globalLike.localStorage;
@@ -399,6 +410,35 @@ test('first migration stores a versioned backup and exposes a reversible restore
     assert.equal(restoreCanvasMigrationBackup(storageKey), true);
     assert.equal(storage.getItem(storageKey), original);
     assert.equal(storage.getItem(getCanvasMigrationBackupKey(storageKey)), null);
+  });
+});
+
+test('migration summary survives when the original backup exceeds localStorage quota', () => {
+  const storageKey = 'kk_test_canvas_migration_quota';
+  const storage = new QuotaBackupStorage();
+  const original = JSON.stringify({
+    canvases: [{
+      id: 'canvas-1',
+      name: 'Large legacy canvas',
+      lastModified: 1,
+      promptNodes: [],
+      imageNodes: [],
+      groups: [],
+      drawings: [],
+    }],
+    history: {},
+    fileSystemHandle: null,
+    folderName: null,
+  });
+  storage.setItem(storageKey, original);
+
+  withLocalStorage(storage, () => {
+    const restored = restoreCanvasStateFromLocalStorage(storageKey);
+    assert.equal(restored?.canvases[0].presentationVersion, 2);
+    assert.equal(storage.getItem(getCanvasMigrationBackupKey(storageKey)), null);
+    const summary = JSON.parse(storage.getItem(getCanvasMigrationSummaryKey(storageKey)) || '{}');
+    assert.equal(summary.backupKey, undefined);
+    assert.deepEqual(summary.migratedCanvasIds, ['canvas-1']);
   });
 });
 

@@ -139,33 +139,47 @@ export const restoreCanvasStateFromLocalStorage = (
         const migration = migrateCanvasPresentations(sanitization.canvases);
         if (migration.changed || sanitization.changed) {
             const backupKey = getCanvasMigrationBackupKey(storageKey);
+            let backupAvailable = false;
             try {
-                if (!localStorage.getItem(backupKey)) {
+                backupAvailable = Boolean(localStorage.getItem(backupKey));
+                if (!backupAvailable) {
                     localStorage.setItem(backupKey, stored);
+                    backupAvailable = true;
                 }
-                const summary = {
-                    ...migration.summary,
-                    migratedCanvasIds: Array.from(new Set([
-                        ...migration.summary.migratedCanvasIds,
-                        ...sanitization.affectedCanvasIds,
-                    ])),
-                    repairedNodeIds: Array.from(new Set([
-                        ...migration.summary.repairedNodeIds,
-                        ...sanitization.repairedNodeIds,
-                    ])),
-                    flaggedNodeIds: Array.from(new Set([
-                        ...(migration.summary.flaggedNodeIds || []),
-                        ...sanitization.flaggedNodeIds,
-                    ])),
-                    issues: [
-                        ...(migration.summary.issues || []),
-                        ...sanitization.issues,
-                    ],
-                    backupKey,
-                };
+            } catch (backupError) {
+                const errorName = backupError instanceof Error ? backupError.name : '';
+                if (errorName === 'QuotaExceededError') {
+                    console.warn('[CanvasProvider] Migration backup skipped because localStorage quota is full.');
+                } else {
+                    console.warn('[CanvasProvider] Migration backup could not be persisted:', backupError);
+                }
+            }
+
+            const summary = {
+                ...migration.summary,
+                migratedCanvasIds: Array.from(new Set([
+                    ...migration.summary.migratedCanvasIds,
+                    ...sanitization.affectedCanvasIds,
+                ])),
+                repairedNodeIds: Array.from(new Set([
+                    ...migration.summary.repairedNodeIds,
+                    ...sanitization.repairedNodeIds,
+                ])),
+                flaggedNodeIds: Array.from(new Set([
+                    ...(migration.summary.flaggedNodeIds || []),
+                    ...sanitization.flaggedNodeIds,
+                ])),
+                issues: [
+                    ...(migration.summary.issues || []),
+                    ...sanitization.issues,
+                ],
+                ...(backupAvailable ? { backupKey } : {}),
+            };
+
+            try {
                 localStorage.setItem(getCanvasMigrationSummaryKey(storageKey), JSON.stringify(summary));
             } catch (backupError) {
-                console.error('[CanvasProvider] Failed to persist migration backup:', backupError);
+                console.warn('[CanvasProvider] Migration summary could not be persisted:', backupError);
             }
         }
         return {
@@ -260,6 +274,7 @@ export const buildCanvasCloudSyncSignature = (canvases: Canvas[] = []): string =
         canvas.imageNodes.length,
         (canvas.groups || []).length,
         (canvas.drawings || []).length,
+        (canvas.connections || []).length,
     ].join(':')).join('|')
 );
 
@@ -274,6 +289,7 @@ export const buildCanvasFileSystemPersistenceSignature = (
         canvas.imageNodes.length,
         (canvas.groups || []).length,
         (canvas.drawings || []).length,
+        (canvas.connections || []).length,
     ].join(':')).join('|')}`
 );
 
@@ -292,6 +308,7 @@ export const buildCanvasLocalPersistenceSignature = (
             canvas.imageNodes.length,
             (canvas.groups || []).length,
             (canvas.drawings || []).length,
+            (canvas.connections || []).length,
         ].join(':')).join('|'),
     ].join('::')
 );

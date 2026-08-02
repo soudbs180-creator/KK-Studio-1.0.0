@@ -30,7 +30,7 @@ test('drawing overlay uses one pointer-event path with capture and correct world
   assert.match(source, /touchPointersRef/);
   assert.match(source, /touchGestureRef/);
   assert.match(source, /canvasRef\.current\?\.setView/);
-  assert.match(source, /activePointerTypeRef\.current === 'pen'/);
+  assert.match(source, /event\.pointerType === 'touch'/);
   assert.doesNotMatch(source, /onMouseDown=|onMouseMove=|onMouseUp=/);
   assert.doesNotMatch(source, /toDataURL|base64/i);
 });

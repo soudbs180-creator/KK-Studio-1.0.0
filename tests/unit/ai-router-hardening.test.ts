@@ -1,9 +1,25 @@
-import { test, describe } from 'node:test';
+import { after, test, describe } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { isPrivateHost, fetchWithRetries } from '../../services/api/lib/fetchClient.js';
-import localUserRouteStore from '../../services/api/lib/dispatcher/localUserRouteStore.js';
 import metricsCollector from '../../services/api/lib/dispatcher/metricsCollector.js';
+
+const rootDir = process.cwd();
+const localStorePath = path.resolve(rootDir, '.tmp', `local-user-apis-test-${process.pid}.json`);
+const previousLocalStorePath = process.env.KKAI_LOCAL_USER_API_STORE_PATH;
+process.env.KKAI_LOCAL_USER_API_STORE_PATH = localStorePath;
+const require = createRequire(import.meta.url);
+const localUserRouteStore = require('../../services/api/lib/dispatcher/localUserRouteStore.js');
+
+after(async () => {
+  if (previousLocalStorePath === undefined) delete process.env.KKAI_LOCAL_USER_API_STORE_PATH;
+  else process.env.KKAI_LOCAL_USER_API_STORE_PATH = previousLocalStorePath;
+  try {
+    await fs.unlink(localStorePath);
+  } catch {}
+});
 
 describe('AI Router Hardening Tests', () => {
   test('isPrivateHost SSRF 防御拦截校验', () => {

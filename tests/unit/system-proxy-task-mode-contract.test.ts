@@ -7,7 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local/contract-compat.json');
+const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local', `contract-compat-test-${process.pid}.json`);
 const TEMP_USER_HEADER = 'x-kk-temp-user-id';
 const TEMP_USER_ID = 'temp-system-proxy-task-test';
 const require = createRequire(import.meta.url);
@@ -49,6 +49,7 @@ test('system model proxy task modes use persisted generation tasks instead of re
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
     KKAI_LOCAL_ONLY: process.env.KKAI_LOCAL_ONLY,
+    KKAI_LOCAL_STORE_PATH: process.env.KKAI_LOCAL_STORE_PATH,
     NODE_ENV: process.env.NODE_ENV,
     PASSWORD_SALT: process.env.PASSWORD_SALT,
   };
@@ -109,6 +110,7 @@ test('system model proxy task modes use persisted generation tasks instead of re
 
     process.env.NODE_ENV = 'test';
     process.env.KKAI_LOCAL_ONLY = 'true';
+    process.env.KKAI_LOCAL_STORE_PATH = LOCAL_STORE_PATH;
     process.env.JWT_SECRET = 'system-proxy-task-test-secret';
     process.env.PASSWORD_SALT = 'system-proxy-task-test-salt';
     delete process.env.DATABASE_URL;

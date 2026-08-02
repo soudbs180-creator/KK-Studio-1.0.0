@@ -21,5 +21,5 @@ test('drawing toolbar uses a dedicated pointer-captured handle and compact contr
   assert.match(source, /data-drawing-toolbar-handle="true"/);
   assert.match(source, /setPointerCapture/);
   assert.match(source, /DRAWING_TOOLBAR_STORAGE_KEY/);
-  assert.match(source, /h-9 w-9/);
+  assert.match(source, /h-8 w-8/);
 });

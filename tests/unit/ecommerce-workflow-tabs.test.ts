@@ -21,10 +21,10 @@ test('desktop ecommerce composer keeps workflow controls on one page', () => {
 
   assert.match(
     workspaceStyleSource,
-    /data-composer-mode='ecommerce'[\s\S]*> \.input-bar-inner[\s\S]*max-height:\s*none !important[\s\S]*overflow:\s*visible !important/,
+    /data-composer-mode='ecommerce'[\s\S]*> \.input-bar-inner[\s\S]*max-height:\s*min\(calc\(100dvh - 86px\), 428px\) !important[\s\S]*overflow:\s*visible !important/,
   );
   assert.match(
     workspaceStyleSource,
-    /data-composer-mode='ecommerce'[\s\S]*\.input-bar-textarea[\s\S]*max-height:\s*90px !important[\s\S]*overflow-y:\s*auto !important/,
+    /data-composer-mode='ecommerce'[\s\S]*\.input-bar-textarea[\s\S]*max-height:\s*72px !important[\s\S]*overflow-y:\s*auto !important/,
   );
 });

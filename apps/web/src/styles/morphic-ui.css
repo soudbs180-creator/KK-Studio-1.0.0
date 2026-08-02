@@ -1333,8 +1333,28 @@ select,
 }
 
 #prompt-bar-container[data-composer-mode='ecommerce'] .input-bar-inner {
+  overflow: visible !important;
+  scrollbar-gutter: auto;
+}
+
+#prompt-bar-container[data-composer-mode='ecommerce'] .kk-ecommerce-composer-panel {
+  overflow: hidden !important;
+}
+
+#prompt-bar-container[data-composer-mode='ecommerce'] .input-bar-textarea {
   overflow-y: auto !important;
-  scrollbar-gutter: stable;
+}
+
+/* The canvas owns the single interactive dot layer. Surface backgrounds stay
+ * flat so toggling the grid cannot stack a second pattern underneath it. */
+:where(
+  .kk-surface--canvas,
+  .canvas-workspace,
+  .canvas-container,
+  .infinite-canvas,
+  [data-canvas-viewport]
+) {
+  background-image: none !important;
 }
 
 #prompt-bar-container[data-composer-layout='desktop']:not([data-composer-mode='ecommerce']) {
@@ -1357,6 +1377,30 @@ select,
   left: 0;
   width: 100%;
   pointer-events: none;
+}
+
+.kk-composer-floating-tools-anchor {
+  display: none;
+}
+
+.kk-composer-floating-tools-host {
+  margin: 0;
+}
+
+.kk-composer-floating-tools-host > * {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.kk-composer-floating-tools-host .kk-composer-type-picker__trigger {
+  box-sizing: border-box;
+  width: 84px !important;
+  min-width: 84px !important;
+  padding-inline: 8px !important;
+}
+
+.kk-composer-floating-tools-host .kk-composer-prompt-tools__group {
+  flex: 0 0 auto;
 }
 
 .kk-composer-floating-tools > * {

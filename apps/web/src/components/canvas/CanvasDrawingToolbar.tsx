@@ -6,34 +6,48 @@ import {
   Minus,
   MousePointer2,
   PenTool,
-  Scissors,
+  Redo2,
+  Settings2,
   Shapes,
   Square,
   Trash2,
   Type,
+  Undo2,
 } from 'lucide-react';
-
 import {
   clampFloatingToolbarPosition,
   type FloatingToolbarPoint,
 } from './floatingToolbarPosition';
+import {
+  clampDrawingWidth,
+  DRAWING_WIDTH_MAX,
+  DRAWING_WIDTH_MIN,
+  normalizeDrawingHexColor,
+} from '../../canvas/canvasDrawingUtils';
 
-export type CanvasDrawingTool = 'pen' | 'rect' | 'circle' | 'line' | 'arrow' | 'text' | 'select';
+export type CanvasDrawingTool = 'idle' | 'pen' | 'rect' | 'circle' | 'line' | 'arrow' | 'text' | 'select';
 
-export const DRAWING_TOOLBAR_STORAGE_KEY = 'kk:canvas-drawing-toolbar:v1';
+export const DRAWING_TOOLBAR_STORAGE_KEY = 'kk:canvas-drawing-toolbar:v2';
+// These palette values are persisted as drawing strokes, so they must remain concrete colors instead of theme tokens. // UI_TOKEN_EXCEPTION
+export const DRAWING_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#111827', '#f9fafb']; // UI_TOKEN_EXCEPTION
+export { clampDrawingWidth, normalizeDrawingHexColor } from '../../canvas/canvasDrawingUtils';
 
 interface CanvasDrawingToolbarProps {
   activeTool: CanvasDrawingTool;
   activeColor: string;
   activeWidth: number;
+  selectedDrawingCount?: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
   onToolChange: (tool: CanvasDrawingTool) => void;
   onColorChange: (color: string) => void;
   onWidthChange: (width: number) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
   onClear: () => void;
 }
 
-const DRAWING_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#111827', '#f9fafb']; // UI_TOKEN_EXCEPTION
-const DRAWING_WIDTHS = [2, 4, 8];
+const DRAWING_WIDTH_LABELS: Record<number, string> = { 1: 'Fine', 4: 'Medium', 8: 'Bold', 16: 'Heavy' };
 
 function readStoredToolbarPosition(): FloatingToolbarPoint {
   if (typeof window === 'undefined') return { x: 16, y: 64 };
@@ -41,7 +55,7 @@ function readStoredToolbarPosition(): FloatingToolbarPoint {
     const parsed = JSON.parse(localStorage.getItem(DRAWING_TOOLBAR_STORAGE_KEY) || 'null');
     if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) return parsed;
   } catch {
-    // Invalid legacy layout is ignored and replaced on the next successful drag.
+    // A stale toolbar position is harmless; use the compact default.
   }
   return { x: 16, y: 64 };
 }
@@ -54,7 +68,7 @@ function useFloatingToolbarPosition() {
     const rect = toolbarRef.current?.getBoundingClientRect();
     return clampFloatingToolbarPosition(
       next,
-      { width: rect?.width || 420, height: rect?.height || 44 },
+      { width: rect?.width || 360, height: rect?.height || 42 },
       { width: window.innerWidth, height: window.innerHeight },
     );
   }, []);
@@ -78,7 +92,7 @@ function useFloatingToolbarPosition() {
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (dragRef.current?.pointerId !== event.pointerId) return;
     dragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setPosition((current) => {
       localStorage.setItem(DRAWING_TOOLBAR_STORAGE_KEY, JSON.stringify(current));
       return current;
@@ -90,17 +104,19 @@ function useFloatingToolbarPosition() {
 interface ToolbarIconButtonProps {
   label: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }
 
-const ToolbarIconButton: React.FC<ToolbarIconButtonProps> = ({ label, active = false, onClick, children }) => (
+const ToolbarIconButton: React.FC<ToolbarIconButtonProps> = ({ label, active = false, disabled = false, onClick, children }) => (
   <button
     type="button"
-    className="kk-drawing-toolbar__control h-9 w-9"
+    className="kk-drawing-toolbar__control h-8 w-8"
     data-active={active ? 'true' : 'false'}
     aria-label={label}
     title={label}
+    disabled={disabled}
     onClick={onClick}
   >
     {children}
@@ -112,86 +128,103 @@ const DrawingShapeControls: React.FC<Pick<CanvasDrawingToolbarProps, 'activeTool
   const shapeActive = ['rect', 'circle', 'line', 'arrow'].includes(activeTool);
   return (
     <div className="kk-drawing-toolbar__shape-wrap">
-      <ToolbarIconButton label="形状工具" active={shapeActive} onClick={() => setOpen((visible) => !visible)}>
-        <Shapes size={16} />
-      </ToolbarIconButton>
+      <ToolbarIconButton label="Shapes" active={shapeActive} onClick={() => setOpen((visible) => !visible)}><Shapes size={15} /></ToolbarIconButton>
       {open ? (
-        <div className="kk-drawing-toolbar__shape-menu" role="menu" aria-label="选择形状">
-          <ToolbarIconButton label="矩形" active={activeTool === 'rect'} onClick={() => { onToolChange('rect'); setOpen(false); }}><Square size={16} /></ToolbarIconButton>
-          <ToolbarIconButton label="圆形" active={activeTool === 'circle'} onClick={() => { onToolChange('circle'); setOpen(false); }}><Circle size={16} /></ToolbarIconButton>
-          <ToolbarIconButton label="直线" active={activeTool === 'line'} onClick={() => { onToolChange('line'); setOpen(false); }}><Minus size={16} /></ToolbarIconButton>
-          <ToolbarIconButton label="箭头" active={activeTool === 'arrow'} onClick={() => { onToolChange('arrow'); setOpen(false); }}><ArrowRight size={16} /></ToolbarIconButton>
+        <div className="kk-drawing-toolbar__shape-menu" role="menu" aria-label="Shape tools">
+          <ToolbarIconButton label="Rectangle" active={activeTool === 'rect'} onClick={() => { onToolChange('rect'); setOpen(false); }}><Square size={15} /></ToolbarIconButton>
+          <ToolbarIconButton label="Circle" active={activeTool === 'circle'} onClick={() => { onToolChange('circle'); setOpen(false); }}><Circle size={15} /></ToolbarIconButton>
+          <ToolbarIconButton label="Line" active={activeTool === 'line'} onClick={() => { onToolChange('line'); setOpen(false); }}><Minus size={15} /></ToolbarIconButton>
+          <ToolbarIconButton label="Arrow" active={activeTool === 'arrow'} onClick={() => { onToolChange('arrow'); setOpen(false); }}><ArrowRight size={15} /></ToolbarIconButton>
         </div>
       ) : null}
     </div>
   );
 };
 
-/** Compact, draggable desktop toolbar for board-mode drawing. */
+/** Compact drawing toolbar. It only changes the active tool; drawing starts after a tool is selected. */
 export const CanvasDrawingToolbar: React.FC<CanvasDrawingToolbarProps> = ({
   activeTool,
   activeColor,
   activeWidth,
+  selectedDrawingCount = 0,
+  canUndo = false,
+  canRedo = false,
   onToolChange,
   onColorChange,
   onWidthChange,
+  onUndo,
+  onRedo,
   onClear,
 }) => {
   const drag = useFloatingToolbarPosition();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hexValue, setHexValue] = useState(activeColor);
+
+  useEffect(() => setHexValue(activeColor), [activeColor]);
+
+  const commitHex = (value: string) => {
+    const normalized = normalizeDrawingHexColor(value);
+    if (normalized) {
+      onColorChange(normalized);
+      setHexValue(normalized);
+    }
+  };
+
   return (
     <div
       ref={drag.toolbarRef}
       className="kk-drawing-toolbar"
       style={{ left: drag.position.x, top: drag.position.y }}
       role="toolbar"
-      aria-label="画板工具"
+      aria-label="Canvas drawing tools"
     >
       <button
         type="button"
         data-drawing-toolbar-handle="true"
-        className="kk-drawing-toolbar__handle h-9 w-6"
-        aria-label="拖动画板工具栏"
+        className="kk-drawing-toolbar__handle h-8 w-5"
+        aria-label="Drag drawing toolbar"
+        title="Drag toolbar"
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}
         onPointerCancel={drag.onPointerUp}
       >
-        <GripVertical size={15} />
+        <GripVertical size={13} />
       </button>
       <div className="kk-drawing-toolbar__group">
-        <ToolbarIconButton label="自由画笔" active={activeTool === 'pen'} onClick={() => onToolChange('pen')}><PenTool size={16} /></ToolbarIconButton>
-        <ToolbarIconButton label="框选为参考" active={activeTool === 'select'} onClick={() => onToolChange('select')}><Scissors size={16} /></ToolbarIconButton>
-        <ToolbarIconButton label="文本" active={activeTool === 'text'} onClick={() => onToolChange('text')}><Type size={16} /></ToolbarIconButton>
+        <ToolbarIconButton label="Idle / select canvas" active={activeTool === 'idle'} onClick={() => onToolChange('idle')}><MousePointer2 size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label="Pen" active={activeTool === 'pen'} onClick={() => onToolChange('pen')}><PenTool size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label="Select drawings" active={activeTool === 'select'} onClick={() => onToolChange('select')}><Settings2 size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label="Text" active={activeTool === 'text'} onClick={() => onToolChange('text')}><Type size={15} /></ToolbarIconButton>
         <DrawingShapeControls activeTool={activeTool} onToolChange={onToolChange} />
       </div>
-      <div className="kk-drawing-toolbar__group" aria-label="颜色">
-        {DRAWING_COLORS.map((color) => (
-          <button
-            key={color}
-            type="button"
-            className="kk-drawing-toolbar__swatch h-9 w-6"
-            data-active={activeColor === color ? 'true' : 'false'}
-            aria-label={`选择颜色 ${color}`}
-            onClick={() => onColorChange(color)}
-          >
-            <span style={{ backgroundColor: color }} />
-          </button>
-        ))}
+      <div className="kk-drawing-toolbar__group kk-drawing-toolbar__settings-group">
+        <ToolbarIconButton label="Color and stroke settings" active={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}><span className="kk-drawing-toolbar__color-indicator" style={{ backgroundColor: activeColor }} /></ToolbarIconButton>
+        {settingsOpen ? (
+          <div className="kk-drawing-toolbar__settings-panel">
+            {DRAWING_COLORS.map((color) => (
+              <button key={color} type="button" className="kk-drawing-toolbar__swatch h-7 w-7" data-active={activeColor === color ? 'true' : 'false'} aria-label={`Color ${color}`} onClick={() => onColorChange(color)}>
+                <span style={{ backgroundColor: color }} />
+              </button>
+            ))}
+            <label className="kk-drawing-toolbar__hex-field">
+              <span>#</span>
+              <input value={hexValue.replace(/^#/, '')} maxLength={6} aria-label="Custom HEX color" onChange={(event) => setHexValue(`#${event.target.value.replace(/[^0-9a-f]/gi, '').slice(0, 6)}`)} onBlur={() => commitHex(hexValue)} onKeyDown={(event) => { if (event.key === 'Enter') commitHex(hexValue); }} />
+            </label>
+            <label className="kk-drawing-toolbar__range-field">
+              <span>{Math.round(activeWidth)}px</span>
+              <input type="range" min={DRAWING_WIDTH_MIN} max={DRAWING_WIDTH_MAX} step={1} value={activeWidth} aria-label="Stroke width" onChange={(event) => onWidthChange(clampDrawingWidth(Number(event.target.value)))} />
+            </label>
+          </div>
+        ) : null}
       </div>
-      <div className="kk-drawing-toolbar__group" aria-label="线宽">
-        {DRAWING_WIDTHS.map((width) => (
-          <button
-            key={width}
-            type="button"
-            className="kk-drawing-toolbar__width h-9"
-            data-active={activeWidth === width ? 'true' : 'false'}
-            onClick={() => onWidthChange(width)}
-          >
-            {width === 2 ? '细' : width === 4 ? '中' : '粗'}
-          </button>
-        ))}
+      <div className="kk-drawing-toolbar__group">
+        <ToolbarIconButton label="Undo drawing change" disabled={!canUndo} onClick={() => onUndo?.()}><Undo2 size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label="Redo drawing change" disabled={!canRedo} onClick={() => onRedo?.()}><Redo2 size={15} /></ToolbarIconButton>
+        <ToolbarIconButton label={`Clear all drawings${selectedDrawingCount ? ` (${selectedDrawingCount} selected)` : ''}`} onClick={onClear}><Trash2 size={15} /></ToolbarIconButton>
       </div>
-      <ToolbarIconButton label="清除画板" onClick={onClear}><Trash2 size={16} /></ToolbarIconButton>
     </div>
   );
 };
+
+export default CanvasDrawingToolbar;

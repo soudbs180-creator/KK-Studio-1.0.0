@@ -8,7 +8,7 @@ import { after, before, describe, test } from 'node:test';
 import { readSource } from '../support/workspacePaths.js';
 
 const ROOT_DIR = process.cwd();
-const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local/contract-compat.json');
+const LOCAL_STORE_PATH = path.resolve(ROOT_DIR, 'services/api/.kk-local', `contract-compat-test-${process.pid}.json`);
 const TEMP_USER_HEADER = 'x-kk-temp-user-id';
 const TEMP_USER_ID = 'temp-asset-sync-test';
 const require = createRequire(import.meta.url);
@@ -52,6 +52,7 @@ describe('workspace cloud asset sync contract', () => {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
     KKAI_LOCAL_ONLY: process.env.KKAI_LOCAL_ONLY,
+    KKAI_LOCAL_STORE_PATH: process.env.KKAI_LOCAL_STORE_PATH,
     NODE_ENV: process.env.NODE_ENV,
     PASSWORD_SALT: process.env.PASSWORD_SALT,
   };
@@ -75,6 +76,7 @@ describe('workspace cloud asset sync contract', () => {
 
     process.env.NODE_ENV = 'test';
     process.env.KKAI_LOCAL_ONLY = 'true';
+    process.env.KKAI_LOCAL_STORE_PATH = LOCAL_STORE_PATH;
     process.env.JWT_SECRET = 'asset-sync-test-secret';
     process.env.PASSWORD_SALT = 'asset-sync-test-salt';
     delete process.env.DATABASE_URL;

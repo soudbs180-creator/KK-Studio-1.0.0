@@ -52,6 +52,7 @@ test('web workspace uses root npm lockfile and declares local workspace packages
   assert.equal(rootPackage.packageManager, 'npm@11.12.1');
   assert.deepEqual(rootPackage.workspaces, ['packages/*', 'apps/web', 'local-runner']);
   assert.equal(existsSync(workspacePath('package-lock.json')), true);
+  assert.equal(existsSync(workspacePath('pnpm-workspace.yaml')), false);
   assert.equal(existsSync(workspacePath('apps/web/package-lock.json')), false);
   assert.equal(existsSync(workspacePath('apps/web/bun.lock')), false);
 

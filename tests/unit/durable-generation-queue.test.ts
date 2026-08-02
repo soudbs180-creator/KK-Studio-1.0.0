@@ -31,6 +31,22 @@ const requireJob = (queue: DurableGenerationQueue, jobId: string) => {
   return job;
 };
 
+const nativeSetTimeout = globalThis.setTimeout;
+
+const waitForQueueCondition = async (
+  condition: () => boolean,
+  description: string,
+  timeoutMs = 1000,
+): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for ${description}`);
+    }
+    await new Promise<void>((resolve) => nativeSetTimeout(resolve, 5));
+  }
+};
+
 describe('DurableGenerationQueue Tests', () => {
   before(() => {
     mockLocalStorage.clear();
@@ -173,7 +189,10 @@ describe('DurableGenerationQueue Tests', () => {
     const createdJob = queue.createJob(prompts, { concurrency: 1 }, 'canvas-1');
 
     // 等待微任务/setTimeout 启动队列调度
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => requireJob(queue, createdJob.id).prompts[0].status === 'running',
+      'the first prompt to start',
+    );
     let job = requireJob(queue, createdJob.id);
 
     // 因为并发限制为 1，此时只有第一个子任务在运行
@@ -188,7 +207,13 @@ describe('DurableGenerationQueue Tests', () => {
     }
     
     // 等待队列流转到下一个
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => {
+        const snapshot = requireJob(queue, createdJob.id);
+        return snapshot.prompts[0].status === 'completed' && snapshot.prompts[1].status === 'running';
+      },
+      'the second prompt to start',
+    );
     job = requireJob(queue, createdJob.id);
 
     // 第二个任务应该开始运行，第一个已完成，第三个仍在队列
@@ -203,7 +228,10 @@ describe('DurableGenerationQueue Tests', () => {
     }
 
     // 等待队列全部流转完成
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await waitForQueueCondition(
+      () => requireJob(queue, createdJob.id).status === 'completed',
+      'the queue to complete',
+    );
     job = requireJob(queue, createdJob.id);
 
     assert.equal(job.prompts[1].status, 'completed');
@@ -230,7 +258,10 @@ describe('DurableGenerationQueue Tests', () => {
     const createdJob = queue.createJob(prompts, { concurrency: 1 }, 'canvas-1');
 
     // 等待调度启动第一个任务
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => requireJob(queue, createdJob.id).prompts[0].status === 'running',
+      'the pausable prompt to start',
+    );
     let job = requireJob(queue, createdJob.id);
     assert.equal(job.status, 'running');
     assert.equal(job.prompts[0].status, 'running');
@@ -246,7 +277,13 @@ describe('DurableGenerationQueue Tests', () => {
     if (resolveTask) {
       (resolveTask as any)(['node-1']);
     }
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => {
+        const snapshot = requireJob(queue, createdJob.id);
+        return snapshot.status === 'paused' && snapshot.prompts[1].status === 'queued';
+      },
+      'the paused queue to remain idle',
+    );
     job = requireJob(queue, createdJob.id);
     assert.equal(job.status, 'paused');
     assert.equal(job.prompts[1].status, 'queued');
@@ -257,7 +294,13 @@ describe('DurableGenerationQueue Tests', () => {
     assert.equal(job.status, 'queued'); // 恢复后变回 queued 等待调度
 
     // 等待调度重新启动
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => {
+        const snapshot = requireJob(queue, createdJob.id);
+        return snapshot.status === 'running' && snapshot.prompts[0].status === 'completed' && snapshot.prompts[1].status === 'running';
+      },
+      'the resumed queue to start the next prompt',
+    );
     job = requireJob(queue, createdJob.id);
     assert.equal(job.status, 'running');
     // 之前 prompts[0] 已经被 executor resolve 并设置为 completed 了，因此现在应该开始跑 prompts[1]
@@ -283,10 +326,17 @@ describe('DurableGenerationQueue Tests', () => {
       { id: 'p2', prompt: 'prompt 2' }
     ], { concurrency: 1 }, 'canvas-1');
 
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await waitForQueueCondition(
+      () => callCount === 1 && requireJob(queue, createdJob.id).prompts[0].status === 'running',
+      'the original prompt to start before pausing',
+    );
     queue.pauseJob(createdJob.id);
     queue.resumeJob(createdJob.id);
-    await new Promise(resolve => setTimeout(resolve, 20));
+
+    await waitForQueueCondition(
+      () => callCount === 1 && requireJob(queue, createdJob.id).prompts.every((prompt) => prompt.status === 'queued'),
+      'the resumed queue to avoid a duplicate in-flight call',
+    );
 
     assert.equal(callCount, 1);
     let job = requireJob(queue, createdJob.id);
@@ -296,7 +346,13 @@ describe('DurableGenerationQueue Tests', () => {
     if (resolveTask) {
       (resolveTask as any)(['node-1']);
     }
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await waitForQueueCondition(
+      () => {
+        const snapshot = requireJob(queue, createdJob.id);
+        return snapshot.prompts[0].status === 'completed' && snapshot.prompts[1].status === 'running' && callCount === 2;
+      },
+      'the next prompt to start after the original call completes',
+    );
 
     job = requireJob(queue, createdJob.id);
     assert.equal(job.prompts[0].status, 'completed');
@@ -316,7 +372,10 @@ describe('DurableGenerationQueue Tests', () => {
     });
 
     queue.createJob([{ id: 'p1', prompt: 'prompt 1' }], { concurrency: 1 }, 'canvas-1');
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await waitForQueueCondition(
+      () => snapshots.includes('completed'),
+      'a completed subscriber snapshot',
+    );
     unsubscribe();
 
     assert.ok(snapshots.includes('queued'));
@@ -347,7 +406,10 @@ describe('DurableGenerationQueue Tests', () => {
       const createdJob = queue.createJob(prompts, { concurrency: 1 }, 'canvas-1');
 
       // 稍微多等待一下，确保 4 次（初始1次 + 3次重试）有足够时间在 1ms 延迟下全部调度完毕
-      await new Promise(resolve => originalSetTimeout(resolve, 150));
+      await waitForQueueCondition(
+        () => callCount === 4 && requireJob(queue, createdJob.id).status === 'failed',
+        'all automatic retries to fail',
+      );
 
       const job = requireJob(queue, createdJob.id);
       assert.equal(callCount, 4);
@@ -388,7 +450,10 @@ describe('DurableGenerationQueue Tests', () => {
       });
 
       const createdJob = queue.createJob([{ id: 'p1', prompt: 'retry explicit' }], { concurrency: 1 }, 'canvas-1');
-      await new Promise(resolve => originalSetTimeout(resolve, 150));
+      await waitForQueueCondition(
+        () => callCount === 4 && requireJob(queue, createdJob.id).status === 'failed',
+        'all automatic retries to fail before explicit retry',
+      );
 
       let job = requireJob(queue, createdJob.id);
       assert.equal(callCount, 4);
@@ -406,7 +471,10 @@ describe('DurableGenerationQueue Tests', () => {
       assert.equal(job.prompts[0].retryCount, 0);
       assert.equal(job.prompts[0].error, undefined);
 
-      await new Promise(resolve => originalSetTimeout(resolve, 50));
+      await waitForQueueCondition(
+        () => callCount === 5 && requireJob(queue, createdJob.id).status === 'completed',
+        'the explicitly retried prompt to complete',
+      );
       job = requireJob(queue, createdJob.id);
       assert.equal(callCount, 5);
       assert.equal(job.status, 'completed');
@@ -455,7 +523,10 @@ describe('DurableGenerationQueue Tests', () => {
       outputGroup
     }, 'canvas-1', 'grouped-key');
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await waitForQueueCondition(
+      () => requireJob(queue, createdJob.id).status === 'completed',
+      'the arranged output group job to complete',
+    );
 
     const job = requireJob(queue, createdJob.id);
     assert.equal(job.status, 'completed');

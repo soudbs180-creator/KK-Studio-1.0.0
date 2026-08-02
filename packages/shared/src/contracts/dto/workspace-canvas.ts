@@ -21,6 +21,20 @@ export type CanvasCardSizeToken = "compact" | "standard" | "wide";
 
 export type CanvasConnectionSide = "top" | "right" | "bottom" | "left";
 
+export type CanvasConnectionStyle = "solid" | "dashed" | "animated";
+
+export interface CanvasConnection {
+  id: EntityId;
+  sourceNodeId: EntityId;
+  targetNodeId: EntityId;
+  sourcePort: CanvasConnectionSide;
+  targetPort: CanvasConnectionSide;
+  style?: CanvasConnectionStyle;
+  label?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface CanvasSceneBounds {
   x: number;
   y: number;
@@ -141,6 +155,7 @@ export interface CanvasLayoutRecordDto {
   imageNodes?: unknown[];
   groups?: unknown[];
   drawings?: unknown[];
+  connections?: CanvasConnection[];
   noteNodes?: CanvasNoteNodeDto[];
   workflow?: unknown;
   presentationVersion?: typeof CANVAS_PRESENTATION_VERSION;

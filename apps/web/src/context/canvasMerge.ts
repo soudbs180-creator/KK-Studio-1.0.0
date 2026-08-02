@@ -37,6 +37,7 @@ export const mergeSingleCanvas = (
             imageNodes: diskCanvas.imageNodes || [],
             groups: diskCanvas.groups || [],
             drawings: diskCanvas.drawings || [],
+            connections: diskCanvas.connections || [],
             lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
         });
     }
@@ -49,6 +50,7 @@ export const mergeSingleCanvas = (
             imageNodes: localCanvas.imageNodes || [],
             groups: localCanvas.groups || [],
             drawings: localCanvas.drawings || [],
+            connections: localCanvas.connections || [],
             lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
         });
     }
@@ -66,6 +68,7 @@ export const mergeSingleCanvas = (
         imageNodes: mergeItemsById(localCanvas.imageNodes || [], diskCanvas.imageNodes || []),
         groups: mergeItemsById(localCanvas.groups || [], diskCanvas.groups || []),
         drawings: mergeItemsById(localCanvas.drawings || [], diskCanvas.drawings || []),
+        connections: mergeItemsById(localCanvas.connections || [], diskCanvas.connections || []),
         lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
     });
 };

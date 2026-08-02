@@ -1,4 +1,4 @@
-import type { CanvasMigrationIssue } from '@kk/shared';
+import type { CanvasConnection, CanvasMigrationIssue } from '@kk/shared';
 import type {
   Canvas,
   CanvasDrawing,
@@ -259,6 +259,35 @@ const validWorkflowEdges = (
   });
 };
 
+const validCanvasConnections = (
+  value: unknown,
+  canvasId: string,
+  validNodeIds: Set<string>,
+  reporter: SanitizationReporter,
+): CanvasConnection[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is CanvasConnection => {
+    const valid = isRecord(entry)
+      && typeof entry.id === 'string'
+      && typeof entry.sourceNodeId === 'string'
+      && typeof entry.targetNodeId === 'string'
+      && validNodeIds.has(entry.sourceNodeId)
+      && validNodeIds.has(entry.targetNodeId)
+      && ['top', 'right', 'bottom', 'left'].includes(String(entry.sourcePort))
+      && ['top', 'right', 'bottom', 'left'].includes(String(entry.targetPort));
+    if (!valid) {
+      reportIssue(reporter, {
+        code: 'invalid-canvas-connection-entry',
+        message: 'A malformed independent canvas connection was removed from the runtime graph.',
+        severity: 'warning',
+        canvasId,
+        nodeId: isRecord(entry) && typeof entry.id === 'string' ? entry.id : undefined,
+      });
+    }
+    return valid;
+  });
+};
+
 const sanitizePersistedCanvasWithReport = (
   canvas: Canvas,
   reporter: SanitizationReporter,
@@ -327,6 +356,7 @@ const sanitizePersistedCanvasWithReport = (
     });
   const drawings = validNodeRecords<CanvasDrawing>(canvas.drawings, canvasId, 'drawing', reporter)
     .map((drawing) => sanitizeDrawing(drawing, reporter, canvasId));
+  const connections = validCanvasConnections(canvas.connections, canvasId, validNodeIds, reporter);
   const workflow = canvas.workflow
     ? {
       ...canvas.workflow,
@@ -351,6 +381,7 @@ const sanitizePersistedCanvasWithReport = (
     imageNodes,
     groups,
     drawings,
+    connections,
     noteNodes,
     workflow,
   };

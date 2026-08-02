@@ -12,7 +12,9 @@ const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
 const ADMIN_SESSION_TOKEN_HEADER = 'x-kk-admin-session-token';
 const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
 const REFRESH_TOKEN_COOKIE_NAME = 'kk.api.refresh_token';
-const LOCAL_STORE_PATH = path.resolve(__dirname, '../../.kk-local/contract-compat.json');
+const LOCAL_STORE_PATH = path.resolve(
+  process.env.KKAI_LOCAL_STORE_PATH || path.resolve(__dirname, '../../.kk-local/contract-compat.json'),
+);
 const DEFAULT_CREDIT_BALANCE = 999999;
 
 function isDbEnabled() {

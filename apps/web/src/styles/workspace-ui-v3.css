@@ -216,18 +216,18 @@
   z-index: var(--kk-z-dropdown, 1000) !important;
 }
 
-/* Ecommerce keeps its body scrollable, so the mode row must stay inside the
- * scroll surface instead of overflowing above it where hit-testing is clipped. */
+/* Ecommerce keeps the controls on one compact page. Only the prompt textarea
+ * is allowed to scroll when the user writes a longer instruction. */
 @media (min-width: 769px) {
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce'] {
     min-height: 0 !important;
-    max-height: none !important;
+    max-height: min(calc(100dvh - 86px), 430px) !important;
   }
 
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     > .input-bar-inner {
     height: auto !important;
-    max-height: none !important;
+    max-height: min(calc(100dvh - 86px), 428px) !important;
     overflow: visible !important;
     overflow-x: visible !important;
     overflow-y: visible !important;
@@ -237,20 +237,99 @@
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     [data-ecommerce-composer-panel] {
     max-height: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     padding-right: 0 !important;
-    gap: 6px !important;
+    gap: 5px !important;
   }
 
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     [data-testid='ecommerce-workflow-header'] {
-    padding: 10px !important;
+    padding: 8px !important;
     border-radius: 14px !important;
   }
 
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-workbench-header__description,
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-panel__description,
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card__description {
+    display: none !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-workflow-tab,
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-section-tab,
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-analyze {
+    height: 30px !important;
+    min-height: 30px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-panel {
+    margin-bottom: 0 !important;
+    padding: 8px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card {
+    min-height: 0 !important;
+    padding: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-panel {
+    border-radius: 12px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-panel > .flex {
+    gap: 5px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card .text-sm {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card .kk-ecommerce-import-card__icon {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 8px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card .kk-ecommerce-import-preview {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 7px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card > .mt-2 {
+    margin-top: 4px !important;
+    min-height: 30px;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card__trigger {
+    min-height: 0 !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card__icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     [data-ecommerce-import-grid] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 6px !important;
   }
 
@@ -262,24 +341,63 @@
 
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     .input-bar-textarea {
-    max-height: 90px !important;
+    max-height: 72px !important;
     overflow-y: auto !important;
   }
 
-  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
-    .kk-composer-floating-tools {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    z-index: 2;
-    pointer-events: auto;
-    margin-bottom: 4px;
+  /* The desktop control row is portaled to body, so its geometry must not
+   * depend on the input-bar ancestor that owns the anchor. */
+  .kk-composer-floating-tools-host[data-composer-layout='desktop'] {
+    pointer-events: none;
+    margin: 0;
   }
 
-  #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
+  .kk-composer-floating-tools-host[data-composer-mode='ecommerce']
     .kk-composer-type-picker__menu {
     top: calc(100% + 8px);
     bottom: auto;
+  }
+
+  .kk-composer-floating-tools-host[data-composer-layout='desktop'] svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex: 0 0 14px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop']
+    .kk-composer-compact-footer {
+    gap: 2px !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop']
+    .kk-composer-compact-footer > button,
+  #prompt-bar-container[data-composer-layout='desktop']
+    .kk-composer-compact-footer > [role='button'] {
+    transform: none !important;
+  }
+
+  /* Desktop tools are portaled outside the input shell so the mode control
+   * remains a separate, stable surface at every viewport width. */
+  .kk-composer-floating-tools-host {
+    min-height: 32px;
+    max-width: calc(100vw - 32px);
+    overflow: visible;
+  }
+
+  .kk-composer-floating-tools-host > * {
+    pointer-events: auto;
+  }
+
+  .kk-composer-floating-tools-host[data-composer-mode='ecommerce']
+    .kk-composer-type-picker__menu {
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+
+  .kk-composer-floating-tools-host svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex: 0 0 14px !important;
   }
 }
 

@@ -5,7 +5,9 @@ const { getPool } = require('../db');
 const { READONLY_SECRET_PLACEHOLDER } = require('../userApiSecret');
 const providerConnectionLegacyRouteAdapter = require('../capability-graph/providerConnectionLegacyRouteAdapter');
 
-const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../../../.kk-local/local-user-apis.json');
+const LOCAL_STORAGE_PATH = path.resolve(
+  process.env.KKAI_LOCAL_USER_API_STORE_PATH || path.resolve(__dirname, '../../../../.kk-local/local-user-apis.json'),
+);
 
 // 🚀 路由解析结果的内存缓存：避免每次请求都做全量 DB 查询 + 解密 + 索引构建
 const ROUTE_CACHE_TTL_MS = 10000; // 10秒

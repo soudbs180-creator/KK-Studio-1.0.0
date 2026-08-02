@@ -1,5 +1,6 @@
 import type {
   CanvasCardPresentation,
+  CanvasConnection,
   CanvasNoteNodeDto,
   ContextReferenceDto,
   GenerationTelemetry,
@@ -1010,6 +1011,9 @@ export interface PromptNode {
   height?: number; // Dynamic height for connection line anchoring
   tags?: string[]; // Search tags
   isDraft?: boolean; // Preview/Draft state
+  draftMode?: GenerationMode;
+  slotRole?: 'standalone-prompt' | 'result-slot';
+  capabilityTags?: GenerationMode[];
   hiddenInCanvas?: boolean; // Keep runtime-owned helper nodes off the infinite canvas surface
   orphaned?: boolean; // 孤立主卡（由 pending 卡转换而来）
   userMoved?: boolean; // 🎯 [New] 是否被用户手动移动过（用于智能归位逻辑）
@@ -1200,6 +1204,7 @@ export interface Canvas {
   imageNodes: GeneratedImage[];
   groups: CanvasGroup[];
   drawings: CanvasDrawing[];
+  connections?: CanvasConnection[];
   noteNodes?: CanvasNoteNode[];
   workflow?: CanvasWorkflow;
   presentationVersion?: number;

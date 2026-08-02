@@ -3,9 +3,10 @@ import { type CanvasDrawing } from '../../types';
 
 interface CanvasDrawingsLayerProps {
     drawings: CanvasDrawing[];
+    selectedDrawingIds?: string[];
 }
 
-export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawings }) => {
+export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawings, selectedDrawingIds = [] }) => {
     if (!drawings || drawings.length === 0) return null;
 
     return (
@@ -13,6 +14,8 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
             {drawings.map((drawing) => {
                 const { id, type, points, color, width, text, fontSize } = drawing;
                 if (!points || points.length === 0) return null;
+                const isSelected = selectedDrawingIds.includes(id);
+                const selectionStroke = isSelected ? 'var(--kk-canvas-drawing-selection-stroke)' : undefined;
 
                 const baseStrokeProps = {
                     stroke: color,
@@ -34,6 +37,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                             d={d}
                             {...baseStrokeProps}
                             opacity={type === 'marker' ? 0.45 : 1}
+                            style={isSelected ? { filter: 'drop-shadow(0 0 3px var(--kk-canvas-drawing-selection-stroke))' } : undefined}
                         />
                     );
                 }
@@ -55,7 +59,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                             height={h}
                             rx={4}
                             ry={4}
-                            stroke={color}
+                            stroke={selectionStroke || color}
                             strokeWidth={width}
                             fill={drawing.fillColor || 'none'}
                         />
@@ -75,7 +79,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                             cx={cx}
                             cy={cy}
                             r={r}
-                            stroke={color}
+                            stroke={selectionStroke || color}
                             strokeWidth={width}
                             fill={drawing.fillColor || 'none'}
                         />
@@ -94,6 +98,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                             x2={p2.x}
                             y2={p2.y}
                             {...baseStrokeProps}
+                            stroke={selectionStroke || color}
                         />
                     );
                 }
@@ -119,6 +124,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                                 x2={p2.x}
                                 y2={p2.y}
                                 {...baseStrokeProps}
+                                stroke={selectionStroke || color}
                             />
                             <line
                                 x1={p2.x}
@@ -126,6 +132,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                                 x2={x3}
                                 y2={y3}
                                 {...baseStrokeProps}
+                                stroke={selectionStroke || color}
                             />
                             <line
                                 x1={p2.x}
@@ -133,6 +140,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                                 x2={x4}
                                 y2={y4}
                                 {...baseStrokeProps}
+                                stroke={selectionStroke || color}
                             />
                         </g>
                     );
@@ -145,7 +153,7 @@ export const CanvasDrawingsLayer: React.FC<CanvasDrawingsLayerProps> = ({ drawin
                             key={id}
                             x={p.x}
                             y={p.y}
-                            fill={color}
+                            fill={selectionStroke || color}
                             fontSize={fontSize || 16}
                             fontFamily="Inter, system-ui, sans-serif"
                             fontWeight="500"

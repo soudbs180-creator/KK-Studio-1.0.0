@@ -3129,3 +3129,93 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 解析后条目较多时，电商审核内部仍保留局部历史/图库滚动容器；若要强制所有审核条目也单页展示，应另做列表分页或画布侧工作台承接，避免把 Composer 撑出视口。
+
+## 276. 2026-08-02 - feat(canvas): 升级绘画工具与节点工作流交互
+
+**修改范围**
+- 扩展共享 Canvas 契约：增加独立 `CanvasConnection`、连接端口/样式、布局序列化字段和 draft 卡片生成模式/槽位语义。
+- CanvasContext 增加绘画批量更新/移动、独立连接增删改和连接创建 API；旧画布缺少 `connections` 时按空数组兼容。
+- 绘画工具栏默认 `idle`，颜色与粗细合并为展开设置面板，支持基础色、HEX 输入、滑条、撤销/重做和清空确认；框选改为绘画独立选择，支持批量移动与文字编辑。
+- 根画布右键区分空白、卡片和绘画上下文；空白菜单可创建图片/视频/音频、电商、PPT、Workflow、Notebook 以及主卡/结果槽位 draft 卡片。
+- 新增独立卡片四向连接点、动态软连线和轻量流动动画，连接随可见节点的实时拖动位置更新。
+
+**修改文件**
+- `packages/shared/src/contracts/dto/workspace-canvas.ts`
+- `apps/web/src/types.ts`
+- `apps/web/src/types/index.ts`
+- `apps/web/src/context/CanvasContext.tsx`
+- `apps/web/src/context/canvasContextState.ts`
+- `apps/web/src/context/canvasCardFactory.ts`
+- `apps/web/src/context/canvasDrawingConnectionOperations.ts`
+- `apps/web/src/context/canvasGeometrySanitizer.ts`
+- `apps/web/src/context/canvasMerge.ts`
+- `apps/web/src/context/canvasPersistence.ts`
+- `apps/web/src/services/system/syncService.ts`
+- `apps/web/src/canvas/canvasDrawingUtils.ts`
+- `apps/web/src/components/canvas/CanvasDrawingToolbar.tsx`
+- `apps/web/src/components/canvas/CanvasDrawingInteractionOverlay.tsx`
+- `apps/web/src/components/canvas/CanvasDrawingsLayer.tsx`
+- `apps/web/src/components/canvas/CanvasConnectionLayer.tsx`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `tests/unit/canvas-drawing-selection-upgrade.test.ts`
+- `tests/unit/canvas-drawing-connection-operations.test.ts`
+
+**当前设计决策**
+1. 绘画选择与卡片选择保持独立；框选不会再把绘画转换成 Notebook。
+2. 独立连接保存在 `Canvas.connections`，主卡-结果组和 Workflow edges 仍走原有数据链路。
+3. 空白卡片先以 `draft` PromptNode 持久化，点击后复用现有 Prompt Bar/生成提交链路；媒体模式用 `GenerationMode` 表达，不新增平行卡片渲染体系。
+
+**已运行验证**
+- Root TypeScript、Architecture TypeScript、服务端 119 文件语法和 Tests TypeScript（633 文件）通过。
+- 定向画布/绘画/持久化测试通过；新增绘画选择、HEX/粗细和独立连接操作测试全部通过。
+- Shared、UI、API Client 构建和 Vite production build（2618 modules）通过。
+- 相关架构边界、前端数据边界、UI import/hidden DOM 边界通过；Governance 全链通过。
+- 本地 Vite smoke：`http://127.0.0.1:5173/` 返回 HTTP 200，验证完成后已停止开发服务器。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`，使用 bundled Node 和底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建或大画布性能基准；本轮改动集中在 Web Canvas 交互和共享契约。
+
+**风险与下一步**
+- 生成多选能力过滤目前由现有 PromptNode `mode/capabilityTags` 和 draft 链路承载，批量生成 UI/队列回填仍建议补充一条独立 E2E 流程验证。
+- 连接端口当前只对可见节点渲染，超大画布需继续观察虚拟化与端口 hover 的性能。
+
+## 277. 2026-08-02 - fix: 收口画布绘图/连接契约并稳定治理索引并发
+
+**修改范围**
+- 继续收口画布绘图工具：统一 Pointer Events、触控双指手势、绘图选择/移动/编辑和连接层；补齐 Canvas 类型、持久化、合并与 Provider API 的 `connections` / drawing 更新契约。
+- 同步桌面绘图工具、PromptBar 浮动工具和电商 Composer 的过时单元契约；删除旧 `pnpm-workspace.yaml`，保持 npm workspace 为唯一主链路。
+- 修复知识库索引在 Windows 并发治理进程下临时文件替换偶发 `EPERM` 的问题，加入短生命周期锁、陈旧锁回收和并发回归测试。
+- 将新增画布连接/绘图纯变换提取到独立 helper，保持 `CanvasContext` 维护性 ratchet 不增长；硬编码层级和固定绘图调色板分别接入 `KK_LAYER` 与明确治理豁免。
+
+**修改文件**
+- `apps/web/src/components/canvas/{CanvasDrawingInteractionOverlay,CanvasDrawingToolbar,CanvasDrawingsLayer,CanvasConnectionLayer}.tsx`
+- `apps/web/src/canvas/canvasDrawingUtils.ts`
+- `apps/web/src/context/{CanvasContext,canvasContextState,canvasDrawingConnectionOperations,canvasGeometrySanitizer,canvasMerge,canvasPersistence}.ts`
+- `apps/web/src/types.ts`、`apps/web/src/types/index.ts`、`packages/shared/src/contracts/dto/workspace-canvas.ts`
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx` 与电商 Composer/UI 样式文件
+- `scripts/governance/ai-assistant/build-knowledge-index.mjs`
+- `tests/unit/` 中画布、知识索引、Composer、队列隔离和治理契约测试
+- `pnpm-workspace.yaml`（删除）
+
+**当前设计决策**
+1. 知识索引仍采用同目录临时文件原子替换；跨进程写入先取得 `.lock`，超时和陈旧锁均 fail closed，避免 Windows `rename` 竞争破坏治理输出。
+2. 画布连接使用 `KK_LAYER.connector`，绘图固定调色板因为会序列化为用户笔迹而保留具体颜色，并在同一行标注 `UI_TOKEN_EXCEPTION`。
+3. `CanvasContext` 只负责历史记录、Provider API 和当前画布选择，纯数据变换放入 helper，维护性热点保持在 3411 行基线内。
+
+**已运行验证**
+- `architecture:check` 全链通过（含 maintainability ratchet、z-index、UI token）；`governance:check` 12 项全部通过。
+- Root/Architecture TypeScript、服务端 119 文件语法、Tests TypeScript 632 文件全部通过。
+- Full Unit 通过（fail 0）；Integration `16/16`、Contract `31/31`、E2E `11/11`、Local Runner `22/22`。
+- Shared、UI、API Client 和 Web Vite production build 通过；Canvas performance benchmark `3/3`、10K 画布 smoke 通过。
+- Spec structure、Encoding、Mojibake、`git diff --check` 全部通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`/`npx`，使用 bundled Node 与底层脚本完成等价检查；`pnpm run` 会触发受限的依赖安装钩子，因此未继续使用它。
+- 未运行 `swagger-cli validate`：本地 `node_modules` 未安装 swagger-cli，且无可用 npm/npx；OpenAPI 规格结构检查已通过。
+- 未执行真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；10K smoke 中 API 502/离线 WebSocket 仅为本地后端未启动的预期信号。
+
+**风险与下一步**
+- 画布连接真实跨设备同步和生产 Provider/数据库链路仍需受控环境验收；当前本地契约与浏览器大画布路径已通过。
+- 下一步执行 `npm run agents:commit` 固化本次全部工作区改动，并由后续会话继续处理外部门禁。

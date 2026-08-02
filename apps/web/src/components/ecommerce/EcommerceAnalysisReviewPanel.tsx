@@ -572,7 +572,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
   );
 
   return (
-    <div className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3" style={{ ...containerStyle, ...reviewViewportStyle }}>
+    <div className="kk-ecommerce-review-panel mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-2.5" style={{ ...containerStyle, ...reviewViewportStyle }}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-[var(--text-primary)]">分析结果确认</div>

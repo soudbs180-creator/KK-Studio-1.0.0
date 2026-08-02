@@ -257,6 +257,7 @@ export const syncService = {
           imageNodes: canvas.imageNodes.map((node) => ({ ...node })),
           groups: canvas.groups.map((group) => ({ ...group })),
           drawings: canvas.drawings.map((drawing) => ({ ...drawing })),
+          connections: (canvas.connections || []).map((connection) => ({ ...connection })),
           workflow: canvas.workflow ? { ...canvas.workflow } : undefined,
           lastModified: canvas.lastModified,
         })),
@@ -278,7 +279,7 @@ export const syncService = {
         const cachedMetas = await offlineDb.getAllCardMetas();
         const promptNodes = cachedMetas.filter(m => m.type === 'prompt').map(m => ({ id: m.id, position: { x: m.x, y: m.y }, timestamp: m.updatedAt, prompt: 'Offline Prompt Card', isDraft: false, childImageIds: [], tags: [] } as any));
         const imageNodes = cachedMetas.filter(m => m.type === 'image').map(m => ({ id: m.id, position: { x: m.x, y: m.y }, timestamp: m.updatedAt, url: m.thumbnailUrl || '' } as any));
-        return [{ id: 'default', name: 'Offline Workspace', promptNodes, imageNodes, groups: [], drawings: [], lastModified: Date.now() }];
+        return [{ id: 'default', name: 'Offline Workspace', promptNodes, imageNodes, groups: [], drawings: [], connections: [], lastModified: Date.now() }];
       }
 
       const response = await kkWebApiClient.getWorkspaceLayout();
@@ -291,6 +292,7 @@ export const syncService = {
         imageNodes: record.imageNodes || [],
         groups: record.groups || [],
         drawings: record.drawings || [],
+        connections: record.connections || [],
         workflow: record.workflow,
         lastModified: record.lastModified || Date.now(),
       }));

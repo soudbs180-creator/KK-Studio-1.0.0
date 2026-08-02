@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+import type { CanvasConnection } from '@kk/shared';
 import { type Canvas, type PromptNode, type GeneratedImage, AspectRatio, type CanvasGroup, type CanvasDrawing, type CanvasNoteNode, GenerationMode, KnownModel, type WorkflowNode, type WorkflowPanelNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
@@ -30,6 +31,7 @@ import {
 import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
+import { createCanvasConnectionOnCanvas, deleteCanvasConnectionOnCanvas, moveCanvasDrawingsOnCanvas, updateCanvasConnectionOnCanvas, updateCanvasDrawingsOnCanvas, upsertCanvasConnectionOnCanvas } from './canvasDrawingConnectionOperations';
 import {
     DEFAULT_CANVAS,
     DEFAULT_STATE,
@@ -880,6 +882,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         if ((c1.groups?.length || 0) !== (c2.groups?.length || 0)) return false;
         if ((c1.drawings?.length || 0) !== (c2.drawings?.length || 0)) return false;
+        if ((c1.connections?.length || 0) !== (c2.connections?.length || 0)) return false;
 
         for (let i = 0; i < c1.promptNodes.length; i++) {
             const p1 = c1.promptNodes[i];
@@ -1169,6 +1172,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             imageNodes: [],
             groups: [] as CanvasGroup[],
             drawings: [] as CanvasDrawing[],
+            connections: [],
             workflow: createCanvasWorkflow(),
             lastModified: Date.now()
         };
@@ -2102,7 +2106,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         urgentSaveRef.current = true; // 父节点删除后同步存盘
         updateCanvas(canvas => deleteCanvasPromptNode(canvas, id));
     }, [updateCanvas, pushToHistory]);
-
     const linkNodes = useCallback((fromId: string, toId: string) => {
         pushToHistory();
         updateCanvas(canvas => {
@@ -3238,6 +3241,28 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     }, [updateCanvas, pushToHistory]);
 
+    const updateCanvasDrawings = useCallback((ids: string[], updates: Partial<CanvasDrawing>) => {
+        if (!ids.some(Boolean)) return;
+        pushToHistory(); updateCanvas(canvas => updateCanvasDrawingsOnCanvas(canvas, ids, updates));
+    }, [pushToHistory, updateCanvas]);
+    const moveCanvasDrawings = useCallback((ids: string[], delta: { x: number; y: number }) => {
+        if (!ids.some(Boolean) || (delta.x === 0 && delta.y === 0)) return;
+        pushToHistory(); updateCanvas(canvas => moveCanvasDrawingsOnCanvas(canvas, ids, delta));
+    }, [pushToHistory, updateCanvas]);
+    const addCanvasConnection = useCallback((connection: CanvasConnection) => {
+        pushToHistory(); updateCanvas(canvas => upsertCanvasConnectionOnCanvas(canvas, connection));
+    }, [pushToHistory, updateCanvas]);
+    const deleteCanvasConnection = useCallback((id: string) => {
+        pushToHistory(); updateCanvas(canvas => deleteCanvasConnectionOnCanvas(canvas, id));
+    }, [pushToHistory, updateCanvas]);
+    const updateCanvasConnection = useCallback((id: string, updates: Partial<CanvasConnection>) => {
+        pushToHistory(); updateCanvas(canvas => updateCanvasConnectionOnCanvas(canvas, id, updates));
+    }, [pushToHistory, updateCanvas]);
+    const createCanvasConnection = useCallback((sourceNodeId: string, targetNodeId: string, sourcePort?: CanvasConnection['sourcePort'], targetPort?: CanvasConnection['targetPort']): CanvasConnection | null => {
+        const canvas = stateRef.current.canvases.find((item) => item.id === stateRef.current.activeCanvasId); const connection = canvas && createCanvasConnectionOnCanvas(canvas, sourceNodeId, targetNodeId, generateId, sourcePort, targetPort);
+        if (!connection) return null;
+        addCanvasConnection(connection); return connection;
+    }, [addCanvasConnection]);
     const convertDrawingsToNote = useCallback((drawingIds: string[], title?: string): CanvasNoteNode | null => {
         const currentCanvas = stateRef.current.canvases.find(canvas => canvas.id === stateRef.current.activeCanvasId);
         if (!currentCanvas) return null;
@@ -3249,7 +3274,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateCanvas(canvas => convertCanvasDrawingsToNote(canvas, drawingIds, options));
         return createdNote;
     }, [pushToHistory, updateCanvas]);
-
     const updateNoteNodePosition = useCallback((id: string, position: { x: number; y: number }) => {
         updateCanvas(canvas => ({
             ...canvas,
@@ -3338,6 +3362,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addCanvasDrawing,
         deleteCanvasDrawing,
         clearCanvasDrawings,
+        updateCanvasDrawings,
+        moveCanvasDrawings,
+        addCanvasConnection,
+        deleteCanvasConnection,
+        updateCanvasConnection,
+        createCanvasConnection,
         convertDrawingsToNote, editNoteNode, rasterizeNote,
         updateNoteNodePosition,
         deleteNoteNode,
@@ -3351,6 +3381,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
         isShellReady, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
         addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings,
+        updateCanvasDrawings, moveCanvasDrawings, addCanvasConnection, deleteCanvasConnection, updateCanvasConnection, createCanvasConnection,
         convertDrawingsToNote, editNoteNode, rasterizeNote, updateNoteNodePosition, deleteNoteNode
     ]);
     const startupStatusValue = React.useMemo(() => ({

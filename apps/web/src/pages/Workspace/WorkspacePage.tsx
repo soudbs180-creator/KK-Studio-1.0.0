@@ -2,7 +2,8 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, start
 import InfiniteCanvas, { type InfiniteCanvasHandle } from '../../components/canvas/InfiniteCanvas';
 import CanvasDrawingsLayer from '../../components/canvas/CanvasDrawingsLayer';
 import CanvasDrawingInteractionOverlay from '../../components/canvas/CanvasDrawingInteractionOverlay';
-import { CanvasDrawingToolbar } from '../../components/canvas/CanvasDrawingToolbar';
+import CanvasConnectionLayer from '../../components/canvas/CanvasConnectionLayer';
+import { CanvasDrawingToolbar, type CanvasDrawingTool } from '../../components/canvas/CanvasDrawingToolbar';
 import CanvasNoteCard from '../../components/canvas/CanvasNoteCard.tsx';
 import CanvasMigrationNotice from '../../components/canvas/CanvasMigrationNotice.tsx';
 import WorkflowPanelCard from '../../components/canvas/WorkflowPanelCard.tsx';
@@ -46,6 +47,7 @@ import {
 } from '../../app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
 import { getCanvasSceneBounds, getCanvasSceneBoundsForNodeIds } from '../../canvas/canvasSceneGeometry.ts';
+import { getDrawingBounds } from '../../canvas/canvasDrawingUtils';
 import { getCanvasViewportStorageKey } from '../../canvas/canvasViewportPersistence.ts';
 import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
@@ -564,6 +566,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     setNodeTags,
     arrangeAllNodes,
     moveSelectedNodesImmediate,
+    createCanvasConnection,
     addWorkflowNode,
     updateWorkflowNode,
     updateWorkflowNodePosition,
@@ -579,6 +582,8 @@ export const AppContent: React.FC<AppContentProps> = () => {
     addCanvasDrawing,
     deleteCanvasDrawing,
     clearCanvasDrawings,
+    updateCanvasDrawings,
+    moveCanvasDrawings,
     convertDrawingsToNote,
     editNoteNode,
     rasterizeNote,
@@ -1031,11 +1036,26 @@ export const AppContent: React.FC<AppContentProps> = () => {
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
   const [canvasMode, setCanvasMode] = useState<'normal' | 'board'>('normal');
-  const [activeDrawingTool, setActiveDrawingTool] = useState<'pen' | 'rect' | 'circle' | 'line' | 'arrow' | 'text' | 'select'>('pen');
+  const [activeDrawingTool, setActiveDrawingTool] = useState<CanvasDrawingTool>('idle');
   const [activeDrawingColor, setActiveDrawingColor] = useState<string>('#ef4444');
   const [activeDrawingWidth, setActiveDrawingWidth] = useState<number>(3);
+  const [selectedDrawingIds, setSelectedDrawingIds] = useState<string[]>([]);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
+
+  const handleDrawingColorChange = useCallback((color: string) => {
+    setActiveDrawingColor(color);
+    if (selectedDrawingIds.length > 0) updateCanvasDrawings(selectedDrawingIds, { color });
+  }, [selectedDrawingIds, updateCanvasDrawings]);
+
+  const handleDrawingWidthChange = useCallback((width: number) => {
+    setActiveDrawingWidth(width);
+    if (selectedDrawingIds.length > 0) updateCanvasDrawings(selectedDrawingIds, { width, fontSize: width * 5 + 12 });
+  }, [selectedDrawingIds, updateCanvasDrawings]);
+
+  useEffect(() => {
+    if (canvasMode === 'board') setActiveDrawingTool('idle');
+  }, [canvasMode]);
   const openSettingsPanel = useCallback((
     view: SettingsSurfaceView = 'api-management',
     supplier: Supplier | null = null
@@ -2123,13 +2143,39 @@ export const AppContent: React.FC<AppContentProps> = () => {
 
   // Right-Click Selection State
   const [selectionMenuPosition, setSelectionMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; context: 'blank' | 'drawing' } | null>(null);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (isMobile) {
       return;
     }
     e.preventDefault();
-  }, [isMobile]);
+    const target = e.target as HTMLElement;
+    const nodeElement = target.closest('[id^="prompt-card-"], [id^="image-card-"], [id^="workflow-card-"]');
+    const nodeId = nodeElement?.id.match(/^(?:prompt-card|image-card|workflow-card)-(.+)$/)?.[1];
+    const isNode = Boolean(nodeId);
+    if (isNode) {
+      selectNodes([nodeId as string], 'replace');
+      setSelectionMenuPosition({ x: e.clientX, y: e.clientY });
+      setCanvasContextMenu(null);
+      return;
+    }
+    const isDrawingSurface = Boolean(target.closest('.kk-canvas-drawing-overlay'));
+    const rect = canvasRef.current?.getCanvasRect();
+    const transform = canvasRef.current?.getCurrentTransform();
+    const canvasPoint = rect && transform
+      ? { x: (e.clientX - rect.left - transform.x) / transform.scale, y: (e.clientY - rect.top - transform.y) / transform.scale }
+      : null;
+    const drawingHit = canvasPoint && (activeCanvas?.drawings || []).some((drawing) => {
+      const bounds = getDrawingBounds(drawing);
+      return bounds && canvasPoint.x >= bounds.x && canvasPoint.x <= bounds.x + bounds.width && canvasPoint.y >= bounds.y && canvasPoint.y <= bounds.y + bounds.height;
+    });
+    if (!isDrawingSurface && !drawingHit && selectedNodeIds.length > 0) {
+      setCanvasContextMenu(null);
+      return;
+    }
+    setCanvasContextMenu({ x: e.clientX, y: e.clientY, context: isDrawingSurface || Boolean(drawingHit) ? 'drawing' : 'blank' });
+  }, [activeCanvas?.drawings, canvasRef, isMobile, selectNodes, selectedNodeIds.length]);
 
   const {
     selectionBox,
@@ -3928,6 +3974,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
     clearSelection();
     setFocusedGroupId(null);
     setSelectionMenuPosition(null);
+    setCanvasContextMenu(null);
   }, [clearSelection, setFocusedGroupId, setSelectionMenuPosition]);
 
   const handleCanvasDoubleClick = React.useCallback(() => {
@@ -5282,6 +5329,27 @@ const isRectIntersecting = (
     onOpenMigrate: () => setShowMigrateModal(true),
   });
 
+  const handleCreateBlankCard = useCallback((kind: Parameters<typeof createCard>[0]['kind'], generationMode?: GenerationMode, slotRole?: 'standalone-prompt' | 'result-slot') => {
+    const menu = canvasContextMenu;
+    if (!menu) return;
+    const rect = canvasRef.current?.getCanvasRect();
+    const transform = canvasRef.current?.getCurrentTransform();
+    const position = rect && transform
+      ? { x: (menu.x - rect.left - transform.x) / transform.scale, y: (menu.y - rect.top - transform.y) / transform.scale }
+      : undefined;
+    try {
+      const result = createCard({ kind, generationMode, slotRole, draft: true, position });
+      const promptNode = result.promptNodes[0];
+      if (promptNode) {
+        selectNodes([promptNode.id], 'replace');
+        handlePromptClick(promptNode);
+      }
+      setCanvasContextMenu(null);
+    } catch (error) {
+      console.error('[Workspace] Failed to create blank canvas card', error);
+    }
+  }, [canvasContextMenu, canvasRef, createCard, handlePromptClick, selectNodes]);
+
   const handleCloseSettingsPanel = useCallback(() => {
     setShowSettingsPanel(false);
     setSettingsInitialSupplier(null);
@@ -5496,16 +5564,50 @@ const isRectIntersecting = (
           activeTool={activeDrawingTool}
           activeColor={activeDrawingColor}
           activeWidth={activeDrawingWidth}
+          selectedDrawingCount={selectedDrawingIds.length}
+          canUndo={canUndo}
+          canRedo={canRedo}
           onToolChange={setActiveDrawingTool}
-          onColorChange={setActiveDrawingColor}
-          onWidthChange={setActiveDrawingWidth}
+          onColorChange={handleDrawingColorChange}
+          onWidthChange={handleDrawingWidthChange}
+          onUndo={undo}
+          onRedo={redo}
           onClear={() => {
             if (window.confirm('确认清除当前项目的所有画板手绘和形状吗？此操作无法撤销。')) {
               clearCanvasDrawings();
+              setSelectedDrawingIds([]);
             }
           }}
         />
       ) : null}
+      {canvasContextMenu && !isMobile && (
+        <div
+          className="kk-canvas-context-menu fixed z-[900] flex min-w-[190px] flex-col gap-1 rounded-xl border p-1"
+          style={{ left: canvasContextMenu.x, top: canvasContextMenu.y }}
+          role="menu"
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          {canvasContextMenu.context === 'drawing' ? (
+            <>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => { setActiveDrawingTool('select'); setCanvasContextMenu(null); }}>Select drawings</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => { setActiveDrawingTool('idle'); setCanvasContextMenu(null); }}>Return to canvas</button>
+            </>
+          ) : (
+            <>
+              <div className="kk-canvas-context-menu__label">Add blank card</div>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.IMAGE)}>Image prompt</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.IMAGE, 'result-slot')}>Image result slot</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.VIDEO)}>Video prompt</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.VIDEO, 'result-slot')}>Video result slot</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.AUDIO)}>Audio prompt</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('ecommerce', GenerationMode.ECOMMERCE)}>Ecommerce card</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('ppt-deck', GenerationMode.PPT)}>PPT card</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('workflow-panel')}>Workflow card</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('notebook')}>Notebook card</button>
+            </>
+          )}
+        </div>
+      )}
       {/* 简体中文：左上角等宽悬浮控制卡片 */}
       {!isMobile && (
         <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-auto pointer-events-auto select-none">
@@ -5659,13 +5761,24 @@ const isRectIntersecting = (
         onImageDrop={handleImageDrop}
       >
         {/* 1. Connection Lines Layer (SVG) - Below all cards */}
+        <CanvasConnectionLayer
+          nodes={[
+            ...visiblePromptNodes.map((node) => ({ id: node.id, position: resolveLivePromptPosition(node) || node.position, width: node.width || getPromptNodeBoundsWidth(node, isMobile), height: node.height || 200 })),
+            ...visibleImageNodes.map((node) => ({ id: node.id, position: resolveLiveImagePosition(node) || node.position, width: getCardDimensions(node.aspectRatio, true).width, height: imageCardHeightById[node.id] || getCardDimensions(node.aspectRatio, true).totalHeight })),
+            ...(visibleWorkflowUtilityNodes || []).map((node) => ({ id: node.id, position: node.position, width: node.width || 284, height: node.height || 176 })),
+          ]}
+          connections={activeCanvas?.connections || []}
+          onCreateConnection={(sourceNodeId, targetNodeId, sourcePort, targetPort) => {
+            createCanvasConnection(sourceNodeId, targetNodeId, sourcePort, targetPort);
+          }}
+        />
                 {/* Drawings Layer */}
         {activeCanvas?.drawings && (
           <svg
             className="absolute inset-0 pointer-events-none overflow-visible"
             style={{ zIndex: 10 }}
           >
-            <CanvasDrawingsLayer drawings={activeCanvas.drawings} />
+            <CanvasDrawingsLayer drawings={activeCanvas.drawings} selectedDrawingIds={selectedDrawingIds} />
           </svg>
         )}
 
@@ -5678,10 +5791,9 @@ const isRectIntersecting = (
           activeWidth={activeDrawingWidth}
           drawings={activeCanvas?.drawings || []}
           addCanvasDrawing={addCanvasDrawing}
-          onConvertDrawingsToNote={(drawingIds) => {
-            const note = convertDrawingsToNote(drawingIds);
-            if (note) selectNodes([note.id], 'replace');
-          }}
+          updateCanvasDrawing={(id, updates) => updateCanvasDrawings([id], updates)}
+          moveCanvasDrawings={moveCanvasDrawings}
+          onSelectionChange={setSelectedDrawingIds}
           promptNodes={activeCanvas?.promptNodes || []}
           imageNodes={activeCanvas?.imageNodes || []}
         />

@@ -66,7 +66,8 @@ test('HandoffWriter: writeHandoff 在 Node 环境下成功写入本地 docs 文�
   };
 
   const root = process.cwd();
-  const docsPath = path.join(root, 'docs', 'development', 'session-handoff.md');
+  const docsPath = path.join(root, '.tmp', `session-handoff-test-${process.pid}.md`);
+  const previousHandoffPath = process.env.KK_HANDOFF_FS_PATH;
   
   // 备份原 handoff 文件（若存在）
   let originalContent = '';
@@ -77,6 +78,7 @@ test('HandoffWriter: writeHandoff 在 Node 环境下成功写入本地 docs 文�
 
   try {
     process.env.KK_ENABLE_HANDOFF_FS_WRITE = '1';
+    process.env.KK_HANDOFF_FS_PATH = docsPath;
     await writeHandoff(record, 'handoff-fs-test-owner');
     
     // 确认文件存在并包含 record 关键标识
@@ -86,6 +88,8 @@ test('HandoffWriter: writeHandoff 在 Node 环境下成功写入本地 docs 文�
     assert.ok(content.includes('测试写入'));
   } finally {
     delete process.env.KK_ENABLE_HANDOFF_FS_WRITE;
+    if (previousHandoffPath === undefined) delete process.env.KK_HANDOFF_FS_PATH;
+    else process.env.KK_HANDOFF_FS_PATH = previousHandoffPath;
     // 恢复文件内容
     if (fileExists) {
       fs.writeFileSync(docsPath, originalContent, 'utf8');

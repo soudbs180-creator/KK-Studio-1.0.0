@@ -52,9 +52,9 @@ function useFilePreviewUrls(files: File[]): string[] {
 }
 
 const chipClass = 'inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium';
-const cardClass = 'rounded-[16px] border px-3 py-2.5';
-const cardButtonClass = 'w-full text-left transition-all duration-200 hover:opacity-90';
-const thumbClass = 'relative h-14 w-14 overflow-hidden rounded-[12px] border';
+const cardClass = 'kk-ecommerce-import-card rounded-[12px] border px-3 py-2';
+const cardButtonClass = 'kk-ecommerce-import-card__trigger w-full text-left transition-all duration-200 hover:opacity-90';
+const thumbClass = 'kk-ecommerce-import-preview relative h-12 w-12 overflow-hidden rounded-[10px] border';
 const importGridStyle: React.CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 196px), 1fr))',
 };
@@ -155,7 +155,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
   return (
     <>
       <div
-        className="mb-2 rounded-[18px] border px-3 py-2.5"
+        className="kk-ecommerce-import-panel mb-2 rounded-[14px] border px-2.5 py-2"
         style={{
           background: 'var(--frost-card-framework-bg)',
           borderColor: 'var(--frost-card-sub-border)',
@@ -163,7 +163,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
       >
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[15px] font-semibold text-[var(--text-primary)]">电商需求单导入</div>
+            <div className="text-[13px] font-semibold text-[var(--text-primary)]">电商需求单导入</div>
             <span
               className={chipClass}
               style={{
@@ -186,7 +186,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             </span>
           </div>
 
-          <div className="text-[11px] leading-4 text-[var(--text-secondary)]">
+          <div className="kk-ecommerce-import-panel__description text-[11px] leading-4 text-[var(--text-secondary)]">
             需求单参考图逐条绑定；产品图和补充参考图是全局素材。
             {analyzedProductName ? ` 已识别产品：${analyzedProductName}` : ''}
           </div>
@@ -210,7 +210,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
               >
                 <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="kk-ecommerce-import-card__icon flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border"
                     style={{
                       borderColor: hasRequirementFile ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasRequirementFile ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -222,7 +222,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="text-sm font-medium text-[var(--text-primary)]">上传需求单</div>
+                      <div className="text-[12px] font-medium text-[var(--text-primary)]">上传需求单</div>
                       <span
                         className={chipClass}
                         style={{
@@ -235,7 +235,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       </span>
                     </div>
 
-                    <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
+                    <div className="kk-ecommerce-import-card__description mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                       {hasRequirementFile ? '已导入需求单，可点击重新上传替换。' : '支持 xlsx / pdf / doc / docx / txt / md'}
                     </div>
                   </div>
@@ -260,7 +260,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                 <button
                   type="button"
-                  className="ml-auto inline-flex h-9 !min-w-[132px] items-center justify-center gap-2 whitespace-nowrap rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="kk-ecommerce-import-analyze ml-auto inline-flex h-8 !min-w-[118px] items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2.5 text-[11px] font-semibold transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     borderColor: 'var(--frost-card-sub-border)',
                     background: 'var(--frost-card-sub-bg)',
@@ -290,7 +290,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
               >
                 <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="kk-ecommerce-import-card__icon flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border"
                     style={{
                       borderColor: hasProductFiles ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasProductFiles ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -302,7 +302,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="text-sm font-medium text-[var(--text-primary)]">上传产品图</div>
+                      <div className="text-[12px] font-medium text-[var(--text-primary)]">上传产品图</div>
                       <span
                         className={chipClass}
                         style={{
@@ -326,7 +326,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                     </div>
 
                     {uploadPreviewModel.productItems.length === 0 ? (
-                      <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
+                      <div className="kk-ecommerce-import-card__description mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                         最多上传 4 张，可放一个产品的多个角度，或多个产品。
                       </div>
                     ) : null}
@@ -351,7 +351,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
               >
                 <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="kk-ecommerce-import-card__icon flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border"
                     style={{
                       borderColor: hasExtraReferences ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasExtraReferences ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -363,7 +363,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="text-sm font-medium text-[var(--text-primary)]">补充参考图</div>
+                      <div className="text-[12px] font-medium text-[var(--text-primary)]">补充参考图</div>
                       <span
                         className={chipClass}
                         style={{
@@ -387,7 +387,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                     </div>
 
                     {uploadPreviewModel.extraReferenceItems.length === 0 ? (
-                      <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
+                      <div className="kk-ecommerce-import-card__description mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                         最多上传 4 张，风格、场景、版式参考会全局生效。
                       </div>
                     ) : null}

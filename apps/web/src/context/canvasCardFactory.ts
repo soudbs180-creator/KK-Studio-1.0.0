@@ -36,6 +36,9 @@ export type CanvasCreateCardInput = {
   sourceNodeIds?: string[];
   workflowSteps?: Array<Partial<WorkflowPanelStep> & Pick<WorkflowPanelStep, 'label'>>;
   diagnostic?: string;
+  generationMode?: GenerationMode;
+  draft?: boolean;
+  slotRole?: PromptNode['slotRole'];
 };
 
 export type CanvasCardFactoryDefaults = {
@@ -69,7 +72,8 @@ const createDeterministicId = (idempotencyKey: string) => (prefix: string, index
   return `agent-${prefix}-${stableCardHash(source, 2166136261)}${stableCardHash(source, 3335557771)}`;
 };
 
-const resolvePromptMode = (kind: CanvasCardKind) => {
+const resolvePromptMode = (kind: CanvasCardKind, generationMode?: GenerationMode) => {
+  if (generationMode) return generationMode;
   if (kind === 'ecommerce') return GenerationMode.ECOMMERCE;
   if (kind === 'ppt-deck') return GenerationMode.PPT;
   return GenerationMode.IMAGE;
@@ -180,7 +184,11 @@ export const createCanvasCardNodes = (
     model,
     childImageIds: [],
     timestamp: now,
-    mode: resolvePromptMode(promptKind),
+    mode: resolvePromptMode(promptKind, input.generationMode),
+    isDraft: input.draft === true,
+    draftMode: input.generationMode,
+    slotRole: input.slotRole || 'standalone-prompt',
+    capabilityTags: input.generationMode ? [input.generationMode] : [resolvePromptMode(promptKind, input.generationMode)],
     pptSlides: input.pptSlides,
     ...(promptKind === 'ecommerce' ? {
       ecommerce: {
