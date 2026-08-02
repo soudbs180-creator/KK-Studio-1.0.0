@@ -2956,3 +2956,40 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 只读并行执行仍依赖 Planner 正确声明依赖；未在本轮把所有 `control.effect=read` 工具自动扩展进白名单，避免把导航或上下文切换误判为无副作用读取。
 - 后续若扩大并行白名单，应增加真实 `AgentRuntime` 执行级并发测试，并验证多失败情况下 Run snapshot、replan 选择和恢复资源顺序。
+
+---
+
+## 272. 2026-08-02 - fix(governance): 让文档版本索引跟随 release manifest
+
+**修改范围**
+- 修复文档治理索引生成器硬编码 `v1.6.0` 的问题，改为读取 `config/release-manifest.json` 的 `displayVersion`。
+- 同步根 README、当前能力矩阵、团队技术计划和生成后的文档索引到当前发布线 `v1.6.1`；历史/参考文档中的版本记录保持原样。
+- 新增版本治理回归测试，防止索引与生成器再次漂移。
+
+**修改文件**
+- `scripts/governance/check-documentation-governance.mjs`
+- `docs/governance/DOCUMENTATION_INDEX.md`
+- `README.md`
+- `docs/governance/SOURCE_CAPABILITY_MATRIX.md`
+- `docs/standards/TEAM_TECHNICAL_IMPROVEMENT_PLAN.md`
+- `tests/unit/documentation-governance-version.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 版本唯一来源仍是 `config/release-manifest.json`；治理脚本不再复制一个会过期的字面量。
+2. 只更新被分类为当前文档的版本声明，不批量改写 reference/history 文档，避免破坏历史语义。
+3. 回归测试同时检查生成索引的输出和生成器不包含旧版本硬编码。
+
+**已运行验证**
+- 文档治理索引生成与检查、当前事实检查、版本一致性检查通过。
+- 定向 Agent Run/文档治理测试 `8/8` 通过；全量 Unit `2394` 项中 `2392` 通过、0 失败、2 跳过。
+- Root/Architecture/Server/Tests TypeScript、服务端 119 文件语法和 625 个测试文件语义类型检查通过。
+- Architecture/Governance 相关检查、Encoding、Mojibake、`git diff --check` 通过。
+- Shared、UI、API Client 与 Web Vite 8.1.4 生产构建在本会话修改前已通过；本次仅涉及文档治理脚本、Markdown 和测试，不改变运行时代码或构建产物。
+
+**未运行验证及原因**
+- 系统没有 `npm` 可执行文件，未原样运行 `npm run verify:changes`；使用 bundled Node 和本地脚本完成可执行的对应检查。
+- 未执行在线依赖审计、Contract/E2E、浏览器 smoke、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮未新增依赖、HTTP 契约、数据库迁移或支付状态。
+
+**风险与下一步**
+- 当前文档中仍可能存在有意保留的旧版本参考或历史快照；后续只应依据文档治理分类逐项处理，不做全仓库盲目替换。

@@ -4,6 +4,10 @@ import path from "node:path";
 const root = process.cwd();
 const writeMode = process.argv.includes("--write");
 const indexPath = "docs/governance/DOCUMENTATION_INDEX.md";
+const releaseManifest = JSON.parse(
+  fs.readFileSync(path.join(root, "config", "release-manifest.json"), "utf8"),
+);
+const activeDisplayVersion = releaseManifest.displayVersion || `v${releaseManifest.version}`;
 const ignoredDirectories = new Set([
   ".git",
   "node_modules",
@@ -177,7 +181,7 @@ const indexSource = [
   "",
   "Classification rules:",
   "",
-  "- `current`: normative for the active v1.6.0 implementation; must be kept in sync with source.",
+  `- \`current\`: normative for the active ${activeDisplayVersion} implementation; must be kept in sync with source.`,
   "- `reference`: stable API/contract/spec reference; not the implementation source of truth but authoritative for its domain.",
   "- `proposed`: future plan, draft, or roadmap; not yet implemented.",
   "- `history`: archived material or chronological handoff evidence.",

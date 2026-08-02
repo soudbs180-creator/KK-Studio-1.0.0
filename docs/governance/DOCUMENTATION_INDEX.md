@@ -7,7 +7,7 @@ Markdown sources inventoried (generated index excluded): **272**.
 
 Classification rules:
 
-- `current`: normative for the active v1.6.0 implementation; must be kept in sync with source.
+- `current`: normative for the active v1.6.1 implementation; must be kept in sync with source.
 - `reference`: stable API/contract/spec reference; not the implementation source of truth but authoritative for its domain.
 - `proposed`: future plan, draft, or roadmap; not yet implemented.
 - `history`: archived material or chronological handoff evidence.

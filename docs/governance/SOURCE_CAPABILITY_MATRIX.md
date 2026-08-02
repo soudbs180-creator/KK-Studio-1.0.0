@@ -5,7 +5,7 @@
 > Verifies: `openspec/changes/upgrade-ai-creation-core/proposal.md`
 > Last verified: 2026-07-25
 
-本矩阵记录 KK Studio v1.6.0 的**当前事实**（非规划目标）。每项能力声明必须附带源码证据；证据缺失或矛盾的条目不得作为当前事实引用。
+本矩阵记录 KK Studio v1.6.1 的**当前事实**（非规划目标）。每项能力声明必须附带源码证据；证据缺失或矛盾的条目不得作为当前事实引用。
 
 ---
 
