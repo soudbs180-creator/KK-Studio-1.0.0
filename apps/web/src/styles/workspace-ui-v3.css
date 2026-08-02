@@ -237,7 +237,7 @@
   #prompt-bar-container[data-composer-layout='desktop'][data-composer-mode='ecommerce']
     [data-ecommerce-composer-panel] {
     max-height: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     padding-right: 0 !important;
     gap: 5px !important;
   }

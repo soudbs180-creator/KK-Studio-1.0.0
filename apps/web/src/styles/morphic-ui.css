@@ -1338,7 +1338,7 @@ select,
 }
 
 #prompt-bar-container[data-composer-mode='ecommerce'] .kk-ecommerce-composer-panel {
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 #prompt-bar-container[data-composer-mode='ecommerce'] .input-bar-textarea {

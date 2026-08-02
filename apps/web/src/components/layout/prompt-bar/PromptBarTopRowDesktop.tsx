@@ -35,11 +35,19 @@ const PromptBarTopRowDesktop: React.FC<PromptBarTopRowDesktopProps> = ({ childre
       ? null
       : new ResizeObserver(updatePosition);
     resizeObserver?.observe(composer);
+    const mutationObserver = typeof MutationObserver === 'undefined'
+      ? null
+      : new MutationObserver(updatePosition);
+    mutationObserver?.observe(composer, {
+      attributes: true,
+      attributeFilter: ['data-composer-mode'],
+    });
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
 
     return () => {
       resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
@@ -58,7 +66,9 @@ const PromptBarTopRowDesktop: React.FC<PromptBarTopRowDesktopProps> = ({ childre
         bottom: 'auto',
         left: floatingPosition.left,
         width: floatingPosition.width,
-        zIndex: KK_LAYER.promptComposer,
+        // The picker menu overlaps the composer surface; keep the whole
+        // portaled control row above canvas and composer stacking contexts.
+        zIndex: KK_LAYER.dropdown,
         pointerEvents: 'none',
       }}
     >

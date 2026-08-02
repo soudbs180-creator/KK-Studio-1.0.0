@@ -73,7 +73,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const reviewViewportStyle: React.CSSProperties = {
-  maxHeight: 'min(calc(100vh - 220px), 720px)',
+  maxHeight: 'none',
 };
 
 function useFilePreviewUrls(files: File[]): string[] {
@@ -247,7 +247,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
   ) => {
     const galleryStateKey = `${itemKey}:${label}`;
     const isGalleryExpanded = expandedGalleryKeys[galleryStateKey] === true;
-    const referenceGalleryHeightClassName = isGalleryExpanded ? 'max-h-56' : 'max-h-28';
+    const referenceGalleryHeightClassName = isGalleryExpanded ? 'max-h-none' : 'max-h-28';
 
     return (
     <div className="rounded-xl border p-3" style={cardStyle}>
@@ -292,7 +292,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
 
       <div
         data-testid="ecommerce-review-reference-gallery"
-        className={`custom-scrollbar mt-3 grid ${referenceGalleryHeightClassName} min-w-0 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3`}
+        className={`mt-3 grid ${referenceGalleryHeightClassName} min-w-0 grid-cols-2 gap-2 pr-1 sm:grid-cols-3 ${isGalleryExpanded ? 'overflow-visible' : 'overflow-hidden'}`}
       >
         {items.length > 0 ? items.map((item, index) => {
           const src = resolveReferencePreviewSource(item);
@@ -355,7 +355,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
         </div>
       </div>
 
-      <div className="custom-scrollbar mt-3 grid max-h-28 min-w-0 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+      <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 overflow-visible pr-1 sm:grid-cols-3">
         {items.length > 0 ? items.map((item, index) => {
           const itemLabel = `图${startIndex + index + 1} · ${rolePrefix}${index + 1}`;
           return (
@@ -394,10 +394,10 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
     return (
       <div
         data-testid="ecommerce-review-active-detail"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border p-3"
+        className="flex min-w-0 flex-col rounded-xl border p-3"
         style={cardStyle}
       >
-        <div className={compact ? 'space-y-3' : 'min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1'}>
+        <div className="space-y-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
               {reviewItem.section === '主图' ? '主图条目详情' : 'A+ 条目详情'}
@@ -572,7 +572,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
   );
 
   return (
-    <div className="kk-ecommerce-review-panel mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-2.5" style={{ ...containerStyle, ...reviewViewportStyle }}>
+    <div className="kk-ecommerce-review-panel mb-2 flex min-w-0 flex-col overflow-visible rounded-xl border p-2.5" style={{ ...containerStyle, ...reviewViewportStyle }}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-[var(--text-primary)]">分析结果确认</div>
@@ -610,11 +610,11 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
         </div>
       ) : null}
 
-      <div className="grid min-h-0 min-w-0 flex-1 gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="min-w-0">
           <div
             data-testid="ecommerce-review-item-list"
-            className="min-h-0 min-w-0 flex-1 overflow-y-auto custom-scrollbar pr-1"
+            className="min-w-0 pr-1"
           >
             <div className="space-y-4">
               {activeSection === '主图' ? renderReviewSection('主图卡', mainReviewItems, 'var(--mobile-clay-active-border)') : null}
@@ -623,7 +623,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
           </div>
         </div>
 
-        <div className="hidden min-h-0 min-w-0 flex-col overflow-hidden md:flex">
+        <div className="hidden min-w-0 md:block">
           {activeReviewItem ? renderActiveDetail(activeReviewItem) : null}
         </div>
       </div>

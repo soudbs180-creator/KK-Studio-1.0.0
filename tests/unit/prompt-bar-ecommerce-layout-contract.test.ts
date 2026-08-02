@@ -24,15 +24,20 @@ test('ecommerce composer keeps mode tools outside the compact one-page surface',
   assert.match(floatingToolsSource, /createPortal\(floatingTools, document\.body\)/);
   assert.match(floatingToolsSource, /kk-composer-floating-tools-anchor/);
   assert.match(floatingToolsSource, /data-composer-layout="desktop"/);
+  assert.match(floatingToolsSource, /zIndex: KK_LAYER\.dropdown/);
+  assert.match(floatingToolsSource, /new MutationObserver\(updatePosition\)/);
+  assert.match(floatingToolsSource, /attributeFilter: \['data-composer-mode'\]/);
+  assert.match(modeSwitcherSource, /import \{ KK_LAYER \} from '@kk\/ui';/);
+  assert.match(modeSwitcherSource, /style=\{\{ zIndex: KK_LAYER\.dropdown \}\}/);
   assert.match(modeSwitcherSource, /style=\{isMobile \? undefined : \{ width: 84, minWidth: 84, paddingInline: 8 \}\}/);
   assert.match(ecommercePanelSource, /kk-ecommerce-composer-panel/);
-  assert.match(ecommercePanelSource, /overflow-hidden/);
-  assert.match(morphicUiSource, /\.kk-ecommerce-composer-panel[\s\S]*overflow:\s*hidden/);
+  assert.match(ecommercePanelSource, /kk-ecommerce-composer-panel[^\n]*overflow-visible/);
+  assert.match(morphicUiSource, /\.kk-ecommerce-composer-panel[\s\S]*overflow:\s*visible/);
 });
 
 test('ecommerce composer only scrolls prompt text, not its controls', () => {
   assert.match(morphicUiSource, /data-composer-mode='ecommerce'[\s\S]*\.input-bar-textarea[\s\S]*overflow-y:\s*auto/);
-  assert.match(morphicUiSource, /data-composer-mode='ecommerce'[\s\S]*\.kk-ecommerce-composer-panel[\s\S]*overflow:\s*hidden/);
+  assert.match(morphicUiSource, /data-composer-mode='ecommerce'[\s\S]*\.kk-ecommerce-composer-panel[\s\S]*overflow:\s*visible/);
 });
 
 test('ecommerce composer stays compact and keeps fixed-size desktop controls', () => {
@@ -42,6 +47,9 @@ test('ecommerce composer stays compact and keeps fixed-size desktop controls', (
   assert.match(morphicUiSource, /\.kk-composer-floating-tools-host \.kk-composer-type-picker__trigger[\s\S]*width:\s*84px !important/);
   assert.match(morphicUiSource, /\.kk-composer-floating-tools-host \.kk-composer-type-picker__trigger[\s\S]*padding-inline:\s*8px !important/);
   assert.match(workspaceUiV4Source, /\.kk-composer-floating-tools-host \.kk-composer-type-picker__trigger[\s\S]*width:\s*84px !important/);
+  assert.match(workspaceUiV4Source, /data-composer-mode='ecommerce'[\s\S]*max-height:\s*none !important/);
+  assert.match(workspaceUiV4Source, /data-composer-mode='ecommerce'[\s\S]*overflow:\s*visible !important/);
+  assert.match(workspaceUiV4Source, /\.kk-ecommerce-import-card[\s\S]*min-height:\s*76px !important/);
   assert.match(workspaceUiV4Source, /\[data-testid='ecommerce-workflow-header'\][\s\S]*background:\s*transparent !important/);
   assert.match(workspaceUiV4Source, /\.kk-ecommerce-import-panel[\s\S]*border-color:\s*transparent !important/);
   assert.match(workspaceUiV4Source, /\.prompt-bar-liquid-send[\s\S]*width:\s*64px !important/);

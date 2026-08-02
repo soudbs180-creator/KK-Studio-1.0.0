@@ -134,12 +134,12 @@ const actionButtonStyle: React.CSSProperties = {
 };
 
 const workbenchViewportStyle: React.CSSProperties = {
-  maxHeight: 'min(calc(100vh - 220px), 720px)',
+  maxHeight: 'none',
 };
 
 const ecommercePanelViewportStyle: React.CSSProperties = {
   maxHeight: 'none',
-  overflow: 'hidden',
+  overflow: 'visible',
 };
 
 const sectionLabelMap: Record<EcommerceGroupSheet, string> = {
@@ -346,7 +346,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
 
     return (
       <div
-        className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
+        className="mb-2 flex min-w-0 flex-col overflow-visible rounded-xl border p-3"
         style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
         data-testid="ecommerce-promptbar-slot-history-surface"
       >
@@ -424,7 +424,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
         </div>
 
         {onPreviewSlotHistory && expandedHistorySourceKey === activeTaskState.sourceRowKey && currentHistoricalVersions.length > 0 ? (
-          <div className="mb-3 max-h-48 space-y-2 overflow-y-auto custom-scrollbar pr-1" data-testid="ecommerce-slot-history-panel">
+          <div className="mb-3 space-y-2 pr-1" data-testid="ecommerce-slot-history-panel">
             {currentHistoricalVersions.map((historyEntry, index) => (
               <button
                 key={`${activeTaskState.sourceRowKey}-${historyEntry.imageId}-${index}`}
@@ -540,7 +540,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
   return (
     <div
       data-ecommerce-composer-panel="true"
-      className="kk-ecommerce-composer-panel flex min-h-0 flex-col gap-1.5 overflow-hidden"
+      className="kk-ecommerce-composer-panel flex min-h-0 flex-col gap-1.5 overflow-visible"
       style={ecommercePanelViewportStyle}
     >
       {renderWorkflowHeader()}
@@ -636,7 +636,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           </div>
 
           <div
-            className="flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
+            className="flex min-w-0 flex-col overflow-visible rounded-xl border p-3"
             style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
             data-testid="ecommerce-canvas-task-overview-panel"
           >
@@ -696,7 +696,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
             </div>
 
             {previewEntries.length > 0 ? (
-              <div className="mt-3 min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1">
+              <div className="mt-3 min-w-0 pr-1">
                 {previewEntries.map((entry) => (
                   <div
                     key={entry.sourceKey}

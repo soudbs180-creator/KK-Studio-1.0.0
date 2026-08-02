@@ -3268,3 +3268,39 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 混合能力批量生成与真实浏览器右键/端口拖动仍需受控 E2E 验证；本轮未改变既有 DurableGenerationQueue 业务链路。
+
+## 280. 2026-08-02 - fix(prompt-bar): 收口电商 Composer 模式浮层与单页交互
+
+**修改范围**
+- 将桌面 Composer Portal 宿主和模式菜单统一提升到 `KK_LAYER.dropdown`，避免输入框和画布内容覆盖菜单命中区域。
+- 监听 `data-composer-mode` 属性变化，使 Portal 控制行在图片、视频、电商、PPT 连续切换时保持同步。
+- 延续电商 Composer 单页收口：审核、图库、历史和工作台不再创建内部滚动容器，仅输入文本区保留滚动；按钮、发送/语音控件和图标保持固定尺寸。
+
+**修改文件**
+- `apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx`
+- `apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx`
+- `apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx`
+- `apps/web/src/styles/morphic-ui.css`
+- `apps/web/src/styles/workspace-ui-v3.css`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `tests/unit/prompt-bar-ecommerce-layout-contract.test.ts`
+- `tests/unit/ecommerce-composer-scroll-regression.test.ts`
+
+**当前设计决策**
+1. 模式选择器继续作为输入框外的独立 Portal 控件，使用统一 dropdown 层级，避免 stacking context 竞争。
+2. 电商面板采用自然展开的紧凑单页布局，不让审核/素材区域抢占滚动条；长文本仅由输入框自身滚动。
+3. 固定尺寸通过项目 UI token 和明确 CSS 尺寸约束实现，不依赖视口缩放来改变图标和操作按钮大小。
+
+**已运行验证**
+- 电商 Composer 定向单测 9/9 通过；`git diff --check` 通过。
+- Root TypeScript、Architecture TypeScript 通过；Vite production build（2618 modules）通过。
+- In-app Browser 验证模式菜单中心命中 `role=option`，图片/视频/电商/PPT 连续切换时 Composer 与 Portal 状态一致。
+- 浏览器实测电商面板 `overflow: visible`、面板内部无滚动容器，文本区 `overflow-y: auto`，模式按钮 84px、发送按钮 64px、语音按钮 30px，图标尺寸固定。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`，使用 bundled Node 和底层脚本完成等价检查。
+- 本地预览代理未连接 API（3001），因此未执行真实 Provider/OAuth、上传解析和导出链路；本轮只验证前端布局与交互契约。
+
+**风险与下一步**
+- 电商真实文件上传、分析结果数量增长时的纵向空间仍需在连接 API 的受控环境中验收；当前 Composer 不再通过内部滚动隐藏内容。

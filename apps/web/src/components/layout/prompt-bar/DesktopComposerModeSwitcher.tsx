@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
+import { KK_LAYER } from '@kk/ui';
 
 import { PROMPT_COMPOSER_ACTIONS } from '../../../features/ai-assistant-runtime';
 import { GenerationMode } from '../../../types';
@@ -69,6 +70,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
       {isOpen && (
         <div
           className="kk-composer-type-picker__menu absolute bottom-[calc(100%+8px)] left-0 z-[var(--kk-layer-dropdown)] min-w-[196px] rounded-[14px] border border-[var(--prompt-bar-shell-border)] bg-[var(--kk-morphic-panel)] p-1.5"
+          style={{ zIndex: KK_LAYER.dropdown }}
           role="listbox"
           aria-label="创作类型"
         >
