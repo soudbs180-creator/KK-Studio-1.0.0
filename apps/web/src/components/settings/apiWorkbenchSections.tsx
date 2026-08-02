@@ -875,7 +875,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
       <div className="settings-model-center-pool" data-testid="api-model-center-provider-pool">
         <div className="settings-model-center-toolbar settings-model-center-column-header">
           <div className="settings-model-center-toolbar__copy">
-            <div className="settings-model-center-toolbar__title">{pick('供应商卡片池', 'Provider cards')}</div>
+            <div className="settings-model-center-toolbar__title settings-model-center-column-title">{pick('供应商卡片池', 'Provider cards')}</div>
             <div className="settings-model-center-toolbar__helper">{autoRoutingSummary}</div>
           </div>
           <div className="settings-model-center-toolbar__actions">
@@ -1075,7 +1075,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
       <aside className="settings-model-center-directory" data-testid="api-model-center-preset-directory">
         <div className="settings-model-center-directory__header settings-model-center-column-header">
           <div>
-            <div className="settings-model-center-directory__title">{pick('预设模型目录', 'Preset directory')}</div>
+            <div className="settings-model-center-directory__title settings-model-center-column-title">{pick('预设模型目录', 'Preset directory')}</div>
             <div className="settings-model-center-directory__helper">
               {pick('点击后只会预填编辑器，仍需填写 API Key 并保存。', 'Clicking only prefills the editor. You still need to enter an API key and save.')}
             </div>

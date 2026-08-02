@@ -118,7 +118,6 @@ const SettingsConsoleTopbar: React.FC<{
   return (
     <header className="settings-console-topbar">
       <div className="settings-console-topbar__title">
-        <span>{meta.eyebrow}</span>
         <div><h1>{meta.title}</h1><p>{meta.description}</p></div>
       </div>
       <div className="settings-console-topbar__actions">

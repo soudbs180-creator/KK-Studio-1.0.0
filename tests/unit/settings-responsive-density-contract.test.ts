@@ -46,7 +46,7 @@ test('model directory shows six presets before using an internal scroll region',
   assert.doesNotMatch(apiWorkbenchSource, /MODEL_CENTER_PRESET_PAGE_SIZE|presetPage|filteredPresets\.slice\(/);
   assert.doesNotMatch(apiWorkbenchSource, /settings-model-center-directory__pagination/);
   assert.match(settingsStyles, /\.settings-section__copy\s*\{[\s\S]*?flex:\s*1 1 180px/);
-  assert.match(settingsUiV4Styles, /\.settings-panel \.settings-console-content \.settings-model-center-preset-list\s*\{[\s\S]*grid-auto-rows:\s*68px\s*!important/);
+  assert.match(settingsUiV4Styles, /\.settings-panel \.settings-console-content \.settings-model-center-preset-list\s*\{[\s\S]*grid-auto-rows:\s*66px\s*!important/);
 });
 
 test('provider routing matrix becomes labeled cards instead of compressed columns on phones', () => {

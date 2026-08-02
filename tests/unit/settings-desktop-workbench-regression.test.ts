@@ -36,6 +36,7 @@ test('desktop console sidebar exposes fixed groups and a bottom account entry', 
 test('desktop console topbar stays compact and action-oriented', () => {
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
 
+  assert.doesNotMatch(shellSource, /<span>\{meta\.eyebrow\}<\/span>/);
   assert.match(shellSource, /aria-label=\{pick\('切换主题', 'Toggle theme'\)\}/);
   assert.match(shellSource, /aria-label=\{pick\('刷新当前页面', 'Refresh current view'\)\}/);
   assert.match(shellSource, /aria-label=\{pick\('关闭设置', 'Close settings'\)\}/);

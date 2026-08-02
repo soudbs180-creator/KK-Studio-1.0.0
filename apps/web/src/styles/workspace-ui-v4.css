@@ -100,8 +100,27 @@
     box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent) !important;
   }
 
+  #btn-desktop-settings {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+  }
+
+  #btn-desktop-settings:hover,
+  #btn-desktop-settings:focus-visible {
+    color: var(--text-primary) !important;
+    background: transparent !important;
+  }
+
   .kk-task-center-host:not([data-mobile='true']) {
-    top: 56px !important;
+    top: 52px !important;
     left: 50% !important;
     width: 360px;
     transform: translateX(-50%);
@@ -117,6 +136,7 @@
     box-shadow: 0 18px 48px color-mix(in oklch, black 24%, transparent) !important;
     backdrop-filter: blur(22px) saturate(135%);
     -webkit-backdrop-filter: blur(22px) saturate(135%);
+    transform: translateY(0) !important;
   }
 
   .kk-morphic-project-panel[data-desktop-persistent='true'] {
@@ -169,7 +189,13 @@
     width: auto !important;
     min-width: 76px !important;
     padding-inline: 11px 4px !important;
+    border: 1px solid color-mix(in oklch, var(--text-primary) 34%, transparent) !important;
     border-radius: 999px !important;
+    box-shadow: inset 0 1px 0 color-mix(in oklch, white 7%, transparent) !important;
+  }
+
+  .kk-composer-compact-footer .prompt-bar-liquid-send:disabled {
+    border-color: color-mix(in oklch, var(--text-primary) 22%, transparent) !important;
   }
 
   .kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-content {

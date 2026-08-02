@@ -2827,3 +2827,49 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 旧 `settings.css` 仍包含历史模型中心规则；当前已由高优先级作用域样式和回归契约阻断覆盖，后续应在独立清理切片删除失效规则，降低样式债务。
 - 若后续调整单卡信息密度，必须同时验证桌面五卡视窗、手机内容轨道和预设六条视窗，禁止只修改卡片高度而遗漏父网格轨道。
+
+---
+
+## 269. 2026-08-02 - fix(ui): 统一设置中心层级与工作区反馈
+
+**修改范围**
+- 重新统一 API 模型中心的桌面视觉语言：供应商池和预设目录使用相同的标题字体、132px 标题区、640px 等高磨砂容器与轻量边框；供应商保持单行横向长卡，预设目录完整显示六条后内部滚动。
+- 修复设置中心的错误控件层级：桌面顶栏移除 `API CONNECTIONS` 等英文 eyebrow，账户入口去除双重描边；云端回退与实体回退统一使用 44×24px Switch，并修正开启态引用不存在 Token 导致的透明轨道。
+- 修复 AI 代理安全授权菜单被风险矩阵遮挡的问题；菜单提升到统一 dropdown 层级，所属字段和卡片允许溢出，五个授权选项均可完整覆盖后续内容。
+- 重排总览中的调用趋势、默认执行与体验模式、存储与运行诊断：增强模块轮廓，把趋势摘要移入独立详情列，并压缩诊断拓扑的留白和装饰线。
+- 收口工作区反馈：发送胶囊在禁用态仍保留可见轮廓；设置入口改为纯图标；任务状态列表与顶部任务入口保持约 8px 间距。
+
+**修改文件**
+- `apps/web/src/components/settings/SettingsWorkbenchShell.tsx`
+- `apps/web/src/components/settings/apiWorkbenchSections.tsx`
+- `apps/web/src/styles/settings-ui-v4.css`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `tests/unit/connected-runtime-ui-contract.test.ts`
+- `tests/unit/settings-desktop-workbench-regression.test.ts`
+- `tests/unit/settings-responsive-density-contract.test.ts`
+- `tests/unit/settings-ui-v4-contract.test.ts`
+- `tests/unit/workspace-ui-v4-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. API 主列表继续保留现有操作、Provider、RouteEngine、Quote 与排序契约；本轮只统一信息层级和视觉投影，不复制 CLIProxyAPI Runtime，也不改变真实健康状态。
+2. 桌面左右栏严格等高，供应商占主要宽度；预设目录使用连续内部滚动并保证前六条完整。手机使用同一组件与字体语义，但改为顺序单列，不强行保留桌面双栏尺寸。
+3. 设置 Switch 只使用项目现有的 `--settings-accent-rgb` Token；权威几何统一由共享控件选择器控制，页面不得再用局部轨道或滑块尺寸覆盖。
+4. 安全授权菜单属于浮层，不参与风险矩阵文档流；使用统一 z-index Token 和可见溢出，不通过移动后续卡片规避遮挡。
+5. 工作区任务列表仍复用唯一 Task Center；入口到浮层保留约 8px 视觉缝隙，二次点击关闭逻辑不变。
+
+**已运行验证**
+- 定向 UI 契约 17/17 通过；完整 Unit 2387 项中 2385 通过、0 失败、2 跳过。
+- Root、Architecture、Server 与 Tests TypeScript 全部通过；服务端语法检查 119 个文件，Tests TypeScript 语义检查 622 个文件。
+- Architecture 全链与 Governance 全链通过；Shared、UI、API Client 和 Web Vite 8.1.4 生产构建通过，共转换 2614 modules。
+- 移动设置、桌面设置和 AI Takeover Browser Smoke 全部通过；Smoke 中本地 API 未启动产生的 502/连接拒绝按真实离线状态展示，不影响 UI 契约。
+- 应用内浏览器在 1548×1272 实测：供应商池和预设目录均为 640px，标题均为 Inter 15px/700，预设前六条均为 66px 且完整，任务入口到浮层间距约 8.3px，发送轮廓和纯图标设置入口可见。
+- 应用内浏览器在 390×844 实测：页面无横向溢出，API 模型中心单列显示，两个标题字体一致，预设列表为 468px 且前六条完整；云端回退与实体回退开启态均为 44×24px 蓝色轨道和 18px 滑块。
+
+**未运行验证及原因**
+- 环境未提供系统 `npm`，无法原样运行聚合 `npm run verify:changes`；尝试 pnpm fallback 时其依赖预检会重新执行安装并被仓库的 ignored-build policy 拒绝，因此改用绑定 Node 和本地 CLI 逐项完成本轮相关的架构、治理、类型、构建、完整 Unit 与三条 Browser Smoke。
+- 未执行在线依赖审计、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮没有新增依赖、后端接口或数据库迁移。
+
+**风险与下一步**
+- 旧 `settings.css` 仍包含历史模型中心样式；当前由设置面板作用域的 V6 权威规则与回归契约阻断覆盖，后续应在独立清理切片删除失效规则，避免继续累积样式债务。
+- 真实 CLIProxyAPI、Local Runner 和 Provider 状态仍需在配对桌面环境验证；设置页必须继续展示真实离线/错误，不得以模拟在线替代。

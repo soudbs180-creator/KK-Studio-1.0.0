@@ -22,10 +22,18 @@ test('desktop workspace chrome is three independent frosted clusters without a f
 test('task center and project menu are anchored floating surfaces that do not reflow the composer', () => {
   const styles = readSource('apps/web/src/styles/workspace-ui-v4.css');
 
-  assert.match(styles, /\.kk-task-center-host:not\(\[data-mobile='true'\]\)[\s\S]*top:\s*56px/);
+  assert.match(styles, /\.kk-task-center-host:not\(\[data-mobile='true'\]\)[\s\S]*top:\s*52px/);
+  assert.match(styles, /\.kk-task-center-morph\[data-state='open'\][\s\S]*transform:\s*translateY\(0\)\s*!important/);
   assert.match(styles, /\.kk-task-center-morph\[data-state='open'\][\s\S]*width:\s*360px[\s\S]*max-height:\s*70vh/);
   assert.match(styles, /\.kk-morphic-project-panel\[data-desktop-persistent='true'\][\s\S]*--kk-project-panel-left[\s\S]*backdrop-filter:/);
   assert.doesNotMatch(styles, /body:has\(\.kk-morphic-project-panel\)\s+#prompt-bar-container/);
+});
+
+test('desktop account actions and composer send keep the requested lightweight geometry', () => {
+  const styles = readSource('apps/web/src/styles/workspace-ui-v4.css');
+
+  assert.match(styles, /#btn-desktop-settings\s*\{[\s\S]*background:\s*transparent\s*!important[\s\S]*border:\s*0\s*!important/);
+  assert.match(styles, /\.kk-composer-compact-footer \.prompt-bar-liquid-send\s*\{[\s\S]*border:\s*1px solid/);
 });
 
 test('desktop AI assistant uses the same frosted composer structure without touching canvas navigation', () => {

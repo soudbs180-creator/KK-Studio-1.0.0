@@ -20,6 +20,24 @@
   box-shadow: inset 0 0 0 1px var(--settings-border-subtle);
 }
 
+.settings-panel .settings-console-topbar__title {
+  gap: 0;
+}
+
+.settings-panel .settings-console-account {
+  border: 0 !important;
+  background: color-mix(in srgb, var(--settings-layer-surface) 74%, transparent) !important;
+  box-shadow: inset 0 0 0 1px var(--settings-border-subtle) !important;
+}
+
+.settings-panel .settings-console-account:hover,
+.settings-panel .settings-console-account:focus-visible,
+.settings-panel .settings-console-account[data-selected='true'] {
+  background: var(--settings-layer-hover) !important;
+  box-shadow: inset 0 0 0 1px var(--settings-border-strong) !important;
+  outline: none;
+}
+
 /* The usage panel is the first decision surface. Capability and system health
    form an equal-height pair underneath the quick strategy. */
 .dashboard-card-consumption {
@@ -48,7 +66,7 @@
 
 @media (min-width: 760px) {
   .settings-card-grid-container.dashboard-command-center {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr) !important;
   }
 
   .settings-card-grid-container.dashboard-command-center > .dashboard-card-consumption,
@@ -63,6 +81,83 @@
     grid-row: auto !important;
     height: 100% !important;
   }
+}
+
+.settings-panel .dashboard-command-center--focused > .dashboard-panel {
+  border: 1px solid var(--settings-border-subtle) !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--settings-layer-surface) 88%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 4%, transparent) !important;
+}
+
+.settings-panel .dashboard-command-center--focused > .dashboard-quick-strategy {
+  border-color: var(--settings-border-strong) !important;
+  background:
+    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.08), transparent 46%),
+    color-mix(in srgb, var(--settings-layer-surface) 94%, transparent) !important;
+}
+
+.settings-panel .dashboard-quick-strategy .dashboard-preference-control {
+  border-color: var(--settings-border-strong);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--settings-layer-hover) 76%, transparent);
+}
+
+@media (min-width: 760px) {
+  .settings-panel .dashboard-card-consumption .dashboard-panel__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(180px, 0.7fr);
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-chart {
+    min-height: 132px;
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-inline-grid {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: stretch;
+    gap: 8px;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-inline-row {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--settings-border-subtle);
+    border-radius: 13px;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--settings-layer-hover) 70%, transparent);
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-inline-row strong {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+.settings-panel .dashboard-card-system .dashboard-system-topology {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.settings-panel .dashboard-card-system .dashboard-system-topology::before {
+  display: none;
+}
+
+.settings-panel .dashboard-card-system .dashboard-topology-node {
+  gap: 5px;
+  border-radius: 13px;
+  padding: 10px 6px;
+  background: color-mix(in srgb, var(--settings-layer-hover) 74%, transparent);
+}
+
+.settings-panel .dashboard-card-system .dashboard-topology-node strong {
+  font-size: clamp(16px, 1.6vw, 20px);
 }
 
 /* Provider pool and preset directory share one height. The provider side owns
@@ -377,6 +472,66 @@
   transform: translate(20px,-50%);
 }
 
+.settings-panel .settings-console button.settings-system-switch.settings-control-toggle {
+  position: relative !important;
+  width: 44px !important;
+  height: 24px !important;
+  min-width: 44px !important;
+  min-height: 24px !important;
+  flex: 0 0 44px !important;
+  appearance: none;
+  overflow: visible !important;
+  border: 1px solid var(--settings-border-strong) !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  background: var(--settings-control-bg) !important;
+  box-shadow: inset 0 1px 2px color-mix(in srgb, black 16%, transparent) !important;
+}
+
+.settings-panel .settings-console button.settings-system-switch.settings-control-toggle::after {
+  top: 50% !important;
+  left: 3px !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: var(--text-secondary) !important;
+  box-shadow: 0 1px 4px color-mix(in srgb, black 30%, transparent) !important;
+  transform: translate(0, -50%) !important;
+}
+
+.settings-panel .settings-console button.settings-system-switch.settings-control-toggle[data-state='on'] {
+  border-color: rgb(var(--settings-accent-rgb) / 0.88) !important;
+  background: rgb(var(--settings-accent-rgb) / 0.86) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    0 0 0 1px rgb(var(--settings-accent-rgb) / 0.08) !important;
+}
+
+.settings-panel .settings-console button.settings-system-switch.settings-control-toggle[data-state='on']::after {
+  background: white !important;
+  transform: translate(20px, -50%) !important;
+}
+
+.settings-panel .settings-section__frame:has(.settings-system-control-menu),
+.settings-panel .settings-reference-card:has(.settings-system-control-menu) {
+  position: relative;
+  z-index: var(--kk-z-dropdown, 900);
+  overflow: visible !important;
+}
+
+.settings-panel .settings-system-field:has(.settings-system-control-menu) {
+  position: relative;
+  z-index: var(--kk-z-dropdown, 900);
+  overflow: visible;
+}
+
+.settings-panel .settings-system-control-menu {
+  z-index: var(--kk-z-dropdown, 900) !important;
+  max-height: min(260px, 48vh);
+  overflow-y: auto;
+  background: var(--settings-layer-strong) !important;
+  box-shadow: 0 18px 48px color-mix(in srgb, black 42%, transparent) !important;
+}
+
 .settings-console .settings-risk-card__icon {
   display: grid;
   width: 34px;
@@ -540,7 +695,7 @@
   flex: 0 0 30px;
   place-items: center;
   border-radius: 10px;
-  color: var(--settings-accent);
+  color: rgb(var(--settings-accent-rgb));
   background: var(--settings-control-bg);
 }
 
@@ -794,7 +949,7 @@
 }
 
 .settings-api-editor__hero-copy > span {
-  color: var(--settings-accent);
+  color: rgb(var(--settings-accent-rgb));
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -877,7 +1032,7 @@
   place-items: center;
   border: 1px solid var(--settings-border-subtle);
   border-radius: 10px;
-  color: var(--settings-accent);
+  color: rgb(var(--settings-accent-rgb));
   background: var(--settings-control-bg);
   font-size: 10px;
   font-weight: 800;
@@ -1369,7 +1524,7 @@
   }
 }
 
-/* Model Center V5: authoritative layout after the legacy settings bundle. */
+/* Model Center V6: one visual system for provider routes and preset entries. */
 .settings-capability-api-embed--model-center {
   min-width: 0;
 }
@@ -1390,26 +1545,48 @@
   height: var(--settings-model-center-column-height) !important;
   min-height: var(--settings-model-center-column-height) !important;
   max-height: var(--settings-model-center-column-height) !important;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 76%, transparent) !important;
-  border-radius: 18px !important;
-  background: color-mix(in srgb, var(--surface-secondary) 76%, transparent) !important;
-  box-shadow: none !important;
+  border: 1px solid var(--settings-border-strong) !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--settings-layer-surface) 92%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 4%, transparent),
+    0 16px 36px color-mix(in srgb, black 16%, transparent) !important;
   overflow: hidden !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-pool {
   display: grid !important;
-  grid-template-rows: 120px minmax(0, 1fr) !important;
+  grid-template-rows: 132px minmax(0, 1fr) !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-column-header {
   box-sizing: border-box;
   display: grid !important;
-  min-height: 120px !important;
-  max-height: 120px !important;
-  padding: 16px !important;
+  min-height: 132px !important;
+  max-height: 132px !important;
+  padding: 18px !important;
   border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent) !important;
-  background: transparent !important;
+  background: color-mix(in srgb, var(--settings-layer-hover) 58%, transparent) !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-column-title {
+  margin: 0 !important;
+  color: var(--text-primary) !important;
+  font-family: inherit !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.settings-panel .settings-console-content :is(.settings-model-center-toolbar__helper, .settings-model-center-directory__helper) {
+  margin-top: 5px !important;
+  color: var(--text-secondary) !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-toolbar {
@@ -1427,7 +1604,7 @@
 .settings-panel .settings-console-content .settings-model-center-route-grid {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  grid-auto-rows: 92px !important;
+  grid-auto-rows: 96px !important;
   align-content: start !important;
   gap: 8px !important;
   padding: 10px !important;
@@ -1439,21 +1616,21 @@
   grid-template-columns: minmax(260px, 1.35fr) minmax(190px, 0.85fr) auto !important;
   align-items: center !important;
   gap: 10px !important;
-  height: 92px !important;
-  min-height: 92px !important;
-  max-height: 92px !important;
-  padding: 10px 12px !important;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 74%, transparent) !important;
-  border-radius: 14px !important;
-  background: color-mix(in srgb, var(--surface-primary) 54%, transparent) !important;
+  height: 96px !important;
+  min-height: 96px !important;
+  max-height: 96px !important;
+  padding: 11px 12px !important;
+  border: 1px solid var(--settings-border-subtle) !important;
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--settings-layer-emphasis) 76%, transparent) !important;
   box-shadow: none !important;
   overflow: hidden !important;
   cursor: pointer;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route:hover {
-  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-subtle)) !important;
-  background: color-mix(in srgb, var(--surface-primary) 76%, transparent) !important;
+  border-color: color-mix(in srgb, rgb(var(--settings-accent-rgb)) 44%, var(--settings-border-subtle)) !important;
+  background: var(--settings-layer-hover) !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__glow-line,
@@ -1581,13 +1758,17 @@
   min-width: 0;
   overflow: hidden;
   border: 0 !important;
-  border-radius: 0;
+  gap: 5px;
+  border-radius: 12px;
   background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__metric {
   min-width: 0;
-  padding: 5px 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--settings-layer-hover) 72%, transparent);
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__metric + .settings-model-center-route__metric {
@@ -1629,7 +1810,7 @@
 
 .settings-panel .settings-console-content .settings-model-center-directory {
   display: grid !important;
-  grid-template-rows: 120px 52px minmax(0, 1fr) !important;
+  grid-template-rows: 132px 52px minmax(0, 1fr) !important;
   gap: 0 !important;
   padding: 0 !important;
 }
@@ -1648,11 +1829,11 @@
 .settings-panel .settings-console-content .settings-model-center-preset-list {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  grid-auto-rows: 68px !important;
+  grid-auto-rows: 66px !important;
   align-content: start !important;
-  gap: 8px !important;
+  gap: 7px !important;
   min-height: 0 !important;
-  padding: 10px !important;
+  padding: 8px 10px !important;
   overflow-y: auto !important;
   scrollbar-gutter: stable;
 }
@@ -1662,12 +1843,21 @@
   display: grid !important;
   grid-template-columns: 34px minmax(0, 1fr) !important;
   gap: 9px !important;
-  height: 68px !important;
-  min-height: 68px !important;
-  max-height: 68px !important;
+  height: 66px !important;
+  min-height: 66px !important;
+  max-height: 66px !important;
   padding: 7px 10px !important;
   overflow: hidden !important;
-  border-radius: 12px !important;
+  border: 1px solid var(--settings-border-subtle) !important;
+  border-radius: 13px !important;
+  background: color-mix(in srgb, var(--settings-layer-emphasis) 74%, transparent) !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset-row:hover,
+.settings-panel .settings-console-content .settings-model-center-preset-row:focus-visible {
+  border-color: var(--settings-border-strong) !important;
+  background: var(--settings-layer-hover) !important;
+  outline: none;
 }
 
 .settings-panel .settings-console-content .settings-model-center-preset__main {
