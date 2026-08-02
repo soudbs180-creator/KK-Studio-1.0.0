@@ -25,6 +25,7 @@ import {
   agentRunStore,
   agentRuntimeInstance,
   durableGenerationQueue,
+  summarizeAgentRunCoverage,
   type AgentRunRecord,
   type GenerationBatchJob,
 } from '../../features/ai-assistant-runtime';
@@ -251,24 +252,14 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
       };
     }),
     ...agentRuns.map((run) => {
-      const totalSteps = Math.max(0, Number(run.totalSteps || 0));
-      const completedSteps = Math.min(totalSteps, run.completedStepIds?.length || 0);
-      const isTerminal = ['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(run.status);
+      const coverage = summarizeAgentRunCoverage(run);
       const status: TaskCenterActivityStatus = run.status === 'waiting_confirmation'
         ? 'waiting_confirmation'
         : run.status === 'planning' || run.status === 'waiting_execution'
           ? 'queued'
           : run.status;
-      const progress = isTerminal
-        ? 100
-        : totalSteps > 0
-          ? Math.round((completedSteps / totalSteps) * 100)
-          : 0;
-      const latestFailure = [...(run.stepResults || [])]
-        .reverse()
-        .find((step) => step.outcome !== 'success');
       const error = ['failed', 'cancelled', 'completed_with_errors'].includes(run.status)
-        ? latestFailure?.message || run.nextStep
+        ? coverage.latestFailure?.message || run.nextStep
         : undefined;
 
       return {
@@ -277,7 +268,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         name: run.userMessage || run.intent || 'AI assistant task',
         type: 'assistant' as const,
         status,
-        progress,
+        progress: coverage.progressPercent,
         error,
         createdAt: Date.parse(run.createdAt) || Date.now(),
         isGenerationJob: false,

@@ -59,6 +59,14 @@ export type {
 } from './runtime/agentSessionProjection.ts';
 export { buildAgentRunTimeline } from './runtime/agentRunTimeline.ts';
 export type { AgentRunTimelineStep, AgentRunTimelineStepStatus } from './runtime/agentRunTimeline.ts';
+export { summarizeAgentRunCoverage } from './runtime/agentRunProgress.ts';
+export type {
+  AgentRunCoverageInput,
+  AgentRunCoverageState,
+  AgentRunCoverageSummary,
+  AgentRunStepCoverage,
+  AgentRunStepCoverageStatus,
+} from './runtime/agentRunProgress.ts';
 export { AGENT_CONTROL_ACTIONS } from './runtime/agentControlActions.ts';
 export type { AgentControlActionKey, AgentControlRuntimeAction, AgentControlToolName, AgentControlUiAction } from './runtime/agentControlActions.ts';
 export { CHAT_SHELL_ACTIONS } from './runtime/chatShellActions.ts';

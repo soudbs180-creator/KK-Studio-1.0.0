@@ -74,6 +74,7 @@
     "apps/web/src/features/ai-takeover/core/agentPlannerReferencePolicy.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentPlanCompiler.ts",
+    "apps/web/src/features/ai-assistant-runtime/runtime/agentRunProgress.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentReplanPolicy.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentReplanCoordinator.ts",
     "apps/web/src/features/ai-assistant-runtime/runtime/agentReplanPlanner.ts",

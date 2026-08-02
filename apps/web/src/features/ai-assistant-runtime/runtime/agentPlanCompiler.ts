@@ -5,6 +5,23 @@ import { createRunStepIdempotencyKey } from './AssistantExecutionContext.ts';
 
 export type AgentPlanningQueue = Pick<DurableGenerationQueue, 'getJob' | 'getJobs'>;
 
+/** Safe reads that can overlap without changing canvas, queue, or authorization state. */
+export const AGENT_READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'knowledge.searchProject',
+  'provider.getModelCapabilities',
+  'generation.getJobStatus',
+  'browser.getStatus',
+]);
+
+/** Execution policy selected for the next ready slice of a validated plan. */
+export type AgentExecutionGroupKind = 'read_only_parallel' | 'mutation_serial';
+
+/** Ready steps returned to the runtime as one bounded execution slice. */
+export interface AgentExecutionGroup {
+  kind: AgentExecutionGroupKind;
+  steps: readonly AgentPlanStep[];
+}
+
 const retryableFailedPromptIds = (job: ReturnType<AgentPlanningQueue['getJob']>): string[] => (
   (job?.prompts || [])
     .filter((prompt) => prompt.status === 'failed' && prompt.retryable !== false)
@@ -113,6 +130,30 @@ export function validateAgentStepGraph(steps: AgentPlanStep[], maxSteps = 20): v
       if (dependency === step.stepId) throw new Error(`Step ${step.stepId} cannot depend on itself.`);
     }
   }
+}
+
+/**
+ * Selects the next deterministic execution group from a validated step graph.
+ * Read-only work may run together; mutations remain strictly serial.
+ */
+export function selectReadyAgentExecutionGroup(
+  steps: readonly AgentPlanStep[],
+  completedStepIds: ReadonlySet<string>,
+  maxReadOnlyConcurrency = 4,
+): AgentExecutionGroup | undefined {
+  const readySteps = steps.filter((step) => (
+    !completedStepIds.has(step.stepId)
+    && step.dependsOn.every((dependency) => completedStepIds.has(dependency))
+  ));
+  if (readySteps.length === 0) return undefined;
+
+  const readOnlySteps = readySteps
+    .filter((step) => AGENT_READ_ONLY_TOOL_NAMES.has(step.action.type))
+    .slice(0, Math.max(1, maxReadOnlyConcurrency));
+  if (readOnlySteps.length > 0) {
+    return { kind: 'read_only_parallel', steps: readOnlySteps };
+  }
+  return { kind: 'mutation_serial', steps: [readySteps[0]] };
 }
 
 /** Replaces Planner-provided idempotency values with the Run/step execution identity. */

@@ -1,14 +1,15 @@
+import {
+  summarizeAgentRunCoverage,
+  type AgentRunCoverageInput,
+} from '../../features/ai-assistant-runtime/runtime/agentRunProgress.ts';
+
 export interface GenerationSummaryInput {
   status: string;
   progress?: { percent?: number };
   prompts: ReadonlyArray<{ status: string }>;
 }
 
-export interface AgentSummaryInput {
-  status: string;
-  totalSteps?: number;
-  completedStepIds?: readonly string[];
-}
+export interface AgentSummaryInput extends AgentRunCoverageInput {}
 
 export interface TaskCenterSummary {
   activeCount: number;
@@ -33,9 +34,7 @@ function generationProgress(job: GenerationSummaryInput): number {
 }
 
 function agentProgress(run: AgentSummaryInput): number {
-  const totalSteps = Math.max(0, Number(run.totalSteps || 0));
-  if (totalSteps === 0) return 0;
-  return Math.round((Math.min(totalSteps, run.completedStepIds?.length || 0) / totalSteps) * 100);
+  return summarizeAgentRunCoverage(run).progressPercent;
 }
 
 /** Projects the two authoritative task stores into compact chrome telemetry. */

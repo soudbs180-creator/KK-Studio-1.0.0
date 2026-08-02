@@ -2915,3 +2915,44 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 旧 `settings.css` 等历史样式文件仍存在，但本轮已针对复现的工作区回流点建立最终层规则和契约；后续清理应单独删除无效重复规则并继续跑浏览器回归。
 - 推送后需再次确认 `main`、本地 `codex/morphic-ui-refactor` 和 `origin/main` 指向同一最新版提交。
+
+---
+
+## 271. 2026-08-02 - feat(ai): 吸收 open-code-review 的确定性执行与覆盖投影设计
+
+**修改范围**
+- 将只读查询并行、变更动作串行的执行分组从 `AgentRuntime` 提取到 `agentPlanCompiler`，固定并发上限为 4；仍只允许显式白名单工具进入并行组，不改变 `ToolRegistry`、PermissionPolicy、确认或 Queue 边界。
+- 新增 `agentRunProgress.ts`，统一运行进度、失败分类、部分完成、阻塞依赖、可重试状态和最新失败信息的确定性投影；Task Center 与紧凑任务摘要复用同一份覆盖计算。
+- 新增覆盖摘要集成测试、依赖阻塞传播测试和执行分组测试；将新模块纳入 maintainability strict paths。
+
+**修改文件**
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentRunProgress.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentPlanCompiler.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts`
+- `apps/web/src/features/ai-assistant-runtime/index.ts`
+- `apps/web/src/components/workspace/TaskCenterTray.tsx`
+- `apps/web/src/components/workspace/taskCenterSummary.ts`
+- `tests/unit/agent-run-progress.test.ts`
+- `tests/integration/agent-run-coverage.integration.test.ts`
+- `config/maintainability-ratchet.json`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 只复用 open-code-review 中有价值的执行分组和失败覆盖思想，不另起 Agent、Queue 或远端执行链；执行权限仍来自当前本地验证计划和既有授权门禁。
+2. 并行组只包含 `knowledge.searchProject`、`provider.getModelCapabilities`、`generation.getJobStatus`、`browser.getStatus`；所有 mutation 始终一次执行一个，依赖图仍是唯一顺序依据。
+3. 覆盖百分比只统计已完成、部分完成和已分类失败的步骤；pending、blocked 不被伪装成完成，缺少本地计划时只按安全的 `completedStepIds/stepResults` 投影，不信任远端 plan。
+4. 多级依赖使用固定点传播 blocked 状态；Task Center 不再对失败/取消 Run 直接显示 100%，而是展示真实覆盖率和最新失败原因。
+
+**已运行验证**
+- 相关 Unit `5/5`、覆盖摘要 Integration `1/1` 通过；完整 Unit `2390` 通过、0 失败、2 跳过；完整 Integration `16` 通过、0 失败。
+- Architecture 全链、Governance 全链、Root/Architecture/Server/Tests TypeScript、服务端 119 文件语法检查和 maintainability strict `59` 个模块通过。
+- Tests TypeScript 通过，共检查 `624` 个测试文件；Encoding、Mojibake、`git diff --check` 通过。
+- Shared、UI、API Client 构建与 Web Vite `8.1.4` 生产构建通过，共转换 `2615` modules。
+
+**未运行验证及原因**
+- 系统没有 `npm` 可执行文件，未原样运行 `npm run verify:changes`；已使用仓库 bundled Node 和本地 CLI 逐项完成可执行的类型、测试、架构、治理、编码和构建检查。
+- 未执行在线依赖审计、Contract/E2E、浏览器 smoke、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮未新增依赖、HTTP 契约、数据库迁移或支付状态。
+
+**风险与下一步**
+- 只读并行执行仍依赖 Planner 正确声明依赖；未在本轮把所有 `control.effect=read` 工具自动扩展进白名单，避免把导航或上下文切换误判为无副作用读取。
+- 后续若扩大并行白名单，应增加真实 `AgentRuntime` 执行级并发测试，并验证多失败情况下 Run snapshot、replan 选择和恢复资源顺序。

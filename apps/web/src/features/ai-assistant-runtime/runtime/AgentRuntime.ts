@@ -79,6 +79,7 @@ import {
   createAgentStepPayload as actionPayloadWithIdempotency,
   freezeAgentPlanExecutionTargets as freezePlanExecutionTargets,
   normalizeAgentPlanSteps as normalizePlanSteps,
+  selectReadyAgentExecutionGroup,
   validateAgentPlanStepInputs as validatePlanStepInputs,
   validateAgentStepGraph as validateStepGraph,
   type AgentPlanningQueue,
@@ -89,12 +90,6 @@ const llmBrain = new LLMBrain();
 const MAX_AGENT_STEPS = 20;
 const MAX_READ_ONLY_CONCURRENCY = 4;
 const SNAPSHOT_HYDRATION_TIMEOUT_MS = 1_500;
-const READ_ONLY_TOOLS = new Set([
-  'knowledge.searchProject',
-  'provider.getModelCapabilities',
-  'generation.getJobStatus',
-  'browser.getStatus',
-]);
 
 let contextSnapshotSequence = 0;
 
@@ -924,17 +919,20 @@ export class AgentRuntime {
 
     try {
       while (pending.size > 0) {
-        const ready = [...pending.values()].filter((step) => step.dependsOn.every((dependency) => completed.has(dependency)));
-        if (ready.length === 0) throw new Error('Agent step graph contains a dependency cycle.');
-        const readOnlyBatch = ready
-          .filter((step) => READ_ONLY_TOOLS.has(step.action.type))
-          .slice(0, MAX_READ_ONLY_CONCURRENCY);
-        if (readOnlyBatch.length > 0) {
-          const results = await Promise.allSettled(readOnlyBatch.map(executeStep));
+        const executionGroup = selectReadyAgentExecutionGroup(
+          [...pending.values()],
+          completed,
+          MAX_READ_ONLY_CONCURRENCY,
+        );
+        if (!executionGroup) throw new Error('Agent step graph contains a dependency cycle.');
+        if (executionGroup.kind === 'read_only_parallel') {
+          const results = await Promise.allSettled(executionGroup.steps.map(executeStep));
           const rejected = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
           if (rejected) throw rejected.reason;
         } else {
-          await executeStep(ready[0]);
+          const mutationStep = executionGroup.steps[0];
+          if (!mutationStep) throw new Error('Agent execution group did not contain a mutation step.');
+          await executeStep(mutationStep);
         }
       }
 
