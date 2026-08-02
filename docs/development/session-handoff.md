@@ -2993,3 +2993,39 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 当前文档中仍可能存在有意保留的旧版本参考或历史快照；后续只应依据文档治理分类逐项处理，不做全仓库盲目替换。
+
+---
+
+## 273. 2026-08-02 - feat(tooling): 为 KK Studio 建立 CodeGraph 本地图谱入口
+
+**修改范围**
+- 使用 `@colbymchenry/codegraph@1.5.0` 为当前仓库生成首份本地图谱；索引覆盖 1,796 个文件、22,877 个节点和 69,670 条边。
+- 增加固定版本的 npm 快捷入口，支持初始化、增量同步、状态检查、查询、探索、影响分析和受影响测试发现。
+- 将 `.codegraph/` 标记为本机运行数据，避免 SQLite 数据库、daemon 与 socket 文件进入版本库；保留 CodeGraph 的 MCP 配置打印入口，不自动修改用户级 Codex 配置。
+
+**修改文件**
+- `package.json`
+- `.gitignore`
+- `tests/unit/codegraph-integration-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 不把 CodeGraph 作为生产运行时依赖写入 workspace lockfile；项目命令通过 `npx --yes` 固定到 `1.5.0`，减少平台可选二进制和当前 npm 锁文件的耦合。
+2. 图谱数据库只保存在项目根的 `.codegraph/`，不提交机器相关索引；CodeGraph 默认遵循 `.gitignore` 并自动观察文件变化。
+3. Codex MCP 先提供 `codegraph:mcp:print` 只读配置预览，由使用者决定是否写入全局配置，避免在未确认时修改用户级 Agent 设置。
+
+**已运行验证**
+- `codegraph init . --verbose` 通过：1,796 files、22,877 nodes、69,670 edges，索引状态 `complete`，journal mode `wal`。
+- `codegraph sync .` 通过；新增测试文件纳入后，`codegraph status . --json` 仍为 `complete`，当前为 1,797 files、22,885 nodes、69,679 edges，`pendingChanges` 为 0，`reindexRecommended` 为 false。
+- `codegraph explore -p . --max-files 8 "AI takeover runtime ToolRegistry Planner Executor"` 通过，返回符号、调用关系、影响范围和带行号源码。
+- `query AgentToolRegistry`、`impact AgentToolRegistry` 和 `affected ToolRegistry.ts` 均通过，能够返回符号、影响范围和关联测试。
+- CodeGraph 契约测试 `2/2` 通过；版本/当前事实/Agent 文档/文档治理/敏感边界检查通过；Web Vite 8.1.4 生产构建通过；`git diff --check` 通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前执行环境没有系统 `npm`/`npx`，使用 CodeGraph 的 `pnpm dlx` 等价入口和 bundled Node 完成验证。
+- Root 与 tests TypeScript 检查未通过，失败来自本次修改范围之外的既有类型错误（电商设置状态、聊天会话投影、认证/计费 `ApiResponse` 窄化、Agent runtime 事件与重规划等）；本次新增契约测试本身已通过。
+- 未执行 `codegraph install` 写入全局 Codex MCP 配置；本轮只生成可审阅的配置片段，避免未经确认改变用户级设置。
+
+**风险与下一步**
+- 当前图谱是本机生成的 94 MB SQLite 索引；修改分支或切换 Windows/WSL 时应保持各自 `.codegraph/`，必要时通过 `codegraph sync .` 或 `codegraph init .` 重建。
+- 若要让 Codex CLI 自动调用 MCP，可先运行 `npm run codegraph:mcp:print` 审阅配置，再按需执行 CodeGraph 的 `install --target codex`。
