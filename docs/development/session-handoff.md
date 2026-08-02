@@ -3253,3 +3253,18 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 多卡片混合能力过滤与 DurableGenerationQueue 结果回填仍沿用现有 draft/队列链路，建议在后续受控 E2E 中验证视频/图片混选的跳过计数与目标卡片回填。
+
+## 279. 2026-08-02 - fix(canvas): 空白右键不受绘画覆盖层干扰
+
+**修改范围**
+- 右键上下文只在实际命中绘画元素时进入绘画属性菜单；透明绘画交互层覆盖的空白区域继续打开“添加空白卡片”菜单。
+
+**修改文件**
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `docs/development/session-handoff.md`
+
+**已运行验证**
+- Root TypeScript、定向绘画/连接测试 9/9、`git diff --check` 通过。
+
+**风险与下一步**
+- 混合能力批量生成与真实浏览器右键/端口拖动仍需受控 E2E 验证；本轮未改变既有 DurableGenerationQueue 业务链路。

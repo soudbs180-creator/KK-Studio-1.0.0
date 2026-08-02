@@ -2161,7 +2161,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
       setCanvasContextMenu(null);
       return;
     }
-    const isDrawingSurface = Boolean(target.closest('.kk-canvas-drawing-overlay'));
     const rect = canvasRef.current?.getCanvasRect();
     const transform = canvasRef.current?.getCurrentTransform();
     const canvasPoint = rect && transform
@@ -2171,7 +2170,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       const bounds = getDrawingBounds(drawing);
       return bounds && canvasPoint.x >= bounds.x && canvasPoint.x <= bounds.x + bounds.width && canvasPoint.y >= bounds.y && canvasPoint.y <= bounds.y + bounds.height;
     });
-    setCanvasContextMenu({ x: e.clientX, y: e.clientY, context: isDrawingSurface || Boolean(drawingHit) ? 'drawing' : 'blank' });
+    setCanvasContextMenu({ x: e.clientX, y: e.clientY, context: Boolean(drawingHit) ? 'drawing' : 'blank' });
   }, [activeCanvas?.drawings, canvasRef, isMobile, selectNodes]);
 
   const {
