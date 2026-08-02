@@ -5,7 +5,7 @@ import {
 } from '../../services/auth/keyManagerCanonicalIds';
 import { getModelCapabilities } from '../../services/model/modelCapabilities';
 import { notify } from '../../services/system/notificationService';
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, Layers3, type LucideIcon } from 'lucide-react';
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Trash2, Wallet, Wand2, Layers3, type LucideIcon } from 'lucide-react';
 
 
 import ModelLogo from '../common/ModelLogo';
@@ -957,101 +957,59 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                     '--route-accent': route.accentColor || '#38bdf8',
                   } as React.CSSProperties}
                 >
-                  {/* 顶部模糊光晕线 */}
                   <div className="settings-model-center-route__glow-line" />
-
-                  {/* Header 区 */}
-                  <header className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      {/* Logo 容器 */}
-                      <div className="settings-model-center-route__logo-container">
-                        <ModelLogo
-                          modelId={route.recommendedModel || ''}
-                          provider={route.logoName || route.title}
-                          modelName={route.title}
-                          size={24}
-                          className="settings-model-center-route__logo"
-                          preferProvider
-                        />
-                      </div>
-
-                      {/* 标题 & ID */}
-                      <div className="min-w-0">
-                        <h1 className="settings-model-center-route__title-text">
-                          {route.title}
-                        </h1>
-                        <div className="settings-model-center-route__id-wrapper mt-1 flex items-center gap-1.5 text-[11px] leading-none" onClick={(e) => e.stopPropagation()}>
-                          <span className="truncate max-w-[100px]">ID: {getDisplayId(route.id, route.title, route.subtitle)}</span>
-                          <button
-                            type="button"
-                            title={pick('复制 ID', 'Copy ID')}
-                            data-api-management-action={API_MANAGEMENT_ACTIONS.copyRouteId.uiAction}
-                            className="hover:text-white transition-colors duration-150 p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(getDisplayId(route.id, route.title, route.subtitle));
-                              notify.success(pick('成功', 'Success'), pick('复制成功', 'Copied to clipboard'));
-                            }}
-                          >
-                            <Copy size={11} strokeWidth={1.8} className="settings-model-center-route__id-copy-icon" />
-                          </button>
-                        </div>
-                        {route.recommendedModel ? (
-                          <ModelCapabilityBadges modelId={route.recommendedModel} pick={pick} />
-                        ) : null}
-                      </div>
+                  <header className="settings-model-center-route__identity">
+                    <div className="settings-model-center-route__logo-container">
+                      <ModelLogo
+                        modelId={route.recommendedModel || ''}
+                        provider={route.logoName || route.title}
+                        modelName={route.title}
+                        size={24}
+                        className="settings-model-center-route__logo"
+                        preferProvider
+                      />
                     </div>
-
-                    {/* 状态 Badge */}
-                    <div className={`settings-model-center-route__status-indicator ${statusClass}`}>
-                      <span className="settings-model-center-route__status-dot-glow" />
-                      {route.statusLabel}
+                    <div className="settings-model-center-route__copy">
+                      <div className="settings-model-center-route__title-row">
+                        <h4 className="settings-model-center-route__title-text">{route.title}</h4>
+                        <div className={`settings-model-center-route__status-indicator ${statusClass}`}>
+                          <span className="settings-model-center-route__status-dot-glow" />
+                          {route.statusLabel}
+                        </div>
+                      </div>
+                      <div className="settings-model-center-route__meta">
+                        <span>{route.protocolLabel}</span>
+                        <span>{pick(`${route.modelCountLabel} 个模型`, `${route.modelCountLabel} models`)}</span>
+                      </div>
+                      <div className="settings-model-center-route__endpoint">{route.subtitle}</div>
+                      <div className="settings-model-center-route__id-wrapper" onClick={(event) => event.stopPropagation()}>
+                        <span>ID: {getDisplayId(route.id, route.title, route.subtitle)}</span>
+                        <button
+                          type="button"
+                          title={pick('复制 ID', 'Copy ID')}
+                          aria-label={pick('复制 ID', 'Copy ID')}
+                          data-api-management-action={API_MANAGEMENT_ACTIONS.copyRouteId.uiAction}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigator.clipboard.writeText(getDisplayId(route.id, route.title, route.subtitle));
+                            notify.success(pick('成功', 'Success'), pick('复制成功', 'Copied to clipboard'));
+                          }}
+                        >
+                          <Copy size={11} strokeWidth={1.8} className="settings-model-center-route__id-copy-icon" />
+                        </button>
+                      </div>
+                      {route.recommendedModel ? (
+                        <ModelCapabilityBadges modelId={route.recommendedModel} pick={pick} />
+                      ) : null}
                     </div>
                   </header>
 
-                  {/* 中间分割线 */}
-                  <div className="settings-model-center-route__section-divider" />
-
-                  {/* Metrics 舱 */}
-                  <section className="grid grid-cols-[auto_1fr_1px_auto_1fr] items-center gap-3">
-                    {/* Balance Icon */}
-                    <div className="settings-model-center-route__metric-icon-box">
-                      <Wallet size={18} strokeWidth={1.75} className="settings-model-center-route__metric-icon" />
-                    </div>
-
-                    {/* Balance Text */}
-                    <div className="min-w-0 text-left">
-                      <p className="settings-model-center-route__metric-lbl">
-                        Total Balance
-                      </p>
-                      <p className="settings-model-center-route__metric-val">
-                        {route.budgetLabel}
-                      </p>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="settings-model-center-route__metrics-divider" />
-
-                    {/* Delay Icon */}
-                    <div className="settings-model-center-route__metric-icon-box ml-1">
-                      <Timer size={18} strokeWidth={1.8} className="settings-model-center-route__metric-icon" />
-                    </div>
-
-                    {/* Delay Text */}
-                    <div className="min-w-0 text-left">
-                      <p className="settings-model-center-route__metric-lbl">
-                        Delay
-                      </p>
-                      <p className="settings-model-center-route__metric-val">
-                        {route.latencyLabel}
-                      </p>
-                    </div>
+                  <section className="settings-model-center-route__summary">
+                    <ModelCenterMetric label={pick('预算', 'Budget')} value={route.budgetLabel} />
+                    <ModelCenterMetric label={pick('用量', 'Usage')} value={route.usageLabel} />
+                    <ModelCenterMetric label={pick('延迟', 'Latency')} value={route.latencyLabel} />
                   </section>
 
-                  {/* 底部割线 */}
-                  <div className="settings-model-center-route__section-divider" />
-
-                  {/* 底部动作控制栏 */}
                   <footer className="settings-model-center-route__actions grid grid-cols-4 gap-2" onClick={(e) => e.stopPropagation()}>
                     {/* Pause Button */}
                     <button

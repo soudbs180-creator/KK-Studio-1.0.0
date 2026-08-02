@@ -1368,3 +1368,275 @@
     transition: none;
   }
 }
+
+/* Model Center V5: authoritative layout after the legacy settings bundle. */
+.settings-capability-api-embed--model-center {
+  min-width: 0;
+}
+
+.settings-panel .settings-console-content .settings-capability-api-embed--model-center > .settings-view-shell {
+  padding: 0;
+}
+
+.settings-panel .settings-console-content .settings-model-center-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 65fr) minmax(280px, 35fr) !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+.settings-panel .settings-console-content :is(.settings-model-center-pool, .settings-model-center-directory) {
+  height: min(640px, calc(100vh - 250px)) !important;
+  min-height: 440px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 76%, transparent) !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--surface-secondary) 76%, transparent) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.settings-panel .settings-console-content .settings-model-center-pool {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 10px !important;
+  min-height: 112px;
+  padding: 16px !important;
+  align-content: start;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  background: transparent !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-toolbar__copy,
+.settings-panel .settings-console-content .settings-model-center-toolbar__actions {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-auto-rows: minmax(104px, auto) !important;
+  align-content: start !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  overflow: auto !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1.45fr) minmax(250px, 1fr) auto !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-height: 104px !important;
+  padding: 12px 14px !important;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 74%, transparent) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--surface-primary) 54%, transparent) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route:hover {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-subtle)) !important;
+  background: color-mix(in srgb, var(--surface-primary) 76%, transparent) !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__glow-line,
+.settings-panel .settings-console-content .settings-model-center-route__section-divider {
+  display: none !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__identity {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__logo-container {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  background: color-mix(in srgb, var(--surface-tertiary) 78%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__copy {
+  min-width: 0;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__title-text {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__status-indicator {
+  position: static !important;
+  flex: none;
+  min-height: 22px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--surface-tertiary) 78%, transparent) !important;
+  box-shadow: none !important;
+  font-size: 10px !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__meta > span + span::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--text-tertiary);
+}
+
+.settings-panel .settings-console-content :is(.settings-model-center-route__endpoint, .settings-model-center-route__id-wrapper) {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__id-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__id-wrapper button {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 5px;
+  color: inherit;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 64%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-secondary) 46%, transparent);
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__metric {
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__metric + .settings-model-center-route__metric {
+  border-left: 1px solid color-mix(in srgb, var(--border-subtle) 62%, transparent);
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__metric-label {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__metric-value {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__actions {
+  display: grid !important;
+  grid-template-columns: repeat(4, 32px) !important;
+  gap: 6px !important;
+  width: auto !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__btn-action {
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-directory {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .settings-panel .settings-console-content .settings-model-center-route {
+    grid-template-columns: minmax(210px, 1fr) auto !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-route__summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-panel .settings-console-content .settings-model-center-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .settings-panel .settings-console-content :is(.settings-model-center-pool, .settings-model-center-directory) {
+    height: auto !important;
+    min-height: 0;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-route-grid {
+    max-height: 560px;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-directory {
+    min-height: 520px;
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-panel .settings-console-content .settings-model-center-route {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-route__actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: 100% !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-route__btn-action {
+    width: 100% !important;
+  }
+}

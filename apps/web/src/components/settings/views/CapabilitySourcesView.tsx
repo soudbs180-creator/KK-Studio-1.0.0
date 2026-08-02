@@ -175,11 +175,9 @@ export const CapabilitySourcesView: React.FC = () => {
 
       <ProviderConnectionsPanel />
 
-      <SettingsSection title={pick('密钥与通道配置 (原 API 设置)', 'Keys & Channels')}>
-        <div className="settings-capability-api-embed">
-          <ApiSettingsView initialSupplier={null} />
-        </div>
-      </SettingsSection>
+      <div className="settings-capability-api-embed settings-capability-api-embed--model-center">
+        <ApiSettingsView initialSupplier={null} />
+      </div>
     </SettingsViewShell>
   );
 };

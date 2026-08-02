@@ -2748,3 +2748,42 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 真实 CLIProxyAPI 模型目录与能力仍需在已配对 Local Runner 上验证 OAuth、多账号、目录刷新和断线恢复；前端继续只消费受限投影。
 - 后续增加 Provider schema 字段时应扩展共享编辑器 section/controller，不得重新分叉三套二级页或在 footer 使用覆盖式定位。
+
+---
+
+## 267. 2026-08-02 - fix(settings): 重做 API 模型中心主列表
+
+**修改范围**
+- 删除能力配置页中“密钥与通道配置（原 API 设置）”的旧嵌套外壳，让模型管理中心成为唯一主标题与内容容器。
+- 将供应商从两列重色竖卡重构为一行一张横向轻量卡片，完整展示协议、模型数量、端点、连接 ID、模型能力、预算、用量、延迟和四个既有操作。
+- 固化桌面 65/35 等高双栏：左侧供应商列表约显示五张后内部滚动，右侧预设目录维持六项分页；标题、说明和新增动作统一左对齐。
+- 增加高于动态旧设置样式的权威选择器，避免 `settings.css` 延迟加载后重新覆盖单列列表、卡片几何和浅表面设计；手机使用同一语义结构并回落为单列。
+
+**修改文件**
+- `apps/web/src/components/settings/apiWorkbenchSections.tsx`
+- `apps/web/src/components/settings/views/CapabilitySourcesView.tsx`
+- `apps/web/src/styles/settings-ui-v4.css`
+- `tests/unit/connected-runtime-ui-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 模型中心主列表与三个 API 二级编辑页是同一管理链路的两个层级：主列表负责通道概览和排序入口，二级页继续复用统一 schema-driven 编辑器。
+2. 供应商默认一行一张，完整信息优先于单位面积卡片数量；不得再用桌面宽屏断点恢复为两列竖卡。
+3. 状态、余额和延迟仍来自既有运行数据；新卡片只改变视觉投影，不制造在线状态、不改变 Provider、RouteEngine、Quote 或计费契约。
+4. 旧设置 CSS 尚未物理删除时，新模型中心规则必须使用限定在设置面板内容区的高优先级选择器，防止动态样式包加载顺序造成视觉回退。
+
+**已运行验证**
+- TDD：扩展模型中心布局契约，先复现缺少权威选择器、旧外壳标题残留和卡片结构未更新，完成后 3/3 通过。
+- API 设置相关 Unit 与设置 V4 契约共 51/51 通过。
+- Root、Architecture、Server 与 Tests TypeScript 通过；Tests TypeScript 共检查 622 个测试文件。
+- Web Vite 8.1.4 生产构建通过，共转换 2614 modules。
+- Architecture 全链、Governance 全链、Encoding 与 Mojibake 检查全部通过。
+- 应用内浏览器在 1548×1272 实测：旧外壳标题消失、供应商一行一张、预算/用量/延迟和操作完整、左右容器等高；390×844 下同一内容结构单列显示且无页面级横向溢出。
+
+**未运行验证及原因**
+- 环境未提供系统 `npm`，未原样运行聚合 `npm run verify:changes`；已使用绑定 Node 逐项执行本轮相关测试、类型、构建、架构、治理和编码检查。
+- 未执行在线依赖审计、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮不增加依赖、不修改后端或数据库契约。
+
+**风险与下一步**
+- 风险低，主要是旧 `settings.css` 仍保留历史模型卡片规则；本轮已用契约和浏览器验证阻断回盖，后续可在独立清理切片删除已失效的重复规则，避免继续增加样式债务。
+- 下一轮若加入供应商拖拽，只能调用现有 owner-scoped 原子排序接口并处理 revision 冲突，不能仅调整前端 DOM 顺序。
