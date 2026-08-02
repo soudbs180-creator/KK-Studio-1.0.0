@@ -4,7 +4,9 @@ import { test } from 'node:test';
 import { readSource } from '../support/workspacePaths.js';
 import {
   requestTaskCenterOpen,
+  requestTaskCenterToggle,
   TASK_CENTER_OPEN_EVENT,
+  TASK_CENTER_TOGGLE_EVENT,
 } from '../../apps/web/src/components/workspace/taskCenterEvents.ts';
 
 test('mobile composer uses the shared three-layer input hierarchy and keeps an active draft expanded', () => {
@@ -74,6 +76,18 @@ test('task center open requests use one shared event contract', () => {
   });
 
   requestTaskCenterOpen(target);
+
+  assert.equal(requestCount, 1);
+});
+
+test('desktop task center toggle requests use a distinct shared event contract', () => {
+  const target = new EventTarget();
+  let requestCount = 0;
+  target.addEventListener(TASK_CENTER_TOGGLE_EVENT, () => {
+    requestCount += 1;
+  });
+
+  requestTaskCenterToggle(target);
 
   assert.equal(requestCount, 1);
 });

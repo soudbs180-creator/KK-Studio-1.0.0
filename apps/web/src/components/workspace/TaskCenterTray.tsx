@@ -31,7 +31,7 @@ import {
 import { notify } from '../../services/system/notificationService';
 import { useCanvas } from '../../context/CanvasContext';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
-import { TASK_CENTER_OPEN_EVENT } from './taskCenterEvents';
+import { TASK_CENTER_OPEN_EVENT, TASK_CENTER_TOGGLE_EVENT } from './taskCenterEvents';
 
 interface TaskCenterTrayProps {
   onOpenSettings?: (view?: SettingsSurfaceView) => void;
@@ -123,15 +123,34 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   useEffect(() => agentRunStore.subscribe(setAgentRuns), []);
 
   useEffect(() => {
-    const handleOpenRequest = () => {
+    const rememberExternalTrigger = () => {
       const activeElement = document.activeElement;
       externalTriggerRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
         ? activeElement
         : null;
+    };
+    const handleOpenRequest = () => {
+      rememberExternalTrigger();
       setIsOpen(true);
     };
+    const handleToggleRequest = () => {
+      setIsOpen((currentOpen) => {
+        if (currentOpen) {
+          const returnTarget = externalTriggerRef.current;
+          externalTriggerRef.current = null;
+          window.requestAnimationFrame(() => returnTarget?.focus());
+          return false;
+        }
+        rememberExternalTrigger();
+        return true;
+      });
+    };
     window.addEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
-    return () => window.removeEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
+    window.addEventListener(TASK_CENTER_TOGGLE_EVENT, handleToggleRequest);
+    return () => {
+      window.removeEventListener(TASK_CENTER_OPEN_EVENT, handleOpenRequest);
+      window.removeEventListener(TASK_CENTER_TOGGLE_EVENT, handleToggleRequest);
+    };
   }, []);
 
   useEffect(() => {

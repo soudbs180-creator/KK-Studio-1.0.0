@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { KeyRound, Server, ShieldCheck, Globe, Cpu } from 'lucide-react';
+import { KeyRound, Server, Globe, Cpu, Waypoints } from 'lucide-react';
 import { useLocation } from 'react-router';
 import { useLocale } from '../../../context/LocaleContext';
 import {
@@ -12,6 +12,11 @@ import {
 import ApiSettingsView from '../ApiSettingsView';
 import ProviderConnectionsPanel from '../ProviderConnectionsPanel';
 import { getKkApiServerHealth } from '../../../services/api/kkApiServerHealth';
+import {
+  getCliProxyModelCatalog,
+  type CliProxyCatalogSnapshot,
+} from '../../../services/runtime/cliProxyModelCatalog';
+import { getRuntimeHealthSnapshot } from '../../../services/runtime/runtimeHealthSnapshot';
 import { toolRegistryInstance, type BrowserBridgeStatusSnapshot } from '../../../features/ai-assistant-runtime';
 import { isApiManagementEditorRoute } from '../apiManagementRouteState';
 
@@ -20,6 +25,8 @@ export const CapabilitySourcesView: React.FC = () => {
   const location = useLocation();
   const isEditorRoute = isApiManagementEditorRoute(location.pathname);
   const [localRunnerStatus, setLocalRunnerStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
+  const [cliProxyStatus, setCliProxyStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
+  const [cliProxyCatalog, setCliProxyCatalog] = useState<CliProxyCatalogSnapshot | null>(null);
   const [browserBridgeStatus, setBrowserBridgeStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
   
   useEffect(() => {
@@ -29,8 +36,10 @@ export const CapabilitySourcesView: React.FC = () => {
 
     let active = true;
     const check = async () => {
-      const [healthResult, bridgeResult] = await Promise.allSettled([
+      const [healthResult, runtimeResult, catalogResult, bridgeResult] = await Promise.allSettled([
         getKkApiServerHealth(),
+        getRuntimeHealthSnapshot(),
+        getCliProxyModelCatalog(),
         toolRegistryInstance.execute('browser.getStatus', {}, {}) as Promise<BrowserBridgeStatusSnapshot>,
       ]);
 
@@ -39,6 +48,11 @@ export const CapabilitySourcesView: React.FC = () => {
       setLocalRunnerStatus(
         healthResult.status === 'fulfilled' && healthResult.value.reachable ? 'active' : 'inactive'
       );
+      const cliProxyService = runtimeResult.status === 'fulfilled'
+        ? runtimeResult.value.services.find((service) => service.serviceId === 'cliproxyapi')
+        : undefined;
+      setCliProxyStatus(cliProxyService?.status === 'ready' ? 'active' : 'inactive');
+      setCliProxyCatalog(catalogResult.status === 'fulfilled' ? catalogResult.value : null);
 
       const bridgeConnected = bridgeResult.status === 'fulfilled'
         && !bridgeResult.value.setupRequired
@@ -101,6 +115,29 @@ export const CapabilitySourcesView: React.FC = () => {
             </div>
             <SettingsBadge className="settings-capability-source-card__badge" tone={statusTone(localRunnerStatus)}>
               {statusLabel(localRunnerStatus)}
+            </SettingsBadge>
+          </article>
+
+          <article className="settings-capability-source-card">
+            <span className="settings-capability-source-card__icon settings-capability-source-card__icon--runner">
+              <Waypoints size={16} />
+            </span>
+            <div className="settings-capability-source-card__copy">
+              <div className="settings-capability-source-card__title">CLIProxyAPI</div>
+              {cliProxyCatalog ? (
+                <p className="settings-capability-source-card__detail">
+                  {pick(
+                    `${cliProxyCatalog.models.length} 个模型 · ${cliProxyCatalog.webModelCount} 个联网 · ${cliProxyCatalog.reasoningModelCount} 个思考`,
+                    `${cliProxyCatalog.models.length} models · ${cliProxyCatalog.webModelCount} web · ${cliProxyCatalog.reasoningModelCount} reasoning`,
+                  )}
+                </p>
+              ) : null}
+              <p className="settings-capability-source-card__description">
+                {pick('本机回环 API、账号 OAuth 与模型目录的统一管理桥。', 'Loopback bridge for APIs, account OAuth, and the model catalog.')}
+              </p>
+            </div>
+            <SettingsBadge className="settings-capability-source-card__badge" tone={statusTone(cliProxyStatus)}>
+              {statusLabel(cliProxyStatus)}
             </SettingsBadge>
           </article>
 

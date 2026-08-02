@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CircleGauge, Gauge, Layers3, Palette, RotateCcw, Zap } from 'lucide-react';
+import { CircleGauge, Layers3, Palette, RotateCcw, Zap } from 'lucide-react';
 
 import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';
@@ -151,6 +151,29 @@ const AppearanceMotionView: React.FC = () => {
               </button>
             ))}
           </div>
+          {activePerformancePreset === 'custom' ? (
+            <div className="settings-performance-custom-controls">
+              <SettingsSystemField
+                label={pick('画布渲染策略', 'Canvas rendering')}
+                value={canvasPerformanceLabel}
+                description={pick(
+                  '只调整可见区调度、媒体解码、连线与缓存；缩放或拖动画布不会改变卡片结构与文字完整度。',
+                  'Tunes viewport scheduling, media decoding, connectors, and cache without changing visible card structure or text.',
+                )}
+              >
+                <SettingSelect
+                  value={canvasPerformanceMode}
+                  onChange={selectCanvasPerformanceMode}
+                  options={[
+                    { label: pick('自动调节', 'Auto'), value: 'auto' },
+                    { label: pick('质量优先', 'Quality'), value: 'quality' },
+                    { label: pick('流畅优先', 'Smooth'), value: 'smooth' },
+                    { label: pick('极限调度', 'Maximum scheduling'), value: 'ghost' },
+                  ]}
+                />
+              </SettingsSystemField>
+            </div>
+          ) : null}
         </SettingsSystemCard>
 
         {activePerformancePreset === 'custom' ? (
@@ -242,32 +265,6 @@ const AppearanceMotionView: React.FC = () => {
             <SettingsBadge tone={systemReducedMotion ? 'amber' : 'emerald'}>
               {systemReducedMotion ? pick('跟随系统', 'Following system') : pick('可用', 'Available')}
             </SettingsBadge>
-          </SettingsSystemField>
-        </SettingsSystemCard>
-
-        <SettingsSystemCard
-          className="settings-system-card--wide"
-          title={pick('画布性能', 'Canvas Performance')}
-          description={pick('把无限画布的渲染策略纳入同一体验档位；单独修改后总览会显示手动。', 'Keep canvas rendering in the same experience preset; custom changes appear as Manual on overview.')}
-          icon={Gauge}
-          tone="sky"
-          action={<SettingsBadge tone="amber">{canvasPerformanceLabel}</SettingsBadge>}
-        >
-          <SettingsSystemField
-            label={pick('画布渲染策略', 'Canvas rendering')}
-            value={canvasPerformanceLabel}
-            description={pick('自动、质量、流畅和极限模式会影响大画布卡片、连接线与缩略图渲染。', 'Controls cards, connectors, and thumbnail rendering on large canvases.')}
-          >
-            <SettingSelect
-              value={canvasPerformanceMode}
-              onChange={selectCanvasPerformanceMode}
-              options={[
-                { label: pick('自动调节', 'Auto'), value: 'auto' },
-                { label: pick('质量优先', 'Quality'), value: 'quality' },
-                { label: pick('流畅优先', 'Smooth'), value: 'smooth' },
-                { label: pick('极限模式', 'Ghost'), value: 'ghost' },
-              ]}
-            />
           </SettingsSystemField>
         </SettingsSystemCard>
 

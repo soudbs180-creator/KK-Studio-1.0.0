@@ -2660,3 +2660,43 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 在受控 PostgreSQL 创建空的 `kk_workspace_v4_rehearsal` 后，按示例注入三项 `KK_MIGRATION_*` 环境变量并运行唯一演练入口；保存 JSON 成功报告后再关闭 migration gate。
 - 如果真实演练暴露旧迁移兼容问题，应修复迁移或 bootstrap 后从全新空库重新演练，禁止在失败的演练库上手工改表后继续宣称通过。
+
+---
+
+## 265. 2026-08-02 - fix(ui): 收口 API 管理、AI 代理与工作区二次标注
+
+**修改范围**
+- 按本轮 14 条桌面端标注继续精修：顶部黑色整条背景拆除，项目/任务/账户保持独立磨砂簇；项目与任务入口支持二次点击关闭；账户、充值、小地图、收藏和统一 Switch 完成视觉与交互修正。
+- 性能配置改成桌面单排五档，并把画布渲染策略收进“自定义”档位，不再常驻独立画布性能卡；任何档位都不改变已显示卡片结构和文字。
+- API 模型中心改为等高 65/35 双栏、一行一张横向轻量供应商卡和六项预设分页；本地 API、供应商、预设编辑器统一使用满宽二级页，模型能力徽标复用现有能力源真值。
+- CLIProxyAPI 只通过已配对 Local Runner 的 loopback 投影提供账号、模型目录和能力摘要；AI 代理继续使用 KK Studio 唯一的 `IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification` 链路，借鉴 grok-build 的计划反馈与检查点，不复制其 Runtime。
+- 系统日志改为 API Gateway、Local Runner、CLIProxyAPI、OpenCLI Bridge 和 Browser Session 五项独立探测；删除模拟路由决策和伪造安全成功记录，离线、禁用和错误恢复动作均如实呈现。
+
+**修改文件**
+- Workspace：`apps/web/src/app/AppDesktopChrome.tsx`、`AppCanvasNavigationPanel.tsx`、`apps/web/src/components/workspace/{TaskCenterTray,taskCenterEvents}.ts*`、`apps/web/src/styles/workspace-ui-v4.css`。
+- Settings / Runtime UI：`apps/web/src/components/settings/apiWorkbenchSections.tsx`、`views/{AppearanceMotionView,CapabilitySourcesView,AiTakeoverView,ProviderRoutesView,DevDiagnosticsView}.tsx`、`apps/web/src/services/runtime/cliProxyModelCatalog.ts`、`apps/web/src/styles/settings-ui-v4.css`、`apps/web/src/main.tsx`。
+- Tests：`tests/unit/connected-runtime-ui-contract.test.ts`、`settings-ui-v4-contract.test.ts`、`workspace-ui-v4-contract.test.ts` 以及受任务入口语义影响的既有 UI 契约测试。
+
+**当前设计决策**
+1. CLIProxyAPI 是本地账号/OAuth 与模型目录的受限来源，不是浏览器可直连的 Provider；Web 只能访问 `127.0.0.1:9099/api/provider-runtime/models` 的 Local Runner 鉴权投影，Management API、明文 Secret 与任意代理接口继续禁止。
+2. CLIProxy 模型 ID 经现有 `getModelCapabilities` 映射为联网、思考、图像搜索和视觉参考等能力；未知能力明确显示“待声明”，不得根据供应商名称猜测。
+3. grok-build 只作为 AI Agent 的交互参考；会话、计划、工具、权限、审计、Skill/MCP/Plugin 继续由现有 KK Agent Runtime 管理，不新增第二套执行器或任务队列。
+4. 运行诊断只记录真实探测和真实请求产生的 RouteEngine trace；设置页打开本身不得制造成功状态或路由样本。
+5. API 二级编辑页使用显式单列满宽 Grid；三个新增/编辑入口共享相同边界，桌面内容占满可用区，手机仍由同一语义组件投影为单栏。
+
+**已运行验证**
+- 全量 Unit：2381 项中 2379 通过、0 失败、2 跳过；本轮新增/相关 UI 契约 12/12 通过。
+- Root TypeScript、Local Runner typecheck/build 与 22/22 测试通过；Shared、UI、API Client 和 Web Vite 8.1.4 构建通过。
+- Architecture 全链、Governance 全链、Encoding、Mojibake 与 `git diff --check` 通过。
+- Canvas Performance 3/3 通过；10K Canvas Smoke 在 11,103 节点下通过，卡片结构、子卡跟随和连接线断言保持稳定。
+- 应用内浏览器在 1548x1272 实测：性能五档同一排；统一 Switch 开/关状态与滑块对齐；API 编辑器满宽；系统五张服务卡等高；AI 代理展示唯一执行链；项目/任务二次点击关闭；小地图展开只增加地图、底栏不变；收藏为可读磨砂背景。
+
+**未运行验证及原因**
+- 系统没有 `npm` 可执行文件，未直接调用聚合 `npm run verify:changes`；已用绑定 Node 逐项执行本轮涉及的单元、类型、构建、架构、治理、编码和画布性能检查。
+- 未执行在线依赖审计、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮没有新增依赖或数据库变更。
+- 本机 API Gateway、Local Runner 和 CLIProxyAPI 未启动，浏览器验收中以真实 `offline` / `disabled` 展示，不以 Mock 成功替代。
+
+**风险与下一步**
+- CLIProxyAPI 真实模型能力仍依赖本地配对凭据与上游模型目录；上线前需在已固定版本的 sidecar 上验证 OAuth、多账号切换、模型刷新与断线恢复。
+- Provider 卡片现已显示服务端现有顺序和能力摘要；下一轮如补充拖拽动画，仍必须提交 owner-scoped 原子排序并遵守 Quote 冻结，不能只调整 DOM 顺序。
+- 继续按纵向切片验收剩余深层功能，禁止用视觉“在线”状态代替真实 Runtime Health。

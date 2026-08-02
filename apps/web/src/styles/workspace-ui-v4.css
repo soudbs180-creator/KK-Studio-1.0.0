@@ -13,10 +13,15 @@
     left: 0 !important;
     width: 100% !important;
     height: 52px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
     pointer-events: none;
   }
 
-  .kk-workspace-chrome-v3 {
+  .kk-workspace-chrome-v3,
+  .desktop-left-chrome .kk-workspace-chrome-v3 {
     position: relative;
     display: grid !important;
     width: 100%;
@@ -46,6 +51,15 @@
     border-radius: 12px !important;
   }
 
+  .kk-workspace-chrome-v3__project > strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: var(--kk-type-button);
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .kk-workspace-chrome-v3__canvas,
   .kk-workspace-chrome-v3__account {
     border-radius: 999px !important;
@@ -56,14 +70,34 @@
   }
 
   .kk-workspace-chrome-v3__account {
-    padding: 3px;
+    gap: 3px;
+    padding: 4px 5px;
+  }
+
+  .kk-workspace-chrome-v3__billing {
+    min-height: 28px;
+    gap: 6px;
+    padding: 0 2px 0 7px;
+    border: 0;
+    background: transparent;
+  }
+
+  .kk-workspace-chrome-v3__billing > span {
+    gap: 3px;
+  }
+
+  .kk-workspace-chrome-v3__billing > span > svg {
+    color: var(--kk-morphic-action);
   }
 
   #btn-desktop-recharge {
     min-height: 28px;
-    margin-inline-end: 3px;
-    padding-inline: 11px;
-    border: 1px solid color-mix(in oklch, white 18%, transparent) !important;
+    margin-inline-end: 2px;
+    padding-inline: 12px;
+    color: white;
+    border: 1px solid color-mix(in oklch, var(--kk-morphic-action) 82%, white 18%) !important;
+    background: var(--kk-morphic-action) !important;
+    box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent) !important;
   }
 
   .kk-task-center-host:not([data-mobile='true']) {
@@ -434,11 +468,14 @@
 .workspace-favorites-card {
   container-name: favorites-panel;
   container-type: inline-size;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid var(--frost-card-framework-border);
-  background: var(--frost-card-framework-bg);
+  background: color-mix(in oklch, var(--kk-morphic-panel) 96%, transparent);
+  background-image: none;
   box-shadow: var(--frost-card-framework-shadow);
-  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
 }
 
 .workspace-favorites-resize-handle {

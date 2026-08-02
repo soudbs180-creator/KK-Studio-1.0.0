@@ -16,7 +16,7 @@ import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useCanvas } from '../context/CanvasContext.tsx';
 import { navigateAppRoot } from './navigation/appRootNavigation';
-import { requestTaskCenterOpen } from '../components/workspace/taskCenterEvents';
+import { requestTaskCenterToggle } from '../components/workspace/taskCenterEvents';
 import { useTaskCenterSummary } from '../components/workspace/useTaskCenterSummary';
 import { requestProjectMenuToggle } from '../components/settings/projectMenuEvents';
 
@@ -126,7 +126,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         aria-label="打开当前项目"
       >
         <FolderKanban size={16} aria-hidden="true" />
-        <span><small>项目</small><strong><ActiveProjectName /></strong></span>
+        <strong><ActiveProjectName /></strong>
       </button>
 
       <button
@@ -137,7 +137,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         aria-haspopup="dialog"
         aria-controls="desktop-task-center-panel"
         data-attention={taskSummary.hasAttentionRequired ? 'true' : 'false'}
-        onClick={() => requestTaskCenterOpen()}
+        onClick={() => requestTaskCenterToggle()}
       >
         <ListTodo size={16} aria-hidden="true" />
         <span>任务</span>

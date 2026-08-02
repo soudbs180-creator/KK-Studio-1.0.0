@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Cpu, CheckCircle, RefreshCw } from 'lucide-react';
-import type { RuntimeHealthSnapshotDto, RuntimeServiceId } from '@kk/shared';
+import { Cpu, RefreshCw } from 'lucide-react';
+import type { RuntimeHealthSnapshotDto } from '@kk/shared';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
   SettingsSection,
   SettingsHero,
-  SettingsBadge,
   SettingsActionButton,
 } from '../SettingsScaffold';
 import { getRuntimeHealthSnapshot } from '../../../services/runtime/runtimeHealthSnapshot';
-import { providerRouteEngine } from '../../../core/routing/ProviderRouteEngine';
 import RuntimeHealthOverview from '../RuntimeHealthOverview';
 
 interface LogEntry {
@@ -52,20 +50,9 @@ export const DevDiagnosticsView: React.FC = () => {
         );
       });
 
-      // 2. Query RouteEngine for test models
-      pushLog('RouteEngine', 'info', 'Querying route decision for flux-schnell (image)...');
-      const decImage = await providerRouteEngine.decideRoute({ modelId: 'flux-schnell', taskType: 'image' });
-      pushLog('RouteEngine', 'info', `Decision resolved: Mode=${decImage.mode}, Reason=${decImage.reason}`);
-
-      pushLog('RouteEngine', 'info', 'Querying route decision for gpt-4o (text)...');
-      const decText = await providerRouteEngine.decideRoute({ modelId: 'gpt-4o', taskType: 'text' });
-      pushLog('RouteEngine', 'info', `Decision resolved: Mode=${decText.mode}, Reason=${decText.reason}`);
-
-      // 3. Security Boundary checks
-      const isRedonly = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
-      pushLog('SecurityPolicy', 'info', `Security read-only snap flag: ${isRedonly ? 'ACTIVE' : 'INACTIVE'}`);
-      pushLog('SecurityPolicy', 'info', 'Evaluating CORS boundaries for secure proxy routing...');
-      pushLog('SecurityPolicy', 'info', 'Sandbox policies verified: execute_url and write_file boundaries stagings are staging-secured.');
+      const isReadonly = typeof window !== 'undefined' && (window as Window & { __KK_SETTINGS_READONLY__?: boolean }).__KK_SETTINGS_READONLY__ === true;
+      pushLog('Settings', 'info', `Current settings access: ${isReadonly ? 'read-only snapshot' : 'editable runtime'}.`);
+      pushLog('RouteEngine', 'info', 'Health probes do not create synthetic route decisions. Runtime traces appear only after a real request.');
 
       setLogs(newLogs);
     } catch (err: unknown) {
@@ -79,11 +66,6 @@ export const DevDiagnosticsView: React.FC = () => {
   useEffect(() => {
     void runDiagnostic();
   }, []);
-
-  const readService = (serviceId: RuntimeServiceId) => (
-    runtimeSnapshot?.services.find((service) => service.serviceId === serviceId)
-  );
-  const manifest = runtimeSnapshot?.build;
 
   return (
     <SettingsViewShell>
@@ -107,108 +89,6 @@ export const DevDiagnosticsView: React.FC = () => {
         services={runtimeSnapshot?.services || []}
         onRetry={() => void runDiagnostic()}
       />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* System Health Card */}
-        <SettingsSection title={pick('系统服务连通性', 'Connectivity')}>
-          <div className="space-y-3 text-xs text-[var(--text-secondary)]">
-            <div className="flex items-center justify-between">
-              <span>Local Runner (Daemon)</span>
-              <SettingsBadge tone={readService('local-runner')?.status === 'ready' ? 'emerald' : 'rose'}>
-                {readService('local-runner')?.status || pick('检测中', 'CHECKING')}
-              </SettingsBadge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>OpenCLI Bridge API</span>
-              <SettingsBadge tone={readService('opencli')?.status === 'ready' ? 'emerald' : 'rose'}>
-                {readService('opencli')?.status || pick('检测中', 'CHECKING')}
-              </SettingsBadge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>API Gateway Health</span>
-              <SettingsBadge tone={readService('api-gateway')?.status === 'ready' ? 'emerald' : 'rose'}>
-                {readService('api-gateway')?.status || pick('检测中', 'CHECKING')}
-              </SettingsBadge>
-            </div>
-          </div>
-        </SettingsSection>
-
-        {/* Security Sandbox Card */}
-        <SettingsSection title={pick('安全与沙箱边界', 'Security Boundaries')}>
-          <div className="space-y-3 text-xs text-[var(--text-secondary)]">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-              <span>{pick('明文密钥绝对不暴露于前端 DOM。', 'Private keys redacted in DOM.')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-              <span>{pick('跨平台 API 请求均通过安全代理中继。', 'CORS bypassed via relay proxies.')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-              <span>{pick('本地文件处理沙箱权限已固化。', 'Local filesystem scoped write.')}</span>
-            </div>
-          </div>
-        </SettingsSection>
-
-        {/* Performance Metrics Card */}
-        <SettingsSection title={pick('画布物理指标', 'Canvas Metrics')}>
-          <div className="space-y-3 text-xs text-[var(--text-secondary)]">
-            <div className="flex items-center justify-between">
-              <span>{pick('当前渲染节点数', 'Rendered Node Count')}</span>
-              <span className="font-mono font-bold text-[var(--text-primary)]">
-                {typeof window !== 'undefined' ? document.querySelectorAll('[data-canvas-surface]').length : 0}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{pick('交互流畅度预测', 'Expected Smoothness')}</span>
-              <SettingsBadge tone="emerald">EXCELLENT (60FPS)</SettingsBadge>
-            </div>
-          </div>
-        </SettingsSection>
-
-        {/* Build Metadata & Environment Card */}
-        <SettingsSection title={pick('环境诊断与元数据', 'Build Metadata & Environment')}>
-          <div className="space-y-2 text-xs text-[var(--text-secondary)]">
-            <div className="flex items-center justify-between">
-              <span>Version / Target</span>
-              <span className="font-mono text-[var(--text-primary)]">
-                {manifest?.version || '1.5.9'} ({manifest?.deploymentTarget || 'production'})
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Commit SHA</span>
-              <span className="font-mono text-[var(--text-primary)] truncate max-w-[100px]" title={manifest?.commitSha || undefined}>
-                {manifest?.commitSha ? manifest.commitSha.slice(0, 7) : 'f4d2b09'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Pathname / Mode</span>
-              <span className="font-mono text-[var(--text-primary)] truncate max-w-[100px]" title={typeof window !== 'undefined' ? window.location.pathname : ''}>
-                {typeof window !== 'undefined' ? window.location.pathname : '/settings'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Active View</span>
-              <span className="font-mono text-[var(--text-primary)]">
-                {typeof window !== 'undefined' ? window.location.pathname.split('/').pop() || 'dashboard' : 'dashboard'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Settings Shell</span>
-              <span className="font-semibold text-emerald-400">
-                {typeof window !== 'undefined' ? (window.innerWidth <= 768 ? 'Mobile' : 'Desktop') : 'Desktop'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>UI Theme Preference</span>
-              <span className="font-mono text-[var(--text-primary)]">
-                {typeof window !== 'undefined' ? (localStorage.getItem('kk_theme') || localStorage.getItem('theme') || 'dark') : 'dark'}
-              </span>
-            </div>
-          </div>
-        </SettingsSection>
-      </div>
 
       {/* Logs and Traces */}
       <SettingsSection title={pick('Provider 路由与执行链决策日志', 'Decision Traces & Exec Logs')}>

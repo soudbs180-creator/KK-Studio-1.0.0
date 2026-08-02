@@ -18,6 +18,74 @@ interface AppCanvasNavigationPanelProps {
   onAutoArrange: () => void;
 }
 
+interface CanvasNavigationBarProps {
+  displayZoomPercent: number;
+  zoomProgress: number;
+  expanded: boolean;
+  onZoomOut: React.MouseEventHandler<HTMLButtonElement>;
+  onZoomIn: React.MouseEventHandler<HTMLButtonElement>;
+  onSliderChange: React.ChangeEventHandler<HTMLInputElement>;
+  onAutoArrange: () => void;
+  onToggle: React.MouseEventHandler<HTMLButtonElement>;
+}
+
+const CanvasNavigationBar: React.FC<CanvasNavigationBarProps> = ({
+  displayZoomPercent,
+  zoomProgress,
+  expanded,
+  onZoomOut,
+  onZoomIn,
+  onSliderChange,
+  onAutoArrange,
+  onToggle,
+}) => (
+  <div data-canvas-navigation-bar="true" className="flex h-8 w-full items-center gap-1.5">
+    <div data-canvas-zoom-control="true" className="flex min-w-0 flex-1 items-center gap-1">
+      <button onClick={onZoomOut} className="kk-workspace-icon-control h-7 w-7 rounded-lg" title="缩小" aria-label="缩小">
+        <Minus size={13} />
+      </button>
+      <input
+        type="range"
+        min="10"
+        max="300"
+        value={displayZoomPercent}
+        onChange={onSliderChange}
+        onMouseDown={(event) => event.stopPropagation()}
+        className="zoom-slider h-1 min-w-0 flex-1 cursor-pointer"
+        aria-label="画布缩放"
+        style={{ '--zoom-slider-progress': `${zoomProgress}%` } as React.CSSProperties}
+      />
+      <button onClick={onZoomIn} className="kk-workspace-icon-control h-7 w-7 rounded-lg" title="放大" aria-label="放大">
+        <Plus size={13} />
+      </button>
+      <span className="inline-flex w-10 items-center justify-end whitespace-nowrap text-[10px] font-black text-[var(--text-secondary)]">
+        {displayZoomPercent}%
+      </span>
+    </div>
+    <button
+      type="button"
+      data-canvas-navigation-action="autoArrange"
+      data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+      onClick={onAutoArrange}
+      className="kk-workspace-icon-control h-7 w-7 rounded-lg"
+      title="自动整理卡片"
+      aria-label="自动整理卡片"
+    >
+      <LayoutDashboard size={13} />
+    </button>
+    <button
+      type="button"
+      data-canvas-minimap-toggle="true"
+      onClick={onToggle}
+      className="kk-workspace-icon-control h-7 w-7 rounded-lg"
+      title={expanded ? '收起小地图' : '展开小地图'}
+      aria-label={expanded ? '收起小地图' : '展开小地图'}
+    >
+      {expanded ? <Minimize2 size={13} /> : <Map size={13} className="text-[var(--accent-coral)]" />}
+    </button>
+  </div>
+);
+
 const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   activeCanvas,
   canvasTransform,
@@ -39,7 +107,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   });
 
   useEffect(() => {
-    const panelWidth = isMobile || !activeCanvas ? 0 : isCollapsed ? 296 : 304;
+    const panelWidth = isMobile || !activeCanvas ? 0 : 304;
     setWorkspaceNavigationPanelWidth(panelWidth);
     return () => setWorkspaceNavigationPanelWidth(0);
   }, [activeCanvas, isCollapsed, isMobile]);
@@ -452,12 +520,11 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       <div
         data-canvas-navigation-dock="true"
         data-canvas-navigation-bar="true"
-        className="kk-workspace-chrome-surface canvas-nav-panel canvas-nav-panel--compact flex items-center gap-1.5 rounded-2xl border px-2 py-1 select-none transition-all duration-300 ease-in-out"
+        className="kk-workspace-chrome-surface canvas-nav-panel flex items-center rounded-2xl border p-1.5 select-none transition-all duration-300 ease-in-out"
         style={{
-          width: '296px',
-          maxWidth: '296px',
+          width: '304px',
+          maxWidth: '304px',
           boxSizing: 'border-box',
-          height: '38px',
           boxShadow: 'var(--frost-card-framework-shadow)',
           background: 'var(--frost-card-framework-bg)',
           border: '1px solid var(--frost-card-framework-border)',
@@ -465,61 +532,16 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         }}
       >
-        <div data-canvas-zoom-control="true" className="flex min-w-0 flex-1 items-center gap-1">
-          <button
-            onClick={handleZoomOut}
-            className="kk-workspace-icon-control h-6 w-6 rounded-md"
-            title="缩小"
-            aria-label="缩小"
-          >
-            <Minus size={11} />
-          </button>
-          <div className="flex min-w-0 flex-1 items-center">
-            <input
-              type="range"
-              min="10"
-              max="300"
-              value={displayZoomPercent}
-              onChange={handleSliderChange}
-              onMouseDown={(event) => event.stopPropagation()}
-              className="zoom-slider h-1 w-full min-w-0 cursor-pointer"
-              aria-label="画布缩放"
-              style={{ '--zoom-slider-progress': `${zoomProgress}%` } as React.CSSProperties}
-            />
-          </div>
-          <button
-            onClick={handleZoomIn}
-            className="kk-workspace-icon-control h-6 w-6 rounded-md"
-            title="放大"
-            aria-label="放大"
-          >
-            <Plus size={11} />
-          </button>
-          <span className="min-w-[38px] text-right text-[10px] font-black text-[var(--text-secondary)]">
-            {displayZoomPercent}%
-          </span>
-        </div>
-        <button
-          type="button"
-          data-canvas-navigation-action="autoArrange"
-          data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-          onClick={onAutoArrange}
-          className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-          title="自动整理卡片"
-          aria-label="自动整理卡片"
-        >
-          <LayoutDashboard size={13} />
-        </button>
-        <button
-          type="button"
-          data-canvas-minimap-toggle="true"
-          onClick={toggleCollapsed}
-          className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-          title="展开小地图"
-          aria-label="展开小地图"
-        >
-          <Map size={13} className="text-[var(--accent-coral)]" />
-        </button>
+        <CanvasNavigationBar
+          displayZoomPercent={displayZoomPercent}
+          zoomProgress={zoomProgress}
+          expanded={false}
+          onZoomOut={handleZoomOut}
+          onZoomIn={handleZoomIn}
+          onSliderChange={handleSliderChange}
+          onAutoArrange={onAutoArrange}
+          onToggle={toggleCollapsed}
+        />
       </div>
     );
   }
@@ -528,7 +550,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     <div
       data-canvas-navigation-dock="true"
       data-canvas-minimap-popover="true"
-      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-3 select-none transition-all duration-300 ease-in-out"
+      className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-1.5 select-none transition-all duration-300 ease-in-out"
       style={{
         width: '304px',
         maxWidth: '304px',
@@ -637,71 +659,16 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             </div>
           ) : null}
         </div>
-        <div data-canvas-navigation-bar="true" className="mt-0.5 flex h-8 items-center gap-1.5">
-          <div data-canvas-zoom-control="true" className="flex min-w-0 flex-1 items-center gap-1">
-          <button
-            onClick={handleZoomOut}
-            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-            title="缩小"
-            aria-label="缩小"
-          >
-            <Minus size={13} />
-          </button>
-          <div className="flex min-w-0 flex-1 items-center">
-            <input
-              type="range"
-              min="10"
-              max="300"
-              value={displayZoomPercent}
-              onChange={handleSliderChange}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="zoom-slider cursor-pointer w-full min-w-0 h-1"
-              aria-label="画布缩放"
-              style={{
-                '--zoom-slider-progress': `${zoomProgress}%`,
-              } as React.CSSProperties}
-            />
-          </div>
-
-          <button
-            onClick={handleZoomIn}
-            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-            title="放大"
-            aria-label="放大"
-          >
-            <Plus size={13} />
-          </button>
-
-          <span
-            className="inline-flex w-10 items-center justify-end whitespace-nowrap text-[10px] font-black text-[var(--text-secondary)]"
-            style={{ height: '28px', lineHeight: '28px' }}
-            title="当前实际缩放比"
-          >
-            {displayZoomPercent}%
-          </span>
-          </div>
-          <button
-            type="button"
-            data-canvas-navigation-action="autoArrange"
-            data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-            onClick={onAutoArrange}
-            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-            title="自动整理卡片"
-            aria-label="自动整理卡片"
-          >
-            <LayoutDashboard size={13} />
-          </button>
-          <button
-            type="button"
-            data-canvas-minimap-toggle="true"
-            onClick={toggleCollapsed}
-            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
-            title="收起小地图"
-            aria-label="收起小地图"
-          >
-            <Minimize2 size={13} />
-          </button>
-        </div>
+        <CanvasNavigationBar
+          displayZoomPercent={displayZoomPercent}
+          zoomProgress={zoomProgress}
+          expanded
+          onZoomOut={handleZoomOut}
+          onZoomIn={handleZoomIn}
+          onSliderChange={handleSliderChange}
+          onAutoArrange={onAutoArrange}
+          onToggle={toggleCollapsed}
+        />
       </div>
     </div>
   );

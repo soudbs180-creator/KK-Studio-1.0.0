@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bot, Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
@@ -10,9 +10,11 @@ import {
 } from '../SettingsScaffold';
 import { SettingSelect } from '../ui/index';
 import AgentExtensionsSection from '../AgentExtensionsSection';
+import { getCliProxyModelCatalog } from '../../../services/runtime/cliProxyModelCatalog';
 
 export const AiTakeoverView: React.FC = () => {
   const { pick } = useLocale();
+  const [catalogModelCount, setCatalogModelCount] = useState<number | null>(null);
 
   const [takeoverMode, setTakeoverMode] = useState<'advisory' | 'low_risk' | 'confirm_medium' | 'confirm_batch' | 'strict'>(() => {
     const val = localStorage.getItem('kk_studio_ai_takeover_mode');
@@ -23,6 +25,20 @@ export const AiTakeoverView: React.FC = () => {
     setTakeoverMode(mode);
     localStorage.setItem('kk_studio_ai_takeover_mode', mode);
   };
+
+  useEffect(() => {
+    let active = true;
+    void getCliProxyModelCatalog()
+      .then((catalog) => {
+        if (active) setCatalogModelCount(catalog.models.length);
+      })
+      .catch(() => {
+        if (active) setCatalogModelCount(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <SettingsViewShell>
@@ -36,6 +52,28 @@ export const AiTakeoverView: React.FC = () => {
         icon={Bot}
         tone="indigo"
       />
+
+      <SettingsSection
+        title={pick('AI 代理执行链', 'AI Agent Runtime')}
+        description={pick(
+          '交互方式借鉴 grok-build 的计划反馈、工具执行与检查点，但所有操作仍经过 KK Studio 唯一的权限链。',
+          'The interaction model follows grok-build-style planning, tool feedback, and checkpoints while retaining KK Studio\'s single permission chain.',
+        )}
+      >
+        <div className="settings-agent-runtime-flow" aria-label={pick('AI 代理执行阶段', 'AI agent stages')}>
+          {['IntentGate', 'Planner', 'ToolRegistry', 'PermissionPolicy', 'Executor', 'Verification', 'Checkpoint'].map((stage, index) => (
+            <React.Fragment key={stage}>
+              {index > 0 ? <span aria-hidden="true">→</span> : null}
+              <SettingsBadge tone={stage === 'PermissionPolicy' ? 'amber' : 'indigo'}>{stage}</SettingsBadge>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="settings-agent-runtime-sources">
+          <span><strong>API / OAuth</strong> CLIProxyAPI{catalogModelCount === null ? '' : ` · ${catalogModelCount} models`}</span>
+          <span><strong>{pick('能力选择', 'Capability choice')}</strong> RouteEngine + CapabilityGraph</span>
+          <span><strong>{pick('执行与审计', 'Execution & audit')}</strong> KK Agent Runtime</span>
+        </div>
+      </SettingsSection>
 
       <SettingsSection title={pick('接管策略', 'Takeover Policy')}>
         <div className="space-y-4">

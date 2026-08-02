@@ -27,13 +27,14 @@ test('task center projects Queue and Agent Run state without a second mobile sto
   assert.match(tray, /data-state=\{isOpen \? ['"]open['"] : ['"]collapsed['"]\}/);
   assert.doesNotMatch(tray, /\{!isOpen && !isMobile && \(/);
   assert.doesNotMatch(tray, /className="kk-task-center-trigger"/);
-  assert.match(desktopChrome, /requestTaskCenterOpen/);
+  assert.match(desktopChrome, /requestTaskCenterToggle/);
   assert.match(desktopChrome, /useTaskCenterSummary/);
   assert.match(desktopChrome, /aria-label="打开任务管理"/);
   assert.match(tray, /document\.activeElement/);
   const transientTaskHandler = tray.match(/const handleAddTask[\s\S]*?const handleUpdateTask/)?.[0] || '';
   assert.doesNotMatch(transientTaskHandler, /setIsOpen\(true\)/);
   assert.match(tray, /TASK_CENTER_OPEN_EVENT/);
+  assert.match(tray, /TASK_CENTER_TOGGLE_EVENT/);
   assert.doesNotMatch(tray, /kk_custom_tasks/);
   assert.match(tray, /agentRunStore\.subscribe/);
   assert.match(tray, /durableGenerationQueue\.archiveJob\(task\.id\)/);

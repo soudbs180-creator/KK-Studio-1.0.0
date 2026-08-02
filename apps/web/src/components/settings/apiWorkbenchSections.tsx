@@ -3,6 +3,7 @@ import {
   buildCanonicalApiRecordId,
   isCanonicalApiRecordId,
 } from '../../services/auth/keyManagerCanonicalIds';
+import { getModelCapabilities } from '../../services/model/modelCapabilities';
 import { notify } from '../../services/system/notificationService';
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, Layers3, type LucideIcon } from 'lucide-react';
 
@@ -49,6 +50,34 @@ const getDisplayId = (id: string, title: string, subtitle?: string): string => {
     baseUrl: subtitle,
   });
 };
+
+/**
+ * Only presents capabilities declared by the existing model capability source.
+ * CLIProxyAPI catalog entries stay honest when a model has not been profiled yet.
+ */
+export const getModelCapabilityLabels = (modelId: string, pick: LocalePick): string[] => {
+  const capabilities = getModelCapabilities(modelId);
+  if (!capabilities) return [pick('能力待同步', 'Capabilities pending')];
+
+  const labels = [
+    capabilities.supportsGrounding ? pick('联网', 'Web') : '',
+    capabilities.supportsThinking ? pick('思考', 'Reasoning') : '',
+    capabilities.supportsImageSearch ? pick('图片搜索', 'Image search') : '',
+    capabilities.supportsReferenceImages !== false && (capabilities.maxRefImages || 0) > 0
+      ? pick('视觉参考', 'Vision refs')
+      : '',
+  ].filter(Boolean);
+
+  return labels.length > 0 ? labels : [pick('基础生成', 'Base generation')];
+};
+
+const ModelCapabilityBadges: React.FC<{ modelId: string; pick: LocalePick }> = ({ modelId, pick }) => (
+  <span className="settings-model-capability-badges" aria-label={pick('模型能力', 'Model capabilities')}>
+    {getModelCapabilityLabels(modelId, pick).map((label) => (
+      <span key={label}>{label}</span>
+    ))}
+  </span>
+);
 
 
 // 简体中文：注入 API 工作台专用状态卡片的 CSS 样式，带来半透明玻璃、动态发光及柔和过渡微动效，看齐侧边栏顶级卡片设计
@@ -926,11 +955,6 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                   }}
                   style={{
                     '--route-accent': route.accentColor || '#38bdf8',
-                    position: 'relative',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                   } as React.CSSProperties}
                 >
                   {/* 顶部模糊光晕线 */}
@@ -972,6 +996,9 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                             <Copy size={11} strokeWidth={1.8} className="settings-model-center-route__id-copy-icon" />
                           </button>
                         </div>
+                        {route.recommendedModel ? (
+                          <ModelCapabilityBadges modelId={route.recommendedModel} pick={pick} />
+                        ) : null}
                       </div>
                     </div>
 
@@ -1161,6 +1188,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                 <span className="settings-model-center-preset__title">{preset.title}</span>
                 <span className="settings-model-center-preset__meta">{preset.kindLabel} · {preset.protocolLabel}</span>
                 <span className="settings-model-center-preset__url">{preset.baseUrlLabel}</span>
+                <ModelCapabilityBadges modelId={preset.recommendedModel} pick={pick} />
               </span>
               <span className="settings-model-center-preset__model">{preset.recommendedModel}</span>
             </button>

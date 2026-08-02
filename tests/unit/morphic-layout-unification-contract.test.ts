@@ -74,7 +74,7 @@ test('workspace modes are controlled by the real surface and hidden panels are i
 
   assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
   assert.doesNotMatch(chromeSource, /useState<'canvas'\s*\|\s*'copilot'\s*\|\s*'create'>/);
-  assert.match(chromeSource, /requestTaskCenterOpen\(\)/);
+  assert.match(chromeSource, /requestTaskCenterToggle\(\)/);
   assert.match(chromeSource, /data-chrome-region="tasks"/);
   assert.doesNotMatch(chromeSource, /data-composer-copilot-toggle="true"/);
   assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);

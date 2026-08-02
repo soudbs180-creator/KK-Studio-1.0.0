@@ -49,7 +49,7 @@ test('desktop workspace chrome and minimap consume the shared chrome system', ()
   assert.match(desktopChromeSource, /data-chrome-region="project"/);
   assert.match(desktopChromeSource, /data-chrome-region="tasks"/);
   assert.match(desktopChromeSource, /data-chrome-region="account"/);
-  assert.match(desktopChromeSource, /requestTaskCenterOpen/);
+  assert.match(desktopChromeSource, /requestTaskCenterToggle/);
   assert.doesNotMatch(desktopChromeSource, /data-composer-copilot-toggle="true"/);
   assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
   assert.match(promptBarSource, /className="kk-composer-assistant-toggle"/);

@@ -18,7 +18,7 @@ test('desktop workspace chrome exposes project, tasks and account with Composer-
   assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
   assert.match(workspaceSource, /onToggleAssistant:\s*toggleChatPanel/);
   assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
-  assert.match(chromeSource, /requestTaskCenterOpen\(\)/);
+  assert.match(chromeSource, /requestTaskCenterToggle\(\)/);
   assert.match(chromeSource, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
   assert.match(
     chromeSource,
