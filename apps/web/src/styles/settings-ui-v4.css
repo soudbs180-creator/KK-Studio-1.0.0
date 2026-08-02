@@ -1379,6 +1379,7 @@
 }
 
 .settings-panel .settings-console-content .settings-model-center-layout {
+  --settings-model-center-column-height: min(640px, calc(100vh - 250px));
   display: grid !important;
   grid-template-columns: minmax(0, 65fr) minmax(280px, 35fr) !important;
   gap: 12px !important;
@@ -1386,29 +1387,35 @@
 }
 
 .settings-panel .settings-console-content :is(.settings-model-center-pool, .settings-model-center-directory) {
-  height: min(640px, calc(100vh - 250px)) !important;
-  min-height: 440px;
+  height: var(--settings-model-center-column-height) !important;
+  min-height: var(--settings-model-center-column-height) !important;
+  max-height: var(--settings-model-center-column-height) !important;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 76%, transparent) !important;
   border-radius: 18px !important;
   background: color-mix(in srgb, var(--surface-secondary) 76%, transparent) !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: hidden !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-pool {
   display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: 120px minmax(0, 1fr) !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-column-header {
+  box-sizing: border-box;
+  display: grid !important;
+  min-height: 120px !important;
+  max-height: 120px !important;
+  padding: 16px !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent) !important;
+  background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-toolbar {
-  display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
   gap: 10px !important;
-  min-height: 112px;
-  padding: 16px !important;
   align-content: start;
-  border-bottom: 1px solid var(--border-subtle) !important;
-  background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-toolbar__copy,
@@ -1420,7 +1427,7 @@
 .settings-panel .settings-console-content .settings-model-center-route-grid {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  grid-auto-rows: minmax(104px, auto) !important;
+  grid-auto-rows: 92px !important;
   align-content: start !important;
   gap: 8px !important;
   padding: 10px !important;
@@ -1429,15 +1436,18 @@
 
 .settings-panel .settings-console-content .settings-model-center-route {
   display: grid !important;
-  grid-template-columns: minmax(220px, 1.45fr) minmax(250px, 1fr) auto !important;
+  grid-template-columns: minmax(260px, 1.35fr) minmax(190px, 0.85fr) auto !important;
   align-items: center !important;
-  gap: 14px !important;
-  min-height: 104px !important;
-  padding: 12px 14px !important;
+  gap: 10px !important;
+  height: 92px !important;
+  min-height: 92px !important;
+  max-height: 92px !important;
+  padding: 10px 12px !important;
   border: 1px solid color-mix(in srgb, var(--border-subtle) 74%, transparent) !important;
   border-radius: 14px !important;
   background: color-mix(in srgb, var(--surface-primary) 54%, transparent) !important;
   box-shadow: none !important;
+  overflow: hidden !important;
   cursor: pointer;
 }
 
@@ -1468,10 +1478,20 @@
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title title'
+    'meta endpoint'
+    'identifier capabilities';
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
   min-width: 0;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__title-row {
+  grid-area: title;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1502,9 +1522,10 @@
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__meta {
+  grid-area: meta;
   display: flex;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 0;
   color: var(--text-secondary);
   font-size: 11px;
 }
@@ -1516,7 +1537,7 @@
 }
 
 .settings-panel .settings-console-content :is(.settings-model-center-route__endpoint, .settings-model-center-route__id-wrapper) {
-  margin-top: 3px;
+  margin-top: 0;
   overflow: hidden;
   color: var(--text-tertiary);
   font-size: 10px;
@@ -1526,9 +1547,25 @@
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__id-wrapper {
+  grid-area: identifier;
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__endpoint {
+  grid-area: endpoint;
+  max-width: 108px;
+  text-align: right;
+}
+
+.settings-panel .settings-console-content .settings-model-center-route__copy > .settings-model-capability-badges {
+  grid-area: capabilities;
+  max-width: 108px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-top: 0;
+  overflow: hidden;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__id-wrapper button {
@@ -1543,18 +1580,18 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 64%, transparent);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--surface-secondary) 46%, transparent);
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__metric {
   min-width: 0;
-  padding: 9px 10px;
+  padding: 5px 8px;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__metric + .settings-model-center-route__metric {
-  border-left: 1px solid color-mix(in srgb, var(--border-subtle) 62%, transparent);
+  border-left: 0 !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__metric-label {
@@ -1577,27 +1614,109 @@
 
 .settings-panel .settings-console-content .settings-model-center-route__actions {
   display: grid !important;
-  grid-template-columns: repeat(4, 32px) !important;
-  gap: 6px !important;
+  grid-template-columns: repeat(4, 30px) !important;
+  gap: 4px !important;
   width: auto !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__btn-action {
-  width: 32px !important;
-  height: 32px !important;
-  min-height: 32px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
   border-radius: 9px !important;
   background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-directory {
   display: grid !important;
-  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+  grid-template-rows: 120px 52px minmax(0, 1fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-directory__header {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 10px !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-directory__tabs {
+  align-self: center;
+  margin: 4px 16px !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset-list {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-auto-rows: 68px !important;
+  align-content: start !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+  padding: 10px !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset-row {
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 9px !important;
+  height: 68px !important;
+  min-height: 68px !important;
+  max-height: 68px !important;
+  padding: 7px 10px !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__main {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title capabilities'
+    'meta capabilities'
+    'url capabilities';
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__title {
+  grid-area: title;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__meta {
+  grid-area: meta;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__url {
+  grid-area: url;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__main > .settings-model-capability-badges {
+  grid-area: capabilities;
+  max-width: 94px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-top: 0;
+  overflow: hidden;
+}
+
+.settings-panel .settings-console-content .settings-model-center-preset__model {
+  display: none !important;
 }
 
 @media (min-width: 901px) and (max-width: 1180px) {
+  .settings-panel .settings-console-content .settings-model-center-route-grid {
+    grid-auto-rows: 132px !important;
+  }
+
   .settings-panel .settings-console-content .settings-model-center-route {
     grid-template-columns: minmax(210px, 1fr) auto !important;
+    height: 132px !important;
+    min-height: 132px !important;
+    max-height: 132px !important;
   }
 
   .settings-panel .settings-console-content .settings-model-center-route__summary {
@@ -1613,15 +1732,37 @@
 
   .settings-panel .settings-console-content :is(.settings-model-center-pool, .settings-model-center-directory) {
     height: auto !important;
-    min-height: 0;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-pool {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-column-header {
+    min-height: 0 !important;
+    max-height: none !important;
   }
 
   .settings-panel .settings-console-content .settings-model-center-route-grid {
+    grid-auto-rows: minmax(224px, auto) !important;
     max-height: 560px;
   }
 
   .settings-panel .settings-console-content .settings-model-center-directory {
-    min-height: 520px;
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    min-height: 0 !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-preset-list {
+    max-height: 468px !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-route {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
   }
 }
 

@@ -18,10 +18,9 @@ test('settings v4 presents the approved dashboard and model-center hierarchy', (
   assert.match(styles, /grid-template-columns:\s*minmax\(0,\s*65fr\)\s+minmax\(280px,\s*35fr\)/);
   assert.match(styles, /\.settings-model-center-route\s*\{[\s\S]*grid-template-columns/);
   assert.match(styles, /\.settings-model-center-directory__tab\s*\{[\s\S]*border-radius:\s*999px/);
-  assert.match(modelCenterSource, /MODEL_CENTER_PRESET_PAGE_SIZE\s*=\s*6/);
-  assert.match(modelCenterSource, /visiblePresets\.map/);
-  assert.match(modelCenterSource, /settings-model-center-directory__pagination/);
-  assert.match(styles, /\.settings-model-center-directory__pagination\s*\{/);
+  assert.match(modelCenterSource, /filteredPresets\.map/);
+  assert.doesNotMatch(modelCenterSource, /MODEL_CENTER_PRESET_PAGE_SIZE|visiblePresets|settings-model-center-directory__pagination/);
+  assert.match(styles, /\.settings-panel \.settings-console-content \.settings-model-center-preset-list\s*\{[\s\S]*grid-auto-rows:\s*68px\s*!important/);
 });
 
 test('settings v4 fixes the shared switch and risk-icon alignment', () => {

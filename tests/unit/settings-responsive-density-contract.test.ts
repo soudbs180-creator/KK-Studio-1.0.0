@@ -37,17 +37,16 @@ test('capability sources avoid nested card shells and fixed-height overview card
   );
 });
 
-test('model directory shows six presets per page with explicit pagination', () => {
+test('model directory shows six presets before using an internal scroll region', () => {
   const apiWorkbenchSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
   const settingsStyles = readSource('apps/web/src/styles/settings-v3.css');
   const settingsUiV4Styles = readSource('apps/web/src/styles/settings-ui-v4.css');
 
-  assert.match(apiWorkbenchSource, /const MODEL_CENTER_PRESET_PAGE_SIZE = 6;/);
-  assert.match(apiWorkbenchSource, /const \[presetPage, setPresetPage\] = useState\(0\);/);
-  assert.match(apiWorkbenchSource, /filteredPresets\.slice\(/);
-  assert.match(apiWorkbenchSource, /settings-model-center-directory__pagination/);
+  assert.match(apiWorkbenchSource, /\{filteredPresets\.map\(\(preset\) => \(/);
+  assert.doesNotMatch(apiWorkbenchSource, /MODEL_CENTER_PRESET_PAGE_SIZE|presetPage|filteredPresets\.slice\(/);
+  assert.doesNotMatch(apiWorkbenchSource, /settings-model-center-directory__pagination/);
   assert.match(settingsStyles, /\.settings-section__copy\s*\{[\s\S]*?flex:\s*1 1 180px/);
-  assert.match(settingsUiV4Styles, /\.settings-console-content \.settings-model-center-directory__pagination\s*\{/);
+  assert.match(settingsUiV4Styles, /\.settings-panel \.settings-console-content \.settings-model-center-preset-list\s*\{[\s\S]*grid-auto-rows:\s*68px\s*!important/);
 });
 
 test('provider routing matrix becomes labeled cards instead of compressed columns on phones', () => {
