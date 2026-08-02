@@ -569,9 +569,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     : pick('暂无请求', 'No requests yet');
   const activePerformancePreset = getActivePerformancePreset(preferences, canvasMode);
   const performanceOptions: Array<{ id: WebPerformanceMode; label: string; description: string }> = [
-    { id: 'fast', label: pick('快速', 'Fast'), description: pick('优先操作响应', 'Prioritize responsiveness') },
-    { id: 'balanced', label: pick('正常', 'Normal'), description: pick('性能与质感均衡', 'Balanced performance') },
-    { id: 'visual', label: pick('性能', 'Performance'), description: pick('完整特效与画质', 'Full effects and quality') },
+    { id: 'auto', label: pick('自动', 'Auto'), description: pick('按当前操作调配', 'Adapt to the current operation') },
+    { id: 'smooth', label: pick('流畅', 'Smooth'), description: pick('全页面响应优先', 'Prioritize responsiveness') },
+    { id: 'standard', label: pick('标准', 'Standard'), description: pick('优先画布操作', 'Prioritize canvas interaction') },
+    { id: 'performance', label: pick('高性能', 'High performance'), description: pick('充分使用本地性能', 'Use available local performance') },
+    { id: 'custom', label: pick('自定义', 'Custom'), description: pick('逐项调整', 'Tune individually') },
   ];
   // 取值域必须与 GenerationModeView 及 ProviderRouteEngine 一致（auto/local/cloud/platform）。
   const routeOptions: Array<{ id: QuickGenerationRoute; label: string; description: string; icon: React.ReactNode }> = [
@@ -1660,7 +1662,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           icon={<CircleGauge size={18} />}
           eyebrow={pick('快捷策略', 'Quick strategy')}
           title={pick('默认执行与体验模式', 'Execution and experience')}
-          action={<SettingsBadge tone={activePerformancePreset === 'manual' ? 'amber' : 'indigo'}>{activePerformancePreset === 'manual' ? pick('手动', 'Manual') : pick('自动同步', 'Synced')}</SettingsBadge>}
+          action={<SettingsBadge tone={activePerformancePreset === 'custom' ? 'amber' : 'indigo'}>{activePerformancePreset === 'custom' ? pick('自定义', 'Custom') : pick('自动同步', 'Synced')}</SettingsBadge>}
         >
           <div className="dashboard-preference-stack">
             <div className="dashboard-preference-control">
@@ -1689,7 +1691,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="dashboard-preference-control">
               <div className="dashboard-preference-control__label">
                 <span>{pick('体验模式', 'Experience mode')}</span>
-                <strong>{activePerformancePreset === 'manual' ? pick('手动', 'Manual') : performanceOptions.find((option) => option.id === activePerformancePreset)?.label}</strong>
+                <strong>{performanceOptions.find((option) => option.id === activePerformancePreset)?.label}</strong>
               </div>
               <div className="dashboard-segment dashboard-segment--three" role="radiogroup" aria-label={pick('体验模式', 'Experience mode')}>
                 {performanceOptions.map((option) => (

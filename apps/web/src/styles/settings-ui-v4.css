@@ -1,0 +1,785 @@
+/* KK Studio settings v4: shared desktop/mobile information architecture and
+   final visual overrides for the approved settings redesign. */
+
+.settings-console-nav__group:first-child {
+  padding-top: 2px;
+}
+
+.settings-console-nav__group:first-child > h2:empty {
+  display: none;
+}
+
+.settings-console-nav__item {
+  min-height: 42px;
+  border-radius: 14px;
+}
+
+.settings-console-nav__item[data-selected='true'] {
+  border-color: var(--settings-border-strong);
+  background: var(--settings-surface-elevated);
+  box-shadow: inset 0 0 0 1px var(--settings-border-subtle);
+}
+
+/* The usage panel is the first decision surface. Capability and system health
+   form an equal-height pair underneath the quick strategy. */
+.dashboard-card-consumption {
+  order: 1;
+}
+
+.dashboard-quick-strategy {
+  order: 2;
+}
+
+.dashboard-card-api {
+  order: 3;
+}
+
+.dashboard-card-system {
+  order: 4;
+}
+
+.settings-card-grid-container.dashboard-command-center {
+  align-items: stretch;
+}
+
+.settings-card-grid-container.dashboard-command-center > .dashboard-panel {
+  align-self: stretch;
+}
+
+@media (min-width: 760px) {
+  .settings-card-grid-container.dashboard-command-center {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .settings-card-grid-container.dashboard-command-center > .dashboard-card-consumption,
+  .settings-card-grid-container.dashboard-command-center > .dashboard-quick-strategy {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+
+  .settings-card-grid-container.dashboard-command-center > .dashboard-card-api,
+  .settings-card-grid-container.dashboard-command-center > .dashboard-card-system {
+    grid-column: span 1 !important;
+    grid-row: auto !important;
+    height: 100% !important;
+  }
+}
+
+/* Provider pool and preset directory share one height. The provider side owns
+   more horizontal space because complete route state is the primary task. */
+.settings-console-content .settings-model-center-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 65fr) minmax(280px, 35fr) !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  min-height: 0;
+}
+
+.settings-console-content .settings-model-center-pool,
+.settings-console-content .settings-model-center-directory {
+  box-sizing: border-box;
+  height: min(660px, calc(100vh - 260px));
+  min-height: 460px;
+  overflow: hidden;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 22px;
+  background: var(--frost-card-framework-bg);
+  box-shadow: var(--frost-card-sub-shadow);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
+}
+
+.settings-console-content .settings-model-center-pool {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.settings-console-content .settings-model-center-toolbar {
+  display: flex !important;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 16px 16px 12px;
+}
+
+.settings-console-content .settings-model-center-toolbar__copy,
+.settings-console-content .settings-model-center-toolbar__helper {
+  width: 100%;
+  max-width: none;
+}
+
+.settings-console-content .settings-model-center-toolbar__helper {
+  white-space: normal;
+}
+
+.settings-console-content .settings-model-center-toolbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.settings-console-content .settings-model-center-toolbar__button {
+  min-height: 36px;
+  border-radius: 999px;
+  padding-inline: 14px;
+}
+
+.settings-console-content .settings-model-center-route-grid {
+  display: grid !important;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-content: start;
+  gap: 10px !important;
+  overflow-y: auto;
+  padding: 4px 14px 16px;
+  scrollbar-gutter: stable;
+}
+
+.settings-console-content .settings-model-center-route {
+  display: grid !important;
+  min-height: 112px !important;
+  grid-template-columns: minmax(170px, 1.35fr) minmax(190px, 1fr) auto;
+  align-items: center;
+  justify-content: initial !important;
+  gap: 14px;
+  border-radius: 18px !important;
+  padding: 14px !important;
+  cursor: grab;
+}
+
+.settings-console-content .settings-model-center-route:active {
+  cursor: grabbing;
+}
+
+.settings-console-content .settings-model-center-route > header {
+  min-width: 0;
+}
+
+.settings-console-content .settings-model-center-route > section {
+  min-width: 0;
+}
+
+.settings-console-content .settings-model-center-route__section-divider {
+  display: none;
+}
+
+.settings-console-content .settings-model-center-route__actions {
+  display: grid !important;
+  min-width: 76px;
+  grid-template-columns: repeat(2, 34px) !important;
+  gap: 6px !important;
+}
+
+.settings-console-content .settings-model-center-route__btn-action {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 11px;
+}
+
+.settings-console-content .settings-model-center-directory {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.settings-console-content .settings-model-center-directory__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.settings-console-content .settings-model-center-directory__tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.settings-console-content .settings-model-center-directory__tab {
+  position: relative;
+  z-index: 1;
+  min-height: 36px;
+  border-radius: 999px;
+  transition: color 180ms ease, background 220ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 180ms ease;
+}
+
+.settings-console-content .settings-model-center-directory__tab--active {
+  transform: translateY(-1px);
+  box-shadow: var(--frost-card-sub-shadow);
+}
+
+.settings-console-content .settings-model-center-preset-list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+}
+
+.settings-console-content .settings-model-center-preset-row {
+  min-height: 70px;
+  border-radius: 16px;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.settings-console-content .settings-model-center-preset-row:hover,
+.settings-console-content .settings-model-center-preset-row:focus-visible {
+  transform: translateX(2px);
+}
+
+.settings-console-content .settings-model-center-directory__pagination {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.settings-console-content .settings-model-center-directory__pagination button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--settings-control-bg);
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.settings-console-content .settings-model-center-directory__pagination button:hover:not(:disabled),
+.settings-console-content .settings-model-center-directory__pagination button:focus-visible {
+  border-color: var(--settings-border-strong);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.settings-console-content .settings-model-center-directory__pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.settings-console-content .settings-model-center-directory__pagination span {
+  min-width: 48px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* One authoritative geometric treatment fixes the old entity-fallback switch. */
+.settings-console .settings-system-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 44px;
+  border-radius: 999px;
+  padding: 0;
+}
+
+.settings-console .settings-system-switch::after {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  transform: translate(0,-50%);
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.settings-console .settings-system-switch[data-state='on']::after {
+  transform: translate(20px,-50%);
+}
+
+.settings-console .settings-risk-card__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  align-self: center;
+}
+
+.settings-console .settings-risk-card__icon > svg {
+  display: block;
+}
+
+.provider-connection-order-list {
+  display: grid;
+  gap: 10px;
+}
+
+.provider-connection-order-card {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 0.8fr) minmax(220px, 1.2fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 18px;
+  background: var(--settings-surface-elevated);
+  padding: 12px;
+  cursor: grab;
+  transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.provider-connection-order-card:hover,
+.provider-connection-order-card:focus-visible {
+  border-color: var(--settings-border-strong);
+  outline: none;
+  box-shadow: var(--frost-card-sub-shadow);
+}
+
+.provider-connection-order-card[data-dragging='true'] {
+  opacity: 0.58;
+  transform: scale(0.99);
+}
+
+.provider-connection-order-card__handle,
+.provider-connection-order-card__move-actions,
+.provider-connection-order-card__actions {
+  display: flex;
+  align-items: center;
+}
+
+.provider-connection-order-card__handle {
+  gap: 4px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.provider-connection-order-card__identity,
+.provider-connection-order-card__capabilities {
+  min-width: 0;
+}
+
+.provider-connection-order-card__identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.provider-connection-order-card__actions {
+  gap: 10px;
+}
+
+.provider-connection-order-card__move-actions {
+  gap: 4px;
+}
+
+.provider-connection-order-card__move {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--settings-control-bg);
+}
+
+.provider-connection-order-card__move:hover:not(:disabled),
+.provider-connection-order-card__move:focus-visible {
+  border-color: var(--settings-border-strong);
+  color: var(--text-primary);
+}
+
+.provider-connection-order-card__move:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.settings-runtime-health-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-runtime-health-card {
+  display: flex;
+  min-width: 0;
+  min-height: 190px;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 18px;
+  background: var(--settings-surface-elevated);
+  padding: 13px;
+}
+
+.settings-runtime-health-card > header,
+.settings-runtime-health-card__identity,
+.settings-runtime-health-card > footer,
+.settings-runtime-health-card dl > div {
+  display: flex;
+  align-items: center;
+}
+
+.settings-runtime-health-card > header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-runtime-health-card__identity {
+  min-width: 0;
+  gap: 8px;
+}
+
+.settings-runtime-health-card__identity > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.settings-runtime-health-card__identity strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-runtime-health-card__identity span,
+.settings-runtime-health-card dt,
+.settings-runtime-health-card > p {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.settings-runtime-health-card__icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--settings-accent);
+  background: var(--settings-control-bg);
+}
+
+.settings-runtime-health-card dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.settings-runtime-health-card dl > div {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-runtime-health-card dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-runtime-health-card > p {
+  margin: 0;
+}
+
+.settings-runtime-health-card > footer {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.settings-runtime-health-card > footer button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  background: var(--settings-control-bg);
+  font-size: 10px;
+}
+
+.settings-agent-extension-shell,
+.settings-agent-extension-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-agent-extension-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 999px;
+  padding: 4px;
+  background: var(--settings-control-bg);
+}
+
+.settings-agent-extension-tabs button {
+  min-height: 36px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  transition: color 160ms ease, background 180ms ease, transform 160ms ease;
+}
+
+.settings-agent-extension-tabs button[data-active='true'] {
+  color: var(--text-primary);
+  background: var(--settings-segment-active-bg);
+  box-shadow: var(--settings-segment-active-shadow);
+  transform: translateY(-1px);
+}
+
+.settings-agent-extension-editor {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 20px;
+  background: var(--settings-surface-elevated);
+  padding: 16px;
+}
+
+.settings-agent-extension-editor__heading,
+.settings-agent-extension-card,
+.settings-agent-extension-card__main,
+.settings-agent-extension-card__actions {
+  display: flex;
+  align-items: center;
+}
+
+.settings-agent-extension-editor__heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-agent-extension-editor__heading > div,
+.settings-agent-extension-card__main > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.settings-agent-extension-editor__heading span,
+.settings-agent-extension-card__main span,
+.settings-agent-extension-message,
+.settings-agent-extension-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-agent-extension-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-agent-extension-editor__wide {
+  grid-column: 1 / -1;
+}
+
+.settings-agent-extension-card {
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 18px;
+  padding: 13px;
+  background: var(--settings-surface-elevated);
+}
+
+.settings-agent-extension-card__main,
+.settings-agent-extension-card__actions {
+  gap: 10px;
+}
+
+.settings-agent-extension-card__icon,
+.settings-agent-extension-card__actions > button:last-child {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 11px;
+  color: var(--text-secondary);
+  background: var(--settings-control-bg);
+}
+
+.settings-agent-extension-card__actions > button:last-child:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.settings-agent-extension-card__permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.settings-agent-extension-card__permissions em {
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--text-tertiary);
+  background: var(--settings-control-bg);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.settings-agent-extension-message {
+  margin: 0;
+  color: var(--settings-state-danger-text);
+}
+
+.settings-agent-extension-empty {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--settings-border-subtle);
+  border-radius: 18px;
+}
+
+/* Runtime/browser cards keep one frosted rhythm and never crop their controls. */
+.settings-console .settings-browser-section-card,
+.settings-console .settings-model-center-editor-page .settings-reference-card {
+  overflow: visible;
+  border-radius: 22px;
+  background: var(--frost-card-framework-bg);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
+}
+
+@media (min-width: 1500px) {
+  .settings-console-content .settings-model-center-route-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .settings-console-content .settings-model-center-route {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-console-content .settings-model-center-route > section {
+    grid-column: 1 / -1;
+  }
+
+}
+
+@media (max-width: 900px) {
+  .settings-console-content .settings-model-center-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .settings-console-content .settings-model-center-pool,
+  .settings-console-content .settings-model-center-directory {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .settings-console-content .settings-model-center-route-grid,
+  .settings-console-content .settings-model-center-preset-list {
+    max-height: 480px;
+  }
+
+  .settings-console-content .settings-model-center-route {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-console-content .settings-model-center-route > section {
+    grid-column: 1 / -1;
+  }
+
+  .provider-connection-order-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .provider-connection-order-card__capabilities {
+    grid-column: 2 / -1;
+  }
+
+  .provider-connection-order-card__actions {
+    grid-column: 2 / -1;
+    justify-content: space-between;
+  }
+
+  .settings-runtime-health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-agent-extension-editor__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-agent-extension-editor__wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-console-content .settings-model-center-toolbar__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .settings-console-content .settings-model-center-route {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch;
+  }
+
+  .settings-console-content .settings-model-center-route__actions {
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .settings-console-content .settings-model-center-route__btn-action {
+    width: 100%;
+  }
+
+  .provider-connection-order-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .provider-connection-order-card__capabilities,
+  .provider-connection-order-card__actions {
+    grid-column: 1 / -1;
+  }
+
+  .provider-connection-order-card__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-runtime-health-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-runtime-health-card {
+    min-height: 0;
+  }
+
+  .settings-agent-extension-editor__heading,
+  .settings-agent-extension-card,
+  .settings-agent-extension-card__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-console-content .settings-model-center-directory__tab,
+  .settings-console-content .settings-model-center-preset-row,
+  .settings-console-content .settings-model-center-directory__pagination button,
+  .settings-agent-extension-tabs button,
+  .provider-connection-order-card,
+  .settings-console .settings-system-switch::after {
+    transition: none;
+  }
+}

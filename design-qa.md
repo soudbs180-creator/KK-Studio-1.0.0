@@ -117,6 +117,44 @@ No new P0, P1 or P2 finding remains after the workflow-browser comparison.
 
 final result: passed
 
+## 41-item implementation verification — 2026-08-02
+
+### Scope
+
+- Verified the approved Workspace, Composer, Settings, Provider, Runtime and mobile-shell changes against the four required viewports.
+- Exercised the project menu, unique Task Center entry, expanded minimap, Companion AI panel, desktop/mobile Composer, desktop/mobile settings registry and API configuration layout in the in-app browser.
+- Compared the implemented states directly with the 41 annotated requirements supplied for this release train.
+
+### Responsive geometry
+
+| Viewport | Composer | Navigation panel | Intersection | Result |
+|---:|---:|---:|---:|---|
+| 1099×720 | `570×94 @ (136.7,616)` | `304×222.7 @ (783.3,485.3)` | none | passed |
+| 1133×720 | `570×94 @ (153.7,616)` | `304×222.7 @ (817.3,485.3)` | none | passed |
+| 1440×900 | `570×94 @ (307,796)` | `304×222.7 @ (1124,665.3)` | none | passed |
+| 390×844 | `374×177.3 @ (8,650.7)` after expansion | mobile shell | none after transition | passed |
+
+### Interaction and information architecture
+
+- The desktop header renders project, task and account as independent frosted clusters with one Task Center entry.
+- The project panel opens below and left-aligned with the project trigger without a desktop backdrop or layout shift.
+- The minimap keeps zoom, arrange and map controls available at the bottom; the map expands above them and has no persistent title or confirmation row.
+- The Composer exposes `随心输入`, reference/model/parameter controls, voice and a labeled Send capsule; the published workspace occupancy keeps it clear of the navigation panel.
+- The Companion AI panel keeps a 12px gap from the shifted navigation panel and reuses the existing assistant runtime.
+- Mobile Composer expansion settles above the system safe area and preserves the phone shell controls without horizontal overflow.
+- Desktop and mobile settings are generated from the same `总览 / 集成 / 系统维护` registry. The API page shows the larger provider column, six-item preset page and real unavailable-service state instead of simulated success.
+- Desktop Overview places `今日消耗` before the quick strategy module and keeps system status adjacent to plugin capability; mobile preserves the same semantic order.
+
+### Finding resolved during QA
+
+| Priority | Finding | Resolution |
+|---|---|---|
+| P1 | At 1099/1133 widths the expanded minimap overlapped the right edge of the Composer by about 64px | The navigation panel now publishes its occupied width to the central workspace layout registry; the Composer consumes the registry through `useSyncExternalStore` and reserves a 12px gap without `body:has()` offsets |
+
+All required visual states passed after the responsive-occupancy fix. Local API `502 Bad Gateway` messages observed during isolated UI smoke runs correctly represent an unavailable backend and were not replaced with simulated health.
+
+final result: passed
+
 ## Canvas card and Companion Copilot pass — 2026-07-30
 
 ### Scope

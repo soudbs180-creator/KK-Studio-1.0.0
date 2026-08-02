@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, start
 import InfiniteCanvas, { type InfiniteCanvasHandle } from '../../components/canvas/InfiniteCanvas';
 import CanvasDrawingsLayer from '../../components/canvas/CanvasDrawingsLayer';
 import CanvasDrawingInteractionOverlay from '../../components/canvas/CanvasDrawingInteractionOverlay';
+import { CanvasDrawingToolbar } from '../../components/canvas/CanvasDrawingToolbar';
 import CanvasNoteCard from '../../components/canvas/CanvasNoteCard.tsx';
 import CanvasMigrationNotice from '../../components/canvas/CanvasMigrationNotice.tsx';
 import WorkflowPanelCard from '../../components/canvas/WorkflowPanelCard.tsx';
 import CanvasCardShell from '../../components/canvas/CanvasCardShell.tsx';
-import { PenTool, Type, Shapes, Palette, Trash, Scissors } from 'lucide-react';
 import ImageNode from '../../components/image/ImageCard';
 import PromptNodeComponent from '../../components/canvas/PromptNodeComponent';
 // KeyManagerModal removed - integrated into UserProfileModal
@@ -300,7 +300,7 @@ import { resolveAppRootMode } from '../../app/navigation/appRootNavigation';
 import { getStorageMode, isMobileDevice } from '../../services/storage/storagePreference';
 import type { UserProfileView } from '../../components/modals/UserProfileModal';
 import { useAuth } from '../../context/AuthContext';
-import { Loader2, X } from 'lucide-react';
+import { CircleHelp, Loader2, X } from 'lucide-react';
 import { BillingProvider, useBilling } from '../../context/BillingContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import {
@@ -750,7 +750,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
   }, [canvasPerformancePreferences.dragSuspend, isCanvasTransforming, isLargeMeasurementCanvas]);
 
   const handleToggleGrid = () => setShowGrid(prev => !prev);
-  const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
 
 
 
@@ -5138,8 +5137,6 @@ const isRectIntersecting = (
   const connectorStrokeLinecap: 'butt' | 'round' = 'round';
   const activeDragStroke = 1.5;
   const connectorHitStroke = Math.max(16, Math.min(40, 20 / zoomForConnectors));
-  const connectorDotStart = Math.max(2, Math.min(4.5, 3 / zoomForConnectors));
-  const connectorDotEnd = Math.max(1.5, Math.min(3.5, 2 / zoomForConnectors));
   const derivedMobileUserName = (() => {
     const candidate =
       user?.user_metadata?.full_name ||
@@ -5356,9 +5353,9 @@ const isRectIntersecting = (
         onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
         isMobile={isMobile}
         onToggleCanvasMode={() => setCanvasMode(prev => prev === 'normal' ? 'board' : 'normal')}
-        onToggleSnapToGrid={handleToggleSnapToGrid}
+        onToggleSnapToGrid={handleToggleGrid}
         canvasMode={canvasMode}
-        showSnapToGrid={snapToGrid}
+        showSnapToGrid={showGrid}
         onToggleChat={toggleChatPanel}
         isChatOpen={isChatOpen}
         workflowTemplates={WORKFLOW_TEMPLATES}
@@ -5494,129 +5491,21 @@ const isRectIntersecting = (
         />
       )}
       {/* 简体中文：画板模式顶部控制栏，使用磨砂质感毛玻璃高定设计 */}
-      {canvasMode === 'board' && !isMobile && (
-        <div 
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-3 px-4 py-2 rounded-2xl border shadow-xl transition-all duration-300 pointer-events-auto"
-          style={{
-            background: 'var(--frost-card-framework-bg)',
-            border: '1px solid var(--frost-card-framework-border)',
-            boxShadow: 'var(--frost-card-framework-shadow)',
-            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+      {canvasMode === 'board' && !isMobile ? (
+        <CanvasDrawingToolbar
+          activeTool={activeDrawingTool}
+          activeColor={activeDrawingColor}
+          activeWidth={activeDrawingWidth}
+          onToolChange={setActiveDrawingTool}
+          onColorChange={setActiveDrawingColor}
+          onWidthChange={setActiveDrawingWidth}
+          onClear={() => {
+            if (window.confirm('确认清除当前项目的所有画板手绘和形状吗？此操作无法撤销。')) {
+              clearCanvasDrawings();
+            }
           }}
-        >
-          {/* 工具选择 */}
-          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
-            <button
-              onClick={() => setActiveDrawingTool('pen')}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'pen' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-              title="自由画笔"
-            >
-              <PenTool size={18} />
-            </button>
-            <button
-              onClick={() => setActiveDrawingTool('select')}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'select' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-              title="框选为参考图"
-            >
-              <Scissors size={18} />
-            </button>
-            <button
-              onClick={() => setActiveDrawingTool('text')}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'text' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-              title="文本工具"
-            >
-              <Type size={18} />
-            </button>
-            
-            {/* 形状下拉 */}
-            <div className="relative group/shape flex items-center">
-              <button
-                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${['rect', 'circle', 'line', 'arrow'].includes(activeDrawingTool) ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                title="形状工具"
-              >
-                <Shapes size={18} />
-              </button>
-              <div className="absolute top-full left-0 mt-2 hidden group-hover/shape:flex flex-col gap-1 p-1.5 rounded-xl border shadow-lg bg-[var(--frost-card-framework-bg)] border-[var(--frost-card-framework-border)] backdrop-blur-md z-[102] w-28">
-                <button
-                  onClick={() => setActiveDrawingTool('rect')}
-                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'rect' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                >
-                  <span className="w-3 h-3 border border-current rounded-sm inline-block" />
-                  矩形
-                </button>
-                <button
-                  onClick={() => setActiveDrawingTool('circle')}
-                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'circle' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                >
-                  <span className="w-3 h-3 border border-current rounded-full inline-block" />
-                  圆形
-                </button>
-                <button
-                  onClick={() => setActiveDrawingTool('line')}
-                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'line' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                >
-                  <span className="w-3 h-px bg-current inline-block transform" style={{ transform: 'translateY(-1px)' }} />
-                  直线
-                </button>
-                <button
-                  onClick={() => setActiveDrawingTool('arrow')}
-                  className={`flex min-h-11 items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'arrow' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                >
-                  <span className="text-[10px] inline-block font-bold">→</span>
-                  箭头
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 颜色选择 */}
-          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
-            {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#000000', '#ffffff'].map(color => (
-              <button
-                key={color}
-                onClick={() => setActiveDrawingColor(color)}
-                className="flex h-11 w-11 items-center justify-center rounded-lg"
-                aria-label={`选择颜色 ${color}`}
-                title={`选择颜色 ${color}`}
-              >
-                <span
-                  className={`h-5 w-5 rounded-full border transition-all ${activeDrawingColor === color ? 'scale-120 ring-2 ring-[var(--accent-coral)] border-transparent' : 'border-white/20 hover:scale-110'}`}
-                  style={{ backgroundColor: color }}
-                />
-              </button>
-            ))}
-          </div>
-
-          {/* 笔宽选择 */}
-          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
-            {[2, 4, 8].map(w => (
-              <button
-                key={w}
-                onClick={() => setActiveDrawingWidth(w)}
-                className={`flex h-11 w-11 items-center justify-center rounded-lg text-[10px] transition-colors ${activeDrawingWidth === w ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
-                title={`线宽: ${w}px`}
-              >
-                {w === 2 ? '细' : w === 4 ? '中' : '粗'}
-              </button>
-            ))}
-          </div>
-
-          {/* 清除全部 */}
-          <button
-            onClick={() => {
-              if (window.confirm('确认清除当前项目的所有画板手绘和形状吗？此操作无法撤销。')) {
-                clearCanvasDrawings();
-              }
-            }}
-            className="flex h-11 items-center gap-1.5 rounded-xl px-3 text-xs text-red-400 transition-colors hover:bg-red-500/10 active:scale-95"
-            title="清除全部画板内容"
-          >
-            <Trash size={15} />
-            清除
-          </button>
-        </div>
-      )}
+        />
+      ) : null}
       {/* 简体中文：左上角等宽悬浮控制卡片 */}
       {!isMobile && (
         <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-auto pointer-events-auto select-none">
@@ -5651,8 +5540,8 @@ const isRectIntersecting = (
           className="desktop-navigation-panel kk-canvas-navigation-stack fixed z-[650] pointer-events-auto select-none"
           style={{
             '--kk-canvas-navigation-right': isChatOpen
-              ? `${chatSidebarWidth + 10}px`
-              : '10px',
+              ? `${chatSidebarWidth + 24}px`
+              : '12px',
           } as React.CSSProperties}
         >
           <AppCanvasNavigationPanel
@@ -5669,19 +5558,19 @@ const isRectIntersecting = (
 
       {/* 简体中文：左下角精致独立的毛玻璃版本号卡片 */}
       {!isMobile && (
-        <div className="desktop-version-badge fixed bottom-4 z-50 py-1.5 px-3 flex items-center justify-center rounded-xl border select-none pointer-events-auto"
-          style={{
-            left: '16px',
-            background: 'var(--frost-card-framework-bg)',
-            border: '1px solid var(--frost-card-framework-border)',
-            boxShadow: 'var(--frost-card-framework-shadow)',
-            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-          }}
-        >
-          <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-tight leading-none text-center">
+        <div className="desktop-version-badge fixed bottom-4 left-4 z-50 flex items-center gap-1.5 select-none pointer-events-auto">
+          <span className="kk-version-surface flex h-7 items-center rounded-xl border px-3 text-[10px] text-[var(--text-secondary)] font-bold tracking-tight leading-none text-center">
             {APP_DISPLAY_VERSION}
           </span>
+          <button
+            type="button"
+            className="kk-version-help flex h-7 w-7 items-center justify-center rounded-xl border"
+            aria-label="查看画布操作引导"
+            title="画布操作引导"
+            onClick={() => setShowTutorial(true)}
+          >
+            <CircleHelp size={15} aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -5885,10 +5774,6 @@ const isRectIntersecting = (
                   />
                 )}
 
-                {/* Start/End Dots - REMOVED per user request */}
-                {/* <circle cx={startX} cy={startY} r="3" fill="#6366f1" opacity="0.6" /> */}
-                {/* <circle cx={endX} cy={endY} r="2" fill="#6366f1" opacity="0.5" /> */}
-
                 {/* Disconnect Button - Visible on Hover */}
                 {showConnectorButtons && (
                   <ConnectorDisconnectButton
@@ -5948,9 +5833,6 @@ const isRectIntersecting = (
                 {showConnectorHitAreas && (
                   <path d={d} stroke="transparent" strokeWidth={connectorHitStroke} fill="none" className="pointer-events-auto cursor-pointer" />
                 )}
-                <circle cx={startX} cy={startY} r={connectorDotStart} fill={baseColor} opacity="0.6" />
-                <circle cx={endX} cy={endY} r={connectorDotEnd} fill={baseColor} opacity="0.5" />
-
                 {showConnectorButtons && (
                   <ConnectorDisconnectButton
                     x={btnX}
@@ -6004,7 +5886,6 @@ const isRectIntersecting = (
 
             return (
               <g key={`workflow-edge-${edge.id}`}>
-                <circle cx={startX} cy={startY} r={connectorDotStart} fill={strokeColor} opacity="0.4" />
                 <path
                   d={d}
                   fill="none"
@@ -6015,8 +5896,6 @@ const isRectIntersecting = (
                   strokeLinejoin="round"
                   opacity="0.45"
                 />
-                <circle cx={endX} cy={endY} r={connectorDotEnd} fill={strokeColor} opacity="0.55" />
-
                 {showConnectorButtons && (
                   <ConnectorDisconnectButton
                     x={btnX}
@@ -6044,7 +5923,7 @@ const isRectIntersecting = (
           .map((note) => note.presentation?.kind === 'unknown'
             ? renderUnknownCanvasCard(
                 note,
-                canvasPerformanceProfile.cardDetailLevel,
+                'full',
                 selectedNodeIds.includes(note.id),
                 canvasTransform.scale,
               )
@@ -6054,7 +5933,7 @@ const isRectIntersecting = (
             note={note}
             selected={selectedNodeIds.includes(note.id)}
             zoomScale={canvasTransform.scale}
-            detailLevel={canvasPerformanceProfile.cardDetailLevel}
+            detailLevel="full"
             onSelect={() => selectNodes([note.id], 'replace')}
             onDelete={() => deleteNoteNode(note.id)}
             onUseAsReference={() => {
@@ -6098,7 +5977,7 @@ const isRectIntersecting = (
           .map((node) => node.presentation?.kind === 'unknown'
             ? renderUnknownCanvasCard(
                 node,
-                canvasPerformanceProfile.cardDetailLevel,
+                'full',
                 selectedNodeIds.includes(node.id),
                 canvasTransform.scale,
               )
@@ -6111,7 +5990,7 @@ const isRectIntersecting = (
                 .filter((output): output is GeneratedImage => Boolean(output))}
               selected={selectedNodeIds.includes(node.id)}
               zoomScale={canvasTransform.scale}
-              detailLevel={canvasPerformanceProfile.cardDetailLevel}
+              detailLevel="full"
               onSelect={() => selectNodes([node.id], 'replace')}
               onDelete={() => deleteWorkflowNode(node.id)}
               onPositionChange={(position) => updateWorkflowNodePosition(node.id, position)}
@@ -6368,16 +6247,14 @@ const isRectIntersecting = (
         </React.Suspense>
       )}
 
-      {!isLargeProject && (
-        <React.Suspense fallback={null}>
-          <TaskCenterTray
-            onOpenSettings={openSettingsSurfaceTracked}
-            isChatOpen={isChatOpen}
-            chatSidebarWidth={chatSidebarWidth}
-            isMobile={isMobile}
-          />
-        </React.Suspense>
-      )}
+      <React.Suspense fallback={null}>
+        <TaskCenterTray
+          onOpenSettings={openSettingsSurfaceTracked}
+          isChatOpen={isChatOpen}
+          chatSidebarWidth={chatSidebarWidth}
+          isMobile={isMobile}
+        />
+      </React.Suspense>
     </WorkspaceShell>
   );
 };

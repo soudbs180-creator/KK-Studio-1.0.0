@@ -16,6 +16,8 @@ const adminRouter = require('./admin');
 const providerProbeRouter = require('./provider-probe');
 const ocrRouter = require('./ocr');
 const aiAssistantRouter = require('./ai-assistant');
+const pairedRuntimesRouter = require('./paired-runtimes');
+const agentExtensionsRouter = require('./agent-extensions');
 const configRouter = require('./config');
 
 const apiRouter = express.Router();
@@ -29,6 +31,8 @@ apiRouter.use(userRouter);
 apiRouter.use(adminRouter);
 apiRouter.use(providerProbeRouter);
 apiRouter.use(ocrRouter);
+apiRouter.use(pairedRuntimesRouter);
+apiRouter.use(agentExtensionsRouter);
 apiRouter.use(aiAssistantRouter);
 apiRouter.use(configRouter);
 

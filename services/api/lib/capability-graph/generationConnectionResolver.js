@@ -21,9 +21,11 @@ function resolveDependencies(overrides = {}) {
 
 /** A quote can only freeze a route that verification projected for this exact user Connection. */
 async function resolveQuoteConnectionRoute(userId, request, overrides = {}) {
-  if (!request.connectionId) return null;
   const { store } = resolveDependencies(overrides);
-  const binding = await store.getVerifiedRouteBinding(userId, request, overrides);
+  if (!request.connectionId && !request.capabilityId) return null;
+  const binding = request.connectionId
+    ? await store.getVerifiedRouteBinding(userId, request, overrides)
+    : await store.selectVerifiedRouteBinding(userId, request, overrides);
   if (!binding) {
     throw createRouteError('CONNECTION_ROUTE_UNAVAILABLE', 'No verified Connection supports the requested capability and model.', 409);
   }

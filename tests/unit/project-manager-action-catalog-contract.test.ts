@@ -63,23 +63,18 @@ test('Project Manager shell and canvas controls expose project action metadata',
     );
   }
 
-  for (const key of ['fitToAll', 'resetView', 'autoArrange'] as const) {
+  for (const key of ['fitToAll', 'resetView'] as const) {
     assert.doesNotMatch(
       projectManagerSource,
       new RegExp(`data-project-manager-action=\\{PROJECT_MANAGER_ACTIONS\\.${key}\\.uiAction\\}`),
       `Project Manager rail should not duplicate ${key}`,
     );
-    assert.match(
-      canvasNavigationSource,
-      new RegExp(`data-canvas-navigation-action="${key}"`),
-      `Canvas navigation dock should own ${key}`,
-    );
-    assert.match(
-      canvasNavigationSource,
-      new RegExp(`data-project-manager-action=\\{PROJECT_MANAGER_ACTIONS\\.${key}\\.uiAction\\}`),
-      `Canvas navigation dock should preserve ${key} action metadata`,
-    );
+    assert.doesNotMatch(canvasNavigationSource, new RegExp(`data-canvas-navigation-action="${key}"`));
   }
+
+  assert.doesNotMatch(projectManagerSource, /PROJECT_MANAGER_ACTIONS\.autoArrange\.uiAction/);
+  assert.match(canvasNavigationSource, /data-canvas-navigation-action="autoArrange"/);
+  assert.match(canvasNavigationSource, /data-project-manager-action=\{PROJECT_MANAGER_ACTIONS\.autoArrange\.uiAction\}/);
 
   assert.doesNotMatch(
     projectManagerSource,

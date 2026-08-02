@@ -1328,12 +1328,6 @@ select,
   backdrop-filter: none !important;
 }
 
-body:has(#project-manager-container[data-panel-open='true'])
-  #prompt-bar-container[data-composer-layout='desktop'] {
-  left: max(50%, 615px) !important;
-  width: min(var(--kk-morphic-composer-width), calc(100vw - 342px)) !important;
-}
-
 #prompt-bar-container .input-bar-inner {
   overscroll-behavior: contain;
 }

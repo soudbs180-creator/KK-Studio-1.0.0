@@ -12,6 +12,7 @@ import {
   canvasScreenPointToWorld,
   getAvailableCanvasViewport,
 } from '../../apps/web/src/canvas/canvasAvailableViewport.ts';
+import { resolveWorkspaceLayoutInsets } from '../../apps/web/src/app/workspaceLayoutRegistry.ts';
 
 test('workspace keeps phones and portrait tablets in the result flow', () => {
   assert.equal(resolveCanvasWorkspaceSurface(390, 844), 'phone-results');
@@ -52,22 +53,26 @@ test('workspace persists canvas views per responsive surface', () => {
   assert.doesNotMatch(source, /getCanvasViewportStorageKey\([^)]*,\s*'desktop'\)/);
 });
 
-test('desktop canvas chrome preserves the original composer layout at a compact scale', () => {
+test('desktop canvas keeps the composer centered in available space at a compact scale', () => {
   const promptBar = fs.readFileSync('apps/web/src/components/layout/PromptBar.tsx', 'utf8');
   const projectManager = fs.readFileSync('apps/web/src/components/settings/ProjectManager.tsx', 'utf8');
   const css = fs.readFileSync('apps/web/src/styles/canvas.css', 'utf8');
 
   assert.match(promptBar, /if \(!isExpanded && isMobile\)/);
   assert.match(promptBar, /data-desktop-composer-state="expanded"/);
-  assert.doesNotMatch(promptBar, /title="收起高级配置"/);
-  assert.match(promptBar, /shouldRenderStandaloneUploadRow/);
-  assert.match(promptBar, /title="上传参考图"/);
+  assert.match(promptBar, /resolveWorkspaceLayoutInsets/);
+  assert.match(promptBar, /'--kk-workspace-left-inset'/);
+  assert.match(promptBar, /'--kk-workspace-right-inset'/);
+  assert.match(promptBar, /<ComposerReferenceButton/);
+  assert.match(promptBar, /placeholder="随心输入"/);
+  assert.match(promptBar, /const PROMPT_TEXTAREA_MAX_ROWS = 10;/);
   assert.match(promptBar, /rows=\{PROMPT_TEXTAREA_MIN_ROWS\}/);
   assert.doesNotMatch(promptBar, /kk-desktop-composer-primary-input/);
   assert.match(css, /max-height:\s*min\(216px, calc\(100dvh - 120px\)\)/);
   assert.match(css, /padding:\s*6px;[\s\S]*gap:\s*4px;/);
   assert.doesNotMatch(css, /\.kk-desktop-composer-expanded \.input-bar-footer \{[\s\S]*order:/);
-  assert.match(promptBar, /<DesktopComposerPromptTools[\s\S]*shouldRenderStandaloneUploadRow[\s\S]*<PromptBarFooter isMobile=\{isMobile\}>/);
+  assert.match(promptBar, /<DesktopComposerPromptTools[\s\S]*<PromptBarFooter isMobile=\{isMobile\}>/);
+  assert.doesNotMatch(promptBar, /body:has\(/);
   assert.match(projectManager, /kk-project-rail-host fixed left-3 z-50 flex w-\[30px\]/);
   assert.match(projectManager, /h-\[30px\] w-\[30px\] shrink-0/);
   assert.doesNotMatch(projectManager, /tabIndex=\{-1\}/);
@@ -75,11 +80,29 @@ test('desktop canvas chrome preserves the original composer layout at a compact 
   assert.doesNotMatch(projectManager, /scale\(\$\{desktopScale\}\)/);
 });
 
-test('tablet drawing tools keep 44px targets without enlarging color swatches', () => {
-  const workspace = fs.readFileSync('apps/web/src/pages/Workspace/WorkspacePage.tsx', 'utf8');
-  assert.match(workspace, /className="flex h-11 w-11 items-center justify-center rounded-lg"/);
-  assert.match(workspace, /className=\{`h-5 w-5 rounded-full border/);
-  assert.match(workspace, /text-\[10px\] h-11 w-11|h-11 w-11 items-center justify-center rounded-lg text-\[10px\]/);
+test('workspace composer reserves the navigation panel instead of overlapping it', () => {
+  assert.deepEqual(resolveWorkspaceLayoutInsets({
+    isMobile: false,
+    isChatOpen: false,
+    chatSidebarWidth: 0,
+    navigationPanelWidth: 304,
+  }), { left: 72, right: 328 });
+  assert.deepEqual(resolveWorkspaceLayoutInsets({
+    isMobile: false,
+    isChatOpen: true,
+    chatSidebarWidth: 420,
+    navigationPanelWidth: 304,
+  }), { left: 72, right: 760 });
+});
+
+test('desktop drawing toolbar stays compact, draggable, persisted, and viewport-clamped', () => {
+  const toolbar = fs.readFileSync('apps/web/src/components/canvas/CanvasDrawingToolbar.tsx', 'utf8');
+  assert.match(toolbar, /className="kk-drawing-toolbar__control h-9 w-9"/);
+  assert.match(toolbar, /className="kk-drawing-toolbar__swatch h-9 w-6"/);
+  assert.match(toolbar, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(toolbar, /releasePointerCapture\(event\.pointerId\)/);
+  assert.match(toolbar, /DRAWING_TOOLBAR_STORAGE_KEY/);
+  assert.match(toolbar, /clampFloatingToolbarPosition/);
 });
 
 test('touch canvas owns browser gestures and supports two-finger pan and zoom', () => {

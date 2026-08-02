@@ -29,6 +29,9 @@ AGENT_RUN_REPLAN_EVENT_MIGRATION="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_
 OAUTH_IDENTITY_MIGRATION="${KK_OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION="${KK_PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
 PAYMENT_RECHARGE_HARDENING_MIGRATION="${KK_PAYMENT_RECHARGE_HARDENING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
+PROVIDER_ROUTING_PRIORITY_MIGRATION="${KK_PROVIDER_ROUTING_PRIORITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
+PAIRED_RUNTIMES_MIGRATION="${KK_PAIRED_RUNTIMES_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/030_paired_runtimes.sql}"
+AGENT_EXTENSIONS_MIGRATION="${KK_AGENT_EXTENSIONS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/031_agent_extensions.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -146,6 +149,15 @@ setup_postgres() {
     echo "[bootstrap-kk-vps] Required payment recharge hardening migration not found at ${PAYMENT_RECHARGE_HARDENING_MIGRATION}." >&2
     exit 1
   fi
+  for runtime_migration in \
+    "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
+    "${PAIRED_RUNTIMES_MIGRATION}" \
+    "${AGENT_EXTENSIONS_MIGRATION}"; do
+    if [[ ! -f "${runtime_migration}" ]]; then
+      echo "[bootstrap-kk-vps] Required runtime capability migration not found at ${runtime_migration}." >&2
+      exit 1
+    fi
+  done
 
   REPO_BOOTSTRAP_SQL="$(realpath "${REPO_BOOTSTRAP_SQL}")"
   STRICT_BILLING_SCHEMA_MIGRATION="$(realpath "${STRICT_BILLING_SCHEMA_MIGRATION}")"
@@ -162,6 +174,9 @@ setup_postgres() {
   OAUTH_IDENTITY_MIGRATION="$(realpath "${OAUTH_IDENTITY_MIGRATION}")"
   PAYMENT_RECHARGE_MIGRATION="$(realpath "${PAYMENT_RECHARGE_MIGRATION}")"
   PAYMENT_RECHARGE_HARDENING_MIGRATION="$(realpath "${PAYMENT_RECHARGE_HARDENING_MIGRATION}")"
+  PROVIDER_ROUTING_PRIORITY_MIGRATION="$(realpath "${PROVIDER_ROUTING_PRIORITY_MIGRATION}")"
+  PAIRED_RUNTIMES_MIGRATION="$(realpath "${PAIRED_RUNTIMES_MIGRATION}")"
+  AGENT_EXTENSIONS_MIGRATION="$(realpath "${AGENT_EXTENSIONS_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -213,6 +228,15 @@ setup_postgres() {
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Payment recharge hardening migration must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
   esac
+  for runtime_migration in \
+    "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
+    "${PAIRED_RUNTIMES_MIGRATION}" \
+    "${AGENT_EXTENSIONS_MIGRATION}"; do
+    case "${runtime_migration}" in
+      "${REPO_ROOT}"/*) ;;
+      *) echo "[bootstrap-kk-vps] Runtime capability migrations must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
+    esac
+  done
 
   for identifier in "${POSTGRES_USER}" "${POSTGRES_DB}" "${POSTGRES_SUPERUSER}"; do
     if [[ ! "${identifier}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
@@ -270,7 +294,10 @@ SQL
     -f "${AGENT_RUN_REPLAN_EVENT_MIGRATION}" \
     -f "${OAUTH_IDENTITY_MIGRATION}" \
     -f "${PAYMENT_RECHARGE_MIGRATION}" \
-    -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}"
+    -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" \
+    -f "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
+    -f "${PAIRED_RUNTIMES_MIGRATION}" \
+    -f "${AGENT_EXTENSIONS_MIGRATION}"
 }
 
 install_runtime_templates() {

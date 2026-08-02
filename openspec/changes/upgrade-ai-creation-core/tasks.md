@@ -1,7 +1,7 @@
 # Tasks: upgrade-ai-creation-core
 
 > Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation and bounded replan executor complete, semantic replay and cross-device execution pending
-> Last updated: 2026-07-24
+> Last updated: 2026-08-02
 > Phase 0 progress: 10/10 tasks completed. Phase 1: routing/quote/billing migration and DTOs completed — closure gate below. Phase 2: Capability Graph / Provider Connection、image-slice 数据面准入、Worker drain-safe rollback、本地 pending Job discovery/hydration、Google 安全迁移桥、generation/dispatcher 与 profile execution dual-read 首段已落地；真实 migration rehearsal、灰度、浏览器/跨设备 E2E、全 Provider 映射与新写入切流仍未完成。
 
 ---
@@ -204,7 +204,11 @@
 - [ ] 将 `apps/web/src/config/featureFlags.ts` 和 `app/kkaiFeatureFlags.ts` 硬编码常量升级为服务端 Feature Flag。
 - [ ] 实现 `/api/v1/admin/feature-flags` 与客户端广播（SSE 或短轮询）。
 - [ ] 使用 `workspaceUiVariant` 等视觉 Flag 分阶段切换工作台 UI。
-- [ ] 渐进式 IA：统一 layout state、左侧 Connections/Capabilities、右侧单一 AI + Inspector dock、底部 task/assets tray、全局 command palette、minimap 基于真实 viewport 重排、DOM 单一 AI toggle。
+- [ ] 渐进式 IA：统一 layout registry、顶部唯一 Task Center、右侧单一 AI + Inspector dock、两排参考 Composer、全局 command palette、minimap 基于真实 viewport 重排、DOM 单一 AI toggle。
+  - [x] 工作区第一切片：顶部独立磨砂簇、唯一任务入口、项目菜单定位、单一网格状态、小地图底栏、可拖动画笔、卡片视觉稳定、版本引导和输入框自适应已落地并有 contract/unit 测试。
+  - [x] Composer 基础切片：参考/模型/参数与语音/发送顺序、胶囊发送、10 行滚动、稳定引用 DTO 与图片拖动排序基础已落地；首尾帧可视角色和上下文第二排的完整交互仍待 E2E。
+  - [x] 设置 IA 切片：桌面/手机同源注册表、旧 ID 重定向、统一性能模式、供应商 65/35 双栏与横向卡片、真实运行健康投影已落地。
+  - [x] Runtime 数据面：migration 029–031、原子 Provider 排序、冻结 Quote 路由、owner-scoped 配对桌面命令、Extension manifest 与受控 OpenCLI adapter 已落地；受控 PostgreSQL 与真实配对设备验收仍待完成。
 - [ ] UI 依赖收敛须先有 import/bundle 测量数据，再决定 Chakra、Motion、GSAP 等去留。
 - [ ] 旧路径删除门禁：迁移完成 + 兼容期结束 + flag 回滚验证 + 观测窗口通过后，才删除重复 pricing catalog、旧队列写路径与兼容 alias。
 - [ ] 确保新旧 UI 同时读取相同 Job、Run、Canvas、Deck 投影；关闭 Flag 只回滚界面，不回滚业务数据。

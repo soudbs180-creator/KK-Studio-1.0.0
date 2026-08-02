@@ -1,6 +1,11 @@
 // 简体中文：Agent 运行历史记录持久化仓库 (Agent Run Store)
 
-import type { AgentRunDto, AgentRunStatus, AgentStepResultDto } from '@kk/shared';
+import type {
+  AgentExecutionTarget,
+  AgentRunDto,
+  AgentRunStatus,
+  AgentStepResultDto,
+} from '@kk/shared';
 import type { AgentToolCallLog } from '../../ai-takeover/types.ts';
 import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.ts';
 
@@ -22,6 +27,8 @@ export interface AgentRunRecord {
   replanCount?: 0 | 1 | 2 | 3;
   backendSyncState?: 'pending' | 'synced';
   executionAuthority?: 'local_validated' | 'server_projection';
+  executionTarget?: AgentExecutionTarget;
+  pairedRuntimeId?: string;
 }
 
 export type AgentRunStoreListener = (runs: AgentRunRecord[]) => void;
@@ -88,7 +95,9 @@ const createServerProjection = (snapshot: AgentRunDto): AgentRunRecord => ({
 
 /** Only locally planned or legacy Runs may be resumed by this browser. */
 export const hasLocalAgentRunExecutionAuthority = (record?: AgentRunRecord): boolean => (
-  Boolean(record) && record?.executionAuthority !== 'server_projection'
+  Boolean(record)
+  && record?.executionAuthority !== 'server_projection'
+  && record?.executionTarget !== 'paired-desktop'
 );
 
 const cloneRunUpdates = (updates: Partial<AgentRunRecord>): Partial<AgentRunRecord> => {
@@ -239,7 +248,20 @@ export class AgentRunStore {
     return () => this.listeners.delete(listener);
   }
 
-  createRun(userMessage: string, intent: string, plan: unknown, sessionId?: string): AgentRunRecord {
+  createRun(
+    userMessage: string,
+    intent: string,
+    plan: unknown,
+    sessionId?: string,
+    executionTarget: AgentExecutionTarget = 'local-desktop',
+    pairedRuntimeId?: string,
+  ): AgentRunRecord {
+    if (executionTarget === 'paired-desktop' && !pairedRuntimeId) {
+      throw new Error('Paired desktop Agent Runs require a paired runtime id.');
+    }
+    if (executionTarget !== 'paired-desktop' && pairedRuntimeId) {
+      throw new Error('Only paired desktop Agent Runs can bind a paired runtime id.');
+    }
     this.ensureOwnerScope();
     const now = new Date().toISOString();
     const newRun: AgentRunRecord = {
@@ -256,6 +278,8 @@ export class AgentRunStore {
       replanCount: 0,
       backendSyncState: 'pending',
       executionAuthority: 'local_validated',
+      executionTarget,
+      pairedRuntimeId,
       createdAt: now,
       updatedAt: now
     };

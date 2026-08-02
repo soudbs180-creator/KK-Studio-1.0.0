@@ -33,9 +33,8 @@ import {
   type QuickGenerationRoute,
 } from './settingsQuickPreferences';
 import {
-  getSettingsNavItems,
+  getSettingsNavigationGroups,
   type CanonicalSettingsViewId,
-  type SettingsNavItem,
 } from './settingsRegistry';
 
 const EMPTY_BROWSER_STATUS: BrowserBridgeStatusSnapshot = {
@@ -110,32 +109,10 @@ const SettingsMobileDashboard: React.FC<{
     };
   }, []);
 
-  const navigationGroups = useMemo(() => {
-    const items = getSettingsNavItems(language);
-    const resolveItems = (ids: CanonicalSettingsViewId[]) => ids
-      .map((id) => items.find((item) => item.id === id))
-      .filter((item): item is SettingsNavItem => Boolean(item));
-
-    return [
-      {
-        id: 'creation',
-        label: pick('创作与能力', 'Creation & capabilities'),
-        items: resolveItems(['generation-mode', 'capability-sources', 'provider-routes']),
-      },
-      {
-        id: 'system',
-        label: pick('自动化与系统', 'Automation & system'),
-        items: resolveItems([
-          'browser-assistant',
-          'ai-takeover',
-          'data-sync',
-          'appearance-motion',
-          'canvas-performance',
-          'dev-diagnostics',
-        ]),
-      },
-    ];
-  }, [language, pick]);
+  const navigationGroups = useMemo(
+    () => getSettingsNavigationGroups(language).filter((group) => group.id !== 'overview'),
+    [language],
+  );
   const activePreset = getActivePerformancePreset(preferences, canvasMode);
   const metrics = useMemo(() => deriveMobileSettingsOverviewMetrics({
     slots: runtime.slots,
@@ -157,13 +134,13 @@ const SettingsMobileDashboard: React.FC<{
     { id: 'platform', label: pick('平台积分', 'Platform'), icon: Coins },
   ];
   const performanceOptions: Array<{ id: WebPerformanceMode; label: string }> = [
-    { id: 'fast', label: pick('快速', 'Fast') },
-    { id: 'balanced', label: pick('正常', 'Normal') },
-    { id: 'visual', label: pick('性能', 'Performance') },
+    { id: 'auto', label: pick('自动', 'Auto') },
+    { id: 'smooth', label: pick('流畅', 'Smooth') },
+    { id: 'standard', label: pick('标准', 'Standard') },
+    { id: 'performance', label: pick('高性能', 'High performance') },
+    { id: 'custom', label: pick('自定义', 'Custom') },
   ];
-  const performanceLabel = activePreset === 'manual'
-    ? pick('手动', 'Manual')
-    : performanceOptions.find((option) => option.id === activePreset)?.label || pick('正常', 'Normal');
+  const performanceLabel = performanceOptions.find((option) => option.id === activePreset)?.label || pick('自动', 'Auto');
   const formatCompact = (value: number) => new Intl.NumberFormat(locale, {
     notation: 'compact',
     maximumFractionDigits: 1,

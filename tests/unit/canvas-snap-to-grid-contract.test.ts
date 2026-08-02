@@ -44,7 +44,7 @@ test('desktop canvas rail exposes background-grid visibility while preserving sn
   const promptCardSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
   const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
   const workflowCardSource = readSource('apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx');
-  const appSource = readSource('apps/web/src/App.tsx');
+  const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
   assert.match(projectManagerSource, /showSnapToGrid\?: boolean;/);
   assert.match(projectManagerSource, /onToggleSnapToGrid: \(\) => void;/);
@@ -65,7 +65,10 @@ test('desktop canvas rail exposes background-grid visibility while preserving sn
   assert.doesNotMatch(workflowCardSource, /snapCanvasCoordinate\(nextPosition\.x, zoomScale\)/);
   assert.doesNotMatch(workflowCardSource, /snapCanvasCoordinate\(nextPosition\.y, zoomScale\)/);
 
-  assert.match(appSource, /const \[snapToGrid, setSnapToGrid\] = useState\(false\);/);
-  assert.match(appSource, /snapToGrid=\{snapToGrid\}/);
-  assert.match(appSource, /onToggleSnapToGrid=\{handleToggleSnapToGrid\}/);
+  assert.match(workspaceSource, /const \[showGrid, setShowGrid\] = useState\(true\);/);
+  assert.match(workspaceSource, /const \[snapToGrid, setSnapToGrid\] = useState\(false\);/);
+  assert.match(workspaceSource, /onToggleSnapToGrid=\{handleToggleGrid\}/);
+  assert.match(workspaceSource, /showSnapToGrid=\{showGrid\}/);
+  assert.match(workspaceSource, /showGrid=\{canvasMode === 'board' \? false : showGrid\}/);
+  assert.doesNotMatch(projectManagerSource, /document\.body\.dataset/);
 });

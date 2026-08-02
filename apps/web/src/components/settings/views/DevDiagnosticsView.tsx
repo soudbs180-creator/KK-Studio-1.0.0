@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Cpu, Activity, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
+import { Cpu, CheckCircle, RefreshCw } from 'lucide-react';
+import type { RuntimeHealthSnapshotDto, RuntimeServiceId } from '@kk/shared';
 import { useLocale } from '../../../context/LocaleContext';
 import {
   SettingsViewShell,
@@ -8,8 +9,9 @@ import {
   SettingsBadge,
   SettingsActionButton,
 } from '../SettingsScaffold';
-import { getKkApiServerHealth } from '../../../services/api/kkApiServerHealth';
+import { getRuntimeHealthSnapshot } from '../../../services/runtime/runtimeHealthSnapshot';
 import { providerRouteEngine } from '../../../core/routing/ProviderRouteEngine';
+import RuntimeHealthOverview from '../RuntimeHealthOverview';
 
 interface LogEntry {
   timestamp: string;
@@ -21,16 +23,8 @@ interface LogEntry {
 export const DevDiagnosticsView: React.FC = () => {
   const { pick } = useLocale();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [runnerStatus, setRunnerStatus] = useState<any>(null);
+  const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeHealthSnapshotDto | null>(null);
   const [loading, setLoading] = useState(false);
-  const [manifest, setManifest] = useState<any>(null);
-
-  useEffect(() => {
-    fetch('/app-version.json', { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => setManifest(data))
-      .catch((err) => console.warn('[DevDiagnostics] Failed to fetch app-version.json:', err));
-  }, []);
 
   const runDiagnostic = async () => {
     setLoading(true);
@@ -48,13 +42,15 @@ export const DevDiagnosticsView: React.FC = () => {
       pushLog('System', 'info', 'Initializing DevDiagnostics check...');
       
       // 1. Check Local Runner / OpenCLI
-      const health = await getKkApiServerHealth();
-      setRunnerStatus(health);
-      if (health.reachable) {
-        pushLog('LocalRunner', 'info', `Local Runner connected successfully. Service: ${health.service || 'unknown'}`);
-      } else {
-        pushLog('LocalRunner', 'warn', 'Local daemon helper is not responding. Port 8000 might be closed.');
-      }
+      const snapshot = await getRuntimeHealthSnapshot();
+      setRuntimeSnapshot(snapshot);
+      snapshot.services.forEach((service) => {
+        pushLog(
+          service.label,
+          service.status === 'ready' ? 'info' : service.status === 'offline' ? 'error' : 'warn',
+          `${service.status}; latency=${service.latencyMs ?? 'n/a'}ms; version=${service.version || 'unknown'}`,
+        );
+      });
 
       // 2. Query RouteEngine for test models
       pushLog('RouteEngine', 'info', 'Querying route decision for flux-schnell (image)...');
@@ -72,8 +68,8 @@ export const DevDiagnosticsView: React.FC = () => {
       pushLog('SecurityPolicy', 'info', 'Sandbox policies verified: execute_url and write_file boundaries stagings are staging-secured.');
 
       setLogs(newLogs);
-    } catch (err: any) {
-      pushLog('System', 'error', `Diagnostic interrupted: ${err.message}`);
+    } catch (err: unknown) {
+      pushLog('System', 'error', `Diagnostic interrupted: ${err instanceof Error ? err.message : String(err)}`);
       setLogs(newLogs);
     } finally {
       setLoading(false);
@@ -81,8 +77,13 @@ export const DevDiagnosticsView: React.FC = () => {
   };
 
   useEffect(() => {
-    runDiagnostic();
+    void runDiagnostic();
   }, []);
+
+  const readService = (serviceId: RuntimeServiceId) => (
+    runtimeSnapshot?.services.find((service) => service.serviceId === serviceId)
+  );
+  const manifest = runtimeSnapshot?.build;
 
   return (
     <SettingsViewShell>
@@ -102,25 +103,32 @@ export const DevDiagnosticsView: React.FC = () => {
         }
       />
 
+      <RuntimeHealthOverview
+        services={runtimeSnapshot?.services || []}
+        onRetry={() => void runDiagnostic()}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* System Health Card */}
         <SettingsSection title={pick('系统服务连通性', 'Connectivity')}>
           <div className="space-y-3 text-xs text-[var(--text-secondary)]">
             <div className="flex items-center justify-between">
               <span>Local Runner (Daemon)</span>
-              <SettingsBadge tone={runnerStatus?.reachable ? 'emerald' : 'rose'}>
-                {runnerStatus?.reachable ? pick('就绪', 'ONLINE') : pick('离线', 'OFFLINE')}
+              <SettingsBadge tone={readService('local-runner')?.status === 'ready' ? 'emerald' : 'rose'}>
+                {readService('local-runner')?.status || pick('检测中', 'CHECKING')}
               </SettingsBadge>
             </div>
             <div className="flex items-center justify-between">
               <span>OpenCLI Bridge API</span>
-              <SettingsBadge tone={runnerStatus?.reachable ? 'emerald' : 'rose'}>
-                {runnerStatus?.reachable ? pick('就绪', 'ONLINE') : pick('离线', 'OFFLINE')}
+              <SettingsBadge tone={readService('opencli')?.status === 'ready' ? 'emerald' : 'rose'}>
+                {readService('opencli')?.status || pick('检测中', 'CHECKING')}
               </SettingsBadge>
             </div>
             <div className="flex items-center justify-between">
               <span>API Gateway Health</span>
-              <SettingsBadge tone="emerald">{pick('就绪', 'ONLINE')}</SettingsBadge>
+              <SettingsBadge tone={readService('api-gateway')?.status === 'ready' ? 'emerald' : 'rose'}>
+                {readService('api-gateway')?.status || pick('检测中', 'CHECKING')}
+              </SettingsBadge>
             </div>
           </div>
         </SettingsSection>

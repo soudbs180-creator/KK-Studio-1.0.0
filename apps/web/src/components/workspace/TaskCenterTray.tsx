@@ -20,7 +20,7 @@ import {
   Settings,
   Bot,
 } from 'lucide-react';
-import { KK_LAYER, KK_LAYOUT } from '@kk/ui';
+import { KK_LAYER } from '@kk/ui';
 import {
   agentRunStore,
   agentRuntimeInstance,
@@ -30,7 +30,6 @@ import {
 } from '../../features/ai-assistant-runtime';
 import { notify } from '../../services/system/notificationService';
 import { useCanvas } from '../../context/CanvasContext';
-import { getAssistantSidebarCenterLeft } from '../../utils/canvasCenter';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { TASK_CENTER_OPEN_EVENT } from './taskCenterEvents';
 
@@ -89,8 +88,6 @@ const isSetupRequiredError = (value: string) => {
 
 export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   onOpenSettings,
-  isChatOpen = false,
-  chatSidebarWidth = KK_LAYOUT.workspace.assistantSidebarDefaultWidth,
   isMobile = false,
 }) => {
   const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
@@ -107,11 +104,10 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   // Non-durable event tasks remain a session-only compatibility projection.
   // Durable generation and Agent state stay owned by their respective stores.
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const externalTriggerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeTaskCenter = useCallback(() => {
-    const returnTarget = externalTriggerRef.current ?? triggerRef.current;
+    const returnTarget = externalTriggerRef.current;
     externalTriggerRef.current = null;
     setIsOpen(false);
     window.requestAnimationFrame(() => returnTarget?.focus());
@@ -531,7 +527,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
       data-mobile={isMobile ? 'true' : 'false'}
       className="kk-task-center-host fixed flex flex-col items-center pointer-events-none"
       style={{
-        left: isMobile ? undefined : getAssistantSidebarCenterLeft(isChatOpen, chatSidebarWidth),
         zIndex: KK_LAYER.floatingPanel
       }}
     >
@@ -539,25 +534,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
         className="kk-task-center-morph pointer-events-auto"
         data-state={isOpen ? 'open' : 'collapsed'}
       >
-        {!isOpen && !isMobile && (
-          <button
-            type="button"
-            aria-label="展开任务状态列表"
-            aria-expanded={isOpen}
-            aria-controls="desktop-task-center-panel"
-            ref={triggerRef}
-            onClick={() => setIsOpen(true)}
-            className="kk-task-center-trigger"
-            title="展开任务状态列表"
-          >
-            <span
-              className="kk-task-center-rail"
-              data-active={activeRunningCount > 0 ? 'true' : 'false'}
-              aria-hidden="true"
-            />
-          </button>
-        )}
-
         {isOpen && (
           <div
             id="desktop-task-center-panel"

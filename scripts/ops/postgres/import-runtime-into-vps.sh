@@ -27,6 +27,9 @@ AGENT_RUN_REPLAN_EVENT_MIGRATION="${AGENT_RUN_REPLAN_EVENT_MIGRATION:-${REPO_ROO
 OAUTH_IDENTITY_MIGRATION="${OAUTH_IDENTITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION="${PAYMENT_RECHARGE_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
 PAYMENT_RECHARGE_HARDENING_MIGRATION="${PAYMENT_RECHARGE_HARDENING_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
+PROVIDER_ROUTING_PRIORITY_MIGRATION="${PROVIDER_ROUTING_PRIORITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
+PAIRED_RUNTIMES_MIGRATION="${PAIRED_RUNTIMES_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/030_paired_runtimes.sql}"
+AGENT_EXTENSIONS_MIGRATION="${AGENT_EXTENSIONS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/031_agent_extensions.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -102,6 +105,16 @@ if [[ ! -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" ]]; then
   exit 1
 fi
 
+for runtime_migration in \
+  "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
+  "${PAIRED_RUNTIMES_MIGRATION}" \
+  "${AGENT_EXTENSIONS_MIGRATION}"; do
+  if [[ ! -f "${runtime_migration}" ]]; then
+    echo "[import-runtime-into-vps] Missing runtime capability migration: ${runtime_migration}" >&2
+    exit 1
+  fi
+done
+
 if [[ ! -f "${RUNTIME_SQL}" ]]; then
   echo "[import-runtime-into-vps] Missing export file: ${RUNTIME_SQL}" >&2
   exit 1
@@ -156,5 +169,13 @@ psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${RUNTIME_SQL}"
 
 echo "[import-runtime-into-vps] Applying mandatory payment recharge hardening migration"
 psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}"
+
+echo "[import-runtime-into-vps] Applying provider routing, paired runtime and agent extension migrations"
+for runtime_migration in \
+  "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
+  "${PAIRED_RUNTIMES_MIGRATION}" \
+  "${AGENT_EXTENSIONS_MIGRATION}"; do
+  psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${runtime_migration}"
+done
 
 echo "[import-runtime-into-vps] Import complete."

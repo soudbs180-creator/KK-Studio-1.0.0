@@ -1,0 +1,502 @@
+/*
+ * Workspace v4 visual contract.
+ *
+ * These rules deliberately sit after the legacy morphic and v3 layers. They
+ * keep each desktop control as an independent floating surface while the
+ * underlying canvas remains unobstructed and interactive.
+ */
+
+@media (min-width: 769px) {
+  .desktop-left-chrome {
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 52px !important;
+    pointer-events: none;
+  }
+
+  .kk-workspace-chrome-v3 {
+    position: relative;
+    display: grid !important;
+    width: 100%;
+    height: 52px !important;
+    min-height: 52px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    padding: 8px 12px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    pointer-events: none;
+  }
+
+  .kk-workspace-chrome-v3__project,
+  .kk-workspace-chrome-v3__canvas,
+  .kk-workspace-chrome-v3__account {
+    border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 88%, transparent) !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 82%, transparent) !important;
+    box-shadow: 0 8px 24px color-mix(in oklch, black 18%, transparent) !important;
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+    pointer-events: auto;
+  }
+
+  .kk-workspace-chrome-v3__project {
+    border-radius: 12px !important;
+  }
+
+  .kk-workspace-chrome-v3__canvas,
+  .kk-workspace-chrome-v3__account {
+    border-radius: 999px !important;
+  }
+
+  .kk-workspace-chrome-v3__canvas {
+    min-width: 104px;
+  }
+
+  .kk-workspace-chrome-v3__account {
+    padding: 3px;
+  }
+
+  #btn-desktop-recharge {
+    min-height: 28px;
+    margin-inline-end: 3px;
+    padding-inline: 11px;
+    border: 1px solid color-mix(in oklch, white 18%, transparent) !important;
+  }
+
+  .kk-task-center-host:not([data-mobile='true']) {
+    top: 56px !important;
+    left: 50% !important;
+    width: 360px;
+    transform: translateX(-50%);
+  }
+
+  .kk-task-center-host:not([data-mobile='true']) .kk-task-center-morph[data-state='open'],
+  .kk-task-center-morph[data-state='open'] {
+    width: 360px;
+    max-width: min(360px, calc(100vw - 24px));
+    max-height: 70vh;
+    border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 88%, transparent) !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 86%, transparent) !important;
+    box-shadow: 0 18px 48px color-mix(in oklch, black 24%, transparent) !important;
+    backdrop-filter: blur(22px) saturate(135%);
+    -webkit-backdrop-filter: blur(22px) saturate(135%);
+  }
+
+  .kk-morphic-project-panel[data-desktop-persistent='true'] {
+    --kk-project-panel-left: 12px;
+    top: 56px !important;
+    bottom: auto !important;
+    left: clamp(12px, var(--kk-project-panel-left), calc(100vw - var(--kk-morphic-left-panel-width) - 12px)) !important;
+    max-height: calc(100dvh - 68px);
+    border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 88%, transparent) !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 84%, transparent) !important;
+    box-shadow: 0 18px 48px color-mix(in oklch, black 24%, transparent) !important;
+    backdrop-filter: blur(22px) saturate(135%) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(135%) !important;
+  }
+
+  #prompt-bar-container[data-composer-layout='desktop'] {
+    --kk-workspace-left-inset: 72px;
+    --kk-workspace-right-inset: 12px;
+    left: calc((var(--kk-workspace-left-inset) + 100vw - var(--kk-workspace-right-inset)) / 2) !important;
+    width: min(
+      calc(100vw - var(--kk-workspace-left-inset) - var(--kk-workspace-right-inset) - 24px),
+      var(--kk-morphic-composer-width)
+    ) !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .kk-composer-compact-footer .kk-composer-reference-button {
+    display: inline-flex;
+    min-width: max-content;
+    align-items: center;
+    gap: 5px;
+    padding-inline: 9px;
+    color: var(--text-secondary);
+    border: 1px solid var(--kk-morphic-border);
+    background: var(--kk-morphic-control);
+  }
+
+  .kk-composer-reference-count {
+    min-width: 16px;
+    padding-inline: 4px;
+    border-radius: 999px;
+    color: var(--text-primary);
+    background: var(--kk-morphic-control-hover);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .kk-composer-compact-footer .prompt-bar-liquid-send {
+    width: auto !important;
+    min-width: 76px !important;
+    padding-inline: 11px 4px !important;
+    border-radius: 999px !important;
+  }
+
+  .kk-composer-compact-footer .prompt-bar-liquid-send .kk-prompt-send-button-content {
+    display: flex !important;
+    padding-inline: 0 4px;
+  }
+
+  .desktop-navigation-panel {
+    right: var(--kk-canvas-navigation-right, 12px) !important;
+    bottom: 12px !important;
+  }
+
+  .desktop-navigation-panel .canvas-nav-panel {
+    border-radius: 18px !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 84%, transparent) !important;
+    box-shadow: 0 14px 36px color-mix(in oklch, black 22%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(135%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(135%) !important;
+  }
+
+  #ai-assistant-sidebar {
+    top: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    height: auto !important;
+    overflow: visible;
+    border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 92%, transparent) !important;
+    border-radius: 20px !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 88%, transparent) !important;
+    box-shadow: 0 20px 56px color-mix(in oklch, black 28%, transparent) !important;
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+  }
+
+  #ai-assistant-sidebar > div:last-child {
+    border-radius: inherit;
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-header,
+  #ai-assistant-sidebar .kk-chat-sidebar-bottom {
+    border-color: var(--kk-morphic-border) !important;
+    background: color-mix(in oklch, var(--kk-morphic-panel) 78%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(135%);
+    -webkit-backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-header {
+    padding-top: 4px !important;
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-bottom {
+    padding: 10px 12px 12px !important;
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-composer {
+    padding: 10px !important;
+    border: 1px solid var(--kk-morphic-border) !important;
+    border-radius: 16px !important;
+    background: var(--kk-morphic-control) !important;
+    box-shadow: none !important;
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-composer-input {
+    min-height: 52px !important;
+    padding: 4px 2px 8px !important;
+    line-height: 1.5 !important;
+  }
+
+  #ai-assistant-sidebar .kk-chat-sidebar-composer-actions {
+    min-height: 40px;
+    padding-top: 6px !important;
+    border-color: var(--kk-morphic-border) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .kk-task-center-morph[data-state='open'] {
+    max-height: min(72dvh, 620px);
+  }
+}
+
+.kk-drawing-toolbar {
+  position: fixed;
+  z-index: 710;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 88%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--kk-morphic-panel) 86%, transparent);
+  box-shadow: 0 14px 36px color-mix(in oklch, black 22%, transparent);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  user-select: none;
+}
+
+.kk-drawing-toolbar__handle,
+.kk-drawing-toolbar__control,
+.kk-drawing-toolbar__swatch,
+.kk-drawing-toolbar__width {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.kk-drawing-toolbar__handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.kk-drawing-toolbar__handle:active {
+  cursor: grabbing;
+}
+
+.kk-drawing-toolbar__control:hover,
+.kk-drawing-toolbar__control[data-active='true'],
+.kk-drawing-toolbar__width:hover,
+.kk-drawing-toolbar__width[data-active='true'] {
+  color: var(--text-primary);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-drawing-toolbar__control[data-active='true'],
+.kk-drawing-toolbar__width[data-active='true'] {
+  color: var(--kk-morphic-action);
+}
+
+.kk-drawing-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline-end: 4px;
+  border-inline-end: 1px solid var(--kk-morphic-border);
+}
+
+.kk-drawing-toolbar__shape-wrap {
+  position: relative;
+}
+
+.kk-drawing-toolbar__shape-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 12px;
+  background: var(--kk-morphic-panel);
+  box-shadow: 0 12px 28px color-mix(in oklch, black 22%, transparent);
+}
+
+.kk-drawing-toolbar__swatch > span {
+  width: 14px;
+  height: 14px;
+  border: 1px solid color-mix(in oklch, white 22%, transparent);
+  border-radius: 50%;
+}
+
+.kk-drawing-toolbar__swatch[data-active='true'] > span {
+  outline: 2px solid var(--kk-morphic-action);
+  outline-offset: 2px;
+}
+
+.kk-drawing-toolbar__width {
+  min-width: 30px;
+  padding-inline: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.kk-version-surface,
+.kk-version-help {
+  color: var(--text-secondary);
+  border-color: var(--kk-morphic-border) !important;
+  background: color-mix(in oklch, var(--kk-morphic-panel) 86%, transparent);
+  box-shadow: 0 8px 22px color-mix(in oklch, black 18%, transparent);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+.kk-version-help:hover {
+  color: var(--text-primary);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-composer-reference-stack {
+  display: grid;
+  gap: 6px;
+  margin: 6px 10px 0;
+  padding: 6px;
+  border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 78%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--kk-morphic-control) 72%, transparent);
+}
+
+.kk-composer-reference-media-row {
+  min-height: 52px;
+  margin: 0 !important;
+  padding: 2px !important;
+}
+
+.kk-composer-reference-slot {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  padding: 0;
+  color: var(--text-tertiary);
+  border: 1px dashed var(--kk-morphic-border);
+  border-radius: 10px;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.kk-composer-reference-slot:hover {
+  color: var(--text-primary);
+  border-color: var(--kk-morphic-action);
+  background: var(--kk-morphic-control-hover);
+}
+
+.kk-composer-reference-arrow {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
+.kk-composer-reference-role {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  left: 3px;
+  overflow: hidden;
+  padding: 2px 4px;
+  color: white;
+  border-radius: 6px;
+  background: color-mix(in oklch, black 64%, transparent);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.kk-composer-reference-context-row {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px 1px;
+  border-top: 1px solid var(--kk-morphic-border);
+}
+
+.kk-composer-context-reference {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 180px;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  color: var(--text-secondary);
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 999px;
+  background: var(--kk-morphic-control);
+  font-size: 11px;
+}
+
+.kk-composer-context-reference > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-favorites-panel.is-desktop {
+  min-width: 420px;
+  min-height: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+}
+
+.workspace-favorites-panel.is-resizing,
+.workspace-favorites-panel.is-resizing * {
+  user-select: none;
+}
+
+.workspace-favorites-card {
+  container-name: favorites-panel;
+  container-type: inline-size;
+  border: 1px solid var(--frost-card-framework-border);
+  background: var(--frost-card-framework-bg);
+  box-shadow: var(--frost-card-framework-shadow);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(150%);
+}
+
+.workspace-favorites-resize-handle {
+  position: absolute;
+  z-index: 2;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+.workspace-favorites-resize-handle.is-width {
+  top: 22px;
+  right: -5px;
+  bottom: 22px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.workspace-favorites-resize-handle.is-height {
+  right: 22px;
+  bottom: -5px;
+  left: 22px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.workspace-favorites-resize-handle.is-proportional {
+  right: -3px;
+  bottom: -3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 0 0 22px;
+  cursor: nwse-resize;
+}
+
+.workspace-favorites-resize-handle.is-proportional::after {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--text-tertiary);
+  border-bottom: 1px solid var(--text-tertiary);
+  content: '';
+}
+
+@container favorites-panel (max-width: 560px) {
+  .workspace-favorites-card .workspace-favorites-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-favorites-card .workspace-favorites-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-favorites-card .workspace-favorites-detail-preview {
+    height: 128px;
+  }
+}

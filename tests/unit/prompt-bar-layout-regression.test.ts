@@ -28,8 +28,10 @@ test('prompt bar keeps the desktop footer compact while allowing full control la
     topRowDesktopSource,
     /className="kk-composer-floating-tools flex items-center justify-between gap-1\.5"/,
   );
-  assert.match(footerShellSource, /<PromptBarFooterMobile>[\s\S]*<PromptVoiceInputButton \/>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterMobile>/);
-  assert.match(footerShellSource, /<PromptBarFooterDesktop>[\s\S]*<PromptVoiceInputButton \/>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterDesktop>/);
+  assert.match(footerShellSource, /<PromptBarFooterMobile>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterMobile>/);
+  assert.match(footerShellSource, /<PromptBarFooterDesktop>[\s\S]*\{children\}[\s\S]*<\/PromptBarFooterDesktop>/);
+  assert.match(promptBarSource, /<ComposerReferenceButton[\s\S]*<DesktopComposerModePanel/);
+  assert.match(promptBarSource, /data-composer-control="voice"[\s\S]*data-mobile-footer-control="send"/);
   assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
   assert.match(
     modePanelSource,
@@ -76,18 +78,16 @@ test('desktop creative type picker uses one compact trigger and a content-fit me
   assert.doesNotMatch(modeSwitcherSource, /sliderOffset|sliderLeft|duration-300/);
 });
 
-test('mobile embedded composer keeps the upload affordance inside the input area instead of spending a dedicated row when empty', () => {
+test('mobile embedded composer keeps upload inline while desktop uses the footer reference control', () => {
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,
     /const shouldRenderInlineMobileUploadButton = isMobile && config\.mode !== GenerationMode\.ECOMMERCE && config\.referenceImages\.length === 0 && uploadingCount === 0;/,
   );
-  assert.match(
-    promptBarSource,
-    /const shouldRenderStandaloneUploadRow = !isMobile && config\.mode !== GenerationMode\.ECOMMERCE && config\.referenceImages\.length === 0 && uploadingCount === 0;/,
-  );
   assert.match(promptBarSource, /shouldRenderInlineMobileUploadButton && \(/);
+  assert.match(promptBarSource, /<ComposerReferenceButton/);
+  assert.doesNotMatch(promptBarSource, /shouldRenderStandaloneUploadRow/);
 });
 
 test('prompt bar keeps the textarea transparent while reserving the frosted footer layer for mobile only', () => {

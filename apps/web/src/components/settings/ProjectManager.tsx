@@ -56,6 +56,8 @@ import {
 } from './SettingsScaffold';
 import { PROJECT_MANAGER_ACTIONS } from './settingsModuleActions';
 import { subscribeWorkflowBrowser } from '../layout/prompt-bar/composerEvents';
+import { PROJECT_MENU_TOGGLE_EVENT } from './projectMenuEvents';
+import { computeProjectPanelLeft } from './projectPanelPosition';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -103,7 +105,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onFavorites,
     isMobile,
     onToggleCanvasMode,
+    onToggleSnapToGrid,
     canvasMode = 'normal',
+    showSnapToGrid = false,
     isUserMenuOpen = false,
     onOpenMarkdownImport,
     onOpenMermaidImport,
@@ -135,20 +139,42 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         boxShadow: 'none',
     };
 
-    const [showDropdown, setShowDropdown] = useState(() => !isMobile);
+    const [showDropdown, setShowDropdown] = useState(false);
     const [showWorkflowDropdown, setShowWorkflowDropdown] = useState(false);
     const [workflowBrowserTab, setWorkflowBrowserTab] = useState<WorkflowBrowserTab>('workflows');
     const [workflowCategory, setWorkflowCategory] = useState<WorkflowCategory>('all');
     const [workflowQuery, setWorkflowQuery] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-    const [isGridVisible, setIsGridVisible] = useState(true);
+    const [projectPanelLeft, setProjectPanelLeft] = useState(12);
+
+    const updateProjectPanelPosition = useCallback(() => {
+        if (isMobile) {
+            return;
+        }
+        const trigger = document.querySelector<HTMLElement>('[data-chrome-region="project"]');
+        const triggerLeft = trigger?.getBoundingClientRect().left ?? 12;
+        setProjectPanelLeft(computeProjectPanelLeft(triggerLeft, 262, window.innerWidth));
+    }, [isMobile]);
 
     useEffect(() => {
-        document.body.dataset.kkCanvasGrid = isGridVisible ? 'visible' : 'hidden';
-        return () => {
-            delete document.body.dataset.kkCanvasGrid;
+        if (isMobile) {
+            return undefined;
+        }
+        const toggleProjectMenu = () => {
+            updateProjectPanelPosition();
+            setShowDropdown((visible) => !visible);
         };
-    }, [isGridVisible]);
+        window.addEventListener(PROJECT_MENU_TOGGLE_EVENT, toggleProjectMenu);
+        return () => window.removeEventListener(PROJECT_MENU_TOGGLE_EVENT, toggleProjectMenu);
+    }, [isMobile, updateProjectPanelPosition]);
+
+    useEffect(() => {
+        if (!showDropdown || isMobile) {
+            return undefined;
+        }
+        window.addEventListener('resize', updateProjectPanelPosition);
+        return () => window.removeEventListener('resize', updateProjectPanelPosition);
+    }, [isMobile, showDropdown, updateProjectPanelPosition]);
 
     useEffect(() => {
         const openWorkflowBrowser = () => {
@@ -166,7 +192,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
 
         previousIsMobileRef.current = isMobile;
-        setShowDropdown(!isMobile);
+        setShowDropdown(false);
     }, [isMobile]);
 
     const handleAddUtilityCardWithSafety = useCallback((kind: WorkflowUtilityNodeKind) => {
@@ -396,8 +422,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 style={{
                     ...projectManagerPanelStyle,
                     ...dropdownPositionStyle,
+                    '--kk-project-panel-left': `${projectPanelLeft}px`,
                     zIndex: isMobile ? KK_LAYER.modal : KK_LAYER.floatingPanel,
-                }}
+                } as React.CSSProperties}
             >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
@@ -984,22 +1011,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             >
                 <div className="kk-project-rail flex max-h-[calc(100dvh-144px)] w-full flex-col items-center gap-1 overflow-x-hidden overflow-y-auto rounded-lg p-0.5">
                     <div className="flex w-full flex-col items-center gap-2">
-                                <div className="relative">
-                                    <button
-                                        id="project-manager-trigger"
-                                        data-project-manager-action={PROJECT_MANAGER_ACTIONS.openProjectMenu.uiAction}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            setShowDropdown((prev) => !prev);
-                                        }}
-                                        className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
-                                        title={activeProjectName}
-                                    >
-                                        <Layers size={16} />
-                                        <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--kk-morphic-border)]" />
-                                    </button>
-                                </div>
-
                                 <button
                                     data-project-manager-action={PROJECT_MANAGER_ACTIONS.openSearch.uiAction}
                                     onClick={(event) => {
@@ -1033,46 +1044,29 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 <button
                                     type="button"
                                     data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
-                                    data-canvas-interaction-mode="normal"
+                                    data-canvas-interaction-mode={canvasMode}
                                     onClick={(event) => {
                                         event.stopPropagation();
-                                        if (canvasMode !== 'normal') onToggleCanvasMode();
-                                    }}
-                                    className={`${desktopIconButtonClass} ${canvasMode === 'normal' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                                    title="画布模式"
-                                    aria-label="切换到画布模式"
-                                    aria-pressed={canvasMode === 'normal'}
-                                >
-                                    <MousePointer2 size={16} />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    data-project-manager-action={PROJECT_MANAGER_ACTIONS.toggleCanvasMode.uiAction}
-                                    data-canvas-interaction-mode="board"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        if (canvasMode !== 'board') onToggleCanvasMode();
+                                        onToggleCanvasMode();
                                     }}
                                     className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                                    title="画板模式"
-                                    aria-label="切换到画板模式"
+                                    title={canvasMode === 'normal' ? '切换到画板模式' : '切换到画布模式'}
+                                    aria-label={canvasMode === 'normal' ? '切换到画板模式' : '切换到画布模式'}
                                     aria-pressed={canvasMode === 'board'}
                                 >
-                                    <PenTool size={16} />
+                                    {canvasMode === 'board' ? <PenTool size={16} /> : <MousePointer2 size={16} />}
                                 </button>
-
                                 <button
                                     type="button"
                                     data-canvas-grid-toggle="true"
                                     onClick={(event) => {
                                         event.stopPropagation();
-                                        setIsGridVisible((visible) => !visible);
+                                        onToggleSnapToGrid();
                                     }}
-                                    className={`${desktopIconButtonClass} ${isGridVisible ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                                    title={isGridVisible ? '隐藏背景点阵' : '显示背景点阵'}
-                                    aria-label={isGridVisible ? '隐藏背景点阵' : '显示背景点阵'}
-                                    aria-pressed={isGridVisible}
+                                    className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title={showSnapToGrid ? '隐藏背景点阵' : '显示背景点阵'}
+                                    aria-label={showSnapToGrid ? '隐藏背景点阵' : '显示背景点阵'}
+                                    aria-pressed={showSnapToGrid}
                                 >
                                     <Grid3x3 size={16} />
                                 </button>

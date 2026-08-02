@@ -23,6 +23,10 @@ test('KkApiClient exposes all Provider Connection and Capability Graph endpoints
 
   await client.getCapabilityGraphSnapshot();
   await client.listProviderConnections();
+  await client.reorderProviderConnections({
+    connectionIds: [connectionId],
+    expectedOrderRevision: 2,
+  });
   await client.createProviderConnection({
     providerId: 'google',
     displayName: 'Google official',
@@ -36,12 +40,17 @@ test('KkApiClient exposes all Provider Connection and Capability Graph endpoints
   assert.deepEqual(requests.map(({ url, method }) => ({ url, method })), [
     { url: 'https://api.example.test/api/v1/capability-graph/snapshot', method: 'GET' },
     { url: 'https://api.example.test/api/v1/provider-connections', method: 'GET' },
+    { url: 'https://api.example.test/api/v1/provider-connections/order', method: 'PUT' },
     { url: 'https://api.example.test/api/v1/provider-connections', method: 'POST' },
     { url: `https://api.example.test/api/v1/provider-connections/${connectionId}`, method: 'PATCH' },
     { url: `https://api.example.test/api/v1/provider-connections/${connectionId}/verify`, method: 'POST' },
     { url: `https://api.example.test/api/v1/provider-connections/${connectionId}`, method: 'DELETE' },
   ]);
   assert.deepEqual(requests[2].body, {
+    connectionIds: [connectionId],
+    expectedOrderRevision: 2,
+  });
+  assert.deepEqual(requests[3].body, {
     providerId: 'google',
     displayName: 'Google official',
     protocolProfile: 'google-official',

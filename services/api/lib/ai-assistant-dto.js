@@ -22,6 +22,8 @@ function mapAgentRunRow(row = {}, toolCalls = []) {
     toolCalls: Array.isArray(toolCalls) ? toolCalls : [],
     stepResults: Array.isArray(row.step_results) ? row.step_results : [],
     replanCount: Number.isInteger(row.replan_count) ? row.replan_count : undefined,
+    executionTarget: row.execution_target,
+    pairedRuntimeId: row.paired_runtime_id,
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at),
   });

@@ -1,7 +1,10 @@
 import type {
   CanvasCardPresentation,
   CanvasNoteNodeDto,
+  ContextReferenceDto,
   GenerationTelemetry,
+  ReferenceRole,
+  VideoReferenceMode,
 } from '@kk/shared';
 
 export const AspectRatio = {
@@ -232,6 +235,7 @@ export interface ReferenceImage {
   mentionName?: string; // User-facing @ reference name used for semantic binding
   mentionText?: string;
   mentionSourceId?: string;
+  role?: ReferenceRole;
 }
 
 export interface NormalizedRect {
@@ -1225,6 +1229,7 @@ export interface GenerationConfig {
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
   referenceImages: ReferenceImage[];
+  contextReferences?: ContextReferenceDto[];
   parallelCount: number;
   model: ModelType;
   enableGrounding: boolean;
@@ -1235,6 +1240,7 @@ export interface GenerationConfig {
   videoResolution?: string; // '720p' | '1080p' | '4k'
   videoDuration?: string;   // 根据分辨率动态支持：720p 支持 4s/6s/8s，1080p 和 4k 仅支持 8s
   videoAudio?: boolean;     // 生成音频
+  videoReferenceMode?: VideoReferenceMode;
   // 图像编辑扩展
   maskUrl?: string;         // Base64 蒙版图片 (Inpaint)
   editMode?: 'inpaint' | 'outpaint' | 'vectorize' | 'reframe' | 'upscale' | 'replace-background' | 'edit';

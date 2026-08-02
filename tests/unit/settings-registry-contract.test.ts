@@ -30,7 +30,7 @@ test('settings shell and routes share a single registry for canonical views and 
   assert.match(registrySource, /export function getSettingsStatusSummaryLabel/);
 
   assert.match(panelSource, /from '\.\/settingsRegistry';/);
-  assert.match(panelSource, /getSettingsNavItems/);
+  assert.match(panelSource, /getSettingsNavigationGroups/);
   assert.match(panelSource, /getSettingsViewMeta/);
   assert.doesNotMatch(panelSource, /const NAV_PATHS:/);
   assert.doesNotMatch(panelSource, /const LEGACY_SETTINGS_VIEW_ALIASES:/);

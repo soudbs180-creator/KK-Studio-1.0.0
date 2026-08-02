@@ -20,6 +20,10 @@ import {
 
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { type AppLanguage, pickByLanguage } from '../../context/LocaleContext';
+import {
+  resolveCurrentSettingsDestination,
+  SETTINGS_NAVIGATION_GROUPS,
+} from './settingsNavigationRegistry';
 
 export type CanonicalSettingsViewId =
   | 'dashboard'
@@ -64,6 +68,12 @@ export interface SettingsNavItem {
   section: SettingsNavSectionId;
   path: string;
   keywords?: string[];
+}
+
+export interface SettingsNavigationGroup {
+  id: 'overview' | 'integrations' | 'system';
+  label: string;
+  items: SettingsNavItem[];
 }
 
 export interface SettingsModule {
@@ -236,28 +246,28 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Routing state',
   },
   'capability-sources': {
-    eyebrow: 'Capability Inputs',
-    titleZh: '能力来源',
-    titleEn: 'Capability Sources',
-    descriptionZh: '管理 API 密钥、官方 OAuth 授权、本地 Runner 以及网页会员连接。',
-    descriptionEn: 'Manage API keys, official OAuth credentials, local runners, and web memberships.',
-    primaryActionLabelZh: '配置 Provider 路由',
-    primaryActionLabelEn: 'Configure Provider Routes',
+    eyebrow: 'API Connections',
+    titleZh: 'API 配置',
+    titleEn: 'API Configuration',
+    descriptionZh: '管理用户持有的 API 密钥、官方 OAuth 授权、本地接口和供应商连接。',
+    descriptionEn: 'Manage user-owned API keys, official OAuth credentials, local APIs, and provider connections.',
+    primaryActionLabelZh: '打开能力配置',
+    primaryActionLabelEn: 'Open Capability Configuration',
     primaryActionTarget: 'provider-routes',
     statusSummaryLabelZh: '接入状态',
     statusSummaryLabelEn: 'Input status',
   },
   'provider-routes': {
-    eyebrow: 'Task Dispatch',
-    titleZh: 'Provider 路由',
-    titleEn: 'Provider Routes',
-    descriptionZh: '分配各个业务任务（图片/视频/文本/PPT等）的具体执行 Provider 路由。',
-    descriptionEn: 'Allocate executive routes for each business task (image/video/text/PPT).',
-    primaryActionLabelZh: '查看开发者诊断',
-    primaryActionLabelEn: 'Open Diagnostics',
-    primaryActionTarget: 'dev-diagnostics',
-    statusSummaryLabelZh: '分发状态',
-    statusSummaryLabelEn: 'Dispatch status',
+    eyebrow: 'Capability Configuration',
+    titleZh: '能力配置',
+    titleEn: 'Capability Configuration',
+    descriptionZh: '统一配置运行位置、账号管理、生成路由和桌面浏览器操控。',
+    descriptionEn: 'Configure execution location, account management, generation routing, and desktop browser control.',
+    primaryActionLabelZh: '打开 AI 代理',
+    primaryActionLabelEn: 'Open AI Agent',
+    primaryActionTarget: 'ai-takeover',
+    statusSummaryLabelZh: '能力状态',
+    statusSummaryLabelEn: 'Capability status',
   },
   'browser-assistant': {
     eyebrow: 'Browser Automation',
@@ -284,23 +294,23 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Smoothness grade',
   },
   'ai-takeover': {
-    eyebrow: 'AI Governance',
-    titleZh: 'AI 接管',
-    titleEn: 'AI Takeover',
-    descriptionZh: '管理 AI Control Plane 接管深度，并分配低、中、高风险任务的执行策略。',
-    descriptionEn: 'Manage AI Control Plane takeover scopes and assign safety policy tiers.',
+    eyebrow: 'AI Agent',
+    titleZh: 'AI 代理',
+    titleEn: 'AI Agent',
+    descriptionZh: '管理会话、计划反馈、Skill、MCP、Plugin 与分级权限策略。',
+    descriptionEn: 'Manage conversations, plan feedback, Skills, MCP, Plugins, and tiered permission policies.',
     primaryActionLabelZh: '返回设置总览',
     primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
-    statusSummaryLabelZh: '接管深度',
-    statusSummaryLabelEn: 'Takeover depth',
+    statusSummaryLabelZh: '代理状态',
+    statusSummaryLabelEn: 'Agent status',
   },
   'data-sync': {
-    eyebrow: 'Data & Sync',
-    titleZh: '数据与同步',
-    titleEn: 'Data & Sync',
-    descriptionZh: '管理 IndexedDB 本地缓存、云端 Workspace 存储空间以及导出清理逻辑。',
-    descriptionEn: 'Manage IndexedDB caches, cloud workspaces, sync pipelines, and exports.',
+    eyebrow: 'Data & Security',
+    titleZh: '数据与安全',
+    titleEn: 'Data & Security',
+    descriptionZh: '管理本地缓存、云端同步、导出清理、凭据保护和数据安全边界。',
+    descriptionEn: 'Manage local caches, cloud sync, exports, credential protection, and data boundaries.',
     primaryActionLabelZh: '返回设置总览',
     primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
@@ -308,11 +318,11 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Sync status',
   },
   'dev-diagnostics': {
-    eyebrow: 'Developer Tools',
-    titleZh: '开发者诊断',
-    titleEn: 'Developer Diagnostics',
-    descriptionZh: '实时查阅 ProviderRouteEngine 路由决策、BrowserActionRouter 执行链和性能参数。',
-    descriptionEn: 'Trace real-time ProviderRouteEngine decisions, browser automation sequences, and core metrics.',
+    eyebrow: 'System Logs',
+    titleZh: '系统日志',
+    titleEn: 'System Logs',
+    descriptionZh: '查看服务连通性、延迟、版本、构建信息、路由决策和可执行恢复动作。',
+    descriptionEn: 'Review service health, latency, versions, builds, routing decisions, and recovery actions.',
     primaryActionLabelZh: '返回设置总览',
     primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
@@ -344,11 +354,11 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'Recharge status',
   },
   'appearance-motion': {
-    eyebrow: 'Advanced Performance',
-    titleZh: '高级性能设置',
-    titleEn: 'Advanced Performance',
-    descriptionZh: '统一管理体验档位、外观动态和画布性能；修改细节后快捷档位会标记为手动。',
-    descriptionEn: 'Manage experience presets, appearance, motion, and canvas performance in one place.',
+    eyebrow: 'Performance',
+    titleZh: '性能配置',
+    titleEn: 'Performance',
+    descriptionZh: '统一管理自动、流畅、标准、高性能和自定义档位，不降低已显示卡片的视觉完整度。',
+    descriptionEn: 'Manage automatic, smooth, standard, high-performance, and custom modes without degrading visible cards.',
     primaryActionLabelZh: '返回设置总览',
     primaryActionLabelEn: 'Back to Overview',
     primaryActionTarget: 'dashboard',
@@ -393,10 +403,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'provider-routes',
-    labelZh: '能力路由',
-    labelEn: 'Capability Routing',
-    descriptionZh: '图片、视频等任务的默认执行能力。',
-    descriptionEn: 'Default capabilities for image, video, and other tasks.',
+    labelZh: '能力配置',
+    labelEn: 'Capability Configuration',
+    descriptionZh: '运行位置、账号、生成路由与浏览器操控。',
+    descriptionEn: 'Runtime location, accounts, routing, and browser control.',
     icon: Split,
     section: 'workspace',
     path: SETTINGS_PATHS['provider-routes'],
@@ -426,10 +436,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'ai-takeover',
-    labelZh: 'AI 接管',
-    labelEn: 'AI Takeover',
-    descriptionZh: '权限分级、接管模式。',
-    descriptionEn: 'AI permissions, advisory scopes.',
+    labelZh: 'AI 代理',
+    labelEn: 'AI Agent',
+    descriptionZh: '会话、Skill、MCP、Plugin 与权限分级。',
+    descriptionEn: 'Conversations, Skills, MCP, Plugins, and permissions.',
     icon: Bot,
     section: 'system',
     path: SETTINGS_PATHS['ai-takeover'],
@@ -437,10 +447,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'data-sync',
-    labelZh: '数据与同步',
-    labelEn: 'Data & Sync',
-    descriptionZh: '本地 IndexedDB 缓存、云同步。',
-    descriptionEn: 'IndexedDB quota, cloud workspace.',
+    labelZh: '数据与安全',
+    labelEn: 'Data & Security',
+    descriptionZh: '本地数据、云同步、导出与凭据保护。',
+    descriptionEn: 'Local data, cloud sync, exports, and credentials.',
     icon: HardDrive,
     section: 'system',
     path: SETTINGS_PATHS['data-sync'],
@@ -448,10 +458,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'dev-diagnostics',
-    labelZh: '系统运行诊断',
-    labelEn: 'Runtime Diagnostics',
-    descriptionZh: '决策日志、执行链、API 检查。',
-    descriptionEn: 'Decision logs, action trace.',
+    labelZh: '系统日志',
+    labelEn: 'System Logs',
+    descriptionZh: '服务状态、延迟、版本与运行日志。',
+    descriptionEn: 'Service health, latency, versions, and logs.',
     icon: Cpu,
     section: 'system',
     path: SETTINGS_PATHS['dev-diagnostics'],
@@ -459,10 +469,10 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'appearance-motion',
-    labelZh: '高级性能',
-    labelEn: 'Advanced Performance',
-    descriptionZh: '快捷档位、外观动态与画布细节。',
-    descriptionEn: 'Presets, appearance, motion, and canvas details.',
+    labelZh: '性能配置',
+    labelEn: 'Performance',
+    descriptionZh: '自动档位、流畅度、外观动态与画布细节。',
+    descriptionEn: 'Automatic presets, responsiveness, motion, and canvas details.',
     icon: Palette,
     section: 'workspace',
     path: SETTINGS_PATHS['appearance-motion'],
@@ -481,7 +491,8 @@ function isNavItemEnabled(definition: SettingsNavItemDefinition): boolean {
 }
 
 export function buildSettingsPath(view: CanonicalSettingsViewId): string {
-  return SETTINGS_PATHS[view] ? `/settings/${SETTINGS_PATHS[view]}` : '/settings';
+  const destination = resolveCurrentSettingsDestination(view) as CanonicalSettingsViewId;
+  return SETTINGS_PATHS[destination] ? `/settings/${SETTINGS_PATHS[destination]}` : '/settings';
 }
 
 export function resolveCanonicalSettingsViewId(view?: SettingsViewId): CanonicalSettingsViewId {
@@ -511,7 +522,10 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
   if (currentPath.startsWith('recharge')) return 'recharge';
   if (currentPath.startsWith('storage-settings')) return 'data-sync';
   if (currentPath.startsWith('system-logs')) return 'dev-diagnostics';
-  if (currentPath.startsWith('browser-assistant')) return 'browser-assistant';
+  const mergedDestination = topLevelPath ? resolveCurrentSettingsDestination(topLevelPath) : undefined;
+  if (mergedDestination && mergedDestination !== topLevelPath) {
+    return coerceEnabledSettingsViewId(mergedDestination as CanonicalSettingsViewId);
+  }
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
   }
@@ -547,6 +561,26 @@ export function getSettingsNavItems(language: AppLanguage): SettingsNavItem[] {
       path: item.path,
       keywords: item.keywords,
     }));
+}
+
+/** Returns the single settings taxonomy used by desktop and mobile shells. */
+export function getSettingsNavigationGroups(language: AppLanguage): SettingsNavigationGroup[] {
+  const items = getSettingsNavItems(language);
+
+  return SETTINGS_NAVIGATION_GROUPS.map((group) => ({
+    id: group.id,
+    label: pickByLanguage(language, group.labelZh, group.labelEn),
+    items: group.items
+      .map((definition) => {
+        const item = items.find((candidate) => candidate.id === definition.id);
+        if (!item) return null;
+        return {
+          ...item,
+          label: pickByLanguage(language, definition.labelZh, definition.labelEn),
+        };
+      })
+      .filter((item): item is SettingsNavItem => Boolean(item)),
+  })).filter((group) => group.items.length > 0);
 }
 
 export function getSettingsModules(language: AppLanguage): SettingsModule[] {

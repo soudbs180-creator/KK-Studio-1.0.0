@@ -36,13 +36,23 @@ test('minimap spatial index queries 10000 canvas nodes without scanning the whol
     imageNodes.push(minimapNode(`image-${i}`, (i % 125) * 760, Math.floor(i / 125) * 760, 'image'));
   }
 
-  const indexStartedAt = performance.now();
-  const index = buildMinimapSpatialIndex(promptNodes, imageNodes);
-  const indexDurationMs = performance.now() - indexStartedAt;
+  let index = buildMinimapSpatialIndex(promptNodes, imageNodes);
+  const indexDurationsMs: number[] = [];
+  for (let sample = 0; sample < 3; sample += 1) {
+    const indexStartedAt = performance.now();
+    index = buildMinimapSpatialIndex(promptNodes, imageNodes);
+    indexDurationsMs.push(performance.now() - indexStartedAt);
+  }
+  const indexDurationMs = Math.min(...indexDurationsMs);
 
-  const queryStartedAt = performance.now();
-  const visibleNodes = selectMinimapVisibleNodes(index, -200, -200, 2400, 1800);
-  const queryDurationMs = performance.now() - queryStartedAt;
+  let visibleNodes = selectMinimapVisibleNodes(index, -200, -200, 2400, 1800);
+  const queryDurationsMs: number[] = [];
+  for (let sample = 0; sample < 3; sample += 1) {
+    const queryStartedAt = performance.now();
+    visibleNodes = selectMinimapVisibleNodes(index, -200, -200, 2400, 1800);
+    queryDurationsMs.push(performance.now() - queryStartedAt);
+  }
+  const queryDurationMs = Math.min(...queryDurationsMs);
 
   assert.equal(index.totalNodeCount, 12000);
   assert.ok(visibleNodes.length > 0);

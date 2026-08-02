@@ -700,7 +700,7 @@ try {
 
   const settingsDashboard = page.getByTestId('settings-mobile-dashboard');
   const settingsOverviewHeading = page.getByRole('heading', { name: /创作系统状态|Creative system status/i });
-  const performanceEntry = page.getByRole('button', { name: /高级性能|Advanced Performance/i });
+  const performanceEntry = page.getByRole('button', { name: /性能配置|Performance/i });
   const currentApiEntry = page.getByRole('button', { name: /API 配置|API Configuration/i });
 
   await assertVisible(settingsDashboard, 'Mobile settings dashboard did not open by default.');

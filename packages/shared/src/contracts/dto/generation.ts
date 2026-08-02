@@ -31,6 +31,33 @@ export interface GenerationPromptInputDto {
   referenceImageNodeId?: EntityId;
 }
 
+export type ReferenceRole =
+  | "reference"
+  | "source"
+  | "style"
+  | "first-frame"
+  | "last-frame";
+
+export interface MediaReferenceDto {
+  id: EntityId;
+  assetId: EntityId;
+  mediaType: "image" | "video";
+  mimeType?: string;
+  role: ReferenceRole;
+  order: number;
+}
+
+export type ContextReferenceKind = "file" | "skill" | "mcp" | "plugin";
+
+export interface ContextReferenceDto {
+  id: EntityId;
+  kind: ContextReferenceKind;
+  manifestId: EntityId;
+  label: string;
+  order: number;
+  permissionScopes: string[];
+}
+
 export interface ImageGenerationJobParametersDto {
   taskType: "image";
   aspectRatio?: string;

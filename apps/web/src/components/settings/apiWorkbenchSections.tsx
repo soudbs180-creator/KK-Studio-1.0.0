@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   buildCanonicalApiRecordId,
   isCanonicalApiRecordId,
 } from '../../services/auth/keyManagerCanonicalIds';
 import { notify } from '../../services/system/notificationService';
-import { Activity, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, ChevronDown, Layers3, type LucideIcon } from 'lucide-react';
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, Layers3, type LucideIcon } from 'lucide-react';
 
 
 import ModelLogo from '../common/ModelLogo';
@@ -780,6 +780,8 @@ const MODEL_CENTER_PRESET_TABS = [
   { value: 'relay', label: (pick: LocalePick) => pick('中转站', 'Relay') },
 ] as const;
 
+const MODEL_CENTER_PRESET_PAGE_SIZE = 6;
+
 type PresetTabValue = typeof MODEL_CENTER_PRESET_TABS[number]['value'];
 
 type ApiWorkbenchModelCenterSectionProps = {
@@ -816,7 +818,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
   onAddOfficial,
   onAddProvider,
 }) => {
-  const [isPresetDirectoryExpanded, setIsPresetDirectoryExpanded] = useState(false);
+  const [presetPage, setPresetPage] = useState(0);
 
   /* 按标签页类型过滤预设并对相同 baseUrl 进行去重 */
   const seenBaseUrls = new Set<string>();
@@ -833,6 +835,19 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
     }
     return true;
   });
+  const presetPageCount = Math.max(1, Math.ceil(filteredPresets.length / MODEL_CENTER_PRESET_PAGE_SIZE));
+  const visiblePresets = filteredPresets.slice(
+    presetPage * MODEL_CENTER_PRESET_PAGE_SIZE,
+    (presetPage + 1) * MODEL_CENTER_PRESET_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPresetPage(0);
+  }, [presetTab]);
+
+  useEffect(() => {
+    setPresetPage((currentPage) => Math.min(currentPage, presetPageCount - 1));
+  }, [presetPageCount]);
 
   return (
   <SettingsSection
@@ -1122,9 +1137,9 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
         <div
           id="api-model-center-presets"
           className="settings-model-center-preset-list"
-          data-expanded={isPresetDirectoryExpanded}
+          aria-live="polite"
         >
-          {filteredPresets.map((preset) => (
+          {visiblePresets.map((preset) => (
             <button
               key={preset.id}
               type="button"
@@ -1151,25 +1166,28 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
             </button>
           ))}
         </div>
-        {filteredPresets.length > 4 ? (
-          <button
-            type="button"
-            className="settings-model-center-directory__expand"
-            aria-controls="api-model-center-presets"
-            aria-expanded={isPresetDirectoryExpanded}
-            onClick={() => setIsPresetDirectoryExpanded((isExpanded) => !isExpanded)}
-          >
-            <span>
-              {isPresetDirectoryExpanded
-                ? pick('收起预设目录', 'Collapse directory')
-                : pick(`查看全部 ${filteredPresets.length} 个预设`, `View all ${filteredPresets.length} presets`)}
+        {presetPageCount > 1 ? (
+          <nav className="settings-model-center-directory__pagination" aria-label={pick('预设目录分页', 'Preset directory pages')}>
+            <button
+              type="button"
+              aria-label={pick('上一页', 'Previous page')}
+              disabled={presetPage === 0}
+              onClick={() => setPresetPage((currentPage) => Math.max(0, currentPage - 1))}
+            >
+              <ChevronLeft size={15} aria-hidden="true" />
+            </button>
+            <span aria-current="page">
+              {presetPage + 1} / {presetPageCount}
             </span>
-            <ChevronDown
-              size={15}
-              className={isPresetDirectoryExpanded ? 'rotate-180' : ''}
-              aria-hidden="true"
-            />
-          </button>
+            <button
+              type="button"
+              aria-label={pick('下一页', 'Next page')}
+              disabled={presetPage >= presetPageCount - 1}
+              onClick={() => setPresetPage((currentPage) => Math.min(presetPageCount - 1, currentPage + 1))}
+            >
+              <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </nav>
         ) : null}
       </aside>
     </div>

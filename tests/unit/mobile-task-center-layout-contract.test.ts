@@ -9,7 +9,7 @@ test('desktop and mobile reuse the same persistent task-center projection', () =
   const mobileSurface = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
   assert.doesNotMatch(workspace, /taskCenter=\{/);
-  assert.match(workspace, /!isLargeProject && \(/);
+  assert.doesNotMatch(workspace, /!isLargeProject && \([\s\S]{0,180}<TaskCenterTray/);
   assert.match(workspace, /<TaskCenterTray[\s\S]{0,240}isMobile=\{isMobile\}/);
   assert.doesNotMatch(shell, /taskCenter/);
   assert.doesNotMatch(mobileWorkspace, /taskCenter/);
@@ -19,14 +19,17 @@ test('desktop and mobile reuse the same persistent task-center projection', () =
 
 test('task center projects Queue and Agent Run state without a second mobile store', () => {
   const tray = readSource('apps/web/src/components/workspace/TaskCenterTray.tsx');
+  const desktopChrome = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const tokens = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
   assert.match(tray, /data-testid="desktop-task-center"/);
   assert.match(tray, /className="kk-task-center-host/);
   assert.match(tray, /data-state=\{isOpen \? ['"]open['"] : ['"]collapsed['"]\}/);
-  assert.match(tray, /\{!isOpen && !isMobile && \(/);
-  assert.match(tray, /aria-label="展开任务状态列表"/);
-  assert.match(tray, /className="kk-task-center-rail"/);
+  assert.doesNotMatch(tray, /\{!isOpen && !isMobile && \(/);
+  assert.doesNotMatch(tray, /className="kk-task-center-trigger"/);
+  assert.match(desktopChrome, /requestTaskCenterOpen/);
+  assert.match(desktopChrome, /useTaskCenterSummary/);
+  assert.match(desktopChrome, /aria-label="打开任务管理"/);
   assert.match(tray, /document\.activeElement/);
   const transientTaskHandler = tray.match(/const handleAddTask[\s\S]*?const handleUpdateTask/)?.[0] || '';
   assert.doesNotMatch(transientTaskHandler, /setIsOpen\(true\)/);

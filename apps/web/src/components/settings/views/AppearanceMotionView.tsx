@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { CircleGauge, Gauge, Layers3, Palette, RotateCcw, Zap } from 'lucide-react';
-import { useNavigate } from 'react-router';
 
 import { useAppearanceMotion, type WebPerformanceMode } from '../../../context/AppearanceMotionContext';
 import { useLocale } from '../../../context/LocaleContext';
@@ -31,7 +30,6 @@ const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
 const AppearanceMotionView: React.FC = () => {
   const { locale, pick } = useLocale();
-  const navigate = useNavigate();
   const {
     preferences,
     systemReducedMotion,
@@ -63,19 +61,29 @@ const AppearanceMotionView: React.FC = () => {
     description: string;
   }> = [
     {
-      id: 'fast',
-      label: pick('快速', 'Fast'),
-      description: pick('减少模糊与转场', 'Less blur and motion'),
+      id: 'auto',
+      label: pick('自动', 'Auto'),
+      description: pick('根据当前操作动态调配', 'Adapts to the current operation'),
     },
     {
-      id: 'balanced',
-      label: pick('均衡', 'Balanced'),
-      description: pick('平衡流畅与质感', 'Balanced experience'),
+      id: 'smooth',
+      label: pick('流畅', 'Smooth'),
+      description: pick('全页面响应优先', 'Prioritizes responsiveness everywhere'),
     },
     {
-      id: 'visual',
-      label: pick('高质量', 'High quality'),
-      description: pick('启用完整特效与画质', 'Full effects and quality'),
+      id: 'standard',
+      label: pick('标准', 'Standard'),
+      description: pick('优先保障画布操作', 'Prioritizes canvas interaction'),
+    },
+    {
+      id: 'performance',
+      label: pick('高性能', 'High performance'),
+      description: pick('充分使用本地可用性能', 'Uses all available local performance'),
+    },
+    {
+      id: 'custom',
+      label: pick('自定义', 'Custom'),
+      description: pick('逐项调整性能细节', 'Tune performance settings individually'),
     },
   ];
   const activePerformancePreset = getActivePerformancePreset(preferences, readCanvasPerformanceMode());
@@ -119,9 +127,7 @@ const AppearanceMotionView: React.FC = () => {
             <SettingsBadge tone="emerald">
               {systemReducedMotion
                 ? pick('跟随系统减少动态', 'System reduced motion')
-                : activePerformancePreset === 'manual'
-                  ? pick('手动', 'Manual')
-                  : performanceModes.find((mode) => mode.id === activePerformancePreset)?.label}
+                : performanceModes.find((mode) => mode.id === activePerformancePreset)?.label}
             </SettingsBadge>
           )}
         >
@@ -147,6 +153,8 @@ const AppearanceMotionView: React.FC = () => {
           </div>
         </SettingsSystemCard>
 
+        {activePerformancePreset === 'custom' ? (
+          <>
         <SettingsSystemCard
           title={pick('毛玻璃层级', 'Glass Layers')}
           description={pick('控制导航、工具栏和浮层的透明与模糊，不影响正文阅读区域。', 'Controls glass on navigation, toolbars, and floating layers without weakening reading areas.')}
@@ -243,7 +251,7 @@ const AppearanceMotionView: React.FC = () => {
           description={pick('把无限画布的渲染策略纳入同一体验档位；单独修改后总览会显示手动。', 'Keep canvas rendering in the same experience preset; custom changes appear as Manual on overview.')}
           icon={Gauge}
           tone="sky"
-          action={<SettingsBadge tone={activePerformancePreset === 'manual' ? 'amber' : 'emerald'}>{canvasPerformanceLabel}</SettingsBadge>}
+          action={<SettingsBadge tone="amber">{canvasPerformanceLabel}</SettingsBadge>}
         >
           <SettingsSystemField
             label={pick('画布渲染策略', 'Canvas rendering')}
@@ -261,12 +269,10 @@ const AppearanceMotionView: React.FC = () => {
               ]}
             />
           </SettingsSystemField>
-                    <div className="settings-system-card-footer-actions">
-            <SettingsActionButton icon={Gauge} tone="secondary" onClick={() => navigate('/settings/canvas-performance')}>
-              {pick('高级画布细节', 'Advanced canvas details')}
-            </SettingsActionButton>
-          </div>
         </SettingsSystemCard>
+
+          </>
+        ) : null}
 
       </div>
     </SettingsViewShell>

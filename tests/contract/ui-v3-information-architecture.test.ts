@@ -25,39 +25,38 @@ test('mobile result footer reports image count and generation task progress in o
   assert.match(resultFeed, /--mobile-task-progress/);
 });
 
-test('desktop chrome has three regions and the composer owns Copilot expansion', () => {
+test('desktop chrome has project, tasks, and account regions while the composer owns Copilot expansion', () => {
   const chrome = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const promptBar = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const workspacePage = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
   assert.match(chrome, /data-chrome-region="project"/);
-  assert.match(chrome, /data-chrome-region="canvas"/);
+  assert.match(chrome, /data-chrome-region="tasks"/);
   assert.match(chrome, /data-chrome-region="account"/);
+  assert.match(chrome, /requestTaskCenterOpen\(\)/);
   assert.match(chrome, /activeCanvas\?\.name \|\| '项目 1'/);
   assert.doesNotMatch(chrome, /data-composer-copilot-toggle="true"/);
   assert.match(promptBar, /data-composer-copilot-toggle="true"/);
   assert.match(promptBar, /onToggleAssistant/);
   assert.match(workspacePage, /onToggleAssistant:\s*toggleChatPanel/);
-  assert.match(chrome, /onCloseAssistant/);
   assert.doesNotMatch(chrome, /kk-morphic-mode-switch/);
   assert.doesNotMatch(chrome, />Copilot</);
   assert.doesNotMatch(chrome, />创作</);
 });
 
-test('canvas rail owns modes and theme while the bottom navigation owns view actions', () => {
+test('canvas rail owns one mode toggle and theme while bottom navigation owns arrangement', () => {
   const projectManager = readSource('apps/web/src/components/settings/ProjectManager.tsx');
   const canvasNavigation = readSource('apps/web/src/app/AppCanvasNavigationPanel.tsx');
 
-  assert.match(projectManager, /data-canvas-interaction-mode="normal"/);
-  assert.match(projectManager, /data-canvas-interaction-mode="board"/);
+  assert.match(projectManager, /data-canvas-interaction-mode=\{canvasMode\}/);
+  assert.match(projectManager, /aria-pressed=\{canvasMode === 'board'\}/);
   assert.match(projectManager, /data-canvas-grid-toggle="true"/);
   assert.match(projectManager, /data-canvas-theme-toggle="true"/);
   assert.match(projectManager, /useTheme\(\)/);
   assert.doesNotMatch(projectManager, /PROJECT_MANAGER_ACTIONS\.(fitToAll|resetView|autoArrange)\.uiAction/);
   assert.match(canvasNavigation, /data-canvas-minimap-popover="true"/);
-  assert.match(canvasNavigation, /data-canvas-navigation-action="fitToAll"/);
-  assert.match(canvasNavigation, /data-canvas-navigation-action="resetView"/);
   assert.match(canvasNavigation, /data-canvas-navigation-action="autoArrange"/);
+  assert.doesNotMatch(canvasNavigation, /data-canvas-navigation-action="(?:fitToAll|resetView)"/);
   assert.doesNotMatch(projectManager, /className="kk-canvas-view-tools/);
 });
 

@@ -6,10 +6,22 @@ import glob from 'fast-glob';
 async function run() {
   const files = await glob('local-runner/src/**/*.{ts,js}');
   let violation = false;
+  const approvedSupervisor = 'local-runner/src/runtime/RuntimeProcessSupervisor.ts';
 
   for (const file of files) {
     const content = fs.readFileSync(file, 'utf8');
     if (content.includes('child_process') || content.includes('exec(') || content.includes('spawn(')) {
+      if (file.replaceAll('\\', '/') === approvedSupervisor) {
+        const hasRequiredGuards = content.includes('shell: false')
+          && content.includes('isAbsolute(config.executablePath)')
+          && content.includes("createHash('sha256')")
+          && content.includes('maxBuffer: 2 * 1024 * 1024');
+        if (!hasRequiredGuards) {
+          console.error(`❌ [Security Violation] Approved runtime supervisor is missing mandatory guards: ${file}`);
+          violation = true;
+        }
+        continue;
+      }
       // 排除安全审计日志的 console 打印
       if (!file.includes('localAuditLogService')) {
         console.error(`❌ [Security Violation] Local Runner 中含有非法的系统命令执行逻辑: ${file}`);

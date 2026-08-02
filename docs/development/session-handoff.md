@@ -2572,3 +2572,49 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 风险低；生产构建与真实浏览器几何均已通过，业务回调和 DOM 语义保持不变。
+
+---
+
+## 263. 2026-08-02 - feat(workspace): 落地 41 项工作区与运行时升级
+
+**修改范围**
+- 按 41 条浏览器标注完成 Workspace V4：顶部独立磨砂簇、唯一任务入口、项目浮层定位、画布/画板单入口、单一网格状态、紧凑可拖动画笔、卡片视觉稳定、操作引导、Command Palette 与新版小地图。
+- 重构 Composer、参考系统、收藏和 Companion AI：`随心输入`、10 行内部滚动、参考/模型/参数与语音/发送分组、媒体/上下文双排、首尾帧角色、稳定引用 ID、收藏拖动缩放及桌面可用区自动避让。
+- 将桌面与手机设置收敛为同一注册表：总览、API 配置、能力配置、AI 代理、数据与安全、性能配置、系统日志；完成总览重排、65/35 模型中心、横向供应商卡、预设分页、性能档位与真实运行诊断。
+- 扩展现有 AI Runtime 与 Provider Registry：连接排序 revision、Quote 连接冻结、真实 OpenCLI Adapter、配对桌面出站 Worker、Runtime Health、owner-scoped Skill/MCP/Plugin manifest；未新增平行 Runtime、助手或任务队列。
+- 新增数据库迁移 029–031，分别覆盖 Provider 路由优先级、配对运行时和 Agent 扩展；补充共享 DTO、API client、服务端路由、安全边界与 OpenSpec 说明。
+- 视觉验收期间修复 1099/1133px 下 Composer 与展开小地图约 64px 的交叠：导航面板向中央 Workspace layout registry 发布占用宽度，Composer 使用 `useSyncExternalStore` 预留 12px 间距，不依赖 `body:has()` 偏移。
+
+**修改文件**
+- Workspace / Composer / UI：`apps/web/src/app/`、`apps/web/src/components/canvas/`、`apps/web/src/components/layout/`、`apps/web/src/components/settings/`、`apps/web/src/components/workspace/`、`apps/web/src/pages/Workspace/WorkspacePage.tsx`、`apps/web/src/styles/workspace-ui-v4.css`、`apps/web/src/styles/settings-ui-v4.css`。
+- Runtime / contracts：`packages/shared/src/`、`packages/api-client/` 契约消费、`services/api/lib/`、`services/api/routes/`、`local-runner/src/`。
+- Database / governance / operations：`infrastructure/database/migrations/029_provider_connection_routing_priority.sql`、`030_paired_runtimes.sql`、`031_agent_extensions.sql`、`scripts/governance/architecture/`、`scripts/ops/`。
+- Spec / tests / QA：`openspec/changes/upgrade-ai-creation-core/`、`tests/unit/`、`tests/integration/`、`tests/contract/`、`scripts/test/`、`design-qa.md`。
+
+**当前设计决策**
+1. 顶部“任务”是桌面唯一 Task Center 入口，继续复用 `DurableGenerationQueue` 和 `AgentRunStore`；手机使用同一任务中心的 Sheet 投影。
+2. Workspace 浮层通过中央占用注册表共享可用边界；项目菜单、Composer、小地图和 Companion Panel 不通过全局遮罩或 `body:has()` 互相猜测位置。
+3. 任何性能档位只影响可见区调度、解码、连线与缓存；画布平移和缩放不得改变已显示卡片结构、文字、端口或细节等级。
+4. Provider 排序是 owner-scoped 服务端原子状态；RouteEngine 先筛选再按 `routingPriority` 选择，Quote 冻结 Connection/Binding，失效后必须重新签发 Quote。
+5. OpenCLI 只在已配对桌面本地运行，手机和 VPS 只负责提交、调度、状态与审计；VPS 不执行网页自动化，也不开放任意 Shell。
+6. Skill/MCP/Plugin 继续通过现有 Planner、`ToolRegistry`、权限策略和加密 secret reference 解析；Provider 永远只接收规范化安全上下文。
+7. 桌面和手机共享设置状态、路由兼容映射和语义注册表，外壳尺寸按平台适配；版本仍以 `config/release-manifest.json` 的 v1.6.1 为唯一来源。
+
+**已运行验证**
+- Root、Architecture、Server、Tests 与 Local Runner TypeScript 全部通过；Shared、UI、API Client、Web Vite 与 Local Runner build 全部通过。
+- Architecture、Governance、OpenSpec structure、Encoding、Mojibake、OpenAPI YAML 解析与 `git diff --check` 全部通过。
+- 全量 Unit：2369 项中 2367 通过、0 失败、2 跳过；Integration 15/15、Contract 31/31、E2E 11/11 通过。
+- Local Runner 22/22；Canvas Performance 3/3；10K Canvas Smoke 在 11,103 节点下保持卡片稳定与连线跟随。
+- Prompt Group Drag、移动设置、桌面设置、AI Takeover、启动横向居中 Browser Smoke 全部通过；最终布局变更后再次复验 Prompt Group Drag 与移动设置。
+- 应用内浏览器视觉验收通过：1099×720、1133×720、1440×900、390×844；项目菜单、唯一任务入口、小地图、AI 侧栏、Composer、桌面/手机设置和 65/35 API 页面均完成真实点击与截图检查。
+- 最终 1099/1133/1440 三档 Composer 与小地图交叠均为 false；390×844 Composer 展开后为 374×177.3px 且无横向溢出。
+
+**未运行验证及原因**
+- 系统未提供 `npm` 可执行文件，因此未直接运行聚合 `npm run verify:changes`；已使用绑定 Node 逐项执行其中全部可用的构建、测试、治理、编码、性能和 Browser Smoke。
+- 环境未安装 `swagger-cli`，OpenAPI 只完成 `yaml` 包解析和 34 条 path 结构检查，未运行 Swagger CLI 语义校验。
+- 环境无受控真实 PostgreSQL 与 Bash 数据库会话，029–031 未进行真实空库/存量库/重复执行演练；迁移文件已完成静态契约与服务端测试，发布前仍需在受控 PostgreSQL 执行。
+- 未执行在线依赖审计、真实 Provider 生成、支付、语音权限或生产部署；本轮没有增加生产依赖，本地 API 3001 未启动时的 `502 Bad Gateway` 被 UI 正确显示为真实不可用状态。
+
+**风险与下一步**
+- 主要剩余风险是 029–031 在真实 PostgreSQL 上的演练、配对桌面长期在线/断线恢复和多供应商真实延迟/预算数据；这些需要受控后端环境，不应由前端模拟。
+- internal 发布前应补跑 Swagger 语义校验、依赖审计与三类数据库迁移演练；通过后再开启 Provider 排序、配对桌面和 Agent Extensions 功能标记。

@@ -24,3 +24,16 @@ test('Capability Sources owns and mounts the Provider Connections migration pane
   assert.match(source, /import ProviderConnectionsPanel from ['"]\.\.\/ProviderConnectionsPanel['"]/);
   assert.match(source, /<ProviderConnectionsPanel\s*\/>/);
 });
+
+test('Provider Connections panel persists mouse, touch-friendly, and keyboard ordering through the revision API', () => {
+  const source = fs.readFileSync(PANEL_PATH, 'utf8');
+
+  assert.match(source, /reorderProviderConnections/);
+  assert.match(source, /orderRevision/);
+  assert.match(source, /draggable/);
+  assert.match(source, /onDrag(Start|Over|End|Drop)/);
+  assert.match(source, /event\.key === 'ArrowUp'/);
+  assert.match(source, /event\.key === 'ArrowDown'/);
+  assert.match(source, /aria-label=\{pick\('上移供应商'/);
+  assert.match(source, /aria-label=\{pick\('下移供应商'/);
+});

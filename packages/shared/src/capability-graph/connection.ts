@@ -13,7 +13,7 @@ export const ProviderConnectionStatusSchema = z.enum([
 ]);
 
 /** 公共 Connection DTO 故意不含 secret_ref；strict 模式会阻断意外序列化。 */
-export const ProviderConnectionDtoSchema = z.object({
+export const ProviderConnectionDtoV1Schema = z.object({
   connectionId: ProviderConnectionIdSchema,
   providerId: z.string().min(1),
   displayName: z.string().min(1).max(120),
@@ -27,6 +27,16 @@ export const ProviderConnectionDtoSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 }).strict();
+
+export const ProviderConnectionDtoV2Schema = ProviderConnectionDtoV1Schema.extend({
+  routingPriority: z.number().int().nonnegative(),
+}).strict();
+
+/** Both versions remain readable for one release while all new lists emit v2. */
+export const ProviderConnectionDtoSchema = z.union([
+  ProviderConnectionDtoV2Schema,
+  ProviderConnectionDtoV1Schema,
+]);
 
 export type ProviderConnectionDto = z.infer<typeof ProviderConnectionDtoSchema>;
 
@@ -52,12 +62,38 @@ export const UpdateProviderConnectionRequestSchema = z.object({
 
 export type UpdateProviderConnectionRequest = z.infer<typeof UpdateProviderConnectionRequestSchema>;
 
-export const ProviderConnectionListDtoSchema = z.object({
+export const ProviderConnectionListV1DtoSchema = z.object({
   version: z.literal('v1'),
-  connections: z.array(ProviderConnectionDtoSchema),
+  connections: z.array(ProviderConnectionDtoV1Schema),
 }).strict();
 
+export const ProviderConnectionListV2DtoSchema = z.object({
+  version: z.literal('v2'),
+  orderRevision: z.number().int().nonnegative(),
+  connections: z.array(ProviderConnectionDtoV2Schema),
+}).strict();
+
+export const ProviderConnectionListDtoSchema = z.union([
+  ProviderConnectionListV2DtoSchema,
+  ProviderConnectionListV1DtoSchema,
+]);
+
 export type ProviderConnectionListDto = z.infer<typeof ProviderConnectionListDtoSchema>;
+
+export const ReorderProviderConnectionsRequestSchema = z.object({
+  connectionIds: z.array(ProviderConnectionIdSchema).min(1).max(500),
+  expectedOrderRevision: z.number().int().nonnegative(),
+}).strict().superRefine((input, context) => {
+  if (new Set(input.connectionIds).size !== input.connectionIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['connectionIds'],
+      message: 'Provider Connection order cannot contain duplicate IDs.',
+    });
+  }
+});
+
+export type ReorderProviderConnectionsRequest = z.infer<typeof ReorderProviderConnectionsRequestSchema>;
 
 export const DeleteProviderConnectionResponseDtoSchema = z.object({
   connectionId: ProviderConnectionIdSchema,

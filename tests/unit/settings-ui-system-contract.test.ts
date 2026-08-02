@@ -36,7 +36,7 @@ test('settings UI system exposes responsive tokens and shared scaffold primitive
   assert.match(settingsStylesSource, /prefers-reduced-motion:\s*reduce/);
 });
 
-test('advanced performance keeps the canonical appearance route and persistent document variables', () => {
+test('performance configuration keeps the canonical appearance route and persistent document variables', () => {
   const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
   const routeSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
   const workspaceSurfaceSource = readSource('apps/web/src/hooks/useWorkspaceSurface.ts');
@@ -56,8 +56,8 @@ test('advanced performance keeps the canonical appearance route and persistent d
   assert.match(contextSource, /dataset\.kkWebPerformance/);
 
   assert.match(registrySource, /'appearance-motion'/);
-  assert.match(registrySource, /titleZh:\s*'高级性能设置'/);
-  assert.match(registrySource, /labelZh:\s*'高级性能'/);
+  assert.match(registrySource, /titleZh:\s*'性能配置'/);
+  assert.match(registrySource, /labelZh:\s*'性能配置'/);
   assert.match(routeSource, /AppearanceMotionView/);
   assert.match(routeSource, /kind:\s*'appearance-motion'/);
   assert.match(workspaceSurfaceSource, /'appearance-motion'/);

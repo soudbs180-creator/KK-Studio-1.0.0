@@ -16,12 +16,16 @@ const createItem = (id: SettingsNavItem['id'], label: string): SettingsNavItem =
   path: id,
 });
 
-test('mobile settings home is the overview and does not render a duplicate overview destination', () => {
+test('mobile settings home uses the shared taxonomy without rendering a duplicate overview destination', () => {
   const groups = buildMobileSettingsGroups(
     [
       createItem('dashboard', 'Overview'),
-      createItem('generation-mode', 'Generation'),
+      createItem('capability-sources', 'API'),
+      createItem('provider-routes', 'Capabilities'),
+      createItem('ai-takeover', 'Agent'),
+      createItem('data-sync', 'Data'),
       createItem('appearance-motion', 'Performance'),
+      createItem('dev-diagnostics', 'Logs'),
     ],
     false,
   );
@@ -32,8 +36,8 @@ test('mobile settings home is the overview and does not render a duplicate overv
       itemIds: group.items.map((item) => item.id),
     })),
     [
-      { id: 'workspace', itemIds: ['generation-mode'] },
-      { id: 'system', itemIds: ['appearance-motion'] },
+      { id: 'integrations', itemIds: ['capability-sources', 'provider-routes', 'ai-takeover'] },
+      { id: 'system', itemIds: ['data-sync', 'appearance-motion', 'dev-diagnostics'] },
     ],
   );
 });

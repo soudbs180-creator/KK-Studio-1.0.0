@@ -3,15 +3,13 @@ import { test } from 'node:test';
 
 import { readSource } from '../support/workspacePaths.js';
 
-test('desktop canvas keeps the 262px workspace panel persistent without a modal backdrop', () => {
+test('desktop project menu opens on demand below the top trigger without a modal backdrop', () => {
   const projectManagerSource = readSource(
     'apps/web/src/components/settings/ProjectManager.tsx',
   );
-  const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
-  const workspaceCssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
-
-  assert.match(projectManagerSource, /useState\(\(\) => !isMobile\)/);
-  assert.match(projectManagerSource, /setShowDropdown\(!isMobile\)/);
+  assert.match(projectManagerSource, /const \[showDropdown, setShowDropdown\] = useState\(false\);/);
+  assert.match(projectManagerSource, /PROJECT_MENU_TOGGLE_EVENT/);
+  assert.match(projectManagerSource, /computeProjectPanelLeft\(triggerLeft, 262, window\.innerWidth\)/);
   assert.match(projectManagerSource, /data-desktop-persistent=\{!isMobile\}/);
   assert.match(
     projectManagerSource,
@@ -21,18 +19,11 @@ test('desktop canvas keeps the 262px workspace panel persistent without a modal 
     projectManagerSource,
     /zIndex:\s*isMobile\s*\?\s*KK_LAYER\.modal\s*:\s*KK_LAYER\.floatingPanel/,
   );
-  assert.match(
-    cssSource,
-    /\.kk-morphic-project-panel\[data-desktop-persistent='true'\]\s*\{[\s\S]*width:\s*var\(--kk-morphic-left-panel-width\)/,
-  );
-  assert.match(
-    cssSource,
-    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-morphic-project-panel\s*\{[\s\S]*display:\s*none\s*!important/,
-  );
-  assert.match(
-    workspaceCssSource,
-    /body\[data-kk-workspace-mode='copilot'\]\s+\.kk-morphic-project-panel\s*\{[\s\S]*display:\s*flex\s*!important/,
-  );
+  const workspaceOverrideSource = readSource('apps/web/src/styles/workspace-ui-v4.css');
+  assert.match(workspaceOverrideSource, /\.kk-morphic-project-panel\[data-desktop-persistent='true'\]/);
+  assert.match(workspaceOverrideSource, /--kk-project-panel-left:\s*12px/);
+  assert.match(workspaceOverrideSource, /top:\s*56px\s*!important/);
+  assert.doesNotMatch(projectManagerSource, /!isMobile\s*\?\s*\([\s\S]*KK_LAYER\.modalBackdrop/);
 });
 
 test('desktop chrome publishes the V3 hierarchy while PromptBar owns Copilot expansion', () => {
@@ -41,7 +32,7 @@ test('desktop chrome publishes the V3 hierarchy while PromptBar owns Copilot exp
   const cssSource = readSource('apps/web/src/styles/workspace-ui-v3.css');
 
   assert.match(desktopChromeSource, /data-chrome-region="project"/);
-  assert.match(desktopChromeSource, /data-chrome-region="canvas"/);
+  assert.match(desktopChromeSource, /data-chrome-region="tasks"/);
   assert.match(desktopChromeSource, /data-chrome-region="account"/);
   assert.doesNotMatch(desktopChromeSource, /data-composer-copilot-toggle="true"/);
   assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);

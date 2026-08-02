@@ -11,6 +11,7 @@ import {
   type CanonicalSettingsViewId,
   type SettingsViewId,
 } from './settingsRegistry';
+import { resolveCurrentSettingsDestination } from './settingsNavigationRegistry';
 
 const DashboardView = lazyWithRetry(() => import('./views/DashboardView.localized.tsx'));
 const UserProfileView = lazyWithRetry(() => import('./views/UserProfileView.tsx'));
@@ -98,6 +99,14 @@ function getRouteElement(
   options: SettingsRouteOptions,
 ) {
   const routeRefreshKey = `${definition.kind}:${definition.path || 'dashboard'}:${options.refreshKey || 0}`;
+  const currentDestination = resolveCurrentSettingsDestination(definition.kind);
+  if (currentDestination !== definition.kind) {
+    const target = buildSettingsPath(currentDestination as CanonicalSettingsViewId);
+    const destination = options.dashboardBasePath && options.dashboardBasePath !== '/settings'
+      ? `${options.dashboardBasePath}${target}`
+      : target;
+    return <Navigate to={destination} replace />;
+  }
 
   switch (definition.kind) {
     case 'dashboard':

@@ -1,5 +1,12 @@
-import type { OpencliCommand } from '../contracts/opencli';
-import { localAuditLogService } from './localAuditLogService';
+import type { OpencliCommand, OpencliCommandKind } from '../contracts/opencli';
+import {
+  createOpencliRuntimeSupervisor,
+  type RuntimeProcessInvoker,
+} from '../runtime/RuntimeProcessSupervisor';
+import {
+  assertRegisteredOpencliTarget,
+  assertSafeOpencliArgument,
+} from '../security/opencliTargetPolicy';
 
 export interface OpencliExecutionResult {
   status: 'success';
@@ -11,53 +18,119 @@ interface OpencliExecutionCommand extends OpencliCommand {
   logId: string;
 }
 
-// 简体中文：本地 OpenCLI 核心执行器 (OpenCLI Service)
+export interface OpencliRuntimeHealth {
+  configured: boolean;
+  reachable: boolean;
+  status: 'ready' | 'disabled' | 'offline';
+  version?: string;
+  message?: string;
+}
+
+function parseOpencliOutput(stdout: string): Record<string, unknown> {
+  const normalized = stdout.trim();
+  if (!normalized) return {};
+  try {
+    const parsed: unknown = JSON.parse(normalized);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : { result: parsed };
+  } catch {
+    return { text: normalized.slice(0, 64_000) };
+  }
+}
+
+function requirePayloadString(command: OpencliCommand, key: string): string {
+  const value = command.payload?.[key];
+  if (typeof value !== 'string') {
+    throw new Error(`OpenCLI command payload is missing ${key}.`);
+  }
+  return assertSafeOpencliArgument(value, key);
+}
+
+function buildDirectArguments(command: OpencliCommand): string[] {
+  const session = 'kk-studio';
+  const target = assertSafeOpencliArgument(command.target, 'target');
+  const base = ['browser', session];
+  switch (command.kind) {
+    case 'open':
+      return [...base, 'open', assertRegisteredOpencliTarget(target).toString(), '--format', 'json'];
+    case 'click':
+      return [...base, 'click', target, '--format', 'json'];
+    case 'type':
+    case 'fill':
+      return [...base, command.kind, target, requirePayloadString(command, 'text'), '--format', 'json'];
+    case 'select':
+      return [...base, 'select', target, requirePayloadString(command, 'value'), '--format', 'json'];
+    case 'extract':
+    case 'screenshot':
+    case 'network':
+    case 'state':
+      return [...base, command.kind, target, '--format', 'json'];
+    default:
+      throw new Error(`OpenCLI action requires a registered adapter: ${command.kind}`);
+  }
+}
+
+/** Executes strict OpenCLI commands through a pinned local binary; no simulated data is returned. */
 export class OpencliService {
-  public async executeCommand(command: OpencliExecutionCommand): Promise<OpencliExecutionResult> {
-    const { kind, target, payload, logId } = command;
+  constructor(private readonly supervisor: RuntimeProcessInvoker | null = createOpencliRuntimeSupervisor()) {}
 
-    // 针对每个动作进行针对性渲染回传（支持高保真返回以及 CDP 交互防错机制）
+  public async getHealth(): Promise<OpencliRuntimeHealth> {
+    if (!this.supervisor) {
+      return {
+        configured: false,
+        reachable: false,
+        status: 'disabled',
+        message: 'OpenCLI executable path and SHA-256 digest are not configured.',
+      };
+    }
     try {
-      if (kind === 'extract_product') {
-        // 高保真返回
-        return {
-          status: 'success',
-          summary: `已在 ${target} 提取到网页产品属性。`,
-          data: {
-            title: `KK Studio 智能生成海报 (数据源: ${target})`,
-            price: '$199.00',
-            images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80'],
-            description: `这是一款由 KK Studio 浏览器助手提取并整理的艺术海报素材。目标网页地址为 ${target}。`
-          }
-        };
-      }
+      const result = await this.supervisor.invoke(['--version']);
+      return {
+        configured: true,
+        reachable: true,
+        status: 'ready',
+        version: result.stdout.trim().slice(0, 120) || undefined,
+      };
+    } catch (error) {
+      return {
+        configured: true,
+        reachable: false,
+        status: 'offline',
+        message: error instanceof Error ? error.message : 'OpenCLI health check failed.',
+      };
+    }
+  }
 
-      if (kind === 'generate_external') {
-        return {
-          status: 'success',
-          summary: `外部网页生成任务执行成功 (平台: ${payload?.platformId || 'chatgpt'})。`,
-          data: {
-            text: `这里是 ChatGPT/Gemini 针对 prompt "${payload?.prompt || 'KK Studio artwork'}" 返回的艺术文案建议。`,
-            imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80'
-          }
-        };
-      }
-
-      // 常规网页审查与截图
+  public async executeCommand(command: OpencliExecutionCommand): Promise<OpencliExecutionResult> {
+    if (!this.supervisor) {
+      throw new Error('OpenCLI is not configured on this paired desktop.');
+    }
+    if (command.kind === 'generate_external') {
+      throw new Error('External generation requires a registered provider adapter.');
+    }
+    if (command.kind === 'inspect_page' || command.kind === 'extract_product') {
+      const targetUrl = assertRegisteredOpencliTarget(command.target).toString();
+      await this.supervisor.invoke(['browser', 'kk-studio', 'open', targetUrl, '--format', 'json']);
+      const result = await this.supervisor.invoke([
+        'browser',
+        'kk-studio',
+        command.kind === 'extract_product' ? 'extract' : 'state',
+        '--format',
+        'json',
+      ]);
       return {
         status: 'success',
-        summary: `已在浏览器打开并分析 ${target}。`,
-        data: {
-          extractedText: `关于 KK Studio：\n1. KK Studio 是一个“本地优先 + 云端补位”的 AI 创作台。\n2. 支持无限画布和智能卡片编排。\n3. 当前版本为 v1.6.0，适配用户自有浏览器。`,
-          screenshotUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
-        }
+        summary: command.kind === 'extract_product' ? 'OpenCLI returned page extraction data.' : 'OpenCLI returned browser state.',
+        data: parseOpencliOutput(result.stdout),
       };
-    } catch (error: unknown) {
-      localAuditLogService.log(logId, kind, 'medium', target, 'failed', {
-        errorType: error instanceof Error ? error.name : 'UnknownError',
-      });
-      throw error;
     }
+    const result = await this.supervisor.invoke(buildDirectArguments(command));
+    return {
+      status: 'success',
+      summary: `OpenCLI completed ${command.kind}.`,
+      data: parseOpencliOutput(result.stdout),
+    };
   }
 }
 

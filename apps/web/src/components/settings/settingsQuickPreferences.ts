@@ -26,28 +26,38 @@ type AppearancePreset = AppearanceMotionPreferences & {
   canvasMode: 'auto' | 'quality' | 'smooth';
 };
 
-export const APPEARANCE_PERFORMANCE_PRESETS: Record<WebPerformanceMode, AppearancePreset> = {
-  fast: {
-    performanceMode: 'fast',
-    glassOpacity: 0.94,
-    glassBlur: 0,
-    motionScale: 0.35,
-    solidFallback: true,
-    canvasMode: 'smooth',
-  },
-  balanced: {
-    performanceMode: 'balanced',
+type ManagedPerformanceMode = Exclude<WebPerformanceMode, 'custom'>;
+
+export const APPEARANCE_PERFORMANCE_PRESETS: Record<ManagedPerformanceMode, AppearancePreset> = {
+  auto: {
+    performanceMode: 'auto',
     glassOpacity: 0.76,
     glassBlur: 20,
     motionScale: 1,
     solidFallback: false,
     canvasMode: 'auto',
   },
-  visual: {
-    performanceMode: 'visual',
-    glassOpacity: 0.68,
-    glassBlur: 32,
-    motionScale: 1.2,
+  smooth: {
+    performanceMode: 'smooth',
+    glassOpacity: 0.94,
+    glassBlur: 0,
+    motionScale: 0.35,
+    solidFallback: true,
+    canvasMode: 'smooth',
+  },
+  standard: {
+    performanceMode: 'standard',
+    glassOpacity: 0.76,
+    glassBlur: 20,
+    motionScale: 1,
+    solidFallback: false,
+    canvasMode: 'auto',
+  },
+  performance: {
+    performanceMode: 'performance',
+    glassOpacity: 0.76,
+    glassBlur: 20,
+    motionScale: 1,
     solidFallback: false,
     canvasMode: 'quality',
   },
@@ -80,6 +90,11 @@ export const applyPerformancePreset = (
   mode: WebPerformanceMode,
   setPreferences: (patch: Partial<AppearanceMotionPreferences>) => void,
 ) => {
+  if (mode === 'custom') {
+    setPreferences({ performanceMode: 'custom' });
+    dispatchPreferenceChange();
+    return;
+  }
   const preset = APPEARANCE_PERFORMANCE_PRESETS[mode];
   const { canvasMode, ...appearancePreferences } = preset;
   setPreferences(appearancePreferences);
@@ -92,7 +107,7 @@ export const applyPerformancePreset = (
 
 export const isPerformancePresetActive = (
   preferences: AppearanceMotionPreferences,
-  mode: WebPerformanceMode,
+  mode: ManagedPerformanceMode,
   canvasMode = readCanvasPerformanceMode(),
 ) => {
   const preset = APPEARANCE_PERFORMANCE_PRESETS[mode];
@@ -107,8 +122,9 @@ export const isPerformancePresetActive = (
 export const getActivePerformancePreset = (
   preferences: AppearanceMotionPreferences,
   canvasMode = readCanvasPerformanceMode(),
-): WebPerformanceMode | 'manual' => {
-  const activeMode = (Object.keys(APPEARANCE_PERFORMANCE_PRESETS) as WebPerformanceMode[])
+): WebPerformanceMode => {
+  if (preferences.performanceMode === 'custom') return 'custom';
+  const activeMode = (Object.keys(APPEARANCE_PERFORMANCE_PRESETS) as ManagedPerformanceMode[])
     .find((mode) => isPerformancePresetActive(preferences, mode, canvasMode));
-  return activeMode || 'manual';
+  return activeMode || 'custom';
 };

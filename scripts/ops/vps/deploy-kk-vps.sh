@@ -25,6 +25,9 @@ AGENT_RUN_REPLAN_EVENT_MIGRATION_PATH="${KK_AGENT_RUN_REPLAN_EVENT_MIGRATION:-in
 OAUTH_IDENTITY_MIGRATION_PATH="${KK_OAUTH_IDENTITY_MIGRATION:-infrastructure/database/migrations/026_oauth_identities.sql}"
 PAYMENT_RECHARGE_MIGRATION_PATH="${KK_PAYMENT_RECHARGE_MIGRATION:-infrastructure/database/migrations/027_payment_recharge_integrity.sql}"
 PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH="${KK_PAYMENT_RECHARGE_HARDENING_MIGRATION:-infrastructure/database/migrations/028_payment_recharge_hardening.sql}"
+PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH="${KK_PROVIDER_ROUTING_PRIORITY_MIGRATION:-infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
+PAIRED_RUNTIMES_MIGRATION_PATH="${KK_PAIRED_RUNTIMES_MIGRATION:-infrastructure/database/migrations/030_paired_runtimes.sql}"
+AGENT_EXTENSIONS_MIGRATION_PATH="${KK_AGENT_EXTENSIONS_MIGRATION:-infrastructure/database/migrations/031_agent_extensions.sql}"
 LEGACY_PAYMENT_IMPORT_SCRIPT_PATH="scripts/ops/postgres/import-legacy-payment-state.mjs"
 SYSTEMD_SERVICES=("kk-api")
 
@@ -209,7 +212,7 @@ on_error() {
 
   if [[ "${SCHEMA_MIGRATION_ATTEMPTED}" == "true" ]]; then
     echo "[deploy-kk-vps] Database migration was attempted and its commit outcome may be unknown; refusing to restart the previous release." >&2
-    echo "[deploy-kk-vps] Verify billing prerequisites and schemas 016, 020, 021, 022, 023, 024, 026, 027 and 028 manually before selecting and starting a compatible release." >&2
+    echo "[deploy-kk-vps] Verify billing prerequisites and schemas 016, 020, 021, 022, 023, 024 and 026-031 manually before selecting and starting a compatible release." >&2
     return
   fi
   
@@ -411,6 +414,15 @@ verify_database_migration_inputs() {
     echo "[deploy-kk-vps] Payment recharge hardening migration not found at ${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH}" >&2
     exit 1
   fi
+  for runtime_migration_path in \
+    "${PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH}" \
+    "${PAIRED_RUNTIMES_MIGRATION_PATH}" \
+    "${AGENT_EXTENSIONS_MIGRATION_PATH}"; do
+    if [[ ! -f "${NEW_RELEASE_DIR}/${runtime_migration_path}" ]]; then
+      echo "[deploy-kk-vps] Runtime capability migration not found at ${NEW_RELEASE_DIR}/${runtime_migration_path}" >&2
+      exit 1
+    fi
+  done
   if [[ ! -f "${NEW_RELEASE_DIR}/${LEGACY_PAYMENT_IMPORT_SCRIPT_PATH}" ]]; then
     echo "[deploy-kk-vps] Legacy payment import script not found at ${NEW_RELEASE_DIR}/${LEGACY_PAYMENT_IMPORT_SCRIPT_PATH}" >&2
     exit 1
@@ -463,6 +475,14 @@ apply_database_migrations() {
   echo "[deploy-kk-vps] Applying mandatory payment recharge hardening migration..."
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${PAYMENT_RECHARGE_HARDENING_MIGRATION_PATH}"
 
+  echo "[deploy-kk-vps] Applying provider routing, paired runtime and agent extension migrations..."
+  for runtime_migration_path in \
+    "${PROVIDER_ROUTING_PRIORITY_MIGRATION_PATH}" \
+    "${PAIRED_RUNTIMES_MIGRATION_PATH}" \
+    "${AGENT_EXTENSIONS_MIGRATION_PATH}"; do
+    psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${NEW_RELEASE_DIR}/${runtime_migration_path}"
+  done
+
   psql "${MIGRATION_DATABASE_URL}" -v ON_ERROR_STOP=1 -v runtime_role="${RUNTIME_DATABASE_USER}" <<'SQL'
 SELECT format(
   'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %s TO %I',
@@ -474,7 +494,9 @@ FROM (VALUES
   ('agent_tool_calls'), ('agent_memory'), ('knowledge_documents'),
   ('knowledge_chunks'), ('canvas_runtime_snapshots'), ('agent_skills'), ('agent_skill_versions'),
   ('auth_identities'), ('oauth_transactions'), ('credit_exchange_rates'),
-  ('recharge_submissions'), ('legacy_payment_imports'), ('plans'), ('orders')
+  ('recharge_submissions'), ('legacy_payment_imports'), ('plans'), ('orders'),
+  ('provider_connections'), ('provider_connection_order_revisions'),
+  ('paired_runtimes'), ('paired_runtime_commands'), ('agent_extensions')
 ) AS ai_tables(table_name)
 \gexec
 

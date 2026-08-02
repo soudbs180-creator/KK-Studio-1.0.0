@@ -17,6 +17,7 @@ const agentRunWriteStore = require('../lib/agent-run-write-store');
 const agentRunEventStore = require('../lib/agent-run-event-store');
 const agentSessionStore = require('../lib/agent-session-store');
 const {
+  AgentExecutionTargetSchema,
   AgentContextSnapshotInputDtoSchema,
   AgentSessionUpsertDtoSchema,
 } = require('@kk/shared');
@@ -231,6 +232,7 @@ router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
   const {
     id, sessionId, userMessage, intent, plan, status,
     stepResults = [], updatedAt = new Date().toISOString(),
+    executionTarget = 'local-desktop', pairedRuntimeId,
   } = req.body;
   if (!id || !userMessage || !intent || !plan || !status) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -240,10 +242,22 @@ router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
   )) {
     return res.status(400).json({ error: 'Invalid Agent Session binding' });
   }
+  const parsedTarget = AgentExecutionTargetSchema.safeParse(executionTarget);
+  const pairedRuntimeValid = typeof pairedRuntimeId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pairedRuntimeId);
+  if (!parsedTarget.success
+    || (executionTarget === 'paired-desktop' && !pairedRuntimeValid)
+    || (executionTarget !== 'paired-desktop' && pairedRuntimeId !== undefined)) {
+    return res.status(400).json({ error: 'Invalid Agent Run execution target' });
+  }
 
   try {
-    const outcome = await agentRunWriteStore.upsertAgentRun(req.userId, {
+    const writeRun = executionTarget === 'paired-desktop'
+      ? agentRunWriteStore.upsertPairedAgentRun
+      : agentRunWriteStore.upsertAgentRun;
+    const outcome = await writeRun(req.userId, {
       id, sessionId: sessionId?.trim(), userMessage, intent, plan, status, stepResults, updatedAt,
+      executionTarget, pairedRuntimeId,
     });
     if (outcome.outcome === 'ownership_conflict') {
       return res.status(403).json({ error: 'Agent run ownership conflict' });
@@ -254,11 +268,20 @@ router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
     if (outcome.outcome === 'binding_conflict') {
       return res.status(409).json({ error: 'Agent run Session binding conflict' });
     }
+    if (outcome.outcome === 'runtime_conflict') {
+      return res.status(409).json({ error: 'Paired runtime ownership or availability conflict' });
+    }
+    if (outcome.outcome === 'target_conflict') {
+      return res.status(409).json({ error: 'Agent run execution target is immutable' });
+    }
     if (outcome.outcome === 'stale') {
       return res.json({ ok: true, stale: true, data: outcome.data });
     }
     return res.json({ ok: true, data: outcome.data });
   } catch (err) {
+    if (err?.statusCode === 400 && err?.code === 'INVALID_PAIRED_RUNTIME_ENVELOPE') {
+      return res.status(400).json({ error: err.message, code: err.code });
+    }
     console.error('[后端AI助手] 同步 Runs 失败:', err);
     res.status(500).json({ error: '同步失败' });
   }

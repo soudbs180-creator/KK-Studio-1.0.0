@@ -613,14 +613,18 @@ async function resolvePromptDragStartScreen(page, promptId) {
     if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
 
     const x = visibleLeft + ((visibleRight - visibleLeft) / 2);
+    const visibleHeight = visibleBottom - visibleTop;
     const candidateYs = [
-      visibleBottom - Math.min(12, (visibleBottom - visibleTop) / 4),
-      visibleTop + ((visibleBottom - visibleTop) / 2),
-      visibleTop + Math.min(12, (visibleBottom - visibleTop) / 4),
+      visibleTop + (visibleHeight / 2),
+      visibleTop + (visibleHeight / 3),
+      visibleTop + ((visibleHeight * 2) / 3),
     ];
     const y = candidateYs.find((candidateY) => {
       const hit = document.elementFromPoint(x, candidateY);
-      return Boolean(hit && (hit === surface || surface.contains(hit)));
+      const interactiveHit = hit?.closest(
+        'button, a, input, textarea, select, [role="button"], .kk-canvas-v3-port, [data-no-drag]',
+      );
+      return Boolean(hit && !interactiveHit && (hit === surface || surface.contains(hit)));
     });
     if (y === undefined) return null;
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
+import type { VideoReferenceMode } from '@kk/shared';
 import { AspectRatio, VIDEO_RESOLUTION_DURATION_MAP } from '../../types';
-import { Fullscreen, Volume2, VolumeOff } from 'lucide-react';
+import { Fullscreen, Images, Volume2, VolumeOff } from 'lucide-react';
 
 interface VideoOptionsPanelProps {
     aspectRatio: AspectRatio;
@@ -13,6 +14,8 @@ interface VideoOptionsPanelProps {
     onAudioChange: (audio: boolean) => void;
     availableRatios?: AspectRatio[];
     supportsAudio?: boolean; // 添加：是否支持音频开关
+    referenceMode?: VideoReferenceMode;
+    onReferenceModeChange?: (mode: VideoReferenceMode) => void;
 }
 
 const VideoOptionsPanel: React.FC<VideoOptionsPanelProps> = ({
@@ -32,7 +35,9 @@ const VideoOptionsPanel: React.FC<VideoOptionsPanelProps> = ({
         AspectRatio.PORTRAIT_3_4,
         AspectRatio.PORTRAIT_9_16,
     ],
-    supportsAudio = false
+    supportsAudio = false,
+    referenceMode = 'multiple',
+    onReferenceModeChange,
 }) => {
     const resolutions = ['720p', '1080p', '4k'];
 
@@ -138,6 +143,34 @@ const VideoOptionsPanel: React.FC<VideoOptionsPanelProps> = ({
                 isolation: 'isolate',
             }}
         >
+            <div className="mb-4 last:mb-0">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                    <Images size={15} aria-hidden="true" />
+                    <span>参考方式</span>
+                </div>
+                <div className="relative flex rounded-lg p-0.5" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                    {([
+                        ['multiple', '多个参考'],
+                        ['first-frame', '首帧'],
+                        ['first-last-frame', '首尾帧'],
+                    ] as const).map(([value, label]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            aria-pressed={referenceMode === value}
+                            className="flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200"
+                            style={{
+                                color: referenceMode === value ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                                backgroundColor: referenceMode === value ? 'var(--bg-secondary)' : 'transparent',
+                            }}
+                            onClick={() => onReferenceModeChange?.(value)}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* 1. 音频 - 左右两个按钮带图标 (仅当 supportsAudio 为 true 时显示) */}
             {supportsAudio && (
                 <div className="mb-4 last:mb-0">

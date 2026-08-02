@@ -1,13 +1,17 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Focus, LayoutDashboard, Map, Maximize2, Minimize2, Minus, Plus } from 'lucide-react';
+import { LayoutDashboard, Map, Minimize2, Minus, Plus } from 'lucide-react';
 import { PROJECT_MANAGER_ACTIONS } from '../components/settings/settingsModuleActions';
-import { buildMinimapSpatialIndex, selectMinimapVisibleNodes } from './minimapSpatialIndex';
+import type { Canvas } from '../types';
+import type { InfiniteCanvasHandle } from '../components/canvas/InfiniteCanvas';
+import { buildMinimapSpatialIndex, selectMinimapVisibleNodes, type MinimapIndexedNode } from './minimapSpatialIndex';
+import { computeCenteredZoomTransform } from './canvasNavigationMath';
+import { setWorkspaceNavigationPanelWidth } from './workspaceLayoutRegistry';
 
 // 简体中文：定义导航面板 of Props 接口
 interface AppCanvasNavigationPanelProps {
-  activeCanvas: any; // 当前激活的画布数据
+  activeCanvas: Canvas | null | undefined; // 当前激活的画布数据
   canvasTransform: { x: number; y: number; scale: number }; // 画布实时变换
-  canvasRef: React.RefObject<any>; // 大画布实例引用
+  canvasRef: React.RefObject<InfiniteCanvasHandle | null>; // 大画布实例引用
   isMobile: boolean; // 是否是移动端
   onFitToAll: () => void;
   onResetView: () => void;
@@ -19,8 +23,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   canvasTransform,
   canvasRef,
   isMobile,
-  onFitToAll,
-  onResetView,
   onAutoArrange,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -35,6 +37,12 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     }
     return true;
   });
+
+  useEffect(() => {
+    const panelWidth = isMobile || !activeCanvas ? 0 : isCollapsed ? 296 : 304;
+    setWorkspaceNavigationPanelWidth(panelWidth);
+    return () => setWorkspaceNavigationPanelWidth(0);
+  }, [activeCanvas, isCollapsed, isMobile]);
 
   const [minimapScaleMultiplier, setMinimapScaleMultiplier] = useState(3.0);
   const [minimapCenterOffset, setMinimapCenterOffset] = useState<{ x: number; y: number } | null>(null);
@@ -77,7 +85,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   // 2. 简体中文：新引入的延迟定位状态管理
   const [isEdited, setIsEdited] = useState(false);
   const [targetCenter, setTargetCenter] = useState<{ x: number; y: number } | null>(null);
-  const [targetScale, setTargetScale] = useState(1);
 
   // 监听窗口尺寸变化，更新缓存宽高尺寸
   useEffect(() => {
@@ -92,8 +99,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   }, [updateContainerSize]);
 
   // 小地图的固定物理尺寸
-  const miniWidth = 200;
-  const miniHeight = 90; // 简体中文：优化高度，使之更矮平精致
+  const miniWidth = 280;
+  const miniHeight = 156;
 
   const scale = canvasTransform.scale || 1;
 
@@ -119,7 +126,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const viewportMaxY = (safeContainerHeight - canvasTransform.y) / safeScale;
 
 
-  const currentTargetScale = isEdited ? targetScale : scale;
+  const currentTargetScale = scale;
   const displayZoomPercent = Math.round(currentTargetScale * 100);
 
   // 6. 简体中文：重构小地图世界包围盒，基于当前实际视口宽高乘小地图自身倍数，保持聚焦框适中尺寸
@@ -261,9 +268,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // ⚠️ Rules of Hooks: 必须在所有 Hook 声明完毕后进行条件性提前返回
-  if (isMobile || !activeCanvas) return null;
-
   // 折叠状态下，在左下角渲染成一个极其精致的 Map 图标高亮悬浮小圆钮 (36x36)
   // 折叠状态逻辑已下移到 return 前
 
@@ -287,61 +291,34 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   // 10. 缩放控制器 of 交互行为 (只改变拟定位状态)
   const zoomProgress = Math.max(0, Math.min(100, (displayZoomPercent - 10) / 290 * 100));
 
+  const applyZoomToCanvas = (newScale: number) => {
+    if (!canvasRef.current) return;
+    const next = computeCenteredZoomTransform({
+      centerX: viewportCenterX,
+      centerY: viewportCenterY,
+      viewportWidth: safeContainerWidth,
+      viewportHeight: safeContainerHeight,
+      scale: newScale,
+    });
+    canvasRef.current.setView(next.x, next.y, next.scale);
+  };
+
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     const newScale = parseInt(e.target.value, 10) / 100;
-    setTargetScale(newScale);
-    
-    if (isCollapsed && canvasRef.current) {
-      const center = {
-        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
-        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
-      };
-      const newX = safeContainerWidth / 2 - center.x * newScale;
-      const newY = safeContainerHeight / 2 - center.y * newScale;
-      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, newScale);
-      setIsEdited(false);
-    } else {
-      setIsEdited(true);
-    }
+    applyZoomToCanvas(newScale);
   };
 
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextScale = Math.min(3, currentTargetScale + 0.1);
-    setTargetScale(nextScale);
-    
-    if (isCollapsed && canvasRef.current) {
-      const center = {
-        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
-        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
-      };
-      const newX = safeContainerWidth / 2 - center.x * nextScale;
-      const newY = safeContainerHeight / 2 - center.y * nextScale;
-      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, nextScale);
-      setIsEdited(false);
-    } else {
-      setIsEdited(true);
-    }
+    applyZoomToCanvas(nextScale);
   };
 
   const handleZoomOut = (e: React.MouseEvent) => {
     e.stopPropagation();
     const nextScale = Math.max(0.1, currentTargetScale - 0.1);
-    setTargetScale(nextScale);
-    
-    if (isCollapsed && canvasRef.current) {
-      const center = {
-        x: viewportMinX + (viewportMaxX - viewportMinX) / 2,
-        y: viewportMinY + (viewportMaxY - viewportMinY) / 2
-      };
-      const newX = safeContainerWidth / 2 - center.x * nextScale;
-      const newY = safeContainerHeight / 2 - center.y * nextScale;
-      canvasRef.current.setView(isNaN(newX) ? 0 : newX, isNaN(newY) ? 0 : newY, nextScale);
-      setIsEdited(false);
-    } else {
-      setIsEdited(true);
-    }
+    applyZoomToCanvas(nextScale);
   };
 
   // 小地图 SVG 区域上 of 鼠标滚轮缩放事件（根据鼠标的位置来局部缩放小地图内容）
@@ -467,15 +444,18 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     setMinimapOffset(null); // 重置视野偏移
   };
 
+  if (isMobile || !activeCanvas) return null;
+
   // 折叠状态下，在右上角渲染成扁平横向缩放控制栏
   if (isCollapsed) {
     return (
       <div
         data-canvas-navigation-dock="true"
-        className="kk-workspace-chrome-surface canvas-nav-panel canvas-nav-panel--compact flex items-center gap-2 rounded-2xl border px-3 py-1 select-none transition-all duration-300 ease-in-out"
+        data-canvas-navigation-bar="true"
+        className="kk-workspace-chrome-surface canvas-nav-panel canvas-nav-panel--compact flex items-center gap-1.5 rounded-2xl border px-2 py-1 select-none transition-all duration-300 ease-in-out"
         style={{
-          width: '224px',
-          maxWidth: '224px',
+          width: '296px',
+          maxWidth: '296px',
           boxSizing: 'border-box',
           height: '38px',
           boxShadow: 'var(--frost-card-framework-shadow)',
@@ -485,66 +465,61 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         }}
       >
-        {/* 展开按钮，用带有 Map 图标的按钮 */}
+        <div data-canvas-zoom-control="true" className="flex min-w-0 flex-1 items-center gap-1">
+          <button
+            onClick={handleZoomOut}
+            className="kk-workspace-icon-control h-6 w-6 rounded-md"
+            title="缩小"
+            aria-label="缩小"
+          >
+            <Minus size={11} />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center">
+            <input
+              type="range"
+              min="10"
+              max="300"
+              value={displayZoomPercent}
+              onChange={handleSliderChange}
+              onMouseDown={(event) => event.stopPropagation()}
+              className="zoom-slider h-1 w-full min-w-0 cursor-pointer"
+              aria-label="画布缩放"
+              style={{ '--zoom-slider-progress': `${zoomProgress}%` } as React.CSSProperties}
+            />
+          </div>
+          <button
+            onClick={handleZoomIn}
+            className="kk-workspace-icon-control h-6 w-6 rounded-md"
+            title="放大"
+            aria-label="放大"
+          >
+            <Plus size={11} />
+          </button>
+          <span className="min-w-[38px] text-right text-[10px] font-black text-[var(--text-secondary)]">
+            {displayZoomPercent}%
+          </span>
+        </div>
         <button
+          type="button"
+          data-canvas-navigation-action="autoArrange"
+          data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+          onClick={onAutoArrange}
+          className="kk-workspace-icon-control h-7 w-7 rounded-lg"
+          title="自动整理卡片"
+          aria-label="自动整理卡片"
+        >
+          <LayoutDashboard size={13} />
+        </button>
+        <button
+          type="button"
           data-canvas-minimap-toggle="true"
           onClick={toggleCollapsed}
-          className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer transition-colors"
-          style={{
-            background: 'rgba(255, 77, 139, 0.1)',
-            borderColor: 'rgba(255, 77, 139, 0.25)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-          }}
+          className="kk-workspace-icon-control h-7 w-7 rounded-lg"
           title="展开小地图"
+          aria-label="展开小地图"
         >
-          <Map size={13} style={{ color: 'var(--accent-coral)' }} />
+          <Map size={13} className="text-[var(--accent-coral)]" />
         </button>
-
-        {/* 缩小按钮 */}
-        <button
-          onClick={handleZoomOut}
-          className="kk-workspace-icon-control w-6 h-6 rounded-md flex items-center justify-center active:scale-90 outline-none cursor-pointer"
-          title="缩小"
-        >
-          <Minus size={11} />
-        </button>
-
-        {/* 横向滑块 */}
-        <div className="flex-1 flex items-center justify-center relative min-w-0">
-          <input
-            type="range"
-            min="10"
-            max="300"
-            value={displayZoomPercent}
-            onChange={handleSliderChange}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="zoom-slider cursor-pointer w-full min-w-0 h-1"
-            style={{
-              '--zoom-slider-progress': `${zoomProgress}%`,
-            } as React.CSSProperties}
-          />
-        </div>
-
-        {/* 放大按钮 */}
-        <button
-          onClick={handleZoomIn}
-          className="kk-workspace-icon-control w-6 h-6 rounded-md flex items-center justify-center active:scale-90 outline-none cursor-pointer"
-          title="放大"
-        >
-          <Plus size={11} />
-        </button>
-
-        {/* 缩放百分比数值 */}
-        <span
-          className={`inline-flex items-center justify-end text-[10px] font-black tracking-tighter text-right select-none min-w-[44px] whitespace-nowrap transition-colors ${
-            isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
-          }`}
-          style={{ height: '24px', lineHeight: '24px' }}
-          title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
-        >
-          {displayZoomPercent}%{isEdited && '*'}
-        </span>
       </div>
     );
   }
@@ -555,8 +530,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
       data-canvas-minimap-popover="true"
       className="kk-workspace-chrome-surface canvas-nav-panel flex flex-col gap-1.5 rounded-2xl border p-3 select-none transition-all duration-300 ease-in-out"
       style={{
-        width: '224px',
-        maxWidth: '224px',
+        width: '304px',
+        maxWidth: '304px',
         boxSizing: 'border-box',
         boxShadow: 'var(--frost-card-framework-shadow)',
         background: 'var(--frost-card-framework-bg)',
@@ -565,26 +540,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
       }}
     >
-      {/* 顶部标题栏 (仅在展开状态下使用) */}
-      <div className="flex items-center justify-between gap-1.5 h-7 border-b border-[var(--kk-workspace-minimap-border)]/20 pb-1.5 mb-0.5">
-        <div className="flex items-center gap-1.5 select-none">
-          <Map size={12} className="text-[var(--accent-coral)]" />
-          <span className="text-[10px] font-bold tracking-tight text-[var(--text-secondary)]">导航小地图</span>
-        </div>
-        <div className="w-11 flex justify-center items-center">
-          <button
-            data-canvas-minimap-toggle="true"
-            onClick={toggleCollapsed}
-            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            title="收起小地图"
-          >
-            <Minimize2 size={13} className="text-[var(--text-secondary)]" />
-          </button>
-        </div>
-      </div>
-
       <div className="w-full flex flex-col gap-1.5 transition-all">
-        <div className="w-full relative overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
+        <div className="relative w-full overflow-hidden rounded-xl border border-[var(--kk-workspace-minimap-border)] bg-[var(--kk-workspace-minimap-bg)]">
           <svg
             ref={svgRef}
             width={miniWidth}
@@ -602,8 +559,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
 
             {/* 渲染视口范围内的卡片小方块（只展示空白卡片占位，低饱和度半透明中性色彩） */}
             {visibleNodes
-              .map((node: any) => {
-                const isImage = node.url || node.storageId;
+              .map((node: MinimapIndexedNode) => {
+                const isImage = node.minimapKind === 'image';
                 const w = isImage ? 380 : 500;
                 const h = isImage ? 380 : 300;
 
@@ -658,57 +615,39 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               }}
             />
           </svg>
+          {isEdited ? (
+            <div
+              data-minimap-confirmation="true"
+              className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl border border-[var(--frost-card-framework-border)] bg-[var(--frost-card-framework-bg)] p-1 shadow-lg backdrop-blur-xl"
+            >
+              <button
+                type="button"
+                onClick={handleCancelLocation}
+                className="kk-workspace-icon-control h-7 rounded-lg px-2 text-[11px] font-semibold"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLocation}
+                className="h-7 rounded-lg bg-[var(--accent-coral)] px-2.5 text-[11px] font-bold text-white"
+              >
+                确认
+              </button>
+            </div>
+          ) : null}
         </div>
-
-        <div className="kk-canvas-navigation-actions" aria-label="画布操作">
-          <button
-            type="button"
-            data-canvas-navigation-action="fitToAll"
-            data-project-manager-action={PROJECT_MANAGER_ACTIONS.fitToAll.uiAction}
-            onClick={onFitToAll}
-            className="kk-workspace-icon-control"
-            title="适应全部卡片"
-            aria-label="适应全部卡片"
-          >
-            <Maximize2 size={13} />
-          </button>
-          <button
-            type="button"
-            data-canvas-navigation-action="resetView"
-            data-project-manager-action={PROJECT_MANAGER_ACTIONS.resetView.uiAction}
-            onClick={onResetView}
-            className="kk-workspace-icon-control"
-            title="重置画布视图"
-            aria-label="重置画布视图"
-          >
-            <Focus size={13} />
-          </button>
-          <button
-            type="button"
-            data-canvas-navigation-action="autoArrange"
-            data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
-            onClick={onAutoArrange}
-            className="kk-workspace-icon-control"
-            title="自动整理卡片"
-            aria-label="自动整理卡片"
-          >
-            <LayoutDashboard size={13} />
-          </button>
-        </div>
-
-        {/* 缩放控制栏 (移至小地图下方，不再受折叠按钮挤压，使滑块拥有充足的可操作宽度) */}
-        <div className="flex items-center justify-between gap-1.5 h-7 mt-0.5">
-          {/* 缩小按钮 */}
+        <div data-canvas-navigation-bar="true" className="mt-0.5 flex h-8 items-center gap-1.5">
+          <div data-canvas-zoom-control="true" className="flex min-w-0 flex-1 items-center gap-1">
           <button
             onClick={handleZoomOut}
-            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
             title="缩小"
+            aria-label="缩小"
           >
             <Minus size={13} />
           </button>
-
-          {/* 横向滑块 */}
-          <div className="flex-1 flex items-center justify-center relative min-w-0">
+          <div className="flex min-w-0 flex-1 items-center">
             <input
               type="range"
               min="10"
@@ -717,57 +656,50 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
               onChange={handleSliderChange}
               onMouseDown={(e) => e.stopPropagation()}
               className="zoom-slider cursor-pointer w-full min-w-0 h-1"
+              aria-label="画布缩放"
               style={{
                 '--zoom-slider-progress': `${zoomProgress}%`,
               } as React.CSSProperties}
             />
           </div>
 
-          {/* 放大按钮 */}
           <button
             onClick={handleZoomIn}
-            className="kk-workspace-icon-control w-7 h-7 rounded-lg flex items-center justify-center active:scale-90 outline-none cursor-pointer"
+            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
             title="放大"
+            aria-label="放大"
           >
             <Plus size={13} />
           </button>
 
-          {/* 缩放百分比数值 */}
           <span
-            className={`inline-flex items-center justify-center text-[10px] font-black tracking-tighter text-center select-none w-11 whitespace-nowrap transition-colors ${
-              isEdited ? 'text-[var(--accent-coral)] animate-pulse' : 'text-[var(--text-secondary)]'
-            }`}
+            className="inline-flex w-10 items-center justify-end whitespace-nowrap text-[10px] font-black text-[var(--text-secondary)]"
             style={{ height: '28px', lineHeight: '28px' }}
-            title={isEdited ? "当前拟定位缩放比（未保存）" : "当前实际缩放比"}
+            title="当前实际缩放比"
           >
-            {displayZoomPercent}%{isEdited && '*'}
+            {displayZoomPercent}%
           </span>
-        </div>
-
-        {/* 确认与重置按钮栏，展开状态下始终常驻，由 disabled 状态平滑过渡 */}
-        <div className="flex gap-1.5 mt-0.5">
+          </div>
           <button
-            disabled={!isEdited}
-            onClick={handleConfirmLocation}
-            className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg text-center outline-none transition-all shadow-sm ${
-              isEdited
-                ? 'bg-[var(--accent-coral)] text-white hover:opacity-90 active:scale-95 cursor-pointer'
-                : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
-            }`}
+            type="button"
+            data-canvas-navigation-action="autoArrange"
+            data-project-manager-action={PROJECT_MANAGER_ACTIONS.autoArrange.uiAction}
+            onClick={onAutoArrange}
+            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
+            title="自动整理卡片"
+            aria-label="自动整理卡片"
           >
-            确认定位
+            <LayoutDashboard size={13} />
           </button>
           <button
-            disabled={!isEdited}
-            onClick={handleCancelLocation}
-            className={`w-11 text-[11px] font-medium py-1.5 rounded-lg text-center outline-none transition-all ${
-              isEdited
-                ? 'bg-neutral-200 dark:bg-neutral-800 text-[var(--text-secondary)] hover:opacity-90 active:scale-95 cursor-pointer'
-                : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border border-neutral-200/40 dark:border-neutral-800/40'
-            }`}
-            title="取消更改，回到当前位置"
+            type="button"
+            data-canvas-minimap-toggle="true"
+            onClick={toggleCollapsed}
+            className="kk-workspace-icon-control h-7 w-7 rounded-lg"
+            title="收起小地图"
+            aria-label="收起小地图"
           >
-            重置
+            <Minimize2 size={13} />
           </button>
         </div>
       </div>

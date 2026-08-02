@@ -7,10 +7,11 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { normalizePerformanceMode, type WebPerformanceMode } from './performanceModes';
 
 export const APPEARANCE_MOTION_STORAGE_KEY = 'kk_appearance_motion_preferences_v1';
 
-export type WebPerformanceMode = 'fast' | 'balanced' | 'visual';
+export type { WebPerformanceMode } from './performanceModes';
 
 export interface AppearanceMotionPreferences {
   glassOpacity: number;
@@ -32,7 +33,7 @@ export const DEFAULT_APPEARANCE_MOTION_PREFERENCES: AppearanceMotionPreferences 
   glassBlur: 20,
   motionScale: 1,
   solidFallback: false,
-  performanceMode: 'balanced',
+  performanceMode: 'auto',
 };
 
 const AppearanceMotionContext = createContext<AppearanceMotionContextValue | undefined>(undefined);
@@ -42,10 +43,6 @@ const clampNumber = (value: unknown, fallback: number, min: number, max: number)
   if (!Number.isFinite(numericValue)) return fallback;
   return Math.min(max, Math.max(min, numericValue));
 };
-
-const normalizePerformanceMode = (value: unknown): WebPerformanceMode => (
-  value === 'fast' || value === 'visual' ? value : 'balanced'
-);
 
 const normalizePreferences = (value: Partial<AppearanceMotionPreferences> = {}): AppearanceMotionPreferences => ({
   glassOpacity: clampNumber(
@@ -105,10 +102,10 @@ export const applyAppearanceMotionPreferences = (
 
   const root = document.documentElement;
   const reducedMotion = options.systemReducedMotion ?? getSystemReducedMotion();
-  const fastMode = preferences.performanceMode === 'fast';
-  const modeMotionScale = fastMode ? Math.min(preferences.motionScale, 0.55) : preferences.motionScale;
-  const modeGlassOpacity = fastMode ? Math.max(preferences.glassOpacity, 0.84) : preferences.glassOpacity;
-  const modeGlassBlur = fastMode ? Math.min(preferences.glassBlur, 8) : preferences.glassBlur;
+  const smoothMode = preferences.performanceMode === 'smooth';
+  const modeMotionScale = smoothMode ? Math.min(preferences.motionScale, 0.55) : preferences.motionScale;
+  const modeGlassOpacity = smoothMode ? Math.max(preferences.glassOpacity, 0.84) : preferences.glassOpacity;
+  const modeGlassBlur = smoothMode ? Math.min(preferences.glassBlur, 8) : preferences.glassBlur;
   const effectiveMotionScale = reducedMotion ? 0 : modeMotionScale;
   const effectiveGlassOpacity = preferences.solidFallback ? 1 : modeGlassOpacity;
   const effectiveGlassBlur = preferences.solidFallback ? 0 : modeGlassBlur;
@@ -154,6 +151,7 @@ export const AppearanceMotionProvider: React.FC<{ children: React.ReactNode }> =
     setPreferencesState((current) => normalizePreferences({
       ...current,
       ...patch,
+      performanceMode: patch.performanceMode ?? 'custom',
     }));
   }, []);
 

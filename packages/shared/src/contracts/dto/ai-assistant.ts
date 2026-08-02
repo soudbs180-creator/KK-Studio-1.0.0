@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  AgentExecutionTargetSchema,
+  type AgentExecutionTarget,
+} from "./paired-runtime.ts";
 
 export type AssistantCollaborationMode = "direct" | "assist" | "takeover";
 
@@ -114,6 +118,8 @@ export interface AgentRunDto {
   totalSteps?: number;
   completedStepIds?: string[];
   replanCount?: 0 | 1 | 2 | 3;
+  executionTarget?: AgentExecutionTarget;
+  pairedRuntimeId?: string;
 }
 
 export interface AgentRunSnapshotEventDto {
@@ -246,6 +252,24 @@ export const AgentRunDtoSchema = z.object({
   totalSteps: z.number().int().nonnegative().optional(),
   completedStepIds: z.array(z.string()).optional(),
   replanCount: AgentRunReplanCountSchema.optional(),
+  executionTarget: AgentExecutionTargetSchema.optional(),
+  pairedRuntimeId: z.string().uuid().optional(),
+}).superRefine((run, context) => {
+  const target = run.executionTarget || "local-desktop";
+  if (target === "paired-desktop" && !run.pairedRuntimeId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pairedRuntimeId"],
+      message: "Paired desktop runs require pairedRuntimeId.",
+    });
+  }
+  if (target !== "paired-desktop" && run.pairedRuntimeId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["pairedRuntimeId"],
+      message: "pairedRuntimeId is only valid for paired desktop runs.",
+    });
+  }
 });
 
 /** Validates the bounded server collection before it enters Web runtime state. */

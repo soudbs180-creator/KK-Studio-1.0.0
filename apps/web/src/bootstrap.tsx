@@ -6,6 +6,8 @@ import './styles/kk-ui-tokens.css';
 import './styles/morphic-ui.css';
 import './styles/morphic-button-geometry.css';
 import './styles/workspace-ui-v3.css';
+import './styles/workspace-ui-v4.css';
+import './styles/settings-ui-v4.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';

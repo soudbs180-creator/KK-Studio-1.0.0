@@ -10,6 +10,19 @@ import { localAuditLogService } from '../services/localAuditLogService';
 // 简体中文：OpenCLI 指令分发执行路由 (OpenCLI Execution Route)
 const router = Router();
 
+router.get('/health', async (req, res) => {
+  if (!localToken.validate(req.headers.authorization || '')) {
+    return res.status(401).json({
+      error: { code: 'INVALID_LOCAL_TOKEN', message: 'Local Runner authentication failed.' },
+    });
+  }
+  const health = await opencliService.getHealth();
+  return res.status(health.status === 'offline' ? 503 : 200).json({
+    runtime: 'opencli',
+    ...health,
+  });
+});
+
 router.post('/execute', async (req, res) => {
   const authHeader = req.headers.authorization || '';
   

@@ -21,9 +21,11 @@ test('desktop settings shell owns the grouped console sidebar and shared routed 
 
 test('desktop console sidebar exposes fixed groups and a bottom account entry', () => {
   const shellSource = readSource('apps/web/src/components/settings/SettingsWorkbenchShell.tsx');
+  const navigationSource = readSource('apps/web/src/components/settings/settingsNavigationRegistry.ts');
 
-  for (const label of ['工作区', '能力配置', '自动化', '系统维护']) {
-    assert.match(shellSource, new RegExp(label));
+  assert.match(shellSource, /getSettingsNavigationGroups\(language\)/);
+  for (const label of ['总览', '集成', 'API 配置', '能力配置', 'AI 代理', '系统维护', '数据与安全', '性能配置', '系统日志']) {
+    assert.match(navigationSource, new RegExp(label));
   }
   assert.match(shellSource, /className="settings-console-nav__group"/);
   assert.match(shellSource, /className="settings-console-account"/);

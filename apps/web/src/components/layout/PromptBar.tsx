@@ -1,4 +1,4 @@
-import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
 import { KK_LAYER } from '@kk/ui';
 import { type GenerationConfig, AspectRatio, ImageSize, GenerationMode, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
@@ -21,7 +21,7 @@ const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { safeRevokeBlobUrl } from '../../utils/blobUtils';
-import { X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal, ArrowUp, PanelRightClose, PanelRightOpen } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { ArrowRight, Blocks, FileText, Plug, Wrench, X, Loader2, Sparkles, ChevronDown, Plus, Pin, SlidersHorizontal, ArrowUp, PanelRightClose, PanelRightOpen } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -33,6 +33,7 @@ import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '..
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
 import PromptBarFooter from './prompt-bar/PromptBarFooter';
 import PromptVoiceInputButton from './prompt-bar/PromptVoiceInputButton';
+import ComposerReferenceButton from './prompt-bar/ComposerReferenceButton';
 import { PROMPT_BAR_MODE_REGISTRY, getPromptBarModeOption } from './prompt-bar/composerModeRegistry';
 import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
 import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
@@ -62,6 +63,17 @@ import {
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
 import { PROMPT_COMPOSER_ACTIONS } from '../../features/ai-assistant-runtime';
+import {
+    getWorkspaceLayoutOccupancy,
+    resolveWorkspaceLayoutInsets,
+    subscribeWorkspaceLayoutOccupancy,
+} from '../../app/workspaceLayoutRegistry';
+import {
+    applyComposerReferenceRoles,
+    getComposerReferenceLabel,
+    reorderComposerReferenceImages,
+    sortContextReferences,
+} from './prompt-bar/composerReferenceState';
 
 // [FIX] Imports for PPT Outline generation
 import type { PPTOutline, PPTStyleSpec } from '../../utils/pptPrompts';
@@ -79,7 +91,7 @@ import {
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
 const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
 const PROMPT_TEXTAREA_MIN_ROWS = 2;
-const PROMPT_TEXTAREA_MAX_ROWS = 6;
+const PROMPT_TEXTAREA_MAX_ROWS = 10;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 const MODEL_MENU_SKELETON_COUNT = 3;
@@ -491,6 +503,8 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                     {/* 分隔线 */}
                     <div className="w-px h-4" style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)' }} />
+
+                    <span className="text-sm font-bold">发送</span>
 
                     {/* 发送箭头按钮 - 内嵌圆形按钮 🚀 箭头朝右 + 滑动动画 */}
                     <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm transition-transform duration-200 group-hover:scale-110"
@@ -1295,6 +1309,23 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const refContainerRef = useRef<HTMLDivElement>(null);
     const optionsPanelRef = useRef<HTMLDivElement>(null); // [NEW] Ref for options panel
+    const orderedContextReferences = useMemo(
+        () => sortContextReferences(config.contextReferences || []),
+        [config.contextReferences],
+    );
+
+    useEffect(() => {
+        setConfig((current) => {
+            const referenceImages = applyComposerReferenceRoles(
+                current.referenceImages,
+                current.mode,
+                current.videoReferenceMode || 'multiple',
+            );
+            return referenceImages === current.referenceImages
+                ? current
+                : { ...current, referenceImages };
+        });
+    }, [config.mode, config.referenceImages, config.videoReferenceMode, setConfig]);
 
     // 状态：选项面板显示
     const [showOptionsPanel, setShowOptionsPanel] = useState(false);
@@ -3421,10 +3452,24 @@ const PromptBar: React.FC<PromptBarProps> = ({
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
-    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
     const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
     const shouldRenderMobileReferenceTray = isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0);
     const shouldUseMobileInlineMedia = shouldRenderInlineMobileUploadButton || shouldRenderMobileReferenceTray;
+    const workspaceLayoutOccupancy = useSyncExternalStore(
+        subscribeWorkspaceLayoutOccupancy,
+        getWorkspaceLayoutOccupancy,
+        getWorkspaceLayoutOccupancy,
+    );
+    const workspaceLayoutInsets = resolveWorkspaceLayoutInsets({
+        isMobile,
+        isChatOpen,
+        chatSidebarWidth,
+        navigationPanelWidth: workspaceLayoutOccupancy.navigationPanelWidth,
+    });
+    const desktopComposerLayoutStyle = {
+        '--kk-workspace-left-inset': `${workspaceLayoutInsets.left}px`,
+        '--kk-workspace-right-inset': `${workspaceLayoutInsets.right}px`,
+    } as React.CSSProperties;
     const activeEcommerceFooterSheet: EcommerceGroupSheet = ecommerceActiveTaskState?.sourceSheet ?? ecommerceActiveGroupSheet ?? '主图';
     const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -3557,6 +3602,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
                         onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
                         onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                        referenceMode={config.videoReferenceMode || 'multiple'}
+                        onReferenceModeChange={(mode) => updateConfigFields({ videoReferenceMode: mode })}
                         availableRatios={availableRatios}
                         supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
                     />
@@ -4235,7 +4282,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         }}
                                         onCompositionStart={() => { isComposingRef.current = true; }}
                                         onCompositionEnd={handleCompositionEnd}
-                                        placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述要生成的音频风格或歌词..." : config.mode === GenerationMode.PPT ? "输入PPT主题，批量生成..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令..." : "上传运营文件后，在这里补充要求...") : "描述你想要生成的图片..."}
+                                        placeholder="随心输入"
                                         className="input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto mt-0.5 py-1 px-0"
                                         style={{
                                             color: 'var(--text-primary)',
@@ -4950,6 +4997,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
                                             onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
                                             onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                            referenceMode={config.videoReferenceMode || 'multiple'}
+                                            onReferenceModeChange={(mode) => updateConfigFields({ videoReferenceMode: mode })}
                                             availableRatios={availableRatios}
                                             supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
                                         />
@@ -5121,10 +5170,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 style={isMobile ? mobileStyle : { 
+                    ...desktopComposerLayoutStyle,
                     bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
-                    left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
-                    transform: 'translateX(-50%)',
-                    transition: 'left 0.3s ease-out'
+                    transition: 'left 0.3s ease-out, width 0.3s ease-out'
                 }}
             >
                 {/* Drag Overlay */}
@@ -5435,10 +5483,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     <div>
                         {/* Reference Images List */}
-                        {!isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
+                        {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
+                            (config.referenceImages && config.referenceImages.length > 0)
+                            || uploadingCount > 0
+                            || orderedContextReferences.length > 0
+                            || (config.mode === GenerationMode.VIDEO && (config.videoReferenceMode || 'multiple') !== 'multiple')
+                        ) && (
+                            <div className="kk-composer-reference-stack">
                             <div
                                 ref={refContainerRef}
-                                className="flex flex-nowrap items-center gap-2 transition-all p-2 px-3 mt-1 rounded-lg overflow-x-auto overflow-y-hidden scrollbar-thin"
+                                className="kk-composer-reference-media-row flex flex-nowrap items-center gap-2 transition-all p-2 px-3 mt-1 rounded-lg overflow-x-auto overflow-y-hidden scrollbar-thin"
                                 style={{
                                     WebkitOverflowScrolling: 'touch',
                                     overscrollBehaviorX: 'contain',
@@ -5450,7 +5504,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                     // Calculate insertion index based on mouse cursor X
                                     if (refContainerRef.current) {
-                                        const children = Array.from(refContainerRef.current.children).filter(c => !c.id.includes('spacer'));
+                                        const children = Array.from(refContainerRef.current.querySelectorAll<HTMLElement>('[data-reference-item]'));
                                         let insertIndex = children.length;
 
                                         for (let i = 0; i < children.length; i++) {
@@ -5493,15 +5547,21 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 const sourceIndex = newImages.findIndex(i => i.id === dragSourceId);
                                                 if (sourceIndex === -1) return prev;
 
-                                                const [moved] = newImages.splice(sourceIndex, 1);
                                                 // Adjust target index if we removed an item before it
                                                 let finalTargetIndex = dropTargetIndex;
                                                 if (sourceIndex < finalTargetIndex) {
                                                     finalTargetIndex -= 1;
                                                 }
-
-                                                newImages.splice(finalTargetIndex, 0, moved);
-                                                return { ...prev, referenceImages: newImages };
+                                                const referenceImages = reorderComposerReferenceImages(
+                                                    newImages,
+                                                    dragSourceId,
+                                                    finalTargetIndex,
+                                                    prev.mode,
+                                                    prev.videoReferenceMode || 'multiple',
+                                                );
+                                                return referenceImages === prev.referenceImages
+                                                    ? prev
+                                                    : { ...prev, referenceImages };
                                             });
                                         }
                                         setDragSourceId(null);
@@ -5521,6 +5581,18 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     // If it's internal dragSourceId, handle and stop.
                                 }}
                             >
+                                {config.mode === GenerationMode.VIDEO
+                                    && (config.videoReferenceMode || 'multiple') !== 'multiple'
+                                    && config.referenceImages.length === 0 ? (
+                                    <button
+                                        type="button"
+                                        data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                        className="kk-composer-reference-slot"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <span>首帧</span>
+                                    </button>
+                                ) : null}
                                 {config.referenceImages.map((img, index) => {
                                     const isSource = dragSourceId === img.id;
 
@@ -5529,6 +5601,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                     return (
                                         <React.Fragment key={img.id}>
+                                            {config.mode === GenerationMode.VIDEO
+                                                && (config.videoReferenceMode || 'multiple') === 'first-last-frame'
+                                                && index === 1 ? (
+                                                <ArrowRight className="kk-composer-reference-arrow" size={16} aria-label="到尾帧" />
+                                            ) : null}
                                             {/* Spacer */}
                                             <div
                                                 id="spacer"
@@ -5539,6 +5616,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             </div>
 
                                             <div
+                                                data-reference-item={img.id}
                                                 className={`relative group cursor-move transition-all duration-300 ${isSource ? 'opacity-0 w-0 overflow-hidden m-0 p-0 scale-0' : 'hover:scale-105'} ${!isSource ? 'w-12' : ''}`}
                                                 draggable
                                                 onDragStart={(e) => {
@@ -5557,6 +5635,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     onRecovered={handleReferenceRecovered}
                                                     onClick={handleReferencePreview}
                                                 />
+                                                <span className="kk-composer-reference-role">
+                                                    {getComposerReferenceLabel(img.role, index)}
+                                                </span>
                                                 <button
                                                     data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.removeReferenceImage.uiAction}
                                                     onClick={(e) => {
@@ -5572,6 +5653,22 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </React.Fragment>
                                     );
                                 })}
+
+                                {config.mode === GenerationMode.VIDEO
+                                    && (config.videoReferenceMode || 'multiple') === 'first-last-frame'
+                                    && config.referenceImages.length < 2 ? (
+                                    <>
+                                        <ArrowRight className="kk-composer-reference-arrow" size={16} aria-label="到尾帧" />
+                                        <button
+                                            type="button"
+                                            data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
+                                            className="kk-composer-reference-slot"
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <span>尾帧</span>
+                                        </button>
+                                    </>
+                                ) : null}
 
                                 {/* [NEW] Uploading Skeletons */}
                                 {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
@@ -5607,26 +5704,24 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </svg>
                                 </button>
                             </div>
-                        )}
-
-                        {shouldRenderStandaloneUploadRow && (
-                            <div className="kk-composer-reference-row flex items-center">
-                                <button
-                                    data-prompt-composer-action={PROMPT_COMPOSER_ACTIONS.addReferenceImage.uiAction}
-                                    className="kk-composer-reference-button flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border transition-colors duration-125 hover:bg-[var(--toolbar-hover)]"
-                                    style={{
-                                        color: 'var(--text-secondary)',
-                                        borderColor: 'var(--frost-card-sub-border)'
-                                    }}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="上传参考图"
-                                >
-                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                        <polyline points="17 8 12 3 7 8" />
-                                        <line x1="12" y1="3" x2="12" y2="15" />
-                                    </svg><span className="kk-composer-reference-label">参考</span>
-                                </button>
+                            {orderedContextReferences.length > 0 ? (
+                                <div className="kk-composer-reference-context-row" aria-label="上下文参考">
+                                    {orderedContextReferences.map((reference) => (
+                                        <div
+                                            key={reference.id}
+                                            className="kk-composer-context-reference"
+                                            data-context-kind={reference.kind}
+                                            title={`${reference.label} · ${reference.permissionScopes.join(', ') || '无额外权限'}`}
+                                        >
+                                            {reference.kind === 'file' ? <FileText size={14} aria-hidden="true" /> : null}
+                                            {reference.kind === 'skill' ? <Wrench size={14} aria-hidden="true" /> : null}
+                                            {reference.kind === 'mcp' ? <Plug size={14} aria-hidden="true" /> : null}
+                                            {reference.kind === 'plugin' ? <Blocks size={14} aria-hidden="true" /> : null}
+                                            <span>{reference.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
                             </div>
                         )}
 
@@ -5781,7 +5876,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 }}
                                 onCompositionStart={() => { isComposingRef.current = true; }}
                                 onCompositionEnd={handleCompositionEnd}
-                                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令，将应用到当前选中的电商任务..." : "上传运营需求文件后，在这里补充额外的电商要求...") : "描述你想要生成的图片..."}
+                                placeholder="随心输入"
                                 className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldUseMobileInlineMedia ? 'mt-0 min-w-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
                                 style={{
                                     color: 'var(--text-primary)', // 使用 CSS 变量适配主题
@@ -5797,6 +5892,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
                         <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            {config.mode !== GenerationMode.ECOMMERCE ? (
+                                <ComposerReferenceButton
+                                    count={config.referenceImages.length}
+                                    onClick={() => fileInputRef.current?.click()}
+                                />
+                            ) : null}
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
@@ -6226,6 +6327,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
                                             onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
                                             onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                            referenceMode={config.videoReferenceMode || 'multiple'}
+                                            onReferenceModeChange={(mode) => updateConfigFields({ videoReferenceMode: mode })}
                                             availableRatios={availableRatios}
                                             supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
                                         />
@@ -6411,6 +6514,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                             )}
+                        <div data-composer-control="voice" className="shrink-0">
+                            <PromptVoiceInputButton />
+                        </div>
                         <div data-mobile-footer-control="send" className={isMobile ? 'shrink-0' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton

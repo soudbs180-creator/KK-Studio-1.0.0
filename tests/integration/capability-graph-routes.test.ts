@@ -26,6 +26,13 @@ async function startTestServer() {
       async deleteConnection() { return true; },
       async getCapabilitySnapshot() { return { version: 'v1', generatedAt: timestamp, nodes: [], edges: [] }; },
       async listConnections() { return { version: 'v1', connections: [safeConnection] }; },
+      async reorderConnections(_userId: string, input: { connectionIds: string[]; expectedOrderRevision: number }) {
+        return {
+          version: 'v2',
+          orderRevision: input.expectedOrderRevision + 1,
+          connections: input.connectionIds.map(() => ({ ...safeConnection, routingPriority: 0 })),
+        };
+      },
       async updateConnection() { return safeConnection; },
       async verifyConnection() { return { ...safeConnection, status: 'available', verifiedAt: timestamp }; },
     },
@@ -63,6 +70,26 @@ test('connection and snapshot routes return safe envelopes behind the server fla
     });
     assert.equal(snapshotResponse.status, 200);
     assert.match(await snapshotResponse.text(), /"version":"v1"/);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('provider connection ordering is an authenticated atomic endpoint', async () => {
+  const { server, baseUrl } = await startTestServer();
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/provider-connections/order`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer test' },
+      body: JSON.stringify({
+        connectionIds: ['550e8400-e29b-41d4-a716-446655440000'],
+        expectedOrderRevision: 2,
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json() as { data: { version: string; orderRevision: number } };
+    assert.equal(body.data.version, 'v2');
+    assert.equal(body.data.orderRevision, 3);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

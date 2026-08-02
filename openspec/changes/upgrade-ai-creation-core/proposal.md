@@ -3,7 +3,7 @@
 > Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation and bounded replan executor complete, semantic replay and cross-device execution pending
 > Owner: KK Studio AI Core Team
 > Source of truth: this OpenSpec change
-> Last verified: 2026-07-24
+> Last verified: 2026-08-02
 
 ---
 
@@ -62,7 +62,7 @@ Browser/Vercel 只做交互与状态投影；VPS Express 是身份、Connection�
 Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、video poster/proxy、audio waveform/metadata）通过 `LocalMediaJobDto` / `LocalAssetRefDto` 记录源资产、参数与 lineage；建立 1K/10K 真实混合媒体的解码并发、输入响应 p95 ≤100ms、三轮导入/删除后内存相对首轮稳定点增长 ≤10%、object URL 回落到活动资产数的验收基线。
 
 2.11 **统一 IA 与 overlay/layout state**
-左侧 Connections/Capabilities、中心画布、右侧 AI + Context Inspector 单 dock、底部 Task/Run + Assets 可折叠 tray、全局 command palette；统一 layout state 使 dock/tray 打开时自动重排，minimap 基于真实 viewport 定位，DOM 中只保留一个 AI toggle；新旧 UI 读取相同 DTO 投影，视觉 flag 只回滚界面不回滚业务数据。
+中心画布保持主操作面；顶部任务胶囊是唯一 Task Center 入口，复用 DurableGenerationQueue 与 AgentRunStore 投影；右侧 AI 使用单一可调宽 dock，全局 command palette 负责搜索。项目菜单、Task Center、收藏和小地图都是不挤压画布的独立浮层，统一 layout registry 负责输入框、侧栏和小地图间距；新旧 UI 读取相同 DTO 投影，视觉 flag 只回滚界面不回滚业务数据。
 
 ---
 
@@ -84,7 +84,7 @@ Browser 资产进入 OPFS/IndexedDB；派生资产（image thumbnail/metadata、
 - 首个纵向切片（image provider slice）：Google official image adapter 为生产示例、`FakeProviderAdapter` 为自动化测试；链路为 计划 → Quote → 成本/通道确认 → v3 Job → RouteEngine → Adapter → Asset/Lineage → Worker thumbnail → Canvas node → Task Center → Verification/Audit；server flag `capability_graph.image_provider_slice` 必须门禁管理面和 Quote/生成数据面，并按 internal → invited users → full → off 完成非破坏性灰度与回滚。
 - Local Media Runtime 契约与安全加固：`LocalMediaJobDto`、`LocalAssetRefDto`、OPFS/IndexedDB、opaque handle；安全门禁（移除 fallback token 与 token 日志、token 文件 ACL/轮换、body/尺寸上限、Zod 校验、路径 containment、symlink 拒绝、MIME sniff、解码超时与资源限额）；`local-runner:build` 与独立测试纳入 release 验证，通过前只标记 experimental。
 - AI Workspace 控制链：固定 `IntentGate → Planner → CapabilityGraph → ToolRegistry → PermissionPolicy → Quote/Confirmation → Executor → Verification → Audit/Memory`；权限级 `safe | confirm | dangerous | forbidden`；confirmation grant 绑定 `userId/planHash/toolId/targetSnapshot/quoteId/maxCost/expiresAt`。
-- 新 IA 与统一 layout state：Connections/Capabilities 侧栏、单一 AI dock、底部 task/assets tray、command palette、minimap 重排。
+- 新 IA 与统一 layout state：顶部唯一 Task Center、单一 AI dock、两排参考 Composer、command palette、minimap 重排和桌面/手机同源设置注册表。
 - 真实媒体 benchmark 与 10K 零回归门禁。
 - 每项任务必须写明问题、决策、迁移、兼容、flag、回滚、安全、性能、测试、残余风险与删除条件。
 

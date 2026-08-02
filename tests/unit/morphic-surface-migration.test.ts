@@ -3,23 +3,22 @@ import { test } from 'node:test';
 
 import { readSource } from '../support/workspacePaths.js';
 
-test('desktop workspace chrome exposes project, canvas and account with Composer-owned Copilot', () => {
+test('desktop workspace chrome exposes project, tasks and account with Composer-owned Copilot', () => {
   const chromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const workspaceSource = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
 
   assert.match(chromeSource, /data-chrome-region="project"/);
-  assert.match(chromeSource, /data-chrome-region="canvas"/);
+  assert.match(chromeSource, /data-chrome-region="tasks"/);
   assert.match(chromeSource, /data-chrome-region="account"/);
-  assert.match(chromeSource, />\s*画布\s*</);
+  assert.match(chromeSource, />\s*任务\s*</);
   assert.doesNotMatch(chromeSource, />\s*Copilot\s*</);
   assert.doesNotMatch(chromeSource, />\s*创作\s*</);
   assert.doesNotMatch(chromeSource, /data-composer-copilot-toggle="true"/);
   assert.match(promptBarSource, /data-composer-copilot-toggle="true"/);
   assert.match(workspaceSource, /onToggleAssistant:\s*toggleChatPanel/);
-  assert.match(chromeSource, /onCloseAssistant:\s*\(\) => void/);
   assert.match(chromeSource, /activeMode:\s*'canvas'\s*\|\s*'copilot'\s*\|\s*'create'/);
-  assert.match(chromeSource, /onOpenCanvasWorkspace\(\);[\s\S]*focusWorkspaceCanvas\(\)/);
+  assert.match(chromeSource, /requestTaskCenterOpen\(\)/);
   assert.match(chromeSource, /document\.body\.dataset\.kkWorkspaceMode = activeMode/);
   assert.match(
     chromeSource,

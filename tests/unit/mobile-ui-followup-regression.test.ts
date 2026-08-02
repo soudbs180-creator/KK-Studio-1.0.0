@@ -50,7 +50,7 @@ test('mobile settings resets nested routes while restoring the dashboard scroll 
   assert.match(shellSource, /const nextScrollTop = atHome \? dashboardScrollTopRef\.current : 0/);
   assert.match(shellSource, /scrollContainer\.scrollTop = nextScrollTop/);
   assert.match(shellSource, /if \(atHome\) dashboardScrollTopRef\.current = scrollRef\.current\?\.scrollTop \?\? 0/);
-  assert.match(dashboardSource, /getSettingsNavItems/);
+  assert.match(dashboardSource, /getSettingsNavigationGroups/);
   assert.doesNotMatch(dashboardSource, /getSettingsModules/);
 });
 

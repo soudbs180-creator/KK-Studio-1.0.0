@@ -1,5 +1,6 @@
 export * from "./client/kk-api-client.ts";
 export * from "./dto/admin-console.ts";
+export * from "./dto/agent-extension.ts";
 export * from "./dto/ai-assistant.ts";
 export * from "./dto/asset-library.ts";
 export * from "./dto/auth.ts";
@@ -7,6 +8,8 @@ export * from "./dto/billing.ts";
 export * from "./dto/common.ts";
 export * from "./dto/generation.ts";
 export * from "./dto/model-catalog.ts";
+export * from "./dto/paired-runtime.ts";
+export * from "./dto/runtime-health.ts";
 export * from "./dto/workspace-canvas.ts";
 export * from "./dto/workflow.ts";
 export * from "./enums/status.ts";

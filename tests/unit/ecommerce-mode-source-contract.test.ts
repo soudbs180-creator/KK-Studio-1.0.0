@@ -17,10 +17,8 @@ test('ecommerce mode is wired into the shared mode entry surfaces', () => {
   assert.match(typesSource, /ECOMMERCE\s*[:=]\s*'ecommerce'/);
   assert.match(registrySource, /mode:\s*GenerationMode\.ECOMMERCE/);
   assert.match(registrySource, /PackageOpen/);
-  assert.match(
-    promptBarSource,
-    /placeholder=\{[\s\S]*GenerationMode\.ECOMMERCE[\s\S]*上传运营需求文件后，在这里补充额外的电商要求/,
-  );
+  assert.match(promptBarSource, /placeholder="随心输入"/);
+  assert.match(promptBarSource, /config\.mode === GenerationMode\.ECOMMERCE/);
   assert.match(promptBarSource, /mode === GenerationMode\.ECOMMERCE/);
   assert.match(
     registrySource,

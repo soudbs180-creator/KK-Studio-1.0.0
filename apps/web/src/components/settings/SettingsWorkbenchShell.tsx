@@ -19,10 +19,9 @@ import { resolveAvatarUrl } from '../../utils/presetAvatars';
 import {
   buildSettingsPath,
   getCurrentSettingsViewId,
-  getSettingsNavItems,
+  getSettingsNavigationGroups,
   getSettingsViewMeta,
   type CanonicalSettingsViewId,
-  type SettingsNavItem,
   type SettingsViewId,
 } from './settingsRegistry';
 import {
@@ -35,20 +34,6 @@ import {
 import { renderSettingsRouteElements } from './settingsRouteConfig';
 import SettingsMobileDashboard from './SettingsMobileDashboard';
 
-type ConsoleGroupId = 'workspace' | 'capabilities' | 'automation' | 'system';
-
-const GROUPS: Array<{
-  id: ConsoleGroupId;
-  labelZh: string;
-  labelEn: string;
-  views: CanonicalSettingsViewId[];
-}> = [
-  { id: 'workspace', labelZh: '工作区', labelEn: 'Workspace', views: ['dashboard', 'generation-mode'] },
-  { id: 'capabilities', labelZh: '能力配置', labelEn: 'Capabilities', views: ['capability-sources', 'provider-routes'] },
-  { id: 'automation', labelZh: '自动化', labelEn: 'Automation', views: ['browser-assistant', 'ai-takeover'] },
-  { id: 'system', labelZh: '系统维护', labelEn: 'System', views: ['data-sync', 'appearance-motion', 'canvas-performance', 'dev-diagnostics'] },
-];
-
 const ConsoleFallback: React.FC = () => (
   <div className="settings-console-loading" role="status" aria-label="正在加载设置">
     <span />
@@ -57,16 +42,6 @@ const ConsoleFallback: React.FC = () => (
   </div>
 );
 
-function buildGroups(items: SettingsNavItem[], english: boolean) {
-  return GROUPS.map((group) => ({
-    id: group.id,
-    label: english ? group.labelEn : group.labelZh,
-    items: group.views
-      .map((view) => items.find((item) => item.id === view))
-      .filter((item): item is SettingsNavItem => Boolean(item)),
-  }));
-}
-
 const SettingsConsoleSidebar: React.FC<{
   activeView: CanonicalSettingsViewId;
   onNavigate: (view: CanonicalSettingsViewId) => void;
@@ -74,8 +49,7 @@ const SettingsConsoleSidebar: React.FC<{
   const { language, pick } = useLocale();
   const { balance, loading } = useBilling();
   const { user, isAdmin, authLoading, checkingAdmin } = useAdminRole();
-  const items = useMemo(() => getSettingsNavItems(language), [language]);
-  const groups = useMemo(() => buildGroups(items, language === 'en-US'), [items, language]);
+  const groups = useMemo(() => getSettingsNavigationGroups(language), [language]);
   const accountName = user?.email || user?.phone || pick('当前账户', 'Current account');
   const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
   const accountRole = !authLoading && !checkingAdmin && isAdmin ? pick('管理员', 'Administrator') : pick('标准账户', 'Standard account');
@@ -90,7 +64,7 @@ const SettingsConsoleSidebar: React.FC<{
       <nav className="settings-console-nav" aria-label={pick('设置导航', 'Settings navigation')}>
         {groups.map((group) => (
           <section key={group.id} className="settings-console-nav__group">
-            <h2>{group.label}</h2>
+            {group.label ? <h2>{group.label}</h2> : null}
             <div>
               {group.items.map((item) => {
                 const Icon = item.icon;

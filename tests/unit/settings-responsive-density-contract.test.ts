@@ -37,19 +37,17 @@ test('capability sources avoid nested card shells and fixed-height overview card
   );
 });
 
-test('mobile model directory is compact by default and explicitly expandable', () => {
+test('model directory shows six presets per page with explicit pagination', () => {
   const apiWorkbenchSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
   const settingsStyles = readSource('apps/web/src/styles/settings-v3.css');
+  const settingsUiV4Styles = readSource('apps/web/src/styles/settings-ui-v4.css');
 
-  assert.match(apiWorkbenchSource, /isPresetDirectoryExpanded/);
-  assert.match(apiWorkbenchSource, /aria-expanded=\{isPresetDirectoryExpanded\}/);
-  assert.match(apiWorkbenchSource, /settings-model-center-directory__expand/);
+  assert.match(apiWorkbenchSource, /const MODEL_CENTER_PRESET_PAGE_SIZE = 6;/);
+  assert.match(apiWorkbenchSource, /const \[presetPage, setPresetPage\] = useState\(0\);/);
+  assert.match(apiWorkbenchSource, /filteredPresets\.slice\(/);
+  assert.match(apiWorkbenchSource, /settings-model-center-directory__pagination/);
   assert.match(settingsStyles, /\.settings-section__copy\s*\{[\s\S]*?flex:\s*1 1 180px/);
-  assert.match(
-    settingsStyles,
-    /\.settings-model-center-preset-list\[data-expanded='false'\][\s\S]*?:nth-child\(n \+ 5\)/,
-  );
-  assert.match(settingsStyles, /\.settings-model-center-directory__expand\s*\{[\s\S]*?display:\s*flex/);
+  assert.match(settingsUiV4Styles, /\.settings-console-content \.settings-model-center-directory__pagination\s*\{/);
 });
 
 test('provider routing matrix becomes labeled cards instead of compressed columns on phones', () => {

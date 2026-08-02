@@ -23,16 +23,22 @@ test('canvas composer publishes a compact desktop contract without changing ecom
   const countControlSource = readSource(
     'apps/web/src/components/layout/prompt-bar/ComposerGenerationCountField.tsx',
   );
+  const referenceButtonSource = readSource(
+    'apps/web/src/components/layout/prompt-bar/ComposerReferenceButton.tsx',
+  );
   const cssSource = readSource('apps/web/src/styles/morphic-ui.css');
+  const workspaceCssSource = readSource('apps/web/src/styles/workspace-ui-v4.css');
 
   assert.match(promptBarSource, /data-composer-mode=\{config\.mode\}/);
   assert.match(
     promptBarSource,
     /data-composer-layout=\{isMobile \? 'mobile' : 'desktop'\}/,
   );
-  assert.match(promptBarSource, /className="kk-composer-reference-row/);
-  assert.match(promptBarSource, /className="kk-composer-reference-button/);
-  assert.match(promptBarSource, /className="kk-composer-reference-label">/);
+  assert.match(promptBarSource, /className="kk-composer-reference-stack"/);
+  assert.match(promptBarSource, /className="kk-composer-reference-media-row/);
+  assert.match(promptBarSource, /className="kk-composer-reference-context-row"/);
+  assert.match(promptBarSource, /<ComposerReferenceButton/);
+  assert.match(referenceButtonSource, /className="kk-composer-reference-button prompt-bar-liquid-button"/);
   assert.match(topRowSource, /kk-composer-floating-tools/);
   assert.match(modeSwitcherSource, /kk-composer-type-picker__trigger/);
   assert.match(modeSwitcherSource, /kk-composer-type-picker__menu/);
@@ -70,14 +76,9 @@ test('canvas composer publishes a compact desktop contract without changing ecom
     cssSource,
     /\.kk-composer-prompt-tools__trigger,[\s\S]*transition-duration:\s*125ms\s*!important/,
   );
-  assert.match(
-    cssSource,
-    /\.kk-composer-reference-row\s*\{[\s\S]*position:\s*absolute[\s\S]*min-height:\s*30px/,
-  );
-  assert.match(
-    cssSource,
-    /\.input-bar-inner:has\(\.kk-composer-reference-row\)[\s\S]*\.input-bar-textarea\s*\{[\s\S]*margin-left:\s*80px\s*!important/,
-  );
+  assert.match(workspaceCssSource, /\.kk-composer-reference-stack\s*\{[\s\S]*display:\s*grid/);
+  assert.match(workspaceCssSource, /\.kk-composer-reference-context-row\s*\{[\s\S]*display:\s*flex/);
+  assert.doesNotMatch(cssSource, /body:has\(#project-manager-container/);
   assert.match(
     cssSource,
     /#prompt-bar-container\[data-composer-layout='desktop'\]:not\(\[data-composer-mode='ecommerce'\]\)\s+\.input-bar-textarea\s*\{[\s\S]*min-height:\s*24px\s*!important[\s\S]*font-size:\s*14px\s*!important[\s\S]*line-height:\s*21px\s*!important/,

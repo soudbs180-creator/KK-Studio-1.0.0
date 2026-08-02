@@ -135,10 +135,26 @@ import type {
   AssistantApiResultDto,
 } from "../dto/ai-assistant.ts";
 import type {
+  CompletePairedRuntimeCommandRequest,
+  PairedRuntimeCommand,
+  PairedRuntimeHeartbeatRequest,
+  PairedRuntimeHeartbeatResponse,
+  RegisterPairedRuntimeRequest,
+  RegisterPairedRuntimeResponse,
+} from "../dto/paired-runtime.ts";
+import type {
+  AgentExtensionDto,
+  AgentExtensionListDto,
+  AgentExtensionType,
+  DeleteAgentExtensionResponse,
+  UpsertAgentExtensionRequest,
+} from "../dto/agent-extension.ts";
+import type {
   CreateProviderConnectionRequest,
   DeleteProviderConnectionResponseDto,
   ProviderConnectionDto,
   ProviderConnectionListDto,
+  ReorderProviderConnectionsRequest,
   UpdateProviderConnectionRequest,
 } from "../../capability-graph/connection.ts";
 import type { CapabilityGraphSnapshotDto } from "../../capability-graph/graph.ts";
@@ -249,6 +265,10 @@ export interface KkApiClient {
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<CapabilityGraphSnapshotDto>>;
   listProviderConnections(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderConnectionListDto>>;
+  reorderProviderConnections(
+    input: ReorderProviderConnectionsRequest,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<ProviderConnectionListDto>>;
   createProviderConnection(
@@ -520,6 +540,40 @@ export interface KkApiClient {
     input: AgentRunDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AssistantApiResultDto<AgentRunDto>>>;
+  listAgentExtensions(
+    type?: AgentExtensionType,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AgentExtensionListDto>>;
+  upsertAgentExtension(
+    input: UpsertAgentExtensionRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AgentExtensionDto>>;
+  deleteAgentExtension(
+    extensionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<DeleteAgentExtensionResponse>>;
+  registerPairedRuntime(
+    input: RegisterPairedRuntimeRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<RegisterPairedRuntimeResponse>>;
+  heartbeatPairedRuntime(
+    runtimeId: string,
+    credential: string,
+    input: PairedRuntimeHeartbeatRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<PairedRuntimeHeartbeatResponse>>;
+  claimPairedRuntimeCommand(
+    runtimeId: string,
+    credential: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<PairedRuntimeCommand | null>>;
+  completePairedRuntimeCommand(
+    runtimeId: string,
+    commandId: string,
+    credential: string,
+    input: CompletePairedRuntimeCommandRequest,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<{ accepted: true; idempotent: boolean }>>;
   recordAgentToolCall(
     input: AgentToolCallDto,
     options?: ApiClientRequestOptions,
@@ -1271,6 +1325,15 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         config,
         "api/v1/provider-connections",
         { method: "GET" },
+        options,
+      );
+    },
+
+    reorderProviderConnections(input, options) {
+      return requestJson<ProviderConnectionListDto>(
+        config,
+        "api/v1/provider-connections/order",
+        { method: "PUT", body: JSON.stringify(input) },
         options,
       );
     },
@@ -2051,6 +2114,79 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         "api/ai-assistant/runs",
         { method: "POST", body: JSON.stringify(input) },
         options,
+      );
+    },
+
+    listAgentExtensions(type, options) {
+      const suffix = type ? `?type=${encodeURIComponent(type)}` : "";
+      return requestJson<AgentExtensionListDto>(
+        config,
+        `api/v1/agent-extensions${suffix}`,
+        { method: "GET" },
+        options,
+      );
+    },
+
+    upsertAgentExtension(input, options) {
+      return requestJson<AgentExtensionDto>(
+        config,
+        `api/v1/agent-extensions/${encodeURIComponent(input.id)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    deleteAgentExtension(extensionId, options) {
+      return requestJson<DeleteAgentExtensionResponse>(
+        config,
+        `api/v1/agent-extensions/${encodeURIComponent(extensionId)}`,
+        { method: "DELETE" },
+        options,
+      );
+    },
+
+    registerPairedRuntime(input, options) {
+      return requestJson<RegisterPairedRuntimeResponse>(
+        config,
+        "api/v1/paired-runtimes",
+        { method: "POST", body: JSON.stringify(input) },
+        options,
+      );
+    },
+
+    heartbeatPairedRuntime(runtimeId, credential, input, options) {
+      return requestJson<PairedRuntimeHeartbeatResponse>(
+        config,
+        `api/v1/paired-runtimes/${encodeURIComponent(runtimeId)}/heartbeat`,
+        { method: "POST", body: JSON.stringify(input) },
+        {
+          ...options,
+          headers: { ...options?.headers, "x-kk-runtime-credential": credential },
+        },
+      );
+    },
+
+    claimPairedRuntimeCommand(runtimeId, credential, options) {
+      return requestJson<PairedRuntimeCommand | null>(
+        config,
+        `api/v1/paired-runtimes/${encodeURIComponent(runtimeId)}/commands/claim`,
+        { method: "POST", body: "{}" },
+        {
+          ...options,
+          headers: { ...options?.headers, "x-kk-runtime-credential": credential },
+        },
+      );
+    },
+
+    completePairedRuntimeCommand(runtimeId, commandId, credential, input, options) {
+      return requestJson<{ accepted: true; idempotent: boolean }>(
+        config,
+        `api/v1/paired-runtimes/${encodeURIComponent(runtimeId)}/commands/${encodeURIComponent(commandId)}/result`,
+        { method: "POST", body: JSON.stringify(input) },
+        {
+          ...options,
+          headers: { ...options?.headers, "x-kk-runtime-credential": credential },
+        },
       );
     },
 

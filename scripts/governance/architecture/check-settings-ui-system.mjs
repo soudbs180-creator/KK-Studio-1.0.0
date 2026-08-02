@@ -63,8 +63,8 @@ expectMatch(
 
 expectMatch(
   'apps/web/src/components/settings/settingsRegistry.ts',
-  /'appearance-motion'[\s\S]*titleZh:\s*'高级性能设置'[\s\S]*id:\s*'appearance-motion'[\s\S]*labelZh:\s*'高级性能'/,
-  'appearance-motion must remain the canonical advanced-performance registry entry.',
+  /'appearance-motion'[\s\S]*titleEn:\s*'Performance'[\s\S]*id:\s*'appearance-motion'[\s\S]*labelEn:\s*'Performance'/,
+  'appearance-motion must remain the canonical merged performance registry entry.',
 );
 
 expectMatch(

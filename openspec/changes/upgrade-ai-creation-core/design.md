@@ -2,7 +2,7 @@
 
 > Status: active / Phase 2 external rollout gates pending / Phase 3 confirmation expiry foundation and bounded replan executor complete, semantic replay and cross-device execution pending
 > Companion: proposal.md, tasks.md
-> Last verified: 2026-07-24
+> Last verified: 2026-08-02
 
 ---
 
@@ -471,6 +471,7 @@ DELETE /api/v1/provider-connections/:id
 - Connection secret 只保存为加密 `secret_ref`；API 永不返回原值；日志与 audit 统一脱敏。
 - Verify 流程：协议 profile 识别 → URL 规范化 → DNS 解析与 IP 校验（拒绝私网/保留段，防 SSRF 与 DNS rebinding）→ 最小只读探测；失败保留可操作诊断，但不回显凭据。
 - Quote 冻结字段扩展为 `connectionId / provider / model / capability / channel / requestProfile / priceVersion`；Adapter 不得自行切换通道或写账。
+- migration 029 为 owner-scoped Connection 增加压紧的 `routing_priority` 与乐观并发 `orderRevision`。排序 API 必须提交完整活动 Connection 集合；服务端在事务中校验 owner、重复项与集合一致性，冲突时返回最新规范顺序。RouteEngine 在能力、模型、通道、状态和预算过滤之后按优先级选择第一条健康连接。已签发 Quote 继续冻结 Connection/Binding 版本；失效只返回 stale，必须重新 Quote，旧 Quote 内禁止静默切换。
 - 迁移：迁移期 dual-read 旧 profile payload 与新表；新写入只走 `provider_connections`；旧 payload 在两个稳定版本后停止读取；无法映射到安全 `secret_ref` 的旧 Connection 要求用户重新验证，不复制明文。
 
 ---
@@ -486,6 +487,13 @@ DELETE /api/v1/provider-connections/:id
 - 三端通过版本化 DTO、幂等 id、签名事件和 capability manifest 通信。
 - 任何 runtime 重启后均由 VPS Job / Run 状态恢复。
 - Browser Bridge 与未来 Local Media Runtime 共用同一份受控 runtime manifest；Local Runtime 使用短期配对凭据、opaque asset handle 和受控根目录。
+
+### 11.1 配对桌面执行
+
+- migration 030 建立 owner-bound `paired_runtimes` 与幂等、带租约的 `paired_runtime_commands`；凭据只保存 HMAC hash、具备到期与吊销状态，能力 manifest 随心跳更新。
+- 手机端只向 VPS 创建 `executionTarget: paired-desktop` 的 Agent Run。桌面通过主动出站的鉴权 claim/heartbeat/result 调用领取命令；电脑离线时 Run 保持等待设备，VPS 不登录网页、不执行 OpenCLI。
+- migration 031 统一保存 Skill/MCP/Plugin manifest、权限与加密 secret reference。Planner 只读取 allowlisted manifest 投影，再经 ToolRegistry 与 PermissionPolicy；扩展内容不得原样透传给 Provider。
+- OpenCLI 仅允许注册站点与严格 command envelope；本地进程只能由 `RuntimeProcessSupervisor` 以校验后的绝对二进制路径、固定参数、`shell:false` 启动。
 
 ---
 
@@ -561,12 +569,14 @@ interface ConfirmationGrant {
 
 ## 14. 新 IA 与统一 Layout State
 
-- 左侧：Connections 与 Capabilities，按 `未连接 / 可用 / 受限 / 离线` 分组，直接解释 Provider、Model、Channel、隐私和成本。
-- 中心：无限画布与主编辑区，普通直接操作始终可用。
-- 右侧：AI 与 Context Inspector 共用一个可调宽 dock，禁止同时出现平行侧栏；DOM 中只保留一个可访问的 AI toggle。
-- 底部：Task/Run 与 Assets 共用可折叠 tray；Task Center 不再作为覆盖画布的左上浮层。
+- 顶部：项目、任务和账户是三个独立磨砂簇，不存在整条黑色底板。中间任务胶囊是唯一 Task Center 入口；桌面打开 360px、最大 70vh 的浮层，手机打开底部 Sheet。
+- 中心：无限画布与主编辑区始终可直接操作。项目菜单、收藏和 Task Center 覆盖但不挤压布局；桌面不创建全屏灰色点击层。
+- 右侧：AI 与 Context Inspector 共用一个可调宽 dock，禁止平行侧栏；DOM 中只保留一个可访问的 AI toggle，并与小地图保持至少 12px 间距。
+- 底部导航：固定顺序为缩放滑条、整理、展开地图。地图在底栏上方展开，只有地图拖动/框选后才在地图内部显示确认与取消。
+- Composer：按 layout registry 在左右可用空间居中，文本最多 10 行；媒体参考在第一排，文件/Skill/MCP/Plugin 在第二排；底部左侧为参考/模型/参数，右侧为语音/发送。
+- 设置：桌面和手机从同一注册表生成 `总览 / 集成(API 配置、能力配置、AI 代理) / 系统维护(数据与安全、性能配置、系统日志)`，旧 route ID 保留一版重定向。
 - 全局 command palette 负责查找 Capability、Provider、Asset、Workflow 和运行记录。
-- 统一 layout state：minimap 基于实际 canvas viewport 定位；right dock / bottom tray 打开时自动重排。
+- 统一 layout state：输入框与 minimap 基于实际可用 viewport 定位；right dock 打开或调宽时自动夹紧并保持间隙。
 - 继续使用现有 design tokens、组件和图标库；在 import/bundle 测量前不删除 Chakra、Motion、GSAP 等依赖。
 
 ---

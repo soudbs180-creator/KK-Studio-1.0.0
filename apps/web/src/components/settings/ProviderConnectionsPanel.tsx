@@ -7,7 +7,7 @@ import {
   type CapabilityGraphSnapshotDto,
   type ProviderConnectionDto,
 } from '@kk/shared';
-import { Link2, ShieldCheck } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, Link2, ShieldCheck } from 'lucide-react';
 import { useLocale } from '../../context/LocaleContext';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { keyManager } from '../../services/auth/keyManager';
@@ -39,6 +39,7 @@ const PHASE_ONE_PROVIDER_TEMPLATE = {
 type GraphAvailability = {
   enabled: boolean;
   connections: ProviderConnectionDto[];
+  orderRevision: number;
   snapshot?: CapabilityGraphSnapshotDto;
 };
 
@@ -49,7 +50,9 @@ function unwrapConnection(response: ApiResponse<ProviderConnectionDto>): Provide
 
 async function loadCapabilityGraph(): Promise<GraphAvailability> {
   const response = await kkWebApiClient.getCapabilityGraphSnapshot();
-  if (!response.success && response.error.code === 'FEATURE_DISABLED') return { enabled: false, connections: [] };
+  if (!response.success && response.error.code === 'FEATURE_DISABLED') {
+    return { enabled: false, connections: [], orderRevision: 0 };
+  }
   if (!response.success) throw new Error(response.error.message);
   const connectionResponse = await kkWebApiClient.listProviderConnections();
   if (!connectionResponse.success) throw new Error(connectionResponse.error.message);
@@ -57,6 +60,7 @@ async function loadCapabilityGraph(): Promise<GraphAvailability> {
   return {
     enabled: true,
     connections: connectionList.connections,
+    orderRevision: connectionList.version === 'v2' ? connectionList.orderRevision : 0,
     snapshot: CapabilityGraphSnapshotDtoSchema.parse(response.data),
   };
 }
@@ -135,7 +139,7 @@ function ConnectionRow({
   );
 }
 
-function ConnectionList({
+export function ConnectionList({
   rows,
   busy,
   onDelete,
@@ -154,6 +158,204 @@ function ConnectionList({
     <div className="grid grid-cols-1 gap-3">
       {rows.map((row, index) => (
         <ConnectionRow key={`${row.connectionId}:${row.modelName}:${index}`} {...{ row, busy, onDelete, onVerify }} />
+      ))}
+    </div>
+  );
+}
+
+function connectionStatusTone(status: ProviderConnectionDto['status']) {
+  if (status === 'available') return 'emerald' as const;
+  if (status === 'restricted' || status === 'verifying' || status === 'unverified') return 'amber' as const;
+  return 'rose' as const;
+}
+
+interface OrderedConnectionRowProps {
+  busy: boolean;
+  capabilityRows: ProviderConnectionCapabilityRow[];
+  connection: ProviderConnectionDto;
+  index: number;
+  isDragging: boolean;
+  total: number;
+  onDelete: (connectionId: string) => void;
+  onDragEnd: () => void;
+  onDragStart: (connectionId: string) => void;
+  onDrop: (connectionId: string) => void;
+  onMove: (connectionId: string, delta: -1 | 1) => void;
+  onVerify: (connectionId: string) => void;
+}
+
+function OrderedConnectionRow({
+  busy,
+  capabilityRows,
+  connection,
+  index,
+  isDragging,
+  total,
+  onDelete,
+  onDragEnd,
+  onDragStart,
+  onDrop,
+  onMove,
+  onVerify,
+}: OrderedConnectionRowProps) {
+  const { pick } = useLocale();
+  const primaryCapability = capabilityRows[0];
+  const providerName = primaryCapability?.providerName || connection.providerId;
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      onMove(connection.connectionId, -1);
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      onMove(connection.connectionId, 1);
+    }
+  };
+
+  return (
+    <article
+      className="provider-connection-order-card"
+      data-dragging={isDragging ? 'true' : 'false'}
+      data-testid={`provider-connection-${connection.connectionId}`}
+      draggable={!busy}
+      onDragStart={() => onDragStart(connection.connectionId)}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={() => onDrop(connection.connectionId)}
+      onDragEnd={onDragEnd}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
+      <div className="provider-connection-order-card__handle" aria-hidden="true">
+        <GripVertical size={16} />
+        <span>{index + 1}</span>
+      </div>
+      <div className="provider-connection-order-card__identity">
+        <div className="min-w-0">
+          <div className="text-xs font-bold text-[var(--text-primary)]">{connection.displayName}</div>
+          <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">
+            {providerName} · {connection.protocolProfile}
+          </div>
+        </div>
+        <SettingsBadge tone={connectionStatusTone(connection.status)}>{connection.status}</SettingsBadge>
+      </div>
+      <div className="provider-connection-order-card__capabilities">
+        <div className="flex flex-wrap gap-1.5">
+          {capabilityRows.length > 0 ? capabilityRows.map((row) => (
+            <SettingsBadge key={`${row.modelName}:${row.capabilityName}`} tone="indigo">
+              {row.modelName} → {row.capabilityName}
+            </SettingsBadge>
+          )) : (
+            <SettingsBadge tone="neutral">{pick('尚未绑定能力', 'No capability bindings')}</SettingsBadge>
+          )}
+          {primaryCapability?.channel ? <SettingsBadge tone="neutral">{primaryCapability.channel}</SettingsBadge> : null}
+          {primaryCapability?.requestProfile ? <SettingsBadge tone="neutral">{primaryCapability.requestProfile}</SettingsBadge> : null}
+        </div>
+      </div>
+      <div className="provider-connection-order-card__actions">
+        <div className="provider-connection-order-card__move-actions">
+          <button
+            type="button"
+            className="provider-connection-order-card__move"
+            aria-label={pick('上移供应商', 'Move provider up')}
+            disabled={busy || index === 0}
+            onClick={() => onMove(connection.connectionId, -1)}
+          >
+            <ChevronUp size={14} />
+          </button>
+          <button
+            type="button"
+            className="provider-connection-order-card__move"
+            aria-label={pick('下移供应商', 'Move provider down')}
+            disabled={busy || index === total - 1}
+            onClick={() => onMove(connection.connectionId, 1)}
+          >
+            <ChevronDown size={14} />
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <SecondaryButton disabled={busy} onClick={() => onVerify(connection.connectionId)}>
+            {pick('重新验证', 'Verify')}
+          </SecondaryButton>
+          <DangerButton disabled={busy} onClick={() => onDelete(connection.connectionId)}>
+            {pick('删除', 'Delete')}
+          </DangerButton>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+interface OrderedConnectionListProps {
+  busy: boolean;
+  connections: ProviderConnectionDto[];
+  rows: ProviderConnectionCapabilityRow[];
+  onDelete: (connectionId: string) => void;
+  onReorder: (connectionIds: string[]) => void;
+  onVerify: (connectionId: string) => void;
+}
+
+function OrderedConnectionList({
+  busy,
+  connections,
+  rows,
+  onDelete,
+  onReorder,
+  onVerify,
+}: OrderedConnectionListProps) {
+  const { pick } = useLocale();
+  const [draggedConnectionId, setDraggedConnectionId] = useState<string | null>(null);
+  const connectionIds = useMemo(
+    () => connections.map((connection) => connection.connectionId),
+    [connections],
+  );
+  const rowsByConnection = useMemo(() => {
+    const groupedRows = new Map<string, ProviderConnectionCapabilityRow[]>();
+    rows.forEach((row) => {
+      groupedRows.set(row.connectionId, [...(groupedRows.get(row.connectionId) || []), row]);
+    });
+    return groupedRows;
+  }, [rows]);
+  const moveConnection = (connectionId: string, delta: -1 | 1) => {
+    const sourceIndex = connectionIds.indexOf(connectionId);
+    const destinationIndex = sourceIndex + delta;
+    if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= connectionIds.length) return;
+    const nextIds = [...connectionIds];
+    nextIds.splice(destinationIndex, 0, nextIds.splice(sourceIndex, 1)[0]);
+    onReorder(nextIds);
+  };
+  const dropConnection = (destinationId: string) => {
+    if (!draggedConnectionId || draggedConnectionId === destinationId) return;
+    const sourceIndex = connectionIds.indexOf(draggedConnectionId);
+    const destinationIndex = connectionIds.indexOf(destinationId);
+    if (sourceIndex < 0 || destinationIndex < 0) return;
+    const nextIds = [...connectionIds];
+    nextIds.splice(destinationIndex, 0, nextIds.splice(sourceIndex, 1)[0]);
+    setDraggedConnectionId(null);
+    onReorder(nextIds);
+  };
+
+  if (connections.length === 0) {
+    return <p className="text-xs text-[var(--text-tertiary)]">{pick('尚未创建安全连接。', 'No secure connections yet.')}</p>;
+  }
+
+  return (
+    <div className="provider-connection-order-list" role="list">
+      {connections.map((connection, index) => (
+        <OrderedConnectionRow
+          key={connection.connectionId}
+          busy={busy}
+          capabilityRows={rowsByConnection.get(connection.connectionId) || []}
+          connection={connection}
+          index={index}
+          isDragging={draggedConnectionId === connection.connectionId}
+          total={connections.length}
+          onDelete={onDelete}
+          onDragEnd={() => setDraggedConnectionId(null)}
+          onDragStart={setDraggedConnectionId}
+          onDrop={dropConnection}
+          onMove={moveConnection}
+          onVerify={onVerify}
+        />
       ))}
     </div>
   );
@@ -317,7 +519,7 @@ function useConnectionOperations({
   setSelectedMigration,
 }: ConnectionOperationsProps) {
   const [error, setError] = useState<Error | null>(null);
-  const [pendingOperation, setPendingOperation] = useState<'create' | 'delete' | 'verify' | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<'create' | 'delete' | 'reorder' | 'verify' | null>(null);
   const runOperation = async (
     operation: Exclude<typeof pendingOperation, null>,
     action: () => Promise<void>,
@@ -351,7 +553,25 @@ function useConnectionOperations({
     'delete',
     () => deleteConnection(connectionId),
   );
-  return { createConnection, deleteConnection: removeConnection, error, pendingOperation, verifyConnection };
+  const reorderConnections = (connectionIds: string[], expectedOrderRevision: number) => runOperation(
+    'reorder',
+    async () => {
+      const response = await kkWebApiClient.reorderProviderConnections({
+        connectionIds,
+        expectedOrderRevision,
+      });
+      if (!response.success) throw new Error(response.error.message);
+      ProviderConnectionListDtoSchema.parse(response.data);
+    },
+  );
+  return {
+    createConnection,
+    deleteConnection: removeConnection,
+    error,
+    pendingOperation,
+    reorderConnections,
+    verifyConnection,
+  };
 }
 
 /**
@@ -398,7 +618,17 @@ export const ProviderConnectionsPanel: React.FC = () => {
     <SettingsSection title={pick('Provider 连接与能力', 'Provider Connections & Capabilities')}>
       <ConnectionFormCard busy={busy} displayName={displayName} error={operationError} loading={operations.pendingOperation === 'create'} secret={secret} selectedMigration={selectedMigration} onCancel={handleMigrationCancel} onDisplayNameChange={setDisplayName} onSecretChange={setSecret} onSubmit={() => void operations.createConnection()} />
       <MigrationCandidateList candidates={migrationCandidates} busy={busy} onSelect={handleMigrationSelect} />
-      <ConnectionList rows={rows} busy={busy} onDelete={handleDelete} onVerify={(connectionId) => void operations.verifyConnection(connectionId)} />
+      <OrderedConnectionList
+        connections={graphState.data?.connections || []}
+        rows={rows}
+        busy={busy}
+        onDelete={handleDelete}
+        onReorder={(connectionIds) => void operations.reorderConnections(
+          connectionIds,
+          graphState.data?.orderRevision || 0,
+        )}
+        onVerify={(connectionId) => void operations.verifyConnection(connectionId)}
+      />
     </SettingsSection>
   );
 };

@@ -6,6 +6,14 @@ import { buildMentionText, filterFavorites, normalizeFavoriteName, type Favorite
 import { favoriteImageToReferenceImage } from './referenceSources';
 import { useFavoritesStore } from './favoritesStore';
 import type { FavoriteImage, FavoriteItem, FavoritePrompt } from './types';
+import {
+  FAVORITES_PANEL_MARGIN,
+  FAVORITES_PANEL_SCHEMA_VERSION,
+  clampFavoritesPanelGeometry,
+  resizeFavoritesPanelGeometry,
+  type FavoritesPanelGeometry,
+  type FavoritesPanelResizeMode,
+} from './favoritesPanelGeometry';
 
 interface FavoritesPanelProps {
   isOpen: boolean;
@@ -14,13 +22,8 @@ interface FavoritesPanelProps {
   onRenameImageAlias?: (imageId: string, name: string) => void;
 }
 
-interface PanelPosition {
-  left: number;
-  top: number;
-}
-
 const FAVORITES_PANEL_POSITION_STORAGE_KEY = 'kk_favorites_panel_position_v1';
-const PANEL_MARGIN = 12;
+const FAVORITES_PANEL_GEOMETRY_STORAGE_KEY = 'kk_favorites_panel_geometry_v2';
 const DESKTOP_PANEL_WIDTH = 720;
 const DESKTOP_PANEL_HEIGHT = 680;
 const MOBILE_PANEL_HEIGHT_OFFSET = 112;
@@ -37,72 +40,80 @@ const sortOptions: Array<{ id: FavoriteSortMode; label: string }> = [
   { id: 'name-asc', label: '名称排序' },
 ];
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
-
-function estimatePanelSize(isMobile: boolean) {
+function createDefaultGeometry(): FavoritesPanelGeometry {
   if (typeof window === 'undefined') {
-    return { width: DESKTOP_PANEL_WIDTH, height: DESKTOP_PANEL_HEIGHT };
+    return {
+      schemaVersion: FAVORITES_PANEL_SCHEMA_VERSION,
+      x: FAVORITES_PANEL_MARGIN,
+      y: FAVORITES_PANEL_MARGIN,
+      width: DESKTOP_PANEL_WIDTH,
+      height: DESKTOP_PANEL_HEIGHT,
+    };
   }
-
-  const width = Math.min(
-    isMobile ? window.innerWidth - PANEL_MARGIN * 2 : DESKTOP_PANEL_WIDTH,
-    window.innerWidth - PANEL_MARGIN * 2,
-  );
-  const height = Math.min(
-    isMobile ? window.innerHeight - MOBILE_PANEL_HEIGHT_OFFSET : DESKTOP_PANEL_HEIGHT,
-    window.innerHeight - PANEL_MARGIN * 2,
-  );
-
-  return {
-    width: Math.max(300, width),
-    height: Math.max(360, height),
-  };
+  const width = Math.min(DESKTOP_PANEL_WIDTH, window.innerWidth - FAVORITES_PANEL_MARGIN * 2);
+  const height = Math.min(DESKTOP_PANEL_HEIGHT, window.innerHeight - FAVORITES_PANEL_MARGIN * 2);
+  return clampFavoritesPanelGeometry({
+    schemaVersion: FAVORITES_PANEL_SCHEMA_VERSION,
+    x: Math.round((window.innerWidth - width) / 2),
+    y: Math.round((window.innerHeight - height) / 2),
+    width,
+    height,
+  }, { width: window.innerWidth, height: window.innerHeight });
 }
 
-function clampPanelPosition(
-  position: PanelPosition,
-  isMobile: boolean,
-  panelSize = estimatePanelSize(isMobile),
-): PanelPosition {
-  if (typeof window === 'undefined') return position;
-  return {
-    left: clamp(position.left, PANEL_MARGIN, window.innerWidth - panelSize.width - PANEL_MARGIN),
-    top: clamp(position.top, PANEL_MARGIN, window.innerHeight - panelSize.height - PANEL_MARGIN),
-  };
-}
-
-function readStoredPanelPosition(): PanelPosition | null {
+function readStoredPanelGeometry(): FavoritesPanelGeometry | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(FAVORITES_PANEL_POSITION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PanelPosition>;
-    if (typeof parsed.left !== 'number' || typeof parsed.top !== 'number') return null;
-    return { left: parsed.left, top: parsed.top };
+    const raw = window.localStorage.getItem(FAVORITES_PANEL_GEOMETRY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<FavoritesPanelGeometry>;
+      if (
+        parsed.schemaVersion === FAVORITES_PANEL_SCHEMA_VERSION
+        && typeof parsed.x === 'number'
+        && typeof parsed.y === 'number'
+        && typeof parsed.width === 'number'
+        && typeof parsed.height === 'number'
+      ) {
+        return clampFavoritesPanelGeometry(parsed as FavoritesPanelGeometry, {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        });
+      }
+    }
+    const legacyRaw = window.localStorage.getItem(FAVORITES_PANEL_POSITION_STORAGE_KEY);
+    if (!legacyRaw) return null;
+    const legacy = JSON.parse(legacyRaw) as { left?: unknown; top?: unknown };
+    if (typeof legacy.left !== 'number' || typeof legacy.top !== 'number') return null;
+    return clampFavoritesPanelGeometry({
+      ...createDefaultGeometry(),
+      x: legacy.left,
+      y: legacy.top,
+    }, { width: window.innerWidth, height: window.innerHeight });
   } catch {
     return null;
   }
 }
 
-function persistPanelPosition(position: PanelPosition) {
+function persistPanelGeometry(geometry: FavoritesPanelGeometry) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(FAVORITES_PANEL_POSITION_STORAGE_KEY, JSON.stringify(position));
+    window.localStorage.setItem(FAVORITES_PANEL_GEOMETRY_STORAGE_KEY, JSON.stringify(geometry));
   } catch {
-    // Position persistence is only a UI convenience; favorites data stays in IndexedDB.
+    // Geometry persistence is only a UI convenience; favorites data stays in IndexedDB.
   }
 }
 
-function getInitialPanelPosition(isMobile: boolean): PanelPosition {
-  if (typeof window === 'undefined') return { left: PANEL_MARGIN, top: PANEL_MARGIN };
-  const stored = readStoredPanelPosition();
-  if (stored) return clampPanelPosition(stored, isMobile);
-
-  const size = estimatePanelSize(isMobile);
-  return clampPanelPosition({
-    left: Math.round((window.innerWidth - size.width) / 2),
-    top: Math.round((window.innerHeight - size.height) / 2),
-  }, isMobile, size);
+function getInitialPanelGeometry(isMobile: boolean): FavoritesPanelGeometry {
+  if (typeof window === 'undefined' || !isMobile) {
+    return readStoredPanelGeometry() || createDefaultGeometry();
+  }
+  return {
+    schemaVersion: FAVORITES_PANEL_SCHEMA_VERSION,
+    x: FAVORITES_PANEL_MARGIN,
+    y: FAVORITES_PANEL_MARGIN,
+    width: Math.max(300, window.innerWidth - FAVORITES_PANEL_MARGIN * 2),
+    height: Math.max(360, window.innerHeight - MOBILE_PANEL_HEIGHT_OFFSET),
+  };
 }
 
 function itemSubtitle(item: FavoriteItem): string {
@@ -121,7 +132,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
 }) => {
   const { items, loaded, load, updateFavorite, removeFavorite, addPromptFavorite } = useFavoritesStore();
   const panelRef = useRef<HTMLElement | null>(null);
-  const positionRef = useRef<PanelPosition>(getInitialPanelPosition(isMobile));
+  const geometryRef = useRef<FavoritesPanelGeometry>(getInitialPanelGeometry(isMobile));
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -131,6 +142,13 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
     width: number;
     height: number;
   } | null>(null);
+  const resizeRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    geometry: FavoritesPanelGeometry;
+    mode: FavoritesPanelResizeMode;
+  } | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<FavoriteFilterKind>('all');
   const [sortMode, setSortMode] = useState<FavoriteSortMode>('updated-desc');
@@ -139,8 +157,9 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
   const [editName, setEditName] = useState('');
   const [editPrompt, setEditPrompt] = useState('');
   const [newPrompt, setNewPrompt] = useState('');
-  const [position, setPosition] = useState<PanelPosition>(() => getInitialPanelPosition(isMobile));
+  const [geometry, setGeometry] = useState<FavoritesPanelGeometry>(() => getInitialPanelGeometry(isMobile));
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
     if (isOpen && !loaded) {
@@ -149,20 +168,25 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
   }, [isOpen, loaded, load]);
 
   useEffect(() => {
-    positionRef.current = position;
-  }, [position]);
+    geometryRef.current = geometry;
+  }, [geometry]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setPosition(getInitialPanelPosition(isMobile));
+    setGeometry(getInitialPanelGeometry(isMobile));
   }, [isMobile, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleResize = () => {
-      setPosition((current) => {
-        const next = clampPanelPosition(current, isMobile);
-        persistPanelPosition(next);
+      setGeometry((current) => {
+        const next = isMobile
+          ? getInitialPanelGeometry(true)
+          : clampFavoritesPanelGeometry(current, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          });
+        if (!isMobile) persistPanelGeometry(next);
         return next;
       });
     };
@@ -247,6 +271,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
   };
 
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (isMobile) return;
     const target = event.target as HTMLElement;
     if (target.closest('button, input, textarea, select')) return;
     const panel = panelRef.current;
@@ -265,17 +290,20 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
     event.currentTarget.setPointerCapture(event.pointerId);
     setIsDragging(true);
     event.preventDefault();
-  }, []);
+  }, [isMobile]);
 
   const handleDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const next = clampPanelPosition({
-      left: drag.startLeft + event.clientX - drag.startX,
-      top: drag.startTop + event.clientY - drag.startY,
-    }, isMobile, { width: drag.width, height: drag.height });
-    setPosition(next);
-  }, [isMobile]);
+    const next = clampFavoritesPanelGeometry({
+      ...geometryRef.current,
+      x: drag.startLeft + event.clientX - drag.startX,
+      y: drag.startTop + event.clientY - drag.startY,
+      width: drag.width,
+      height: drag.height,
+    }, { width: window.innerWidth, height: window.innerHeight });
+    setGeometry(next);
+  }, []);
 
   const handleDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
@@ -284,21 +312,65 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    persistPanelPosition(positionRef.current);
+    persistPanelGeometry(geometryRef.current);
     setIsDragging(false);
+  }, []);
+
+  const handleResizeStart = useCallback((
+    event: React.PointerEvent<HTMLButtonElement>,
+    mode: FavoritesPanelResizeMode,
+  ) => {
+    if (isMobile) return;
+    resizeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      geometry: geometryRef.current,
+      mode,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizing(true);
+    event.preventDefault();
+  }, [isMobile]);
+
+  const handleResizeMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const resize = resizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    setGeometry(resizeFavoritesPanelGeometry(
+      resize.geometry,
+      resize.mode,
+      event.clientX - resize.startX,
+      event.clientY - resize.startY,
+      { width: window.innerWidth, height: window.innerHeight },
+    ));
+  }, []);
+
+  const handleResizeEnd = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const resize = resizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    resizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    persistPanelGeometry(geometryRef.current);
+    setIsResizing(false);
   }, []);
 
   if (!isOpen) return null;
 
   const panelStyle: CSSProperties = {
-    left: position.left,
-    top: position.top,
+    ...(isMobile ? {} : {
+      left: geometry.x,
+      top: geometry.y,
+      width: geometry.width,
+      height: geometry.height,
+    }),
   };
 
   return (
     <section
       ref={panelRef}
-      className={`workspace-favorites-panel is-floating ${isMobile ? 'is-mobile' : 'is-desktop'} ${isDragging ? 'is-dragging' : ''}`}
+      className={`workspace-favorites-panel is-floating ${isMobile ? 'is-mobile' : 'is-desktop'} ${isDragging ? 'is-dragging' : ''} ${isResizing ? 'is-resizing' : ''}`}
       data-testid="favorites-panel"
       style={panelStyle}
     >
@@ -447,6 +519,37 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
           </WorkspaceCard>
         </div>
       </WorkspaceCard>
+      {!isMobile ? (
+        <>
+          <button
+            type="button"
+            className="workspace-favorites-resize-handle is-width"
+            aria-label="调整收藏面板宽度"
+            onPointerDown={(event) => handleResizeStart(event, 'width')}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+          />
+          <button
+            type="button"
+            className="workspace-favorites-resize-handle is-height"
+            aria-label="调整收藏面板高度"
+            onPointerDown={(event) => handleResizeStart(event, 'height')}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+          />
+          <button
+            type="button"
+            className="workspace-favorites-resize-handle is-proportional"
+            aria-label="等比缩放收藏面板"
+            onPointerDown={(event) => handleResizeStart(event, 'proportional')}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+          />
+        </>
+      ) : null}
     </section>
   );
 };

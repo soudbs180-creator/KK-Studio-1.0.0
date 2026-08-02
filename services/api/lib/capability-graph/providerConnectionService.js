@@ -3,6 +3,7 @@ const {
   CapabilityGraphSnapshotDtoSchema,
   CreateProviderConnectionRequestSchema,
   ProviderConnectionListDtoSchema,
+  ReorderProviderConnectionsRequestSchema,
 } = require('@kk/shared');
 const cryptoUtil = require('../../utils/crypto');
 const storeModule = require('./providerConnectionStore');
@@ -62,8 +63,33 @@ async function createConnection(userId, input, overrides = {}) {
 
 async function listConnections(userId, overrides = {}) {
   const dependencies = resolveDependencies(overrides);
-  const connections = await dependencies.store.listProviderConnections(userId, overrides);
-  return ProviderConnectionListDtoSchema.parse({ version: 'v1', connections });
+  const result = await dependencies.store.listProviderConnectionsWithRevision(userId, overrides);
+  return ProviderConnectionListDtoSchema.parse({ version: 'v2', ...result });
+}
+
+async function reorderConnections(userId, input, overrides = {}) {
+  const dependencies = resolveDependencies(overrides);
+  const request = ReorderProviderConnectionsRequestSchema.parse(input);
+  const result = await dependencies.store.reorderProviderConnections(userId, request, overrides);
+  if (result.conflict || result.setMismatch) {
+    const error = createServiceError(
+      result.conflict ? 'ORDER_REVISION_CONFLICT' : 'CONNECTION_ORDER_SET_MISMATCH',
+      result.conflict
+        ? 'Provider Connection order changed. Refresh the canonical order and retry.'
+        : 'Provider Connection order must contain the complete active owner set.',
+      409,
+    );
+    error.canonicalOrder = {
+      orderRevision: result.orderRevision,
+      connectionIds: result.connectionIds,
+    };
+    throw error;
+  }
+  return ProviderConnectionListDtoSchema.parse({
+    version: 'v2',
+    orderRevision: result.orderRevision,
+    connections: result.connections,
+  });
 }
 
 async function updateConnection(userId, connectionId, input, overrides = {}) {
@@ -125,6 +151,7 @@ module.exports = {
   deleteConnection,
   getCapabilitySnapshot,
   listConnections,
+  reorderConnections,
   updateConnection,
   verifyConnection,
 };

@@ -12,6 +12,7 @@ const SAFE_CONNECTION_COLUMNS = `
   display_name AS "displayName",
   protocol_profile AS "protocolProfile",
   endpoint_url AS "endpoint",
+  routing_priority AS "routingPriority",
   status,
   (secret_ref IS NOT NULL) AS "hasSecret",
   verified_at AS "verifiedAt",
@@ -34,6 +35,7 @@ function parseSafeConnectionRow(row) {
     endpoint: row.endpoint || undefined,
     status: row.status,
     hasSecret: Boolean(row.hasSecret),
+    ...(Number.isInteger(row.routingPriority) ? { routingPriority: row.routingPriority } : {}),
     verifiedAt: toIsoString(row.verifiedAt),
     verificationErrorCode: row.verificationErrorCode || undefined,
     verificationMessage: row.verificationMessage || undefined,
@@ -62,18 +64,47 @@ async function withUserScopedClient(userId, operation, pool = getPool()) {
   }
 }
 
+/** Serializes every owner-scoped priority mutation behind the same revision row. */
+async function lockOwnerOrderRevision(client, userId) {
+  await client.query(
+    `INSERT INTO public.provider_connection_order_revisions (user_id, revision)
+     VALUES ($1, 0)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId],
+  );
+  const result = await client.query(
+    `SELECT revision AS "orderRevision"
+     FROM public.provider_connection_order_revisions
+     WHERE user_id = $1
+     FOR UPDATE`,
+    [userId],
+  );
+  return Number(result.rows[0]?.orderRevision || 0);
+}
+
 /** 创建 Connection 时立即加密 secret，RETURNING 列表不包含 secret_ref。 */
 async function createProviderConnection(userId, input, dependencies = {}) {
   const request = CreateProviderConnectionRequestSchema.parse(input);
   const encrypt = dependencies.encrypt || cryptoUtil.encrypt;
   const secretRef = encrypt(request.secret);
   return withUserScopedClient(userId, async (client) => {
+    await lockOwnerOrderRevision(client, userId);
     const result = await client.query(
       `INSERT INTO public.provider_connections (
-        user_id, provider_id, display_name, protocol_profile, endpoint_url, secret_ref
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+        user_id, provider_id, display_name, protocol_profile, endpoint_url, secret_ref, routing_priority
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        (SELECT COALESCE(MAX(routing_priority) + 1, 0)
+         FROM public.provider_connections WHERE user_id = $1 AND revoked_at IS NULL)
+      )
       RETURNING ${SAFE_CONNECTION_COLUMNS}`,
       [userId, request.providerId, request.displayName, request.protocolProfile, request.endpoint || null, secretRef],
+    );
+    await client.query(
+      `UPDATE public.provider_connection_order_revisions
+       SET revision = revision + 1, updated_at = now()
+       WHERE user_id = $1`,
+      [userId],
     );
     return parseSafeConnectionRow(result.rows[0]);
   }, dependencies.pool);
@@ -86,10 +117,92 @@ async function listProviderConnections(userId, dependencies = {}) {
       `SELECT ${SAFE_CONNECTION_COLUMNS}
        FROM public.provider_connections
        WHERE user_id = $1 AND revoked_at IS NULL
-       ORDER BY updated_at DESC`,
+       ORDER BY routing_priority ASC, updated_at DESC, connection_id`,
       [userId],
     );
     return result.rows.map(parseSafeConnectionRow);
+  }, dependencies.pool);
+}
+
+async function listProviderConnectionsWithRevision(userId, dependencies = {}) {
+  return withUserScopedClient(userId, async (client) => {
+    await client.query(
+      `INSERT INTO public.provider_connection_order_revisions (user_id, revision)
+       VALUES ($1, 0)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId],
+    );
+    const [connectionsResult, revisionResult] = await Promise.all([
+      client.query(
+        `SELECT ${SAFE_CONNECTION_COLUMNS}
+         FROM public.provider_connections
+         WHERE user_id = $1 AND revoked_at IS NULL
+         ORDER BY routing_priority ASC, updated_at DESC, connection_id`,
+        [userId],
+      ),
+      client.query(
+        `SELECT revision AS "orderRevision"
+         FROM public.provider_connection_order_revisions
+         WHERE user_id = $1`,
+        [userId],
+      ),
+    ]);
+    return {
+      connections: connectionsResult.rows.map(parseSafeConnectionRow),
+      orderRevision: Number(revisionResult.rows[0]?.orderRevision || 0),
+    };
+  }, dependencies.pool);
+}
+
+/** Reorders the complete active owner set under a revision lock in one transaction. */
+async function reorderProviderConnections(userId, request, dependencies = {}) {
+  return withUserScopedClient(userId, async (client) => {
+    const orderRevision = await lockOwnerOrderRevision(client, userId);
+    const currentResult = await client.query(
+      `SELECT connection_id AS "connectionId"
+       FROM public.provider_connections
+       WHERE user_id = $1 AND revoked_at IS NULL
+       ORDER BY routing_priority ASC, updated_at DESC, connection_id
+       FOR UPDATE`,
+      [userId],
+    );
+    const currentIds = currentResult.rows.map((row) => row.connectionId);
+    if (orderRevision !== request.expectedOrderRevision) {
+      return { conflict: true, orderRevision, connectionIds: currentIds };
+    }
+    const requestedSet = new Set(request.connectionIds);
+    const sameSet = requestedSet.size === currentIds.length
+      && currentIds.every((connectionId) => requestedSet.has(connectionId));
+    if (!sameSet) {
+      return { setMismatch: true, orderRevision, connectionIds: currentIds };
+    }
+    await client.query(
+      `UPDATE public.provider_connections AS connection
+       SET routing_priority = ordered.ordinality - 1
+       FROM unnest($2::uuid[]) WITH ORDINALITY AS ordered(connection_id, ordinality)
+       WHERE connection.user_id = $1
+         AND connection.connection_id = ordered.connection_id
+         AND connection.revoked_at IS NULL`,
+      [userId, request.connectionIds],
+    );
+    const nextRevisionResult = await client.query(
+      `UPDATE public.provider_connection_order_revisions
+       SET revision = revision + 1, updated_at = now()
+       WHERE user_id = $1
+       RETURNING revision AS "orderRevision"`,
+      [userId],
+    );
+    const connectionsResult = await client.query(
+      `SELECT ${SAFE_CONNECTION_COLUMNS}
+       FROM public.provider_connections
+       WHERE user_id = $1 AND revoked_at IS NULL
+       ORDER BY routing_priority ASC, updated_at DESC, connection_id`,
+      [userId],
+    );
+    return {
+      orderRevision: Number(nextRevisionResult.rows[0]?.orderRevision || orderRevision + 1),
+      connections: connectionsResult.rows.map(parseSafeConnectionRow),
+    };
   }, dependencies.pool);
 }
 
@@ -134,13 +247,34 @@ async function updateProviderConnection(userId, connectionId, input, dependencie
 
 async function deleteProviderConnection(userId, connectionId, dependencies = {}) {
   return withUserScopedClient(userId, async (client) => {
+    await lockOwnerOrderRevision(client, userId);
     const result = await client.query(
       `DELETE FROM public.provider_connections
        WHERE connection_id = $1 AND user_id = $2
        RETURNING connection_id`,
       [connectionId, userId],
     );
-    return result.rows.length > 0;
+    if (result.rows.length === 0) return false;
+    await client.query(
+      `WITH ranked AS (
+         SELECT connection_id, row_number() OVER (ORDER BY routing_priority, updated_at DESC, connection_id) - 1 AS priority
+         FROM public.provider_connections
+         WHERE user_id = $1 AND revoked_at IS NULL
+       )
+       UPDATE public.provider_connections AS connection
+       SET routing_priority = ranked.priority
+       FROM ranked
+       WHERE connection.connection_id = ranked.connection_id`,
+      [userId],
+    );
+    await client.query(
+      `INSERT INTO public.provider_connection_order_revisions (user_id, revision)
+       VALUES ($1, 1)
+       ON CONFLICT (user_id) DO UPDATE
+       SET revision = public.provider_connection_order_revisions.revision + 1, updated_at = now()`,
+      [userId],
+    );
+    return true;
   }, dependencies.pool);
 }
 
@@ -264,6 +398,35 @@ async function getVerifiedRouteBinding(userId, selection, dependencies = {}) {
   }, dependencies.pool);
 }
 
+/** Automatic Quote selection filters healthy bindings, then honors owner priority. */
+async function selectVerifiedRouteBinding(userId, selection, dependencies = {}) {
+  return withUserScopedClient(userId, async (client) => {
+    const result = await client.query(
+      `SELECT pc.connection_id AS "connectionId", pc.provider_id AS "providerId",
+              pc.endpoint_url AS endpoint, pc.routing_priority AS "routingPriority",
+              cb.model_id AS "modelId", cb.capability_id AS "capabilityId", cb.channel,
+              cb.request_profile AS "requestProfile",
+              pc.updated_at AS "connectionUpdatedAt", cb.updated_at AS "bindingUpdatedAt"
+       FROM public.provider_connections pc
+       JOIN public.capability_bindings cb
+         ON cb.user_id = pc.user_id AND cb.connection_id = pc.connection_id
+       WHERE pc.user_id = $1
+         AND cb.model_id = $2 AND cb.capability_id = $3
+         AND ($4::text IS NULL OR cb.channel = $4)
+         AND pc.status = 'available' AND cb.status = 'active' AND pc.revoked_at IS NULL
+       ORDER BY pc.routing_priority ASC, cb.updated_at DESC, pc.connection_id
+       LIMIT 1`,
+      [userId, selection.model, selection.capabilityId, selection.preferredChannel || null],
+    );
+    if (!result.rows[0]) return null;
+    return {
+      ...result.rows[0],
+      connectionUpdatedAt: toIsoString(result.rows[0].connectionUpdatedAt),
+      bindingUpdatedAt: toIsoString(result.rows[0].bindingUpdatedAt),
+    };
+  }, dependencies.pool);
+}
+
 /** Execution rechecks every frozen route field before encrypted credential material can be read. */
 async function getConnectionExecutionRecord(userId, snapshot, dependencies = {}) {
   return withUserScopedClient(userId, async (client) => {
@@ -301,8 +464,11 @@ module.exports = {
   getVerifiedRouteBinding,
   listCapabilityBindings,
   listProviderConnections,
+  listProviderConnectionsWithRevision,
+  reorderProviderConnections,
   saveVerificationFailure,
   saveVerificationResult,
+  selectVerifiedRouteBinding,
   updateProviderConnection,
   withUserScopedClient,
 };

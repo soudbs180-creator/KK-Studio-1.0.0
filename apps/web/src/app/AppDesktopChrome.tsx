@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import {
   FolderKanban,
-  LayoutPanelTop,
+  ListTodo,
   LogOut,
   Settings,
   Shield,
@@ -16,6 +16,9 @@ import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useCanvas } from '../context/CanvasContext.tsx';
 import { navigateAppRoot } from './navigation/appRootNavigation';
+import { requestTaskCenterOpen } from '../components/workspace/taskCenterEvents';
+import { useTaskCenterSummary } from '../components/workspace/useTaskCenterSummary';
+import { requestProjectMenuToggle } from '../components/settings/projectMenuEvents';
 
 interface AppDesktopChromeProps {
   isMobile: boolean;
@@ -44,11 +47,6 @@ interface DesktopMenuActionButtonProps {
   onClick: () => void;
   testId?: string;
   id?: string;
-}
-
-function focusWorkspaceCanvas() {
-  const canvas = document.querySelector<HTMLElement>('[data-canvas-viewport], .canvas-container, canvas');
-  canvas?.focus();
 }
 
 const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
@@ -94,10 +92,9 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   onOpenProfile,
   onOpenSettings,
   onSignOut,
-  onCloseAssistant,
-  onOpenCanvasWorkspace,
 }) => {
   const { adminLevel } = useAuth();
+  const taskSummary = useTaskCenterSummary();
   React.useEffect(() => {
     if (isMobile) {
       delete document.body.dataset.kkWorkspaceMode;
@@ -116,15 +113,6 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
     return null;
   }
 
-  const openCanvasMode = () => {
-    onCloseAssistant();
-    onOpenCanvasWorkspace();
-    focusWorkspaceCanvas();
-  };
-  const openProjectMenu = () => {
-    document.getElementById('project-manager-trigger')?.click();
-  };
-
   return (
     <div
       className="kk-workspace-chrome-surface kk-workspace-chrome-v3 w-full select-none"
@@ -134,7 +122,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         type="button"
         data-chrome-region="project"
         className="kk-workspace-chrome-v3__project"
-        onClick={openProjectMenu}
+        onClick={() => requestProjectMenuToggle()}
         aria-label="打开当前项目"
       >
         <FolderKanban size={16} aria-hidden="true" />
@@ -143,13 +131,22 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
       <button
         type="button"
-        data-chrome-region="canvas"
+        data-chrome-region="tasks"
         className="kk-workspace-chrome-v3__canvas"
-        aria-current="page"
-        onClick={openCanvasMode}
+        aria-label="打开任务管理"
+        aria-haspopup="dialog"
+        aria-controls="desktop-task-center-panel"
+        data-attention={taskSummary.hasAttentionRequired ? 'true' : 'false'}
+        onClick={() => requestTaskCenterOpen()}
       >
-        <LayoutPanelTop size={16} aria-hidden="true" />
-        <span>画布</span>
+        <ListTodo size={16} aria-hidden="true" />
+        <span>任务</span>
+        {taskSummary.activeCount > 0 ? (
+          <strong className="kk-workspace-chrome-v3__task-count">
+            {taskSummary.activeCount}
+            <small>{taskSummary.averageProgress}%</small>
+          </strong>
+        ) : null}
       </button>
 
       <div data-chrome-region="account" className="kk-workspace-chrome-v3__account">

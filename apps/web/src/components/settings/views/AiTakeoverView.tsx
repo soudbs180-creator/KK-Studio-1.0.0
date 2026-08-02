@@ -9,6 +9,7 @@ import {
   SettingsBadge,
 } from '../SettingsScaffold';
 import { SettingSelect } from '../ui/index';
+import AgentExtensionsSection from '../AgentExtensionsSection';
 
 export const AiTakeoverView: React.FC = () => {
   const { pick } = useLocale();
@@ -111,6 +112,8 @@ export const AiTakeoverView: React.FC = () => {
           </div>
         </div>
       </SettingsSection>
+
+      <AgentExtensionsSection />
     </SettingsViewShell>
   );
 };

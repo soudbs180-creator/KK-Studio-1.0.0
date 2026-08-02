@@ -86,7 +86,8 @@ test('Run write store accepts only owned Sessions and keeps an established bindi
   assert.match(calls[0].sql, /COALESCE\(current_run\.session_id, EXCLUDED\.session_id\)/);
   assert.match(calls[0].sql, /EXCLUDED\.session_id IS NULL/);
   assert.deepEqual(calls[0].params.slice(0, 3), ['run-binding-1', 'binding-owner-a', 'bind this run']);
-  assert.equal(calls[0].params[calls[0].params.length - 1], 'session-binding-1');
+  assert.equal(calls[0].params[8], 'session-binding-1');
+  assert.equal(calls[0].params[9], 'local-desktop');
 });
 
 test('Run write store distinguishes missing, immutable, stale, and cross-owner conflicts', async () => {
@@ -113,7 +114,9 @@ test('Run routes delegate writes and preserve conflict-specific envelopes', () =
   const route = readSource('services/api/routes/ai-assistant.js');
   const mapping = readSource('services/api/lib/ai-assistant-dto.js');
 
-  assert.match(route, /agentRunWriteStore\.upsertAgentRun\(req\.userId/);
+  assert.match(route, /agentRunWriteStore\.upsertPairedAgentRun/);
+  assert.match(route, /agentRunWriteStore\.upsertAgentRun/);
+  assert.match(route, /const outcome = await writeRun\(req\.userId/);
   assert.match(route, /Agent session ownership conflict/);
   assert.match(route, /Agent run Session binding conflict/);
   assert.match(route, /outcome\.outcome === 'stale'[\s\S]*stale: true/);
