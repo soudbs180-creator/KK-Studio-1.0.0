@@ -33,7 +33,7 @@ test('desktop chrome has project, tasks, and account regions while the composer 
   assert.match(chrome, /data-chrome-region="project"/);
   assert.match(chrome, /data-chrome-region="tasks"/);
   assert.match(chrome, /data-chrome-region="account"/);
-  assert.match(chrome, /requestTaskCenterOpen\(\)/);
+  assert.match(chrome, /requestTaskCenterToggle\(\)/);
   assert.match(chrome, /activeCanvas\?\.name \|\| '项目 1'/);
   assert.doesNotMatch(chrome, /data-composer-copilot-toggle="true"/);
   assert.match(promptBar, /data-composer-copilot-toggle="true"/);

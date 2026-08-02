@@ -1,10 +1,7 @@
 import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
 
-const ROOT_DIR = process.cwd();
 const API_SETTINGS_VIEW_PATH = 'apps/web/src/components/settings/ApiSettingsView.tsx';
 
 
@@ -20,7 +17,7 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   assert.match(source, /<SecondaryButton onClick=\{editingOfficialId \? cancelEdit : resetOfficialDraft\}(?:\s+controlAction=\{[^}]+\})?>/);
   assert.match(
     source,
-    /\{officialEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{officialEditorValidationMessage\}/s,
+    /<span>\{officialEditorValidationMessage \|\| pick\([\s\S]*?\)\}<\/span>/,
   );
 
   assert.match(source, /const providerEditorValidationMessage = \(\(\) => \{/);
@@ -33,6 +30,6 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   assert.match(source, /<SecondaryButton onClick=\{editingProviderId \? cancelEdit : resetProviderDraft\}(?:\s+controlAction=\{[^}]+\})?>/);
   assert.match(
     source,
-    /\{providerEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{providerEditorValidationMessage\}/s,
+    /<span>\{providerEditorValidationMessage \|\| pick\([\s\S]*?\)\}<\/span>/,
   );
 });

@@ -2700,3 +2700,51 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - CLIProxyAPI 真实模型能力仍依赖本地配对凭据与上游模型目录；上线前需在已固定版本的 sidecar 上验证 OAuth、多账号切换、模型刷新与断线恢复。
 - Provider 卡片现已显示服务端现有顺序和能力摘要；下一轮如补充拖拽动画，仍必须提交 owner-scoped 原子排序并遵守 Quote 冻结，不能只调整 DOM 顺序。
 - 继续按纵向切片验收剩余深层功能，禁止用视觉“在线”状态代替真实 Runtime Health。
+
+---
+
+## 266. 2026-08-02 - fix(settings): 统一 API 二级编辑页与模型能力配置
+
+**修改范围**
+- 将“添加本地 API”“添加供应商”和“预设添加”收敛到同一套二级页外壳，统一标题区、返回入口、步骤卡、主次栏和底部保存区。
+- 二级页按“连接信息 → 模型与能力 → 预算策略”组织；桌面主表单占主要宽度，手机自动切为单栏，底部操作区参与正常文档流，不再覆盖模型或预算字段。
+- 本地 API 默认带入官方模型，供应商预设带入预设模型 ID；模型能力只读取共享模型注册表，展示联网、思考等已验证能力，不向供应商写入推测标签。
+- 恢复速创 / Wuyin 专属模型目录投影和同步动作元数据，避免统一编辑器重构后退化为普通供应商模型列表。
+- 将旧的内联警告、保存反馈和只读提示契约更新到共享 `ApiConnectionEditorNotice` 与统一 footer，继续保留 BYOK 鉴权、只读密钥和服务端诊断边界。
+
+**修改文件**
+- `apps/web/src/components/settings/ApiConnectionEditor.tsx`
+- `apps/web/src/components/settings/ApiSettingsView.tsx`
+- `apps/web/src/components/settings/apiProviderPresets.ts`
+- `apps/web/src/styles/settings-ui-v4.css`
+- `tests/unit/api-editor-secondary-page-ui-contract.test.ts`
+- `tests/unit/api-provider-presets.test.ts`
+- `tests/unit/api-settings-editor-feedback.test.ts`
+- `tests/unit/api-settings-workbench-structure.test.ts`
+- `tests/unit/frontend-key-boundary-hardening.test.ts`
+- `tests/contract/ui-v3-information-architecture.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 三种 API 接入入口共享 UI 结构、字段语义和保存规则；预设只负责预填，不能绕过 API Key、鉴权或服务端校验。
+2. 模型 ID 是编辑器的主要输入，联网、思考等能力由共享模型注册表投影；未知能力显示基础生成或待声明，不能按供应商名称猜测。
+3. Footer 使用静态文档流布局；窄屏标题、返回按钮、主栏、预算和操作按钮依次堆叠，避免 sticky/absolute 覆盖表单。
+4. 速创 / Wuyin 继续使用专属图片、视频和音频目录及同步动作；统一外壳不改变既有 Provider 行为与安全边界。
+5. 桌面任务入口契约以 `requestTaskCenterToggle()` 为准，符合“再次点击关闭”的既定交互，不回退为单向打开。
+
+**已运行验证**
+- API 设置相关回归 55/55 通过；修复后的 BYOK、API action catalog 与速创目录定向回归 13/13 通过。
+- 全量 Unit：2384 项中 2382 通过、0 失败、2 跳过；Integration 15/15、Contract 31/31、E2E 11/11 通过。
+- Root / Architecture / Server / Tests TypeScript 通过；Local Runner typecheck、22/22 测试与 build 通过。
+- Shared、UI、API Client 与 Web Vite 8.1.4 生产构建通过；Architecture 与 Governance 全链通过。
+- Spec Structure、Prompt Group Drag、移动设置、桌面设置、AI Takeover、启动居中、Encoding、Mojibake 与 Canvas Performance 3/3 均通过；`git diff --check` 通过。
+- 应用内浏览器在 1548×1272 与 390×844 实测：三个步骤、模型 ID、能力徽标、预算和保存反馈完整可见；桌面无右侧页面空洞，手机 footer 不覆盖内容。
+
+**未运行验证及原因**
+- 环境未提供系统 `npm`，无法原样调用聚合 `npm run verify:changes`；已使用绑定 Node 逐项等价执行其中所有本轮可用的类型、构建、测试、治理、编码、性能和 Browser Smoke 检查。
+- 环境未安装 `swagger-cli`，本轮完成 Spec Structure 检查但未运行 OpenAPI CLI 语义校验。
+- 未运行在线依赖审计、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮未新增依赖或数据库变更。
+
+**风险与下一步**
+- 真实 CLIProxyAPI 模型目录与能力仍需在已配对 Local Runner 上验证 OAuth、多账号、目录刷新和断线恢复；前端继续只消费受限投影。
+- 后续增加 Provider schema 字段时应扩展共享编辑器 section/controller，不得重新分叉三套二级页或在 footer 使用覆盖式定位。

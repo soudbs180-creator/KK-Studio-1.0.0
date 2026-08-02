@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   ChevronDown,
   Globe,
-  Layers3,
   Pause,
   Play,
   Plus,
@@ -130,8 +129,13 @@ import {
   ApiWorkbenchPlatformSection,
   ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,
-  InfoCell,
 } from './apiWorkbenchSections';
+import {
+  ApiConnectionEditorNotice,
+  ApiConnectionEditorSection,
+  ApiConnectionEditorShell,
+  ApiModelCapabilityEditor,
+} from './ApiConnectionEditor';
 import {
   resolveApiWorkbenchDiagnosticsAvailability,
   resolveApiWorkbenchStageMeta,
@@ -145,7 +149,6 @@ import {
   formatUsd,
   getModeLabel,
   getModeOption,
-  getOfficialProviderLabel,
   getProtocolLabel,
   maskSecretDisplay,
   parseModeOption,
@@ -162,6 +165,7 @@ type OfficialForm = {
   provider: OfficialProvider;
   key: string;
   keyPreview?: string;
+  modelsText: string;
   mode: CostMode;
   value: string;
 };
@@ -186,14 +190,20 @@ const officialDefaults: OfficialForm = {
   provider: 'Google',
   key: '',
   keyPreview: '',
+  modelsText: 'gemini-2.5-flash',
   mode: 'unlimited',
   value: '',
 };
+
+const getOfficialRecommendedModel = (provider: OfficialProvider): string => (
+  provider === 'OpenAI' ? 'gpt-4o' : 'gemini-2.5-flash'
+);
 
 const buildOfficialDraft = (provider: OfficialProvider = 'Google'): OfficialForm => ({
   ...officialDefaults,
   provider,
   name: provider,
+  modelsText: getOfficialRecommendedModel(provider),
 });
 
 const DEFAULT_PROVIDER_COLOR = 'var(--text-secondary)';
@@ -593,6 +603,7 @@ const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   provider: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   key: slot.key,
   keyPreview: slot.keyPreview,
+  modelsText: formatProviderModelsText(slot.supportedModels || []),
   mode: getMode(slot.budgetLimit, slot.tokenLimit),
   value:
     typeof slot.tokenLimit === 'number' && slot.tokenLimit > -1
@@ -1211,6 +1222,44 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       );
     }
   }, [providerForm.baseUrl, providerForm.format, pick]);
+
+  const handleOfficialProviderChange = useCallback((value: string) => {
+    const provider = value === 'OpenAI' ? 'OpenAI' : 'Google';
+    setOfficialForm((current) => ({
+      ...current,
+      provider,
+      name: provider,
+      modelsText: getOfficialRecommendedModel(provider),
+    }));
+  }, []);
+
+  const handleProviderBaseUrlChange = useCallback((value: string) => {
+    setProviderForm((current) => {
+      const preset = detectProviderPresetByBaseUrl(value);
+      if (preset) {
+        return {
+          ...current,
+          baseUrl: value,
+          name: preset.name,
+          format: preset.format,
+          color: preset.color,
+          modelsText: current.modelsText || preset.modelId || '',
+        };
+      }
+
+      let hostname = '';
+      try {
+        hostname = new URL(value.startsWith('http') ? value : `https://${value}`).hostname;
+      } catch {
+        hostname = '';
+      }
+      return {
+        ...current,
+        baseUrl: value,
+        name: current.name || (hostname ? `自定义 (${hostname})` : '自定义供应商'),
+      };
+    });
+  }, []);
 
   // 3. 简体中文注释：官方接口密钥格式诊断
   const officialKeyDiagnostics = useMemo(() => {
@@ -2550,6 +2599,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     const value = officialForm.mode === 'unlimited' ? null : positive(officialForm.value);
     const normalizedKey = officialForm.key.trim();
     const existingOfficialSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
+    const manualOfficialModels = parseProviderModelsText(officialForm.modelsText);
+    const officialModelsForSave = manualOfficialModels.length > 0
+      ? manualOfficialModels
+      : (existingOfficialSlot?.supportedModels || []);
     const officialBaseUrl = officialForm.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL;
     const nextSlotId = buildCanonicalApiRecordId(
       {
@@ -2614,7 +2667,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
           baseUrl: officialBaseUrl,
           key: nextKeyValue,
-          supportedModels: existingOfficialSlot?.supportedModels || [],
+          supportedModels: officialModelsForSave,
           disabled: existingOfficialSlot?.disabled || false,
           status: existingOfficialSlot?.status || 'unknown',
           failCount: existingOfficialSlot?.failCount || 0,
@@ -2648,6 +2701,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
           baseUrl: '',
           key: runtimeKeyValue,
+          supportedModels: officialModelsForSave,
           ...payload,
         });
         await keyManager.syncToCloudNow();
@@ -2658,6 +2712,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
           baseUrl: '',
+          supportedModels: officialModelsForSave,
           ...payload,
         });
         if (!result.success) {
@@ -3889,420 +3944,325 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
       {activeEditorMode !== null ? (
         <div className="settings-model-center-editor-page">
-          <div className="settings-model-center-editor-page__bar">
-            <SettingsActionButton
-              data-testid={activeEditorMode === 'official' ? 'api-official-editor-back' : 'api-provider-editor-back'}
-              data-content-back-button="true"
-              data-api-management-action={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction}
-              icon={ArrowLeft}
-              onClick={cancelEdit}
-            >
-              {pick('返回模型中心', 'Back to model center')}
-            </SettingsActionButton>
-            <SettingsBadge tone="neutral">
-              {activeEditorMode === 'official' ? pick('本地 API 二级页面', 'Local API subpage') : pick('供应商二级页面', 'Provider subpage')}
-            </SettingsBadge>
-          </div>
-
-            {showOfficialEditor ? (
-        <>
-        <SettingsSection
-          title={pick('本地 API 编辑器', 'Local API editor')}
-          eyebrow={
-            editingOfficialId
-              ? pick('编辑本地 API', 'Edit local API')
-              : pick('新增本地 API', 'Add local API')
-          }
-          description={pick(
-            '这里只编辑当前接口。',
-            'Edit one endpoint here.'
-          )}
-        >
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <InfoCell
-                label={pick('当前对象', 'Current object')}
-                value={getOfficialDisplayName(officialForm.provider)}
-                helper={editingOfficialId ? pick('正在编辑已有本地 API', 'Editing an existing local API') : pick('准备新增一条本地 API', 'Preparing a new local API')}
-              />
-              <InfoCell
-                label={pick('服务商', 'Provider')}
-                value={getOfficialDisplayName(officialForm.provider)}
-                helper={getOfficialProviderLabel(officialForm.provider)}
-              />
-              <InfoCell
-                label={pick('预算策略', 'Budget rule')}
-                value={getModeLabel(officialForm.mode)}
-                helper={
-                  officialForm.mode === 'unlimited'
-                    ? pick('当前不限制累计消耗', 'There is no cumulative usage limit right now')
-                    : officialForm.mode === 'amount'
-                      ? pick('按累计金额控制预算', 'Budget is controlled by cumulative amount')
-                      : pick('按累计词元量控制预算', 'Budget is controlled by cumulative tokens')
-                }
-              />
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              {userApiEditorReadOnlyHelper ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                  {userApiEditorReadOnlyHelper}
-                </div>
-              ) : null}
-              {browserDirectChecksDisabled ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                  {browserDirectChecksHelper}
-                </div>
-              ) : null}
-              <SettingInput
-                label={pick('接口名称', 'Endpoint name')}
-                value={getOfficialDisplayName(officialForm.provider)}
-                onChange={() => setOfficialForm((current) => ({ ...current, name: current.provider }))}
-                placeholder={pick('会根据提供商自动固定', 'Automatically fixed by provider')}
-                helper={pick('本地 API 名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Local API names are fixed by provider; Google follows the current language.')}
-                disabled={userApiEditorReadOnly}
-                autoComplete="new-password"
-              />
-              <SettingSelect
-                label={pick('服务商', 'Provider')}
-                value={officialForm.provider}
-                options={[
-                  { value: 'Google', label: pick('谷歌', 'Google') },
-                  { value: 'OpenAI', label: 'OpenAI' },
-                ]}
-                onChange={(value) => setOfficialForm((current) => ({ ...current, provider: value as OfficialProvider, name: value as OfficialProvider }))}
-                disabled={userApiEditorReadOnly}
-              />
-            </div>
-
-            <SettingInput
-              label="API Key"
-              value={officialForm.key}
-              onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
-              placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
-              type="password"
-              autoComplete="new-password"
-              helper={isReadonlySecretPlaceholder(officialForm.key)
-                ? savedSecretReadOnlyHelper
-                : pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
-              onReveal={isReadonlySecretPlaceholder(officialForm.key) ? revealOfficialSecret : undefined}
-              revealLoading={busy === `official-reveal:${editingOfficialId || officialForm.id || ''}`}
-              disabled={userApiEditorReadOnly}
-            />
-
-            {officialKeyDiagnostics ? (
-              <div className="mt-2 rounded-[18px] border px-4 py-2.5 text-[12px] leading-5 text-[var(--state-warning-text)] bg-[var(--state-warning-bg)]/10 border-[var(--state-warning-border)] animate-fadeIn">
-                {officialKeyDiagnostics}
-              </div>
-            ) : null}
-
-            <div>
-              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
-              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
-              {officialForm.mode !== 'unlimited' ? (
-                <div className="mt-3">
-                  <SettingInput
-                    label={officialForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
-                    value={officialForm.value}
-                    onChange={(value) => setOfficialForm((current) => ({ ...current, value }))}
-                    type="number"
-                    placeholder={officialForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
-                    helper={officialForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
-                    disabled={userApiEditorReadOnly}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton disabled={userApiActionsDisabled || Boolean(officialEditorValidationMessage)} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`} controlAction={API_MANAGEMENT_ACTIONS.saveOfficialEndpoint.uiAction}>
-                <Save size={16} className="mr-1" />
-                {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增本地 API', 'Add local API')}
-              </PrimaryButton>
-              <SecondaryButton onClick={editingOfficialId ? cancelEdit : resetOfficialDraft} controlAction={API_MANAGEMENT_ACTIONS.resetOfficialDraft.uiAction}>
-                {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
-              </SecondaryButton>
-              {editingOfficialId ? (
-                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto" controlAction={API_MANAGEMENT_ACTIONS.deleteOfficialEndpoint.uiAction}>
-                  <Trash2 size={16} className="mr-1" />
-                  {pick('删除接口', 'Delete endpoint')}
-                </DangerButton>
-              ) : null}
-            </div>
-            {officialEditorValidationMessage ? (
-              <div className="text-[13px] leading-6 text-[var(--state-warning-text)]">
-                {officialEditorValidationMessage}
-              </div>
-            ) : null}
-          </div>
-        </SettingsSection>
-        {selectedOfficialSlot && (
-          <PresetModelsCardComponent
-            title={pick('可用模型', 'Available models')}
-            models={selectedOfficialSlot.supportedModels || []}
-            onSync={() => void refreshOfficial(selectedOfficialSlot)}
-            syncLoading={busy === `official-check:${selectedOfficialSlot.id}`}
-            isMobile={isMobile}
-            isDarkMode={isDarkMode}
-            getModelMetadata={getModelMetadata}
-            pick={pick}
-            notify={notify}
-            SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
-          />
-        )}
-        </>
-      ) : null}
-
-      {showProviderEditor ? (
-        <>
-        <SettingsSection
-          title={(() => {
-            const name = activeProviderPreset?.name || providerForm.name || '';
-            if (editingProviderId) {
-              return name
-                ? pick(`编辑 ${name} 通道`, `Edit ${name} route`)
-                : pick('编辑模型通道', 'Edit model route');
-            } else {
-              return name
-                ? pick(`添加 ${name} 通道`, `Add ${name} route`)
-                : pick('添加模型通道', 'Add model route');
-            }
-          })()}
-          eyebrow={
-            editingProviderId
-              ? pick('二级页面', 'Subpage')
-              : activeProviderPreset
-                ? pick('预设已填好', 'Preset ready')
-                : pick('新建配置', 'New setup')
-          }
-          description={pick(
-            '预设会自动带入名称、地址和协议；通常只需要填写 API Key。模型可留空自动获取，也可以手动输入。',
-            'Presets fill the name, URL, and protocol. Usually only the API key is needed. Models can stay automatic or be entered manually.'
-          )}
-        >
-          <div className="settings-provider-editor-compact">
-            <div className="settings-provider-editor-alerts">
-              {providerEditorReadOnlyHelper ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                  {providerEditorReadOnlyHelper}
-                </div>
-              ) : null}
-              {browserDirectChecksDisabled ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                  {browserDirectChecksHelper}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="settings-provider-editor-card">
-              <div className="settings-provider-editor-card__header">
-                <div className="min-w-0">
-                  <div className="settings-provider-editor-card__title">{pick('基础信息', 'Basics')}</div>
-                  <div className="settings-provider-editor-card__helper">
-                    {isWuyin
-                      ? pick('你正在接入速创 API。只需输入 API 密钥，即可自动匹配模型和路由。', 'You are connecting Wuyin API. Just enter the API Key to auto route.')
-                      : pick('名称、地址、API Key 和模型是唯一需要确认的基础项。协议会根据预设或地址自动处理。', 'Name, URL, API key, and models are the only basics to confirm. The protocol is handled automatically.')}
-                  </div>
-                </div>
-                <div className="settings-provider-editor-card__actions">
-                  {!isWuyin && (
-                    <SettingsBadge tone="neutral">{pick(`协议 ${getProtocolLabel(providerForm.format)}`, `Protocol ${getProtocolLabel(providerForm.format)}`)}</SettingsBadge>
-                  )}
-                  {activeProviderPresetLinks.map((link) => {
-                    // 确保 URL 具有协议头
-                    let targetUrl = link.url.trim();
-                    if (!/^https?:\/\//i.test(targetUrl)) {
-                      targetUrl = `https://${targetUrl}`;
-                    }
-                    return (
-                      <a
-                        key={`${link.labelEn}:${link.url}`}
-                        href={targetUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="settings-provider-editor-link"
-                      >
-                        <Globe size={14} />
-                        <span>{pick(link.labelZh, link.labelEn)}</span>
-                      </a>
-                    );
-                  })}
-                  {isWuyin && (
-                    <button
-                      type="button"
-                      onClick={syncWuyinCatalog}
-                      disabled={busy === 'sync-wuyin'}
-                      data-api-management-action={API_MANAGEMENT_ACTIONS.syncWuyinCatalog.uiAction}
-                      className="settings-provider-editor-link cursor-pointer border-none bg-transparent hover:text-[var(--primary)] flex items-center gap-1 text-[13px] text-[var(--text-secondary)] transition-colors"
-                      style={{ padding: '6px 12px', maxWidth: 'none', minWidth: '120px', outline: 'none' }}
-                    >
-                      <RefreshCw size={14} className={busy === 'sync-wuyin' ? 'animate-spin' : ''} />
-                      <span className="whitespace-nowrap">{pick('同步最新价格', 'Sync Latest Prices')}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="settings-provider-editor-grid">
-                <div className="settings-provider-editor-grid__wide">
-                  <SettingInput
-                    label={pick('接口地址', 'Base URL')}
-                    value={providerForm.baseUrl}
-                    onChange={(value) => {
-                      setProviderForm((current) => {
-                        const preset = detectProviderPresetByBaseUrl(value);
-                        if (preset) {
-                          return {
-                            ...current,
-                            baseUrl: value,
-                            name: preset.name,
-                            format: preset.format,
-                            color: preset.color,
-                          };
-                        } else {
-                          let customName = '自定义供应商';
-                          try {
-                            const parsed = new URL(value.startsWith('http') ? value : `https://${value}`);
-                            if (parsed.hostname) {
-                              customName = `自定义 (${parsed.hostname})`;
-                            }
-                          } catch (e) {}
-
-                          return {
-                            ...current,
-                            baseUrl: value,
-                            name: customName,
-                            format: 'openai', // 标准兼容协议
-                            color: 'var(--text-secondary)',
-                          };
-                        }
-                      });
-                    }}
-                    onBlur={autoFixProviderFormat}
-                    placeholder="https://api.example.com/v1"
-                    disabled={providerEditorReadOnly}
-                    autoComplete="new-password"
-                  />
-                  <div className="mt-2.5 flex items-center gap-2 text-xs">
-                    {activeProviderPreset ? (
-                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/20">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {pick(
-                          `✨ 已自动识别供应商为：${activeProviderPreset.name} (协议: ${getProtocolLabel(activeProviderPreset.format)})`,
-                          `✨ Auto-detected provider: ${activeProviderPreset.name} (Format: ${getProtocolLabel(activeProviderPreset.format)})`
-                        )}
-                      </span>
-                    ) : providerForm.baseUrl.trim() ? (
-                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/10 text-blue-600 font-bold border border-blue-500/20">
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        {pick(
-                          `ℹ️ 未匹配到预设，将使用标准兼容协议 (OpenAI 兼容协议) 通信。`,
-                          `ℹ️ Custom URL. Standard compatible protocol (OpenAI format) will be used.`
-                        )}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="settings-provider-editor-grid__wide">
-                  <SettingInput
-                    label="API Key"
-                    value={providerForm.apiKey}
-                    onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
-                    placeholder={pick('输入该品牌的 API Key', 'Enter this provider API key')}
-                    type="password"
-                    autoComplete="new-password"
-                    helper={isReadonlySecretPlaceholder(providerForm.apiKey) ? savedSecretReadOnlyHelper : undefined}
-                    onReveal={isReadonlySecretPlaceholder(providerForm.apiKey) ? revealProviderSecret : undefined}
-                    revealLoading={busy === `provider-reveal:${editingProviderId || providerForm.id || ''}`}
-                    disabled={providerEditorReadOnly}
-                  />
-                  {providerKeyDiagnostics ? (
-                    <div className="mt-2 rounded-[18px] border px-4 py-2.5 text-[12px] leading-5 text-[var(--state-warning-text)] bg-[var(--state-warning-bg)]/10 border-[var(--state-warning-border)] animate-fadeIn">
-                      {providerKeyDiagnostics}
+          {showOfficialEditor ? (
+            <>
+              <ApiConnectionEditorShell
+                eyebrow={editingOfficialId ? pick('编辑本地 API', 'Edit local API') : pick('新增本地 API', 'Add local API')}
+                title={pick('本地 API 连接', 'Local API connection')}
+                description={pick('完成连接、模型能力与预算配置；保存后由同一运行时链路负责检测和同步。', 'Configure the connection, model capabilities, and budget. The same runtime pipeline handles checks and sync after saving.')}
+                kindLabel={pick('本地 API', 'Local API')}
+                statusLabel={getProtocolLabel(officialForm.provider === 'Google' ? 'gemini' : 'openai')}
+                backLabel={pick('返回模型中心', 'Back to model center')}
+                backTestId="api-official-editor-back"
+                backAction={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction}
+                onBack={cancelEdit}
+                footer={
+                  <>
+                    <div className="settings-api-editor__footer-copy">
+                      <strong>{pick('保存到当前账号', 'Save to this account')}</strong>
+                      <span>{officialEditorValidationMessage || pick('连接信息完整，可以保存。', 'Connection details are ready to save.')}</span>
                     </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-
-
-            <div className="settings-provider-editor-card">
-              <div className="settings-provider-editor-card__header">
-                <div className="min-w-0">
-                  <div className="settings-provider-editor-card__title">{pick('预算策略', 'Budget rule')}</div>
-                  <div className="settings-provider-editor-card__helper">
-                    {pick('默认不限额；需要成本保护时再设置金额预算或词元上限。', 'Unlimited by default. Set an amount or token cap only when you need cost protection.')}
-                  </div>
-                </div>
-              </div>
-              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
-              {providerForm.mode !== 'unlimited' ? (
-                <div className="mt-3">
-                  <SettingInput
-                    label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
-                    value={providerForm.value}
-                    onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
-                    type="number"
-                    placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
-                    helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
-                    disabled={providerEditorReadOnly}
-                  />
-                </div>
+                    <div className="settings-api-editor__footer-actions">
+                      <SecondaryButton onClick={editingOfficialId ? cancelEdit : resetOfficialDraft} controlAction={API_MANAGEMENT_ACTIONS.resetOfficialDraft.uiAction}>
+                        {editingOfficialId ? pick('取消', 'Cancel') : pick('重置', 'Reset')}
+                      </SecondaryButton>
+                      {editingOfficialId ? (
+                        <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteOfficial(editingOfficialId)} controlAction={API_MANAGEMENT_ACTIONS.deleteOfficialEndpoint.uiAction}>
+                          <Trash2 size={16} />
+                          {pick('删除', 'Delete')}
+                        </DangerButton>
+                      ) : null}
+                      <PrimaryButton disabled={userApiActionsDisabled || Boolean(officialEditorValidationMessage)} onClick={() => void saveOfficial()} loading={busy === ('official-save:' + (officialForm.id || 'new'))} controlAction={API_MANAGEMENT_ACTIONS.saveOfficialEndpoint.uiAction}>
+                        <Save size={16} />
+                        {editingOfficialId ? pick('保存变更', 'Save changes') : pick('添加本地 API', 'Add local API')}
+                      </PrimaryButton>
+                    </div>
+                  </>
+                }
+              >
+                <main className="settings-api-editor__main">
+                  {userApiEditorReadOnlyHelper ? <ApiConnectionEditorNotice>{userApiEditorReadOnlyHelper}</ApiConnectionEditorNotice> : null}
+                  {browserDirectChecksDisabled ? <ApiConnectionEditorNotice>{browserDirectChecksHelper}</ApiConnectionEditorNotice> : null}
+                  <ApiConnectionEditorSection
+                    step="01"
+                    title={pick('连接信息', 'Connection')}
+                    description={pick('选择官方服务并填写密钥；地址与协议会保持一致。', 'Choose the official service and enter its key. Endpoint and protocol stay aligned.')}
+                  >
+                    <div className="settings-api-editor__field-grid">
+                      <SettingSelect
+                        label={pick('服务商', 'Provider')}
+                        value={officialForm.provider}
+                        options={[
+                          { value: 'Google', label: pick('谷歌', 'Google') },
+                          { value: 'OpenAI', label: 'OpenAI' },
+                        ]}
+                        onChange={handleOfficialProviderChange}
+                        disabled={userApiEditorReadOnly}
+                      />
+                      <SettingInput
+                        label={pick('服务地址', 'Endpoint')}
+                        value={officialForm.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL}
+                        onChange={() => {}}
+                        helper={pick('官方地址由运行时固定管理。', 'The official endpoint is managed by the runtime.')}
+                        disabled
+                      />
+                      <div className="settings-api-editor__field--wide">
+                        <SettingInput
+                          label="API Key"
+                          value={officialForm.key}
+                          onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
+                          placeholder={pick('输入当前服务的 API Key', 'Enter the API key for this service')}
+                          type="password"
+                          autoComplete="new-password"
+                          helper={isReadonlySecretPlaceholder(officialForm.key) ? savedSecretReadOnlyHelper : officialKeyDiagnostics || undefined}
+                          onReveal={isReadonlySecretPlaceholder(officialForm.key) ? revealOfficialSecret : undefined}
+                          revealLoading={busy === ('official-reveal:' + (editingOfficialId || officialForm.id || ''))}
+                          disabled={userApiEditorReadOnly}
+                        />
+                      </div>
+                    </div>
+                  </ApiConnectionEditorSection>
+                  <ApiConnectionEditorSection
+                    step="02"
+                    title={pick('模型与能力', 'Models and capabilities')}
+                    description={pick('可预先指定模型，也可保存后从接口同步。能力标签只读取共享模型注册表。', 'Choose models now or sync them after saving. Capability badges only read from the shared model registry.')}
+                  >
+                    <ApiModelCapabilityEditor
+                      modelsText={officialForm.modelsText}
+                      onChange={(modelsText) => setOfficialForm((current) => ({ ...current, modelsText }))}
+                      disabled={userApiEditorReadOnly}
+                      pick={pick}
+                    />
+                  </ApiConnectionEditorSection>
+                </main>
+                <aside className="settings-api-editor__sidebar">
+                  <ApiConnectionEditorSection
+                    step="03"
+                    title={pick('预算策略', 'Budget rule')}
+                    description={pick('不限额适合长期使用；也可按金额或 Tokens 设置保护上限。', 'Use unlimited for ongoing access, or protect usage with an amount or token cap.')}
+                    action={<SettingsBadge tone="neutral">{getModeLabel(officialForm.mode)}</SettingsBadge>}
+                  >
+                    <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
+                    {officialForm.mode !== 'unlimited' ? (
+                      <SettingInput
+                        label={officialForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('Tokens 上限', 'Token limit')}
+                        value={officialForm.value}
+                        onChange={(value) => setOfficialForm((current) => ({ ...current, value }))}
+                        type="number"
+                        placeholder={officialForm.mode === 'amount' ? '100' : '1000000'}
+                        disabled={userApiEditorReadOnly}
+                      />
+                    ) : null}
+                  </ApiConnectionEditorSection>
+                </aside>
+              </ApiConnectionEditorShell>
+              {selectedOfficialSlot ? (
+                <PresetModelsCardComponent
+                  title={pick('已同步模型', 'Synchronized models')}
+                  models={selectedOfficialSlot.supportedModels || []}
+                  onSync={() => void refreshOfficial(selectedOfficialSlot)}
+                  syncLoading={busy === ('official-check:' + selectedOfficialSlot.id)}
+                  isMobile={isMobile}
+                  isDarkMode={isDarkMode}
+                  getModelMetadata={getModelMetadata}
+                  pick={pick}
+                  notify={notify}
+                  SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
+                />
               ) : null}
-            </div>
+            </>
+          ) : null}
 
-            <div className="settings-provider-editor-actions">
-              <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`} controlAction={API_MANAGEMENT_ACTIONS.saveProviderRoute.uiAction}>
-                <Save size={16} className="mr-1" />
-                {editingProviderId ? pick('保存变更', 'Save changes') : pick('保存模型通道', 'Save model route')}
-              </PrimaryButton>
-              <SecondaryButton onClick={editingProviderId ? cancelEdit : resetProviderDraft} controlAction={API_MANAGEMENT_ACTIONS.resetProviderDraft.uiAction}>
-                {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
-              </SecondaryButton>
-              {editingProviderId ? (
-                <DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto" controlAction={API_MANAGEMENT_ACTIONS.deleteProviderRoute.uiAction}>
-                  <Trash2 size={16} className="mr-1" />
-                  {pick('删除供应商', 'Delete provider')}
-                </DangerButton>
+          {showProviderEditor ? (
+            <>
+              <ApiConnectionEditorShell
+                eyebrow={editingProviderId ? pick('编辑供应商', 'Edit provider') : activeProviderPreset ? pick('预设添加', 'Preset setup') : pick('新增供应商', 'Add provider')}
+                title={editingProviderId ? pick('编辑供应商连接', 'Edit provider connection') : activeProviderPreset ? pick('添加预设供应商', 'Add preset provider') : pick('添加供应商连接', 'Add provider connection')}
+                description={pick('三种入口共用同一套字段与保存规则；预设只负责可靠地预填，不会跳过密钥校验。', 'All entry points share the same fields and save rules. Presets only prefill trusted values and never bypass key validation.')}
+                kindLabel={activeProviderPreset ? activeProviderPreset.name : pick('自定义供应商', 'Custom provider')}
+                statusLabel={getProtocolLabel(providerForm.format)}
+                backLabel={pick('返回模型中心', 'Back to model center')}
+                backTestId="api-provider-editor-back"
+                backAction={API_MANAGEMENT_ACTIONS.backToModelCenter.uiAction}
+                onBack={cancelEdit}
+                footer={
+                  <>
+                    <div className="settings-api-editor__footer-copy">
+                      <strong>{pick('保存到供应商池', 'Save to provider pool')}</strong>
+                      <span>{providerEditorValidationMessage || pick('连接与模型信息完整，可以保存。', 'Connection and model details are ready to save.')}</span>
+                    </div>
+                    <div className="settings-api-editor__footer-actions">
+                      <SecondaryButton onClick={editingProviderId ? cancelEdit : resetProviderDraft} controlAction={API_MANAGEMENT_ACTIONS.resetProviderDraft.uiAction}>
+                        {editingProviderId ? pick('取消', 'Cancel') : pick('重置', 'Reset')}
+                      </SecondaryButton>
+                      {editingProviderId ? (
+                        <DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} controlAction={API_MANAGEMENT_ACTIONS.deleteProviderRoute.uiAction}>
+                          <Trash2 size={16} />
+                          {pick('删除', 'Delete')}
+                        </DangerButton>
+                      ) : null}
+                      <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === ('provider-save:' + (providerForm.id || 'new'))} controlAction={API_MANAGEMENT_ACTIONS.saveProviderRoute.uiAction}>
+                        <Save size={16} />
+                        {editingProviderId ? pick('保存变更', 'Save changes') : pick('保存供应商', 'Save provider')}
+                      </PrimaryButton>
+                    </div>
+                  </>
+                }
+              >
+                <main className="settings-api-editor__main">
+                  {providerEditorReadOnlyHelper ? <ApiConnectionEditorNotice>{providerEditorReadOnlyHelper}</ApiConnectionEditorNotice> : null}
+                  {browserDirectChecksDisabled ? <ApiConnectionEditorNotice>{browserDirectChecksHelper}</ApiConnectionEditorNotice> : null}
+                  <ApiConnectionEditorSection
+                    step="01"
+                    title={pick('连接信息', 'Connection')}
+                    description={isWuyin
+                      ? pick('速创 API 会使用固定兼容协议，只需核对名称、地址和密钥。', 'Wuyin API uses its compatible protocol; confirm the name, endpoint, and key.')
+                      : pick('名称、协议、地址和密钥都可见，便于适配不同供应商。', 'Name, protocol, endpoint, and key stay visible for different providers.')}
+                    action={activeProviderPreset ? <SettingsBadge tone="emerald">{pick('预设已载入', 'Preset loaded')}</SettingsBadge> : null}
+                  >
+                    <div className="settings-api-editor__field-grid">
+                      <SettingInput
+                        label={pick('供应商名称', 'Provider name')}
+                        value={providerForm.name}
+                        onChange={(name) => setProviderForm((current) => ({ ...current, name }))}
+                        placeholder={pick('例如：团队中转站', 'For example: Team relay')}
+                        disabled={providerEditorReadOnly}
+                      />
+                      <SettingSelect
+                        label={pick('协议格式', 'Protocol format')}
+                        value={providerForm.format}
+                        options={[
+                          { value: 'auto', label: pick('自动识别', 'Automatic') },
+                          { value: 'openai', label: 'OpenAI compatible' },
+                          { value: 'gemini', label: 'Gemini native' },
+                          { value: 'claude', label: 'Anthropic Claude' },
+                        ]}
+                        onChange={(format) => setProviderForm((current) => ({ ...current, format: format as ApiProtocolFormat }))}
+                        disabled={providerEditorReadOnly || isWuyin}
+                      />
+                      <div className="settings-api-editor__field--wide">
+                        <SettingInput
+                          label={pick('接口地址', 'Base URL')}
+                          value={providerForm.baseUrl}
+                          onChange={handleProviderBaseUrlChange}
+                          onBlur={autoFixProviderFormat}
+                          placeholder="https://api.example.com/v1"
+                          disabled={providerEditorReadOnly}
+                          autoComplete="new-password"
+                          helper={activeProviderPreset ? pick('已匹配供应商预设，可继续调整。', 'A provider preset was matched and can still be adjusted.') : undefined}
+                        />
+                      </div>
+                      <div className="settings-api-editor__field--wide">
+                        <SettingInput
+                          label="API Key"
+                          value={providerForm.apiKey}
+                          onChange={(apiKey) => setProviderForm((current) => ({ ...current, apiKey }))}
+                          placeholder={pick('输入该供应商的 API Key', 'Enter this provider API key')}
+                          type="password"
+                          autoComplete="new-password"
+                          helper={isReadonlySecretPlaceholder(providerForm.apiKey) ? savedSecretReadOnlyHelper : providerKeyDiagnostics || undefined}
+                          onReveal={isReadonlySecretPlaceholder(providerForm.apiKey) ? revealProviderSecret : undefined}
+                          revealLoading={busy === ('provider-reveal:' + (editingProviderId || providerForm.id || ''))}
+                          disabled={providerEditorReadOnly}
+                        />
+                      </div>
+                    </div>
+                    {activeProviderPresetLinks.length > 0 ? (
+                      <div className="settings-api-editor__resource-links">
+                        {activeProviderPresetLinks.map((link) => (
+                          <button key={link.labelEn + ':' + link.url} type="button" onClick={() => safeOpenLink(link.url)}>
+                            <Globe size={14} />
+                            {pick(link.labelZh, link.labelEn)}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </ApiConnectionEditorSection>
+                  <ApiConnectionEditorSection
+                    step="02"
+                    title={pick('模型与能力', 'Models and capabilities')}
+                    description={pick('每行填写一个模型 ID；联网、思考等能力由共享模型注册表识别。', 'Enter one model ID per line. Web, reasoning, and other capabilities come from the shared model registry.')}
+                    action={isWuyin ? (
+                      <SettingsActionButton
+                        icon={RefreshCw}
+                        size="sm"
+                        loading={busy === 'sync-wuyin'}
+                        disabled={providerEditorReadOnly}
+                        onClick={() => void syncWuyinCatalog()}
+                        data-api-management-action={API_MANAGEMENT_ACTIONS.syncWuyinCatalog.uiAction}
+                      >
+                        {pick('同步目录', 'Sync catalog')}
+                      </SettingsActionButton>
+                    ) : (
+                      <SettingsActionButton
+                        icon={RefreshCw}
+                        size="sm"
+                        loading={busy === (editingProviderId ? 'provider-check:' + editingProviderId : 'provider-check:new')}
+                        disabled={providerEditorReadOnly}
+                        onClick={() => void fetchProviderModels()}
+                        data-api-management-action={API_MANAGEMENT_ACTIONS.syncEditorModels.uiAction}
+                      >
+                        {pick('检测并获取模型', 'Check and fetch models')}
+                      </SettingsActionButton>
+                    )}
+                  >
+                    <ApiModelCapabilityEditor
+                      modelsText={providerForm.modelsText}
+                      onChange={(modelsText) => setProviderForm((current) => ({ ...current, modelsText }))}
+                      disabled={providerEditorReadOnly}
+                      pick={pick}
+                    />
+                  </ApiConnectionEditorSection>
+                </main>
+                <aside className="settings-api-editor__sidebar">
+                  <ApiConnectionEditorSection
+                    step="03"
+                    title={pick('预算策略', 'Budget rule')}
+                    description={pick('默认不限额；可按金额或 Tokens 设置调用保护。', 'Unlimited by default. Add an amount or token cap for usage protection.')}
+                    action={<SettingsBadge tone="neutral">{getModeLabel(providerForm.mode)}</SettingsBadge>}
+                  >
+                    <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
+                    {providerForm.mode !== 'unlimited' ? (
+                      <SettingInput
+                        label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('Tokens 上限', 'Token limit')}
+                        value={providerForm.value}
+                        onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
+                        type="number"
+                        placeholder={providerForm.mode === 'amount' ? '100' : '1000000'}
+                        disabled={providerEditorReadOnly}
+                      />
+                    ) : null}
+                  </ApiConnectionEditorSection>
+                </aside>
+              </ApiConnectionEditorShell>
+              {selectedProvider ? (
+                <PresetModelsCardComponent
+                  title={
+                    selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
+                      ? pick('速创 API 模型库', 'Suchuang API models')
+                      : pick('已同步模型', 'Synchronized models')
+                  }
+                  models={
+                    selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
+                      ? [
+                          ...SUCHUANG_IMAGE_MODELS.map((model) => model.modelId),
+                          ...SUCHUANG_VIDEO_MODELS.map((model) => model.modelId),
+                          ...SUCHUANG_AUDIO_MODELS.map((model) => model.modelId),
+                        ]
+                      : selectedProvider.models || []
+                  }
+                  onSync={() => void refreshProvider(selectedProvider)}
+                  syncLoading={busy === ('provider-check:' + selectedProvider.id)}
+                  isMobile={isMobile}
+                  isDarkMode={isDarkMode}
+                  getModelMetadata={getModelMetadata}
+                  pick={pick}
+                  notify={notify}
+                  SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
+                />
               ) : null}
-            </div>
-            {providerEditorValidationMessage ? (
-              <div className="text-[13px] leading-6 text-[var(--state-warning-text)]">
-                {providerEditorValidationMessage}
-              </div>
-            ) : null}
-          </div>
-        </SettingsSection>
-        {selectedProvider && (
-          <PresetModelsCardComponent
-            title={
-              selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
-                ? pick('速创 API 模型库', 'Suchuang API Models')
-                : pick('可用模型', 'Available models')
-            }
-            models={
-              selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
-                ? [
-                    ...SUCHUANG_IMAGE_MODELS.map(m => m.modelId),
-                    ...SUCHUANG_VIDEO_MODELS.map(m => m.modelId),
-                    ...SUCHUANG_AUDIO_MODELS.map(m => m.modelId)
-                  ]
-                : selectedProvider.models || []
-            }
-            onSync={() => void refreshProvider(selectedProvider)}
-            syncLoading={busy === `provider-check:${selectedProvider.id}`}
-            isMobile={isMobile}
-            isDarkMode={isDarkMode}
-            getModelMetadata={getModelMetadata}
-            pick={pick}
-            notify={notify}
-            SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
-          />
-        )}
-        </>
-      ) : null}
-
+            </>
+          ) : null}
         </div>
       ) : null}
     </SettingsViewShell>

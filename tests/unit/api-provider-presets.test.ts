@@ -129,7 +129,7 @@ test('toProviderFormFromPreset resets sensitive and user-edited fields while pre
   assert.equal(draft.color, openAiPreset.color);
   assert.equal(draft.apiKey, '');
   assert.equal(draft.apiKeyPreview, '');
-  assert.equal(draft.modelsText, '');
+  assert.equal(draft.modelsText, openAiPreset.modelId);
   assert.equal(draft.group, '');
   assert.equal(draft.mode, 'unlimited');
   assert.equal(draft.value, '');

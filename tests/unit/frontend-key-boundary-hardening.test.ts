@@ -1,12 +1,6 @@
 import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
-
-const ROOT_DIR = process.cwd();
-
-
 
 test('keyManager blocks browser-side provider diagnostics and browser-side secret persistence', () => {
   const source = readSource('apps/web/src/services/auth/keyManager.ts');
@@ -173,8 +167,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /onAddProvider=\{beginCreateProvider\}/);
   assert.match(source, /onSelect: \(\) => startEditOfficial\(slot\)/);
   assert.match(source, /onSelect: \(\) => startEditProvider\(provider\)/);
-  assert.match(source, /<div className="rounded-\[22px\] border px-4 py-3 text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]" style=\{SETTINGS_WARNING_STYLE\}>\s*\{userApiEditorReadOnlyHelper\}\s*<\/div>/);
-  assert.match(source, /<SettingInput[\s\S]*?value=\{getOfficialDisplayName\(officialForm\.provider\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
+  assert.match(source, /<ApiConnectionEditorNotice>\{userApiEditorReadOnlyHelper\}<\/ApiConnectionEditorNotice>/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{officialForm\.provider\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{officialForm\.key\}[\s\S]*?onReveal=\{isReadonlySecretPlaceholder\(officialForm\.key\) \? revealOfficialSecret : undefined\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   // [FIX] providerForm.name is removed in simplify config refactor

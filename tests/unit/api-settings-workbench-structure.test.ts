@@ -206,7 +206,6 @@ test('ApiSettingsView delegates pure formatting helpers to a focused module', ()
     'getModeOption',
     'parseModeOption',
     'getProtocolLabel',
-    'getOfficialProviderLabel',
   ];
 
   assert.ok(formatterImport, 'Expected ApiSettingsView.tsx to import formatters from ./apiSettingsFormatters.');

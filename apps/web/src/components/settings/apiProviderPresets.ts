@@ -115,7 +115,7 @@ export const toProviderFormFromPreset = (preset: ProviderPreset): ProviderPreset
   baseUrl: preset.baseUrl,
   apiKey: '',
   apiKeyPreview: '',
-  modelsText: '',
+  modelsText: preset.modelId || '',
   format: preset.format,
   color: preset.color,
 });
