@@ -9,6 +9,10 @@ SET LOCAL statement_timeout = '5min';
 ALTER TABLE public.provider_connections
   ADD COLUMN IF NOT EXISTS routing_priority integer;
 
+-- 018 对该表启用了 FORCE RLS。迁移必须按 owner 全量初始化，不能依赖
+-- app.current_user_id 或仅更新当前租户；事务回滚会自动恢复原状态。
+ALTER TABLE public.provider_connections NO FORCE ROW LEVEL SECURITY;
+
 WITH ranked AS (
   SELECT connection_id,
          row_number() OVER (PARTITION BY user_id ORDER BY updated_at DESC, connection_id) - 1 AS priority
@@ -39,10 +43,15 @@ CREATE TABLE IF NOT EXISTS public.provider_connection_order_revisions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 重复演练时该表已处于 FORCE RLS；初始化仍必须覆盖所有 owner。
+ALTER TABLE public.provider_connection_order_revisions NO FORCE ROW LEVEL SECURITY;
+
 INSERT INTO public.provider_connection_order_revisions (user_id, revision)
 SELECT DISTINCT user_id, 0
 FROM public.provider_connections
 ON CONFLICT (user_id) DO NOTHING;
+
+ALTER TABLE public.provider_connections FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE public.provider_connection_order_revisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_connection_order_revisions FORCE ROW LEVEL SECURITY;

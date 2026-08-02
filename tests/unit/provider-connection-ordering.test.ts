@@ -59,6 +59,8 @@ test('routing priority migration initializes owner order and revision idempotent
   assert.match(source, /ADD COLUMN IF NOT EXISTS routing_priority/);
   assert.match(source, /row_number\(\) OVER \(PARTITION BY user_id ORDER BY updated_at DESC/);
   assert.match(source, /provider_connection_order_revisions/);
+  assert.equal((source.match(/NO FORCE ROW LEVEL SECURITY/g) || []).length, 2);
+  assert.equal((source.match(/FORCE ROW LEVEL SECURITY/g) || []).length, 4);
   assert.match(source, /ENABLE ROW LEVEL SECURITY/);
 });
 

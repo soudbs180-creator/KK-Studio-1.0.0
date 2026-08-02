@@ -59,4 +59,5 @@
 - 视口：1099×720、1133×720、1440×900、390×844，同主题同状态参考/实现并排对照。
 - Workspace、Composer、Settings、路由、配对安全和 migration 测试按父 change `tasks.md` 执行。
 - 受控 PostgreSQL 必须验证 029–031 的空库、存量库与重复执行；本机无 PostgreSQL 时不得把该 gate 标记完成。
+- `npm run rehearse:migration:029-031` 是该 gate 的唯一仓库入口：只接受专用 `KK_MIGRATION_*` 变量、数据库名必须包含 `rehearsal`、确认短语必须为 `isolated-no-production-data`，且数据库必须从空 public schema 起步。脚本执行 bootstrap + 001–028，写入跨 owner/Run/Skill 哨兵，再连续执行 029–031 两次并核对排序、revision、配对命令和扩展投影不变；只有保存受控实例的成功报告后才能标记 gate 完成。
 - 完成前运行 architecture/governance/typecheck/build/10K/verify:changes，并记录 `design-qa.md` 与 session handoff。

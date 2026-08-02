@@ -2618,3 +2618,45 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 主要剩余风险是 029–031 在真实 PostgreSQL 上的演练、配对桌面长期在线/断线恢复和多供应商真实延迟/预算数据；这些需要受控后端环境，不应由前端模拟。
 - internal 发布前应补跑 Swagger 语义校验、依赖审计与三类数据库迁移演练；通过后再开启 Provider 排序、配对桌面和 Agent Extensions 功能标记。
+
+---
+
+## 264. 2026-08-02 - test(database): 增加 029–031 受控迁移演练
+
+**修改范围**
+- 新增 `npm run rehearse:migration:029-031`，在专用空 PostgreSQL 中按顺序执行 bootstrap、001–028、哨兵数据与 029–031，并在填充配对运行时、命令和 Agent 扩展后重复执行目标迁移。
+- 演练同时核验跨 owner Provider 排序、owner revision、RLS policy、旧 Agent Run 默认执行目标、旧 Skill 导入，以及重复执行前后的状态完全一致。
+- 修复 029 在 018 已启用 `FORCE RLS` 时可能只初始化当前 owner 的问题；迁移在同一事务内临时解除强制 RLS，完成跨 owner 回填后立即恢复。
+- 为演练增加独立环境变量模板、安全门禁契约测试与 OpenSpec 验收说明；脚本不读取通用 `DATABASE_URL`，也不包含 drop、truncate 或自动清理动作。
+
+**修改文件**
+- `scripts/ops/postgres/rehearse-workspace-runtime-v4.mjs`
+- `scripts/ops/postgres/migration-029-031-rehearsal.env.example`
+- `infrastructure/database/migrations/029_provider_connection_routing_priority.sql`
+- `tests/unit/workspace-runtime-v4-migration-rehearsal.test.ts`
+- `tests/unit/provider-connection-ordering.test.ts`
+- `openspec/changes/upgrade-ai-creation-core/workspace-settings-runtime-v4.md`
+- `package.json`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 029–031 真实数据库 gate 只有一个仓库入口，并要求数据库名包含 `rehearsal`、实际库名与声明完全一致、确认短语为 `isolated-no-production-data`，且 public schema 必须为空。
+2. 演练绝不创建、删除或清空数据库；隔离库的生命周期由操作者在脚本外管理，避免误指向存量或生产数据时发生破坏。
+3. 029 的跨 owner 初始化不能依赖 `app.current_user_id`。临时解除 `FORCE RLS` 与恢复均位于迁移事务内，任一步失败都会随事务回滚。
+4. “演练入口和静态/单元验证通过”不等于“真实 PostgreSQL gate 完成”；只有受控实例输出成功报告后才允许更新 OpenSpec gate 状态。
+
+**已运行验证**
+- 定向迁移与 Provider 排序测试 10/10 通过；Tests TypeScript 620 个文件语义检查通过。
+- 全量 Unit：2373 项中 2371 通过、0 失败、2 跳过。
+- Architecture 32 项、Governance、Root/Architecture/Server/Test TypeScript 与 `git diff --check` 全部通过。
+- Shared、UI、API Client 与 Web Vite 8.1.4 生产构建通过，共转换 2612 modules。
+- 10K Canvas Smoke 在 11,103 节点下通过，卡片结构稳定、子卡跟随与连接线距离断言正常。
+
+**未运行验证及原因**
+- 当前 Windows 环境没有 PostgreSQL、Docker 或可用 WSL 发行版，因此未伪造 029–031 的真实数据库成功报告，OpenSpec migration gate 仍保持未完成。
+- 系统未提供 `npm` 可执行文件，未直接运行聚合 `npm run verify:changes`；已使用绑定 Node 和本地 CLI 分别运行本次相关的测试、架构、治理、类型、构建与 10K 烟测。
+- 未运行真实 Provider、支付、配对桌面长期在线、生产部署或在线依赖审计；本轮只增加迁移演练能力并修复 029 初始化语义。
+
+**风险与下一步**
+- 在受控 PostgreSQL 创建空的 `kk_workspace_v4_rehearsal` 后，按示例注入三项 `KK_MIGRATION_*` 环境变量并运行唯一演练入口；保存 JSON 成功报告后再关闭 migration gate。
+- 如果真实演练暴露旧迁移兼容问题，应修复迁移或 bootstrap 后从全新空库重新演练，禁止在失败的演练库上手工改表后继续宣称通过。
