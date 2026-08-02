@@ -2873,3 +2873,45 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 旧 `settings.css` 仍包含历史模型中心样式；当前由设置面板作用域的 V6 权威规则与回归契约阻断覆盖，后续应在独立清理切片删除失效规则，避免继续累积样式债务。
 - 真实 CLIProxyAPI、Local Runner 和 Provider 状态仍需在配对桌面环境验证；设置页必须继续展示真实离线/错误，不得以模拟在线替代。
+
+---
+
+## 270. 2026-08-02 - fix(ui): 阻断旧工作区样式回流并修复全链验证竞态
+
+**修改范围**
+- 在 `main` 上快进合并 `codex/morphic-ui-refactor` 的 30 个提交至 `69a34c61`；远端旧版 `origin/main` 尚未覆盖这些提交，合并前的 `pre-merge latest UI refit snapshot` stash 保持原样保护，未应用、未删除。
+- 修复 `workspace-ui-v4.css` 最终层覆盖 v3 companion 规则的问题：Copilot 桌面面板固定为 `top: 48px / right: 10px / bottom: 10px / width: 420px`，导航固定使用 `10px` 边距，避免旧的 `12px` 和 full-stage 组合重新出现。
+- 将 `WorkspacePage` 的导航默认变量与 v4 CSS 默认值统一；保留布局注册表中用于 Composer 防重叠的独立 `12px` 预留间距。
+- 将响应式 CDP 验收从已移除的三个旧导航动作改为当前唯一的 `autoArrange` 语义动作；导航 UI 不回加旧按钮。
+- 将知识索引生成改为同目录临时文件原子替换，避免并发治理测试读到被截断的空 JSON。
+
+**修改文件**
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `scripts/test/verify-canvas-responsive-cdp.mjs`
+- `scripts/governance/ai-assistant/build-knowledge-index.mjs`
+- `tests/unit/workspace-ui-v4-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. v4 是桌面工作区样式的最终层；Copilot companion 必须使用带 `data-kk-workspace-mode='copilot'` 的权威选择器，不能由旧的 `#ai-assistant-sidebar` full-stage 规则决定几何。
+2. 组件边缘间距 `10px` 与 Composer 的布局占用/防重叠间距 `12px` 是两个不同语义，不能为修复一个边距而全局改写另一个。
+3. 当前 Canvas NavigationBar 只声明 `autoArrange` 为语义操作，缩放与小地图切换保持独立控件，不恢复已删除的 `fitToAll/resetView`。
+4. 治理脚本输出必须以原子替换写入，保证多个隔离测试进程并发运行时不会互相读取半写入文件。
+
+**已运行验证**
+- Git 合并前后状态、远端 fetch、`agents:status` 等价 bundled Node 检查通过；当前 4 个产品/验证文件加本交接文件为唯一修改范围。
+- 定向 UI 契约 `21/21` 通过；全量 Unit `2387` 项中 `2385` 通过、0 失败、2 跳过；Integration `15/15`、Contract `31/31`、E2E `11/11` 通过。
+- Canvas 响应式 CDP `10/10` 视口通过；`1440x900` 的 Copilot 展开/关闭、中央 Composer 隐藏、Chat Composer 可见、导航展开、辅助卡拖拽、工作流浏览器和无重叠检查全部通过。
+- 桌面 settings smoke、移动 settings smoke 通过；移动和桌面 API 未启动时的 `502`、WebSocket 拒绝按真实离线状态保留。
+- Architecture 全链、Governance 全链、Root/Architecture/Server/Tests TypeScript、服务端 119 文件语法、622 个测试文件语义类型检查和 Web Vite 8.1.4 生产构建通过；`git diff --check` 通过。
+- 共享 CJS 产物已用 bundled `esbuild` 重建，避免 stale `packages/shared/dist/index.cjs` 影响服务端测试。
+
+**未运行验证及原因**
+- 系统没有 `npm` 可执行文件，未原样运行 `npm run verify:changes`；已用绑定 Node、bundled CLI 和本地脚本逐项执行对应验证。
+- 未执行在线依赖审计、真实 Provider/OAuth、支付、生产部署或受控 PostgreSQL；本轮没有新增依赖、数据库迁移或支付状态变更。
+- 本地 backend、Local Runner、CLIProxyAPI 未启动，浏览器 smoke 中的网络失败仅代表本地运行时离线，不代表线上服务健康。
+
+**风险与下一步**
+- 旧 `settings.css` 等历史样式文件仍存在，但本轮已针对复现的工作区回流点建立最终层规则和契约；后续清理应单独删除无效重复规则并继续跑浏览器回归。
+- 推送后需再次确认 `main`、本地 `codex/morphic-ui-refactor` 和 `origin/main` 指向同一最新版提交。

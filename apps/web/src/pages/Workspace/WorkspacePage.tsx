@@ -5541,7 +5541,7 @@ const isRectIntersecting = (
           style={{
             '--kk-canvas-navigation-right': isChatOpen
               ? `${chatSidebarWidth + 24}px`
-              : '12px',
+              : '10px',
           } as React.CSSProperties}
         >
           <AppCanvasNavigationPanel

@@ -819,7 +819,7 @@ try {
             navigationExpansion.collapsed.rightInset
             - navigationExpansion.expanded.rightInset
           ) > 1
-          || navigationExpansion.expanded.actionCount !== 3
+          || navigationExpansion.expanded.actionCount !== 1
           || navigationExpansion.expanded.top < 48
         )
       )

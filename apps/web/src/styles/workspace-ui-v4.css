@@ -204,8 +204,8 @@
   }
 
   .desktop-navigation-panel {
-    right: var(--kk-canvas-navigation-right, 12px) !important;
-    bottom: 12px !important;
+    right: var(--kk-canvas-navigation-right, 10px) !important;
+    bottom: 10px !important;
   }
 
   .desktop-navigation-panel .canvas-nav-panel {
@@ -216,10 +216,21 @@
     -webkit-backdrop-filter: blur(20px) saturate(135%) !important;
   }
 
+  /*
+   * Keep the live Copilot as a right-side companion. This rule must remain
+   * later than the legacy full-stage rules so an older selector cannot reopen
+   * the canvas-wide assistant composition.
+   */
+  body[data-kk-workspace-mode='copilot'] #ai-assistant-sidebar {
+    top: 48px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    left: auto !important;
+    width: min(420px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
   #ai-assistant-sidebar {
-    top: 12px !important;
-    right: 12px !important;
-    bottom: 12px !important;
     height: auto !important;
     overflow: visible;
     border: 1px solid color-mix(in oklch, var(--kk-morphic-border) 92%, transparent) !important;

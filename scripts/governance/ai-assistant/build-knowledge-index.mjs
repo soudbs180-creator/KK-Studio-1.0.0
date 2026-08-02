@@ -96,7 +96,17 @@ function run() {
   }
 
   // 写入 output
-  fs.writeFileSync(outputPath, JSON.stringify(documents, null, 2), 'utf-8');
+  // Replace the index atomically so concurrent governance checks never read a
+  // partially truncated JSON file.
+  const temporaryPath = `${outputPath}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify(documents, null, 2), 'utf-8');
+    fs.renameSync(temporaryPath, outputPath);
+  } finally {
+    if (fs.existsSync(temporaryPath)) {
+      fs.rmSync(temporaryPath, { force: true });
+    }
+  }
   console.log(`[Knowledge Index] 构建成功，已生成索引文件: ${outputPath}`);
 }
 

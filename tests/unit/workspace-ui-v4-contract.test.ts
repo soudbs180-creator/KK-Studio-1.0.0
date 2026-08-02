@@ -40,9 +40,10 @@ test('desktop AI assistant uses the same frosted composer structure without touc
   const workspacePage = readSource('apps/web/src/pages/Workspace/WorkspacePage.tsx');
   const styles = readSource('apps/web/src/styles/workspace-ui-v4.css');
 
-  assert.match(styles, /#ai-assistant-sidebar\s*\{[\s\S]*top:\s*12px[\s\S]*right:\s*12px[\s\S]*bottom:\s*12px[\s\S]*border-radius:\s*20px/);
+  assert.match(styles, /body\[data-kk-workspace-mode='copilot'\]\s+#ai-assistant-sidebar\s*\{[\s\S]*top:\s*48px[\s\S]*right:\s*10px[\s\S]*bottom:\s*10px[\s\S]*left:\s*auto[\s\S]*width:\s*min\(420px,[\s\S]*max-width:\s*calc\(100vw - 24px\)/);
+  assert.match(styles, /\.desktop-navigation-panel\s*\{[\s\S]*right:\s*var\(--kk-canvas-navigation-right,\s*10px\)[\s\S]*bottom:\s*10px/);
   assert.match(styles, /#ai-assistant-sidebar \.kk-chat-sidebar-composer\s*\{[\s\S]*border-radius:\s*16px[\s\S]*background:\s*var\(--kk-morphic-control\)/);
-  assert.match(workspacePage, /'--kk-canvas-navigation-right':\s*isChatOpen[\s\S]*chatSidebarWidth \+ 24/);
+  assert.match(workspacePage, /'--kk-canvas-navigation-right':\s*isChatOpen[\s\S]*chatSidebarWidth \+ 24[\s\S]*:\s*'10px'/);
 });
 
 test('collapsed and expanded minimap reuse one navigation bar', () => {
