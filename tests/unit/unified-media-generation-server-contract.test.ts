@@ -50,6 +50,13 @@ test('the browser sync always identifies the lease owner when pushing updates', 
   assert.doesNotMatch(source, /leaseOwner: ACTIVE_STATUSES\.has\(job\.status\) \? getDeviceId\(\) : undefined/);
 });
 
+test('the browser sync preserves prompt target bindings across the server mirror', () => {
+  const source = readSource('apps/web/src/features/ai-assistant-runtime/queue/GenerationQueueSync.ts');
+
+  assert.match(source, /referenceImageNodeId: prompt\.referenceImageNodeId,\s*targetNodeId: prompt\.targetNodeId/);
+  assert.match(source, /id: prompt\.id,\s*prompt: prompt\.prompt,\s*referenceImageNodeId: prompt\.referenceImageNodeId,\s*targetNodeId: prompt\.targetNodeId/);
+});
+
 test('the browser sync reschedules the current owner after an in-flight owner switch', () => {
   const source = readSource('apps/web/src/features/ai-assistant-runtime/queue/GenerationQueueSync.ts');
 

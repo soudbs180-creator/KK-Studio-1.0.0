@@ -938,6 +938,44 @@ test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job
   assert.equal(result.outputGroup.includePromptNodes, false);
 });
 
+test('ToolRegistry: selection-aware batch jobs preserve target cards and media task type', async () => {
+  durableGenerationQueue.clearAllJobs();
+  durableGenerationQueue.registerExecutor(null);
+  const input = {
+    prompts: [{
+      id: 'selection-item-1',
+      prompt: 'animate this selected card',
+      targetNodeId: 'prompt-existing',
+    }],
+    options: {
+      taskType: 'video',
+      modelId: 'video-model',
+      aspectRatio: '16:9',
+      imageSize: '1K',
+      countPerPrompt: 1,
+      layout: 'grid',
+    },
+    idempotencyKey: 'run-bound-batch-key',
+    clientIdempotencyKey: 'selection-stable-key',
+  };
+  const result = await toolRegistryInstance.execute('generation.createBatchJob', input, {
+    ...userGrant(
+      'run-selection-batch',
+      'generation.createBatchJob',
+      input,
+      { activeCanvas: { id: 'canvas-selection' }, selectedModel: { id: 'video-model' } },
+    ),
+    activeCanvas: { id: 'canvas-selection' },
+    selectedModel: { id: 'video-model' },
+    notify: { success: () => {} },
+  });
+
+  assert.equal(result.taskType, 'video');
+  assert.equal(result.idempotencyKey, 'selection-stable-key');
+  assert.equal(result.prompts[0].targetNodeId, 'prompt-existing');
+  durableGenerationQueue.clearAllJobs();
+});
+
 test('ToolRegistry: generation.retryJob retries failed durable queue prompts', async () => {
   const originalSetTimeout = globalThis.setTimeout;
   durableGenerationQueue.clearAllJobs();

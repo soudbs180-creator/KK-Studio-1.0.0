@@ -43,10 +43,25 @@ const getPortPoint = (node: CanvasConnectionNode, side: CanvasConnectionSide) =>
 const PORTS: CanvasConnectionSide[] = ['top', 'right', 'bottom', 'left'];
 
 const getCanvasPoint = (svg: SVGSVGElement, clientX: number, clientY: number) => {
+  const screenMatrix = svg.getScreenCTM?.();
+  if (screenMatrix) {
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    const canvasPoint = point.matrixTransform(screenMatrix.inverse());
+    return {
+      point: { x: canvasPoint.x, y: canvasPoint.y },
+      scale: Math.max(0.01, Math.hypot(screenMatrix.a, screenMatrix.b)),
+    };
+  }
+
+  // Older embedded webviews may not expose an SVG screen matrix. Keep a
+  // conservative local fallback instead of making port dragging unusable.
   const rect = svg.getBoundingClientRect();
-  const scaleX = Math.max(rect.width, 0.0001);
-  const scaleY = Math.max(rect.height, 0.0001);
-  return { x: (clientX - rect.left) / scaleX, y: (clientY - rect.top) / scaleY };
+  return {
+    point: { x: clientX - rect.left, y: clientY - rect.top },
+    scale: 1,
+  };
 };
 
 const findPortHit = (
@@ -91,9 +106,8 @@ export const CanvasConnectionLayer: React.FC<CanvasConnectionLayerProps> = ({ no
     if (!drag) return;
     event.preventDefault();
     event.stopPropagation();
-    const point = getCanvasPoint(event.currentTarget, event.clientX, event.clientY);
-    const svgRect = event.currentTarget.getBoundingClientRect();
-    const target = findPortHit(point, nodes, drag.sourceNodeId, svgRect.width || 1);
+    const { point, scale } = getCanvasPoint(event.currentTarget, event.clientX, event.clientY);
+    const target = findPortHit(point, nodes, drag.sourceNodeId, scale);
     const next = {
       ...drag,
       current: point,

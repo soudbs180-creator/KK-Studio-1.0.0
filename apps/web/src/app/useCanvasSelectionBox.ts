@@ -40,7 +40,7 @@ interface UseCanvasSelectionBoxResult {
   handleSelectionMouseUp: (event: React.MouseEvent) => void;
 }
 
-const BACKGROUND_BLOCKING_SELECTOR = '.prompt-node, .image-node, .group-container, button, input';
+const BACKGROUND_BLOCKING_SELECTOR = '.prompt-node, .image-node, .group-container, [data-workflow-node-id], [data-card-id], button, input';
 
 function intersectsRect(
   left: { x: number; y: number; width: number; height: number },
@@ -52,6 +52,46 @@ function intersectsRect(
     && left.y < right.y + right.height
     && left.y + left.height > right.y
   );
+}
+
+// A right-button drag is followed by a native contextmenu event; consume only
+// that trailing event so it cannot replace the selection toolbar.
+function useRightDragContextMenuSuppression() {
+  const shouldSuppressRef = React.useRef(false);
+  const resetTimerRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => {
+      if (!shouldSuppressRef.current) return;
+
+      shouldSuppressRef.current = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu, true);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu, true);
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
+
+  return React.useCallback(() => {
+    shouldSuppressRef.current = true;
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => {
+      shouldSuppressRef.current = false;
+      resetTimerRef.current = null;
+    }, 300);
+  }, []);
 }
 
 export function useCanvasSelectionBox({
@@ -70,6 +110,7 @@ export function useCanvasSelectionBox({
   const selectionBoxFrameRef = React.useRef<number | null>(null);
   const pendingSelectionPointRef = React.useRef<Point>({ x: 0, y: 0 });
   const hasPendingSelectionPointRef = React.useRef<boolean>(false);
+  const suppressNextContextMenu = useRightDragContextMenuSuppression();
 
   React.useEffect(() => {
     selectionBoxRef.current = selectionBox;
@@ -144,6 +185,29 @@ export function useCanvasSelectionBox({
         minX = Math.min(minX, node.position.x - width / 2);
         maxX = Math.max(maxX, node.position.x + width / 2);
         minY = Math.min(minY, node.position.y - totalHeight);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
+    activeCanvas.workflow?.nodes
+      .filter((node) => nodeIds.includes(node.id))
+      .forEach((node) => {
+        if (!isWorkflowUtilityNodeKind(node.kind)) return;
+        const width = node.width || 284;
+        const height = node.height || 176;
+        minX = Math.min(minX, node.position.x - width / 2);
+        maxX = Math.max(maxX, node.position.x + width / 2);
+        minY = Math.min(minY, node.position.y - height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
+    (activeCanvas.noteNodes || [])
+      .filter((node) => nodeIds.includes(node.id))
+      .forEach((node) => {
+        minX = Math.min(minX, node.position.x - node.width / 2);
+        maxX = Math.max(maxX, node.position.x + node.width / 2);
+        minY = Math.min(minY, node.position.y - node.height);
         maxY = Math.max(maxY, node.position.y);
         hasNodes = true;
       });
@@ -229,9 +293,14 @@ export function useCanvasSelectionBox({
     const endY = Math.max(currentSelectionBox.start.y, currentSelectionBox.current.y);
     const width = endX - startX;
     const height = endY - startY;
+    const isSelectionDrag = width > 5 || height > 5;
     let nextSelectionIds: string[] = [];
 
-    if (width > 5 || height > 5) {
+    if (event.button === 2 && isSelectionDrag) {
+      suppressNextContextMenu();
+    }
+
+    if (isSelectionDrag) {
       const canvasSelectionRect = {
         x: (startX - canvasTransform.x) / canvasTransform.scale,
         y: (startY - canvasTransform.y) / canvasTransform.scale,
@@ -286,6 +355,19 @@ export function useCanvasSelectionBox({
         }
       });
 
+      (activeCanvas?.noteNodes || []).forEach((node) => {
+        const nodeRect = {
+          x: node.position.x - node.width / 2,
+          y: node.position.y - node.height,
+          width: node.width,
+          height: node.height,
+        };
+
+        if (intersectsRect(nodeRect, canvasSelectionRect)) {
+          ids.push(node.id);
+        }
+      });
+
       nextSelectionIds = ids;
       if (ids.length > 0) {
         const selectionMode = event.ctrlKey ? 'remove' : (event.shiftKey ? 'add' : 'replace');
@@ -323,6 +405,7 @@ export function useCanvasSelectionBox({
     resolveSelectionMenuPosition,
     setSelectionMenuPosition,
     selectedNodeIds,
+    suppressNextContextMenu,
   ]);
 
   return {

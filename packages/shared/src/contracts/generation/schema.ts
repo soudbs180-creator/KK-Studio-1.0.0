@@ -17,6 +17,7 @@ export const GenerationPromptInputSchema = z.object({
   prompt: z.string().trim().min(1).max(20_000),
   referenceAssetIds: z.array(z.string().min(1)).max(16).optional(),
   referenceImageNodeId: z.string().min(1).optional(),
+  targetNodeId: z.string().min(1).optional(),
 });
 
 export const ImageGenerationJobParametersSchema = z.object({
@@ -171,9 +172,11 @@ export const CreateImageBatchJobToolInputSchema = z.object({
     id: z.string().min(1).optional(),
     prompt: z.string().trim().min(1).max(20_000),
     referenceImageNodeId: z.string().min(1).optional(),
+    targetNodeId: z.string().min(1).optional(),
   })).min(1).max(100),
   options: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().min(1).max(255).optional(),
+  clientIdempotencyKey: z.string().min(1).max(255).optional(),
 });
 
 export const CreateVideoJobToolInputSchema = z.object({

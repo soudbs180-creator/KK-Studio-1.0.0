@@ -3304,3 +3304,44 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 电商真实文件上传、分析结果数量增长时的纵向空间仍需在连接 API 的受控环境中验收；当前 Composer 不再通过内部滚动隐藏内容。
+
+## 281. 2026-08-03 - fix(ui): 收口电商与画布响应式交互回归
+
+**修改范围**
+- 收口电商 Composer 的单页工作流：资料准备、逐条确认、主图/A+ 参数和上传区保持紧凑自然展开，工作流面板不滚动，仅长文本输入区保留独立滚动。
+- 将移动端输入条与电商工作台隔离：移动端保留居中、固定最大宽度的通用输入组件，电商专属工作台仅在桌面模式显示，避免小屏输入框被复杂业务面板挤占。
+- 修复窄桌面与不同视口下控件几何漂移，固定按钮、发送/语音图标、缩放控制、小地图和设置面板的尺寸与密度。
+- 补齐语音输入 supported/listening 状态及权限失败反馈；发送按钮收紧文字与箭头间距。
+- 修复画布右键上下文、空白右键、卡片框选与批量生成入口，避免绘画覆盖层或拖拽状态吞掉工具菜单；补齐生成选择/提交 helper 与队列契约。
+
+**修改文件**
+- `apps/web/src/components/layout/PromptBar.tsx`、`apps/web/src/components/layout/prompt-bar/`、`apps/web/src/components/ecommerce/`
+- `apps/web/src/styles/{morphic-button-geometry.css,settings-ui-v4.css,workspace-ui-v3.css,workspace-ui-v4.css}`
+- `apps/web/src/app/{AppCanvasOverlays,useCanvasNodeSelection,useCanvasSelectionBox,useSelectionMenuOverlay}.ts*`
+- `apps/web/src/components/canvas/{CanvasConnectionLayer,CanvasDrawingInteractionOverlay,SelectionMenu}.tsx`
+- `apps/web/src/pages/Workspace/WorkspacePage.tsx` 与 `apps/web/src/context/canvasMovement.ts`
+- `apps/web/src/canvas/{canvasGenerationSelection,canvasGenerationSubmission}.ts`
+- `apps/web/src/features/ai-assistant-runtime/`、`apps/web/src/features/ai-takeover/`、`apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx`
+- `packages/shared/src/contracts/{dto/generation.ts,generation/schema.ts}`、`services/api/routes/compat/workspace.js`
+- `tests/unit/` 中新增和更新的浏览器评论、响应式、电商、语音、画布右键/框选、生成队列契约测试
+
+**当前设计决策**
+1. 电商资料面板不再创建内部滚动容器；只有用户输入文本按需滚动，保证常用上传与确认动作在一页内可见。
+2. 模式选择器继续作为输入框外的独立 Portal 控件；移动端不渲染桌面电商工作台，通用输入组件保持居中和稳定宽度。
+3. 右键菜单按真实卡片/绘画命中与框选状态分流，选择菜单由统一 overlay 管理；生成能力通过现有 ToolRegistry/队列链路提交，不新增平行执行入口。
+4. 控件尺寸使用固定 UI token 与窄视口约束，避免浏览器缩放或窗口变窄时图标、按钮反向放大。
+
+**已运行验证**
+- Unit：2434 项，2432 通过、0 失败（2 项跳过）。
+- Architecture：32 项全部通过；Governance：12 项全部通过。
+- Root/Architecture TypeScript、服务端 119 文件语法、测试类型检查全部通过。
+- Shared、UI、API Client 构建与 Vite production build（2620 modules）通过。
+- `git diff --check` 通过；应用内浏览器实测移动端居中宽度、电商单页/隔离、语音权限反馈、画布右键与框选菜单均正常。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：当前桌面环境没有系统 `npm`，已使用 bundled Node 与仓库底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建或受控 PostgreSQL；本轮聚焦 Web UI、Canvas 交互与契约测试。
+
+**风险与下一步**
+- 电商真实文件解析、分析结果数量增长以及 Provider/队列生产链路仍需连接 API 的受控环境验收；当前本地布局与交互回归已覆盖。
+- 执行 `agents:commit` 固化本次完整工作区改动，后续继续处理外部门禁与真实链路验收。

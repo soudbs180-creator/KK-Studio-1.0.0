@@ -470,6 +470,7 @@ export function createUserActionConfirmation(
   const stepId = `${planId}:step:1`;
   const baseContext = {
     ...executionScope,
+    executionOwnerId: getRuntimeOwnerId(),
     runId,
     planId,
     stepId,

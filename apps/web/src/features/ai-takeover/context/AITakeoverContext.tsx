@@ -684,17 +684,22 @@ export function AITakeoverProvider({
       }
       const lastPos = getNextCardPositionRef.current();
       const job = durableGenerationQueue.getJob(jobId);
+      const promptItem = job?.prompts.find(p => p.id === promptId);
       const index = job ? job.prompts.findIndex(p => p.id === promptId) : 0;
       const strayDraft = activeCanvasRef.current?.promptNodes?.find((node: any) => node.isDraft);
-      const shouldKeepPromptNode = job?.outputGroup?.includePromptNodes !== false;
-      const useDraft = shouldKeepPromptNode && index === 0 && strayDraft;
+      const targetNodeId = promptItem?.targetNodeId;
+      const existingTarget = targetNodeId
+        ? activeCanvasRef.current?.promptNodes?.find((node: any) => node.id === targetNodeId)
+        : undefined;
+      const shouldKeepPromptNode = Boolean(existingTarget) || job?.outputGroup?.includePromptNodes !== false;
+      const useDraft = !existingTarget && shouldKeepPromptNode && index === 0 && strayDraft;
       const deterministicNodeId = getQueuePromptNodeId(jobId, promptId);
       const existingQueueNode = activeCanvasRef.current?.promptNodes?.find((node: any) => node.id === deterministicNodeId);
-      const nodeId = useDraft ? strayDraft.id : deterministicNodeId;
-      const pos = useDraft ? strayDraft.position : existingQueueNode?.position || {
+      const nodeId = existingTarget?.id || (useDraft ? strayDraft.id : deterministicNodeId);
+      const pos = existingTarget?.position || (useDraft ? strayDraft.position : existingQueueNode?.position || {
         x: lastPos.x + (index >= 0 ? index : 0) * 420,
         y: lastPos.y
-      };
+      });
 
       const referenceImages: any[] = [];
       if (options.referenceImageNodeId) {
@@ -727,14 +732,14 @@ export function AITakeoverProvider({
         model: options.modelId,
         modelLabel: options.modelId,
         provider: selectedModelRef.current?.provider || 'Google',
-        childImageIds: [],
+        childImageIds: existingTarget?.childImageIds || [],
         timestamp: Date.now(),
         parallelCount: options.countPerPrompt || 1,
         isGenerating: true,
         isDraft: false,
-        hiddenInCanvas: job?.outputGroup?.includePromptNodes === false,
+        hiddenInCanvas: existingTarget?.hiddenInCanvas ?? (job?.outputGroup?.includePromptNodes === false),
         status: 'queued',
-        mode: options.taskType,
+        mode: existingTarget?.mode || options.taskType,
         videoDuration: options.durationSeconds ? `${options.durationSeconds}s` : undefined,
         videoResolution: options.resolution,
         videoAudio: options.generateAudio,
@@ -747,10 +752,9 @@ export function AITakeoverProvider({
       };
 
       // 1. 先把准备执行生成的 prompt 节点加入或更新到画布
-      if (useDraft || existingQueueNode) {
-        console.log('[TakeoverQueue] Reusing queue prompt node:', nodeId);
+      if (existingTarget || useDraft || existingQueueNode) {
         await updatePromptNodeRef.current({
-          ...(useDraft ? strayDraft : existingQueueNode),
+          ...(existingTarget || (useDraft ? strayDraft : existingQueueNode)),
           ...nodeData
         });
         if (useDraft) setConfig((prev: any) => ({ ...prev, prompt: '', referenceImages: [] }));

@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { AspectRatio, ImageSize, KnownModel, type Canvas, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../apps/web/src/types.ts';
+import { AspectRatio, ImageSize, KnownModel, type Canvas, type CanvasNoteNode, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -66,6 +66,27 @@ function workflowNode(input: Partial<WorkflowNode> & Pick<WorkflowNode, 'id' | '
   } as WorkflowNode;
 }
 
+function noteNode(input: Partial<CanvasNoteNode> & Pick<CanvasNoteNode, 'id'>): CanvasNoteNode {
+  return {
+    id: input.id,
+    title: input.title ?? 'Notebook',
+    position: input.position ?? { x: 0, y: 0 },
+    width: input.width ?? 320,
+    height: input.height ?? 240,
+    elements: input.elements ?? [],
+    presentation: input.presentation ?? {
+      version: 2,
+      kind: 'notebook',
+      layoutMode: 'column',
+      size: 'standard',
+      ports: { source: 'right', target: 'left' },
+    },
+    createdAt: input.createdAt ?? 1,
+    updatedAt: input.updatedAt ?? 1,
+    ...input,
+  };
+}
+
 function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
   return {
     id: input.id,
@@ -88,6 +109,7 @@ test('canvas movement boundary lives outside CanvasContext', () => {
   assert.match(contextSource, /from '\.\/canvasMovement';/);
   assert.match(helperSource, /export function moveSelectedCanvasNodes/);
   assert.match(helperSource, /export function resolveMoveSelectedCanvasNodeIds/);
+  assert.match(helperSource, /const noteNodes = \(canvas\.noteNodes \|\| \[\]\)/);
 
   const movementWrapperSource = contextSource.slice(
     contextSource.indexOf('const applyMoveSelectedNodes = useCallback'),
@@ -219,6 +241,26 @@ test('movement only moves selected workflow utility nodes', async () => {
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'preview-1')?.position, { x: 22, y: 23 });
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'video-1')?.position, { x: 30, y: 30 });
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'prompt-workflow')?.position, { x: 40, y: 40 });
+});
+
+test('movement carries selected notebook cards with the canvas selection', async () => {
+  const { moveSelectedCanvasNodes } = await loadCanvasMovementModule();
+  const source = canvas({
+    id: 'canvas-1',
+    noteNodes: [
+      noteNode({ id: 'note-1', position: { x: 10, y: 20 } }),
+      noteNode({ id: 'note-2', position: { x: 100, y: 200 } }),
+    ],
+  });
+
+  const result = moveSelectedCanvasNodes({
+    canvas: source,
+    selectedNodeIds: ['note-1'],
+    delta: { x: 7, y: -4 },
+  });
+
+  assert.deepEqual(result.noteNodes?.find((node) => node.id === 'note-1')?.position, { x: 17, y: 16 });
+  assert.deepEqual(result.noteNodes?.find((node) => node.id === 'note-2')?.position, { x: 100, y: 200 });
 });
 
 test('snap-enabled movement snaps every moved selected node to the canvas grid', async () => {

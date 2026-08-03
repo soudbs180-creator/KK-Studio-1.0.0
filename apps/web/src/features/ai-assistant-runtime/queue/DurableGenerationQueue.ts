@@ -40,6 +40,8 @@ export interface GenerationQueuePrompt {
   id: string;
   prompt: string;
   referenceImageNodeId?: string;
+  /** Existing prompt card to update; absent means the queue creates a deterministic card. */
+  targetNodeId?: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
   phase: GenerationJobPhase;
   promptNodeId?: string;
@@ -155,7 +157,7 @@ const hashString = (value: string): string => {
 };
 
 const createDeterministicIdempotencyKey = (
-  prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }>,
+  prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string; targetNodeId?: string }>,
   options: unknown,
   canvasId: string,
 ): string => `batch_${hashString(stableStringify({ canvasId, prompts, options }))}`;
@@ -305,6 +307,7 @@ const migrateStoredJob = (raw: Partial<GenerationBatchJob> & Record<string, unkn
       id: String(prompt.id || `prompt_${Math.random().toString(36).slice(2, 10)}`),
       prompt: String(prompt.prompt || ''),
       referenceImageNodeId: prompt.referenceImageNodeId,
+      targetNodeId: prompt.targetNodeId,
       status: prompt.status || 'queued',
       phase: prompt.phase || (prompt.status === 'completed' ? 'completed' : prompt.status === 'failed' ? 'failed' : 'queued'),
       promptNodeId: prompt.promptNodeId,
@@ -618,6 +621,7 @@ export class DurableGenerationQueue {
         id: item.id,
         prompt: item.prompt,
         referenceImageNodeId: item.referenceImageNodeId,
+        targetNodeId: item.targetNodeId,
         status: 'queued' as const,
         phase: 'queued' as const,
         retryCount: item.retryCount,
@@ -676,6 +680,7 @@ export class DurableGenerationQueue {
       if (remoteWasRunning) hasReconciliationItem = true;
       return {
         ...prompt,
+        targetNodeId: item.targetNodeId ?? prompt.targetNodeId,
         status,
         phase: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'queued',
         retryCount: item.retryCount,
@@ -743,7 +748,7 @@ export class DurableGenerationQueue {
   }
 
   public createJob(
-    prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string }>,
+    prompts: Array<{ id: string; prompt: string; referenceImageNodeId?: string; targetNodeId?: string }>,
     options: Partial<GenerationQueueOptions> & Record<string, unknown>,
     canvasId: string,
     idempotencyKey?: string,
@@ -786,6 +791,7 @@ export class DurableGenerationQueue {
         id: prompt.id,
         prompt: prompt.prompt,
         referenceImageNodeId: prompt.referenceImageNodeId,
+        targetNodeId: prompt.targetNodeId,
         status: 'queued',
         phase: 'queued',
         retryCount: 0,

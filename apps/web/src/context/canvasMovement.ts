@@ -186,12 +186,19 @@ export function moveSelectedCanvasNodes(input: {
         }
         : canvas.workflow;
 
+    const noteNodes = (canvas.noteNodes || []).map((node) => (
+        selectedSet.has(node.id)
+            ? { ...node, position: moveCanvasPoint(node.position, delta, options) }
+            : node
+    ));
+
     const currentDrawings = canvas.drawings || [];
     if (currentDrawings.length === 0) {
         return {
             ...canvas,
             promptNodes,
             imageNodes,
+            noteNodes,
             workflow,
             drawings: currentDrawings,
         };
@@ -226,6 +233,7 @@ export function moveSelectedCanvasNodes(input: {
         ...canvas,
         promptNodes,
         imageNodes,
+        noteNodes,
         workflow,
         drawings,
     };

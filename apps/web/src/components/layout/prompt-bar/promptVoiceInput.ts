@@ -7,12 +7,17 @@ export interface SpeechRecognitionEventLike {
   readonly results: ArrayLike<SpeechRecognitionResultLike>;
 }
 
+/** Minimal browser error payload used to keep dictation feedback actionable. */
+export interface SpeechRecognitionErrorEventLike {
+  readonly error?: string;
+}
+
 export interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   start(): void;
   stop(): void;

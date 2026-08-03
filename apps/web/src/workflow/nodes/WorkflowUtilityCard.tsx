@@ -153,6 +153,8 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   return (
     <div
       className="absolute pointer-events-auto"
+      data-card-id={node.id}
+      data-workflow-node-id={node.id}
       style={{
         left: node.position.x - viewModel.width / 2,
         top: node.position.y - 176,

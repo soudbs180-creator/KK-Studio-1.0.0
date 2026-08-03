@@ -10,6 +10,7 @@ interface SelectionMenuProps {
     cardGroupCount?: number;
     isolatedPromptCount?: number;
     isolatedResultCount?: number;
+    noteCount?: number;
     onDelete: () => void;
     onGroup: () => void;
     onTag: () => void;
@@ -27,6 +28,7 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
     cardGroupCount = 0,
     isolatedPromptCount = 0,
     isolatedResultCount = 0,
+    noteCount = 0,
     onDelete,
     onGroup,
     onTag,
@@ -84,6 +86,7 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
         if (cardGroupCount > 0) parts.push(`${cardGroupCount} 个卡组`);
         if (isolatedPromptCount > 0) parts.push(`${isolatedPromptCount} 个提示词`);
         if (isolatedResultCount > 0) parts.push(`${isolatedResultCount} 个结果`);
+        if (noteCount > 0) parts.push(`${noteCount} 个笔记本`);
         return parts.length > 0 ? parts.join(' + ') : `${selectedCount} 个项目`;
     };
 

@@ -41,7 +41,7 @@ test('durable generation retries reuse deterministic canvas nodes', () => {
   assert.match(source, /takeover_batch_\$\{jobId\}_\$\{promptId\}/);
   assert.match(source, /existingQueueNode/);
   assert.match(source, /useDraft \|\| existingQueueNode/);
-  assert.match(source, /hiddenInCanvas: job\?\.outputGroup\?\.includePromptNodes === false/);
+  assert.match(source, /hiddenInCanvas: existingTarget\?\.hiddenInCanvas \?\? \(job\?\.outputGroup\?\.includePromptNodes === false\)/);
 });
 
 test('assistant generation jobs keep runtime prompt nodes out of the canvas by default', () => {

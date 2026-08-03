@@ -924,3 +924,271 @@
     height: 128px;
   }
 }
+
+/* Desktop controls keep desktop geometry even when the app window is narrow.
+   Shared touch targets remain available to the mobile layout below 769px. */
+@media (min-width: 769px) {
+  .kk-workspace-chrome-v3__account {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 3px 5px !important;
+  }
+
+  .kk-workspace-chrome-v3__account > .relative,
+  .kk-workspace-chrome-v3 .kk-workspace-avatar-button {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .kk-workspace-chrome-v3__billing {
+    height: 30px !important;
+    min-height: 30px !important;
+  }
+
+  #btn-desktop-recharge {
+    height: 26px !important;
+    min-height: 26px !important;
+    padding-inline: 10px !important;
+  }
+
+  .kk-project-rail-host,
+  .kk-project-rail {
+    width: 38px !important;
+  }
+
+  .kk-project-rail button {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 !important;
+    border-radius: 7px !important;
+  }
+
+  .kk-project-rail button svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .kk-version-help {
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+  }
+
+  .kk-morphic-workflow-panel {
+    top: 20px !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: 50% !important;
+    width: min(calc(100vw - 40px), 680px) !important;
+    max-width: 680px !important;
+    height: min(520px, calc(100dvh - 40px)) !important;
+    border-radius: 16px !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .kk-morphic-workflow-panel__header {
+    min-height: 52px;
+    align-items: center;
+    padding: 9px 10px 7px 14px;
+  }
+
+  .kk-morphic-workflow-panel__header h3 {
+    margin-bottom: 4px;
+  }
+
+  .kk-morphic-workflow-panel__body {
+    padding: 10px;
+  }
+
+  .kk-morphic-workflow-panel__grid,
+  .kk-morphic-workflow-panel__tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .kk-morphic-workflow-card {
+    min-height: 132px;
+    padding: 11px;
+  }
+
+  .kk-morphic-workflow-card__icon {
+    width: 30px;
+    height: 30px;
+    margin-bottom: 9px;
+  }
+
+  .kk-morphic-workflow-panel__tools button {
+    min-height: 112px;
+    padding: 12px;
+  }
+
+  #prompt-bar-container:has(.kk-composer-options-stack) {
+    z-index: var(--kk-z-modal, 1200) !important;
+  }
+
+  .kk-composer-options-stack {
+    box-sizing: border-box;
+    width: 360px;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+    gap: 0 !important;
+    overflow: hidden;
+    border: 1px solid var(--kk-morphic-border);
+    border-radius: 14px;
+    padding: 7px;
+    background: var(--kk-morphic-panel);
+    box-shadow: 0 18px 44px color-mix(in oklch, black 30%, transparent);
+    backdrop-filter: blur(22px) saturate(140%);
+  }
+
+  .kk-composer-options-stack > .kk-image-options-panel {
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    padding: 8px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .kk-composer-options-stack > .kk-image-options-panel > section {
+    margin-bottom: 9px !important;
+  }
+
+  .kk-composer-options-stack > .kk-image-options-panel > section > :first-child {
+    margin-bottom: 5px !important;
+  }
+
+  .kk-composer-options-stack .kk-image-options-panel button {
+    min-height: 30px !important;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+  }
+
+  .kk-composer-options-stack .kk-aspect-ratio-grid {
+    grid-template-rows: 38px !important;
+  }
+
+  .kk-composer-options-stack .kk-aspect-ratio-grid > button {
+    height: 38px !important;
+  }
+
+  .kk-composer-options-stack > .kk-composer-parameter-count {
+    gap: 4px;
+    border: 0;
+    border-top: 1px solid var(--kk-morphic-border);
+    border-radius: 0;
+    padding: 7px 8px 5px;
+    background: transparent;
+  }
+
+  .kk-composer-options-stack .kk-composer-parameter-count__slider {
+    height: 16px;
+    min-height: 16px !important;
+  }
+
+  #prompt-bar-container[data-composer-mode='ecommerce']
+    .kk-ecommerce-workbench-header > .flex:first-child {
+    display: none !important;
+  }
+
+  #prompt-bar-container[data-composer-mode='ecommerce']
+    .kk-ecommerce-workflow-tabs {
+    margin-top: 0 !important;
+  }
+
+  #prompt-bar-container[data-composer-mode='ecommerce']
+    .kk-ecommerce-import-card {
+    min-height: 68px !important;
+  }
+}
+
+.kk-composer-voice-input {
+  position: relative;
+  overflow: visible;
+}
+
+.kk-composer-voice-status {
+  position: absolute;
+  z-index: var(--kk-z-dropdown, 1000);
+  right: 0;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: min(240px, calc(100vw - 24px));
+  padding: 5px 8px;
+  border: 1px solid var(--kk-morphic-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--kk-morphic-panel);
+  box-shadow: 0 10px 28px color-mix(in oklch, black 24%, transparent);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Mobile chrome shares one centered reading rail instead of stretching with
+ * wide phone viewports. The composer keeps its controls fixed while only the
+ * text area remains scrollable when content grows. */
+@media (max-width: 1023px) {
+  :root {
+    --kk-mobile-surface-width: min(580px, calc(100vw - 24px));
+  }
+
+  .mobile-header,
+  .mobile-header.w-full,
+  .ios-mobile-project-strip-wrap,
+  .ios-mobile-project-strip {
+    width: var(--kk-mobile-surface-width) !important;
+    max-width: var(--kk-mobile-surface-width) !important;
+    margin-inline: auto !important;
+  }
+
+  [data-mobile-primary-navigation='true'] {
+    display: flex !important;
+    justify-content: center;
+  }
+
+  [data-mobile-primary-navigation='true'] #mobile-tab-bar,
+  #mobile-tab-bar {
+    width: var(--kk-mobile-surface-width) !important;
+    max-width: var(--kk-mobile-surface-width) !important;
+    margin-inline: auto !important;
+  }
+
+  .kk-result-command-row {
+    width: var(--kk-mobile-surface-width) !important;
+    max-width: var(--kk-mobile-surface-width) !important;
+    margin-inline: auto !important;
+  }
+
+  #prompt-bar-container.kk-prompt-bar-mobile-expanded {
+    width: var(--kk-mobile-surface-width) !important;
+    max-width: var(--kk-mobile-surface-width) !important;
+    margin-inline: auto !important;
+  }
+
+  .kk-prompt-bar-mobile-collapse-handle,
+  .kk-prompt-bar-mobile-collapse-handle--embedded {
+    width: min(420px, calc(100vw - 48px)) !important;
+    min-width: min(420px, calc(100vw - 48px)) !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    margin-inline: auto !important;
+  }
+
+  .kk-prompt-bar-mobile-collapse-handle--embedded .kk-prompt-bar-mobile-home-indicator {
+    width: min(160px, calc(100% - 72px)) !important;
+    height: 4px !important;
+  }
+}

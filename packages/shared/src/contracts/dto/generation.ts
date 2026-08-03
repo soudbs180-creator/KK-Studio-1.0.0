@@ -29,6 +29,7 @@ export interface GenerationPromptInputDto {
   prompt: string;
   referenceAssetIds?: EntityId[];
   referenceImageNodeId?: EntityId;
+  targetNodeId?: EntityId;
 }
 
 export type ReferenceRole =
@@ -116,6 +117,7 @@ export interface GenerationJobItemDto {
   id: EntityId;
   prompt: string;
   referenceImageNodeId?: EntityId;
+  targetNodeId?: EntityId;
   status: "queued" | "running" | "completed" | "failed";
   retryCount: number;
   retryable?: boolean;

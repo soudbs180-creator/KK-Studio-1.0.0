@@ -207,6 +207,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
           <div
             className={`absolute z-30 origin-bottom ${isDesktopPanelClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}
             style={{
+              zIndex: KK_LAYER.dropdown,
               left: '50%',
               transform: 'translateX(-50%)',
               bottom: 'calc(100% - 4px)',

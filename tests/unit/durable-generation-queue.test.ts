@@ -98,6 +98,23 @@ describe('DurableGenerationQueue Tests', () => {
     assert.equal(queue.getJobs().length, 1);
   });
 
+  it('should persist target prompt node ids for selection-aware queue execution', async () => {
+    mockLocalStorage.clear();
+    const queue = new DurableGenerationQueue();
+    queue.registerExecutor(async () => []);
+
+    const created = queue.createJob([
+      { id: 'selection-1', prompt: 'reuse this card', targetNodeId: 'prompt-existing' },
+    ], {}, 'canvas-1', 'selection-key');
+
+    assert.equal(created.prompts[0].targetNodeId, 'prompt-existing');
+    const stored = JSON.parse(mockLocalStorage.getItem('kk_durable_generation_jobs') || '[]');
+    assert.equal(stored[0].prompts[0].targetNodeId, 'prompt-existing');
+
+    const reloaded = new DurableGenerationQueue();
+    assert.equal(requireJob(reloaded, created.id).prompts[0].targetNodeId, 'prompt-existing');
+  });
+
   it('should migrate legacy default assistant groups to result-only canvas output', () => {
     mockLocalStorage.clear();
     mockLocalStorage.setItem('kk_durable_generation_jobs', JSON.stringify([{

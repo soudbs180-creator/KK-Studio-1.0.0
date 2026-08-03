@@ -11,6 +11,7 @@ export type SelectionMenuOverlay = {
   cardGroupCount: number;
   isolatedPromptCount: number;
   isolatedResultCount: number;
+  noteCount?: number;
   onDelete: () => void;
   onGroup: () => void;
   onTag: () => void;
@@ -53,6 +54,7 @@ const AppCanvasOverlays: React.FC<AppCanvasOverlaysProps> = ({
         cardGroupCount={selectionMenu.cardGroupCount}
         isolatedPromptCount={selectionMenu.isolatedPromptCount}
         isolatedResultCount={selectionMenu.isolatedResultCount}
+        noteCount={selectionMenu.noteCount}
         onDelete={selectionMenu.onDelete}
         onGroup={selectionMenu.onGroup}
         onTag={selectionMenu.onTag}

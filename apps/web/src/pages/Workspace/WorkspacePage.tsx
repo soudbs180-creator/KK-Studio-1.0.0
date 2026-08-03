@@ -48,6 +48,9 @@ import {
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from '../../canvas/connectorGeometry';
 import { getCanvasSceneBounds, getCanvasSceneBoundsForNodeIds } from '../../canvas/canvasSceneGeometry.ts';
 import { getDrawingBounds } from '../../canvas/canvasDrawingUtils';
+import {
+  submitCanvasGenerationBatch,
+} from '../../canvas/canvasGenerationSubmission';
 import { getCanvasViewportStorageKey } from '../../canvas/canvasViewportPersistence.ts';
 import AppCanvasNavigationPanel from '../../app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from '../../app/AppCanvasOverlays';
@@ -2913,17 +2916,14 @@ export const AppContent: React.FC<AppContentProps> = () => {
     } else if (error?.request?.body) {
       details.requestBody = typeof error.request.body === 'string' ? error.request.body : JSON.stringify(error.request.body, null, 2);
     }
-
     if (error?.responseBody) {
       details.responseBody = typeof error.responseBody === 'string' ? error.responseBody : JSON.stringify(error.responseBody, null, 2);
     } else if (error?.response?.data) {
       details.responseBody = typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data, null, 2);
     }
-
     if (error?.message && !details.responseBody) {
       details.responseBody = String(error.message);
     }
-
     if (!details.code && !details.status && !details.requestPath && !details.requestBody && !details.responseBody && !details.provider) {
       return undefined;
     }
@@ -2937,7 +2937,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
     setEcommerceGroupExportState: updateEcommerceGroupExportState,
     resolvePptImageBlob,
   });
-
   const getNodeIoTrace = useCallback((nodeId: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === nodeId);
     const inputStorageIds = (node?.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean) as string[];
@@ -2947,7 +2946,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
       .filter(Boolean) as string[];
     return { inputStorageIds, outputStorageIds };
   }, [activeCanvas]);
-
   // Extracted Execution Logic
 
   const handleGenerate = useCallback(async (promptOverride?: string) => {
@@ -2982,7 +2980,21 @@ export const AppContent: React.FC<AppContentProps> = () => {
         ...config,
         referenceImages: referenceMentionBinding.orderedReferenceImages,
       };
-
+    if (selectedNodeIds.length > 1 && activeCanvas) {
+      const { notify } = await import('../../services/system/notificationService');
+      await submitCanvasGenerationBatch({
+        activeCanvas,
+        selectedNodeIds,
+        submissionConfig,
+        submissionPrompt,
+        notify,
+        selectedNodeIdsRef,
+        activeCanvasRef,
+        execute: (name, input, context) => toolRegistryInstance.execute(name, input, context),
+        onSubmitted: () => setConfig((previous) => ({ ...previous, prompt: '', referenceImages: [] })),
+      });
+      return;
+    }
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
     // it must never enter the system-credit deduction flow.
@@ -2995,11 +3007,9 @@ export const AppContent: React.FC<AppContentProps> = () => {
       hasExplicitModelRoute,
       resolveCreditCostForModel,
     });
-
     if (!initialSubmissionContext.allowed) {
       return;
     }
-
     await runInitialGenerationSubmissionTransaction({
       activeSourceImage,
       addPromptNode,
@@ -3016,8 +3026,7 @@ export const AppContent: React.FC<AppContentProps> = () => {
       setDraftNodeId,
       updateImageNodePosition,
     });
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, handleEcommerceSubmitGuard]);
-
+  }, [activeCanvas, config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, handleEcommerceSubmitGuard, selectedNodeIds]);
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
     if (files.length === 0) return;
@@ -3027,7 +3036,6 @@ export const AppContent: React.FC<AppContentProps> = () => {
       });
       files = files.slice(0, 5 - config.referenceImages.length);
     }
-
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -5315,6 +5323,7 @@ const isRectIntersecting = (
     actualChildImageIdsByPromptId,
     deletePromptNode,
     deleteImageNode,
+    deleteNoteNode,
     deleteWorkflowNode,
     removeGroup,
     addGroup,
@@ -5339,6 +5348,10 @@ const isRectIntersecting = (
       if (promptNode) {
         selectNodes([promptNode.id], 'replace');
         handlePromptClick(promptNode);
+      } else if (result.noteNodes[0]) {
+        selectNodes([result.noteNodes[0].id], 'replace');
+      } else if (result.workflowNodes[0]) {
+        selectNodes([result.workflowNodes[0].id], 'replace');
       }
       setCanvasContextMenu(null);
     } catch (error) {
@@ -5596,11 +5609,15 @@ const isRectIntersecting = (
           ) : (
             <>
               <div className="kk-canvas-context-menu__label">Add blank card</div>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-result-group', GenerationMode.IMAGE)}>Main card</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.IMAGE)}>Image prompt</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.IMAGE, 'result-slot')}>Image result slot</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.VIDEO)}>Video prompt</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.VIDEO, 'result-slot')}>Video result slot</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.AUDIO)}>Audio prompt</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('prompt-only', GenerationMode.AUDIO, 'result-slot')}>Audio result slot</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('text')}>Text card</button>
+              <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('multi-image', GenerationMode.IMAGE)}>Multi-image card</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('ecommerce', GenerationMode.ECOMMERCE)}>Ecommerce card</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('ppt-deck', GenerationMode.PPT)}>PPT card</button>
               <button type="button" className="kk-canvas-context-menu__item" onClick={() => handleCreateBlankCard('workflow-panel')}>Workflow card</button>

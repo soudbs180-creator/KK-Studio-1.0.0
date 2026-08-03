@@ -1509,6 +1509,23 @@
   }
 }
 
+@media (min-width: 768px) {
+  .settings-panel .settings-capability-source-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .settings-panel .settings-capability-source-card {
+    min-height: 86px;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .settings-panel .settings-capability-source-card:last-child {
+    grid-column: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .settings-console-content .settings-model-center-directory__tab,
   .settings-console-content .settings-model-center-preset-row,
@@ -1536,7 +1553,7 @@
 .settings-panel .settings-console-content .settings-model-center-layout {
   --settings-model-center-column-height: min(640px, calc(100vh - 250px));
   display: grid !important;
-  grid-template-columns: minmax(0, 65fr) minmax(280px, 35fr) !important;
+  grid-template-columns: minmax(0, 72fr) minmax(220px, 28fr) !important;
   gap: 12px !important;
   align-items: stretch !important;
 }
@@ -1556,15 +1573,15 @@
 
 .settings-panel .settings-console-content .settings-model-center-pool {
   display: grid !important;
-  grid-template-rows: 132px minmax(0, 1fr) !important;
+  grid-template-rows: 104px minmax(0, 1fr) !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-column-header {
   box-sizing: border-box;
   display: grid !important;
-  min-height: 132px !important;
-  max-height: 132px !important;
-  padding: 18px !important;
+  min-height: 104px !important;
+  max-height: 104px !important;
+  padding: 12px !important;
   border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent) !important;
   background: color-mix(in srgb, var(--settings-layer-hover) 58%, transparent) !important;
 }
@@ -1590,9 +1607,9 @@
 }
 
 .settings-panel .settings-console-content .settings-model-center-toolbar {
-  grid-template-columns: minmax(0, 1fr) !important;
-  gap: 10px !important;
-  align-content: start;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-toolbar__copy,
@@ -1601,10 +1618,23 @@
   text-align: left !important;
 }
 
+.settings-panel .settings-console-content .settings-model-center-toolbar__actions {
+  align-self: end;
+  gap: 6px !important;
+}
+
+.settings-panel .settings-console-content .settings-model-center-toolbar__button {
+  height: 30px;
+  min-height: 30px !important;
+  border-radius: 9px;
+  padding-inline: 10px;
+  font-size: 10px;
+}
+
 .settings-panel .settings-console-content .settings-model-center-route-grid {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  grid-auto-rows: 96px !important;
+  grid-auto-rows: max-content !important;
   align-content: start !important;
   gap: 8px !important;
   padding: 10px !important;
@@ -1613,18 +1643,19 @@
 
 .settings-panel .settings-console-content .settings-model-center-route {
   display: grid !important;
-  grid-template-columns: minmax(260px, 1.35fr) minmax(190px, 0.85fr) auto !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto;
   align-items: center !important;
   gap: 10px !important;
-  height: 96px !important;
-  min-height: 96px !important;
-  max-height: 96px !important;
+  height: auto !important;
+  min-height: 136px !important;
+  max-height: none !important;
   padding: 11px 12px !important;
   border: 1px solid var(--settings-border-subtle) !important;
   border-radius: 15px !important;
   background: color-mix(in srgb, var(--settings-layer-emphasis) 76%, transparent) !important;
   box-shadow: none !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   cursor: pointer;
 }
 
@@ -1701,15 +1732,25 @@
 .settings-panel .settings-console-content .settings-model-center-route__meta {
   grid-area: meta;
   display: flex;
-  gap: 8px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 4px;
   margin-top: 0;
+  overflow: hidden;
   color: var(--text-secondary);
   font-size: 11px;
 }
 
+.settings-panel .settings-console-content .settings-model-center-route__meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-panel .settings-console-content .settings-model-center-route__meta > span + span::before {
   content: '·';
-  margin-right: 8px;
+  margin-right: 4px;
   color: var(--text-tertiary);
 }
 
@@ -1747,6 +1788,12 @@
 
 .settings-panel .settings-console-content .settings-model-center-route__id-wrapper button {
   display: inline-flex;
+  width: 18px;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  align-items: center;
+  justify-content: center;
   padding: 2px;
   border-radius: 5px;
   color: inherit;
@@ -1754,6 +1801,8 @@
 
 .settings-panel .settings-console-content .settings-model-center-route__summary {
   display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
   overflow: hidden;
@@ -1795,9 +1844,12 @@
 
 .settings-panel .settings-console-content .settings-model-center-route__actions {
   display: grid !important;
-  grid-template-columns: repeat(4, 30px) !important;
+  grid-template-columns: repeat(2, 30px) !important;
+  grid-column: 2;
+  grid-row: 1;
   gap: 4px !important;
-  width: auto !important;
+  width: 64px !important;
+  min-width: 64px !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-route__btn-action {
@@ -1810,7 +1862,7 @@
 
 .settings-panel .settings-console-content .settings-model-center-directory {
   display: grid !important;
-  grid-template-rows: 132px 52px minmax(0, 1fr) !important;
+  grid-template-rows: 104px 42px minmax(0, 1fr) !important;
   gap: 0 !important;
   padding: 0 !important;
 }
@@ -1819,11 +1871,34 @@
   grid-template-columns: minmax(0, 1fr) auto !important;
   align-items: start !important;
   gap: 10px !important;
+  background: transparent !important;
 }
 
 .settings-panel .settings-console-content .settings-model-center-directory__tabs {
   align-self: center;
-  margin: 4px 16px !important;
+  height: 34px;
+  gap: 2px;
+  margin: 4px 10px !important;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 9px;
+  padding: 2px;
+  background: transparent;
+}
+
+.settings-panel .settings-console-content .settings-model-center-directory__tab {
+  height: 28px !important;
+  min-height: 28px !important;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.settings-panel .settings-console-content .settings-model-center-directory__tab--active {
+  border-color: rgb(var(--settings-accent-rgb));
+  background: rgb(var(--settings-accent-rgb) / 0.12);
+  color: var(--text-primary);
+  box-shadow: none;
+  transform: none;
 }
 
 .settings-panel .settings-console-content .settings-model-center-preset-list {
@@ -1899,14 +1974,15 @@
 
 @media (min-width: 901px) and (max-width: 1180px) {
   .settings-panel .settings-console-content .settings-model-center-route-grid {
-    grid-auto-rows: 132px !important;
+    grid-auto-rows: max-content !important;
   }
 
   .settings-panel .settings-console-content .settings-model-center-route {
-    grid-template-columns: minmax(210px, 1fr) auto !important;
-    height: 132px !important;
-    min-height: 132px !important;
-    max-height: 132px !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    height: auto !important;
+    min-height: 136px !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .settings-panel .settings-console-content .settings-model-center-route__summary {
@@ -1936,7 +2012,7 @@
   }
 
   .settings-panel .settings-console-content .settings-model-center-route-grid {
-    grid-auto-rows: minmax(224px, auto) !important;
+    grid-auto-rows: max-content !important;
     max-height: 560px;
   }
 
@@ -1950,9 +2026,12 @@
   }
 
   .settings-panel .settings-console-content .settings-model-center-route {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto;
     height: auto !important;
-    min-height: 0 !important;
+    min-height: 136px !important;
     max-height: none !important;
+    overflow: visible !important;
   }
 }
 
@@ -1969,5 +2048,100 @@
 
   .settings-panel .settings-console-content .settings-model-center-route__btn-action {
     width: 100% !important;
+  }
+}
+
+/* Narrow desktop keeps the dashboard scan-friendly: two compact metric rows,
+   restrained panel chrome, and fixed icon geometry prevent viewport width from
+   making controls feel oversized. */
+@media (min-width: 760px) and (max-width: 1100px) {
+  .settings-panel .settings-console-content {
+    padding: 20px 24px 28px !important;
+  }
+
+  .settings-panel .dashboard-console-header {
+    gap: 12px;
+    padding-block: 8px;
+  }
+
+  .settings-panel .dashboard-console-header h2 {
+    font-size: 18px;
+  }
+
+  .settings-panel .dashboard-console-header p {
+    max-width: 62ch;
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .settings-panel .dashboard-console-header__actions {
+    gap: 6px;
+  }
+
+  .settings-panel .dashboard-console-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(72px, auto) !important;
+    gap: 8px !important;
+  }
+
+  .settings-panel .dashboard-metric-tile {
+    min-height: 72px !important;
+    border-radius: 12px;
+    padding: 10px !important;
+  }
+
+  .settings-panel .dashboard-metric-tile__value {
+    font-size: 20px !important;
+  }
+
+  .settings-panel .dashboard-command-center {
+    gap: 10px !important;
+  }
+
+  .settings-panel .dashboard-command-center > .dashboard-panel {
+    border-radius: 14px !important;
+    padding: 12px !important;
+  }
+
+  .settings-panel .dashboard-panel__header {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .settings-panel .dashboard-panel__icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border-radius: 10px;
+  }
+
+  .settings-panel .dashboard-panel__icon svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 15px;
+  }
+
+  .settings-panel .dashboard-panel__eyebrow {
+    font-size: 9px !important;
+    letter-spacing: 0.1em;
+  }
+
+  .settings-panel .dashboard-panel__title {
+    font-size: 15px;
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-panel__body {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1.45fr) minmax(150px, 0.55fr);
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-chart {
+    min-height: 116px;
+  }
+
+  .settings-panel .dashboard-card-consumption .dashboard-inline-row {
+    border-radius: 10px;
+    padding: 8px 10px;
   }
 }

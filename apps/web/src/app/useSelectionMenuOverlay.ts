@@ -37,6 +37,7 @@ interface UseSelectionMenuOverlayArgs {
   actualChildImageIdsByPromptId: Map<string, string[]>;
   deletePromptNode: (nodeId: string) => void;
   deleteImageNode: (nodeId: string) => void;
+  deleteNoteNode: (nodeId: string) => void;
   deleteWorkflowNode: (nodeId: string) => void;
   removeGroup: (groupId: string) => void;
   addGroup: (group: CanvasGroup) => void;
@@ -139,6 +140,7 @@ export function useSelectionMenuOverlay({
   actualChildImageIdsByPromptId,
   deletePromptNode,
   deleteImageNode,
+  deleteNoteNode,
   deleteWorkflowNode,
   removeGroup,
   addGroup,
@@ -173,12 +175,14 @@ export function useSelectionMenuOverlay({
 
     const prompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
     const images = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const notes = (activeCanvas.noteNodes || []).filter((node) => selectedNodeIdSet.has(node.id));
     const workflowNodes = (activeCanvas.workflow?.nodes || []).filter((node) => (
       selectedNodeIdSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)
     ));
 
     prompts.forEach((node) => deletePromptNode(node.id));
     images.forEach((node) => deleteImageNode(node.id));
+    notes.forEach((node) => deleteNoteNode(node.id));
     workflowNodes.forEach((node) => deleteWorkflowNode(node.id));
     clearSelection();
     closeSelectionMenu();
@@ -187,6 +191,7 @@ export function useSelectionMenuOverlay({
     selectedNodeIdSet,
     deletePromptNode,
     deleteImageNode,
+    deleteNoteNode,
     deleteWorkflowNode,
     clearSelection,
     closeSelectionMenu,
@@ -202,8 +207,13 @@ export function useSelectionMenuOverlay({
     const images = activeCanvas.imageNodes.filter((node) => (
       selectedNodeIdSet.has(node.id) || childImageIdSet.has(node.id)
     ));
+    const notes = (activeCanvas.noteNodes || []).filter((node) => selectedNodeIdSet.has(node.id));
 
-    const selectedNodeSet = new Set([...prompts.map((node) => node.id), ...images.map((node) => node.id)]);
+    const selectedNodeSet = new Set([
+      ...prompts.map((node) => node.id),
+      ...images.map((node) => node.id),
+      ...notes.map((node) => node.id),
+    ]);
     const existingGroupsInSelection = activeCanvas.groups.filter((group) => (
       group.nodeIds.some((nodeId) => selectedNodeSet.has(nodeId))
     ));
@@ -231,6 +241,7 @@ export function useSelectionMenuOverlay({
 
     const allPrompts = activeCanvas.promptNodes.filter((node) => allMergedNodeIds.has(node.id));
     const allImages = activeCanvas.imageNodes.filter((node) => allMergedNodeIds.has(node.id));
+    const allNotes = (activeCanvas.noteNodes || []).filter((node) => allMergedNodeIds.has(node.id));
 
     allPrompts.forEach((node) => {
       const width = getPromptNodeBoundsWidth(node, isMobile);
@@ -246,6 +257,13 @@ export function useSelectionMenuOverlay({
       minX = Math.min(minX, node.position.x - width / 2);
       maxX = Math.max(maxX, node.position.x + width / 2);
       minY = Math.min(minY, node.position.y - totalHeight);
+      maxY = Math.max(maxY, node.position.y);
+    });
+
+    allNotes.forEach((node) => {
+      minX = Math.min(minX, node.position.x - node.width / 2);
+      maxX = Math.max(maxX, node.position.x + node.width / 2);
+      minY = Math.min(minY, node.position.y - node.height);
       maxY = Math.max(maxY, node.position.y);
     });
 
@@ -399,6 +417,16 @@ export function useSelectionMenuOverlay({
         hasNodes = true;
       });
 
+    (activeCanvas.noteNodes || [])
+      .filter((node) => selectedNodeIdSet.has(node.id))
+      .forEach((node) => {
+        minX = Math.min(minX, node.position.x - node.width / 2);
+        maxX = Math.max(maxX, node.position.x + node.width / 2);
+        minY = Math.min(minY, node.position.y - node.height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
     if (!hasNodes) {
       return {
         ...selectionMenuPosition,
@@ -460,6 +488,14 @@ export function useSelectionMenuOverlay({
         node.position.y,
       );
     });
+    (activeCanvas.noteNodes || []).filter((node) => !selectedNodeIdSet.has(node.id)).forEach((node) => {
+      addBlockedRect(
+        node.position.x - node.width / 2,
+        node.position.y - node.height,
+        node.position.x + node.width / 2,
+        node.position.y,
+      );
+    });
 
     if (isMobile) {
       return {
@@ -509,6 +545,7 @@ export function useSelectionMenuOverlay({
 
     const selectedPrompts = activeCanvas.promptNodes.filter((node) => selectedNodeIdSet.has(node.id));
     const selectedImages = activeCanvas.imageNodes.filter((node) => selectedNodeIdSet.has(node.id));
+    const selectedNotes = (activeCanvas.noteNodes || []).filter((node) => selectedNodeIdSet.has(node.id));
     const selectedImageParentPromptIdSet = new Set(selectedImages.map((image) => image.parentPromptId).filter(Boolean));
     const selectedPromptIdSet = new Set(selectedPrompts.map((prompt) => prompt.id));
 
@@ -525,8 +562,8 @@ export function useSelectionMenuOverlay({
     // 计算是否全部已收藏
     const promptFavCount = selectedPrompts.filter((prompt) => Boolean(getPromptFavoriteId(favoriteLookup, prompt))).length;
     const imageFavCount = selectedImages.filter((image) => Boolean(getImageFavoriteId(favoriteLookup, image))).length;
-    const totalSelected = selectedPrompts.length + selectedImages.length;
-    const isAllFavorite = totalSelected > 0 && (promptFavCount + imageFavCount === totalSelected);
+    const favoriteEligibleCount = selectedPrompts.length + selectedImages.length;
+    const isAllFavorite = favoriteEligibleCount > 0 && (promptFavCount + imageFavCount === favoriteEligibleCount);
 
     // 简体中文注释：计算当前选区是否允许整理排列
     const canArrange = (() => {
@@ -549,7 +586,16 @@ export function useSelectionMenuOverlay({
           return;
         }
         const image = imageById.get(id);
-        if (!image) return;
+        if (!image) {
+          if ((activeCanvas.noteNodes || []).some((note) => note.id === id)) {
+            uniqueRoots.add(id);
+          } else if ((activeCanvas.workflow?.nodes || []).some((node) => (
+            node.id === id && isWorkflowUtilityNodeKind(node.kind)
+          ))) {
+            uniqueRoots.add(id);
+          }
+          return;
+        }
         // 如果图片的 parentPromptId 也在选区中，它们同属于一个 root 组
         if (image.parentPromptId && selectedPromptIdSet.has(image.parentPromptId)) {
           uniqueRoots.add(image.parentPromptId);
@@ -568,13 +614,14 @@ export function useSelectionMenuOverlay({
       cardGroupCount,
       isolatedPromptCount,
       isolatedResultCount,
+      noteCount: selectedNotes.length,
       onDelete: handleDeleteSelectionMenuNodes,
       onGroup: handleGroupSelectionMenuNodes,
       onTag,
       onMigrate: handleSelectionMenuMigrate,
       onArrange: handleSelectionMenuArrange,
       canArrange,
-      onFavorite: handleFavoriteSelectionMenuNodes,
+      onFavorite: favoriteEligibleCount > 0 ? handleFavoriteSelectionMenuNodes : undefined,
       isAllFavorite,
     } satisfies SelectionMenuOverlay;
   }, [

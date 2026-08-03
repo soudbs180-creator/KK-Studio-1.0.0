@@ -4,6 +4,7 @@ import { Mic, Square } from 'lucide-react';
 import {
   appendVoiceTranscript,
   resolveSpeechRecognitionConstructor,
+  type SpeechRecognitionErrorEventLike,
   type SpeechRecognitionEventLike,
   type SpeechRecognitionLike,
 } from './promptVoiceInput';
@@ -44,10 +45,12 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
 }) => {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const feedbackTimerRef = useRef<number | null>(null);
   const valueRef = useRef(value);
   const onValueChangeRef = useRef(onValueChange);
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     valueRef.current = value;
@@ -57,12 +60,26 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
   useEffect(() => {
     setIsSupported(Boolean(resolveSpeechRecognitionConstructor(window)));
     return () => {
+      if (feedbackTimerRef.current !== null) {
+        window.clearTimeout(feedbackTimerRef.current);
+      }
       try {
         recognitionRef.current?.stop();
       } catch {
         recognitionRef.current = null;
       }
     };
+  }, []);
+
+  const showFeedback = useCallback((message: string) => {
+    setFeedbackMessage(message);
+    if (feedbackTimerRef.current !== null) {
+      window.clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = window.setTimeout(() => {
+      setFeedbackMessage(null);
+      feedbackTimerRef.current = null;
+    }, 2600);
   }, []);
 
   const resetListening = useCallback(() => {
@@ -75,8 +92,21 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
       recognitionRef.current?.stop();
     } finally {
       resetListening();
+      showFeedback('语音输入已停止');
     }
-  }, [resetListening]);
+  }, [resetListening, showFeedback]);
+
+  const handleRecognitionError = useCallback((event: SpeechRecognitionErrorEventLike) => {
+    const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+      ? '未获得麦克风权限'
+      : event.error === 'audio-capture'
+        ? '未检测到可用麦克风'
+        : event.error === 'network'
+          ? '语音服务连接失败'
+          : '没有识别到语音，请重试';
+    resetListening();
+    showFeedback(message);
+  }, [resetListening, showFeedback]);
 
   const handleResult = useCallback((event: SpeechRecognitionEventLike) => {
     const transcript = collectFinalTranscript(event);
@@ -86,17 +116,20 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
     if (onValueChangeRef.current) {
       onValueChangeRef.current(prompt);
       valueRef.current = prompt;
+      showFeedback('已写入语音内容');
       window.requestAnimationFrame(() => buttonRef.current?.focus());
       return;
     }
     window.dispatchEvent(new CustomEvent('takeover-fill-prompt', { detail: { prompt } }));
+    showFeedback('已写入语音内容');
     window.requestAnimationFrame(() => textarea?.focus());
-  }, []);
+  }, [showFeedback]);
 
   const startListening = useCallback(() => {
     const Recognition = resolveSpeechRecognitionConstructor(window);
     if (!Recognition) {
       setIsSupported(false);
+      showFeedback('当前浏览器不支持语音识别');
       return;
     }
     const recognition = new Recognition();
@@ -104,16 +137,18 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.onresult = handleResult;
-    recognition.onerror = resetListening;
+    recognition.onerror = handleRecognitionError;
     recognition.onend = resetListening;
     recognitionRef.current = recognition;
     try {
       recognition.start();
       setIsListening(true);
+      showFeedback('正在听，请开始说话');
     } catch {
       resetListening();
+      showFeedback('语音输入启动失败，请重试');
     }
-  }, [handleResult, resetListening]);
+  }, [handleRecognitionError, handleResult, resetListening, showFeedback]);
 
   return (
     <button
@@ -122,14 +157,19 @@ const PromptVoiceInputButton: React.FC<PromptVoiceInputButtonProps> = ({
       className={`kk-composer-voice-input ${className}`.trim()}
       data-state={isListening ? 'listening' : 'idle'}
       data-supported={isSupported}
-      disabled={!isSupported}
+      data-feedback={feedbackMessage ? 'visible' : 'hidden'}
       onClick={isListening ? stopListening : startListening}
       aria-label={isListening ? '停止语音输入' : '语音输入'}
       aria-pressed={isListening}
       title={isSupported ? (isListening ? '停止语音输入' : '语音输入') : '当前浏览器不支持语音输入'}
     >
       {isListening ? <Square size={14} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
-      <span className="sr-only" aria-live="polite">
+      {feedbackMessage ? (
+        <span className="kk-composer-voice-status" role="status" aria-live="polite">
+          {feedbackMessage}
+        </span>
+      ) : null}
+      <span className="sr-only">
         {isListening ? '录音中，点击停止' : isSupported ? '语音输入已关闭' : '当前浏览器不支持语音输入'}
       </span>
     </button>

@@ -1454,6 +1454,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
         setConfig(updater);
     }, [setConfig]);
 
+    useEffect(() => {
+        if (!isMobile || config.mode !== GenerationMode.ECOMMERCE) {
+            return;
+        }
+
+        commitConfigUpdate((previousConfig) => previousConfig.mode === GenerationMode.ECOMMERCE
+            ? {
+                ...previousConfig,
+                ...getPromptBarModePatch(previousConfig, GenerationMode.IMAGE),
+            }
+            : previousConfig);
+    }, [commitConfigUpdate, config.mode, isMobile]);
+
     const [promptDraft, setPromptDraft] = useState(config.prompt || '');
     const promptDraftRef = useRef(promptDraft);
     const deferredPromptDraft = useDeferredValue(promptDraft);
@@ -4296,48 +4309,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             </div>
 
                             {/* 电商配置面板（电商模式下显示） */}
-                            {config.mode === GenerationMode.ECOMMERCE && (
-                                <div className="w-full">
-                                    <React.Suspense fallback={null}>
-                                        <DesktopComposerEcommercePanel
-                                            config={config}
-                                            requirementFileName={ecommerceRequirementFileName}
-                                            productFileCount={ecommerceProductFileCount}
-                                            extraReferenceCount={ecommerceExtraReferenceCount}
-                                            productFiles={ecommerceProductFiles}
-                                            extraReferenceFiles={ecommerceExtraReferenceFiles}
-                                            itemReferenceFiles={ecommerceItemReferenceFiles}
-                                            ecommerceAnalysis={ecommerceAnalysis}
-                                            ecommerceSelection={ecommerceSelection}
-                                            taskStates={ecommerceTaskStates}
-                                            groupSlots={ecommerceGroupSlots}
-                                            activeTaskState={ecommerceActiveTaskState}
-                                            activeFrameworkId={ecommerceActiveFrameworkId}
-                                            frameworkSummary={ecommerceFrameworkSummary}
-                                            analysisConfirmed={ecommerceAnalysisConfirmed}
-                                            confirmingAnalysis={ecommerceConfirmingAnalysis}
-                                            activeGroupSheet={ecommerceActiveGroupSheet}
-                                            ecommerceAnalyzing={ecommerceAnalyzing}
-                                            onPickRequirementFile={onPickEcommerceRequirementFile}
-                                            onPickProductFiles={onPickEcommerceProductFiles}
-                                            onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
-                                            onClearRequirementFile={onClearEcommerceRequirementFile}
-                                            onRemoveProductFile={onRemoveEcommerceProductFile}
-                                            onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
-                                            onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
-                                            onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
-                                            onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
-                                            onResetAnalysis={onResetEcommerceAnalysis}
-                                            onConfirmAnalysis={onConfirmEcommerceAnalysis}
-                                            onToggleSelection={onToggleEcommerceSelection}
-                                            onActivateGroupSheet={onActivateEcommerceGroupSheet}
-                                            onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
-                                            onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
-                                            onTaskStateChange={onChangeEcommerceTaskState}
-                                        />
-                                    </React.Suspense>
-                                </div>
-                            )}
 
                             {/* 3. 第三排：模型库、设置和发送一排 */}
                             <div data-mobile-composer-section="control-row" data-mobile-composer-layer="actions" className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">

@@ -186,4 +186,28 @@ describe('DurableGenerationQueue persistence safety', () => {
     assert.equal(merged.prompts[0]?.reconciliationRequired, true);
     assert.equal(merged.prompts[0]?.retryable, false);
   });
+
+  it('keeps a remote target node binding when a job is hydrated on another device', () => {
+    const storage = new SwitchableStorage();
+    const queue = new DurableGenerationQueue(storage);
+    const now = new Date().toISOString();
+    const remote: any = {
+      schemaVersion: 2,
+      id: 'remote-target',
+      idempotencyKey: 'remote-target-key',
+      workspaceId: 'canvas',
+      modelCode: 'model',
+      taskType: 'image',
+      status: 'queued',
+      parameters: { taskType: 'image' },
+      progress: { total: 1, queued: 1, running: 0, completed: 0, failed: 0, percent: 0, phase: 'queued' },
+      outputs: [],
+      items: [{ id: 'p1', prompt: 'reuse target', targetNodeId: 'prompt-existing', status: 'queued', retryCount: 0, outputs: [] }],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const merged = queue.mergeRemoteJob(remote);
+    assert.equal(merged.prompts[0]?.targetNodeId, 'prompt-existing');
+  });
 });

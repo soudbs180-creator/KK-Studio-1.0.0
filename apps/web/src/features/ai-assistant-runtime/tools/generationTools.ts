@@ -493,20 +493,24 @@ export const generationTools: AgentToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
+              id: { type: 'string' },
               prompt: { type: 'string' },
-              referenceImageNodeId: { type: 'string' }
+              referenceImageNodeId: { type: 'string' },
+              targetNodeId: { type: 'string' }
             },
             required: ['prompt']
           }
         },
         options: { type: 'object' },
-        idempotencyKey: { type: 'string' }
+        idempotencyKey: { type: 'string' },
+        clientIdempotencyKey: { type: 'string' }
       },
       required: ['prompts']
     },
     inputValidator: CreateImageBatchJobToolInputSchema,
-    handler: async (input: { prompts: any[]; options?: any; idempotencyKey?: string }, ctx) => {
-      const { prompts, options, idempotencyKey } = input;
+    handler: async (input: { prompts: any[]; options?: any; idempotencyKey?: string; clientIdempotencyKey?: string }, ctx) => {
+      const { prompts, options, idempotencyKey, clientIdempotencyKey } = input;
+      const queueIdempotencyKey = clientIdempotencyKey || idempotencyKey;
       const { activeCanvas, selectedModel, notify, addPromptNode, getNextCardPosition } = ctx;
       
       if (options?.researchBrief && typeof addPromptNode === 'function') {
@@ -537,9 +541,12 @@ export const generationTools: AgentToolDefinition[] = [
       }
 
       const formattedPrompts = prompts.map((p, idx) => ({
-        id: createGenerationItemId('prompt_item', idempotencyKey, idx),
+        id: typeof p.id === 'string' && p.id.trim()
+          ? p.id.trim()
+          : createGenerationItemId('prompt_item', queueIdempotencyKey, idx),
         prompt: p.prompt,
-        referenceImageNodeId: p.referenceImageNodeId
+        referenceImageNodeId: p.referenceImageNodeId,
+        targetNodeId: p.targetNodeId,
       }));
 
       const job = durableGenerationQueue.createJob(
@@ -547,6 +554,7 @@ export const generationTools: AgentToolDefinition[] = [
         buildQueueOptions({
           selectedModel,
           count: formattedPrompts.length,
+          taskType: options?.taskType === 'video' || options?.taskType === 'audio' ? options.taskType : 'image',
           aspectRatio: options?.aspectRatio || '1:1',
           imageSize: options?.imageSize || '1K',
           countPerPrompt: options?.countPerPrompt || 1,
@@ -558,13 +566,18 @@ export const generationTools: AgentToolDefinition[] = [
           outputGroup: options?.outputGroup
         }),
         activeCanvas?.id || 'default',
-        idempotencyKey
+        queueIdempotencyKey
       );
 
       notify.success('批量生成任务已创建', `Job ID: ${job.id} 已加入队列执行。`);
       return job;
     },
-    verify: (output: any) => verifyQueuedMediaJob(output, 'image')
+    verify: (output: any, input: any) => {
+      const taskType = input?.options?.taskType === 'video' || input?.options?.taskType === 'audio'
+        ? input.options.taskType
+        : 'image';
+      return verifyQueuedMediaJob(output, taskType);
+    }
   },
 
   // 5. ecommerce.createBatchTransformJob - Ecommerce batch adapter

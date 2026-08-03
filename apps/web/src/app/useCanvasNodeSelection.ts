@@ -98,6 +98,16 @@ export function useCanvasNodeSelection({
         hasNodes = true;
       });
 
+    (activeCanvas.noteNodes || [])
+      .filter((node) => nodeIdSet.has(node.id))
+      .forEach((node) => {
+        minX = Math.min(minX, node.position.x - node.width / 2);
+        maxX = Math.max(maxX, node.position.x + node.width / 2);
+        minY = Math.min(minY, node.position.y - node.height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
     if (!hasNodes) return null;
 
     const centerX = (minX + maxX) / 2;

@@ -276,6 +276,21 @@ export const CanvasDrawingInteractionOverlay: React.FC<CanvasDrawingInteractionO
       }
       return;
     }
+    if (activeTool === 'select' && selectionActionRef.current === 'box') {
+      points[1] = point;
+      const bounds = {
+        x: Math.min(start.x, point.x),
+        y: Math.min(start.y, point.y),
+        width: Math.abs(point.x - start.x),
+        height: Math.abs(point.y - start.y),
+      };
+      previewSelectRef.current?.setAttribute('x', String(bounds.x));
+      previewSelectRef.current?.setAttribute('y', String(bounds.y));
+      previewSelectRef.current?.setAttribute('width', String(bounds.width));
+      previewSelectRef.current?.setAttribute('height', String(bounds.height));
+      if (previewSelectRef.current) previewSelectRef.current.style.display = 'block';
+      return;
+    }
     if (activeTool === 'pen') {
       const last = points[points.length - 1];
       if (Math.hypot(point.x - last.x, point.y - last.y) <= 4) return;
