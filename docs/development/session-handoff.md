@@ -3379,3 +3379,37 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 真实 Provider/队列结果回填、跨设备连接同步和大画布端口 hover 性能仍需连接 API 的受控 E2E 验收。
 - 执行 `agents:commit` 固化本次工作区改动。
+
+## 283. 2026-08-03 - refactor(settings): 按紧凑组件语言重做总览布局
+
+**修改范围**
+- 参考 Codex 原生设置页的轻量表单组件节奏，重做桌面设置总览的视觉密度：指标、快捷策略、调用趋势、能力链路和系统状态改为稳定网格与低圆角轻卡片。
+- 将快捷策略前置到指标区之后，调用趋势占据完整内容宽度，能力链路与系统诊断并排排列，减少层层嵌套卡片和无效留白。
+- 固定指标行高、图标尺寸、分段按钮高度和窄桌面断点，保证 1055px 与 769px 视口下布局不会因窗口变化而放大或溢出。
+
+**修改文件**
+- `apps/web/src/components/settings/views/DashboardView.localized.tsx`
+- `apps/web/src/components/settings/SettingsWorkbenchPanel.tsx`
+- `apps/web/src/styles/settings-dashboard-refit.css`（新增）
+- `tests/unit/dashboard-settings-reference-ui.test.ts`（新增）
+
+**当前设计决策**
+1. 总览页沿用现有 SettingsScaffold、路由和数据计算，只替换页面级视觉编排，避免新增平行设置组件体系。
+2. 新样式独立作用于 `settings-dashboard-refit` 根类，并在 SettingsWorkbenchPanel 最后加载，确保不会改变 API 配置、数据同步等其他设置页。
+3. 颜色、边框和字体全部复用现有 console/settings token；交互控件保留原有按钮、radio 和导航语义。
+
+**已运行验证**
+- 定向设置回归：18/18 通过。
+- Root TypeScript、Architecture TypeScript、测试类型检查（638 文件）通过。
+- UI import boundary、UI token、Settings UI System、Visible Items Precision 检查通过。
+- Vite production build：2621 modules，构建成功。
+- 应用内浏览器实测默认视口与 769px 窄桌面：指标、快捷策略、趋势及双列状态卡无重叠；临时视口已恢复默认。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：桌面环境没有系统 `npm`，使用 bundled Node 与仓库底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建或受控 PostgreSQL；本轮仅调整设置总览 Web UI。
+
+**风险与下一步**
+- 设置总览的实际数据量较大时仍依赖现有主滚动容器；若后续要做到完全无滚动，需要另行设计分页或折叠策略。
+- 执行 `agents:commit` 固化本次设置 UI 改版。

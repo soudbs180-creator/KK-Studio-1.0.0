@@ -592,7 +592,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   };
 
   return (
-    <SettingsViewShell>
+    <SettingsViewShell className="settings-dashboard-refit">
       <style>{`
         .dashboard-command-center {
           display: grid;

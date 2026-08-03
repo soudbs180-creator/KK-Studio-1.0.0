@@ -15,6 +15,7 @@ import { SettingsRouterShell } from './SettingsWorkbenchShell';
 import '../../styles/settings.css';
 import '../../styles/settings-console.css';
 import '../../styles/settings-v3.css';
+import '../../styles/settings-dashboard-refit.css';
 
 export interface SettingsPanelProps {
   isOpen: boolean;
