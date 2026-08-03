@@ -3543,3 +3543,33 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 推送后应确认 `governance:registry` 通过；若 Vercel job仍显示 skipped，再检查 GitHub Secrets 中的 Vercel 三项配置。
+
+## 288. 2026-08-03 - fix(governance): 忽略临时文档测试目录并同步 main
+
+**修改范围**
+- 将本地 `main` 快进到 `origin/main` 的 `974a6d77`，保留远端 CI 修复提交。
+- 文档治理扫描忽略 `.tmp/` 临时测试目录，避免临时 Markdown 污染生成索引。
+- 重新生成并核对 `docs/governance/DOCUMENTATION_INDEX.md`，确认干净 checkout 与本地结果一致且无需提交索引变化。
+
+**修改文件**
+- `scripts/governance/check-documentation-governance.mjs`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. `.tmp/` 属于测试运行时产物，不进入文档治理索引；正式文档路径仍按现有分类规则扫描。
+2. 不把外部 `.workbuddy/memory/2026-08-03.md` 纳入发布提交，已保存在本地带说明的 stash 中，避免个人工作记忆进入远端。
+3. `main` 以 `origin/main` 为基准，提交后再次校验提交哈希和工作区状态。
+
+**已运行验证**
+- bundled Node 执行 `scripts/governance/check-documentation-governance.mjs --write`：274 个 Markdown 源，0 conflicts。
+- bundled Node 执行文档治理检查：通过。
+- 文档治理契约测试：2/2 通过。
+- `git diff --check`：通过。
+- `git pull --ff-only origin main`：成功快进到 `974a6d77`。
+
+**未运行验证及原因**
+- 未在本地重放完整 `verify:changes`：当前环境没有系统 `npm`，且本次只涉及治理脚本、生成索引和 Git 同步。
+- Vercel 生产部署仍依赖 GitHub Actions 中的 `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` secrets。
+
+**风险与下一步**
+- 推送后确认 `main` 与 `origin/main` 同一提交且工作区干净；继续观察 Cloud Auto Deploy #503 的最终结果。

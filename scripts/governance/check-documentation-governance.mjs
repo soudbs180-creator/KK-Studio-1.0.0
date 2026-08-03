@@ -16,6 +16,7 @@ const ignoredDirectories = new Set([
   "coverage",
   "release",
   "temp",
+  ".tmp",
 ]);
 
 const normalizePath = (value) => value.split(path.sep).join("/");
