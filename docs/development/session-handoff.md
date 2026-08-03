@@ -3413,3 +3413,34 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 设置总览的实际数据量较大时仍依赖现有主滚动容器；若后续要做到完全无滚动，需要另行设计分页或折叠策略。
 - 执行 `agents:commit` 固化本次设置 UI 改版。
+
+## 284. 2026-08-03 - fix(canvas): 收紧连接点视觉与卡片间距
+
+**修改范围**
+- 将 Canvas Notebook 及其他卡片的四向连接端点移到卡片边缘外侧，连接线也复用新的端点几何，避免圆点压住卡片边框。
+- 把连接端点拆成低对比度视觉指示器和更大的透明命中区：默认显示 `3px / 0.28 opacity` 小圆点，拖拽命中仍保留 `10px` 交互范围，目标端点可在拖拽状态下增强反馈。
+
+**修改文件**
+- `apps/web/src/components/canvas/CanvasConnectionLayer.tsx`
+- `apps/web/src/styles/workspace-ui-v4.css`
+- `tests/unit/canvas-connection-port-geometry.test.ts`
+
+**当前设计决策**
+1. 连接端点统一使用 `PORT_OFFSET = 10`，保持卡片、连接线、端口命中计算的几何一致性。
+2. 交互命中层与视觉层分离，降低常态画布噪声，同时不牺牲端口拖拽的可操作性。
+3. 不新增独立连接组件体系，沿用现有 `CanvasConnectionLayer` 和工作区 token/CSS 语言。
+
+**已运行验证**
+- 定向 Canvas 回归：6/6 通过，覆盖端口几何、Notebook 连接、连接清理及右键框选菜单。
+- Root TypeScript、Architecture TypeScript、测试类型检查（639 文件）全部通过。
+- Vite production build：2621 modules，构建成功。
+- 应用内浏览器刷新后确认 Notebook 四个端点均在卡片外侧；DOM 检查确认命中半径为 10、视觉半径为 3、默认透明度为 0.28。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：桌面环境没有系统 `npm`，使用 bundled Node 与仓库底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建或长距离画布拖拽 E2E。
+
+**风险与下一步**
+- 极高缩放比例或密集卡片布局下，端点间距仍需结合真实连接拖动场景持续观察。
+- 执行 `agents:commit` 固化本次 Canvas 端口视觉修复。

@@ -710,6 +710,14 @@
   animation: kk-canvas-connection-flow 1.8s linear infinite;
 }
 
+.kk-canvas-connection-port-indicator {
+  transition: opacity 140ms ease;
+}
+
+.kk-canvas-connection-port-group:hover .kk-canvas-connection-port-indicator {
+  opacity: 0.72 !important;
+}
+
 @keyframes kk-canvas-connection-flow {
   to { stroke-dashoffset: -26; }
 }

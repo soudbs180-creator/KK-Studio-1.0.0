@@ -32,12 +32,14 @@ const getNodeBounds = (node: CanvasConnectionNode) => ({
   bottom: node.position.y,
 });
 
+const PORT_OFFSET = 10;
+
 const getPortPoint = (node: CanvasConnectionNode, side: CanvasConnectionSide) => {
   const bounds = getNodeBounds(node);
-  if (side === 'top') return { x: node.position.x, y: bounds.top };
-  if (side === 'bottom') return { x: node.position.x, y: bounds.bottom };
-  if (side === 'left') return { x: bounds.left, y: node.position.y - node.height / 2 };
-  return { x: bounds.right, y: node.position.y - node.height / 2 };
+  if (side === 'top') return { x: node.position.x, y: bounds.top - PORT_OFFSET };
+  if (side === 'bottom') return { x: node.position.x, y: bounds.bottom + PORT_OFFSET };
+  if (side === 'left') return { x: bounds.left - PORT_OFFSET, y: node.position.y - node.height / 2 };
+  return { x: bounds.right + PORT_OFFSET, y: node.position.y - node.height / 2 };
 };
 
 const PORTS: CanvasConnectionSide[] = ['top', 'right', 'bottom', 'left'];
@@ -159,26 +161,37 @@ export const CanvasConnectionLayer: React.FC<CanvasConnectionLayerProps> = ({ no
       })}
       {nodes.flatMap((node) => PORTS.map((port) => {
         const point = getPortPoint(node, port);
+        const isTarget = portDrag?.targetNodeId === node.id && portDrag.targetPort === port;
         return (
-          <circle
+          <g
             key={`${node.id}:${port}`}
-            cx={point.x}
-            cy={point.y}
-            r={4}
-            fill="var(--kk-morphic-panel)"
-            stroke="var(--kk-morphic-action)"
-            strokeWidth={1.5}
-            data-connection-target="true"
-            data-node-id={node.id}
-            data-port={port}
-            aria-label={`Connect ${port} port of ${node.id}`}
-            style={{
-              pointerEvents: 'auto',
-              cursor: 'crosshair',
-              opacity: portDrag?.targetNodeId === node.id && portDrag.targetPort === port ? 1 : 0.55,
-            }}
-            onPointerDown={(event) => handlePortPointerDown(event, node.id, port)}
-          />
+            className="kk-canvas-connection-port-group"
+          >
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={10}
+              fill="transparent"
+              data-connection-target="true"
+              data-node-id={node.id}
+              data-port={port}
+              aria-label={`Connect ${port} port of ${node.id}`}
+              style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
+              onPointerDown={(event) => handlePortPointerDown(event, node.id, port)}
+            />
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={isTarget ? 4 : 3}
+              fill="var(--kk-morphic-panel)"
+              stroke="var(--kk-morphic-action)"
+              strokeWidth={isTarget ? 1.5 : 1}
+              className="kk-canvas-connection-port-indicator"
+              data-connection-indicator="true"
+              aria-hidden="true"
+              style={{ opacity: isTarget ? 0.9 : 0.28, pointerEvents: 'none' }}
+            />
+          </g>
         );
       }))}
       {portDrag && (
