@@ -17,6 +17,18 @@ export const updateCanvasDrawingsOnCanvas = (
   };
 };
 
+export const removeCanvasConnectionsForNodes = (
+  canvas: Canvas,
+  nodeIds: readonly string[],
+): Canvas => {
+  const targetIds = new Set(nodeIds.filter(Boolean));
+  if (targetIds.size === 0 || !canvas.connections?.length) return canvas;
+  const connections = canvas.connections.filter((connection) => (
+    !targetIds.has(connection.sourceNodeId) && !targetIds.has(connection.targetNodeId)
+  ));
+  return connections.length === canvas.connections.length ? canvas : { ...canvas, connections };
+};
+
 export const moveCanvasDrawingsOnCanvas = (
   canvas: Canvas,
   ids: string[],
@@ -57,6 +69,7 @@ export const updateCanvasConnectionOnCanvas = (
 const resolveNodePosition = (canvas: Canvas, nodeId: string): CanvasPoint | undefined => (
   canvas.promptNodes.find((node) => node.id === nodeId)?.position
   || canvas.imageNodes.find((node) => node.id === nodeId)?.position
+  || canvas.noteNodes?.find((node) => node.id === nodeId)?.position
   || canvas.workflow?.nodes.find((node) => node.id === nodeId)?.position
 );
 

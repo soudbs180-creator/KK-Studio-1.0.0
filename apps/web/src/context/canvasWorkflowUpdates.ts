@@ -2,6 +2,7 @@ import type { Canvas, WorkflowNode } from '../types';
 import { canvasToWorkflow } from '../workflow/adapters/canvasToWorkflow.ts';
 import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds.ts';
+import { removeCanvasConnectionsForNodes } from './canvasDrawingConnectionOperations.ts';
 
 export function addCanvasWorkflowNode(canvas: Canvas, node: WorkflowNode): Canvas {
     if (!isWorkflowUtilityNodeKind(node.kind)) {
@@ -137,12 +138,12 @@ export function deleteCanvasWorkflowNode(canvas: Canvas, id: string): Canvas {
         && validNodeIds.has(edge.to)
     ));
 
-    return {
+    return removeCanvasConnectionsForNodes({
         ...canvas,
         workflow: {
             ...workflow,
             nodes,
             edges,
         },
-    };
+    }, [id]);
 }

@@ -3345,3 +3345,37 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 电商真实文件解析、分析结果数量增长以及 Provider/队列生产链路仍需连接 API 的受控环境验收；当前本地布局与交互回归已覆盖。
 - 执行 `agents:commit` 固化本次完整工作区改动，后续继续处理外部门禁与真实链路验收。
+
+## 282. 2026-08-03 - fix(canvas): 补齐 Notebook 连接与悬空连接清理
+
+**修改范围**
+- 重构 `canvasGenerationSubmission` 的执行上下文、选择提示、批量输入和队列提交逻辑，保持能力过滤、幂等键、用户确认和失败通知语义不变。
+- 连接创建补齐 `noteNodes` 位置解析，使 Notebook 与 Prompt/Image/Workflow 一样支持四向连接端口。
+- 删除 Image、Prompt、Workflow、Notebook 时同步移除以被删节点为端点的独立连接，避免连接只等到持久化清洗才消失。
+- 新增批量生成提交和 Notebook 连接回归测试，覆盖混合能力过滤、零目标阻止提交、队列失败保留输入状态及悬空连接清理。
+
+**修改文件**
+- `apps/web/src/canvas/canvasGenerationSubmission.ts`
+- `apps/web/src/context/{CanvasContext,canvasDrawingConnectionOperations,canvasPromptImageLinks,canvasWorkflowUpdates}.ts`
+- `tests/unit/{canvas-generation-submission,canvas-drawing-connection-operations}.test.ts`
+
+**当前设计决策**
+1. 批量生成提交继续统一走 `generation.createBatchJob`，仅把可变的选择提示、输入构造和授权上下文拆成小函数，避免重复创建 Prompt 卡片。
+2. 连接清理在删除操作的纯变换层完成，保留现有历史栈和持久化清洗作为第二道兼容保障。
+3. Notebook 使用现有 `CanvasCardPresentation` 和连接端口模型，不新增平行卡片或连接渲染体系。
+
+**已运行验证**
+- Full Unit：2438 项，2436 通过、2 项跳过、0 失败。
+- 定向批量生成提交与连接测试通过；新增测试类型检查纳入 637 个测试文件。
+- Root/Architecture TypeScript、服务端 119 文件语法通过。
+- Architecture 全链与 Governance 全链通过；maintainability ratchet 未增长。
+- Shared、UI、API Client 类型/构建与 Web Vite production build（2620 modules）通过。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未原样运行 `npm run verify:changes`：桌面环境没有系统 `npm`/`npx`，改用 bundled Node 和仓库底层脚本完成等价检查。
+- 未执行真实 Provider/OAuth、支付、生产部署、移动端原生构建、受控 PostgreSQL 或连接端口的真实浏览器拖动验收。
+
+**风险与下一步**
+- 真实 Provider/队列结果回填、跨设备连接同步和大画布端口 hover 性能仍需连接 API 的受控 E2E 验收。
+- 执行 `agents:commit` 固化本次工作区改动。

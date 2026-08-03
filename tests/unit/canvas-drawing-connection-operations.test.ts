@@ -4,9 +4,11 @@ import { test } from 'node:test';
 import {
   createCanvasConnectionOnCanvas,
   moveCanvasDrawingsOnCanvas,
+  removeCanvasConnectionsForNodes,
   updateCanvasDrawingsOnCanvas,
 } from '../../apps/web/src/context/canvasDrawingConnectionOperations.ts';
 import type { Canvas } from '../../apps/web/src/types.ts';
+import { createCanvasCardPresentation } from '../../apps/web/src/context/canvasPresentationMigration.ts';
 
 const canvas = (): Canvas => ({
   id: 'canvas-1',
@@ -40,4 +42,26 @@ test('independent connection ports are inferred from node placement', () => {
     createdAt: result?.createdAt,
     updatedAt: result?.updatedAt,
   });
+});
+
+test('Notebook cards participate in connections and deleted nodes do not leave dangling links', () => {
+  const original = {
+    ...canvas(),
+    noteNodes: [{
+      id: 'note-1',
+      title: 'Notebook',
+      position: { x: 0, y: 360 },
+      width: 320,
+      height: 240,
+      elements: [],
+      presentation: createCanvasCardPresentation('notebook', 'column', 'standard'),
+      createdAt: 1,
+      updatedAt: 1,
+    }],
+  };
+  const connection = createCanvasConnectionOnCanvas(original, 'prompt-1', 'note-1', () => 'note');
+  assert.ok(connection);
+  const connected = { ...original, connections: [connection] };
+  const cleaned = removeCanvasConnectionsForNodes(connected, ['note-1']);
+  assert.deepEqual(cleaned.connections, []);
 });

@@ -31,7 +31,7 @@ import {
 import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
-import { createCanvasConnectionOnCanvas, deleteCanvasConnectionOnCanvas, moveCanvasDrawingsOnCanvas, updateCanvasConnectionOnCanvas, updateCanvasDrawingsOnCanvas, upsertCanvasConnectionOnCanvas } from './canvasDrawingConnectionOperations';
+import { createCanvasConnectionOnCanvas, deleteCanvasConnectionOnCanvas, moveCanvasDrawingsOnCanvas, removeCanvasConnectionsForNodes, updateCanvasConnectionOnCanvas, updateCanvasDrawingsOnCanvas, upsertCanvasConnectionOnCanvas } from './canvasDrawingConnectionOperations';
 import {
     DEFAULT_CANVAS,
     DEFAULT_STATE,
@@ -3323,11 +3323,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const deleteNoteNode = useCallback((id: string) => {
         pushToHistory();
-        updateCanvas(canvas => ({
+        updateCanvas(canvas => removeCanvasConnectionsForNodes({
             ...canvas,
             noteNodes: (canvas.noteNodes || []).filter(note => note.id !== id),
             lastModified: Date.now(),
-        }));
+        }, [id]));
     }, [pushToHistory, updateCanvas]);
 
     // [Performance] Cache the context value so high-frequency state like viewportCenter does not rerender every consumer.

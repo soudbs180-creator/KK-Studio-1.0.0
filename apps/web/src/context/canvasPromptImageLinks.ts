@@ -1,4 +1,5 @@
 import { GenerationMode, type Canvas } from '../types/index.ts';
+import { removeCanvasConnectionsForNodes } from './canvasDrawingConnectionOperations.ts';
 
 export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
     const hasMatchingDrawing = canvas.drawings?.some(d => d.bindingNodeId === id);
@@ -6,7 +7,7 @@ export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
         ? (canvas.drawings || []).filter(d => d.bindingNodeId !== id)
         : canvas.drawings;
 
-    return {
+    return removeCanvasConnectionsForNodes({
         ...canvas,
         imageNodes: canvas.imageNodes.filter(node => node.id !== id),
         promptNodes: canvas.promptNodes.map(prompt => ({
@@ -15,7 +16,7 @@ export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
             sourceImageId: prompt.sourceImageId === id ? undefined : prompt.sourceImageId,
         })),
         drawings: nextDrawings,
-    };
+    }, [id]);
 }
 
 export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
@@ -97,12 +98,15 @@ export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
         ? (canvas.drawings || []).filter(d => !d.bindingNodeId || !toDeletePromptIds.has(d.bindingNodeId))
         : canvas.drawings;
 
-    return {
+    const removedImageIds = canvas.imageNodes
+        .filter(image => image.parentPromptId && ecommercePromptIds.has(image.parentPromptId))
+        .map(image => image.id);
+    return removeCanvasConnectionsForNodes({
         ...canvas,
         promptNodes: nextPromptNodes,
         imageNodes: nextImageNodes,
         drawings: nextDrawings,
-    };
+    }, [...toDeletePromptIds, ...removedImageIds]);
 }
 
 export function linkCanvasPromptToImage(canvas: Canvas, promptId: string, imageId: string): Canvas {

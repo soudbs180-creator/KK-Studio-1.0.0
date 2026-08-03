@@ -106,7 +106,9 @@ function buildCanvasGenerationBatchInput(
   };
 }
 
-function buildCanvasExecutionScope(args: SubmitCanvasGenerationBatchArgs): Record<string, unknown> {
+type CanvasGenerationExecutionArgs = Omit<SubmitCanvasGenerationBatchArgs, 'onSubmitted'>;
+
+function buildCanvasExecutionScope(args: CanvasGenerationExecutionArgs): Record<string, unknown> {
   return {
     currentPage: 'canvas',
     activeCanvas: args.activeCanvas,
@@ -119,7 +121,7 @@ function buildCanvasExecutionScope(args: SubmitCanvasGenerationBatchArgs): Recor
 }
 
 async function executeCanvasGenerationBatch(
-  args: Omit<SubmitCanvasGenerationBatchArgs, 'onSubmitted'>,
+  args: CanvasGenerationExecutionArgs,
   batchInput: CanvasGenerationBatchInput,
 ): Promise<void> {
   const executionScope = buildCanvasExecutionScope(args);
