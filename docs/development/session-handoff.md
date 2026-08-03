@@ -3493,3 +3493,30 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 当前补偿闭环已具备 fencing、补偿标记、事件/快照恢复和 Web Runtime 可恢复副作用清理；尚未部署独立后台 compensator worker。生产上线前必须补做受控 PostgreSQL rehearsal、并发压测、死锁解除和租约丢失故障注入。
 - 本次成果来自 `codex/agent-quality`，现已合并至 `main`。
+
+## 286. 2026-08-03 - chore(merge): 将本地功能分支合并到 main
+
+**修改范围**
+- 将 `codex/agent-quality` 合并到 `main`；`codex/morphic-ui-refactor` 已是 `main` 祖先，确认合并为 no-op。
+- 解决唯一冲突 `docs/development/session-handoff.md`：保留 `main` 的 #271-#284 记录，并将协调能力记录保留为 #285。
+- 追加本次合并交接记录，合并提交由 `agents:commit` 生成。
+
+**当前设计决策**
+1. 以当前 `main` 源码和治理事实为准，不用历史分支内容覆盖后续 UI、Canvas 或版本治理修复。
+2. 合并分支的协调能力实现、迁移、API 契约和治理入口全部保留；文档编号顺延以避免重复。
+3. 本地分支不删除，便于后续审计；`origin/main` 未推送，等待明确发布动作。
+
+**已运行验证**
+- `architecture:check` 全链通过，含 Agent coordination guard。
+- `governance:check` 全链通过；`governance:version/current/docs` 与 OpenSpec 状态一致。
+- Root/Architecture TypeScript、641 个测试文件语义类型检查、服务端 121 文件语法检查通过。
+- 协调策略与 API/迁移契约测试 `6/6` 通过。
+- Shared、UI、API client 构建与 Web Vite production build（2623 modules）通过。
+- `git diff --check` 与合并后 `agents:status` 通过，工作区干净。
+
+**未运行验证及原因**
+- 未原样运行 `npm run agents:status` 或 `npm run verify:changes`：当前桌面环境没有系统 `npm`，并且 pnpm fallback 的 ignored-build policy 会中止安装；已使用 bundled Node 直接运行等价检查。
+- 未执行完整 Unit/Integration/Contract/E2E 聚合、真实 PostgreSQL migration rehearsal、Provider/OAuth、支付或生产部署验证。
+
+**风险与下一步**
+- `main` 当前尚未推送到 `origin/main`；发布前仍需按项目门禁执行完整 `verify:changes` 及受控数据库/真实链路验收。
