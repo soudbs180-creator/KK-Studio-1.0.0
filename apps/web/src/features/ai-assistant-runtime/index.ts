@@ -77,6 +77,15 @@ export { AI_MANAGEMENT_ACTIONS, AI_MANAGEMENT_SKILL_TOOL_OPTIONS } from './runti
 export type { AiManagementActionKey, AiManagementSkillToolOption, AiManagementUiAction } from './runtime/aiManagementActions.ts';
 export { agentPermissionPolicy } from './runtime/AgentPermissionPolicy.ts';
 export { agentAuditLog } from './runtime/AgentAuditLog.ts';
+export {
+  admitAgentPlan,
+  startAgentCoordinationHeartbeat,
+  transitionAgentPlan,
+} from './runtime/agentCoordinationGate.ts';
+export type {
+  AgentCoordinationAdmissionResult,
+  AgentCoordinationHandle,
+} from './runtime/agentCoordinationGate.ts';
 
 export { toolRegistryInstance, AgentToolRegistry } from './tools/ToolRegistry.ts';
 export type {

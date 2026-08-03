@@ -3444,3 +3444,52 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 极高缩放比例或密集卡片布局下，端点间距仍需结合真实连接拖动场景持续观察。
 - 执行 `agents:commit` 固化本次 Canvas 端口视觉修复。
+## 285. 2026-08-02 - feat: 建立多 Agent 全局协调与生产治理闭环
+
+**修改范围**
+- 在 `packages/shared` 增加 Agent 协调 DTO、状态、角色、优先级、事件和指标契约；客户端增加 admission、snapshot、event、transition、heartbeat、metrics API。
+- 在 `services/api/lib/agent-coordinator` 建立服务端全局仲裁：业务优先级分级裁决、角色准入、活动任务/集群实例/资源数量红线、CAS `version + epoch`、幂等命令、资源租约、fencing、wait-for 死锁检测、冲突补偿计数和聚合指标。
+- 在 `infrastructure/database/migrations/032_agent_coordination.sql` 增加任务、资源声明、等待边、事件、命令回执和 durable snapshot 表；每个协调事件自动写入 owner-scoped 快照，事件 cursor 用于乱序/丢失恢复。
+- Web Agent Runtime 接入运行前准入、运行状态 CAS、heartbeat、租约丢失中止、终态释放和未启动任务取消释放；本地缓存只复用中间态，不授予执行权。
+- 增加架构治理门禁、生产规范、生成提示词、迁移部署入口、协调策略单测和 API/迁移集成契约。
+
+**当前设计决策**
+1. 服务端协调器是唯一全局状态权威；公开 Agent 只能以 `executor` 角色进入，`coordinator`/`compensator` 等特权角色由服务端保留。
+2. 优先级来自版本化策略的业务优先级、风险和 deadline 组合；只能抢占尚未开始 mutation 的低优先级任务，运行中任务必须 fencing 后走补偿/对账。
+3. 本地 `AgentRunStore` 和 durable snapshot 都是中间态复用与恢复缓存，任何无法证明 owner、epoch、version、policy 的缓存命中都 fail closed。
+4. 发布分级明确区分 Green（短链路低风险）、Yellow（有补偿但需监控冲突）和 Red（无全局仲裁/死锁防护/fencing/补偿，禁止上线）。
+
+**修改文件**
+- `packages/shared/src/contracts/dto/agent-coordination.ts`
+- `packages/shared/src/contracts/client/kk-api-client.ts`
+- `services/api/lib/agent-coordinator/policy.js`
+- `services/api/lib/agent-coordinator/store.js`
+- `services/api/routes/ai-assistant.js`
+- `apps/web/src/features/ai-assistant-runtime/runtime/agentCoordinationGate.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentRuntime.ts`
+- `apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts`
+- `infrastructure/database/migrations/032_agent_coordination.sql`
+- `scripts/ops/vps/bootstrap-kk-vps.sh`
+- `scripts/ops/vps/deploy-kk-vps.sh`
+- `scripts/ops/postgres/import-runtime-into-vps.sh`
+- `scripts/ops/setup/setup-database.bat`
+- `scripts/governance/architecture/check-agent-coordination-guard.mjs`
+- `docs/governance/MULTI_AGENT_COORDINATION_STANDARD.md`
+- `docs/ai-assistant/multi-agent-production-prompt.md`
+- `tests/unit/agent-coordination-policy.test.ts`
+- `tests/integration/agent-coordination-contract.test.ts`
+- `docs/development/session-handoff.md`
+
+**已运行验证**
+- 协调策略单测 `3/3`、迁移/API 契约集成测试 `3/3`、协调治理门禁通过；服务端语法检查 `121` 个文件通过，shared 类型检查通过。
+- 完整 `architecture:check` 通过；治理脚本逐项逻辑校验通过，Provider Registry/Catalog 在 shared 产物和只读模块解析补齐后通过；`git diff --check` 通过。
+- E2E 契约 `11/11` 通过；shared CJS 产物已用 bundled `esbuild` 重建。
+
+**未运行验证及原因**
+- 根 workspace 当前没有安装 `@kk/shared`、`express`、`dotenv` 等既有依赖链接，完整 Unit/Integration/Contract 和 tests typecheck 不能全绿；失败均为 `ERR_MODULE_NOT_FOUND`/`TS2307`，未指向本次协调代码。
+- 聚合 `build` 未能原样完成：项目脚本调用系统 `npm`，当前环境只有 bundled `pnpm`/Node；shared 单包构建已通过，Web 全量构建仍需完整 workspace 依赖。
+- 未执行真实 PostgreSQL migration rehearsal、压测、消息乱序/丢失故障注入、Provider/OAuth、支付或生产部署验证。
+
+**风险与下一步**
+- 当前补偿闭环已具备 fencing、补偿标记、事件/快照恢复和 Web Runtime 可恢复副作用清理；尚未部署独立后台 compensator worker。生产上线前必须补做受控 PostgreSQL rehearsal、并发压测、死锁解除和租约丢失故障注入。
+- 本次成果来自 `codex/agent-quality`，现已合并至 `main`。

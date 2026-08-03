@@ -30,6 +30,7 @@ PAYMENT_RECHARGE_HARDENING_MIGRATION="${PAYMENT_RECHARGE_HARDENING_MIGRATION:-${
 PROVIDER_ROUTING_PRIORITY_MIGRATION="${PROVIDER_ROUTING_PRIORITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
 PAIRED_RUNTIMES_MIGRATION="${PAIRED_RUNTIMES_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/030_paired_runtimes.sql}"
 AGENT_EXTENSIONS_MIGRATION="${AGENT_EXTENSIONS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/031_agent_extensions.sql}"
+AGENT_COORDINATION_MIGRATION="${AGENT_COORDINATION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/032_agent_coordination.sql}"
 RUNTIME_SQL="${EXPORT_ROOT}/runtime-data.sql"
 RUNTIME_SCHEMA_SQL="${EXPORT_ROOT}/runtime-schema.sql"
 
@@ -108,7 +109,8 @@ fi
 for runtime_migration in \
   "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
   "${PAIRED_RUNTIMES_MIGRATION}" \
-  "${AGENT_EXTENSIONS_MIGRATION}"; do
+  "${AGENT_EXTENSIONS_MIGRATION}" \
+  "${AGENT_COORDINATION_MIGRATION}"; do
   if [[ ! -f "${runtime_migration}" ]]; then
     echo "[import-runtime-into-vps] Missing runtime capability migration: ${runtime_migration}" >&2
     exit 1
@@ -174,7 +176,8 @@ echo "[import-runtime-into-vps] Applying provider routing, paired runtime and ag
 for runtime_migration in \
   "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
   "${PAIRED_RUNTIMES_MIGRATION}" \
-  "${AGENT_EXTENSIONS_MIGRATION}"; do
+  "${AGENT_EXTENSIONS_MIGRATION}" \
+  "${AGENT_COORDINATION_MIGRATION}"; do
   psql "${TARGET_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${runtime_migration}"
 done
 

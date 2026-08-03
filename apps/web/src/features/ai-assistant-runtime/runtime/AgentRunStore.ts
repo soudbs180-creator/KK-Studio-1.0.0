@@ -1,6 +1,7 @@
 // 简体中文：Agent 运行历史记录持久化仓库 (Agent Run Store)
 
 import type {
+  AgentCoordinationRole,
   AgentExecutionTarget,
   AgentRunDto,
   AgentRunStatus,
@@ -29,6 +30,11 @@ export interface AgentRunRecord {
   executionAuthority?: 'local_validated' | 'server_projection';
   executionTarget?: AgentExecutionTarget;
   pairedRuntimeId?: string;
+  coordinationTaskId?: string;
+  coordinationAgentId?: string;
+  coordinationRole?: AgentCoordinationRole;
+  coordinationVersion?: number;
+  coordinationEpoch?: number;
 }
 
 export type AgentRunStoreListener = (runs: AgentRunRecord[]) => void;

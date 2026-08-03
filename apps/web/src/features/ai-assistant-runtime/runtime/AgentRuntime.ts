@@ -74,6 +74,12 @@ import {
   MAX_AGENT_REPLANS,
   type AgentReplanRecoveryEvidence,
 } from './agentReplanPolicy.ts';
+import {
+  admitAgentPlan,
+  startAgentCoordinationHeartbeat,
+  transitionAgentPlan,
+  type AgentCoordinationAdmissionResult,
+} from './agentCoordinationGate.ts';
 import { createAgentReplan } from './agentReplanPlanner.ts';
 import {
   createAgentStepPayload as actionPayloadWithIdempotency,
@@ -647,6 +653,43 @@ export class AgentRuntime {
     });
   }
 
+  private async ensureCoordinationAdmission(
+    record: AgentRunRecord,
+    plan: AssistantPlan,
+    context: AssistantExecutionContext,
+  ): Promise<AgentCoordinationAdmissionResult> {
+    if (record.coordinationTaskId && record.coordinationAgentId
+      && record.coordinationRole && record.coordinationVersion && record.coordinationEpoch) {
+      return {
+        required: true,
+        allowed: true,
+        handle: {
+          taskId: record.coordinationTaskId,
+          agentId: record.coordinationAgentId,
+          role: record.coordinationRole,
+          version: record.coordinationVersion,
+          epoch: record.coordinationEpoch,
+        },
+      };
+    }
+    const admission = await admitAgentPlan(
+      record.id,
+      plan,
+      context.getSanitizedProjectContext?.(),
+      record.updatedAt,
+    );
+    if (admission.handle) {
+      agentRunStore.updateRun(record.id, {
+        coordinationTaskId: admission.handle.taskId,
+        coordinationAgentId: admission.handle.agentId,
+        coordinationRole: admission.handle.role,
+        coordinationVersion: admission.handle.version,
+        coordinationEpoch: admission.handle.epoch,
+      });
+    }
+    return admission;
+  }
+
   executePendingRun(runId: string, executorContext: AssistantExecutionContext): Promise<void> {
     const existingExecution = this.runExecutions.get(runId);
     if (existingExecution) return existingExecution;
@@ -799,6 +842,18 @@ export class AgentRuntime {
       }
       throw new Error(`Explicit user confirmation is required for agent run: ${runId}`);
     }
+    const admission = await this.ensureCoordinationAdmission(record, plan, executorContext);
+    if (!admission.allowed) {
+      const blockedByContention = admission.reason === 'resource_conflict'
+        || admission.reason === 'deadlock_detected';
+      const blockedRecord = updateOwnedRun({
+        status: blockedByContention ? 'waiting_execution' : 'failed',
+        nextStep: `Agent coordination blocked execution: ${admission.reason || 'unknown reason'}.`,
+      });
+      this.syncRunToBackend(blockedRecord);
+      return;
+    }
+    const coordinationHandle = admission.handle;
     const executionStartedAt = Date.now();
     const executionAuthorizationScope = confirmedAuthorizationScope
       || captureAssistantAuthorizationScope(executorContext);
@@ -810,12 +865,35 @@ export class AgentRuntime {
     const abortController = new AbortController();
     this.runAbortControllers.set(runId, abortController);
 
+    if (coordinationHandle) {
+      let started = false;
+      try {
+        started = await transitionAgentPlan(coordinationHandle, 'running');
+      } catch {
+        started = false;
+      }
+      if (!started) {
+        this.runAbortControllers.delete(runId);
+        const failedRecord = updateOwnedRun({
+          status: 'failed',
+          nextStep: 'Agent coordination lease or epoch became stale before execution started.',
+        });
+        this.syncRunToBackend(failedRecord);
+        return;
+      }
+    }
+    const stopCoordinationHeartbeat = coordinationHandle
+      ? startAgentCoordinationHeartbeat(coordinationHandle, () => abortController.abort('coordination_lease_lost'))
+      : undefined;
+
     const runningRecord = updateOwnedRun({
       status: 'running',
       confirmationGrantedAt: confirmationGranted ? explicitGrant?.grantedAt : record.confirmationGrantedAt,
       totalSteps: steps.length,
       completedStepIds: [...completed],
       stepResults,
+      coordinationVersion: coordinationHandle?.version,
+      coordinationEpoch: coordinationHandle?.epoch,
     });
     this.syncRunToBackend(runningRecord);
 
@@ -1051,11 +1129,30 @@ export class AgentRuntime {
       void writeHandoff(updated, executionOwnerId);
       throw error;
     } finally {
+      stopCoordinationHeartbeat?.();
       if (this.runAbortControllers.get(runId) === abortController) {
         this.runAbortControllers.delete(runId);
       }
       const finalRecord = getOwnedRun();
       if (finalRecord && getRuntimeOwnerId() === executionOwnerId) {
+        if (coordinationHandle && ['completed', 'failed', 'cancelled'].includes(finalRecord.status)) {
+          const finalCoordinationState = finalRecord.status === 'cancelled'
+            ? 'cancelled'
+            : finalRecord.status === 'completed'
+              ? 'completed'
+              : 'failed';
+          let released = false;
+          try {
+            released = await transitionAgentPlan(coordinationHandle, finalCoordinationState, finalRecord.nextStep);
+          } catch {
+            released = false;
+          }
+          if (!released) {
+            updateOwnedRun({
+              nextStep: `${finalRecord.nextStep || 'Execution finished.'} Coordination release is pending reconciliation.`,
+            });
+          }
+        }
         this.syncRunToBackend(finalRecord);
       }
     }
@@ -1083,6 +1180,32 @@ export class AgentRuntime {
           : 'Execution and currently known recoverable generation jobs were cancelled by the user.',
       });
       this.syncRunToBackend(updated);
+    }
+    if (!activeController && record.coordinationTaskId && record.coordinationAgentId
+      && record.coordinationRole && record.coordinationVersion && record.coordinationEpoch) {
+      const coordinationHandle = {
+        taskId: record.coordinationTaskId,
+        agentId: record.coordinationAgentId,
+        role: record.coordinationRole,
+        version: record.coordinationVersion,
+        epoch: record.coordinationEpoch,
+      };
+      let released = false;
+      try {
+        released = await transitionAgentPlan(
+          coordinationHandle,
+          'cancelled',
+          'Agent run was cancelled before execution started.',
+        );
+      } catch {
+        released = false;
+      }
+      if (!released) {
+        updated = agentRunStore.updateRunForOwner(cancellationOwnerId, runId, {
+          nextStep: `${updated.nextStep || 'Execution cancelled.'} Coordination release is pending reconciliation.`,
+        });
+        this.syncRunToBackend(updated);
+      }
     }
     if (!activeController) {
       void writeHandoff(updated, cancellationOwnerId);

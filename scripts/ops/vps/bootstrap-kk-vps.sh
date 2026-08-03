@@ -32,6 +32,7 @@ PAYMENT_RECHARGE_HARDENING_MIGRATION="${KK_PAYMENT_RECHARGE_HARDENING_MIGRATION:
 PROVIDER_ROUTING_PRIORITY_MIGRATION="${KK_PROVIDER_ROUTING_PRIORITY_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/029_provider_connection_routing_priority.sql}"
 PAIRED_RUNTIMES_MIGRATION="${KK_PAIRED_RUNTIMES_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/030_paired_runtimes.sql}"
 AGENT_EXTENSIONS_MIGRATION="${KK_AGENT_EXTENSIONS_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/031_agent_extensions.sql}"
+AGENT_COORDINATION_MIGRATION="${KK_AGENT_COORDINATION_MIGRATION:-${REPO_ROOT}/infrastructure/database/migrations/032_agent_coordination.sql}"
 NODE_MAJOR="${KK_NODE_MAJOR:-24}"
 
 require_root() {
@@ -152,7 +153,8 @@ setup_postgres() {
   for runtime_migration in \
     "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
     "${PAIRED_RUNTIMES_MIGRATION}" \
-    "${AGENT_EXTENSIONS_MIGRATION}"; do
+    "${AGENT_EXTENSIONS_MIGRATION}" \
+    "${AGENT_COORDINATION_MIGRATION}"; do
     if [[ ! -f "${runtime_migration}" ]]; then
       echo "[bootstrap-kk-vps] Required runtime capability migration not found at ${runtime_migration}." >&2
       exit 1
@@ -177,6 +179,7 @@ setup_postgres() {
   PROVIDER_ROUTING_PRIORITY_MIGRATION="$(realpath "${PROVIDER_ROUTING_PRIORITY_MIGRATION}")"
   PAIRED_RUNTIMES_MIGRATION="$(realpath "${PAIRED_RUNTIMES_MIGRATION}")"
   AGENT_EXTENSIONS_MIGRATION="$(realpath "${AGENT_EXTENSIONS_MIGRATION}")"
+  AGENT_COORDINATION_MIGRATION="$(realpath "${AGENT_COORDINATION_MIGRATION}")"
   case "${REPO_BOOTSTRAP_SQL}" in
     "${REPO_ROOT}"/*) ;;
     *) echo "[bootstrap-kk-vps] Bootstrap SQL must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -231,7 +234,8 @@ setup_postgres() {
   for runtime_migration in \
     "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
     "${PAIRED_RUNTIMES_MIGRATION}" \
-    "${AGENT_EXTENSIONS_MIGRATION}"; do
+    "${AGENT_EXTENSIONS_MIGRATION}" \
+    "${AGENT_COORDINATION_MIGRATION}"; do
     case "${runtime_migration}" in
       "${REPO_ROOT}"/*) ;;
       *) echo "[bootstrap-kk-vps] Runtime capability migrations must stay inside ${REPO_ROOT}." >&2; exit 1 ;;
@@ -297,7 +301,8 @@ SQL
     -f "${PAYMENT_RECHARGE_HARDENING_MIGRATION}" \
     -f "${PROVIDER_ROUTING_PRIORITY_MIGRATION}" \
     -f "${PAIRED_RUNTIMES_MIGRATION}" \
-    -f "${AGENT_EXTENSIONS_MIGRATION}"
+    -f "${AGENT_EXTENSIONS_MIGRATION}" \
+    -f "${AGENT_COORDINATION_MIGRATION}"
 }
 
 install_runtime_templates() {

@@ -2,6 +2,7 @@ export * from "./client/kk-api-client.ts";
 export * from "./dto/admin-console.ts";
 export * from "./dto/agent-extension.ts";
 export * from "./dto/ai-assistant.ts";
+export * from "./dto/agent-coordination.ts";
 export * from "./dto/asset-library.ts";
 export * from "./dto/auth.ts";
 export * from "./dto/billing.ts";
