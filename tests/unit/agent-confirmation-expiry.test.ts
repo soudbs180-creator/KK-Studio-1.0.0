@@ -103,6 +103,7 @@ function ensureBoundConfirmationTool(): void {
     name: BOUND_TOOL_NAME,
     description: 'bound Session confirmation integration test',
     permission: 'confirm',
+    control: { effect: 'read' },
     inputSchema: { type: 'object' },
     handler: async () => {
       boundSessionExecutionCount += 1;

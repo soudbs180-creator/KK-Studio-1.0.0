@@ -3573,3 +3573,35 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 推送后确认 `main` 与 `origin/main` 同一提交且工作区干净；继续观察 Cloud Auto Deploy #503 的最终结果。
+
+## 289. 2026-08-04 - fix(ci): 修复 Unit 测试在协调门禁前卡住
+
+**修改范围**
+- 修复 `Cloud Auto Deploy` 的 Unit tests 长时间不退出问题。
+- 为两个只验证 owner/session confirmation 行为、不会修改业务状态的测试工具显式声明 `effect: 'read'`，避免它们被默认归类为 mutation 并调用真实协调 admission API。
+- 不修改生产 `AgentRuntime`、`ToolRegistry` 或协调协议，仅校正测试夹具的控制元数据。
+
+**修改文件**
+- `tests/unit/ai-control-plane-hardening.test.ts`
+- `tests/unit/agent-confirmation-expiry.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 测试工具必须按实际副作用声明 effect；纯等待与计数夹具使用 `read`，不借用真实服务端协调路径。
+2. mutation 协调门禁保持 fail closed，不为测试放宽生产安全边界。
+3. 保留 confirmation 权限测试：`test.boundSessionConfirmation` 仍为 `permission: 'confirm'`，只将其副作用分类校正为 read。
+
+**已运行验证**
+- 首次复现：完整 Unit 在 `test.ownerSwitchAwait` 等待 handler 时不退出；增加单测 timeout 后确认阻塞发生在协调 admission 前。
+- 定向回归：`agent-confirmation-expiry` 与 `ai-control-plane-hardening` 共 29/29 通过。
+- 完整 Unit：2441 通过、0 失败、2 跳过，69 suites，进程约 10 秒正常退出。
+- 测试语义类型检查：641 个测试文件通过。
+- 文档治理检查：274 个 Markdown 源，0 conflicts。
+- `git diff --check`：通过。
+
+**未运行验证及原因**
+- 未在本地原样运行完整 `verify:changes`：当前环境没有系统 `npm`；GitHub Actions 将在推送后执行完整链路。
+- 未本地执行 Vercel/VPS 发布，部署继续由 `Cloud Auto Deploy` 的后续 jobs 负责。
+
+**风险与下一步**
+- 风险低，变更仅影响测试夹具元数据。推送后观察新 workflow run 的 `verify`、`deploy-vps-api` 和 `deploy-vercel` 最终结论。

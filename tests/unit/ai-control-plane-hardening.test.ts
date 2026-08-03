@@ -516,7 +516,7 @@ test('an owner switch during an awaited tool stops the Run and persists the term
       name: 'test.ownerSwitchAwait',
       description: 'owner switch await guard',
       permission: 'safe',
-      control: { recovery: { reversible: true } },
+      control: { effect: 'read' },
       inputSchema: { type: 'object' },
       handler: async () => {
         signalStarted();
