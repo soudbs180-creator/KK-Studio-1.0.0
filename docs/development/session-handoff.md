@@ -3520,3 +3520,26 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - `main` 当前尚未推送到 `origin/main`；发布前仍需按项目门禁执行完整 `verify:changes` 及受控数据库/真实链路验收。
+
+## 287. 2026-08-03 - fix(ci): 在治理检查前构建 shared CJS 产物
+
+**修改范围**
+- 修复 GitHub Actions `Cloud Auto Deploy` 在 `governance:registry` 阶段无法加载 `@kk/shared/dist/index.cjs` 的问题。
+- 在 root/server 依赖安装后、架构与治理检查前新增 `npm run build -w packages/shared`，确保干净 CI runner 拥有 `@kk/shared` 的 CommonJS 构建产物。
+
+**当前设计决策**
+1. `packages/shared/dist/` 继续保持 ignored，不提交生成物；CI 显式生成它，避免依赖本机历史构建状态。
+2. 只构建 shared 包作为治理前置，不提前执行完整 Web build，保持验证链路顺序和耗时边界。
+3. Vercel 部署仍由 `deploy-vercel` job 负责，并继续要求 `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` secrets。
+
+**已运行验证**
+- 已从 `main` 创建隔离修复 worktree，确认 workflow YAML 差异仅新增 shared 前置构建步骤。
+- 本地 shared package build 已通过；修复目标对应的 `governance:registry` 依赖链已确认。
+- `git diff --check` 通过。
+
+**未运行验证及原因**
+- 未在本地重放完整 GitHub Actions runner；最终验证需推送后观察 Cloud Auto Deploy 的 `verify`、Vercel 和 VPS job。
+- 当前主工作区存在外部未提交改动，本次修复在隔离 worktree 完成，未触碰那些文件。
+
+**风险与下一步**
+- 推送后应确认 `governance:registry` 通过；若 Vercel job仍显示 skipped，再检查 GitHub Secrets 中的 Vercel 三项配置。
