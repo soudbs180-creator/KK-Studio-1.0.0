@@ -3605,3 +3605,35 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 
 **风险与下一步**
 - 风险低，变更仅影响测试夹具元数据。推送后观察新 workflow run 的 `verify`、`deploy-vps-api` 和 `deploy-vercel` 最终结论。
+
+## 290. 2026-08-05 - fix(settings): 修复移动模型中心工具栏挤压
+
+**修改范围**
+- 刷新 `origin` 后核对全部本地问题分支：`codex/agent-quality`、`codex/fix-ci-governance`、`codex/morphic-ui-refactor` 均已是 `main` 祖先，没有遗漏的独有提交需要再次合并。
+- 完整发布验证首次运行在 `verify:mobile-settings-smoke` 复现移动模型中心工具栏文案列被压缩的问题。
+- 在 Model Center V6 的移动断点恢复单列工具栏，使文案与操作区占满可用宽度；不改变桌面布局、组件结构或业务逻辑。
+
+**修改文件**
+- `apps/web/src/styles/settings-ui-v4.css`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 根因是文件后半段高优先级 V6 双列规则覆盖了前半段的移动单列规则；修复放在同一 V6 `max-width: 520px` 断点，避免继续依赖较低优先级的旧样式。
+2. 保留现有 smoke 的布局比例与单列断言作为回归门禁，不改测试阈值来掩盖真实压缩。
+3. 三个问题分支和 `origin/main` 均保留原状；本次只提交发布门禁暴露出的最小 CSS 修复与交接记录。
+
+**已运行验证**
+- `npm run agents:status`：通过，预检时工作区干净。
+- `git fetch --prune origin` 与祖先/差异核对：三个问题分支相对 `main` 均为 0 个独有提交，`main` 与 `origin/main` 同步。
+- 首次 `npm run verify:changes`：在既有移动设置 smoke 复现 `copyWidth=117.8125px / poolWidth=370px` 后按预期阻断推送。
+- 定向 `npm run verify:mobile-settings-smoke`：修复后通过。
+- 完整 `npm run verify:changes`：通过，覆盖架构、治理、依赖审计、类型检查、Local Runner、Spec、生产构建、Unit/Integration/Contract/E2E、移动/桌面设置、AI takeover、编码检查与画布性能基准。
+- `npm run verify:large-canvas-10k`：通过，11,103 节点 smoke、拖动与连接跟随均满足断言。
+- `git diff --check`：通过。
+
+**未运行验证及原因**
+- 未执行真实 PostgreSQL migration rehearsal、Provider/OAuth、支付或生产部署验证；本次仅修改移动端 CSS 响应式布局，不触及这些链路。
+
+**风险与下一步**
+- 风险低，规则只在 `max-width: 520px` 生效；桌面和平板布局继续使用既有 V6 几何。
+- 提交后推送 `main`，并观察 GitHub Actions 与外部 Vercel/VPS 部署结果；外部环境失败不能由本地 CSS 修复保证。

@@ -2036,6 +2036,21 @@
 }
 
 @media (max-width: 520px) {
+  .settings-panel .settings-console-content .settings-model-center-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-toolbar__copy,
+  .settings-panel .settings-console-content .settings-model-center-toolbar__actions {
+    width: 100% !important;
+  }
+
+  .settings-panel .settings-console-content .settings-model-center-toolbar__actions {
+    align-self: auto;
+    flex-wrap: wrap;
+  }
+
   .settings-panel .settings-console-content .settings-model-center-route {
     grid-template-columns: minmax(0, 1fr) !important;
     gap: 10px !important;
