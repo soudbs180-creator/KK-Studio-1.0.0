@@ -61,7 +61,14 @@ export class DeviceErrorBoundaryWrapper extends React.Component<
     const logger = getTestFlightLogger();
     if (logger) {
       const serialized = serializeError(error);
-      logger.logError(`[ERROR_BOUNDARY] ${serialized.message ?? JSON.stringify(serialized)}`);
+      const serializedMessage =
+        typeof serialized === 'object' &&
+        serialized !== null &&
+        'message' in serialized &&
+        typeof serialized.message === 'string'
+          ? serialized.message
+          : JSON.stringify(serialized);
+      logger.logError(`[ERROR_BOUNDARY] ${serializedMessage}`);
     }
     reportErrorToRemote({ error })
       .then(({ success, error: fetchError }) => {

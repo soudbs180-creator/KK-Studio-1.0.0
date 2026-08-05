@@ -10,7 +10,7 @@ const getURLFromArgs = (...args: Parameters<typeof fetch>) => {
   if (typeof urlArg === 'string') {
     url = urlArg;
   } else if (typeof urlArg === 'object' && urlArg !== null) {
-    url = urlArg.url;
+    url = 'url' in urlArg ? urlArg.url : urlArg.href;
   } else {
     url = null;
   }

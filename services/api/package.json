@@ -24,7 +24,7 @@
   "overrides": {
     "express-rate-limit": "^8.5.1",
     "path-to-regexp": "8.4.2",
-    "protobufjs": "7.6.4",
+    "protobufjs": "7.6.5",
     "undici": "^7.24.0",
     "qs": "6.15.2"
   }

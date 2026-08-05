@@ -26,29 +26,26 @@ function styleToBarColor(
   colorScheme = Appearance.getColorScheme()
 ) {
   const actual = colorScheme ?? "light";
-  let resolved:
-    | Exclude<StatusBarStyle, "auto" | "inverted">
-    | "light"
-    | "dark" = style as any;
+  let resolved: Exclude<StatusBarStyle, "auto" | "inverted">;
 
   if (style === "auto") resolved = actual === "light" ? "dark" : "light";
   else if (style === "inverted")
     resolved = actual === "light" ? "light" : "dark";
+  else resolved = style;
 
   return resolved === "light" ? "#FFFFFF" : "#000000";
 }
 
-export const StatusBar = React.forwardRef<any, StatusBarProps>(
-  function StatusBar({ style = "auto", ...props }, ref) {
-    const colorScheme = useColorScheme();
+/** Mirrors Expo's StatusBar while synchronizing its resolved color with the parent preview. */
+export function StatusBar({ style = "auto", ...props }: StatusBarProps) {
+  const colorScheme = useColorScheme();
 
-    useEffect(() => {
-      postColorToParent(styleToBarColor(style, colorScheme));
-    }, [style, colorScheme]);
+  useEffect(() => {
+    postColorToParent(styleToBarColor(style, colorScheme));
+  }, [style, colorScheme]);
 
-    return <ExpoStatusBar ref={ref} style={style} {...props} />;
-  }
-);
+  return <ExpoStatusBar style={style} {...props} />;
+}
 
 export const setStatusBarStyle = (style: StatusBarStyle, animated?: boolean) =>
   ExpoSB.setStatusBarStyle(style, animated);
@@ -61,7 +58,7 @@ export const setStatusBarHidden = (
 export const setStatusBarBackgroundColor = (
   backgroundColor: string,
   animated?: boolean
-) => ExpoSB.setStatusBarBackgroundColor(backgroundColor as any, animated);
+) => ExpoSB.setStatusBarBackgroundColor(backgroundColor, animated);
 
 export const setStatusBarNetworkActivityIndicatorVisible = (visible: boolean) =>
   ExpoSB.setStatusBarNetworkActivityIndicatorVisible(visible);

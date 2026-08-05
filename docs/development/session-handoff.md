@@ -3637,3 +3637,48 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 风险低，规则只在 `max-width: 520px` 生效；桌面和平板布局继续使用既有 V6 几何。
 - 提交后推送 `main`，并观察 GitHub Actions 与外部 Vercel/VPS 部署结果；外部环境失败不能由本地 CSS 修复保证。
+
+## 291. 2026-08-05 - fix(security): 收紧跨运行时依赖与移动端质量门禁
+
+**修改范围**
+- 首次推送 #290 后，根据 GitHub 返回的 Dependabot 告警，对 root、`services/api`、`apps/mobile` 三套独立依赖树执行完整审计并升级存在已知漏洞的兼容版本。
+- 将 `audit:dependencies` 从吞掉失败的 root-only 检查改为失败即阻断，并同时覆盖 root、API 与 mobile 的生产依赖。
+- 为移动端新增独立 `typecheck`，接入根 `verify:changes`；修复该门禁首次暴露的 error serialization、Web-only style、timer、无类型第三方 polyfill、StatusBar 与 fetch URL 类型问题。
+- 重建三套 lockfile；移动端通过干净 `npm ci` 安装并成功应用现有 13 个 `patch-package` 补丁。
+
+**修改文件**
+- `package.json`
+- `package-lock.json`
+- `apps/web/package.json`
+- `apps/mobile/package.json`
+- `apps/mobile/package-lock.json`
+- `apps/mobile/__create/DeviceErrorBoundary.tsx`
+- `apps/mobile/polyfills/web/alerts.web.tsx`
+- `apps/mobile/polyfills/web/notifications.web.tsx`
+- `apps/mobile/polyfills/web/react-native-web-refresh-control.d.ts`
+- `apps/mobile/polyfills/web/statusBar.web.tsx`
+- `apps/mobile/src/__create/fetch.ts`
+- `services/api/package.json`
+- `services/api/package-lock.json`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 不升级 Expo / React Native 主版本，只在现有兼容版本线更新 `brace-expansion`、`fast-uri`、`js-yaml`、`linkify-it`、`postcss`、`protobufjs`、`shell-quote`、`tar`、`undici` 等受影响依赖。
+2. 三个运行时的生产依赖审计必须全部成功，任一审计失败均阻断 `verify:changes`；不再用 shell fallback 将安全失败伪装成成功。
+3. 第三方 `react-native-web-refresh-control` 仍使用现有运行时实现，仅补充与 React Native `RefreshControlProps` 对齐的本地声明，不引入新依赖。
+4. 移动端 Web 专属 CSS 属性只在局部样式对象做 `unknown` 类型桥接，不扩大 `any` 或放宽全局 TypeScript 配置。
+
+**已运行验证**
+- root、`apps/mobile`、`services/api` 完整 `npm audit --package-lock-only --audit-level=low`：三套依赖树均为 `0 vulnerabilities`。
+- `apps/mobile` 干净 `npm ci --ignore-scripts`：1,537 packages 可重复安装，审计为 0；`npm run postinstall`：现有 13 个 patch 全部成功应用。
+- 完整 `npm run verify:changes`：退出码 0，覆盖架构、治理、三运行时生产依赖审计、root/server/mobile TypeScript、Local Runner、Spec、生产构建、Unit/Integration/Contract/E2E、移动/桌面设置、AI takeover、编码检查与画布性能基准。
+- `npm run verify:large-canvas-10k`：通过，11,103 节点加载、拖动、子节点跟随与连接线跟随均满足断言。
+- `git diff --check`：通过。
+
+**未运行验证及原因**
+- 未执行真实 iOS/Android 原生打包、设备测试、PostgreSQL migration rehearsal、Provider/OAuth、支付或生产部署；依赖变更已通过可重复安装、补丁应用、严格类型检查与现有 Web/服务端全量门禁，但真实原生和外部链路仍需各自发布环境验收。
+- GitHub App 凭据返回 401，无法在 Codex 连接器中读取远端 Actions/Dependabot 刷新状态；本地 Git 远端认证和推送不受影响。
+
+**风险与下一步**
+- 移动端 lockfile 因原有 semver 范围重新解析了较多传递包；已通过 `npm ci`、全部 patch 与 TypeScript 验证，后续原生发布仍应执行 iOS/Android 构建和真机 smoke。
+- 推送后等待 GitHub 重新计算 Dependabot 告警，并在 GitHub 凭据恢复后确认 Actions、Vercel 与 VPS 部署结果。

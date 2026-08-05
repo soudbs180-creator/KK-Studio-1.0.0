@@ -58,7 +58,8 @@
     "db:rehearse-migrations:repeat": "KK_MIGRATION_REHEARSAL_MODE=repeat bash scripts/ops/postgres/rehearse-migration-001-019.sh",
     "db:rehearse-migrations:populated": "KK_MIGRATION_REHEARSAL_MODE=populated bash scripts/ops/postgres/rehearse-migration-001-019.sh",
     "governance:check": "npm run governance:version && npm run governance:current && npm run governance:agent-docs && npm run governance:docs && npm run governance:skills && npm run governance:compat && npm run governance:registry && npm run governance:providers && npm run governance:frontend-providers && npm run governance:security && node scripts/governance/check-provider-catalog.mjs && npm run governance:openspec",
-    "audit:dependencies": "npm audit --omit=dev --audit-level=moderate || (echo 'Audit warning' && exit 0)",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=moderate && npm audit --prefix services/api --omit=dev --audit-level=moderate && npm audit --prefix apps/mobile --omit=dev --audit-level=moderate",
+    "mobile:typecheck": "npm run typecheck --prefix apps/mobile",
     "typecheck:tests": "node scripts/ci/check-tests-types.mjs tsconfig.tests.json",
     "typecheck:server": "node scripts/ci/check-server.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json && npm run typecheck:server && node scripts/ci/check-tests-types.mjs tsconfig.tests.json",
@@ -74,7 +75,7 @@
     "test:contract": "node scripts/test/run-tests.mjs none \"tests/contract/*.test.ts\"",
     "test:e2e": "node scripts/test/run-tests.mjs none \"tests/e2e/*.test.ts\"",
     "test": "npm run test:unit && npm run test:integration && npm run test:contract && npm run test:e2e",
-    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run local-runner:typecheck && npm run local-runner:test && npm run spec:check && npm run build && npm run local-runner:build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
+    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run mobile:typecheck && npm run local-runner:typecheck && npm run local-runner:test && npm run spec:check && npm run build && npm run local-runner:build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:ai-takeover-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding && npm run verify:canvas-performance",
     "preview": "vite preview --configLoader native",
     "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
     "check:encoding": "node scripts/ci/check-encoding.js && node scripts/ci/check-mojibake.mjs",
@@ -106,7 +107,7 @@
     "esbuild": "0.28.1",
     "fast-glob": "^3.3.3",
     "husky": "^9.1.7",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.25",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.3",
     "vite": "^8.0.16",
@@ -114,7 +115,7 @@
     "vitest": "^4.1.9"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "cosmiconfig": {
       "yaml": "1.10.3"
     },
@@ -123,19 +124,19 @@
     "micromatch": {
       "picomatch": "2.3.2"
     },
-    "tar": "7.5.16",
+    "tar": "7.5.22",
     "@mapbox/node-pre-gyp": {
-      "tar": "7.5.16"
+      "tar": "7.5.22"
     },
     "pdfjs-dist": "6.0.227",
     "minimatch": "9.0.7",
     "picomatch": "4.0.4",
-    "protobufjs": "7.6.4",
+    "protobufjs": "7.6.5",
     "form-data": "4.0.6",
     "qs": "6.15.2",
     "rollup": "4.60.1",
     "@xmldom/xmldom": "^0.8.15",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.25",
     "semver": "^7.6.0",
     "send": "^0.19.0",
     "esbuild": "0.28.1",
