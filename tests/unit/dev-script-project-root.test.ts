@@ -145,6 +145,33 @@ test("dev and portable launchers share the path-safe Win32 process helper", () =
   assert.match(versionCheckSource, /is missing from the packaged Portable release/);
 });
 
+test("portable launch recovers a missing or stale process helper before loading it", () => {
+  const portableLaunchSource = readSource("scripts/release/portable-launch.ps1");
+  const workspaceSyncIndex = portableLaunchSource.indexOf("Sync-PortableBundleFromWorkspace | Out-Null");
+  const selfUpdateIndex = portableLaunchSource.indexOf(
+    "& $UpdateScript -ReleaseRoot $ReleaseRoot -ConfigPath $UpdateConfig",
+  );
+  const helperGuardIndex = portableLaunchSource.indexOf(
+    "if (-not (Test-Path -LiteralPath $ProcessLaunchHelper))",
+  );
+  const helperLoadIndex = portableLaunchSource.indexOf(". $ProcessLaunchHelper");
+
+  assert.ok(workspaceSyncIndex > -1, "workspace sync must remain available for in-place recovery");
+  assert.ok(selfUpdateIndex > workspaceSyncIndex, "self-update must run after workspace sync");
+  assert.ok(helperGuardIndex > selfUpdateIndex, "helper validation must wait for both recovery paths");
+  assert.ok(helperLoadIndex > helperGuardIndex, "only a recovered and validated helper may be loaded");
+  assert.match(
+    portableLaunchSource,
+    /if \(\(Get-FileSha256 -Path \$filePair\.Source\) -ne \(Get-FileSha256 -Path \$filePair\.Target\)\)/,
+    "workspace sync must detect both missing and stale helper copies",
+  );
+  assert.match(
+    portableLaunchSource,
+    /Copy-Item -LiteralPath \(Join-Path \$workspaceRoot 'scripts\\lib\\process-launch\.ps1'\) -Destination \(Join-Path \$ReleaseRoot 'support\\process-launch\.ps1'\) -Force/,
+    "workspace sync must restore the helper in the current launch",
+  );
+});
+
 test("dev launch does not fail startup when opening the browser is unavailable", () => {
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
 

@@ -17,11 +17,6 @@ $WebPortFile = Join-Path $RunDir 'web.port'
 $ServerPidFile = Join-Path $RunDir 'server.pid'
 $ProcessLaunchHelper = Join-Path $PSScriptRoot 'process-launch.ps1'
 
-if (-not (Test-Path -LiteralPath $ProcessLaunchHelper)) {
-    throw "Process launch helper was not found at $ProcessLaunchHelper."
-}
-. $ProcessLaunchHelper
-
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
@@ -219,6 +214,15 @@ if (Test-Path -LiteralPath $UpdateScript) {
         Write-Warning ("Portable self-update check failed: " + $_.Exception.Message)
     }
 }
+
+# The workspace sync and signed archive update are both able to repair a missing
+# or stale helper. Load it only after those recovery paths have finished so the
+# repaired copy is used during this launch, while still failing closed if neither
+# source produced a usable file.
+if (-not (Test-Path -LiteralPath $ProcessLaunchHelper)) {
+    throw "Process launch helper was not found at $ProcessLaunchHelper."
+}
+. $ProcessLaunchHelper
 
 function Get-WebUrl {
     param([int]$Port)

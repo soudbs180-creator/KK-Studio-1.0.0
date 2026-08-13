@@ -93,6 +93,23 @@ test('the update source is restricted to https and the download must share the m
   );
 });
 
+test('portable self-update requires the process helper before replacing the current bundle', () => {
+  const helperRequirementIndex = UPDATER.indexOf(
+    "Join-Path $packageRoot 'support\\process-launch.ps1'",
+  );
+  const bundleCopyIndex = UPDATER.indexOf(
+    "Copy-Item -Path (Join-Path $packageRoot '*') -Destination $ReleaseRoot -Recurse -Force",
+  );
+
+  assert.ok(helperRequirementIndex > -1, 'the update archive must contain the process helper');
+  assert.ok(bundleCopyIndex > helperRequirementIndex, 'helper validation must happen before installation');
+  assert.match(
+    UPDATER,
+    /Test-Path -LiteralPath \$processLaunchHelperPath -PathType Leaf/,
+    'a directory named process-launch.ps1 must not satisfy the helper requirement',
+  );
+});
+
 test('the publisher still emits a sha256, so mandatory verification breaks no legitimate release', () => {
   const publisher = readFileSync(
     path.join(ROOT_DIR, 'scripts', 'release', 'publish-portable-release.mjs'),

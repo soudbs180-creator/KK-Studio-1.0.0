@@ -237,6 +237,11 @@ try {
         }
     }
 
+    $processLaunchHelperPath = Join-Path $packageRoot 'support\process-launch.ps1'
+    if (-not (Test-Path -LiteralPath $processLaunchHelperPath -PathType Leaf)) {
+        throw "Portable update package is missing the process launch helper: $processLaunchHelperPath"
+    }
+
     Copy-Item -Path (Join-Path $packageRoot '*') -Destination $ReleaseRoot -Recurse -Force
 
     foreach ($item in $preservedFiles) {
