@@ -3724,3 +3724,43 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 设计批准不等于 1.7.0 已实现或可发布；下一步先编制 Gate 0 的可执行实施计划，再从候选版本契约、平台 Runtime Port、1.6.1 迁移包、路径含空格启动缺陷与真实性能门禁开始 TDD。
 - `agents:commit` 会执行 `git add .`；提交前确认工作区只有本轮三份文档变更。
+
+---
+
+## 293. 2026-08-13 - docs: plan KK Studio 1.7.0 Gate 0 implementation
+
+**修改范围**
+- 将已批准的 1.7.0 Spatial Workspace 设计拆解为可直接执行的 Gate 0 TDD 计划，覆盖版本真相、Windows 启动路径、跨运行时执行权、Platform Runtime Port、服务端 fencing/confirmation、迁移包、能力矩阵和真实性能门禁。
+- 逐项声明新增/修改文件、RED/GREEN 顺序、验证命令、验收条件和提交边界；明确 Gate 0 不创建 Desktop 壳、不提前 bump 稳定版本、不开放远程副作用命令。
+- 本轮只增加实施计划与治理索引，不修改运行时代码；稳定发布版本继续保持 1.6.1。
+
+**修改文件**
+- `docs/superpowers/plans/2026-08-13-kk-studio-1.7.0-gate-0.md`
+- `docs/governance/DOCUMENTATION_INDEX.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Gate 0 以 17 个实施任务和 1 个基线任务收口，完成定义是机器门禁通过，而不是文档或 UI mockup 完成。
+2. `releasedVersion` 在 Gate 6 前保持 1.6.1；1.7.0 candidate 的 phase、sequence 和 artifactVersion 只能由统一 manifest parser 派生。
+3. 复用现有 `AgentExecutionTargetSchema`、`ToolRegistry`、`AgentRunStore` 和 generation-v3；新增 authority、task/error projection 与 Platform Runtime Port 时不得建立平行 Runtime。
+4. 优先修复 Web 对 cloud Run 的潜在误执行边界，并把 paired/cloud confirmation 改造成 owner/runtime/fence/Quote 绑定且一次性消费的 server authority。
+5. 迁移 exporter 必须只读采集 localStorage、IDB、OPFS 和用户目录；不复用会 consolidate/move/delete 的加载路径，不迁移 secret、FileSystemHandle 或执行权。
+6. 10K 门禁必须删除重复文本硬编码、禁止零 connector endpoint 假绿，并用真实 DOM/`getScreenCTM()` 断言 connector 误差小于 1px、DOM peak 不超过 1305。
+7. Gate 1 只有在 Gate 0 全量验证、flag fallback、迁移中断、confirmation replay 和资源生命周期故障注入通过后才创建 `apps/desktop`。
+
+**已运行验证**
+- `npm run agents:status` 的直接 Node 等价命令：通过，开始写入前 HEAD 为 `c0c6d57c` 且工作区干净。
+- 三个独立只读源码映射完成：release/launcher、migration/performance、execution contracts/server authority 均给出精确文件和 TDD 顺序，未修改文件。
+- Gate 0 计划 UTF-8 读取自检：603 行，0 个 Unicode replacement character。
+- `node scripts/governance/check-documentation-governance.mjs`：通过并更新文档索引。
+- `node scripts/ci/check-encoding.js` 与 `node scripts/ci/check-mojibake.mjs`：通过。
+- `git diff --check`：通过。
+
+**未运行验证及原因**
+- 本轮仅新增实施计划、索引和 Handoff，未修改 TypeScript、服务端、数据库、启动器或构建配置，因此未重复运行 typecheck、build、单元/集成测试、10K smoke 或完整 `verify:changes`。
+- 计划中列出的 Gate 0 产品门禁尚未实施，不能把规划状态描述为功能已完成；它们将按 Task 0 至 Task 17 逐项 RED/GREEN 验证。
+
+**风险与下一步**
+- Gate 0 涉及多个真相源和安全边界，必须保持小步提交；Task 1、2、3 可并行，Task 4–15 只能按计划依赖展开，Task 17 串行收口。
+- 下一步从 Task 0 基线开始，然后并行实施候选版本 parser、Windows 参数 quoting 回归和 shared execution authority 契约。
+- `agents:commit` 会执行 `git add .`；提交前确认工作区只包含本轮三份文档变更。
