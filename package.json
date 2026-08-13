@@ -35,7 +35,7 @@
     "release:hosted:check": "node scripts/release/diagnose-hosted-release.mjs",
     "release:hosted": "node scripts/release/release-hosted.mjs",
     "release:hosted:preview": "node scripts/release/release-hosted.mjs --preview",
-    "build": "npm run build -w packages/shared && npm run build -w packages/ui && npm run build -w packages/api-client && vite build --configLoader native --config apps/web/vite.config.ts",
+    "build": "npm run build -w packages/shared && npm run build -w packages/ui && npm run build -w packages/api-client && vite build --configLoader native --config apps/web/vite.config.ts && node scripts/test/verify-platform-runtime-production-bundle.mjs",
     "organize:local": "node scripts/maintenance/organize-local-files.mjs",
     "package:portable": "npm run build && node scripts/release/create-portable-release.mjs",
     "package:portable:with-server-env": "npm run build && node scripts/release/create-portable-release.mjs --include-server-env",

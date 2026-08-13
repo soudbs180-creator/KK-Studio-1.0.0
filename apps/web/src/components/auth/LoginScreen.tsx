@@ -16,7 +16,6 @@ import {
   X,
 } from 'lucide-react';
 
-import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import { buildAdminLoginUrl } from '../../services/admin/adminEntry';
 import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +27,7 @@ import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/local
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { usePlatformRuntime } from '../../platform/runtime/usePlatformRuntime';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import './LoginScreen.css';
@@ -117,6 +117,7 @@ const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
   const { language } = useLocale();
   const { resolvedTheme } = useTheme();
+  const displayVersion = usePlatformRuntime().getAppInfo().displayVersion;
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const turnstileAvailable = canUseTurnstile();
   const turnstileMissingSiteKey = TURNSTILE_ENABLED && !TURNSTILE_HAS_SITE_KEY;
@@ -697,7 +698,7 @@ const LoginScreen: React.FC = () => {
                   <button type="button" onClick={handleTempUserEntry}>Temporary local access</button>
                 </div>
               </footer>
-              <div className="auth-version">{APP_DISPLAY_VERSION}</div>
+              <div className="auth-version">{displayVersion}</div>
 
               {/* 绝对定位人机验证磨砂玻璃浮层，仅在需要时弹出 */}
               {captchaRequiredByBackend && (

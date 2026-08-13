@@ -104,15 +104,32 @@ test('browser adapter returns typed app info and structured unsupported operatio
   assert.equal(operationResults.every((result) => result.status === 'success' || result.status === 'unsupported'), true);
 });
 
-test('composition root injects the browser runtime and one version surface consumes the port', () => {
-  const mainSource = readSource('apps/web/src/main.tsx');
-  const landingSource = readSource('apps/web/src/landing/LandingCTA.tsx');
+test('production entry injects the browser runtime and the reachable login version surface consumes it', () => {
+  const indexSource = readSource('apps/web/index.html');
+  const bootstrapSource = readSource('apps/web/src/bootstrap.tsx');
+  const legacyMainSource = readSource('apps/web/src/main.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
+  const loginSource = readSource('apps/web/src/components/auth/LoginScreen.tsx');
+  const rootPackage = JSON.parse(readSource('package.json')) as {
+    scripts?: Record<string, string>;
+  };
 
-  assert.match(mainSource, /new BrowserPlatformRuntimeAdapter\(\)/);
-  assert.match(mainSource, /<PlatformRuntimeProvider runtime=\{browserPlatformRuntime\}>/);
-  assert.match(landingSource, /usePlatformRuntime\(\)/);
-  assert.match(landingSource, /getAppInfo\(\)\.displayVersion/);
-  assert.doesNotMatch(landingSource, /APP_DISPLAY_VERSION/);
+  assert.match(indexSource, /<script type="module" src="\/src\/bootstrap\.tsx"><\/script>/);
+  assert.doesNotMatch(indexSource, /\/src\/main\.tsx/);
+  assert.match(bootstrapSource, /new BrowserPlatformRuntimeAdapter\(\)/);
+  assert.match(bootstrapSource, /<PlatformRuntimeProvider runtime=\{browserPlatformRuntime\}>/);
+  assert.doesNotMatch(legacyMainSource, /new BrowserPlatformRuntimeAdapter\(\)/);
+  assert.doesNotMatch(legacyMainSource, /<PlatformRuntimeProvider/);
+  assert.match(appSource, /import \{ AuthenticatedAppShell \} from '\.\/app\/AuthenticatedAppShell'/);
+  assert.match(shellSource, /import\('\.\.\/components\/auth\/LoginScreen'\)/);
+  assert.match(loginSource, /usePlatformRuntime\(\)/);
+  assert.match(loginSource, /getAppInfo\(\)\.displayVersion/);
+  assert.doesNotMatch(loginSource, /APP_DISPLAY_VERSION/);
+  assert.match(
+    rootPackage.scripts?.build ?? '',
+    /node scripts\/test\/verify-platform-runtime-production-bundle\.mjs/,
+  );
 });
 
 test('platform port owns no canvas, job, run, agent, or tool execution truth', () => {

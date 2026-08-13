@@ -22,8 +22,6 @@ import {
   pickByResolvedLanguage,
 } from './utils/localeText';
 import { isChunkLoadError, handleChunkLoadError } from './utils/lazyWithRetry';
-import { BrowserPlatformRuntimeAdapter } from './platform/runtime/BrowserPlatformRuntimeAdapter';
-import { PlatformRuntimeProvider } from './platform/runtime/PlatformRuntimeProvider';
 
 type FatalError = {
   message: string;
@@ -94,7 +92,6 @@ if (!rootElement) {
 }
 
 const root = createRoot(rootElement);
-const browserPlatformRuntime = new BrowserPlatformRuntimeAdapter();
 let hasMountedApp = false;
 
 disableVercelToolbar();
@@ -351,14 +348,12 @@ function bootstrap() {
 
     root.render(
       <ErrorBoundary>
-        <PlatformRuntimeProvider runtime={browserPlatformRuntime}>
-          <LocaleProvider>
-            <AuthProvider>
-              <App />
-              {/* <SpeedInsights /> */}
-            </AuthProvider>
-          </LocaleProvider>
-        </PlatformRuntimeProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <App />
+            {/* <SpeedInsights /> */}
+          </AuthProvider>
+        </LocaleProvider>
       </ErrorBoundary>
     );
   } catch (error) {
