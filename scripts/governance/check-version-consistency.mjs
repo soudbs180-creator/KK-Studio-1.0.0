@@ -1,9 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { parseReleaseManifest } from "../lib/release-manifest.mjs";
+import {
+  deriveExpoReleaseMetadata,
+  parseReleaseManifest,
+} from "../lib/release-manifest.mjs";
+import {
+  assertPortablePublicationTransition,
+  createPortablePublicationState,
+} from "../lib/portable-publication.mjs";
+
+function parseValidationScope(argv) {
+  if (argv.length === 0) return "full";
+  if (argv.length === 2 && argv[0] === "--scope" && ["source", "full"].includes(argv[1])) {
+    return argv[1];
+  }
+  throw new Error("Usage: check-version-consistency.mjs [--scope source|full]");
+}
 
 const root = process.cwd();
+let validationScope;
+try {
+  validationScope = parseValidationScope(process.argv.slice(2));
+} catch (error) {
+  console.error(`[version:check] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
 const manifestPath = path.join(root, "config", "release-manifest.json");
 let manifest;
 try {
@@ -19,6 +41,13 @@ const expectedArtifactVersion = manifest.artifactVersion;
 const expectedDisplayVersion = manifest.displayVersion;
 const expectedReleaseDate = manifest.releaseDate;
 const expectedReleaseNotes = manifest.releaseNotes || [];
+const releasedExpoSequence = manifest.releasePhase === "stable" ? manifest.releaseSequence : 0;
+const releasedExpoMetadata = deriveExpoReleaseMetadata(
+  manifest.releasedVersion,
+  "stable",
+  releasedExpoSequence,
+  manifest.releasedVersion,
+);
 const targets = manifest.versionTargets;
 const workspacePackageTargets = targets.workspacePackages || [
   "packages/contracts/package.json",
@@ -73,6 +102,25 @@ function expectNoRegex(relativePath, pattern, message) {
 
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function validatePublishedPortableState(manifestPath, publishedManifest) {
+  const { envelopeHash, ...envelope } = publishedManifest;
+  try {
+    const expectedState = createPortablePublicationState(envelope);
+    if (envelopeHash !== expectedState.envelopeHash) {
+      fail(`${manifestPath} envelopeHash does not match its canonical envelope`);
+    }
+    const statePath = path.join(path.dirname(manifestPath), "publication-state.json");
+    const storedState = readJsonIfExists(statePath);
+    if (!storedState) {
+      fail(`${statePath} is missing for schema v1 Portable publication`);
+      return;
+    }
+    assertPortablePublicationTransition(storedState, envelope);
+  } catch (error) {
+    fail(`${manifestPath} publication state is invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function comparableVersionMetadata(manifest) {
@@ -136,6 +184,15 @@ if (mobileAppConfig?.expo) {
   ) {
     fail(`${mobileAppConfigTarget} expo.name must start with ${manifest.appName}`);
   }
+  if (mobileAppConfig.expo.runtimeVersion !== releasedExpoMetadata.runtimeVersion) {
+    fail(`${mobileAppConfigTarget} expo.runtimeVersion must be ${releasedExpoMetadata.runtimeVersion}`);
+  }
+  if (mobileAppConfig.expo.ios?.buildNumber !== releasedExpoMetadata.ios.buildNumber) {
+    fail(`${mobileAppConfigTarget} expo.ios.buildNumber must be ${releasedExpoMetadata.ios.buildNumber}`);
+  }
+  if (mobileAppConfig.expo.android?.versionCode !== releasedExpoMetadata.android.versionCode) {
+    fail(`${mobileAppConfigTarget} expo.android.versionCode must be ${releasedExpoMetadata.android.versionCode}`);
+  }
 }
 
 const openApiSpecTarget = targets.openApiSpec || "docs/specs/openapi-full.yaml";
@@ -176,7 +233,7 @@ for (const target of packageLockTargets) {
 }
 
 const runtimeAppInfoTarget = targets.runtimeAppInfo || targets.webAppInfo;
-const appInfoSource = readIfExists(runtimeAppInfoTarget);
+const appInfoSource = runtimeAppInfoTarget ? readIfExists(runtimeAppInfoTarget) : null;
 if (appInfoSource) {
   const appInfoUsesManifest = appInfoSource.includes("release-manifest.json");
   if (!appInfoUsesManifest) {
@@ -208,7 +265,7 @@ for (const target of checkTargets) {
 }
 
 const documentationExpectations = [];
-const runtimeAppInfoPattern = new RegExp(`\`${escapeRegExp(runtimeAppInfoTarget)}\`[^\\n]*运行时只读导出`, "u");
+const runtimeAppInfoPattern = new RegExp(`\`${escapeRegExp(runtimeAppInfoTarget || "")}\`[^\\n]*运行时只读导出`, "u");
 if (targets.progressReport && fs.existsSync(path.join(root, targets.progressReport))) {
   documentationExpectations.push({
     path: targets.progressReport,
@@ -243,6 +300,9 @@ for (const { path: target, requiredPatterns } of documentationExpectations) {
 const distManifestPath = "apps/web/dist/app-version.json";
 const distManifest = readJsonIfExists(distManifestPath);
 if (distManifest) {
+  if (distManifest.schemaVersion !== 1 || distManifest.provenance?.kind !== "kk-studio-web-build") {
+    fail(`${distManifestPath} must identify schema v1 kk-studio-web-build provenance`);
+  }
   if (distManifest.version !== expectedVersion) {
     fail(`${distManifestPath} version is ${distManifest.version}, expected ${expectedVersion}`);
   }
@@ -269,6 +329,9 @@ if (distManifest) {
 const portableManifestPath = "release/KK-Studio-Portable/app/dist/app-version.json";
 const portableManifest = readJsonIfExists(portableManifestPath);
 if (portableManifest) {
+  if (portableManifest.schemaVersion !== 1 || portableManifest.provenance?.kind !== "kk-studio-web-build") {
+    fail(`${portableManifestPath} must identify schema v1 kk-studio-web-build provenance. Run npm run package:portable.`);
+  }
   if (portableManifest.version !== expectedVersion) {
     fail(`${portableManifestPath} version is ${portableManifest.version}, expected ${expectedVersion}. Run npm run package:portable.`);
   }
@@ -288,37 +351,73 @@ if (portableManifest) {
   }
 }
 
-const stablePortableManifestPath = targets.stablePortableManifest;
-const stablePortableManifest = JSON.parse(read(stablePortableManifestPath));
-const expectedPortableArchiveName = `KK-Studio-Portable-${expectedVersion}.zip`;
+if (validationScope === "full") {
+  const stablePortableManifestPath = targets.stablePortableManifest;
+  const stablePortableManifest = readJsonIfExists(stablePortableManifestPath);
+  if (!stablePortableManifest) {
+    fail(`stablePortableManifest is missing at ${stablePortableManifestPath}`);
+  } else {
+    const stableArtifactVersion = stablePortableManifest.artifactVersion || stablePortableManifest.version;
+    const sequenceSuffix = Number.isSafeInteger(stablePortableManifest.releaseSequence)
+      ? `-s${stablePortableManifest.releaseSequence}`
+      : "";
+    const expectedPortableArchiveName = `KK-Studio-Portable-${stableArtifactVersion}${sequenceSuffix}.zip`;
+    if (stablePortableManifest.version !== expectedVersion) {
+      fail(`${stablePortableManifestPath} version is ${stablePortableManifest.version}, expected ${expectedVersion}`);
+    }
+    if (stablePortableManifest.releaseDate !== expectedReleaseDate) {
+      fail(`${stablePortableManifestPath} releaseDate is ${stablePortableManifest.releaseDate}, expected ${expectedReleaseDate}`);
+    }
+    if (!sameJson(stablePortableManifest.releaseNotes || [], expectedReleaseNotes)) {
+      fail(`${stablePortableManifestPath} releaseNotes do not match config/release-manifest.json`);
+    }
+    if (stablePortableManifest.packageFile !== expectedPortableArchiveName) {
+      fail(`${stablePortableManifestPath} packageFile is ${stablePortableManifest.packageFile}, expected ${expectedPortableArchiveName}`);
+    }
+    if (typeof stablePortableManifest.downloadUrl !== "string"
+      || !stablePortableManifest.downloadUrl.endsWith(expectedPortableArchiveName)) {
+      fail(`${stablePortableManifestPath} downloadUrl must end with ${expectedPortableArchiveName}`);
+    }
+    if (typeof stablePortableManifest.sha256 !== "string"
+      || !/^[a-f0-9]{64}$/i.test(stablePortableManifest.sha256)) {
+      fail(`${stablePortableManifestPath} sha256 must be a 64-character hexadecimal digest`);
+    }
+    if (!Number.isInteger(stablePortableManifest.size) || stablePortableManifest.size <= 0) {
+      fail(`${stablePortableManifestPath} size must be a positive integer`);
+    }
+    const isLegacy161Manifest = stablePortableManifest.version === "1.6.1"
+      && stablePortableManifest.schemaVersion === undefined;
+    if (!isLegacy161Manifest && stablePortableManifest.schemaVersion !== 1) {
+      fail(`${stablePortableManifestPath} must use the schema v1 publication envelope`);
+    }
+    if (stablePortableManifest.schemaVersion === 1) {
+      if (stablePortableManifest.provenance?.kind !== "kk-studio-portable-publication") {
+        fail(`${stablePortableManifestPath} provenance must identify the Portable publisher`);
+      }
+      if (manifest.releasePhase === "stable") {
+        for (const [field, expectedValue] of [
+          ["releasedVersion", manifest.releasedVersion],
+          ["releaseTarget", manifest.releaseTarget],
+          ["releasePhase", manifest.releasePhase],
+          ["releaseSequence", manifest.releaseSequence],
+          ["artifactVersion", manifest.artifactVersion],
+          ["channel", manifest.releasePhase],
+        ]) {
+          if (stablePortableManifest[field] !== expectedValue) {
+            fail(`${stablePortableManifestPath} ${field} is ${stablePortableManifest[field]}, expected ${expectedValue}`);
+          }
+        }
+      }
+      validatePublishedPortableState(stablePortableManifestPath, stablePortableManifest);
+    }
 
-if (stablePortableManifest.version !== expectedVersion) {
-  fail(`${stablePortableManifestPath} version is ${stablePortableManifest.version}, expected ${expectedVersion}`);
-}
-if (stablePortableManifest.releaseDate !== expectedReleaseDate) {
-  fail(`${stablePortableManifestPath} releaseDate is ${stablePortableManifest.releaseDate}, expected ${expectedReleaseDate}`);
-}
-if (!sameJson(stablePortableManifest.releaseNotes || [], expectedReleaseNotes)) {
-  fail(`${stablePortableManifestPath} releaseNotes do not match config/release-manifest.json`);
-}
-if (stablePortableManifest.packageFile !== expectedPortableArchiveName) {
-  fail(`${stablePortableManifestPath} packageFile is ${stablePortableManifest.packageFile}, expected ${expectedPortableArchiveName}`);
-}
-if (typeof stablePortableManifest.downloadUrl !== "string" || !stablePortableManifest.downloadUrl.endsWith(expectedPortableArchiveName)) {
-  fail(`${stablePortableManifestPath} downloadUrl must end with ${expectedPortableArchiveName}`);
-}
-if (typeof stablePortableManifest.sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(stablePortableManifest.sha256)) {
-  fail(`${stablePortableManifestPath} sha256 must be a 64-character hexadecimal digest`);
-}
-if (!Number.isInteger(stablePortableManifest.size) || stablePortableManifest.size <= 0) {
-  fail(`${stablePortableManifestPath} size must be a positive integer`);
-}
-
-const portableStableVersion = portableManifest?.artifactVersion || portableManifest?.version;
-const portableStablePhase = portableManifest?.releasePhase || portableManifest?.channel;
-if (portableManifest && portableStableVersion === expectedVersion && portableStablePhase === "stable") {
-  if (!sameJson(comparableVersionMetadata(stablePortableManifest), comparableVersionMetadata(portableManifest))) {
-    fail(`${stablePortableManifestPath} does not match release/KK-Studio-Portable/app/dist/app-version.json for version metadata. Run npm run publish:portable after packaging.`);
+    const portableStableVersion = portableManifest?.artifactVersion || portableManifest?.version;
+    const portableStablePhase = portableManifest?.releasePhase || portableManifest?.channel;
+    if (portableManifest && portableStableVersion === expectedVersion && portableStablePhase === "stable") {
+      if (!sameJson(comparableVersionMetadata(stablePortableManifest), comparableVersionMetadata(portableManifest))) {
+        fail(`${stablePortableManifestPath} does not match release/KK-Studio-Portable/app/dist/app-version.json for version metadata. Run npm run publish:portable after packaging.`);
+      }
+    }
   }
 }
 
@@ -328,6 +427,7 @@ for (const [workspacePath, portablePath] of [
   ["scripts/release/portable-stop.ps1", "release/KK-Studio-Portable/support/portable-stop.ps1"],
   ["scripts/release/portable-self-update.ps1", "release/KK-Studio-Portable/support/portable-self-update.ps1"],
   ["scripts/lib/process-launch.ps1", "release/KK-Studio-Portable/support/process-launch.ps1"],
+  ["scripts/lib/portable-update-policy.ps1", "release/KK-Studio-Portable/support/portable-update-policy.ps1"],
 ]) {
   const portableSource = readIfExists(portablePath);
   if (!portableSource) {

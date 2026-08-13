@@ -42,6 +42,9 @@ const TOP_LEVEL_FIELDS = new Set([
 const CORE_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
 const RELEASE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+const EXPO_PHASE_CAPACITY = 2_000;
+const EXPO_CORE_CAPACITY = EXPO_PHASE_CAPACITY * RELEASE_PHASES.length;
+const ANDROID_VERSION_CODE_MAX = 2_100_000_000;
 
 function manifestError(field, message) {
   return new Error(`[release-manifest] ${field} ${message}`);
@@ -193,6 +196,57 @@ export function deriveArtifactVersion(releaseTarget, releasePhase, releaseSequen
     : `${releaseTarget}-${PHASE_TAGS[releasePhase]}.${releaseSequence}`;
 }
 
+function deriveExpoBuildOrdinal(releaseTarget, releasePhase, releaseSequence) {
+  const coreParts = releaseTarget.split(".").map(Number);
+  const [major, minor, patch] = coreParts;
+  if (major > 20 || minor > 99 || patch > 99) {
+    throw manifestError(
+      "releaseTarget",
+      "cannot be represented by the bounded Android versionCode mapping.",
+    );
+  }
+  if (releaseSequence >= EXPO_PHASE_CAPACITY) {
+    throw manifestError(
+      "releaseSequence",
+      `must be below ${EXPO_PHASE_CAPACITY} for Expo build metadata.`,
+    );
+  }
+  const coreOrdinal = ((major * 100) + minor) * 100 + patch;
+  const phaseOrdinal = RELEASE_PHASES.indexOf(releasePhase);
+  const buildOrdinal = (coreOrdinal * EXPO_CORE_CAPACITY)
+    + (phaseOrdinal * EXPO_PHASE_CAPACITY)
+    + releaseSequence
+    + 1;
+  if (buildOrdinal > ANDROID_VERSION_CODE_MAX) {
+    throw manifestError("releaseTarget", "exceeds the Android versionCode limit.");
+  }
+  return buildOrdinal;
+}
+
+/** Derives Expo metadata without placing a prerelease string in expo.version. */
+export function deriveExpoReleaseMetadata(
+  releaseTarget,
+  releasePhase,
+  releaseSequence,
+  artifactVersion,
+) {
+  const expectedArtifactVersion = deriveArtifactVersion(
+    releaseTarget,
+    releasePhase,
+    releaseSequence,
+  );
+  if (artifactVersion !== expectedArtifactVersion) {
+    throw manifestError("artifactVersion", `must equal the derived value ${expectedArtifactVersion}.`);
+  }
+  const buildOrdinal = deriveExpoBuildOrdinal(releaseTarget, releasePhase, releaseSequence);
+  return Object.freeze({
+    version: releaseTarget,
+    ios: Object.freeze({ buildNumber: String(buildOrdinal) }),
+    android: Object.freeze({ versionCode: buildOrdinal }),
+    runtimeVersion: artifactVersion,
+  });
+}
+
 function validateProjection(manifest) {
   if (manifest.version !== manifest.releasedVersion) {
     throw manifestError("version", "must equal releasedVersion.");
@@ -273,10 +327,37 @@ export function assertReleaseTransition(previousSource, nextSource) {
   if (RELEASE_PHASES.indexOf(next.releasePhase) < RELEASE_PHASES.indexOf(previous.releasePhase)) {
     throw manifestError("releasePhase", "must not move to an earlier channel.");
   }
-  if (compareArtifactVersions(next.artifactVersion, previous.artifactVersion) <= 0) {
+  const artifactOrder = compareArtifactVersions(next.artifactVersion, previous.artifactVersion);
+  const isCorrectedStableBuild = previous.releasePhase === "stable"
+    && next.releasePhase === "stable"
+    && artifactOrder === 0;
+  if (artifactOrder < 0 || (artifactOrder === 0 && !isCorrectedStableBuild)) {
     throw manifestError("artifactVersion", "must increase across release transitions.");
   }
   return next;
+}
+
+/**
+ * Creates the immutable final-byte projection tested before the public stable
+ * pointer moves. A failed final build must call this again with a new sequence.
+ */
+export function deriveStablePromotionProjection(source, releaseSequence) {
+  const candidate = parseReleaseManifest(source);
+  if (candidate.releasePhase !== "release-candidate") {
+    throw manifestError("releasePhase", "must be release-candidate before final-byte staging.");
+  }
+  if (!Number.isSafeInteger(releaseSequence) || releaseSequence <= candidate.releaseSequence) {
+    throw manifestError("releaseSequence", "must increase for final-byte staging.");
+  }
+  return parseReleaseManifest({
+    ...candidate,
+    version: candidate.releaseTarget,
+    releasedVersion: candidate.releaseTarget,
+    displayVersion: `v${candidate.releaseTarget}`,
+    releasePhase: "stable",
+    releaseSequence,
+    artifactVersion: candidate.releaseTarget,
+  });
 }
 
 /** Stable publication is intentionally unavailable until candidate truth is promoted. */
@@ -300,9 +381,11 @@ export function derivePlatformReleaseMetadata(source) {
       artifactVersion: manifest.artifactVersion,
     }),
     tauri: Object.freeze({ version: manifest.artifactVersion }),
-    expo: Object.freeze({
-      version: manifest.artifactVersion,
-      runtimeVersion: manifest.artifactVersion,
-    }),
+    expo: deriveExpoReleaseMetadata(
+      manifest.releaseTarget,
+      manifest.releasePhase,
+      manifest.releaseSequence,
+      manifest.artifactVersion,
+    ),
   });
 }

@@ -2,8 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { cp, mkdir, rm, stat, writeFile } from 'fs/promises';
+import { parseReleaseManifest } from '../lib/release-manifest.mjs';
 
 const rootDir = process.cwd();
+const releaseManifest = parseReleaseManifest(JSON.parse(
+  fs.readFileSync(path.join(rootDir, 'config', 'release-manifest.json'), 'utf8'),
+));
 const releaseRoot = path.join(rootDir, 'release', 'KK-Studio-Portable');
 const runtimeDir = path.join(releaseRoot, 'runtime');
 const appDir = path.join(releaseRoot, 'app');
@@ -22,6 +26,7 @@ const portableLaunchSource = path.join(releaseScriptSourceDir, 'portable-launch.
 const portableStopSource = path.join(releaseScriptSourceDir, 'portable-stop.ps1');
 const updateScriptSource = path.join(releaseScriptSourceDir, 'portable-self-update.ps1');
 const processLaunchHelperSource = path.join(rootDir, 'scripts', 'lib', 'process-launch.ps1');
+const updatePolicySource = path.join(rootDir, 'scripts', 'lib', 'portable-update-policy.ps1');
 const portableRuntimeSourceClosures = [
   {
     source: path.join(rootDir, 'services', 'api'),
@@ -40,6 +45,30 @@ const portableRuntimeSourceClosures = [
 function ensureExists(targetPath, message) {
   if (!fs.existsSync(targetPath)) {
     throw new Error(message);
+  }
+}
+
+function assertPortableBuildProvenance(distDir) {
+  const manifestPath = path.join(distDir, 'app-version.json');
+  ensureExists(manifestPath, 'apps/web/dist/app-version.json was not found. Run npm run build first.');
+  const buildManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (buildManifest.schemaVersion !== 1
+    || buildManifest.provenance?.kind !== 'kk-studio-web-build') {
+    throw new Error('Web build provenance must identify a schema v1 kk-studio-web-build.');
+  }
+  for (const field of [
+    'releasedVersion',
+    'releaseTarget',
+    'releasePhase',
+    'releaseSequence',
+    'artifactVersion',
+  ]) {
+    if (buildManifest[field] !== releaseManifest[field]) {
+      throw new Error(`Web build ${field} is stale. Run npm run build before package:portable.`);
+    }
+  }
+  if (buildManifest.channel !== releaseManifest.releasePhase) {
+    throw new Error('Web build channel must equal releasePhase. Run npm run build.');
   }
 }
 
@@ -236,8 +265,9 @@ function buildReadme() {
 
 function buildUpdateConfigExample() {
   return `${JSON.stringify({
-    enabled: true,
-    manifestUrl: 'https://example.com/kk-studio/portable/stable/manifest.json',
+    enabled: releaseManifest.releasePhase === 'stable',
+    channel: releaseManifest.releasePhase,
+    manifestUrl: `https://example.com/kk-studio/portable/${releaseManifest.releasePhase}/manifest.json`,
   }, null, 2)}\r\n`;
 }
 
@@ -250,6 +280,7 @@ function buildAppPackageJson() {
 
 async function main() {
   ensureExists(distSourceDir, 'apps/web/dist/ was not found. Run npm run build first.');
+  assertPortableBuildProvenance(distSourceDir);
   await assertPortableRemoteKkApiBaseUrl(distSourceDir);
   ensureExists(process.execPath, `node executable was not found: ${process.execPath}`);
   ensureExists(portableAppServerSource, 'scripts/release/portable-app-server.cjs was not found.');
@@ -257,6 +288,7 @@ async function main() {
   ensureExists(portableStopSource, 'scripts/release/portable-stop.ps1 was not found.');
   ensureExists(updateScriptSource, 'scripts/release/portable-self-update.ps1 was not found.');
   ensureExists(processLaunchHelperSource, 'scripts/lib/process-launch.ps1 was not found.');
+  ensureExists(updatePolicySource, 'scripts/lib/portable-update-policy.ps1 was not found.');
 
   await rm(releaseRoot, { recursive: true, force: true });
   await mkdir(runtimeDir, { recursive: true });
@@ -272,6 +304,7 @@ async function main() {
   await copyFile(portableStopSource, path.join(supportDir, 'portable-stop.ps1'));
   await copyFile(updateScriptSource, path.join(supportDir, 'portable-self-update.ps1'));
   await copyFile(processLaunchHelperSource, path.join(supportDir, 'process-launch.ps1'));
+  await copyFile(updatePolicySource, path.join(supportDir, 'portable-update-policy.ps1'));
 
   await writeFile(path.join(releaseRoot, 'Start KK Studio.bat'), buildStartBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'Stop KK Studio.bat'), buildStopBat(), 'utf8');

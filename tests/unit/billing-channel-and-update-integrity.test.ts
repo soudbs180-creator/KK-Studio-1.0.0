@@ -68,6 +68,10 @@ const UPDATER = readFileSync(
   path.join(ROOT_DIR, 'scripts', 'release', 'portable-self-update.ps1'),
   'utf8'
 );
+const UPDATE_POLICY = readFileSync(
+  path.join(ROOT_DIR, 'scripts', 'lib', 'portable-update-policy.ps1'),
+  'utf8'
+);
 
 test('the sha256 integrity check is mandatory, not conditional on the manifest', () => {
   assert.doesNotMatch(
@@ -83,8 +87,19 @@ test('the sha256 integrity check is mandatory, not conditional on the manifest',
   assert.match(UPDATER, /Refusing to install/);
 });
 
+test('the updater delegates prerelease ordering and replay checks to the Portable policy', () => {
+  assert.doesNotMatch(UPDATER, /\[version\]/i);
+  assert.match(UPDATER, /portable-update-policy\.ps1/);
+  assert.match(UPDATER, /Assert-PortableUpdateTransition/);
+  assert.match(UPDATER, /artifactVersion/);
+  assert.match(UPDATER, /channel/);
+  assert.match(UPDATE_POLICY, /releaseSequence/);
+  assert.match(UPDATE_POLICY, /Compare-PortableSemanticVersion/);
+});
+
 test('the update source is restricted to https and the download must share the manifest host', () => {
-  assert.match(UPDATER, /\$manifestUri\.Scheme -ne 'https'/, '清单必须经 https 获取');
+  assert.match(UPDATER, /IsWellFormedUriString\(\$manifestUrl/, '清单必须是绝对 URL');
+  assert.match(UPDATER, /\$manifestUrl\.StartsWith\('https:\/\//, '清单必须经 https 获取');
   assert.match(UPDATER, /\$downloadUri\.Scheme -ne 'https'/, '下载地址必须是 https');
   assert.match(
     UPDATER,

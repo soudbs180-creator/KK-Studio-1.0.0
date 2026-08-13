@@ -82,3 +82,14 @@ test('portable publish manifest carries build commit metadata from the packaged 
   assert.match(publishSource, /commitShortSha: portableAppManifest\.commitShortSha \?\? null,/);
   assert.match(publishSource, /buildTime: portableAppManifest\.buildTime \?\? null,/);
 });
+
+test('portable packaging preserves explicit candidate provenance without enabling an unavailable feed', () => {
+  const releaseSource = readSource('scripts/release/create-portable-release.mjs');
+
+  assert.match(releaseSource, /parseReleaseManifest/);
+  assert.match(releaseSource, /function assertPortableBuildProvenance/);
+  assert.match(releaseSource, /provenance\?\.kind !== 'kk-studio-web-build'/);
+  assert.match(releaseSource, /enabled: releaseManifest\.releasePhase === 'stable'/);
+  assert.match(releaseSource, /channel: releaseManifest\.releasePhase/);
+  assert.match(releaseSource, /portable\/\$\{releaseManifest\.releasePhase\}\/manifest\.json/);
+});

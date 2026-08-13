@@ -339,6 +339,8 @@ function buildVersionManifestPlugin(): Plugin {
             const commitShortSha = commitSha ? commitSha.substring(0, 7) : null;
 
             const manifest = {
+                schemaVersion: 1,
+                provenance: { kind: 'kk-studio-web-build' },
                 appName: RELEASE_MANIFEST.appName,
                 version: RELEASE_MANIFEST.releasedVersion,
                 releasedVersion: RELEASE_MANIFEST.releasedVersion,

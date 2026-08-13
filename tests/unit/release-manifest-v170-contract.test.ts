@@ -11,6 +11,7 @@ import {
   compareArtifactVersions,
   deriveArtifactVersion,
   derivePlatformReleaseMetadata,
+  deriveStablePromotionProjection,
   parseReleaseManifest,
 } from '../../scripts/lib/release-manifest.mjs';
 import { readSource } from '../support/workspacePaths.js';
@@ -134,8 +135,45 @@ test('platform metadata exposes stable and candidate identity without mutating s
   assert.deepEqual(metadata, {
     web: { releasedVersion: '1.6.1', artifactVersion: '1.7.0-alpha.0.0' },
     tauri: { version: '1.7.0-alpha.0.0' },
-    expo: { version: '1.7.0-alpha.0.0', runtimeVersion: '1.7.0-alpha.0.0' },
+    expo: {
+      version: '1.7.0',
+      ios: { buildNumber: '107000001' },
+      android: { versionCode: 107000001 },
+      runtimeVersion: '1.7.0-alpha.0.0',
+    },
   });
+});
+
+test('Expo metadata keeps a numeric core while build identities remain monotonic', async () => {
+  const { deriveExpoReleaseMetadata } = await import('../../scripts/lib/release-manifest.mjs');
+  const versions = [
+    deriveExpoReleaseMetadata('1.7.0', 'development', 0, '1.7.0-alpha.0.0'),
+    deriveExpoReleaseMetadata('1.7.0', 'internal', 1, '1.7.0-alpha.1.1'),
+    deriveExpoReleaseMetadata('1.7.0', 'canary', 2, '1.7.0-beta.2'),
+    deriveExpoReleaseMetadata('1.7.0', 'release-candidate', 3, '1.7.0-rc.3'),
+    deriveExpoReleaseMetadata('1.7.0', 'stable', 4, '1.7.0'),
+    deriveExpoReleaseMetadata('1.7.1', 'development', 0, '1.7.1-alpha.0.0'),
+  ];
+
+  for (const metadata of versions) {
+    assert.match(metadata.version, /^\d+\.\d+\.\d+$/);
+    assert.match(metadata.ios.buildNumber, /^\d+$/);
+    assert.ok(Number.isSafeInteger(metadata.android.versionCode));
+  }
+  for (let index = 1; index < versions.length; index += 1) {
+    assert.ok(versions[index].android.versionCode > versions[index - 1].android.versionCode);
+  }
+
+  const upperBound = deriveExpoReleaseMetadata('20.99.99', 'stable', 1999, '20.99.99');
+  assert.equal(upperBound.android.versionCode, 2_100_000_000);
+  assert.throws(
+    () => deriveExpoReleaseMetadata('1.7.0', 'stable', 2000, '1.7.0'),
+    /releaseSequence/,
+  );
+  assert.throws(
+    () => deriveExpoReleaseMetadata('21.0.0', 'development', 0, '21.0.0-alpha.0.0'),
+    /Android versionCode/,
+  );
 });
 
 test('stable publication accepts only a fully promoted stable projection', () => {
@@ -158,6 +196,40 @@ test('stable publication accepts only a fully promoted stable projection', () =>
     releaseSequence: 9,
     artifactVersion: '1.7.0-rc.9',
   }), stable));
+
+  const correctedStable = makeManifest({
+    version: '1.7.0',
+    releasedVersion: '1.7.0',
+    displayVersion: 'v1.7.0',
+    releasePhase: 'stable',
+    releaseSequence: 11,
+    artifactVersion: '1.7.0',
+  });
+  assert.doesNotThrow(() => assertReleaseTransition(stable, correctedStable));
+  assert.throws(
+    () => assertReleaseTransition(stable, { ...correctedStable, releaseSequence: 10 }),
+    /releaseSequence/,
+  );
+});
+
+test('final stable bytes derive from a candidate without relabelling that source manifest', () => {
+  const candidate = parseReleaseManifest(makeManifest({
+    releasePhase: 'release-candidate',
+    releaseSequence: 9,
+    artifactVersion: '1.7.0-rc.9',
+  }));
+  const promotion = deriveStablePromotionProjection(candidate, 10);
+
+  assert.equal(candidate.releasedVersion, '1.6.1');
+  assert.equal(candidate.releasePhase, 'release-candidate');
+  assert.equal(promotion.version, '1.7.0');
+  assert.equal(promotion.releasedVersion, '1.7.0');
+  assert.equal(promotion.displayVersion, 'v1.7.0');
+  assert.equal(promotion.releasePhase, 'stable');
+  assert.equal(promotion.releaseSequence, 10);
+  assert.equal(promotion.artifactVersion, '1.7.0');
+  assert.doesNotThrow(() => assertReleaseTransition(candidate, promotion));
+  assert.throws(() => deriveStablePromotionProjection(candidate, 9), /releaseSequence/);
 });
 
 test('the stable Portable command fails before packaging while the manifest is a candidate', () => {

@@ -23,9 +23,9 @@ const CHECK_SCRIPT = path.join("scripts", "governance", "check-version-consisten
  * @param {string} [options.rootDir] 仓库根目录，默认取 process.cwd()。
  */
 export function assertVersionConsistency(options = {}) {
-  const { context = "release", rootDir = process.cwd() } = options;
+  const { context = "release", rootDir = process.cwd(), scope = "full" } = options;
 
-  const result = spawnSync(process.execPath, [CHECK_SCRIPT], {
+  const result = spawnSync(process.execPath, [CHECK_SCRIPT, "--scope", scope], {
     cwd: rootDir,
     stdio: "inherit",
   });

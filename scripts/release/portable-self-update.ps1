@@ -11,6 +11,8 @@ $LogDir = Join-Path $ReleaseRoot 'logs'
 $script:LogFile = Join-Path $LogDir 'update.log'
 $DefaultConfigPath = Join-Path $ReleaseRoot 'support\update-config.json'
 $LocalManifestPath = Join-Path $ReleaseRoot 'app\dist\app-version.json'
+$UpdatePolicyPath = Join-Path $PSScriptRoot 'portable-update-policy.ps1'
+$UpdateStatePath = Join-Path $ReleaseRoot 'run\update-state.json'
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
@@ -19,20 +21,6 @@ function Write-UpdateLog {
 
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Add-Content -LiteralPath $script:LogFile -Value "[$timestamp] $Message" -Encoding utf8
-}
-
-function Convert-ToVersion {
-    param([string]$Value)
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        return $null
-    }
-
-    try {
-        return [version]$Value
-    } catch {
-        return $null
-    }
 }
 
 function Get-JsonFile {
@@ -48,6 +36,18 @@ function Get-JsonFile {
     }
 
     return $raw | ConvertFrom-Json
+}
+
+function Save-UpdateState {
+    param([object]$RemoteManifest)
+
+    $state = New-PortableAcceptedUpdateState -RemoteManifest $RemoteManifest
+    $stateDir = Split-Path -Parent $UpdateStatePath
+    $temporaryPath = "$UpdateStatePath.tmp"
+    New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
+    $stateJson = $state | ConvertTo-Json -Depth 4
+    [IO.File]::WriteAllText($temporaryPath, $stateJson, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temporaryPath -Destination $UpdateStatePath -Force
 }
 
 function Resolve-AbsoluteUrl {
@@ -103,6 +103,11 @@ function Restore-PreservedFile {
 }
 
 try {
+    if (-not (Test-Path -LiteralPath $UpdatePolicyPath -PathType Leaf)) {
+        throw "Portable update policy is missing: $UpdatePolicyPath"
+    }
+    . $UpdatePolicyPath
+
     if (-not $ConfigPath) {
         $ConfigPath = $DefaultConfigPath
     }
@@ -123,41 +128,41 @@ try {
         return $false
     }
 
-    # 安全：更新清单只允许经 HTTPS 获取。允许 http:// 意味着任何能做中间人的网络位置
-    # （公共 Wi-Fi、被劫持的 DNS）都能替换清单，进而指定任意下载地址。
-    $manifestUri = $null
-    if (-not [Uri]::TryCreate([string]$config.manifestUrl, [UriKind]::Absolute, [ref]$manifestUri) `
-        -or $manifestUri.Scheme -ne 'https') {
-        Write-UpdateLog 'Self-update aborted because manifestUrl must be an absolute https URL.'
+    $expectedChannel = [string]$config.channel
+    if ([string]::IsNullOrWhiteSpace($expectedChannel)) {
+        Write-UpdateLog 'Self-update aborted because update-config.json does not declare a channel.'
         return $false
     }
 
+    # HTTPS prevents an on-path network from replacing the manifest and selecting arbitrary bytes.
+    $manifestUrl = [string]$config.manifestUrl
+    if (-not ([Uri]::IsWellFormedUriString($manifestUrl, [UriKind]::Absolute)) `
+        -or -not ($manifestUrl.StartsWith('https://', [StringComparison]::OrdinalIgnoreCase))) {
+        Write-UpdateLog 'Self-update aborted because manifestUrl must be an absolute https URL.'
+        return $false
+    }
+    $manifestUri = [Uri]$manifestUrl
+
     $localManifest = Get-JsonFile -Path $LocalManifestPath
-    if ($null -eq $localManifest -or [string]::IsNullOrWhiteSpace($localManifest.version)) {
+    if ($null -eq $localManifest -or [string]::IsNullOrWhiteSpace($localManifest.artifactVersion)) {
         Write-UpdateLog "Self-update skipped because local manifest was not found at $LocalManifestPath."
         return $false
     }
 
     $remoteManifest = Invoke-RestMethod -Uri $config.manifestUrl -Headers @{ 'Cache-Control' = 'no-cache' } -TimeoutSec 20
-    if ($null -eq $remoteManifest -or [string]::IsNullOrWhiteSpace($remoteManifest.version)) {
-        Write-UpdateLog 'Self-update skipped because remote manifest is missing a version.'
+    if ($null -eq $remoteManifest -or [string]::IsNullOrWhiteSpace($remoteManifest.artifactVersion)) {
+        Write-UpdateLog 'Self-update skipped because remote manifest is missing artifactVersion.'
         return $false
     }
 
-    $localVersion = [string]$localManifest.version
-    $remoteVersion = [string]$remoteManifest.version
-    $localVersionObject = Convert-ToVersion -Value $localVersion
-    $remoteVersionObject = Convert-ToVersion -Value $remoteVersion
-
-    if ($remoteVersionObject -and $localVersionObject) {
-        if ($remoteVersionObject -le $localVersionObject) {
-            Write-UpdateLog "Self-update check complete. Already on version $localVersion."
-            return $false
-        }
-    } elseif ($remoteVersion -eq $localVersion) {
-        Write-UpdateLog "Self-update check complete. Already on version $localVersion."
-        return $false
-    }
+    $acceptedState = Get-JsonFile -Path $UpdateStatePath
+    Assert-PortableUpdateTransition `
+        -LocalManifest $localManifest `
+        -RemoteManifest $remoteManifest `
+        -ExpectedChannel $expectedChannel `
+        -AcceptedState $acceptedState
+    $localVersion = [string]$localManifest.artifactVersion
+    $remoteVersion = [string]$remoteManifest.artifactVersion
 
     $downloadUrl = Resolve-AbsoluteUrl -BaseUrl $config.manifestUrl -Value ([string]$remoteManifest.downloadUrl)
     if ([string]::IsNullOrWhiteSpace($downloadUrl)) {
@@ -165,12 +170,13 @@ try {
         return $false
     }
 
-    # 安全：downloadUrl 由远端清单提供，Resolve-AbsoluteUrl 对绝对 URL 直接透传，
-    # 因此清单可把下载地址指向任意主机。限制为与清单同源的 https，
-    # 使被篡改的清单无法把安装包换成第三方托管的载荷。
-    $downloadUri = $null
-    if (-not [Uri]::TryCreate([string]$downloadUrl, [UriKind]::Absolute, [ref]$downloadUri) `
-        -or $downloadUri.Scheme -ne 'https' `
+    # Keep the payload on the manifest's HTTPS origin so a manifest cannot redirect to another host.
+    if (-not ([Uri]::IsWellFormedUriString($downloadUrl, [UriKind]::Absolute)) `
+        -or -not ($downloadUrl.StartsWith('https://', [StringComparison]::OrdinalIgnoreCase))) {
+        throw 'Portable update download URL must be an absolute https URL.'
+    }
+    $downloadUri = [Uri]$downloadUrl
+    if ($downloadUri.Scheme -ne 'https' `
         -or $downloadUri.Host -ne $manifestUri.Host) {
         throw "Portable update download URL must be https and share the manifest host ($($manifestUri.Host))."
     }
@@ -205,13 +211,7 @@ try {
         throw 'Portable update download did not create an archive.'
     }
 
-    # 安全：完整性校验必须强制执行，不能「清单里有 sha256 才校验」。
-    # 原先的 fail-open 写法把是否校验的决定权交给了可能已被篡改的一方 ——
-    # 攻击者只要在清单里删掉 sha256 字段，整个校验分支就被跳过，
-    # 随后压缩包会被解包并覆盖到 $ReleaseRoot（内含 runtime\node.exe 与启动脚本），
-    # 用户下次启动即以自身权限执行攻击者投放的可执行文件。
-    # 发布器 scripts/release/publish-portable-release.mjs 始终生成 sha256，
-    # 因此强制校验不会影响任何由本项目正常发布的清单。
+    # Always verify publisher-provided bytes before extracting executables into the release root.
     $expectedHash = ([string]$remoteManifest.sha256).Trim().ToLowerInvariant()
     if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
         throw 'Portable update manifest is missing a valid sha256 checksum. Refusing to install.'
@@ -223,6 +223,11 @@ try {
 
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
     $packageRoot = Get-ArchiveRoot -ExtractDir $extractDir
+    $packageManifestPath = Join-Path $packageRoot 'app\dist\app-version.json'
+    $packageManifest = Get-JsonFile -Path $packageManifestPath
+    Assert-PortablePackageMatchesPublication `
+        -PackageManifest $packageManifest `
+        -RemoteManifest $remoteManifest
 
     $requiredPaths = @(
         (Join-Path $packageRoot 'app'),
@@ -248,9 +253,11 @@ try {
         Restore-PreservedFile -SourcePath $item.Backup -TargetPath $item.Restore
     }
 
+    Save-UpdateState -RemoteManifest $remoteManifest
     Write-UpdateLog "Portable client updated from $localVersion to $remoteVersion."
     return $true
 } catch {
-    Write-UpdateLog ("Portable self-update failed: " + $_.Exception.Message)
+    $failureContext = if ($_.ScriptStackTrace) { " Stack: $($_.ScriptStackTrace)" } else { '' }
+    Write-UpdateLog ("Portable self-update failed: " + $_.Exception.Message + $failureContext)
     return $false
 }

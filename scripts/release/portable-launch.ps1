@@ -58,6 +58,11 @@ function Get-ManifestFingerprint {
 
     return @(
         [string]$Manifest.version,
+        [string]$Manifest.releasedVersion,
+        [string]$Manifest.releaseTarget,
+        [string]$Manifest.releasePhase,
+        [string]$Manifest.releaseSequence,
+        [string]$Manifest.artifactVersion,
         [string]$Manifest.buildTime,
         [string]$Manifest.releaseDate,
         [string]$Manifest.channel,
@@ -93,7 +98,8 @@ function Resolve-WorkspaceRoot {
         (Join-Path $candidate 'scripts\release\portable-app-server.cjs'),
         (Join-Path $candidate 'scripts\release\portable-stop.ps1'),
         (Join-Path $candidate 'scripts\release\portable-self-update.ps1'),
-        (Join-Path $candidate 'scripts\lib\process-launch.ps1')
+        (Join-Path $candidate 'scripts\lib\process-launch.ps1'),
+        (Join-Path $candidate 'scripts\lib\portable-update-policy.ps1')
     )
 
     foreach ($requiredPath in $requiredPaths) {
@@ -155,6 +161,11 @@ function Get-WorkspacePortableSyncPlan {
             Source = Join-Path $WorkspaceRoot 'scripts\lib\process-launch.ps1'
             Target = Join-Path $ReleaseRoot 'support\process-launch.ps1'
             Label = 'process launch helper'
+        },
+        @{
+            Source = Join-Path $WorkspaceRoot 'scripts\lib\portable-update-policy.ps1'
+            Target = Join-Path $ReleaseRoot 'support\portable-update-policy.ps1'
+            Label = 'portable update policy'
         }
     )
 
@@ -199,6 +210,7 @@ function Sync-PortableBundleFromWorkspace {
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\release\portable-stop.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-stop.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\release\portable-self-update.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-self-update.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\lib\process-launch.ps1') -Destination (Join-Path $ReleaseRoot 'support\process-launch.ps1') -Force
+    Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\lib\portable-update-policy.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-update-policy.ps1') -Force
 
     $syncedManifest = Get-JsonFile -Path (Join-Path $PortableDistDir 'app-version.json')
     Write-Host "Portable bundle is now aligned to workspace build $([string]$syncedManifest.version) ($([string]$syncedManifest.buildTime))."
