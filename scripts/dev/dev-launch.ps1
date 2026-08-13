@@ -18,6 +18,12 @@ $apiOutLog = Join-Path $logDir 'dev-api.out.log'
 $apiErrLog = Join-Path $logDir 'dev-api.err.log'
 $viteUrl = 'http://127.0.0.1:3000/'
 $apiUrl = 'http://127.0.0.1:3001/healthz'
+$processLaunchHelper = Join-Path $projectRoot 'scripts\lib\process-launch.ps1'
+
+if (-not (Test-Path -LiteralPath $processLaunchHelper)) {
+    throw "Process launch helper was not found at $processLaunchHelper."
+}
+. $processLaunchHelper
 
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
@@ -46,7 +52,7 @@ function Start-DetachedPowerShellScript {
 
     $startProcessParams = @{
         FilePath = 'powershell'
-        ArgumentList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
+        Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
         WorkingDirectory = $WorkingDirectory
         WindowStyle = 'Hidden'
         PassThru = $true
@@ -62,7 +68,7 @@ function Start-DetachedPowerShellScript {
         $startProcessParams.RedirectStandardError = $StdErrLog
     }
 
-    $process = Start-Process @startProcessParams
+    $process = Start-KkProcess @startProcessParams
 
     Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
     return $process.Id
@@ -88,7 +94,7 @@ function Start-DetachedNodeProcess {
 
     $startProcessParams = @{
         FilePath = $NodeExe
-        ArgumentList = $NodeArguments
+        Arguments = $NodeArguments
         WorkingDirectory = $WorkingDirectory
         WindowStyle = 'Hidden'
         PassThru = $true
@@ -109,7 +115,7 @@ function Start-DetachedNodeProcess {
             Remove-Item Env:PATH -ErrorAction SilentlyContinue
         }
 
-        $process = Start-Process @startProcessParams
+        $process = Start-KkProcess @startProcessParams
     } finally {
         if ($originalPathUpper) {
             $env:PATH = $originalPathUpper
@@ -698,9 +704,9 @@ if (-not (Test-LocalApiBaseUrl -BaseUrl $frontendApiBaseUrl)) {
             Remove-Item Env:PATH -ErrorAction SilentlyContinue
         }
 
-        $apiPreflight = Start-Process `
+        $apiPreflight = Start-KkProcess `
             -FilePath $nodeExe `
-            -ArgumentList @($apiScript, '--check') `
+            -Arguments @($apiScript, '--check') `
             -WorkingDirectory $projectRoot `
             -WindowStyle Hidden `
             -RedirectStandardOutput $apiOutLog `

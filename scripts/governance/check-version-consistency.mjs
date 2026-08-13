@@ -285,9 +285,13 @@ for (const [workspacePath, portablePath] of [
   ["scripts/release/portable-launch.ps1", "release/KK-Studio-Portable/support/portable-launch.ps1"],
   ["scripts/release/portable-stop.ps1", "release/KK-Studio-Portable/support/portable-stop.ps1"],
   ["scripts/release/portable-self-update.ps1", "release/KK-Studio-Portable/support/portable-self-update.ps1"],
+  ["scripts/lib/process-launch.ps1", "release/KK-Studio-Portable/support/process-launch.ps1"],
 ]) {
   const portableSource = readIfExists(portablePath);
   if (!portableSource) {
+    if (portableManifest) {
+      fail(`${portablePath} is missing from the packaged Portable release. Run npm run package:portable.`);
+    }
     continue;
   }
 

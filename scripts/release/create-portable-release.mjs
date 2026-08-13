@@ -21,6 +21,7 @@ const portableAppServerSource = path.join(releaseScriptSourceDir, 'portable-app-
 const portableLaunchSource = path.join(releaseScriptSourceDir, 'portable-launch.ps1');
 const portableStopSource = path.join(releaseScriptSourceDir, 'portable-stop.ps1');
 const updateScriptSource = path.join(releaseScriptSourceDir, 'portable-self-update.ps1');
+const processLaunchHelperSource = path.join(rootDir, 'scripts', 'lib', 'process-launch.ps1');
 const portableRuntimeSourceClosures = [
   {
     source: path.join(rootDir, 'services', 'api'),
@@ -255,6 +256,7 @@ async function main() {
   ensureExists(portableLaunchSource, 'scripts/release/portable-launch.ps1 was not found.');
   ensureExists(portableStopSource, 'scripts/release/portable-stop.ps1 was not found.');
   ensureExists(updateScriptSource, 'scripts/release/portable-self-update.ps1 was not found.');
+  ensureExists(processLaunchHelperSource, 'scripts/lib/process-launch.ps1 was not found.');
 
   await rm(releaseRoot, { recursive: true, force: true });
   await mkdir(runtimeDir, { recursive: true });
@@ -269,6 +271,7 @@ async function main() {
   await copyFile(portableLaunchSource, path.join(supportDir, 'portable-launch.ps1'));
   await copyFile(portableStopSource, path.join(supportDir, 'portable-stop.ps1'));
   await copyFile(updateScriptSource, path.join(supportDir, 'portable-self-update.ps1'));
+  await copyFile(processLaunchHelperSource, path.join(supportDir, 'process-launch.ps1'));
 
   await writeFile(path.join(releaseRoot, 'Start KK Studio.bat'), buildStartBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'Stop KK Studio.bat'), buildStopBat(), 'utf8');

@@ -15,6 +15,12 @@ $ServerEnv = Join-Path $ServerDir '.env'
 $WebPidFile = Join-Path $RunDir 'web.pid'
 $WebPortFile = Join-Path $RunDir 'web.port'
 $ServerPidFile = Join-Path $RunDir 'server.pid'
+$ProcessLaunchHelper = Join-Path $PSScriptRoot 'process-launch.ps1'
+
+if (-not (Test-Path -LiteralPath $ProcessLaunchHelper)) {
+    throw "Process launch helper was not found at $ProcessLaunchHelper."
+}
+. $ProcessLaunchHelper
 
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -91,7 +97,8 @@ function Resolve-WorkspaceRoot {
         (Join-Path $candidate 'dist\app-version.json'),
         (Join-Path $candidate 'scripts\release\portable-app-server.cjs'),
         (Join-Path $candidate 'scripts\release\portable-stop.ps1'),
-        (Join-Path $candidate 'scripts\release\portable-self-update.ps1')
+        (Join-Path $candidate 'scripts\release\portable-self-update.ps1'),
+        (Join-Path $candidate 'scripts\lib\process-launch.ps1')
     )
 
     foreach ($requiredPath in $requiredPaths) {
@@ -148,6 +155,11 @@ function Get-WorkspacePortableSyncPlan {
             Source = Join-Path $WorkspaceRoot 'scripts\release\portable-self-update.ps1'
             Target = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
             Label = 'portable self-update script'
+        },
+        @{
+            Source = Join-Path $WorkspaceRoot 'scripts\lib\process-launch.ps1'
+            Target = Join-Path $ReleaseRoot 'support\process-launch.ps1'
+            Label = 'process launch helper'
         }
     )
 
@@ -191,6 +203,7 @@ function Sync-PortableBundleFromWorkspace {
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\release\portable-app-server.cjs') -Destination (Join-Path $AppDir 'portable-app-server.cjs') -Force
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\release\portable-stop.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-stop.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\release\portable-self-update.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-self-update.ps1') -Force
+    Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\lib\process-launch.ps1') -Destination (Join-Path $ReleaseRoot 'support\process-launch.ps1') -Force
 
     $syncedManifest = Get-JsonFile -Path (Join-Path $PortableDistDir 'app-version.json')
     Write-Host "Portable bundle is now aligned to workspace build $([string]$syncedManifest.version) ($([string]$syncedManifest.buildTime))."
@@ -291,9 +304,9 @@ function Start-HiddenNodeProcess {
     }
 
     try {
-        $process = Start-Process `
+        $process = Start-KkProcess `
             -FilePath $NodeExe `
-            -ArgumentList @($ScriptPath) `
+            -Arguments @($ScriptPath) `
             -WorkingDirectory $WorkingDirectory `
             -WindowStyle Hidden `
             -RedirectStandardOutput $StdOutLog `

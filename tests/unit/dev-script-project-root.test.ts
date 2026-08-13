@@ -52,7 +52,7 @@ test("dev launch fails closed instead of silently falling back to local-only per
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
 
   assert.match(devLaunchSource, /Write-Warning/);
-  assert.match(devLaunchSource, /\$apiPreflight = Start-Process/);
+  assert.match(devLaunchSource, /\$apiPreflight = Start-KkProcess/);
   assert.match(devLaunchSource, /-Wait/);
   assert.doesNotMatch(devLaunchSource, /& \$nodeExe \$apiScript --check/);
   assert.match(devLaunchSource, /\$apiScript = \$apiDevScript/);
@@ -106,6 +106,7 @@ test("dev launch starts Vite through the detached Node runner", () => {
 
   assert.match(devLaunchSource, /function Start-DetachedPowerShellScript/);
   assert.match(devLaunchSource, /function Start-DetachedNodeProcess/);
+  assert.match(devLaunchSource, /Start-KkProcess @startProcessParams/);
   assert.match(devLaunchSource, /\$vitePid = Start-DetachedNodeProcess/);
   assert.match(devLaunchSource, /-NodeArguments @\(\$viteCli, '--configLoader', 'native'/);
   assert.doesNotMatch(devLaunchSource, /\$vitePid = Start-DetachedPowerShellScript/);
@@ -117,6 +118,31 @@ test("dev launch starts Vite through the detached Node runner", () => {
   assert.match(runApiRunnerSource, /if \(\$UseWatch\)/);
   assert.match(runApiRunnerSource, /& \$nodeExe --watch \$ApiScript/);
   assert.match(runApiRunnerSource, /& \$nodeExe \$ApiScript/);
+});
+
+test("dev and portable launchers share the path-safe Win32 process helper", () => {
+  const helperSource = readSource("scripts/lib/process-launch.ps1");
+  const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
+  const portableLaunchSource = readSource("scripts/release/portable-launch.ps1");
+  const portablePackageSource = readSource("scripts/release/create-portable-release.mjs");
+  const versionCheckSource = readSource("scripts/governance/check-version-consistency.mjs");
+
+  assert.match(helperSource, /function ConvertTo-KkWindowsCommandLineArgument/);
+  assert.match(helperSource, /function Start-KkProcess/);
+  assert.match(helperSource, /return Start-Process @startProcessParameters/);
+  assert.match(devLaunchSource, /Join-Path \$projectRoot 'scripts\\lib\\process-launch\.ps1'/);
+  assert.match(devLaunchSource, /\. \$processLaunchHelper/);
+  assert.doesNotMatch(devLaunchSource, /\bArgumentList\s*=/);
+  assert.match(portableLaunchSource, /Join-Path \$PSScriptRoot 'process-launch\.ps1'/);
+  assert.match(portableLaunchSource, /Start-KkProcess/);
+  assert.match(portableLaunchSource, /Label = 'process launch helper'/);
+  assert.match(portableLaunchSource, /support\\process-launch\.ps1/);
+  assert.doesNotMatch(portableLaunchSource, /\bArgumentList\s+@\(\$ScriptPath\)/);
+  assert.match(portablePackageSource, /processLaunchHelperSource/);
+  assert.match(portablePackageSource, /copyFile\(processLaunchHelperSource, path\.join\(supportDir, 'process-launch\.ps1'\)\)/);
+  assert.match(versionCheckSource, /scripts\/lib\/process-launch\.ps1/);
+  assert.match(versionCheckSource, /release\/KK-Studio-Portable\/support\/process-launch\.ps1/);
+  assert.match(versionCheckSource, /is missing from the packaged Portable release/);
 });
 
 test("dev launch does not fail startup when opening the browser is unavailable", () => {
