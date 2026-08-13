@@ -82,7 +82,8 @@ export const ExecutionAuthorityProjectionDtoSchema = z.object({
   observedAt: z.iso.datetime(),
 }).strict();
 
-export const ExecutableExecutionAuthorityDtoSchema = z.discriminatedUnion('authorityKind', [
+/** Validates an authoritative envelope's shape; it does not grant permission to execute. */
+export const AuthoritativeExecutionAuthorityEnvelopeDtoSchema = z.discriminatedUnion('authorityKind', [
   LocalExecutionAuthorityDtoSchema,
   ServerLeaseExecutionAuthorityDtoSchema,
 ]).superRefine((authority, context) => {
@@ -99,13 +100,185 @@ export const ExecutableExecutionAuthorityDtoSchema = z.discriminatedUnion('autho
 });
 
 export const ExecutionAuthorityDtoSchema = z.union([
-  ExecutableExecutionAuthorityDtoSchema,
+  AuthoritativeExecutionAuthorityEnvelopeDtoSchema,
   ExecutionAuthorityProjectionDtoSchema,
 ]);
 
 export type ExecutionAuthorityProjectionDto = z.infer<typeof ExecutionAuthorityProjectionDtoSchema>;
-export type ExecutableExecutionAuthorityDto = z.infer<typeof ExecutableExecutionAuthorityDtoSchema>;
+export type AuthoritativeExecutionAuthorityEnvelopeDto = z.infer<
+  typeof AuthoritativeExecutionAuthorityEnvelopeDtoSchema
+>;
 export type ExecutionAuthorityDto = z.infer<typeof ExecutionAuthorityDtoSchema>;
+
+const projectAuthorityForRead = (
+  authority: ExecutionAuthorityDto,
+): ExecutionAuthorityProjectionDto => {
+  if (authority.authorityState === 'projection-only') return authority;
+  return {
+    schemaVersion: 1,
+    authorityKind: 'projection-only',
+    authorityState: 'projection-only',
+    projectionSource: 'server',
+    canExecute: false,
+    executionTarget: authority.executionTarget,
+    ownerId: authority.ownerId,
+    runId: authority.runId,
+    authorityRuntimeId: authority.authorityRuntimeId,
+    observedAt: authority.issuedAt,
+  };
+};
+
+/**
+ * Additive read compatibility for legacy Run payloads. Authoritative inputs are
+ * irreversibly stripped to a projection before they enter public client state.
+ */
+export const AgentRunAuthorityReadProjectionCompatibilityDtoSchema = ExecutionAuthorityDtoSchema
+  .transform(projectAuthorityForRead);
+
+const ExecutionAuthorityEvaluationContextBaseShape = {
+  now: z.iso.datetime(),
+  expectedOwnerId: z.string().min(1).max(200),
+  expectedRunId: z.string().min(1).max(200),
+  expectedAuthorityRuntimeId: z.string().min(1).max(200),
+  currentGlobalCoordinationEpoch: z.number().int().positive(),
+};
+
+const LocalExecutionAuthorityEvaluationContextSchema = z.object({
+  ...ExecutionAuthorityEvaluationContextBaseShape,
+  expectedExecutionTarget: z.literal('local-desktop'),
+  expectedInstallationId: z.string().min(1).max(200),
+  currentLocalJournalEpoch: z.number().int().positive(),
+  currentSingleInstanceLockId: z.string().min(1).max(200),
+}).strict();
+
+const serverEvaluationContextShape = {
+  ...ExecutionAuthorityEvaluationContextBaseShape,
+  currentExecutionFencingToken: z.number().int().positive(),
+  currentAttempt: z.number().int().positive().max(1000),
+};
+
+const PairedExecutionAuthorityEvaluationContextSchema = z.object({
+  ...serverEvaluationContextShape,
+  expectedExecutionTarget: z.literal('paired-desktop'),
+}).strict();
+
+const CloudExecutionAuthorityEvaluationContextSchema = z.object({
+  ...serverEvaluationContextShape,
+  expectedExecutionTarget: z.literal('cloud'),
+}).strict();
+
+export const ExecutionAuthorityEvaluationContextSchema = z.discriminatedUnion(
+  'expectedExecutionTarget',
+  [
+    LocalExecutionAuthorityEvaluationContextSchema,
+    PairedExecutionAuthorityEvaluationContextSchema,
+    CloudExecutionAuthorityEvaluationContextSchema,
+  ],
+);
+export type ExecutionAuthorityEvaluationContext = z.infer<
+  typeof ExecutionAuthorityEvaluationContextSchema
+>;
+
+export const ExecutionAuthorityEvaluationFailureReasonSchema = z.enum([
+  'invalid_authority_shape',
+  'invalid_evaluation_context',
+  'authority_not_yet_valid',
+  'lease_expired',
+  'owner_mismatch',
+  'run_mismatch',
+  'target_mismatch',
+  'runtime_mismatch',
+  'global_epoch_stale',
+  'installation_mismatch',
+  'local_journal_epoch_stale',
+  'single_instance_lock_stale',
+  'fencing_token_stale',
+  'attempt_stale',
+]);
+export type ExecutionAuthorityEvaluationFailureReason = z.infer<
+  typeof ExecutionAuthorityEvaluationFailureReasonSchema
+>;
+
+export type ExecutionAuthorityEvaluationResult =
+  | {
+    authorized: true;
+    authorityEnvelope: AuthoritativeExecutionAuthorityEnvelopeDto;
+  }
+  | {
+    authorized: false;
+    reason: ExecutionAuthorityEvaluationFailureReason;
+  };
+
+const rejectAuthority = (
+  reason: ExecutionAuthorityEvaluationFailureReason,
+): ExecutionAuthorityEvaluationResult => ({ authorized: false, reason });
+
+const evaluateAuthorityIdentity = (
+  authority: AuthoritativeExecutionAuthorityEnvelopeDto,
+  context: ExecutionAuthorityEvaluationContext,
+): ExecutionAuthorityEvaluationFailureReason | undefined => {
+  if (authority.ownerId !== context.expectedOwnerId) return 'owner_mismatch';
+  if (authority.runId !== context.expectedRunId) return 'run_mismatch';
+  if (authority.executionTarget !== context.expectedExecutionTarget) return 'target_mismatch';
+  if (authority.authorityRuntimeId !== context.expectedAuthorityRuntimeId) return 'runtime_mismatch';
+  if (authority.globalCoordinationEpoch !== context.currentGlobalCoordinationEpoch) {
+    return 'global_epoch_stale';
+  }
+  return undefined;
+};
+
+const evaluateAuthorityLane = (
+  authority: AuthoritativeExecutionAuthorityEnvelopeDto,
+  context: ExecutionAuthorityEvaluationContext,
+): ExecutionAuthorityEvaluationFailureReason | undefined => {
+  if (authority.authorityKind === 'installation-local') {
+    if (context.expectedExecutionTarget !== 'local-desktop') return 'target_mismatch';
+    if (authority.installationId !== context.expectedInstallationId) return 'installation_mismatch';
+    if (authority.localJournalEpoch !== context.currentLocalJournalEpoch) {
+      return 'local_journal_epoch_stale';
+    }
+    if (authority.singleInstanceLockId !== context.currentSingleInstanceLockId) {
+      return 'single_instance_lock_stale';
+    }
+    return undefined;
+  }
+  if (context.expectedExecutionTarget === 'local-desktop') return 'target_mismatch';
+  if (authority.executionFencingToken !== context.currentExecutionFencingToken) {
+    return 'fencing_token_stale';
+  }
+  return authority.attempt === context.currentAttempt ? undefined : 'attempt_stale';
+};
+
+/**
+ * The sole shared authority decision. Callers must supply current identity,
+ * epochs, fence/attempt or local lock, and an injected clock value.
+ */
+export const evaluateCurrentExecutionAuthority = (
+  candidate: unknown,
+  evaluationContext: ExecutionAuthorityEvaluationContext,
+): ExecutionAuthorityEvaluationResult => {
+  const parsedContext = ExecutionAuthorityEvaluationContextSchema.safeParse(evaluationContext);
+  if (!parsedContext.success) return rejectAuthority('invalid_evaluation_context');
+  const parsedAuthority = AuthoritativeExecutionAuthorityEnvelopeDtoSchema.safeParse(candidate);
+  if (!parsedAuthority.success) return rejectAuthority('invalid_authority_shape');
+
+  const authority = parsedAuthority.data;
+  const context = parsedContext.data;
+  if (Date.parse(authority.issuedAt) > Date.parse(context.now)) {
+    return rejectAuthority('authority_not_yet_valid');
+  }
+  if (
+    authority.authorityKind === 'server-lease'
+    && Date.parse(authority.leaseExpiresAt) <= Date.parse(context.now)
+  ) {
+    return rejectAuthority('lease_expired');
+  }
+  const mismatch = evaluateAuthorityIdentity(authority, context)
+    || evaluateAuthorityLane(authority, context);
+  return mismatch
+    ? rejectAuthority(mismatch)
+    : { authorized: true, authorityEnvelope: authority };
+};
 
 const ExecutionCheckpointBaseShape = {
   schemaVersion: z.literal(1),
@@ -145,6 +318,65 @@ export const ExecutionCheckpointRefDtoSchema = z.discriminatedUnion('executionTa
   CloudExecutionCheckpointRefDtoSchema,
 ]);
 export type ExecutionCheckpointRefDto = z.infer<typeof ExecutionCheckpointRefDtoSchema>;
+
+const ExecutionAuthorityCheckpointBindingBaseSchema = z.object({
+  authorityEnvelope: AuthoritativeExecutionAuthorityEnvelopeDtoSchema,
+  checkpoint: ExecutionCheckpointRefDtoSchema,
+}).strict();
+type ParsedAuthorityCheckpointBinding = z.infer<
+  typeof ExecutionAuthorityCheckpointBindingBaseSchema
+>;
+
+const validateCheckpointAuthorityIdentity = (
+  binding: ParsedAuthorityCheckpointBinding,
+  context: z.RefinementCtx,
+): void => {
+  const { authorityEnvelope: authority, checkpoint } = binding;
+  const mismatches: Array<[string, boolean]> = [
+    ['runId', checkpoint.runId !== authority.runId],
+    ['executionTarget', checkpoint.executionTarget !== authority.executionTarget],
+    ['authorityRuntimeId', checkpoint.authorityRuntimeId !== authority.authorityRuntimeId],
+    ['globalCoordinationEpoch', checkpoint.globalCoordinationEpoch !== authority.globalCoordinationEpoch],
+  ];
+  for (const [field, mismatch] of mismatches) {
+    if (mismatch) {
+      addContractIssue(context, ['checkpoint', field], `${field} must match the authority envelope.`);
+    }
+  }
+};
+
+const validateCheckpointAuthorityLane = (
+  binding: ParsedAuthorityCheckpointBinding,
+  context: z.RefinementCtx,
+): void => {
+  const { authorityEnvelope: authority, checkpoint } = binding;
+  if (authority.authorityKind === 'installation-local') {
+    if (
+      checkpoint.executionTarget === 'local-desktop'
+      && checkpoint.localJournalEpoch !== authority.localJournalEpoch
+    ) {
+      addContractIssue(context, ['checkpoint', 'localJournalEpoch'], 'Local journal epoch is stale.');
+    }
+    return;
+  }
+  if (checkpoint.executionTarget === 'local-desktop') return;
+  if (checkpoint.executionFencingToken !== authority.executionFencingToken) {
+    addContractIssue(context, ['checkpoint', 'executionFencingToken'], 'Execution fence is stale.');
+  }
+  if (checkpoint.attempt !== authority.attempt) {
+    addContractIssue(context, ['checkpoint', 'attempt'], 'Execution attempt is stale.');
+  }
+};
+
+/** Exact checkpoint binding is structural only; current authority still requires the evaluator. */
+export const ExecutionAuthorityCheckpointBindingDtoSchema = ExecutionAuthorityCheckpointBindingBaseSchema
+  .superRefine((binding, context) => {
+    validateCheckpointAuthorityIdentity(binding, context);
+    validateCheckpointAuthorityLane(binding, context);
+  });
+export type ExecutionAuthorityCheckpointBindingDto = z.infer<
+  typeof ExecutionAuthorityCheckpointBindingDtoSchema
+>;
 
 const ToolExecutionControlBaseSchema = z.object({
   schemaVersion: z.literal(1),
@@ -216,7 +448,7 @@ const ConfirmationGrantBindingDtoSchema = z.object({
   executionTarget: AgentExecutionTargetSchema,
   authorityRuntimeId: z.string().min(1).max(200),
   allowedAttempt: z.number().int().positive().max(1000),
-  executionAuthority: ExecutableExecutionAuthorityDtoSchema,
+  executionAuthority: AuthoritativeExecutionAuthorityEnvelopeDtoSchema,
 }).strict().superRefine((binding, context) => {
   const authority = binding.executionAuthority;
   const mismatches: Array<[string, boolean]> = [
@@ -230,7 +462,7 @@ const ConfirmationGrantBindingDtoSchema = z.object({
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: [field],
-        message: `${field} must match the executable authority.`,
+        message: `${field} must match the authoritative authority envelope.`,
       });
     }
   }

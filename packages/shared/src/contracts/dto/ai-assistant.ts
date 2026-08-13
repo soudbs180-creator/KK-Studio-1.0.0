@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
+  AgentRunAuthorityReadProjectionCompatibilityDtoSchema,
   AgentExecutionTargetSchema,
+  ExecutionAuthorityCheckpointBindingDtoSchema,
   ExecutionAuthorityDtoSchema,
   ExecutionCheckpointRefDtoSchema,
   ExecutionConfirmationGrantProjectionDtoSchema,
   type AgentExecutionTarget,
-  type ExecutionAuthorityDto,
+  type ExecutionAuthorityProjectionDto,
   type ExecutionCheckpointRefDto,
   type ExecutionConfirmationGrantProjectionDto,
 } from "./execution-authority.ts";
@@ -134,7 +136,8 @@ export interface AgentRunDto {
   replanCount?: 0 | 1 | 2 | 3;
   executionTarget?: AgentExecutionTarget;
   pairedRuntimeId?: string;
-  executionAuthorityEnvelope?: ExecutionAuthorityDto;
+  /** Legacy field name retained for reads; its value is always projection-only. */
+  executionAuthorityEnvelope?: ExecutionAuthorityProjectionDto;
   executionCheckpoint?: ExecutionCheckpointRefDto;
   confirmationGrant?: ExecutionConfirmationGrantProjectionDto;
 }
@@ -331,6 +334,20 @@ const validateRunCheckpoint = (run: ParsedAgentRunDto, context: z.RefinementCtx)
   ) {
     addRunContractIssue(context, ["executionCheckpoint", "authorityRuntimeId"], "Execution checkpoint must match the authority runtime.");
   }
+  const authority = run.executionAuthorityEnvelope;
+  if (
+    authority?.authorityState === "authoritative"
+    && !ExecutionAuthorityCheckpointBindingDtoSchema.safeParse({
+      authorityEnvelope: authority,
+      checkpoint,
+    }).success
+  ) {
+    addRunContractIssue(
+      context,
+      ["executionCheckpoint"],
+      "Execution checkpoint must match the exact authority epoch, fence, and attempt.",
+    );
+  }
 };
 
 const validateRunConfirmation = (run: ParsedAgentRunDto, context: z.RefinementCtx): void => {
@@ -345,12 +362,20 @@ const validateRunConfirmation = (run: ParsedAgentRunDto, context: z.RefinementCt
   }
 };
 
-export const AgentRunDtoSchema = AgentRunDtoBaseSchema.superRefine((run, context) => {
+const AgentRunDtoValidatedInputSchema = AgentRunDtoBaseSchema.superRefine((run, context) => {
   validatePairedRuntime(run, context);
   validateRunAuthority(run, context);
   validateRunCheckpoint(run, context);
   validateRunConfirmation(run, context);
 });
+
+/** Public Run reads retain the legacy field but never expose authoritative material. */
+export const AgentRunDtoSchema = AgentRunDtoValidatedInputSchema.transform((run) => ({
+  ...run,
+  executionAuthorityEnvelope: run.executionAuthorityEnvelope
+    ? AgentRunAuthorityReadProjectionCompatibilityDtoSchema.parse(run.executionAuthorityEnvelope)
+    : undefined,
+}));
 
 /** Validates the bounded server collection before it enters Web runtime state. */
 export const AgentRunListDtoSchema = z.array(AgentRunDtoSchema).max(50);

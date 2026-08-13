@@ -33,6 +33,10 @@ import { notify } from '../../services/system/notificationService';
 import { useCanvas } from '../../context/CanvasContext';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { TASK_CENTER_OPEN_EVENT, TASK_CENTER_TOGGLE_EVENT } from './taskCenterEvents';
+import {
+  mapAgentRunStatusToTaskCenterStatus,
+  type TaskCenterAgentActivityStatus,
+} from './taskCenterAgentStatus';
 
 interface TaskCenterTrayProps {
   onOpenSettings?: (view?: SettingsSurfaceView) => void;
@@ -54,7 +58,7 @@ interface CustomTask {
 
 type TaskCenterActivityStatus = CustomTask['status']
   | GenerationBatchJob['status']
-  | 'waiting_confirmation';
+  | TaskCenterAgentActivityStatus;
 
 interface TaskCenterActivity {
   id: string;
@@ -253,11 +257,7 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     }),
     ...agentRuns.map((run) => {
       const coverage = summarizeAgentRunCoverage(run);
-      const status: TaskCenterActivityStatus = run.status === 'waiting_confirmation'
-        ? 'waiting_confirmation'
-        : run.status === 'planning' || run.status === 'waiting_execution'
-          ? 'queued'
-          : run.status;
+      const status = mapAgentRunStatusToTaskCenterStatus(run.status);
       const error = ['failed', 'cancelled', 'completed_with_errors'].includes(run.status)
         ? coverage.latestFailure?.message || run.nextStep
         : undefined;
