@@ -3764,3 +3764,46 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - Gate 0 涉及多个真相源和安全边界，必须保持小步提交；Task 1、2、3 可并行，Task 4–15 只能按计划依赖展开，Task 17 串行收口。
 - 下一步从 Task 0 基线开始，然后并行实施候选版本 parser、Windows 参数 quoting 回归和 shared execution authority 契约。
 - `agents:commit` 会执行 `git add .`；提交前确认工作区只包含本轮三份文档变更。
+
+---
+
+## 294. 2026-08-13 - docs: record KK Studio 1.7.0 Gate 0 baseline
+
+**修改范围**
+- 执行并记录 1.7.0 Gate 0 开始前的发布、架构、治理、TypeScript、构建、Canvas、10K、启动布局和 Local Runner 本地基线。
+- 把现有 smoke 的通过项与不可外推项分开，明确记录 API-off fallback、WebView2/Desktop/mixed-media 未观测，以及 connector/DOM/重复文本假绿点。
+- 本轮只增加当前事实基线、文档索引和 Handoff，不修改运行时代码或发布版本。
+
+**修改文件**
+- `docs/governance/V170_GATE0_BASELINE.md`
+- `docs/governance/DOCUMENTATION_INDEX.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. Gate 0 基线不是发布证明；本机未启动 API 的 Chromium smoke 只证明 Web fallback，不代表 Provider、支付、OAuth 或生产健康。
+2. 当前 11,103 节点 smoke 的缩放态 `totalElements=6142`，已明确不满足 1.7.0 `<=1305` 目标；Gate 0 应优化渲染并让新断言通过，而不是降低阈值。
+3. 现有 connector 约 0.55px 的本次结果不能掩盖脚本允许空 endpoint 和 120px 容差；Task 14 必须通过故障注入证明新 `<1px` 门禁真实失败。
+4. 当前没有 Tauri/WebView2、统一迁移包、mixed-media、GPU/heap/object URL 生命周期证据，对应状态统一标记 `not_observed`。
+5. 现有 1.6.1 架构、治理、类型、构建和浏览器主路径保持通过；Gate 0 变更不得破坏这一 fallback。
+
+**已运行验证**
+- `agents:status` 直接 Node 等价命令：写入前 HEAD `4a54a1dc`，主工作区干净。
+- `architecture:check` 33/33 个直接等价守卫：通过。
+- `governance:check` 12/12 个直接等价命令：通过。
+- root/architecture TypeScript、121 个 server 文件 syntax、641 个 test 文件 semantic typecheck：通过。
+- shared、UI、API client、Web production build：通过；Vite 转换 2,623 modules，约 4.84 秒。
+- Canvas benchmark：3/3 tests 通过。
+- 10K browser smoke：11,103 nodes 通过现有门禁，初始 DOM 948、缩放 DOM 6,142、最近 connector 距离约 0.55px；同时记录现有假绿边界。
+- startup banner centering：1,600px 与 1,280px viewport 均为 0.5px center delta。
+- Local Runner typecheck 与 22/22 tests：通过。
+- 文档 UTF-8/结构自检、documentation governance、encoding、mojibake 与 `git diff --check`：通过。
+
+**未运行验证及原因**
+- 未运行完整 `verify:changes`：当前 shell 没有系统 npm；本轮逐项执行关键等价命令并明确记录范围，没有把部分等价执行描述为完整聚合门禁。
+- 未运行 dependency audit、mobile 全量检查、全部 unit/integration/E2E、PostgreSQL、Provider、OAuth、支付、生产 Web 或真实 Portable 更新；Task 0 不修改运行时代码，Task 17 负责全量收口。
+- Tauri/WebView2、安装器、签名 updater、Desktop SQLite/CAS 尚不存在，不能测试或描述为通过。
+
+**风险与下一步**
+- 现有 10K smoke 虽通过，但 DOM 与 connector 契约不足以支持 1.7.0 claim；Task 14/15 是 Gate 1 前置 blocker。
+- 候选版本 parser、Windows path quoting 和 shared authority 已在三个隔离 worktree 并行实施；主线只在审阅测试通过后 cherry-pick，并将清理临时 worktree/branch。
+- `agents:commit` 会执行 `git add .`；提交前确认主工作区只有本轮三份文档变更。
