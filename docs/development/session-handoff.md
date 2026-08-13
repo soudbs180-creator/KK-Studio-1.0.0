@@ -3682,3 +3682,45 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 **风险与下一步**
 - 移动端 lockfile 因原有 semver 范围重新解析了较多传递包；已通过 `npm ci`、全部 patch 与 TypeScript 验证，后续原生发布仍应执行 iOS/Android 构建和真机 smoke。
 - 推送后等待 GitHub 重新计算 Dependabot 告警，并在 GitHub 凭据恢复后确认 Actions、Vercel 与 VPS 部署结果。
+
+---
+
+## 292. 2026-08-13 - docs: approve KK Studio 1.7.0 spatial workspace design
+
+**修改范围**
+- 将用户确认的方案 A 固化为 KK Studio 1.7.0 正式设计：采用渐进式 Spatial Workspace，保持无限画布为第一操作界面，并统一直接操作、AI 辅助与 AI 接管三种协作模式。
+- 明确 Tauri 2 Windows 桌面壳、原生数据迁移、更新信任链、三执行通道、AI 恢复、Web 同源、移动伴侣端、UI 动效、性能与发布门禁。
+- 本轮只批准设计，不修改产品运行时代码；稳定发布版本继续保持 1.6.1。
+
+**修改文件**
+- `docs/superpowers/specs/2026-08-13-kk-studio-1.7.0-spatial-workspace-design.md`
+- `docs/governance/DOCUMENTATION_INDEX.md`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. 1.7.0 采用演进式空间工作台，不替换现有自研 10K Canvas、`CanvasRuntimeState`、`ToolRegistry`、generation-v3 或 Agent 主链。
+2. 桌面端采用 Tauri 2，Windows 10/11 优先、macOS-ready；renderer 只经 allowlisted Rust broker 访问签名 `local-runner`，不得直连 sidecar 或持有长期凭据。
+3. `local-desktop`、`paired-desktop`、`cloud` 使用独立且明确的 authority；confirmation、fencing、checkpoint 和 side-effect class 防止跨设备并发与盲目重放。
+4. 原生应用不假设能读取浏览器 origin；1.6.1 本地数据通过签名迁移桥或生产 Web exporter 生成的版本化迁移包，以事务、内容哈希和源数据保留完成迁移。
+5. 更新采用 Authenticode、Tauri artifact signature 和独立签名的 anti-replay release manifest；最终制品按精确 SHA 验收后原样晋级，不宣称 Tauri 自带自动回滚。
+6. Web 与 Desktop 共享产品 UI/领域实现；Expo 使用独立原生 UI，只共享 `packages/shared` 与 `packages/api-client`。移动 1.7.0 是真实伴侣端，不伪装完整手机画布。
+7. 新设计继续映射活跃 OpenSpec `upgrade-ai-creation-core`，不得另建平行助手、队列、后端或业务控制面。
+8. `config/release-manifest.json` 的稳定版本仍为 1.6.1；实施 Gate 0 才扩展候选版本字段，全部门禁通过后才原样晋级 1.7.0。
+
+**已运行验证**
+- 完整核对当前 AGENTS、`package.json`、release manifest、治理事实、活跃 OpenSpec、画布/AI/Portable/移动端现状及现有测试门禁。
+- 独立架构/安全与产品/UX 两轮 blocker 审查：最终均确认无剩余 P0；架构指定范围无剩余 P1。
+- `node scripts/governance/check-documentation-governance.mjs`：通过，275 份 Markdown、0 conflict。
+- `node scripts/ci/check-encoding.js` 与 `node scripts/ci/check-mojibake.mjs`：通过。
+- `architecture:check` 的 33 个 Node 守卫按根脚本顺序直接等价执行：全部通过。
+- Markdown 结构自检：1,100+ 行规格代码围栏闭合，无 TODO/TBD、行尾空白或本机绝对路径。
+- `git diff --check`：提交前复核。
+
+**未运行验证及原因**
+- 根脚本经 bundled `pnpm` 调用时，被工作区已有的 `ERR_PNPM_IGNORED_BUILDS: esbuild@0.28.1` 安装策略拦截；未改变依赖策略，改为直接逐项执行同一 `architecture:check` 守卫。
+- 本轮仅修改设计、索引与 Handoff，未修改运行时代码，因此未重复运行 typecheck、build、全量测试、10K 浏览器 smoke 或 `verify:changes`。
+- Tauri/WebView2 性能、真实签名安装器/更新源、PostgreSQL、Provider/支付、sidecar、Web 生产与移动真机均是后续实施 Gate 的真实环境门禁，未描述为已验证。
+
+**风险与下一步**
+- 设计批准不等于 1.7.0 已实现或可发布；下一步先编制 Gate 0 的可执行实施计划，再从候选版本契约、平台 Runtime Port、1.6.1 迁移包、路径含空格启动缺陷与真实性能门禁开始 TDD。
+- `agents:commit` 会执行 `git add .`；提交前确认工作区只有本轮三份文档变更。
