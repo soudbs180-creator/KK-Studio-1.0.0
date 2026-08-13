@@ -1,11 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { parseReleaseManifest } from "../lib/release-manifest.mjs";
+
 const root = process.cwd();
 const manifestPath = path.join(root, "config", "release-manifest.json");
-const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+let manifest;
+try {
+  manifest = parseReleaseManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[version:check] Invalid config/release-manifest.json: ${message}`);
+  process.exit(1);
+}
 
-const expectedVersion = manifest.version;
+const expectedVersion = manifest.releasedVersion;
+const expectedArtifactVersion = manifest.artifactVersion;
 const expectedDisplayVersion = manifest.displayVersion;
 const expectedReleaseDate = manifest.releaseDate;
 const expectedReleaseNotes = manifest.releaseNotes || [];
@@ -174,8 +184,12 @@ if (appInfoSource) {
   }
   for (const [exportName, manifestExpression] of [
     ["APP_NAME", "releaseManifest.appName"],
-    ["APP_VERSION", "releaseManifest.version"],
+    ["APP_VERSION", "releaseManifest.releasedVersion"],
     ["APP_DISPLAY_VERSION", "releaseManifest.displayVersion"],
+    ["APP_RELEASE_TARGET", "releaseManifest.releaseTarget"],
+    ["APP_RELEASE_PHASE", "releaseManifest.releasePhase"],
+    ["APP_RELEASE_SEQUENCE", "releaseManifest.releaseSequence"],
+    ["APP_ARTIFACT_VERSION", "releaseManifest.artifactVersion"],
     ["APP_RELEASE_DATE", "releaseManifest.releaseDate"],
     ["APP_RELEASE_NOTES", "releaseManifest.releaseNotes"],
   ]) {
@@ -232,6 +246,21 @@ if (distManifest) {
   if (distManifest.version !== expectedVersion) {
     fail(`${distManifestPath} version is ${distManifest.version}, expected ${expectedVersion}`);
   }
+  if (distManifest.releasedVersion !== expectedVersion) {
+    fail(`${distManifestPath} releasedVersion is ${distManifest.releasedVersion}, expected ${expectedVersion}`);
+  }
+  if (distManifest.releaseTarget !== manifest.releaseTarget) {
+    fail(`${distManifestPath} releaseTarget is ${distManifest.releaseTarget}, expected ${manifest.releaseTarget}`);
+  }
+  if (distManifest.releasePhase !== manifest.releasePhase) {
+    fail(`${distManifestPath} releasePhase is ${distManifest.releasePhase}, expected ${manifest.releasePhase}`);
+  }
+  if (distManifest.releaseSequence !== manifest.releaseSequence) {
+    fail(`${distManifestPath} releaseSequence is ${distManifest.releaseSequence}, expected ${manifest.releaseSequence}`);
+  }
+  if (distManifest.artifactVersion !== expectedArtifactVersion) {
+    fail(`${distManifestPath} artifactVersion is ${distManifest.artifactVersion}, expected ${expectedArtifactVersion}`);
+  }
   if (distManifest.releaseDate !== expectedReleaseDate) {
     fail(`${distManifestPath} releaseDate is ${distManifest.releaseDate}, expected ${expectedReleaseDate}`);
   }
@@ -242,6 +271,17 @@ const portableManifest = readJsonIfExists(portableManifestPath);
 if (portableManifest) {
   if (portableManifest.version !== expectedVersion) {
     fail(`${portableManifestPath} version is ${portableManifest.version}, expected ${expectedVersion}. Run npm run package:portable.`);
+  }
+  for (const [field, expectedValue] of [
+    ["releasedVersion", expectedVersion],
+    ["releaseTarget", manifest.releaseTarget],
+    ["releasePhase", manifest.releasePhase],
+    ["releaseSequence", manifest.releaseSequence],
+    ["artifactVersion", expectedArtifactVersion],
+  ]) {
+    if (portableManifest[field] !== expectedValue) {
+      fail(`${portableManifestPath} ${field} is ${portableManifest[field]}, expected ${expectedValue}. Run npm run package:portable.`);
+    }
   }
   if (distManifest && !sameJson(comparableVersionMetadata(portableManifest), comparableVersionMetadata(distManifest))) {
     fail(`${portableManifestPath} does not match ${distManifestPath}. Run npm run package:portable.`);
@@ -274,7 +314,9 @@ if (!Number.isInteger(stablePortableManifest.size) || stablePortableManifest.siz
   fail(`${stablePortableManifestPath} size must be a positive integer`);
 }
 
-if (portableManifest) {
+const portableStableVersion = portableManifest?.artifactVersion || portableManifest?.version;
+const portableStablePhase = portableManifest?.releasePhase || portableManifest?.channel;
+if (portableManifest && portableStableVersion === expectedVersion && portableStablePhase === "stable") {
   if (!sameJson(comparableVersionMetadata(stablePortableManifest), comparableVersionMetadata(portableManifest))) {
     fail(`${stablePortableManifestPath} does not match release/KK-Studio-Portable/app/dist/app-version.json for version metadata. Run npm run publish:portable after packaging.`);
   }

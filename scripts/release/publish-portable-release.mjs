@@ -4,6 +4,10 @@ import path from "node:path";
 
 import JSZip from "jszip";
 
+import {
+  assertStableReleaseProjection,
+  parseReleaseManifest,
+} from "../lib/release-manifest.mjs";
 import { assertVersionConsistency } from "../lib/version-gate.mjs";
 
 const rootDir = process.cwd();
@@ -84,6 +88,34 @@ function ensureExists(targetPath, message) {
   }
 }
 
+function assertPublishChannel(manifest, channel) {
+  if (channel === "stable") {
+    assertStableReleaseProjection(manifest);
+    return;
+  }
+  if (channel !== manifest.releasePhase) {
+    throw new Error(
+      `Portable publish channel ${channel} does not match releasePhase ${manifest.releasePhase}.`,
+    );
+  }
+}
+
+function assertPortableBundleProvenance(manifest, portableManifest) {
+  for (const field of [
+    "releasedVersion",
+    "releaseTarget",
+    "releasePhase",
+    "releaseSequence",
+    "artifactVersion",
+  ]) {
+    if (portableManifest[field] !== manifest[field]) {
+      throw new Error(
+        `Portable bundle ${field} is ${portableManifest[field]}, expected ${manifest[field]}. Run npm run package:portable.`,
+      );
+    }
+  }
+}
+
 async function addDirectoryToZip(zip, absoluteDir, relativeDir = "") {
   const entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
   entries.sort((left, right) => left.name.localeCompare(right.name));
@@ -121,14 +153,15 @@ async function main() {
 
   // 发布门禁：portable 发布不经 GitHub Actions，必须自行校验版本真理源一致性，
   // 否则子包 package.json 的版本漂移会被直接打进对外分发的 zip 与 manifest。
-  assertVersionConsistency({ context: "publish:portable", rootDir });
-
   ensureExists(releaseManifestPath, "config/release-manifest.json was not found.");
+  const releaseManifest = parseReleaseManifest(readJson(releaseManifestPath));
+  assertPublishChannel(releaseManifest, options.channel);
+  assertVersionConsistency({ context: "publish:portable", rootDir });
   ensureExists(portableBundleDir, "release/KK-Studio-Portable was not found. Run npm run package:portable first.");
   ensureExists(portableAppManifestPath, "release/KK-Studio-Portable/app/dist/app-version.json was not found. Run npm run package:portable first.");
 
-  const releaseManifest = readJson(releaseManifestPath);
   const portableAppManifest = readJson(portableAppManifestPath);
+  assertPortableBundleProvenance(releaseManifest, portableAppManifest);
   const publishDir = path.join(rootDir, "release", "publish", options.channel);
   const publishManifestPath = path.join(publishDir, "manifest.json");
   const existingPublishManifest = fs.existsSync(publishManifestPath) ? readJson(publishManifestPath) : null;
@@ -145,7 +178,7 @@ async function main() {
     throw new Error("Missing portable publish base URL. Pass --base-url or set KK_PORTABLE_PUBLISH_BASE_URL.");
   }
 
-  const archiveName = `KK-Studio-Portable-${releaseManifest.version}.zip`;
+  const archiveName = `KK-Studio-Portable-${releaseManifest.artifactVersion}.zip`;
   const archivePath = path.join(publishDir, archiveName);
 
   const zip = new JSZip();
@@ -161,8 +194,13 @@ async function main() {
 
   const manifestPayload = {
     appName: portableAppManifest.appName || "KK Studio",
-    version: releaseManifest.version,
+    version: releaseManifest.artifactVersion,
+    releasedVersion: releaseManifest.releasedVersion,
     displayVersion: releaseManifest.displayVersion,
+    releaseTarget: releaseManifest.releaseTarget,
+    releasePhase: releaseManifest.releasePhase,
+    releaseSequence: releaseManifest.releaseSequence,
+    artifactVersion: releaseManifest.artifactVersion,
     buildTime: portableAppManifest.buildTime ?? null,
     releaseDate: releaseManifest.releaseDate,
     releaseNotes: releaseManifest.releaseNotes || [],

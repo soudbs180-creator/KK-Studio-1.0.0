@@ -1,7 +1,13 @@
 {
   "appName": "KK Studio",
+  "schemaVersion": 1,
   "version": "1.6.1",
+  "releasedVersion": "1.6.1",
   "displayVersion": "v1.6.1",
+  "releaseTarget": "1.7.0",
+  "releasePhase": "development",
+  "releaseSequence": 0,
+  "artifactVersion": "1.7.0-alpha.0.0",
   "releaseDate": "2026-07-25",
   "releaseNotes": [
     "react-router 安全升级至 v8.3.0 (修复 GHSA-qwww-vcr4-c8h2)",

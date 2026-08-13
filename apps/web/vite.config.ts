@@ -7,13 +7,15 @@ import { execSync } from 'child_process';
 import { defineConfig, loadEnv } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo.ts';
+import releaseManifestSource from '../../config/release-manifest.json' with { type: 'json' };
+import { parseReleaseManifest } from '../../scripts/lib/release-manifest.mjs';
 import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData.ts';
 import { shouldIgnoreWatchPath } from './viteWatchPolicy.ts';
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const RELEASE_MANIFEST = parseReleaseManifest(releaseManifestSource);
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
 const TURNSTILE_DIAGNOSTIC_ENTRY = path.resolve(__dirname, 'turnstile-diagnostic.html');
@@ -317,12 +319,6 @@ function buildVersionManifestPlugin(): Plugin {
             projectRoot = config.root;
         },
         generateBundle() {
-            const packageJsonPath = path.resolve(__dirname, '../../package.json');
-            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as {
-                name?: string;
-                version?: string;
-            };
-
             let localGitSha: string | null = null;
             try {
                 localGitSha = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
@@ -343,12 +339,18 @@ function buildVersionManifestPlugin(): Plugin {
             const commitShortSha = commitSha ? commitSha.substring(0, 7) : null;
 
             const manifest = {
-                appName: APP_NAME,
-                version: packageJson.version || '0.0.0',
+                appName: RELEASE_MANIFEST.appName,
+                version: RELEASE_MANIFEST.releasedVersion,
+                releasedVersion: RELEASE_MANIFEST.releasedVersion,
+                displayVersion: RELEASE_MANIFEST.displayVersion,
+                releaseTarget: RELEASE_MANIFEST.releaseTarget,
+                releasePhase: RELEASE_MANIFEST.releasePhase,
+                releaseSequence: RELEASE_MANIFEST.releaseSequence,
+                artifactVersion: RELEASE_MANIFEST.artifactVersion,
                 buildTime: new Date().toISOString(),
-                releaseDate: APP_RELEASE_DATE,
-                releaseNotes: [...APP_RELEASE_NOTES],
-                channel: process.env.KK_STUDIO_RELEASE_CHANNEL || 'stable',
+                releaseDate: RELEASE_MANIFEST.releaseDate,
+                releaseNotes: [...RELEASE_MANIFEST.releaseNotes],
+                channel: RELEASE_MANIFEST.releasePhase,
                 deploymentTarget: process.env.VERCEL_ENV
                     || process.env.NODE_ENV
                     || 'production',
