@@ -2,8 +2,8 @@
 import React from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { ctaCopy } from './landingContent';
-import { APP_DISPLAY_VERSION } from '../config/appInfo';
 import { useLocale } from '../context/LocaleContext';
+import { usePlatformRuntime } from '../platform/runtime/usePlatformRuntime';
 import { pickByResolvedLanguage } from '../utils/localeText';
 
 interface LandingCTAProps {
@@ -16,6 +16,7 @@ export const LandingCTA: React.FC<LandingCTAProps> = ({
   onSecondaryClick
 }) => {
   const { language } = useLocale();
+  const displayVersion = usePlatformRuntime().getAppInfo().displayVersion;
 
   const t = <T,>(text: { zh: T; en: T }): T => {
     return pickByResolvedLanguage(language, text.zh, text.en);
@@ -57,7 +58,7 @@ export const LandingCTA: React.FC<LandingCTAProps> = ({
         {/* Right: Version info & platform links */}
         <div className="flex items-center gap-4 text-xs text-[#6a6a6a] font-mono">
           <span className="bg-white px-2.5 py-1 rounded border border-[#e5e5e5] shadow-2xs">
-            {APP_DISPLAY_VERSION}
+            {displayVersion}
           </span>
         </div>
       </footer>
