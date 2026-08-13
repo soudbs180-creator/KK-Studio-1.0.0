@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   AgentExecutionTargetSchema,
@@ -8,9 +9,7 @@ import {
   ExecutionConfirmationGrantEnvelopeDtoSchema,
   ExecutionConfirmationGrantProjectionDtoSchema,
 } from '../../packages/shared/src/index.ts';
-import {
-  AgentExecutionTargetSchema as PairedRuntimeExecutionTargetSchema,
-} from '../../packages/shared/src/contracts/dto/paired-runtime.ts';
+import { workspacePath } from '../support/workspacePaths.js';
 
 const NOW = '2026-08-13T00:00:00.000Z';
 const LATER = '2026-08-13T00:05:00.000Z';
@@ -47,7 +46,14 @@ const pairedAuthority = {
 } as const;
 
 test('execution target has one canonical schema with a paired-runtime compatibility re-export', () => {
-  assert.equal(AgentExecutionTargetSchema, PairedRuntimeExecutionTargetSchema);
+  const pairedRuntimeSource = readFileSync(
+    workspacePath('packages/shared/src/contracts/dto/paired-runtime.ts'),
+    'utf8',
+  );
+  assert.match(
+    pairedRuntimeSource,
+    /export\s*\{[\s\S]*?AgentExecutionTargetSchema[\s\S]*?\}\s*from\s*['"]\.\/execution-authority\.ts['"];/,
+  );
   assert.deepEqual(AgentExecutionTargetSchema.options, [
     'local-desktop',
     'paired-desktop',
