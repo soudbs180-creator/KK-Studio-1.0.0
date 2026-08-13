@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
-export const AgentExecutionTargetSchema = z.enum([
-  'local-desktop',
-  'paired-desktop',
-  'cloud',
-]);
+export {
+  AgentExecutionTargetSchema,
+  type AgentExecutionTarget,
+} from './execution-authority.ts';
 
 export const PairedRuntimeCapabilityManifestSchema = z.object({
   schemaVersion: z.literal(1),
@@ -74,7 +73,6 @@ export const CompletePairedRuntimeCommandRequestSchema = z.object({
   }
 });
 
-export type AgentExecutionTarget = z.infer<typeof AgentExecutionTargetSchema>;
 export type PairedRuntimeCapabilityManifest = z.infer<typeof PairedRuntimeCapabilityManifestSchema>;
 export type RegisterPairedRuntimeRequest = z.infer<typeof RegisterPairedRuntimeRequestSchema>;
 export type RegisterPairedRuntimeResponse = z.infer<typeof RegisterPairedRuntimeResponseSchema>;

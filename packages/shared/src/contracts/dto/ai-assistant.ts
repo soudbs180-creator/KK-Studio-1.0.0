@@ -1,8 +1,14 @@
 import { z } from "zod";
 import {
   AgentExecutionTargetSchema,
+  ExecutionAuthorityDtoSchema,
+  ExecutionCheckpointRefDtoSchema,
+  ExecutionConfirmationGrantProjectionDtoSchema,
   type AgentExecutionTarget,
-} from "./paired-runtime.ts";
+  type ExecutionAuthorityDto,
+  type ExecutionCheckpointRefDto,
+  type ExecutionConfirmationGrantProjectionDto,
+} from "./execution-authority.ts";
 
 export type AssistantCollaborationMode = "direct" | "assist" | "takeover";
 
@@ -28,18 +34,26 @@ export const AssistantWorkspaceSurfaceSchema = z.enum([
 export type AgentRunStatus =
   | "planning"
   | "waiting_confirmation"
+  | "waiting_for_device"
   | "waiting_execution"
   | "running"
+  | "verifying"
+  | "verification_required"
+  | "manual_reconcile"
   | "completed"
   | "completed_with_errors"
   | "failed"
   | "cancelled";
 
-const AgentRunStatusSchema = z.enum([
+export const AgentRunStatusSchema = z.enum([
   "planning",
   "waiting_confirmation",
+  "waiting_for_device",
   "waiting_execution",
   "running",
+  "verifying",
+  "verification_required",
+  "manual_reconcile",
   "completed",
   "completed_with_errors",
   "failed",
@@ -120,6 +134,9 @@ export interface AgentRunDto {
   replanCount?: 0 | 1 | 2 | 3;
   executionTarget?: AgentExecutionTarget;
   pairedRuntimeId?: string;
+  executionAuthorityEnvelope?: ExecutionAuthorityDto;
+  executionCheckpoint?: ExecutionCheckpointRefDto;
+  confirmationGrant?: ExecutionConfirmationGrantProjectionDto;
 }
 
 export interface AgentRunSnapshotEventDto {
@@ -236,7 +253,7 @@ const AgentRunReplanEventCountSchema = z.union([
   z.literal(3),
 ]);
 
-export const AgentRunDtoSchema = z.object({
+const AgentRunDtoBaseSchema = z.object({
   id: z.string().min(1).max(200),
   sessionId: z.string().min(1).max(200).optional(),
   userMessage: z.string(),
@@ -254,22 +271,85 @@ export const AgentRunDtoSchema = z.object({
   replanCount: AgentRunReplanCountSchema.optional(),
   executionTarget: AgentExecutionTargetSchema.optional(),
   pairedRuntimeId: z.string().uuid().optional(),
-}).superRefine((run, context) => {
+  executionAuthorityEnvelope: ExecutionAuthorityDtoSchema.optional(),
+  executionCheckpoint: ExecutionCheckpointRefDtoSchema.optional(),
+  confirmationGrant: ExecutionConfirmationGrantProjectionDtoSchema.optional(),
+});
+
+type ParsedAgentRunDto = z.infer<typeof AgentRunDtoBaseSchema>;
+
+const addRunContractIssue = (
+  context: z.RefinementCtx,
+  path: string[],
+  message: string,
+): void => {
+  context.addIssue({ code: z.ZodIssueCode.custom, path, message });
+};
+
+const validatePairedRuntime = (run: ParsedAgentRunDto, context: z.RefinementCtx): void => {
   const target = run.executionTarget || "local-desktop";
   if (target === "paired-desktop" && !run.pairedRuntimeId) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["pairedRuntimeId"],
-      message: "Paired desktop runs require pairedRuntimeId.",
-    });
+    addRunContractIssue(context, ["pairedRuntimeId"], "Paired desktop runs require pairedRuntimeId.");
   }
   if (target !== "paired-desktop" && run.pairedRuntimeId) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["pairedRuntimeId"],
-      message: "pairedRuntimeId is only valid for paired desktop runs.",
-    });
+    addRunContractIssue(
+      context,
+      ["pairedRuntimeId"],
+      "pairedRuntimeId is only valid for paired desktop runs.",
+    );
   }
+};
+
+const validateRunAuthority = (run: ParsedAgentRunDto, context: z.RefinementCtx): void => {
+  const authority = run.executionAuthorityEnvelope;
+  if (!authority) return;
+  const target = run.executionTarget || "local-desktop";
+  if (authority.runId !== run.id) {
+    addRunContractIssue(context, ["executionAuthorityEnvelope", "runId"], "Execution authority must belong to the same Run.");
+  }
+  if (authority.executionTarget !== target) {
+    addRunContractIssue(context, ["executionAuthorityEnvelope", "executionTarget"], "Execution authority must match the Run target.");
+  }
+  if (target === "paired-desktop" && authority.authorityRuntimeId && authority.authorityRuntimeId !== run.pairedRuntimeId) {
+    addRunContractIssue(context, ["executionAuthorityEnvelope", "authorityRuntimeId"], "Execution authority must match the paired runtime.");
+  }
+};
+
+const validateRunCheckpoint = (run: ParsedAgentRunDto, context: z.RefinementCtx): void => {
+  const checkpoint = run.executionCheckpoint;
+  if (!checkpoint) return;
+  const target = run.executionTarget || "local-desktop";
+  if (checkpoint.runId !== run.id) {
+    addRunContractIssue(context, ["executionCheckpoint", "runId"], "Execution checkpoint must belong to the same Run.");
+  }
+  if (checkpoint.executionTarget !== target) {
+    addRunContractIssue(context, ["executionCheckpoint", "executionTarget"], "Execution checkpoint must match the Run target.");
+  }
+  if (
+    run.executionAuthorityEnvelope?.authorityRuntimeId
+    && checkpoint.authorityRuntimeId !== run.executionAuthorityEnvelope.authorityRuntimeId
+  ) {
+    addRunContractIssue(context, ["executionCheckpoint", "authorityRuntimeId"], "Execution checkpoint must match the authority runtime.");
+  }
+};
+
+const validateRunConfirmation = (run: ParsedAgentRunDto, context: z.RefinementCtx): void => {
+  const confirmation = run.confirmationGrant;
+  if (!confirmation) return;
+  const target = run.executionTarget || "local-desktop";
+  if (confirmation.runId !== run.id) {
+    addRunContractIssue(context, ["confirmationGrant", "runId"], "Confirmation projection must belong to the same Run.");
+  }
+  if (confirmation.executionTarget !== target) {
+    addRunContractIssue(context, ["confirmationGrant", "executionTarget"], "Confirmation projection must match the Run target.");
+  }
+};
+
+export const AgentRunDtoSchema = AgentRunDtoBaseSchema.superRefine((run, context) => {
+  validatePairedRuntime(run, context);
+  validateRunAuthority(run, context);
+  validateRunCheckpoint(run, context);
+  validateRunConfirmation(run, context);
 });
 
 /** Validates the bounded server collection before it enters Web runtime state. */
