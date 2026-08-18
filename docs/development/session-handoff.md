@@ -3807,3 +3807,37 @@ Node 全局 `fetch` 的 `redirect` 默认为 `'follow'`（最多 20 跳）。
 - 现有 10K smoke 虽通过，但 DOM 与 connector 契约不足以支持 1.7.0 claim；Task 14/15 是 Gate 1 前置 blocker。
 - 候选版本 parser、Windows path quoting 和 shared authority 已在三个隔离 worktree 并行实施；主线只在审阅测试通过后 cherry-pick，并将清理临时 worktree/branch。
 - `agents:commit` 会执行 `git add .`；提交前确认主工作区只有本轮三份文档变更。
+
+---
+
+## 295. 2026-08-18 - fix(governance): 收紧浏览器助手边界扫描范围
+
+**修改范围**
+- 收口上次会话遗留的 browser-assistant 架构守卫补丁，避免源码边界检查递归扫描 `apps/mobile/node_modules`。
+- 固化 `AgentRunDto` 权威快照测试夹具的精确类型，保持测试语义类型检查与当前共享契约一致。
+- 本条仅关闭遗留基线补丁，不继续旧的 CanvasCommandPort 实现路线。
+
+**修改文件**
+- `scripts/governance/architecture/check-browser-assistant-boundaries.mjs`
+- `tests/unit/browser-assistant-boundary-guard.test.ts`
+- `tests/unit/agent-runtime-status-flow.test.ts`
+- `docs/development/session-handoff.md`
+
+**当前设计决策**
+1. browser-assistant 守卫只扫描 `apps/mobile` 的源码文件，显式忽略依赖树并要求 `onlyFiles: true`；依赖内容不能成为跨端边界判定输入。
+2. `CanvasContext`、Agent 执行链和产品运行时代码均不在本切片中变更；该提交只恢复可重复的治理基线。
+3. `AgentRunDto` 测试夹具先构造类型化权威快照，再分别验证 CAS 接受与拒绝路径，避免对象字面量联合类型被错误扩宽。
+
+**已运行验证**
+- `browser-assistant-boundary-guard.test.ts`：1/1 通过。
+- `agent-runtime-status-flow.test.ts`：10/10 通过。
+- `check-browser-assistant-boundaries.mjs`：通过，实际执行约 1.5 秒内完成。
+- `check-tests-types.mjs tsconfig.tests.json`：653 个测试文件语义类型检查通过。
+
+**未运行验证及原因**
+- 尚未运行完整 `architecture:check`、`governance:check`、`typecheck`、`build` 或 `verify:changes`；本切片只固化已定向验证的遗留治理与测试类型补丁，项目级全量门禁留待桌面 App 重基线的最终收口阶段统一执行。
+- 未进行 MiniMax Design 安装资源静态分析或产品能力矩阵写入；这些属于下一独立交付物，不能混入本修复提交。
+
+**风险与下一步**
+- 风险低：运行时产品代码未变，守卫范围从依赖树收窄到项目源码。
+- 下一步基于已批准的 1.7.0 Spatial Workspace 与当前源码，补全 MiniMax Design 产品参考能力矩阵、差距和实施门禁；不得复制其代码或私有实现。

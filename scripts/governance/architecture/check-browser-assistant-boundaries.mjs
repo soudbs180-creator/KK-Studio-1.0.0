@@ -4,7 +4,10 @@ import glob from 'fast-glob';
 
 // 简体中文：静态检测 apps/mobile 没有越界引用任何桌面专属的 browser-assistant 模块
 async function run() {
-  const files = await glob('apps/mobile/**/*.{ts,tsx,js,jsx}');
+  const files = await glob('apps/mobile/**/*.{ts,tsx,js,jsx}', {
+    ignore: ['apps/mobile/node_modules/**'],
+    onlyFiles: true,
+  });
   let violation = false;
 
   for (const file of files) {

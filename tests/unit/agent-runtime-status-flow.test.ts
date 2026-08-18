@@ -1,5 +1,6 @@
 import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import type { AgentRunDto } from '@kk/shared';
 
 // Mock localStorage
 const mockLocalStorage = (() => {
@@ -210,7 +211,7 @@ describe('AgentRunStore Status Flow Tests', () => {
     const expectedLocalUpdatedAt = local.updatedAt;
     const authoritativeUpdatedAt = new Date(Date.parse(local.updatedAt) + 1_000).toISOString();
 
-    const applied = store.applyAuthoritativeRun({
+    const authoritativeSnapshot: AgentRunDto = {
       id: local.id,
       userMessage: local.userMessage,
       intent: local.intent,
@@ -220,7 +221,11 @@ describe('AgentRunStore Status Flow Tests', () => {
       stepResults: [],
       createdAt: local.createdAt,
       updatedAt: authoritativeUpdatedAt,
-    }, expectedLocalUpdatedAt);
+    };
+    const applied = store.applyAuthoritativeRun(
+      authoritativeSnapshot,
+      expectedLocalUpdatedAt,
+    );
 
     assert.equal(applied?.status, 'completed');
     assert.deepEqual(applied?.toolCalls.map((toolCall) => toolCall.id), ['tool-local-only']);
@@ -228,7 +233,7 @@ describe('AgentRunStore Status Flow Tests', () => {
 
     const newerLocal = store.updateRun(local.id, { status: 'cancelled' });
     const rejected = store.applyAuthoritativeRun({
-      ...applied!,
+      ...authoritativeSnapshot,
       status: 'completed_with_errors',
       updatedAt: new Date(Date.parse(newerLocal.updatedAt) + 1_000).toISOString(),
     }, authoritativeUpdatedAt);
