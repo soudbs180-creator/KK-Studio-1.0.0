@@ -26,6 +26,7 @@ export const PublicTaskTerminalOutcomeSchema = z.enum([
   'failed',
   'cancelled',
 ]);
+export type PublicTaskTerminalOutcome = z.infer<typeof PublicTaskTerminalOutcomeSchema>;
 
 export const PublicTaskActionSchema = z.enum([
   'cancel',
@@ -45,6 +46,7 @@ export const PublicTaskActionSchema = z.enum([
   'cancel_update',
   'force_exit',
 ]);
+export type PublicTaskAction = z.infer<typeof PublicTaskActionSchema>;
 
 export const PublicTaskErrorCategorySchema = z.enum([
   'validation',
@@ -61,6 +63,7 @@ export const PublicTaskErrorCategorySchema = z.enum([
   'unsupported',
   'unknown',
 ]);
+export type PublicTaskErrorCategory = z.infer<typeof PublicTaskErrorCategorySchema>;
 
 export const PublicTaskErrorCodeSchema = z.enum([
   'requires_paired_desktop',
@@ -79,6 +82,7 @@ export const PublicTaskErrorCodeSchema = z.enum([
   'unsupported_operation',
   'unknown_error',
 ]);
+export type PublicTaskErrorCode = z.infer<typeof PublicTaskErrorCodeSchema>;
 
 export const PublicTaskSafeActionSchema = z.enum([
   'retry',
@@ -96,6 +100,7 @@ export const PublicTaskSafeActionSchema = z.enum([
   'cancel',
   'open_recovery',
 ]);
+export type PublicTaskSafeAction = z.infer<typeof PublicTaskSafeActionSchema>;
 
 /** Stable semantics are presentation-independent and shared across every surface. */
 export const STABLE_PUBLIC_TASK_ERROR_MAPPINGS = {

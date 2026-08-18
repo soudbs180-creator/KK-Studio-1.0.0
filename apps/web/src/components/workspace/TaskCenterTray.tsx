@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -9,34 +9,36 @@ import {
   AlertTriangle,
   Loader2,
   Image,
-  Video,
-  AudioLines,
   FileText,
   Globe,
   Download,
-  Layers,
-  Eye,
   Copy,
   Settings,
   Bot,
 } from 'lucide-react';
 import { KK_LAYER } from '@kk/ui';
+import type {
+  PublicTaskAction,
+  PublicTaskPhase,
+  PublicTaskProjectionDto,
+  PublicTaskTerminalOutcome,
+} from '@kk/shared';
 import {
-  agentRunStore,
-  agentRuntimeInstance,
-  durableGenerationQueue,
-  summarizeAgentRunCoverage,
-  type AgentRunRecord,
-  type GenerationBatchJob,
-} from '../../features/ai-assistant-runtime';
+  getPublicTaskDisplayStatus,
+  getPublicTaskProgressPercent,
+  projectLocalTask,
+  type LocalTaskInput,
+  type PublicTaskSourceStatus,
+} from '../../features/tasks/publicTaskProjection.ts';
+import {
+  archiveFinishedPublicTaskProjections,
+  archivePublicTaskProjection,
+  dispatchPublicTaskAction,
+} from '../../features/tasks/publicTaskProjectionSource.ts';
+import { usePublicTaskProjections } from '../../features/tasks/usePublicTaskProjections.ts';
 import { notify } from '../../services/system/notificationService';
-import { useCanvas } from '../../context/CanvasContext';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { TASK_CENTER_OPEN_EVENT, TASK_CENTER_TOGGLE_EVENT } from './taskCenterEvents';
-import {
-  mapAgentRunStatusToTaskCenterStatus,
-  type TaskCenterAgentActivityStatus,
-} from './taskCenterAgentStatus';
 
 interface TaskCenterTrayProps {
   onOpenSettings?: (view?: SettingsSurfaceView) => void;
@@ -45,70 +47,59 @@ interface TaskCenterTrayProps {
   isMobile?: boolean;
 }
 
-// 自定义非生图任务结构
-interface CustomTask {
-  id: string;
-  name: string;
-  type: 'image' | 'video' | 'audio' | 'ppt' | 'extract' | 'membership' | 'export';
-  status: 'running' | 'completed' | 'failed' | 'paused';
-  progress?: number;
-  error?: string;
-  createdAt: number;
-}
+type LocalTaskProjection = Extract<PublicTaskProjectionDto, { source: 'local_task' }>;
+type TaskDisplayStatus = PublicTaskPhase | PublicTaskTerminalOutcome;
 
-type TaskCenterActivityStatus = CustomTask['status']
-  | GenerationBatchJob['status']
-  | TaskCenterAgentActivityStatus;
+const LOCAL_EVENT_STATUSES = new Set<PublicTaskSourceStatus>([
+  'running', 'completed', 'failed', 'paused', 'cancelled', 'completed_with_errors',
+]);
 
-interface TaskCenterActivity {
-  id: string;
-  source: 'generation' | 'agent' | 'transient';
-  name: string;
-  type: CustomTask['type'] | 'assistant';
-  status: TaskCenterActivityStatus;
-  progress: number;
-  error?: string;
-  createdAt: number;
-  canRetry: boolean;
-  requiresSetup: boolean;
-  isGenerationJob: boolean;
-  rawJob: GenerationBatchJob | null;
-  rawRun: AgentRunRecord | null;
-}
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+);
 
-const isSetupRequiredError = (value: string) => {
-  const error = value.toUpperCase();
-  return [
-    'SETUP_REQUIRED',
-    'CAPABILITY_UNAVAILABLE',
-    'API',
-    'KEY',
-    '密钥',
-    '余额',
-    '积分',
-    'CREDIT',
-    'CREDITS',
-  ].some((marker) => error.includes(marker));
+const normalizeLocalStatus = (value: unknown, fallback: PublicTaskSourceStatus) => (
+  typeof value === 'string' && LOCAL_EVENT_STATUSES.has(value as PublicTaskSourceStatus)
+    ? value as PublicTaskSourceStatus
+    : fallback
+);
+
+const optionalString = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim() ? value.trim() : undefined
+);
+
+const getLocalSourceStatus = (task?: LocalTaskProjection): PublicTaskSourceStatus => {
+  if (!task) return 'running';
+  if (task.terminalOutcome) return task.terminalOutcome;
+  return task.phase === 'terminal' ? 'completed' : task.phase;
 };
+
+const localTaskInputFromEvent = (
+  detail: Record<string, unknown>,
+  current?: LocalTaskProjection,
+): LocalTaskInput => ({
+  id: optionalString(detail.id) || current?.localTaskId || '',
+  status: normalizeLocalStatus(detail.status, getLocalSourceStatus(current)),
+  progress: typeof detail.progress === 'number' ? detail.progress : current?.progress?.completed,
+  code: optionalString(detail.errorCode) || current?.error?.code,
+  category: optionalString(detail.errorCategory) || current?.error?.category,
+  retryable: typeof detail.retryable === 'boolean' ? detail.retryable : current?.error?.retryable,
+  createdAt: current?.createdAt || Date.now(),
+  updatedAt: Date.now(),
+});
+
+const isTerminalFailure = (status: TaskDisplayStatus): boolean => (
+  ['failed', 'cancelled', 'completed_with_errors'].includes(status)
+);
 
 export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
   onOpenSettings,
   isMobile = false,
 }) => {
-  const { activeCanvas, selectNodes, setViewportCenter } = useCanvas();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
-  
-  // 生图队列任务
-  const [generationJobs, setGenerationJobs] = useState<GenerationBatchJob[]>(() => 
-    durableGenerationQueue.getJobs()
-  );
-
-  const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>(() => agentRunStore.listRuns());
-
-  // Non-durable event tasks remain a session-only compatibility projection.
-  // Durable generation and Agent state stay owned by their respective stores.
-  const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
+  const authoritativeTasks = usePublicTaskProjections();
+  const [localTasks, setLocalTasks] = useState<LocalTaskProjection[]>([]);
   const externalTriggerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeTaskCenter = useCallback(() => {
@@ -117,15 +108,6 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     setIsOpen(false);
     window.requestAnimationFrame(() => returnTarget?.focus());
   }, []);
-
-  // 订阅生图队列更新
-  useEffect(() => {
-    return durableGenerationQueue.subscribe((jobs) => {
-      setGenerationJobs(jobs);
-    });
-  }, []);
-
-  useEffect(() => agentRunStore.subscribe(setAgentRuns), []);
 
   useEffect(() => {
     const rememberExternalTrigger = () => {
@@ -170,50 +152,27 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [closeTaskCenter, isOpen]);
 
-  // 注册全局事件，允许其他组件下发任务
+  // Legacy event tasks are immediately reduced to safe local-task projections.
   useEffect(() => {
-    const handleAddTask = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail || !detail.id) return;
-
-      const newTask: CustomTask = {
-        id: detail.id,
-        name: detail.name || '未知任务',
-        type: detail.type || 'export',
-        status: detail.status || 'running',
-        progress: detail.progress ?? 0,
-        error: detail.error,
-        createdAt: Date.now(),
-      };
-
-      setCustomTasks((prev) => {
-        // 如果已存在则更新，不存在则添加
-        const exists = prev.some((t) => t.id === newTask.id);
-        if (exists) {
-          return prev.map((t) => (t.id === newTask.id ? { ...t, ...newTask } : t));
-        }
-        return [newTask, ...prev];
+    const handleAddTask = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isRecord(detail) || !optionalString(detail.id)) return;
+      const projection = projectLocalTask(localTaskInputFromEvent(detail));
+      setLocalTasks((currentTasks) => {
+        const remaining = currentTasks.filter((task) => task.localTaskId !== projection.localTaskId);
+        return [projection, ...remaining];
       });
-
     };
 
-    const handleUpdateTask = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail || !detail.id) return;
-
-      setCustomTasks((prev) =>
-        prev.map((t) => {
-          if (t.id === detail.id) {
-            return {
-              ...t,
-              status: detail.status ?? t.status,
-              progress: detail.progress ?? t.progress,
-              error: detail.error ?? t.error,
-            };
-          }
-          return t;
-        })
-      );
+    const handleUpdateTask = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      const taskId = isRecord(detail) ? optionalString(detail.id) : undefined;
+      if (!taskId || !isRecord(detail)) return;
+      setLocalTasks((currentTasks) => currentTasks.map((task) => (
+        task.localTaskId === taskId
+          ? projectLocalTask(localTaskInputFromEvent(detail, task))
+          : task
+      )));
     };
 
     window.addEventListener('task-center:add', handleAddTask);
@@ -225,263 +184,141 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
     };
   }, []);
 
-  // Read-only activity projection: Queue and Agent Run remain the sources of truth.
-  const allCombinedTasks: TaskCenterActivity[] = [
-    ...generationJobs.map((job) => {
-      // 映射生图 job 状态
-      const totalPrompts = job.prompts.length;
-      const completedPrompts = job.prompts.filter((p) => p.status === 'completed').length;
-      const failedPrompts = job.prompts.filter((p) => p.status === 'failed').length;
-      const setupRequired = job.prompts.some((prompt) =>
-        prompt.status === 'failed'
-        && isSetupRequiredError(`${prompt.errorCategory || ''} ${prompt.error || ''}`)
-      );
-      const progress = job.progress?.percent
-        ?? (totalPrompts > 0 ? Math.round(((completedPrompts + failedPrompts) / totalPrompts) * 100) : 0);
-
-      return {
-        id: job.id,
-        source: 'generation' as const,
-        name: job.outputGroup?.label || `批量生成任务 (${totalPrompts} 项)`,
-        type: job.taskType,
-        status: job.status,
-        progress,
-        error: failedPrompts > 0 ? `有 ${failedPrompts} 项生成失败` : undefined,
-        createdAt: job.createdAt,
-        isGenerationJob: true,
-        canRetry: !setupRequired && job.prompts.some((prompt) => prompt.status === 'failed' && prompt.retryable !== false),
-        requiresSetup: setupRequired,
-        rawJob: job,
-        rawRun: null,
-      };
-    }),
-    ...agentRuns.map((run) => {
-      const coverage = summarizeAgentRunCoverage(run);
-      const status = mapAgentRunStatusToTaskCenterStatus(run.status);
-      const error = ['failed', 'cancelled', 'completed_with_errors'].includes(run.status)
-        ? coverage.latestFailure?.message || run.nextStep
-        : undefined;
-
-      return {
-        id: run.id,
-        source: 'agent' as const,
-        name: run.userMessage || run.intent || 'AI assistant task',
-        type: 'assistant' as const,
-        status,
-        progress: coverage.progressPercent,
-        error,
-        createdAt: Date.parse(run.createdAt) || Date.now(),
-        isGenerationJob: false,
-        canRetry: false,
-        requiresSetup: isSetupRequiredError(`${error || ''} ${run.nextStep || ''}`),
-        rawJob: null,
-        rawRun: run,
-      };
-    }),
-    ...customTasks.map((t) => ({
-      ...t,
-      source: 'transient' as const,
-      progress: t.progress ?? 0,
-      isGenerationJob: false,
-      canRetry: t.status === 'failed',
-      requiresSetup: false,
-      rawJob: null,
-      rawRun: null,
-    }))
-  ].sort((a, b) => b.createdAt - a.createdAt);
+  const allCombinedTasks = useMemo<PublicTaskProjectionDto[]>(() => [
+    ...authoritativeTasks,
+    ...localTasks,
+  ].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)), [
+    authoritativeTasks,
+    localTasks,
+  ]);
 
   // 过滤任务
   const filteredTasks = allCombinedTasks.filter((task) => {
+    const displayStatus = getPublicTaskDisplayStatus(task);
     if (activeTab === 'all') return true;
-    if (activeTab === 'running') return task.status === 'running' || task.status === 'queued' || task.status === 'paused' || task.status === 'waiting_confirmation';
-    if (activeTab === 'completed') return task.status === 'completed' || task.status === 'completed_with_errors';
-    if (activeTab === 'failed') return task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors';
+    if (activeTab === 'running') return task.phase !== 'terminal';
+    if (activeTab === 'completed') return displayStatus === 'completed';
+    if (activeTab === 'failed') return isTerminalFailure(displayStatus) || Boolean(task.error);
     return true;
   });
 
   const activeRunningCount = allCombinedTasks.filter(
-    (t) => t.status === 'running'
-      || t.status === 'queued'
-      || t.status === 'paused'
-      || t.status === 'waiting_confirmation'
+    (task) => task.phase !== 'terminal'
   ).length;
 
-  const handlePause = (task: typeof allCombinedTasks[0]) => {
-    if (task.isGenerationJob) {
-      durableGenerationQueue.pauseJob(task.id);
-      notify.success('任务已暂停', `已成功挂起批量生成任务：${task.name}`);
-    } else if (task.source === 'transient') {
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, status: 'paused' } : t))
-      );
+  const updateLocalTaskStatus = (
+    task: LocalTaskProjection,
+    status: PublicTaskSourceStatus,
+    progress?: number,
+  ) => setLocalTasks((currentTasks) => currentTasks.map((candidate) => (
+    candidate.localTaskId === task.localTaskId
+      ? projectLocalTask({
+        id: task.localTaskId,
+        status,
+        progress: progress ?? task.progress?.completed,
+        createdAt: task.createdAt,
+        updatedAt: Date.now(),
+      })
+      : candidate
+  )));
+
+  const handleAction = (task: PublicTaskProjectionDto, action: PublicTaskAction) => {
+    if (task.source === 'local_task') {
+      if (action === 'pause') updateLocalTaskStatus(task, 'paused');
+      if (action === 'resume') updateLocalTaskStatus(task, 'running');
+      if (action === 'retry') {
+        window.dispatchEvent(new CustomEvent(`task-center:retry:${task.localTaskId}`, {
+          detail: { taskId: task.localTaskId },
+        }));
+        updateLocalTaskStatus(task, 'running', 10);
+      }
+      if (action === 'cancel') updateLocalTaskStatus(task, 'cancelled');
+      return;
     }
+    void dispatchPublicTaskAction(task, action);
   };
 
-  const handleResume = (task: typeof allCombinedTasks[0]) => {
-    if (task.isGenerationJob) {
-      durableGenerationQueue.resumeJob(task.id);
-      notify.success('任务已恢复', `已重新拉起批量生成任务：${task.name}`);
-    } else if (task.source === 'transient') {
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, status: 'running', progress: t.progress ?? 0 } : t))
-      );
-    }
+  const handlePause = (task: PublicTaskProjectionDto) => {
+    handleAction(task, 'pause');
+    notify.success('任务已暂停', `${task.title} 已挂起。`);
   };
 
-  const handleRetry = (task: typeof allCombinedTasks[0]) => {
-    if (task.isGenerationJob) {
-      durableGenerationQueue.retryFailedPrompts(task.id);
-      notify.success('已发起重试', '失败的生成项已重新进入生成队列。');
-    } else if (task.source === 'transient') {
-      // 自定义任务重试：发布事件让执行器感知
-      window.dispatchEvent(new CustomEvent(`task-center:retry:${task.id}`, { detail: { taskId: task.id } }));
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, status: 'running', progress: 10 } : t))
-      );
-      notify.success('已重新调度', `已向核心引擎下发任务重试指令：${task.name}`);
-    }
+  const handleResume = (task: PublicTaskProjectionDto) => {
+    handleAction(task, 'resume');
+    notify.success('任务已恢复', `${task.title} 已重新调度。`);
   };
 
-  const handleCancel = (task: typeof allCombinedTasks[0]) => {
-    if (task.isGenerationJob) {
-      durableGenerationQueue.cancelJob(task.id);
-      notify.info('任务已取消', `批量生成任务 ${task.name} 已被强制终止。`);
-    } else if (task.source === 'agent' && task.rawRun) {
-      void agentRuntimeInstance.cancelPendingRun(task.rawRun.id).then(() => {
-        notify.info('任务已取消', `AI 任务 ${task.name} 已停止。`);
-      });
+  const handleRetry = (task: PublicTaskProjectionDto) => {
+    handleAction(task, 'retry');
+    notify.success('已发起重试', `${task.title} 已重新调度。`);
+  };
+
+  const handleCancel = (task: PublicTaskProjectionDto) => {
+    handleAction(task, 'cancel');
+    notify.info('任务已取消', `${task.title} 已收到取消请求。`);
+  };
+
+  const handleDelete = (task: PublicTaskProjectionDto) => {
+    let archived = false;
+    if (task.source === 'local_task') {
+      setLocalTasks((current) => current.filter((item) => item.localTaskId !== task.localTaskId));
+      archived = true;
     } else {
-      setCustomTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, status: 'failed', error: '用户强制取消' } : t))
-      );
-      notify.info('任务已取消', `异步任务 ${task.name} 已被强制取消。`);
+      archived = archivePublicTaskProjection(task);
     }
-  };
-
-  const handleDelete = (task: typeof allCombinedTasks[0]) => {
-    if (task.isGenerationJob) {
-      durableGenerationQueue.archiveJob(task.id);
-    } else if (task.source === 'agent') {
-      agentRunStore.archiveRun(task.id);
-    } else {
-      setCustomTasks((prev) => prev.filter((t) => t.id !== task.id));
-    }
-    notify.success('任务已清理', '该任务记录已从任务托盘中移除。');
+    if (archived) notify.success('任务已清理', '该任务记录已从任务托盘中移除。');
   };
 
   const handleClearCompleted = () => {
-    durableGenerationQueue.archiveFinishedJobs();
-    agentRunStore.archiveFinishedRuns();
-    setCustomTasks((prev) => prev.filter((t) => t.status !== 'completed'));
-    notify.success('task cleanup completed', '已自动归档所有完成的任务记录。');
+    archiveFinishedPublicTaskProjections();
+    setLocalTasks((current) => current.filter((task) => task.phase !== 'terminal'));
+    notify.success('任务清理完成', '已归档所有终态任务记录。');
   };
 
-  const handleLocate = (task: typeof allCombinedTasks[0]) => {
-    if (!task.isGenerationJob || !task.rawJob) return;
-    
-    const job = task.rawJob;
-    const includePromptNodes = job.outputGroup?.includePromptNodes !== false;
-    const promptNodeIds = includePromptNodes
-      ? job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id))
-      : [];
-    const imageNodeIds = job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []);
-    
-    const nodeIds = Array.from(new Set([
-      ...promptNodeIds,
-      ...imageNodeIds,
-      ...(job.outputGroup?.nodeIds || [])
-    ]));
-
-    if (nodeIds.length === 0) {
-      notify.warning('未找到生成的画布节点', '任务可能尚未产出图片。');
-      return;
-    }
-
-    if (typeof selectNodes === 'function') {
-      selectNodes(nodeIds, 'replace');
-    }
-
-    let targetPos: { x: number; y: number } | null = null;
-    const canvas = activeCanvas;
-    if (canvas) {
-      const foundPrompt = canvas.promptNodes?.find(n => nodeIds.includes(n.id));
-      if (foundPrompt) {
-        targetPos = foundPrompt.position;
-      } else {
-        const foundImage = canvas.imageNodes?.find(n => nodeIds.includes(n.id));
-        if (foundImage) {
-          targetPos = foundImage.position;
-        }
-      }
-    }
-
-    if (targetPos && typeof setViewportCenter === 'function') {
-      setViewportCenter(targetPos);
-      notify.success('已定位到生成节点', '已自动选中并在画布中心展示产物节点。');
-    }
-  };
-
-  const handleCopyError = (task: typeof allCombinedTasks[0]) => {
-    let errorMsg = '';
-    if (task.isGenerationJob && task.rawJob) {
-      const failedPrompts = task.rawJob.prompts.filter(p => p.status === 'failed' && p.error);
-      if (failedPrompts.length > 0) {
-        errorMsg = failedPrompts.map(p => `提示词: "${p.prompt}"\n错误原因: ${p.error}`).join('\n\n');
-      } else {
-        errorMsg = task.error || '未知任务错误';
-      }
-    } else {
-      errorMsg = task.error || '未知任务错误';
-    }
-
-    navigator.clipboard.writeText(errorMsg)
+  const handleCopyError = (task: PublicTaskProjectionDto) => {
+    if (!task.error) return;
+    const safeError = `code: ${task.error.code}\ncategory: ${task.error.category}\nphase: ${task.phase}`;
+    navigator.clipboard.writeText(safeError)
       .then(() => {
         notify.success('错误已复制', '任务错误信息已成功复制到剪贴板。');
       })
-      .catch((err) => {
-        console.error('无法复制错误:', err);
-        notify.error('复制失败', '请重试或手动复制。');
-      });
+      .catch(() => notify.error('复制失败', '请重试或手动复制。'));
   };
 
-  // 根据类型获取图标
-  const getTaskIcon = (type: string) => {
-    switch (type) {
-      case 'assistant':
+  const getTaskIcon = (source: PublicTaskProjectionDto['source']) => {
+    switch (source) {
+      case 'agent_run':
         return <Bot className="kk-task-center-type-icon" data-type="assistant" size={16} />;
-      case 'image':
+      case 'generation_job':
         return <Image className="kk-task-center-type-icon" data-type="image" size={16} />;
-      case 'video':
-        return <Video className="kk-task-center-type-icon" data-type="video" size={16} />;
-      case 'audio':
-        return <AudioLines className="kk-task-center-type-icon" data-type="audio" size={16} />;
-      case 'ppt':
+      case 'local_task':
         return <FileText className="kk-task-center-type-icon" data-type="ppt" size={16} />;
-      case 'extract':
+      case 'paired_command':
         return <Globe className="kk-task-center-type-icon" data-type="extract" size={16} />;
-      case 'membership':
-        return <Layers className="kk-task-center-type-icon" data-type="membership" size={16} />;
-      case 'export':
-      default:
+      case 'app_update':
         return <Download className="kk-task-center-type-icon" data-type="export" size={16} />;
     }
   };
 
   // 根据状态获取状态徽章与类
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = (status: TaskDisplayStatus) => {
     switch (status) {
       case 'running':
+      case 'retrying':
+      case 'verifying':
         return (
-          <span className="kk-task-center-status" data-status="running">
+          <span className="kk-task-center-status" data-status={status}>
             <Loader2 className="animate-spin" size={11} />
-            <span>执行中</span>
+            <span>{status === 'verifying' ? '验证中' : status === 'retrying' ? '重试中' : '执行中'}</span>
           </span>
         );
       case 'queued':
+      case 'planning':
+      case 'waiting_execution':
         return (
-          <span className="kk-task-center-status" data-status="queued">
+          <span className="kk-task-center-status" data-status={status}>
             <Loader2 className="animate-pulse" size={11} />
-            <span>排队中</span>
+            <span>{status === 'planning' ? '规划中' : status === 'waiting_execution' ? '等待执行' : '排队中'}</span>
           </span>
         );
       case 'waiting_confirmation':
@@ -489,6 +326,24 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
           <span className="kk-task-center-status" data-status="waiting_confirmation">
             <Bot size={11} />
             <span>等待确认</span>
+          </span>
+        );
+      case 'waiting_for_device':
+      case 'setup_required':
+      case 'verification_required':
+      case 'manual_reconcile':
+        return (
+          <span className="kk-task-center-status" data-status={status}>
+            <AlertTriangle size={11} />
+            <span>{status === 'waiting_for_device' ? '等待设备' : status === 'setup_required' ? '需要设置' : '需要处理'}</span>
+          </span>
+        );
+      case 'pausing':
+      case 'cancelling':
+        return (
+          <span className="kk-task-center-status" data-status={status}>
+            <Loader2 className="animate-spin" size={11} />
+            <span>{status === 'pausing' ? '暂停中' : '取消中'}</span>
           </span>
         );
       case 'paused':
@@ -646,91 +501,67 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
               </div>
             ) : (
               filteredTasks.map((task) => {
-                const isRunning = task.status === 'running' || task.status === 'queued';
-                const isAwaitingConfirmation = task.status === 'waiting_confirmation';
-                const isFailed = task.status === 'failed' || task.status === 'cancelled' || task.status === 'completed_with_errors';
-                const isPaused = task.status === 'paused';
+                const displayStatus = getPublicTaskDisplayStatus(task);
+                const progressPercent = getPublicTaskProgressPercent(task);
+                const isFailed = isTerminalFailure(displayStatus) || Boolean(task.error);
                 
                 return (
                   <div
-                    key={task.id}
+                    key={task.projectionId}
                     className="kk-task-center-item"
-                    data-status={task.status}
+                    data-status={displayStatus}
                     data-source={task.source}
                   >
                     {/* 左侧信息 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
-                        {getTaskIcon(task.type)}
+                        {getTaskIcon(task.source)}
                         <span className="kk-task-center-item-name">
-                          {task.name}
+                          {task.title}
                         </span>
-                        {getStatusDisplay(task.status)}
+                        {getStatusDisplay(displayStatus)}
                       </div>
                       
                       {/* 进度条 */}
                       <div className="flex items-center gap-3">
                         <div
                           role="progressbar"
-                          aria-label={`${task.name} progress`}
+                          aria-label={`${task.title} progress`}
                           aria-valuemin={0}
                           aria-valuemax={100}
-                          aria-valuenow={Math.max(0, Math.min(100, task.progress ?? 0))}
+                          aria-valuenow={progressPercent}
                           className="kk-task-center-progress"
                         >
                           <div
                             className="kk-task-center-progress-value"
-                            data-status={isFailed ? 'failed' : task.status}
-                            style={{ width: `${task.progress ?? 0}%` }}
+                            data-status={isFailed ? 'failed' : displayStatus}
+                            style={{ width: `${progressPercent}%` }}
                           />
                         </div>
                         <span className="kk-task-center-progress-label">
-                          {task.progress ?? 0}%
+                          {progressPercent}%
                         </span>
                       </div>
 
                       {task.error && (
                         <div className="kk-task-center-error">
                           <AlertTriangle size={9} />
-                          <span>{task.error}</span>
+                          <span>{task.error.code} · {task.error.category}</span>
                         </div>
                       )}
 
-                      {/* Telemetry metadata row */}
-                      {task.rawJob && (
-                        <div className="kk-task-center-meta">
-                          <span className="kk-task-center-model">
-                            {task.rawJob.options?.modelId ? task.rawJob.options.modelId.slice(0, 15) : 'Model'}
-                          </span>
-                          <span>·</span>
-                          <span className="kk-task-center-meta-accent">
-                            {task.rawJob.options?.aspectRatio || '1:1'}
-                          </span>
-                          {task.rawJob.createdAt && (
-                            <>
-                              <span>·</span>
-                              <span>
-                                {new Date(task.rawJob.createdAt).toLocaleTimeString()}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {!task.isGenerationJob && task.createdAt && (
-                        <div className="kk-task-center-meta">
-                          <span>创建时间: {new Date(task.createdAt).toLocaleTimeString()}</span>
-                        </div>
-                      )}
+                      <div className="kk-task-center-meta">
+                        <span>创建时间: {new Date(task.createdAt).toLocaleTimeString()}</span>
+                      </div>
                     </div>
 
                     {/* 右侧控制动作 */}
                     <div className="kk-task-center-actions">
-                      {isRunning && task.source !== 'agent' && (
+                      {task.allowedActions.includes('pause') && (
                         <button
                           type="button"
                           onClick={() => handlePause(task)}
-                          aria-label={`Pause ${task.name}`}
+                          aria-label={`Pause ${task.title}`}
                           className="kk-task-center-action"
                           title="暂停任务"
                         >
@@ -738,11 +569,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         </button>
                       )}
 
-                      {isPaused && (
+                      {task.allowedActions.includes('resume') && (
                         <button
                           type="button"
                           onClick={() => handleResume(task)}
-                          aria-label={`Resume ${task.name}`}
+                          aria-label={`Resume ${task.title}`}
                           className="kk-task-center-action"
                           data-tone="success"
                           title="恢复执行"
@@ -751,11 +582,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         </button>
                       )}
 
-                      {isFailed && task.canRetry && (
+                      {task.allowedActions.includes('retry') && (
                         <button
                           type="button"
                           onClick={() => handleRetry(task)}
-                          aria-label={`Retry ${task.name}`}
+                          aria-label={`Retry ${task.title}`}
                           className="kk-task-center-action"
                           data-tone="info"
                           title="失败重试"
@@ -764,11 +595,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         </button>
                       )}
 
-                      {(isRunning || isAwaitingConfirmation) && (
+                      {task.allowedActions.includes('cancel') && (
                         <button
                           type="button"
                           onClick={() => handleCancel(task)}
-                          aria-label={`Cancel ${task.name}`}
+                          aria-label={`Cancel ${task.title}`}
                           className="kk-task-center-action"
                           data-tone="danger"
                           title="取消任务"
@@ -777,24 +608,11 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         </button>
                       )}
 
-                      {task.status === 'completed' && task.isGenerationJob && (
-                        <button
-                          type="button"
-                          onClick={() => handleLocate(task)}
-                          aria-label={`Locate ${task.name}`}
-                          className="kk-task-center-action"
-                          data-tone="info"
-                          title="定位节点"
-                        >
-                          <Eye size={13} />
-                        </button>
-                      )}
-
-                      {isFailed && (
+                      {task.error && (
                         <button
                           type="button"
                           onClick={() => handleCopyError(task)}
-                          aria-label={`Copy error for ${task.name}`}
+                          aria-label={`Copy error for ${task.title}`}
                           className="kk-task-center-action"
                           data-tone="warning"
                           title="复制错误"
@@ -803,38 +621,24 @@ export const TaskCenterTray: React.FC<TaskCenterTrayProps> = ({
                         </button>
                       )}
 
-                      {isFailed && (
-                        (() => {
-                          const errText = String(task.error || '').toUpperCase();
-                          const isSetupRequired = errText.includes('SETUP_REQUIRED') ||
-                            errText.includes('CAPABILITY_UNAVAILABLE') ||
-                            errText.includes('API') ||
-                            errText.includes('KEY') ||
-                            errText.includes('密钥') ||
-                            errText.includes('余额') ||
-                            errText.includes('CREDIT') ||
-                            errText.includes('CREDITS');
-                          if (!isSetupRequired) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSettings?.('api-management')}
-                              aria-label="Open API settings"
-                              className="kk-task-center-action"
-                              data-tone="info"
-                              title="去配置 API"
-                            >
-                              <Settings size={13} />
-                            </button>
-                          );
-                        })()
+                      {task.allowedActions.includes('open_runtime_settings') && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenSettings?.('api-management')}
+                          aria-label="Open API settings"
+                          className="kk-task-center-action"
+                          data-tone="info"
+                          title="去配置 API"
+                        >
+                          <Settings size={13} />
+                        </button>
                       )}
 
-                      {(task.status === 'completed' || isFailed) && (
+                      {task.phase === 'terminal' && (
                         <button
                           type="button"
                           onClick={() => handleDelete(task)}
-                          aria-label={`Archive ${task.name}`}
+                          aria-label={`Archive ${task.title}`}
                           className="kk-task-center-action"
                           title="清除记录"
                         >

@@ -1,15 +1,5 @@
-import {
-  summarizeAgentRunCoverage,
-  type AgentRunCoverageInput,
-} from '../../features/ai-assistant-runtime/runtime/agentRunProgress.ts';
-
-export interface GenerationSummaryInput {
-  status: string;
-  progress?: { percent?: number };
-  prompts: ReadonlyArray<{ status: string }>;
-}
-
-export interface AgentSummaryInput extends AgentRunCoverageInput {}
+import type { PublicTaskProjectionDto } from '@kk/shared';
+import { getPublicTaskProgressPercent } from '../../features/tasks/publicTaskProjection.ts';
 
 export interface TaskCenterSummary {
   activeCount: number;
@@ -17,43 +7,41 @@ export interface TaskCenterSummary {
   hasAttentionRequired: boolean;
 }
 
-const ACTIVE_GENERATION_STATUSES = new Set(['queued', 'running', 'paused']);
-const ACTIVE_AGENT_STATUSES = new Set([
+const ACTIVE_TASK_PHASES = new Set<PublicTaskProjectionDto['phase']>([
+  'queued',
   'planning',
-  'waiting_execution',
   'waiting_confirmation',
+  'waiting_for_device',
+  'setup_required',
+  'waiting_execution',
   'running',
+  'pausing',
   'paused',
+  'retrying',
+  'verifying',
+  'verification_required',
+  'manual_reconcile',
+  'cancelling',
 ]);
 
-function generationProgress(job: GenerationSummaryInput): number {
-  if (typeof job.progress?.percent === 'number') return job.progress.percent;
-  if (job.prompts.length === 0) return 0;
-  const settled = job.prompts.filter((prompt) => ['completed', 'failed'].includes(prompt.status)).length;
-  return Math.round((settled / job.prompts.length) * 100);
-}
-
-function agentProgress(run: AgentSummaryInput): number {
-  return summarizeAgentRunCoverage(run).progressPercent;
-}
-
-/** Projects the two authoritative task stores into compact chrome telemetry. */
+/** Summarizes only safe public projections for compact desktop chrome telemetry. */
 export function summarizeTaskCenterActivity(
-  jobs: readonly GenerationSummaryInput[],
-  runs: readonly AgentSummaryInput[],
+  tasks: readonly PublicTaskProjectionDto[],
 ): TaskCenterSummary {
-  const activeJobs = jobs.filter((job) => ACTIVE_GENERATION_STATUSES.has(job.status));
-  const activeRuns = runs.filter((run) => ACTIVE_AGENT_STATUSES.has(run.status));
-  const progressValues = [
-    ...activeJobs.map(generationProgress),
-    ...activeRuns.map(agentProgress),
-  ];
+  const activeTasks = tasks.filter((task) => ACTIVE_TASK_PHASES.has(task.phase));
+  const progressValues = activeTasks.map(getPublicTaskProgressPercent);
 
   return {
     activeCount: progressValues.length,
     averageProgress: progressValues.length > 0
       ? Math.round(progressValues.reduce((sum, value) => sum + value, 0) / progressValues.length)
       : 0,
-    hasAttentionRequired: activeRuns.some((run) => run.status === 'waiting_confirmation'),
+    hasAttentionRequired: activeTasks.some((task) => [
+      'waiting_confirmation',
+      'waiting_for_device',
+      'setup_required',
+      'verification_required',
+      'manual_reconcile',
+    ].includes(task.phase)),
   };
 }

@@ -19,6 +19,7 @@ test('desktop and mobile reuse the same persistent task-center projection', () =
 
 test('task center projects Queue and Agent Run state without a second mobile store', () => {
   const tray = readSource('apps/web/src/components/workspace/TaskCenterTray.tsx');
+  const summaryHook = readSource('apps/web/src/components/workspace/useTaskCenterSummary.ts');
   const desktopChrome = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const tokens = readSource('apps/web/src/styles/kk-ui-tokens.css');
 
@@ -36,15 +37,19 @@ test('task center projects Queue and Agent Run state without a second mobile sto
   assert.match(tray, /TASK_CENTER_OPEN_EVENT/);
   assert.match(tray, /TASK_CENTER_TOGGLE_EVENT/);
   assert.doesNotMatch(tray, /kk_custom_tasks/);
-  assert.match(tray, /agentRunStore\.subscribe/);
-  assert.match(tray, /durableGenerationQueue\.archiveJob\(task\.id\)/);
-  assert.match(tray, /agentRunStore\.archiveRun\(task\.id\)/);
+  assert.match(tray, /usePublicTaskProjections/);
+  assert.match(tray, /dispatchPublicTaskAction/);
+  assert.match(tray, /archivePublicTaskProjection/);
+  assert.doesNotMatch(tray, /AgentRunRecord|GenerationBatchJob|rawRun|rawJob/);
+  assert.doesNotMatch(tray, /userMessage|toolCalls|prompt\.|prompt\}|\.prompt|\.error\s*\|\||modelId|aspectRatio/);
+  assert.match(summaryHook, /usePublicTaskProjections/);
+  assert.doesNotMatch(summaryHook, /agentRunStore|durableGenerationQueue|AgentRunRecord|GenerationBatchJob/);
   assert.match(tray, /data-mobile=\{isMobile \? ['"]true['"] : ['"]false['"]\}/);
   assert.doesNotMatch(tray, /mobile-task-center/);
   assert.doesNotMatch(tray, /variant\?:\s*'desktop'\s*\|\s*'mobile'/);
   assert.doesNotMatch(tray, /createPortal\(/);
   assert.match(tray, /zIndex:\s*KK_LAYER\.floatingPanel/);
-  assert.match(tray, /isSetupRequiredError/);
+  assert.match(tray, /task\.error\.code/);
   assert.doesNotMatch(tray, /z-\[1000\]/);
   assert.match(tokens, /\.kk-task-center-morph\[data-state='open'\]/);
   assert.match(tokens, /\.kk-task-center-rail[\s\S]{0,320}background: var\(--state-info-text\)/);
