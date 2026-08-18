@@ -8,6 +8,12 @@ import type {
   ToolPermission,
 } from '../../ai-takeover/types.ts';
 import {
+  ToolExecutionControlDtoSchema,
+  type AgentExecutionTarget,
+  type ConfirmationClass,
+  type SideEffectClass,
+} from '@kk/shared';
+import {
   createAssistantScopedInputFingerprint,
   createAssistantStepAuthorization,
   createRunStepIdempotencyKey,
@@ -101,6 +107,10 @@ export type AgentToolCostKind = 'none' | 'credits' | 'provider' | 'variable' | '
 
 export interface AgentToolControlMetadata {
   effect: AgentToolEffect;
+  sideEffectClass?: SideEffectClass;
+  confirmationClass: ConfirmationClass;
+  allowedExecutionTargets: AgentExecutionTarget[];
+  cloudSafe: boolean;
   impact: {
     scope: AgentToolImpactScope;
     summary: string;
@@ -128,6 +138,10 @@ export interface AgentToolControlMetadata {
 
 export type AgentToolControlOverrides = {
   effect?: AgentToolEffect;
+  sideEffectClass?: SideEffectClass;
+  confirmationClass?: ConfirmationClass;
+  allowedExecutionTargets?: AgentExecutionTarget[];
+  cloudSafe?: boolean;
   impact?: Partial<AgentToolControlMetadata['impact']>;
   cost?: Partial<AgentToolControlMetadata['cost']>;
   recovery?: Partial<AgentToolControlMetadata['recovery']>;
@@ -255,16 +269,50 @@ const resolveToolPermission = (
   if (name === 'fillApiKey') return 'forbidden';
   if (DANGEROUS_TOOLS.has(name)) return 'dangerous';
   if (CONFIRM_TOOLS.has(name)) return 'confirm';
-  if (permission === 'safe' && control.effect === 'mutation' && !control.recovery.reversible) return 'confirm';
+  if (permission === 'safe' && control.effect === 'mutation' && control.confirmationClass !== 'none') return 'confirm';
   return permission;
 };
 
-const inferControlMetadata = (name: string, overrides?: AgentToolControlOverrides): AgentToolControlMetadata => {
+const inferControlMetadata = (
+  name: string,
+  permission: ToolPermission,
+  overrides?: AgentToolControlOverrides,
+): AgentToolControlMetadata => {
   const effect = overrides?.effect || resolveToolEffect(name);
   const hasCost = COST_TOOLS.has(name);
   const isExternal = name.startsWith('browser.');
-  const reversible = effect === 'mutation' && REVERSIBLE_LOCAL_TOOLS.has(name);
+  const reversible = effect === 'mutation'
+    && (REVERSIBLE_LOCAL_TOOLS.has(name) || overrides?.recovery?.reversible === true);
   const cancellable = effect === 'mutation' && RECOVERABLE_JOB_CREATION_TOOLS.has(name);
+  const hasLegacyMutationClassification = overrides !== undefined
+    || permission !== 'safe'
+    || CONFIRM_TOOLS.has(name)
+    || DANGEROUS_TOOLS.has(name)
+    || COST_TOOLS.has(name)
+    || REVERSIBLE_LOCAL_TOOLS.has(name)
+    || RECOVERABLE_JOB_CREATION_TOOLS.has(name);
+  const sideEffectClass = effect !== 'mutation'
+    ? undefined
+    : overrides?.sideEffectClass
+      || (hasLegacyMutationClassification
+        ? reversible
+          ? 'idempotent'
+          : hasCost || cancellable
+            ? 'deduplicated'
+            : 'reconcilable'
+        : undefined);
+  const confirmationClass = overrides?.confirmationClass
+    || (effect !== 'mutation'
+      ? 'none'
+      : DANGEROUS_TOOLS.has(name)
+        ? 'destructive'
+        : hasCost
+          ? 'cost'
+          : permission === 'confirm'
+            ? 'standard'
+            : reversible
+              ? 'none'
+              : 'standard');
   const impactScope: AgentToolImpactScope = effect === 'read'
     ? 'none'
     : isExternal
@@ -275,6 +323,10 @@ const inferControlMetadata = (name: string, overrides?: AgentToolControlOverride
 
   const base: AgentToolControlMetadata = {
     effect,
+    sideEffectClass,
+    confirmationClass,
+    allowedExecutionTargets: ['local-desktop'],
+    cloudSafe: false,
     impact: {
       scope: impactScope,
       summary: effect === 'read'
@@ -315,6 +367,7 @@ const inferControlMetadata = (name: string, overrides?: AgentToolControlOverride
   };
   return {
     ...merged,
+    allowedExecutionTargets: [...merged.allowedExecutionTargets],
     idempotency: {
       ...merged.idempotency,
       required: merged.effect === 'mutation' ? true : merged.idempotency.required,
@@ -447,7 +500,7 @@ const defaultMutationOutcomeVerifier = (output: unknown): boolean | { success: b
 const normalizeToolDefinition = <Input, Output>(
   tool: AgentToolDefinition<Input, Output>,
 ): ResolvedAgentToolDefinition<Input, Output> => {
-  const control = inferControlMetadata(tool.name, tool.control);
+  const control = inferControlMetadata(tool.name, tool.permission, tool.control);
   return {
     ...tool,
     permission: resolveToolPermission(tool.name, tool.permission, control),
@@ -634,6 +687,82 @@ const isPersistableToolReceipt = (value: unknown): value is Record<string, unkno
   return entries.length > 0 && entries.every(([key, nestedValue]) => (
     PERSISTABLE_TOOL_RECEIPT_FIELDS.has(key) && isPersistableToolReceiptValue(nestedValue)
   ));
+};
+
+type ToolExecutionBoundaryErrorCode =
+  | 'TOOL_CONTROL_INVALID'
+  | 'EXECUTION_TARGET_NOT_LOCAL'
+  | 'EXECUTION_TARGET_NOT_ALLOWED'
+  | 'EXECUTION_AUTHORITY_INVALID';
+
+const createToolExecutionBoundaryError = (
+  code: ToolExecutionBoundaryErrorCode,
+  message: string,
+): Error & { code: ToolExecutionBoundaryErrorCode } => {
+  const error = new Error(message) as Error & { code: ToolExecutionBoundaryErrorCode };
+  error.code = code;
+  return error;
+};
+
+const assertBrowserToolExecutionBoundary = (
+  tool: ResolvedAgentToolDefinition,
+  runId: string,
+  context: AssistantToolExecutionContext,
+): void => {
+  if (context.enforceExecutionAuthority === true) {
+    if (context.executionTarget !== 'local-desktop') {
+      throw createToolExecutionBoundaryError(
+        'EXECUTION_TARGET_NOT_LOCAL',
+        `The browser executor cannot execute ${String(context.executionTarget || 'unknown')} Runs.`,
+      );
+    }
+    if (!tool.control.allowedExecutionTargets.includes('local-desktop')) {
+      throw createToolExecutionBoundaryError(
+        'EXECUTION_TARGET_NOT_ALLOWED',
+        `Tool ${tool.name} does not allow local-desktop execution.`,
+      );
+    }
+    let evaluation: ReturnType<NonNullable<AssistantToolExecutionContext['evaluateCurrentExecutionAuthority']>> | undefined;
+    try {
+      evaluation = context.evaluateCurrentExecutionAuthority?.(context.executionAuthorityEnvelope);
+    } catch {
+      evaluation = undefined;
+    }
+    const accepted = evaluation?.authorized ? evaluation.authorityEnvelope : undefined;
+    const candidate = context.executionAuthorityEnvelope;
+    if (
+      !accepted
+      || !candidate
+      || candidate.authorityState !== 'authoritative'
+      || accepted.authorityKind !== 'installation-local'
+      || accepted.executionTarget !== 'local-desktop'
+      || accepted.runId !== runId
+      || accepted.ownerId !== context.executionOwnerId
+      || accepted.authorityRuntimeId !== candidate.authorityRuntimeId
+      || accepted.globalCoordinationEpoch !== candidate.globalCoordinationEpoch
+    ) {
+      throw createToolExecutionBoundaryError(
+        'EXECUTION_AUTHORITY_INVALID',
+        `Tool ${tool.name} requires current installation-local execution authority.`,
+      );
+    }
+  }
+
+  const parsedControl = ToolExecutionControlDtoSchema.safeParse({
+    schemaVersion: 1,
+    effect: tool.control.effect,
+    sideEffectClass: tool.control.sideEffectClass,
+    confirmationClass: tool.control.confirmationClass,
+    allowedExecutionTargets: tool.control.allowedExecutionTargets,
+    cloudSafe: tool.control.cloudSafe,
+    requiresIdempotencyKey: tool.control.idempotency.required,
+  });
+  if (!parsedControl.success) {
+    throw createToolExecutionBoundaryError(
+      'TOOL_CONTROL_INVALID',
+      `Tool ${tool.name} has invalid execution control metadata.`,
+    );
+  }
 };
 
 export class AgentToolRegistry {
@@ -896,6 +1025,7 @@ export class AgentToolRegistry {
       runId,
       executionOwnerId,
     };
+    if (tool) assertBrowserToolExecutionBoundary(tool, runId, executionContext);
     if (
       !tool
       || !tool.control.idempotency.required

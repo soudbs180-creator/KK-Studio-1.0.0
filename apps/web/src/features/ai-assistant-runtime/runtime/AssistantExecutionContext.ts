@@ -1,4 +1,10 @@
-import type { AssistantCollaborationMode, AssistantWorkspaceSurface } from '@kk/shared';
+import type {
+  AgentExecutionTarget,
+  AssistantCollaborationMode,
+  AssistantWorkspaceSurface,
+  ExecutionAuthorityDto,
+  ExecutionAuthorityEvaluationResult,
+} from '@kk/shared';
 import type {
   AssetContextSummary,
   AssistantPlan,
@@ -177,6 +183,11 @@ export interface AssistantGenerationRuntimeConfig {
   model?: string;
 }
 
+/** Injected host decision; Web cannot manufacture current installation authority. */
+export type AssistantExecutionAuthorityEvaluator = (
+  candidate: unknown,
+) => ExecutionAuthorityEvaluationResult;
+
 /**
  * Web 运行时唯一的 Agent 执行宿主边界。
  *
@@ -188,6 +199,12 @@ export interface AssistantExecutionContext {
   planId?: string;
   stepId?: string;
   executionOwnerId?: string;
+  enforceExecutionAuthority?: boolean;
+  executionTarget?: AgentExecutionTarget;
+  executionAuthorityEnvelope?: ExecutionAuthorityDto;
+  evaluateCurrentExecutionAuthority?: AssistantExecutionAuthorityEvaluator;
+  confirmationQuoteId?: string;
+  confirmationMaxCostCredits?: number;
   currentPage: AssistantWorkspaceSurface;
   collaborationMode: AssistantCollaborationMode;
   trigger: AssistantExecutionTrigger;
@@ -266,6 +283,12 @@ type AssistantToolCoreContext = Pick<
   | 'planId'
   | 'stepId'
   | 'executionOwnerId'
+  | 'enforceExecutionAuthority'
+  | 'executionTarget'
+  | 'executionAuthorityEnvelope'
+  | 'evaluateCurrentExecutionAuthority'
+  | 'confirmationQuoteId'
+  | 'confirmationMaxCostCredits'
   | 'currentPage'
   | 'collaborationMode'
   | 'trigger'
@@ -375,9 +398,28 @@ export function createAssistantScopedInputFingerprint(
   context: Record<string, any>,
   authorizationScope: AssistantAuthorizationScopeSnapshot = captureAssistantAuthorizationScope(context),
 ): string {
+  const authority = context.executionAuthorityEnvelope && typeof context.executionAuthorityEnvelope === 'object'
+    ? context.executionAuthorityEnvelope as Record<string, unknown>
+    : {};
+  // This is only a hashed confirmation projection. It is not execution authority
+  // and cannot replace evaluateCurrentExecutionAuthority at execution time.
+  const executionBindingProjection = {
+    executionTarget: context.executionTarget,
+    authorityKind: authority.authorityKind,
+    authorityRuntimeId: authority.authorityRuntimeId,
+    globalCoordinationEpoch: authority.globalCoordinationEpoch,
+    installationId: authority.installationId,
+    localJournalEpoch: authority.localJournalEpoch,
+    singleInstanceLockId: authority.singleInstanceLockId,
+    executionFencingToken: authority.executionFencingToken,
+    attempt: authority.attempt,
+    confirmationQuoteId: context.confirmationQuoteId,
+    confirmationMaxCostCredits: context.confirmationMaxCostCredits,
+  };
   const serialized = JSON.stringify(stableAuthorizationValue({
     input,
     executionScope: authorizationScope,
+    executionBindingProjection,
   }));
   const reversed = Array.from(serialized).reverse().join('');
   return `${stableAuthorizationHash(serialized)}:${stableAuthorizationHash(reversed)}:${serialized.length}`;

@@ -6,6 +6,8 @@ import type {
   AgentRunDto,
   AgentRunStatus,
   AgentStepResultDto,
+  ExecutionAuthorityDto,
+  ExecutionAuthorityEvaluationResult,
 } from '@kk/shared';
 import type { AgentToolCallLog } from '../../ai-takeover/types.ts';
 import { getRuntimeOwnerId } from '../../../services/auth/runtimeSessionProfile.ts';
@@ -29,6 +31,7 @@ export interface AgentRunRecord {
   backendSyncState?: 'pending' | 'synced';
   executionAuthority?: 'local_validated' | 'server_projection';
   executionTarget?: AgentExecutionTarget;
+  executionAuthorityEnvelope?: ExecutionAuthorityDto;
   pairedRuntimeId?: string;
   coordinationTaskId?: string;
   coordinationAgentId?: string;
@@ -99,12 +102,50 @@ const createServerProjection = (snapshot: AgentRunDto): AgentRunRecord => ({
   executionAuthority: 'server_projection',
 });
 
-/** Only locally planned or legacy Runs may be resumed by this browser. */
-export const hasLocalAgentRunExecutionAuthority = (record?: AgentRunRecord): boolean => (
-  Boolean(record)
-  && record?.executionAuthority !== 'server_projection'
-  && record?.executionTarget !== 'paired-desktop'
-);
+export type AgentRunExecutionAuthorityEvaluator = (
+  candidate: unknown,
+) => ExecutionAuthorityEvaluationResult;
+
+/**
+ * Positive local-authority check. Projection envelopes and non-local targets
+ * are never executable; current envelopes additionally require the host's
+ * injected shared authority decision.
+ */
+export const hasLocalAgentRunExecutionAuthority = (
+  record?: AgentRunRecord | null,
+  evaluateAuthority?: AgentRunExecutionAuthorityEvaluator,
+): boolean => {
+  if (
+    !record
+    || record.executionAuthority === 'server_projection'
+    || (record.executionTarget || 'local-desktop') !== 'local-desktop'
+  ) return false;
+
+  const authority = record.executionAuthorityEnvelope;
+  if (!authority) {
+    // Compatibility is limited to locally-created in-memory Runs. Production
+    // execution passes an evaluator and therefore cannot use this marker.
+    return !evaluateAuthority && record.executionAuthority === 'local_validated';
+  }
+  if (
+    !evaluateAuthority
+    || authority.authorityState !== 'authoritative'
+    || authority.authorityKind !== 'installation-local'
+  ) return false;
+
+  const evaluation = evaluateAuthority(authority);
+  if (!evaluation.authorized) return false;
+  const accepted = evaluation.authorityEnvelope;
+  return accepted.authorityKind === 'installation-local'
+    && accepted.executionTarget === 'local-desktop'
+    && accepted.runId === record.id
+    && accepted.ownerId === authority.ownerId
+    && accepted.authorityRuntimeId === authority.authorityRuntimeId
+    && accepted.globalCoordinationEpoch === authority.globalCoordinationEpoch
+    && accepted.installationId === authority.installationId
+    && accepted.localJournalEpoch === authority.localJournalEpoch
+    && accepted.singleInstanceLockId === authority.singleInstanceLockId;
+};
 
 const cloneRunUpdates = (updates: Partial<AgentRunRecord>): Partial<AgentRunRecord> => {
   const cloned = JSON.parse(JSON.stringify(updates)) as Partial<AgentRunRecord>;

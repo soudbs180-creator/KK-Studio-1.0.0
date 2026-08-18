@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import type { AgentRunDto, AgentToolCallDto } from '@kk/shared';
+import {
+  evaluateCurrentExecutionAuthority,
+  type AgentRunDto,
+  type AgentToolCallDto,
+  type ExecutionAuthorityProjectionDto,
+} from '@kk/shared';
 import {
   AgentRunStore,
   hasLocalAgentRunExecutionAuthority,
@@ -52,6 +57,22 @@ const successClient = (
   },
 });
 
+const projection = (
+  source: ExecutionAuthorityProjectionDto['projectionSource'],
+  executionTarget: ExecutionAuthorityProjectionDto['executionTarget'] = 'local-desktop',
+): ExecutionAuthorityProjectionDto => ({
+  schemaVersion: 1,
+  authorityKind: 'projection-only',
+  authorityState: 'projection-only',
+  projectionSource: source,
+  canExecute: false,
+  executionTarget,
+  ownerId: 'hydration-owner-a',
+  runId: `run-${source}`,
+  authorityRuntimeId: 'runtime-projection',
+  observedAt: '2026-08-13T00:00:00.000Z',
+});
+
 test('hydrates remote-only Runs as owner-scoped, non-executable server projections', async () => {
   const ownerId = 'hydration-owner-a';
   const store = new AgentRunStore(createStorage(), () => ownerId);
@@ -72,6 +93,88 @@ test('hydrates remote-only Runs as owner-scoped, non-executable server projectio
   assert.equal(hydrated?.status, 'running');
   assert.equal(hydrated?.backendSyncState, 'synced');
   assert.equal(hasLocalAgentRunExecutionAuthority(hydrated), false);
+});
+
+test('server, paired-runtime, and import authority projections remain read-only', () => {
+  const evaluator = (candidate: unknown) => evaluateCurrentExecutionAuthority(candidate, {
+    now: '2026-08-13T00:01:00.000Z',
+    expectedOwnerId: 'hydration-owner-a',
+    expectedRunId: 'run-server',
+    expectedAuthorityRuntimeId: 'runtime-projection',
+    currentGlobalCoordinationEpoch: 1,
+    expectedExecutionTarget: 'local-desktop',
+    expectedInstallationId: 'installation-1',
+    currentLocalJournalEpoch: 1,
+    currentSingleInstanceLockId: 'lock-1',
+  });
+  for (const source of ['server', 'paired-runtime', 'import'] as const) {
+    const authority = projection(source);
+    assert.equal(hasLocalAgentRunExecutionAuthority({
+      id: authority.runId,
+      userMessage: 'projection',
+      intent: 'test',
+      plan: {},
+      status: 'waiting_execution',
+      toolCalls: [],
+      createdAt: authority.observedAt,
+      updatedAt: authority.observedAt,
+      executionTarget: 'local-desktop',
+      executionAuthorityEnvelope: authority,
+    }, evaluator), false);
+  }
+});
+
+test('a local Run is executable only when the current installation evaluator accepts its authority', () => {
+  const authority = {
+    schemaVersion: 1 as const,
+    authorityKind: 'installation-local' as const,
+    authorityState: 'authoritative' as const,
+    executionTarget: 'local-desktop' as const,
+    ownerId: 'local-owner',
+    runId: 'run-local-exact',
+    authorityRuntimeId: 'desktop-runtime-1',
+    globalCoordinationEpoch: 4,
+    issuedAt: '2026-08-13T00:00:00.000Z',
+    installationId: 'installation-1',
+    localJournalEpoch: 8,
+    singleInstanceLockId: 'lock-1',
+  };
+  const record = {
+    id: authority.runId,
+    userMessage: 'local',
+    intent: 'test',
+    plan: {},
+    status: 'waiting_execution' as const,
+    toolCalls: [],
+    createdAt: authority.issuedAt,
+    updatedAt: authority.issuedAt,
+    executionTarget: 'local-desktop' as const,
+    executionAuthorityEnvelope: authority,
+  };
+  const context = {
+    now: '2026-08-13T00:01:00.000Z',
+    expectedOwnerId: 'local-owner',
+    expectedRunId: authority.runId,
+    expectedAuthorityRuntimeId: authority.authorityRuntimeId,
+    currentGlobalCoordinationEpoch: 4,
+    expectedExecutionTarget: 'local-desktop' as const,
+    expectedInstallationId: 'installation-1',
+    currentLocalJournalEpoch: 8,
+    currentSingleInstanceLockId: 'lock-1',
+  };
+
+  assert.equal(hasLocalAgentRunExecutionAuthority(record), false);
+  assert.equal(hasLocalAgentRunExecutionAuthority(
+    record,
+    (candidate) => evaluateCurrentExecutionAuthority(candidate, context),
+  ), true);
+  assert.equal(hasLocalAgentRunExecutionAuthority(
+    record,
+    (candidate) => evaluateCurrentExecutionAuthority(candidate, {
+      ...context,
+      currentLocalJournalEpoch: 9,
+    }),
+  ), false);
 });
 
 test('newer server state merges into a local validated Run without replacing its plan', async () => {
@@ -189,4 +292,26 @@ test('AI takeover context subscribes to hydrated projections and does not execut
   assert.match(contextSource, /agentRuntimeInstance\.requestRunHydration/);
   assert.match(contextSource, /hasLocalAgentRunExecutionAuthority/);
   assert.match(runtimeSource, /server projection and cannot execute/);
+});
+
+test('AI takeover UI gates restore, subscription, and confirmation through the injected authority evaluator', () => {
+  const contextSource = readFileSync(
+    'apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx',
+    'utf8',
+  );
+
+  assert.match(
+    contextSource,
+    /hasLocalAgentRunExecutionAuthority\(record, evaluateAuthority\)/,
+  );
+  for (const recordName of ['restoredPendingRun', 'selected', 'executableRun']) {
+    assert.match(
+      contextSource,
+      new RegExp(`hasHostAgentRunExecutionAuthority\\(${recordName}, evaluateCurrentExecutionAuthority\\)`),
+    );
+    assert.doesNotMatch(
+      contextSource,
+      new RegExp(`hasLocalAgentRunExecutionAuthority\\(${recordName}\\)`),
+    );
+  }
 });

@@ -6,6 +6,7 @@ import { durableGenerationQueue } from '../../apps/web/src/features/ai-assistant
 import { toolRegistryInstance } from '../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts';
 import {
   createAssistantPlanHash,
+  createAssistantStepAuthorization,
   createAssistantTargetSnapshotHash,
   isAssistantConfirmationGrantFresh,
   type AssistantConfirmationGrant,
@@ -181,6 +182,39 @@ test('confirmation freshness requires an explicit bounded expiresAt', () => {
   assert.equal(isAssistantConfirmationGrantFresh({ ...grant, quoteId: '   ' }, NOW), false);
   assert.equal(isAssistantConfirmationGrantFresh({ ...grant, maxCostCredits: -1 }, NOW), false);
   assert.equal(isAssistantConfirmationGrantFresh({ ...grant, maxCostCredits: 1.5 }, NOW), false);
+});
+
+test('step confirmation fingerprints bind target, runtime, epoch, fence, attempt, and Quote projection', () => {
+  const baseContext = {
+    executionTarget: 'paired-desktop',
+    executionAuthorityEnvelope: {
+      authorityRuntimeId: 'paired-runtime-1',
+      globalCoordinationEpoch: 4,
+      executionFencingToken: 9,
+      attempt: 2,
+    },
+    confirmationQuoteId: QUOTE_ID,
+    confirmationMaxCostCredits: 12,
+  };
+  const authorize = (context: Record<string, unknown>) => createAssistantStepAuthorization({
+    runId: 'run-fingerprint',
+    stepId: 'step-fingerprint',
+    toolName: 'costly.write',
+    input: { idempotencyKey: 'run-fingerprint:step-fingerprint' },
+    context,
+    authorizationScope,
+  }).inputFingerprint;
+  const baseline = authorize(baseContext);
+  const mutations = [
+    { ...baseContext, executionTarget: 'cloud' },
+    { ...baseContext, executionAuthorityEnvelope: { ...baseContext.executionAuthorityEnvelope, authorityRuntimeId: 'paired-runtime-2' } },
+    { ...baseContext, executionAuthorityEnvelope: { ...baseContext.executionAuthorityEnvelope, globalCoordinationEpoch: 5 } },
+    { ...baseContext, executionAuthorityEnvelope: { ...baseContext.executionAuthorityEnvelope, executionFencingToken: 10 } },
+    { ...baseContext, executionAuthorityEnvelope: { ...baseContext.executionAuthorityEnvelope, attempt: 3 } },
+    { ...baseContext, confirmationQuoteId: OTHER_QUOTE_ID },
+    { ...baseContext, confirmationMaxCostCredits: 13 },
+  ];
+  for (const mutation of mutations) assert.notEqual(authorize(mutation), baseline);
 });
 
 test('Session confirmation records bind plan, tool, target, quote, cost, and expiry', () => {

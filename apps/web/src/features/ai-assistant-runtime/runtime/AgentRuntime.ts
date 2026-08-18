@@ -5,7 +5,7 @@ import type {
   AssistantPlan,
   SanitizedProjectContext,
 } from '../../ai-takeover/types.ts';
-import type { AgentFailureClass, AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
+import type { AgentFailureClass, AgentRunDto, AgentStepOutcome, AgentStepResultDto } from '@kk/shared';
 import { LocalAssistantBrain } from '../../ai-takeover/core/localBrain.ts';
 import { LLMBrain } from '../../ai-takeover/core/llmBrain.ts';
 import { buildAgentContextSnapshotInput } from '../../ai-takeover/core/agentContextSnapshot.ts';
@@ -96,6 +96,14 @@ const llmBrain = new LLMBrain();
 const MAX_AGENT_STEPS = 20;
 const MAX_READ_ONLY_CONCURRENCY = 4;
 const SNAPSHOT_HYDRATION_TIMEOUT_MS = 1_500;
+
+/** Authoritative local envelopes never cross the public Web transport boundary. */
+const projectAgentRunForTransport = (record: AgentRunRecord): AgentRunDto => ({
+  ...record,
+  executionAuthorityEnvelope: record.executionAuthorityEnvelope?.authorityState === 'projection-only'
+    ? record.executionAuthorityEnvelope
+    : undefined,
+});
 
 let contextSnapshotSequence = 0;
 
@@ -568,6 +576,11 @@ export class AgentRuntime {
     const scope = authorizationScope || captureAssistantAuthorizationScope(context);
     const quoteBinding = resolveAssistantPlanQuoteBinding(confirmedPlanSnapshot);
     if (!quoteBinding.valid) throw new TypeError('Confirmation quoteId and maxCostCredits must be supplied together.');
+    const confirmationContext = {
+      ...context,
+      confirmationQuoteId: quoteBinding.quoteId,
+      confirmationMaxCostCredits: quoteBinding.maxCostCredits,
+    };
     const grantedAt = new Date().toISOString();
     return {
       runId,
@@ -578,7 +591,7 @@ export class AgentRuntime {
       confirmed: true,
       toolNames: Array.from(new Set(steps.map((step) => step.action.type))),
       authorizationScope: scope,
-      authorizedSteps: createPlanStepAuthorizations(runId, confirmedPlanSnapshot, steps, context, scope),
+      authorizedSteps: createPlanStepAuthorizations(runId, confirmedPlanSnapshot, steps, confirmationContext, scope),
       quoteId: quoteBinding.quoteId,
       maxCostCredits: quoteBinding.maxCostCredits,
       grantedAt,
@@ -590,10 +603,18 @@ export class AgentRuntime {
   async persistConfirmationGrant(
     runId: string,
     grant: AssistantConfirmationGrant,
+    executionContext?: AssistantExecutionContext,
   ): Promise<AssistantConfirmationGrant> {
     const ownerId = getRuntimeOwnerId();
     const record = agentRunStore.getRunForOwner(ownerId, runId);
-    if (!record || !hasLocalAgentRunExecutionAuthority(record) || grant.runId !== runId) {
+    const hasExecutionAuthority = executionContext?.enforceExecutionAuthority === true
+      ? Boolean(
+          record?.executionAuthorityEnvelope
+          && executionContext.evaluateCurrentExecutionAuthority
+          && hasLocalAgentRunExecutionAuthority(record, executionContext.evaluateCurrentExecutionAuthority),
+        )
+      : hasLocalAgentRunExecutionAuthority(record);
+    if (!record || !hasExecutionAuthority || grant.runId !== runId) {
       throw new Error(`Cannot persist confirmation for a non-executable Agent Run: ${runId}`);
     }
     if (!record.sessionId) {
@@ -631,7 +652,10 @@ export class AgentRuntime {
       getCurrentOwnerId: getRuntimeOwnerId,
       store: agentRunStore,
       transport: {
-        upsertAgentRun: (input, options) => kkWebApiClient.upsertAgentRun(input, options),
+        upsertAgentRun: (input, options) => kkWebApiClient.upsertAgentRun(
+          projectAgentRunForTransport(input),
+          options,
+        ),
         getAgentRun: (requestedRunId, options) => kkWebApiClient.getAgentRun(requestedRunId, options),
       },
       createReplacementPlan: async (nextReplanCount) => {
@@ -801,7 +825,15 @@ export class AgentRuntime {
     );
     const record = getOwnedRun();
     if (!record) throw new Error(`Agent run not found: ${runId}`);
-    if (!hasLocalAgentRunExecutionAuthority(record)) {
+    const enforceExecutionAuthority = executorContext.enforceExecutionAuthority === true;
+    const hasExecutionAuthority = enforceExecutionAuthority
+      ? Boolean(
+          record.executionAuthorityEnvelope
+          && executorContext.evaluateCurrentExecutionAuthority
+          && hasLocalAgentRunExecutionAuthority(record, executorContext.evaluateCurrentExecutionAuthority),
+        )
+      : hasLocalAgentRunExecutionAuthority(record);
+    if (!hasExecutionAuthority) {
       throw new Error(`Agent run is a server projection and cannot execute in this browser: ${runId}`);
     }
     if (!['waiting_confirmation', 'waiting_execution', 'running'].includes(record.status)) return;
@@ -811,8 +843,23 @@ export class AgentRuntime {
     validateStepGraph(steps);
     validatePlanStepInputs(runId, steps);
     const explicitGrant = executorContext.confirmationGrant;
-    const expectedAuthorizations = createPlanStepAuthorizations(runId, plan, steps, executorContext);
     const expectedQuoteBinding = resolveAssistantPlanQuoteBinding(plan);
+    const executionBinding = {
+      executionTarget: enforceExecutionAuthority
+        ? record.executionTarget || 'local-desktop' as const
+        : executorContext.executionTarget,
+      executionAuthorityEnvelope: enforceExecutionAuthority
+        ? record.executionAuthorityEnvelope
+        : executorContext.executionAuthorityEnvelope,
+      confirmationQuoteId: expectedQuoteBinding.quoteId,
+      confirmationMaxCostCredits: expectedQuoteBinding.maxCostCredits,
+    };
+    const expectedAuthorizations = createPlanStepAuthorizations(
+      runId,
+      plan,
+      steps,
+      { ...executorContext, ...executionBinding },
+    );
     const sessionConfirmationGranted = record.sessionId
       ? doesAgentSessionAuthorizeConfirmation(
           agentSessionProjectionStore.getSession(record.sessionId),
@@ -935,6 +982,7 @@ export class AgentRuntime {
       const baselineCanvas = executorContext.getActiveCanvas?.() || executorContext.activeCanvas;
       const stepContext: AssistantExecutionContext = {
         ...executorContext,
+        ...executionBinding,
         runId,
         planId: plan.id,
         stepId: step.stepId,
@@ -1333,7 +1381,10 @@ export class AgentRuntime {
     const record = this.pendingRunSyncs.get(runId);
     if (!record) return;
     try {
-      const response = await kkWebApiClient.upsertAgentRun(record, { expectedAuthSubject: ownerId });
+      const response = await kkWebApiClient.upsertAgentRun(
+        projectAgentRunForTransport(record),
+        { expectedAuthSubject: ownerId },
+      );
       if (!response.success || response.data?.ok !== true) return;
       const toolResponses = await Promise.all(
         (record.toolCalls || []).map((toolCall) => kkWebApiClient.recordAgentToolCall(

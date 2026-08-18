@@ -35,6 +35,7 @@ import {
   toolRegistryInstance,
 } from '../../ai-assistant-runtime';
 import { subscribeAuthSessionChange } from '../../../services/auth/authSessionEvents.ts';
+import type { AssistantExecutionAuthorityEvaluator } from '../../ai-assistant-runtime/runtime/AssistantExecutionContext.ts';
 
 type LlmChat = typeof import('../../generation/generateService')['generationService']['chat'];
 
@@ -49,6 +50,14 @@ const getQueuePromptNodeId = (jobId: string, promptId: string): string => (
 
 const hasExecutablePlanActions = (plan: AssistantPlan): boolean => (
   (plan.steps?.length || plan.actions?.length || 0) > 0
+);
+
+const hasHostAgentRunExecutionAuthority = (
+  record: AgentRunRecord | null | undefined,
+  evaluateAuthority: AssistantExecutionAuthorityEvaluator | undefined,
+): boolean => Boolean(
+  evaluateAuthority
+  && hasLocalAgentRunExecutionAuthority(record, evaluateAuthority)
 );
 
 const buildAssistancePreviewPlan = (plan: AssistantPlan): AssistantPlan => ({
@@ -141,6 +150,8 @@ interface AITakeoverProviderProps {
   setPptEditorMode?: (mode: string) => void;
   togglePinTool?: (toolId: string, pinned: boolean) => void;
   siteCapabilities?: AssistantSiteCapabilityPorts;
+  /** Supplied only by a host that owns current installation-local authority. */
+  evaluateCurrentExecutionAuthority?: AssistantExecutionAuthorityEvaluator;
 }
 
 export function AITakeoverProvider({
@@ -182,7 +193,8 @@ export function AITakeoverProvider({
   updateToolWindowLayout,
   setPptEditorMode,
   togglePinTool,
-  siteCapabilities
+  siteCapabilities,
+  evaluateCurrentExecutionAuthority,
 }: AITakeoverProviderProps) {
 
   useEffect(() => startGenerationQueueSync(), []);
@@ -271,13 +283,17 @@ export function AITakeoverProvider({
   const [restoredPendingRun] = useState<AgentRunRecord | null>(() => agentRunStore.getPendingRun() ?? null);
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(() => {
-    if (!restoredPendingRun?.plan || !hasLocalAgentRunExecutionAuthority(restoredPendingRun)) return null;
+    if (
+      !restoredPendingRun?.plan
+      || !hasHostAgentRunExecutionAuthority(restoredPendingRun, evaluateCurrentExecutionAuthority)
+    ) return null;
     return collaborationMode === 'assist'
       ? buildAssistancePreviewPlan(restoredPendingRun.plan as AssistantPlan)
       : restoredPendingRun.plan as AssistantPlan;
   });
   const [pendingAuthorizationScope, setPendingAuthorizationScope] = useState<AssistantAuthorizationScopeSnapshot | null>(() => (
-    restoredPendingRun && hasLocalAgentRunExecutionAuthority(restoredPendingRun)
+    restoredPendingRun
+      && hasHostAgentRunExecutionAuthority(restoredPendingRun, evaluateCurrentExecutionAuthority)
       ? captureAssistantAuthorizationScope({
           currentPage,
           projectId: siteCapabilities?.project.getSnapshot().activeProjectId || '',
@@ -302,7 +318,7 @@ export function AITakeoverProvider({
         setCurrentRun(selected || null);
         if (!selected
           || selected.status !== 'waiting_confirmation'
-          || !hasLocalAgentRunExecutionAuthority(selected)) {
+          || !hasHostAgentRunExecutionAuthority(selected, evaluateCurrentExecutionAuthority)) {
           setPendingPlan(null);
           setPendingAuthorizationScope(null);
         }
@@ -320,7 +336,7 @@ export function AITakeoverProvider({
       unsubscribeRuns();
       unsubscribeAuth();
     };
-  }, []);
+  }, [evaluateCurrentExecutionAuthority]);
 
   const getFreshSanitizedProjectContext = useCallback((): SanitizedProjectContext => (
     buildSanitizedProjectContext({
@@ -387,8 +403,13 @@ export function AITakeoverProvider({
     confirmedPlanSnapshot?: AssistantPlan,
     confirmedAuthorizationScope?: AssistantAuthorizationScopeSnapshot,
   ) => {
+    const executionRecord = agentRunStore.getRun(runId);
     const ctx: AssistantExecutionContext = {
       runId,
+      enforceExecutionAuthority: true,
+      executionTarget: executionRecord?.executionTarget || 'local-desktop',
+      executionAuthorityEnvelope: executionRecord?.executionAuthorityEnvelope,
+      evaluateCurrentExecutionAuthority,
       currentPage,
       collaborationMode,
       trigger,
@@ -466,7 +487,7 @@ export function AITakeoverProvider({
         ctx,
         confirmedAuthorizationScope,
       );
-      ctx.confirmationGrant = await agentRuntimeInstance.persistConfirmationGrant(runId, confirmationGrant);
+      ctx.confirmationGrant = await agentRuntimeInstance.persistConfirmationGrant(runId, confirmationGrant, ctx);
     }
     ctx.executeTool = (toolName: string, input: unknown, extra: Partial<AssistantExecutionContext> = {}) => (
       toolRegistryInstance.execute(toolName, input, { ...ctx, ...extra })
@@ -478,7 +499,7 @@ export function AITakeoverProvider({
     } finally {
       setCurrentRun(agentRunStore.getRun(runId) ?? null);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, siteCapabilities, currentPage, collaborationMode, getFreshSanitizedProjectContext]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, createCard, convertDrawingsToNote, updateWorkflowNode, rasterizeNote, executeGeneration, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, selectNodes, setConfig, onOpenSettings, openLibrarySurface, openFavoritesSurface, openProfileSurface, focusWorkspace, notify, config, ecommerceState, onGenerate, openToolWindowInstance, updateToolWindowLayout, setPptEditorMode, togglePinTool, siteCapabilities, currentPage, collaborationMode, getFreshSanitizedProjectContext, evaluateCurrentExecutionAuthority]);
 
 
   // 发送消息
@@ -569,7 +590,7 @@ export function AITakeoverProvider({
     if (!currentRunId || !pendingPlan || !pendingAuthorizationScope) return;
     const executableRun = agentRunStore.getRun(currentRunId);
     if (executableRun?.status !== 'waiting_confirmation'
-      || !hasLocalAgentRunExecutionAuthority(executableRun)) return;
+      || !hasHostAgentRunExecutionAuthority(executableRun, evaluateCurrentExecutionAuthority)) return;
     const runId = currentRunId;
     const confirmedPlanSnapshot = pendingPlan;
     const confirmedAuthorizationScope = pendingAuthorizationScope;
@@ -593,7 +614,7 @@ export function AITakeoverProvider({
         setCurrentRunId(null);
       }
     }
-  }, [currentRunId, pendingPlan, pendingAuthorizationScope, executePlan, collaborationMode]);
+  }, [currentRunId, pendingPlan, pendingAuthorizationScope, executePlan, collaborationMode, evaluateCurrentExecutionAuthority]);
 
   // 用户点击“取消计划”
   const cancelPendingPlan = useCallback(() => {

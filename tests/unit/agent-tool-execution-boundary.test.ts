@@ -2,6 +2,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
 import {
+  evaluateCurrentExecutionAuthority,
+  type AuthoritativeExecutionAuthorityEnvelopeDto,
+  type ExecutionAuthorityEvaluationContext,
+} from '@kk/shared';
+import {
   AgentToolRegistry,
   toolRegistryInstance,
 } from '../../apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts';
@@ -58,7 +63,179 @@ const confirmationContext = (runId: string, toolNames: string[], input: unknown 
   };
 };
 
+const createLocalAuthority = (
+  runId: string,
+  overrides: Partial<AuthoritativeExecutionAuthorityEnvelopeDto> = {},
+): AuthoritativeExecutionAuthorityEnvelopeDto => ({
+  schemaVersion: 1,
+  authorityKind: 'installation-local',
+  authorityState: 'authoritative',
+  executionTarget: 'local-desktop',
+  ownerId: 'local_user',
+  runId,
+  authorityRuntimeId: 'desktop-runtime-test',
+  globalCoordinationEpoch: 7,
+  issuedAt: '2026-08-13T00:00:00.000Z',
+  installationId: 'installation-test',
+  localJournalEpoch: 11,
+  singleInstanceLockId: 'lock-test',
+  ...overrides,
+} as AuthoritativeExecutionAuthorityEnvelopeDto);
+
+const createLocalAuthorityEvaluator = (
+  runId: string,
+  overrides: Partial<ExecutionAuthorityEvaluationContext> = {},
+) => {
+  const context = {
+    now: '2026-08-13T00:01:00.000Z',
+    expectedOwnerId: 'local_user',
+    expectedRunId: runId,
+    expectedAuthorityRuntimeId: 'desktop-runtime-test',
+    currentGlobalCoordinationEpoch: 7,
+    expectedExecutionTarget: 'local-desktop',
+    expectedInstallationId: 'installation-test',
+    currentLocalJournalEpoch: 11,
+    currentSingleInstanceLockId: 'lock-test',
+    ...overrides,
+  } as ExecutionAuthorityEvaluationContext;
+  return (candidate: unknown) => evaluateCurrentExecutionAuthority(candidate, context);
+};
+
 describe('Agent ToolRegistry execution boundary', () => {
+  it('fails closed before the handler when a mutation has no side-effect classification', async () => {
+    const registry = new AgentToolRegistry();
+    let handlerCalls = 0;
+    registry.register({
+      name: 'mutation.unclassified',
+      description: 'unclassified mutation',
+      permission: 'safe',
+      inputSchema: { type: 'object' },
+      handler: async () => {
+        handlerCalls += 1;
+        return { success: true };
+      },
+    });
+
+    await assert.rejects(
+      registry.execute('mutation.unclassified', {}, { runId: 'run-unclassified' }),
+      (error: Error & { code?: string }) => error.code === 'TOOL_CONTROL_INVALID',
+    );
+    assert.equal(handlerCalls, 0);
+  });
+
+  it('permits only a current installation-local authority in the browser executor', async () => {
+    const registry = new AgentToolRegistry();
+    let handlerCalls = 0;
+    registry.register({
+      name: 'mutation.localOnly',
+      description: 'local authority boundary',
+      permission: 'safe',
+      control: {
+        sideEffectClass: 'idempotent',
+        confirmationClass: 'none',
+        allowedExecutionTargets: ['local-desktop'],
+        cloudSafe: false,
+      },
+      inputSchema: { type: 'object' },
+      handler: async () => {
+        handlerCalls += 1;
+        return { success: true };
+      },
+    });
+    const runId = 'run-local-authority';
+    const authority = createLocalAuthority(runId);
+    const baseContext = {
+      runId,
+      stepId: 'step-local-authority',
+      executionOwnerId: 'local_user',
+      enforceExecutionAuthority: true,
+      executionTarget: 'local-desktop' as const,
+      executionAuthorityEnvelope: authority,
+    };
+
+    await assert.rejects(
+      registry.execute('mutation.localOnly', {}, {
+        ...baseContext,
+        evaluateCurrentExecutionAuthority: createLocalAuthorityEvaluator(runId, {
+          currentLocalJournalEpoch: 12,
+        }),
+      }),
+      (error: Error & { code?: string }) => error.code === 'EXECUTION_AUTHORITY_INVALID',
+    );
+    assert.equal(handlerCalls, 0);
+
+    const output = await registry.execute('mutation.localOnly', {}, {
+      ...baseContext,
+      evaluateCurrentExecutionAuthority: createLocalAuthorityEvaluator(runId),
+    });
+    assert.deepEqual(output, { success: true });
+    assert.equal(handlerCalls, 1);
+  });
+
+  it('never lets the browser executor run a cloud Run, even for cloud-safe metadata', async () => {
+    const registry = new AgentToolRegistry();
+    let handlerCalls = 0;
+    registry.register({
+      name: 'mutation.cloudSafeButNotBrowserExecutable',
+      description: 'cloud worker boundary',
+      permission: 'safe',
+      control: {
+        sideEffectClass: 'deduplicated',
+        confirmationClass: 'none',
+        allowedExecutionTargets: ['cloud'],
+        cloudSafe: true,
+      },
+      inputSchema: { type: 'object' },
+      handler: async () => {
+        handlerCalls += 1;
+        return { success: true };
+      },
+    });
+
+    await assert.rejects(
+      registry.execute('mutation.cloudSafeButNotBrowserExecutable', {}, {
+        runId: 'run-cloud-browser',
+        stepId: 'step-cloud-browser',
+        executionOwnerId: 'cloud-owner',
+        enforceExecutionAuthority: true,
+        executionTarget: 'cloud',
+        executionAuthorityEnvelope: {
+          schemaVersion: 1,
+          authorityKind: 'server-lease',
+          authorityState: 'authoritative',
+          executionTarget: 'cloud',
+          ownerId: 'cloud-owner',
+          runId: 'run-cloud-browser',
+          authorityRuntimeId: 'cloud-worker-1',
+          globalCoordinationEpoch: 3,
+          issuedAt: '2026-08-13T00:00:00.000Z',
+          executionFencingToken: 9,
+          attempt: 1,
+          leaseExpiresAt: '2026-08-13T00:05:00.000Z',
+        },
+        evaluateCurrentExecutionAuthority: () => ({
+          authorized: true,
+          authorityEnvelope: {
+            schemaVersion: 1,
+            authorityKind: 'server-lease',
+            authorityState: 'authoritative',
+            executionTarget: 'cloud',
+            ownerId: 'cloud-owner',
+            runId: 'run-cloud-browser',
+            authorityRuntimeId: 'cloud-worker-1',
+            globalCoordinationEpoch: 3,
+            issuedAt: '2026-08-13T00:00:00.000Z',
+            executionFencingToken: 9,
+            attempt: 1,
+            leaseExpiresAt: '2026-08-13T00:05:00.000Z',
+          },
+        }),
+      }),
+      (error: Error & { code?: string }) => error.code === 'EXECUTION_TARGET_NOT_LOCAL',
+    );
+    assert.equal(handlerCalls, 0);
+  });
+
   it('requires a run-scoped grant for confirm tools', async () => {
     const registry = new AgentToolRegistry();
     registry.register({
