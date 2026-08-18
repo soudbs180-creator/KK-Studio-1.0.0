@@ -216,7 +216,7 @@ try {
     if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
         throw 'Portable update manifest is missing a valid sha256 checksum. Refusing to install.'
     }
-    $downloadHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $downloadHash = Get-PortableFileSha256 -Path $archivePath
     if ($downloadHash -ne $expectedHash) {
         throw "Portable update hash mismatch. Expected $expectedHash but received $downloadHash."
     }

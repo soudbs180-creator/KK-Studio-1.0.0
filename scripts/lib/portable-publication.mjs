@@ -23,24 +23,68 @@ function requireString(source, field) {
   return value;
 }
 
-function canonicalizeJson(value) {
-  if (Array.isArray(value)) {
-    return value.map(canonicalizeJson);
+function encodeCanonicalString(field, value, nullable = false) {
+  if (nullable && (value === null || value === undefined)) {
+    return `${field}|null|`;
   }
-  if (!isRecord(value)) {
-    return value;
+  if (typeof value !== "string") {
+    throw publicationError(field, "must be a string for canonical hashing.");
   }
-  return Object.fromEntries(
-    Object.keys(value).sort().map((key) => [key, canonicalizeJson(value[key])]),
-  );
+  return `${field}|string|${Buffer.from(value, "utf8").toString("base64")}`;
 }
 
-/** Serializes release metadata with recursively sorted keys. */
+function encodeCanonicalInteger(field, value) {
+  if (!Number.isSafeInteger(value)) {
+    throw publicationError(field, "must be a safe integer for canonical hashing.");
+  }
+  return `${field}|integer|${value}`;
+}
+
+function encodeCanonicalReleaseNotes(value) {
+  if (!Array.isArray(value) || value.some((note) => typeof note !== "string")) {
+    throw publicationError("releaseNotes", "must be a string array for canonical hashing.");
+  }
+  return [
+    `releaseNotes|array|${value.length}`,
+    ...value.map((note, index) => encodeCanonicalString(`releaseNotes[${index}]`, note)),
+  ];
+}
+
+/**
+ * Serializes the fixed v1 envelope fields using UTF-8 Base64 strings and LF
+ * separators so Node and Windows PowerShell hash identical bytes.
+ */
 export function serializePortablePublicationEnvelope(envelope) {
-  return JSON.stringify(canonicalizeJson(envelope));
+  if (!isRecord(envelope) || !isRecord(envelope.provenance)) {
+    throw publicationError("envelope", "must be an object with provenance for canonical hashing.");
+  }
+  return [
+    "kk-studio-portable-publication-envelope-v1",
+    encodeCanonicalInteger("schemaVersion", envelope.schemaVersion),
+    encodeCanonicalString("provenance.kind", envelope.provenance.kind),
+    encodeCanonicalString("appName", envelope.appName),
+    encodeCanonicalString("version", envelope.version),
+    encodeCanonicalString("releasedVersion", envelope.releasedVersion),
+    encodeCanonicalString("displayVersion", envelope.displayVersion),
+    encodeCanonicalString("releaseTarget", envelope.releaseTarget),
+    encodeCanonicalString("releasePhase", envelope.releasePhase),
+    encodeCanonicalInteger("releaseSequence", envelope.releaseSequence),
+    encodeCanonicalString("artifactVersion", envelope.artifactVersion),
+    encodeCanonicalString("buildTime", envelope.buildTime, true),
+    encodeCanonicalString("releaseDate", envelope.releaseDate),
+    ...encodeCanonicalReleaseNotes(envelope.releaseNotes),
+    encodeCanonicalString("channel", envelope.channel),
+    encodeCanonicalString("commitSha", envelope.commitSha, true),
+    encodeCanonicalString("commitShortSha", envelope.commitShortSha, true),
+    encodeCanonicalString("packageFile", envelope.packageFile),
+    encodeCanonicalString("downloadUrl", envelope.downloadUrl),
+    encodeCanonicalString("sha256", envelope.sha256),
+    encodeCanonicalInteger("size", envelope.size),
+  ].join("\n");
 }
 
-function hashEnvelope(envelope) {
+/** Computes the integrity hash carried alongside a Portable publication envelope. */
+export function computePortablePublicationEnvelopeHash(envelope) {
   return createHash("sha256")
     .update(serializePortablePublicationEnvelope(envelope), "utf8")
     .digest("hex");
@@ -98,7 +142,7 @@ export function createPortablePublicationState(source) {
     releaseSequence: envelope.releaseSequence,
     artifactVersion: envelope.artifactVersion,
     artifactSha256: envelope.sha256,
-    envelopeHash: hashEnvelope(envelope),
+    envelopeHash: computePortablePublicationEnvelopeHash(envelope),
     envelope,
   });
 }

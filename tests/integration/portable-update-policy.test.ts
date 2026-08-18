@@ -7,6 +7,8 @@ import path from 'node:path';
 import test from 'node:test';
 import JSZip from 'jszip';
 
+import { computePortablePublicationEnvelopeHash } from '../../scripts/lib/portable-publication.mjs';
+
 const ROOT_DIR = process.cwd();
 const WINDOWS_ONLY = process.platform !== 'win32';
 const POLICY_PATH = path.join(ROOT_DIR, 'scripts', 'lib', 'portable-update-policy.ps1');
@@ -27,16 +29,40 @@ function localManifest(artifactVersion: string, releaseSequence: number, channel
 }
 
 function remoteManifest(artifactVersion: string, releaseSequence: number, channel: string) {
-  return {
+  const releasedVersion = channel === 'stable' ? '1.7.0' : '1.6.1';
+  const envelope = {
     schemaVersion: 1,
     provenance: { kind: 'kk-studio-portable-publication' },
+    appName: 'KK Studio',
+    version: releasedVersion,
+    releasedVersion,
+    displayVersion: `v${releasedVersion}`,
     releaseTarget: '1.7.0',
     releasePhase: channel,
     releaseSequence,
     artifactVersion,
+    buildTime: '2026-08-13T00:00:00.000Z',
+    releaseDate: '2026-08-13',
+    releaseNotes: ['fixture'],
     channel,
+    commitSha: '0123456789abcdef',
+    commitShortSha: '0123456',
+    packageFile: `KK-Studio-Portable-${artifactVersion}-s${releaseSequence}.zip`,
+    downloadUrl: `https://updates.example/${channel}/KK-Studio-Portable-${artifactVersion}-s${releaseSequence}.zip`,
     sha256: 'a'.repeat(64),
-    envelopeHash: 'b'.repeat(64),
+    size: 12,
+  };
+  return {
+    ...envelope,
+    envelopeHash: computePortablePublicationEnvelopeHash(envelope),
+  };
+}
+
+function withCanonicalEnvelopeHash<T extends Record<string, unknown>>(envelope: T) {
+  const { envelopeHash: _ignored, ...hashableEnvelope } = envelope;
+  return {
+    ...hashableEnvelope,
+    envelopeHash: computePortablePublicationEnvelopeHash(hashableEnvelope),
   };
 }
 
@@ -86,6 +112,58 @@ test('Portable update policy accepts a corrected stable build only with a higher
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('Portable update policy enforces the deterministic phase artifact mapping', { skip: WINDOWS_ONLY }, async () => {
+  const cases = [
+    ['development', '1.7.0-alpha.0.3', '1.7.0-alpha.1.3'],
+    ['internal', '1.7.0-alpha.1.4', '1.7.0-alpha.0.4'],
+    ['canary', '1.7.0-beta.5', '1.7.0-rc.5'],
+    ['release-candidate', '1.7.0-rc.6', '1.7.0-beta.6'],
+    ['stable', '1.7.0', '1.7.0-rc.7'],
+  ] as const;
+
+  for (const [channel, expectedArtifact, mismatchedArtifact] of cases) {
+    const artifactParts = expectedArtifact.split('.');
+    const sequence = Number(artifactParts[artifactParts.length - 1]) || 7;
+    const localSequence = Math.max(0, sequence - 1);
+    const localArtifact = channel === 'stable'
+      ? '1.7.0'
+      : expectedArtifact.replace(/\d+$/, String(localSequence));
+    const valid = await evaluateTransition(
+      localManifest(localArtifact, localSequence, channel),
+      remoteManifest(expectedArtifact, sequence, channel),
+      channel,
+    );
+    assert.equal(valid.status, 0, `${channel}: ${valid.stderr}`);
+
+    const invalidEnvelope = remoteManifest(expectedArtifact, sequence, channel);
+    const invalid = await evaluateTransition(
+      localManifest(localArtifact, localSequence, channel),
+      withCanonicalEnvelopeHash({ ...invalidEnvelope, artifactVersion: mismatchedArtifact }),
+      channel,
+    );
+    assert.equal(invalid.status, 17, `${channel} should reject mismatched artifactVersion`);
+    assert.match(invalid.stderr, /artifactVersion/i);
+  }
+});
+
+test('Portable update policy rejects tampering covered by the canonical envelope hash', { skip: WINDOWS_ONLY }, async () => {
+  const local = localManifest('1.7.0', 10, 'stable');
+  const validRemote = remoteManifest('1.7.0', 11, 'stable');
+  const tamperedManifests = [
+    { ...validRemote, channel: 'canary', releasePhase: 'canary', artifactVersion: '1.7.0-beta.11' },
+    { ...validRemote, downloadUrl: 'https://updates.example/stable/replaced.zip' },
+    { ...validRemote, size: 13 },
+    { ...validRemote, sha256: 'c'.repeat(64) },
+    { ...validRemote, releaseSequence: 12 },
+    { ...validRemote, envelopeHash: 'd'.repeat(64) },
+  ];
+
+  for (const tampered of tamperedManifests) {
+    const result = await evaluateTransition(local, tampered, 'stable');
+    assert.equal(result.status, 17, `tampered manifest should fail: ${JSON.stringify(tampered)}`);
+  }
+});
+
 test('Portable update policy rejects wrong channels, downgrades, and replay', { skip: WINDOWS_ONLY }, async () => {
   const wrongChannel = await evaluateTransition(
     localManifest('1.7.0', 10, 'stable'),
@@ -97,7 +175,11 @@ test('Portable update policy rejects wrong channels, downgrades, and replay', { 
 
   const downgrade = await evaluateTransition(
     localManifest('1.7.0-rc.9', 9, 'release-candidate'),
-    remoteManifest('1.7.0-rc.8', 10, 'release-candidate'),
+    withCanonicalEnvelopeHash({
+      ...remoteManifest('1.7.0-rc.10', 10, 'release-candidate'),
+      releaseTarget: '1.6.9',
+      artifactVersion: '1.6.9-rc.10',
+    }),
     'release-candidate',
   );
   assert.equal(downgrade.status, 17);
@@ -150,11 +232,12 @@ test('the real Portable updater installs a corrected stable sequence and persist
   zip.file('Start KK Studio.bat', '@echo off');
   const archive = await zip.generateAsync({ type: 'nodebuffer' });
   await fs.promises.writeFile(archivePath, archive);
-  const remote = {
+  const remote = withCanonicalEnvelopeHash({
     ...remoteManifest('1.7.0', 11, 'stable'),
     downloadUrl: 'https://updates.example/stable/KK-Studio-Portable-1.7.0-s11.zip',
     sha256: createHash('sha256').update(archive).digest('hex'),
-  };
+    size: archive.byteLength,
+  });
   await fs.promises.writeFile(remotePath, JSON.stringify(remote));
 
   const result = spawnSync('powershell.exe', [

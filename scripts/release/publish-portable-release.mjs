@@ -13,6 +13,7 @@ import {
   assertPortablePublicationTransition,
   createPortablePublicationState,
 } from "../lib/portable-publication.mjs";
+import { loadPortableStablePromotion } from "../lib/portable-stable-promotion.mjs";
 import { assertVersionConsistency } from "../lib/version-gate.mjs";
 
 function readJson(filePath) {
@@ -21,11 +22,12 @@ function readJson(filePath) {
 
 function printUsage() {
   process.stdout.write([
-    "Usage: node scripts/release/publish-portable-release.mjs [--base-url <url>] [--channel <name>] [--allow-server-env]",
+    "Usage: node scripts/release/publish-portable-release.mjs [--base-url <url>] [--channel <name>] --promotion-record <path> [--allow-server-env]",
     "",
     "Options:",
     "  --base-url <url>        Public URL prefix for portable artifacts.",
     "  --channel <name>        Output channel under release/publish/. Default: stable.",
+    "  --promotion-record      Frozen candidate provenance and final artifact record.",
     "  --allow-server-env      Allow publishing a portable bundle that still contains app/server/.env.",
     "",
   ].join("\n"));
@@ -37,6 +39,7 @@ function parseArgs(argv) {
     baseUrl: "",
     channel: "stable",
     help: false,
+    promotionRecordPath: "",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -52,6 +55,10 @@ function parseArgs(argv) {
         break;
       case "--allow-server-env":
         options.allowServerEnv = true;
+        break;
+      case "--promotion-record":
+        options.promotionRecordPath = argv[index + 1] || "";
+        index += 1;
         break;
       case "--help":
       case "-h":
@@ -115,6 +122,9 @@ function assertPortableBundleProvenance(manifest, portableManifest) {
       );
     }
   }
+  if (portableManifest.channel !== manifest.releasePhase) {
+    throw new Error("Portable bundle channel must equal releasePhase. Re-stage the final artifact.");
+  }
 }
 
 function normalizePublishedEnvelope(existingManifest) {
@@ -160,32 +170,16 @@ async function writeBufferAtomic(targetPath, value) {
   await fs.promises.rename(temporaryPath, targetPath);
 }
 
-async function addDirectoryToZip(zip, absoluteDir, relativeDir = "") {
-  const entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
-  entries.sort((left, right) => left.name.localeCompare(right.name));
-
-  for (const entry of entries) {
-    if (!relativeDir && (entry.name === "logs" || entry.name === "run")) {
-      continue;
-    }
-
-    const absoluteEntry = path.join(absoluteDir, entry.name);
-    const relativeEntry = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
-    const zipPath = relativeEntry.replace(/\\/g, "/");
-
-    if (entry.isDirectory()) {
-      await addDirectoryToZip(zip, absoluteEntry, relativeEntry);
-      continue;
-    }
-
-    if (!entry.isFile()) {
-      continue;
-    }
-
-    const stat = await fs.promises.stat(absoluteEntry);
-    const content = await fs.promises.readFile(absoluteEntry);
-    zip.file(zipPath, content, { binary: true, date: stat.mtime });
+async function readPortableAppManifestFromArchive(archiveBuffer, allowServerEnv) {
+  const zip = await JSZip.loadAsync(archiveBuffer);
+  if (zip.file("app/server/.env") && !allowServerEnv) {
+    throw new Error("Frozen Portable artifact contains app/server/.env. Re-stage it without secrets.");
   }
+  const manifestEntry = zip.file("app/dist/app-version.json");
+  if (!manifestEntry) {
+    throw new Error("Frozen Portable artifact is missing app/dist/app-version.json.");
+  }
+  return JSON.parse(await manifestEntry.async("string"));
 }
 
 /** Publishes one validated stable Portable artifact and persists anti-replay state. */
@@ -194,13 +188,6 @@ export async function publishPortableRelease(options = {}) {
   // persisted state, and the public pointer cannot be reordered accidentally.
   const rootDir = options.rootDir || process.cwd();
   const releaseManifestPath = path.join(rootDir, "config", "release-manifest.json");
-  const portableBundleDir = path.join(rootDir, "release", "KK-Studio-Portable");
-  const portableAppManifestPath = path.join(
-    portableBundleDir,
-    "app",
-    "dist",
-    "app-version.json",
-  );
   const channel = options.channel || "stable";
   const assertSourceConsistency = options.assertSourceConsistency
     || (() => assertVersionConsistency({ context: "publish:portable", rootDir, scope: "source" }));
@@ -213,22 +200,23 @@ export async function publishPortableRelease(options = {}) {
   const releaseManifest = parseReleaseManifest(readJson(releaseManifestPath));
   assertPublishChannel(releaseManifest, channel);
   assertSourceConsistency();
-  ensureExists(portableBundleDir, "release/KK-Studio-Portable was not found. Run npm run package:portable first.");
-  ensureExists(portableAppManifestPath, "release/KK-Studio-Portable/app/dist/app-version.json was not found. Run npm run package:portable first.");
-
-  const portableAppManifest = readJson(portableAppManifestPath);
+  const promotion = loadPortableStablePromotion({
+    rootDir,
+    promotionRecordPath: options.promotionRecordPath || process.env.KK_PORTABLE_PROMOTION_RECORD,
+    stableManifest: releaseManifest,
+  });
+  const allowServerEnv = options.allowServerEnv
+    || process.env.KK_STUDIO_ALLOW_PORTABLE_SERVER_ENV === "1";
+  const archiveBuffer = promotion.artifactBuffer;
+  const portableAppManifest = await readPortableAppManifestFromArchive(archiveBuffer, allowServerEnv);
   assertPortableBundleProvenance(releaseManifest, portableAppManifest);
+  if (portableAppManifest.commitSha !== promotion.candidateCommitSha) {
+    throw new Error("Frozen final artifact commitSha does not match the candidate promotion source.");
+  }
   const publishDir = path.join(rootDir, "release", "publish", channel);
   const publishManifestPath = path.join(publishDir, "manifest.json");
   const publicationStatePath = path.join(publishDir, "publication-state.json");
   const existingPublishManifest = fs.existsSync(publishManifestPath) ? readJson(publishManifestPath) : null;
-
-  const serverEnvPath = path.join(portableBundleDir, "app", "server", ".env");
-  if (fs.existsSync(serverEnvPath)
-    && !options.allowServerEnv
-    && process.env.KK_STUDIO_ALLOW_PORTABLE_SERVER_ENV !== "1") {
-    throw new Error("Portable bundle still contains app/server/.env. Remove it or pass --allow-server-env.");
-  }
 
   const baseUrl = normalizeBaseUrl(
     options.baseUrl
@@ -245,14 +233,6 @@ export async function publishPortableRelease(options = {}) {
     `s${releaseManifest.releaseSequence}.zip`,
   ].join("-");
   const archivePath = path.join(publishDir, archiveName);
-
-  const zip = new JSZip();
-  await addDirectoryToZip(zip, portableBundleDir);
-  const archiveBuffer = await zip.generateAsync({
-    compression: "DEFLATE",
-    compressionOptions: { level: 1 },
-    type: "nodebuffer",
-  });
 
   const envelope = {
     schemaVersion: 1,
